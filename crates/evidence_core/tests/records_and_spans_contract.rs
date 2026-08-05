@@ -29,7 +29,7 @@ fn source_artifact_copies_bytes_and_detects_mutation() {
 #[test]
 fn source_artifact_rejects_empty_and_oversized_content() {
     assert_eq!(
-        SourceArtifact::from_bytes([]).unwrap_err(),
+        SourceArtifact::from_bytes(b"").unwrap_err(),
         EvidenceError::EmptySourceArtifact
     );
     assert_eq!(
