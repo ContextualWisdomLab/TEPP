@@ -37,6 +37,9 @@ readme = "README.md"
 keywords = ["psychometrics", "temporal", "events", "topic-modeling", "rust"]
 categories = ["science", "algorithms"]
 
+[workspace.dependencies]
+uuid = { version = "=1.24.0", features = ["v7"] }
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 missing_docs = "deny"
