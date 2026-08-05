@@ -45,6 +45,25 @@ jobs:
           sha256sum /tmp/tepp-bootstrap.tar.xz
           echo "6ba8232a1627724e00be47c8b77a12dfdf33f50b01cac280d05bffa4e7fca401  /tmp/tepp-bootstrap.tar.xz" | sha256sum --check -
           tar -xJf /tmp/tepp-bootstrap.tar.xz -C .
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path.cwd()
+          manifest_path = root / "docs/archive/source-material/manifest.json"
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          for entry in manifest["artifacts"]:
+              path = root / entry["repository_path"]
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              print(
+                  "SOURCE-CHECK",
+                  entry["repository_path"],
+                  "manifest=", entry["sha256"],
+                  "actual=", actual,
+                  "bytes=", path.stat().st_size,
+              )
+          PY
           python3 scripts/build_archives.py
           rm -rf .bootstrap
           rm -f .github/workflows/bootstrap-materialize.yml
