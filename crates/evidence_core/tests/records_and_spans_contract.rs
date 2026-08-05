@@ -8,6 +8,10 @@ use std::str::FromStr;
 const ALPHA_SHA256: &str = "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8";
 const UNICODE_SHA256: &str = "eaf608e9cf297c54599c2731f265dfbaf14d0f4784b4db8b9c72a1b28527bb8b";
 
+fn assert_exact_float(actual: f64, expected: f64) {
+    assert_eq!(actual.to_bits(), expected.to_bits());
+}
+
 #[test]
 fn source_artifact_copies_bytes_and_detects_mutation() {
     let mut original = b"alpha".to_vec();
@@ -187,12 +191,12 @@ fn page_location_validates_finite_in_page_bounds() {
         .expect("bounded location must be valid");
 
     assert_eq!(location.page_number(), 2);
-    assert_eq!(location.page_width(), 100.0);
-    assert_eq!(location.page_height(), 200.0);
-    assert_eq!(location.x(), 10.0);
-    assert_eq!(location.y(), 20.0);
-    assert_eq!(location.width(), 30.0);
-    assert_eq!(location.height(), 40.0);
+    assert_exact_float(location.page_width(), 100.0);
+    assert_exact_float(location.page_height(), 200.0);
+    assert_exact_float(location.x(), 10.0);
+    assert_exact_float(location.y(), 20.0);
+    assert_exact_float(location.width(), 30.0);
+    assert_exact_float(location.height(), 40.0);
 
     assert_eq!(
         PageLocation::new(0, 100.0, 200.0, 0.0, 0.0, 10.0, 10.0).unwrap_err(),
