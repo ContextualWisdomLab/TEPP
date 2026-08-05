@@ -21,7 +21,7 @@ impl SourceArtifact {
     /// Returns [`EvidenceError::EmptySourceArtifact`] for empty input or
     /// [`EvidenceError::SourceArtifactTooLarge`] when the default limit is
     /// exceeded.
-    pub fn from_bytes(content: impl AsRef<[u8]>) -> Result<Self, EvidenceError> {
+    pub fn from_bytes(content: &[u8]) -> Result<Self, EvidenceError> {
         Self::from_bytes_with_limit(content, DEFAULT_SOURCE_ARTIFACT_BYTE_LIMIT)
     }
 
@@ -33,10 +33,9 @@ impl SourceArtifact {
     /// [`EvidenceError::SourceArtifactTooLarge`] when `maximum_bytes` is
     /// exceeded.
     pub fn from_bytes_with_limit(
-        content: impl AsRef<[u8]>,
+        content: &[u8],
         maximum_bytes: usize,
     ) -> Result<Self, EvidenceError> {
-        let content = content.as_ref();
         if content.is_empty() {
             return Err(EvidenceError::EmptySourceArtifact);
         }
@@ -77,7 +76,7 @@ impl SourceArtifact {
 
     /// Return whether `candidate` has the recorded content digest.
     #[must_use]
-    pub fn verify_content(&self, candidate: impl AsRef<[u8]>) -> bool {
+    pub fn verify_content(&self, candidate: &[u8]) -> bool {
         ContentDigest::sha256(candidate) == self.content_digest
     }
 }
