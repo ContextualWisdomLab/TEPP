@@ -35,6 +35,10 @@ REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
     "cargo llvm-cov --workspace --all-features",
     "python3 scripts/check_docstrings.py",
     "python3 scripts/check_coverage.py",
+    "Restore pinned Rust quality tools",
+    "Verify pinned Rust quality tool versions",
+    "Restore pinned cargo-llvm-cov",
+    "Verify pinned cargo-llvm-cov version",
 )
 
 ACTION_PATTERN = re.compile(r"^\s*uses:\s*([^\s#]+)@([^\s#]+)", re.MULTILINE)
@@ -188,6 +192,8 @@ def _validate_ci_contract(root: Path) -> list[str]:
         errors.append("CI workflow must not reference COPILOT_GITHUB_TOKEN")
     if "NVIDIA_NIM_API_KEY" in ci_text:
         errors.append("Task 1 CI must not receive an LLM credential")
+    if "~/.cargo/registry" in ci_text or "~/.cargo/git" in ci_text:
+        errors.append("CI must not cache mutable Cargo registry or Git source trees")
     if not toolchain_path.is_file():
         errors.append("rust-toolchain.toml is missing")
     if not deny_path.is_file():

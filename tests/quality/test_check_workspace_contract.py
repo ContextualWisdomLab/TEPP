@@ -160,7 +160,8 @@ class WorkspaceContractTests(unittest.TestCase):
             "uses: actions/checkout@v4\n"
             "env:\n"
             "  COPILOT_GITHUB_TOKEN: forbidden\n"
-            "  NVIDIA_NIM_API_KEY: forbidden\n",
+            "  NVIDIA_NIM_API_KEY: forbidden\n"
+            "  CACHE_PATH: ~/.cargo/registry\n",
             encoding="utf-8",
         )
         (repository / "rust-toolchain.toml").unlink()
@@ -173,6 +174,7 @@ class WorkspaceContractTests(unittest.TestCase):
         self.assertTrue(
             any("must not receive an LLM credential" in error for error in errors)
         )
+        self.assertTrue(any("must not cache mutable Cargo" in error for error in errors))
         self.assertIn("rust-toolchain.toml is missing", errors)
         self.assertIn("deny.toml is missing", errors)
         self.assertTrue(any("full commit SHA" in error for error in errors))
