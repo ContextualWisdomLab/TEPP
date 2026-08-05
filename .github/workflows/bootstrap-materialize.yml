@@ -39,7 +39,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          wc -c .bootstrap/v3-*.txt
+          sha256sum .bootstrap/v3-*.txt
           cat .bootstrap/v3-*.txt | base64 --decode > /tmp/tepp-bootstrap.tar.xz
+          sha256sum /tmp/tepp-bootstrap.tar.xz
           echo "6ba8232a1627724e00be47c8b77a12dfdf33f50b01cac280d05bffa4e7fca401  /tmp/tepp-bootstrap.tar.xz" | sha256sum --check -
           tar -xJf /tmp/tepp-bootstrap.tar.xz -C .
           python3 scripts/build_archives.py
