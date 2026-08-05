@@ -31,8 +31,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .bootstrap/v2-*.txt | base64 --decode > /tmp/tepp-bootstrap.tar.xz
-          echo "643a772ea7547d4e30ca22db70bd8bfb3674f798a606a33943e5a8d3d087734e  /tmp/tepp-bootstrap.tar.xz" | sha256sum --check -
+          cat .bootstrap/v3-*.txt | base64 --decode > /tmp/tepp-bootstrap.tar.xz
+          echo "6ba8232a1627724e00be47c8b77a12dfdf33f50b01cac280d05bffa4e7fca401  /tmp/tepp-bootstrap.tar.xz" | sha256sum --check -
           tar -xJf /tmp/tepp-bootstrap.tar.xz -C .
           python3 scripts/build_archives.py
           rm -rf .bootstrap
