@@ -1,0 +1,23 @@
+name: Hourly PR Maintenance
+
+on:
+  schedule:
+    - cron: "11 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  checks: read
+  actions: write
+
+concurrency:
+  group: tepp-hourly-pr-maintenance
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    name: Review, repair, revalidate, and merge
+    uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@3f65dbee6672b78802e7d71d49c390f3817bb03b
+    secrets: inherit
