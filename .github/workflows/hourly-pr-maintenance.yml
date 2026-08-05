@@ -6,11 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  checks: read
-  actions: write
+  contents: read
 
 concurrency:
   group: tepp-hourly-pr-maintenance
@@ -19,5 +15,10 @@ concurrency:
 jobs:
   maintain:
     name: Review, repair, revalidate, and merge
+    permissions:
+      actions: write
+      checks: read
+      contents: write
+      id-token: write
+      pull-requests: write
     uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@3f65dbee6672b78802e7d71d49c390f3817bb03b
-    secrets: inherit
