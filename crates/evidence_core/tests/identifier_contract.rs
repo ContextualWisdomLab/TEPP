@@ -1,4 +1,4 @@
-//! Public contracts for immutable RFC 9562 UUIDv7 evidence identifiers.
+//! Public contracts for immutable RFC 9562 `UUIDv7` evidence identifiers.
 
 use evidence_core::{EvidenceError, EvidenceId};
 use std::error::Error;
