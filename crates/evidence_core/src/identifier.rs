@@ -8,7 +8,7 @@ use uuid::{Uuid, Version};
 /// A validated RFC 9562 UUID version 7 used to identify evidence-domain objects.
 ///
 /// The wrapper prevents UUIDs from other versions from crossing the evidence
-/// boundary accidentally. UUIDv7 embeds a millisecond Unix timestamp for useful
+/// boundary accidentally. `UUIDv7` embeds a millisecond Unix timestamp for useful
 /// database locality while retaining randomized uniqueness bits.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct EvidenceId(Uuid);
@@ -24,7 +24,7 @@ impl EvidenceId {
     ///
     /// # Errors
     ///
-    /// Returns [`EvidenceError::InvalidEvidenceId`] when `value` is not UUIDv7.
+    /// Returns [`EvidenceError::InvalidEvidenceId`] when `value` is not `UUIDv7`.
     pub fn from_uuid(value: Uuid) -> Result<Self, EvidenceError> {
         if value.get_version() == Some(Version::SortRand) {
             Ok(Self(value))

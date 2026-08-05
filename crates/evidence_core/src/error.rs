@@ -6,7 +6,7 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum EvidenceError {
-    /// The supplied identifier was malformed or was not an RFC 9562 UUIDv7.
+    /// The supplied identifier was malformed or was not an RFC 9562 `UUIDv7`.
     InvalidEvidenceId,
 }
 
