@@ -1,13 +1,16 @@
 //! Public contracts for immutable RFC 9562 UUIDv7 evidence identifiers.
 
 use evidence_core::{EvidenceError, EvidenceId};
+use std::error::Error;
 use std::str::FromStr;
 
 #[test]
-fn generated_evidence_identifier_uses_uuid_v7() {
-    let identifier = EvidenceId::new();
+fn generated_and_default_identifiers_use_uuid_v7() {
+    let generated = EvidenceId::new();
+    let defaulted = EvidenceId::default();
 
-    assert_eq!(identifier.as_uuid().get_version_num(), 7);
+    assert_eq!(generated.as_uuid().get_version_num(), 7);
+    assert_eq!(defaulted.as_uuid().get_version_num(), 7);
 }
 
 #[test]
@@ -32,4 +35,13 @@ fn non_v7_and_malformed_identifiers_fail_closed() {
         EvidenceId::from_str("not-a-uuid"),
         Err(EvidenceError::InvalidEvidenceId)
     );
+}
+
+#[test]
+fn validation_error_is_stable_and_has_no_hidden_source() {
+    let error = EvidenceError::InvalidEvidenceId;
+    let standard_error: &dyn Error = &error;
+
+    assert_eq!(error.to_string(), "invalid evidence identifier");
+    assert!(standard_error.source().is_none());
 }
