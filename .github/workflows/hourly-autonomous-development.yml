@@ -1,0 +1,101 @@
+name: Hourly OpenCode Product Development
+
+on:
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+  checks: read
+
+concurrency:
+  group: tepp-hourly-opencode-development
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    name: Fail-closed repository inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      may_develop: ${{ steps.inventory.outputs.may_develop }}
+    steps:
+      - name: Inspect open pull requests and active development runs
+        id: inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          open_pr_count="$(gh api --paginate "/repos/${REPOSITORY}/pulls?state=open&per_page=100" --jq 'length' | awk '{sum += $1} END {print sum + 0}')"
+          active_run_count="$(gh api --paginate "/repos/${REPOSITORY}/actions/workflows/hourly-autonomous-development.yml/runs?status=in_progress&per_page=100" --jq "[.workflow_runs[] | select((.id | tostring) != \"${CURRENT_RUN_ID}\")] | length" | awk '{sum += $1} END {print sum + 0}')"
+          queued_run_count="$(gh api --paginate "/repos/${REPOSITORY}/actions/workflows/hourly-autonomous-development.yml/runs?status=queued&per_page=100" --jq "[.workflow_runs[] | select((.id | tostring) != \"${CURRENT_RUN_ID}\")] | length" | awk '{sum += $1} END {print sum + 0}')"
+          if [[ "${open_pr_count}" == "0" && "${active_run_count}" == "0" && "${queued_run_count}" == "0" ]]; then
+            echo "may_develop=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "may_develop=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+  develop:
+    name: Implement one bounded buyer-visible product gap
+    needs: inventory
+    if: needs.inventory.outputs.may_develop == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout exact default branch
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Run OpenCode with NVIDIA NIM
+        uses: anomalyco/opencode/github@b8ea3ea091ea2b62b589d43af8b10e811195e39f
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          model: nvidia/nemotron-3-super-120b-a12b
+          prompt: |
+            You are the bounded hourly product-development agent for ContextualWisdomLab/TEPP.
+
+            Read AGENTS.md, CLAUDE.md, ARCHITECTURE.md, GOVERNANCE.md, SECURITY.md,
+            CONTRIBUTING.md, the approved PRD, current roadmap, ADRs, research references,
+            CHANGELOG.md, issues, and recent merged pull requests before acting.
+
+            Select exactly one buyer-visible gap that can be completed and independently
+            reviewed in one pull request. Prefer the next unblocked task in the approved
+            Temporal/Event Foundation implementation plan. Do not duplicate active work.
+
+            Requirements:
+            - use test-driven development and preserve modular MSA boundaries;
+            - implement production psychometric arithmetic in Rust;
+            - keep a CPU f64 reference and require multithreaded CPU/GPU parity when the
+              slice includes numerical computation;
+            - model temporal, multilevel, cross-classified, and multiple-membership
+              structure where relevant; never introduce atomistic-fallacy assumptions;
+            - preserve exact source evidence and enforce availability_time <= knowledge_cutoff;
+            - add realistic true-parameter recovery, RMSE, bias, interval-coverage,
+              temporal-ordering, leakage, and failure-path tests as relevant;
+            - maintain 100% production line/branch coverage and complete public docstrings;
+            - use current authoritative standards and primary research with APA 7th
+              citations in docs/research; label novel methods as novel;
+            - use NVIDIA_NIM_API_KEY for any approved live LLM test and never add,
+              read, rename, or reference COPILOT_GITHUB_TOKEN;
+            - when LLM orchestration is relevant, compare direct single-model routing
+              with deeper role-based orchestration, vary reasoning effort, workflow depth,
+              decomposition, recursion, and access lists, and record the ablation;
+            - use two-or-more-word snake_case database object names;
+            - update ADRs, ARCHITECTURE.md, CHANGELOG.md, manifests, and rollback notes;
+            - run focused and complete verification before publishing.
+
+            Create one branch, one intentional commit series, and one draft pull request.
+            Never merge, publish a release, weaken branch protection, reuse review-agent
+            credentials, or claim queued checks passed. If no safe bounded slice exists,
+            create or refine one actionable issue instead of changing code.
