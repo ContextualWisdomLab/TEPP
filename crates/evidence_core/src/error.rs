@@ -46,9 +46,7 @@ impl fmt::Display for EvidenceError {
             Self::InvalidEvidenceId => "invalid evidence identifier",
             Self::InvalidContentDigest => "invalid content digest",
             Self::EmptySourceArtifact => "source artifact is empty",
-            Self::SourceArtifactTooLarge => {
-                "source artifact exceeds the configured byte limit"
-            }
+            Self::SourceArtifactTooLarge => "source artifact exceeds the configured byte limit",
             Self::EmptyDocument => "document text is empty",
             Self::DocumentTooLarge => "document text exceeds the configured byte limit",
             Self::EmptySourceSpan => "source span is empty",

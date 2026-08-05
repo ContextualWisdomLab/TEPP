@@ -5,10 +5,8 @@ use evidence_core::{
 };
 use std::str::FromStr;
 
-const ALPHA_SHA256: &str =
-    "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8";
-const UNICODE_SHA256: &str =
-    "eaf608e9cf297c54599c2731f265dfbaf14d0f4784b4db8b9c72a1b28527bb8b";
+const ALPHA_SHA256: &str = "8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8";
+const UNICODE_SHA256: &str = "eaf608e9cf297c54599c2731f265dfbaf14d0f4784b4db8b9c72a1b28527bb8b";
 
 #[test]
 fn source_artifact_copies_bytes_and_detects_mutation() {
@@ -67,10 +65,8 @@ fn content_digest_parsing_is_exact_and_canonical() {
         EvidenceError::InvalidContentDigest
     );
     assert_eq!(
-        ContentDigest::from_str(
-            "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
-        )
-        .unwrap_err(),
+        ContentDigest::from_str("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz")
+            .unwrap_err(),
         EvidenceError::InvalidContentDigest
     );
 }
@@ -267,8 +263,7 @@ fn source_span_carries_validated_page_location() {
         DocumentRecord::from_text(artifact.id(), "Aé🧠Z").expect("document must be valid");
     let location = PageLocation::new(1, 100.0, 200.0, 10.0, 20.0, 30.0, 40.0)
         .expect("bounded location must be valid");
-    let span = SourceSpan::new(&document, 1, 7, 1, 3, Some(location))
-        .expect("span must be exact");
+    let span = SourceSpan::new(&document, 1, 7, 1, 3, Some(location)).expect("span must be exact");
 
     assert_eq!(span.page_location(), Some(location));
 }
@@ -276,8 +271,14 @@ fn source_span_carries_validated_page_location() {
 #[test]
 fn every_record_validation_error_has_a_stable_message() {
     let cases = [
-        (EvidenceError::InvalidContentDigest, "invalid content digest"),
-        (EvidenceError::EmptySourceArtifact, "source artifact is empty"),
+        (
+            EvidenceError::InvalidContentDigest,
+            "invalid content digest",
+        ),
+        (
+            EvidenceError::EmptySourceArtifact,
+            "source artifact is empty",
+        ),
         (
             EvidenceError::SourceArtifactTooLarge,
             "source artifact exceeds the configured byte limit",
@@ -308,7 +309,10 @@ fn every_record_validation_error_has_a_stable_message() {
             EvidenceError::SpanDocumentMismatch,
             "source span belongs to a different document",
         ),
-        (EvidenceError::InvalidPageNumber, "page number must be positive"),
+        (
+            EvidenceError::InvalidPageNumber,
+            "page number must be positive",
+        ),
         (
             EvidenceError::InvalidPageGeometry,
             "page geometry must be finite and positive",
