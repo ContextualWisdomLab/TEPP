@@ -35,10 +35,17 @@ REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
     "cargo llvm-cov --workspace --all-features",
     "python3 scripts/check_docstrings.py",
     "python3 scripts/check_coverage.py",
+    "Restore pinned Rust quality tools",
+    "Verify pinned Rust quality tool versions",
+    "Restore pinned cargo-llvm-cov",
+    "Verify pinned cargo-llvm-cov version",
 )
 
 ACTION_PATTERN = re.compile(r"^\s*uses:\s*([^\s#]+)@([^\s#]+)", re.MULTILINE)
 FULL_SHA_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")
+PLACEHOLDER_PATTERN = re.compile(
+    r"(?:\bpub\b[^\n]*(?:Placeholder|placeholder)|\b(?:todo|unimplemented)!\s*\()"
+)
 
 
 def load_toml(path: Path) -> Mapping[str, Any]:
@@ -152,28 +159,18 @@ def _validate_crate(root: Path, crate_name: str) -> list[str]:
             errors.append(f"{crate_name}: unsafe_code is not explicitly forbidden")
         if "#![deny(missing_docs)]" not in library_text:
             errors.append(f"{crate_name}: missing_docs is not explicitly denied")
-        if _contains_public_item(library_text):
-            errors.append(
-                f"{crate_name}: workspace foundation must not expose placeholder APIs"
-            )
+        if _contains_placeholder_api(library_text):
+            errors.append(f"{crate_name}: placeholder production APIs are prohibited")
 
     if not test_path.is_file():
         errors.append(f"{crate_name}: package identity contract test is missing")
     return errors
 
 
-def _contains_public_item(source: str) -> bool:
-    """Return whether *source* declares a public Rust item."""
+def _contains_placeholder_api(source: str) -> bool:
+    """Return whether *source* exposes or executes placeholder behavior."""
 
-    return bool(
-        re.search(
-            r"^\s*pub(?:\([^)]*\))?\s+"
-            r"(?:async\s+|const\s+|unsafe\s+|extern\s+)*"
-            r"(?:fn|struct|enum|trait|mod|type|const|static|use)\b",
-            source,
-            re.MULTILINE,
-        )
-    )
+    return bool(PLACEHOLDER_PATTERN.search(source))
 
 
 def _validate_ci_contract(root: Path) -> list[str]:
@@ -195,6 +192,8 @@ def _validate_ci_contract(root: Path) -> list[str]:
         errors.append("CI workflow must not reference COPILOT_GITHUB_TOKEN")
     if "NVIDIA_NIM_API_KEY" in ci_text:
         errors.append("Task 1 CI must not receive an LLM credential")
+    if "~/.cargo/registry" in ci_text or "~/.cargo/git" in ci_text:
+        errors.append("CI must not cache mutable Cargo registry or Git source trees")
     if not toolchain_path.is_file():
         errors.append("rust-toolchain.toml is missing")
     if not deny_path.is_file():

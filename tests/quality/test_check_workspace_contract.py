@@ -35,15 +35,26 @@ class WorkspaceContractTests(unittest.TestCase):
         return temporary, destination
 
     def test_live_repository_satisfies_contract(self) -> None:
-        """The committed Task 1 workspace satisfies every repository contract."""
+        """The committed workspace satisfies every repository contract."""
 
         self.assertEqual(contract.validate_workspace(REPOSITORY_ROOT), [])
         self.assertEqual(
             contract.expected_member_paths(),
             [f"crates/{name}" for name in contract.EXPECTED_CRATES],
         )
-        self.assertFalse(contract._contains_public_item("//! documented\n"))
-        self.assertTrue(contract._contains_public_item("pub struct Placeholder;\n"))
+        self.assertFalse(contract._contains_placeholder_api("//! documented\n"))
+        self.assertFalse(
+            contract._contains_placeholder_api("/// Real API.\npub struct EvidenceId;\n")
+        )
+        self.assertTrue(
+            contract._contains_placeholder_api("pub struct Placeholder;\n")
+        )
+        self.assertTrue(
+            contract._contains_placeholder_api("pub fn run() { todo!() }\n")
+        )
+        self.assertTrue(
+            contract._contains_placeholder_api("fn private() { unimplemented!() }\n")
+        )
         self.assertEqual(contract._mapping({"key": "value"}), {"key": "value"})
         self.assertEqual(contract._mapping("not-a-table"), {})
 
@@ -122,7 +133,7 @@ class WorkspaceContractTests(unittest.TestCase):
             "crate-level rustdoc",
             "unsafe_code is not explicitly forbidden",
             "missing_docs is not explicitly denied",
-            "must not expose placeholder APIs",
+            "placeholder production APIs",
             "package identity contract test",
             "temporal_core/Cargo.toml is missing",
         )
@@ -149,7 +160,8 @@ class WorkspaceContractTests(unittest.TestCase):
             "uses: actions/checkout@v4\n"
             "env:\n"
             "  COPILOT_GITHUB_TOKEN: forbidden\n"
-            "  NVIDIA_NIM_API_KEY: forbidden\n",
+            "  NVIDIA_NIM_API_KEY: forbidden\n"
+            "  CACHE_PATH: ~/.cargo/registry\n",
             encoding="utf-8",
         )
         (repository / "rust-toolchain.toml").unlink()
@@ -162,6 +174,7 @@ class WorkspaceContractTests(unittest.TestCase):
         self.assertTrue(
             any("must not receive an LLM credential" in error for error in errors)
         )
+        self.assertTrue(any("must not cache mutable Cargo" in error for error in errors))
         self.assertIn("rust-toolchain.toml is missing", errors)
         self.assertIn("deny.toml is missing", errors)
         self.assertTrue(any("full commit SHA" in error for error in errors))

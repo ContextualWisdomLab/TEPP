@@ -76,10 +76,24 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+      - name: Restore pinned Rust quality tools
+        id: rust-tools-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest
+            ~/.cargo/bin/cargo-deny
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-rust-tools-nextest-${{ env.CARGO_NEXTEST_VERSION }}-deny-${{ env.CARGO_DENY_VERSION }}
       - name: Install cargo-nextest
+        if: steps.rust-tools-cache.outputs.cache-hit != 'true'
         run: cargo install cargo-nextest --locked --version "$CARGO_NEXTEST_VERSION"
       - name: Install cargo-deny
+        if: steps.rust-tools-cache.outputs.cache-hit != 'true'
         run: cargo install cargo-deny --locked --version "$CARGO_DENY_VERSION"
+      - name: Verify pinned Rust quality tool versions
+        run: |
+          cargo nextest --version | grep -F "$CARGO_NEXTEST_VERSION"
+          cargo deny --version | grep -F "$CARGO_DENY_VERSION"
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Compile all targets
@@ -106,8 +120,17 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust toolchain with LLVM tools
         run: rustup toolchain install 1.97.1 --profile minimal --component llvm-tools-preview
+      - name: Restore pinned cargo-llvm-cov
+        id: llvm-cov-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-cargo-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}
       - name: Install cargo-llvm-cov
+        if: steps.llvm-cov-cache.outputs.cache-hit != 'true'
         run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
+      - name: Verify pinned cargo-llvm-cov version
+        run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
       - name: Generate exact line coverage
         run: cargo llvm-cov --workspace --all-features --json --summary-only --output-path coverage.json
       - name: Enforce complete line coverage
@@ -124,8 +147,17 @@ jobs:
           persist-credentials: false
       - name: Install pinned nightly with LLVM tools
         run: rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
+      - name: Restore pinned cargo-llvm-cov
+        id: llvm-cov-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-cargo-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}
       - name: Install cargo-llvm-cov
+        if: steps.llvm-cov-cache.outputs.cache-hit != 'true'
         run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
+      - name: Verify pinned cargo-llvm-cov version
+        run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
       - name: Generate exact branch coverage
         run: cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json
       - name: Enforce complete branch coverage

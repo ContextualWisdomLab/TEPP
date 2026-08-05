@@ -19,6 +19,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Repository contract, public-rustdoc, line-coverage, and nightly branch-coverage gates.
 - Pinned `cargo-nextest` 0.9.140, `cargo-llvm-cov` 0.8.6, `cargo-deny` 0.19.7, and Coverage.py 7.15.2 quality tooling.
 - Task 1 architecture decision and workspace-foundation validation report.
+- Version-keyed, executable-only GitHub Actions caches for pinned Rust quality tools.
 
 ### Security
 
@@ -27,6 +28,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Removed completed bootstrap materializers, encoded payload fragments, readiness sentinels, and push probes from the reviewable tree.
 - Required full-commit GitHub Action pins, minimum permissions, concurrency controls, immutable audit evidence, SBOM, and provenance.
 - Kept ordinary Rust CI free of LLM and reviewer credentials and disabled persisted checkout credentials.
+- Refused to cache mutable Cargo registry, Git source, or target trees; cached quality binaries are keyed and checked by exact version.
 
 ### Quality
 

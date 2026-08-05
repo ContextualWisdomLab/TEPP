@@ -44,7 +44,11 @@ claiming that the temporal, event, database, GPU, or psychometric layers exist.
 10. Test repository-quality Python scripts at 100% statement and branch
     coverage with pinned Coverage.py 7.15.2.
 11. Require all GitHub Actions and reusable workflows to use a full commit SHA.
-12. Do not expose `NVIDIA_NIM_API_KEY`, reviewer credentials, publication
+12. Cache only pinned Cargo quality-tool executables. Cache keys include the OS,
+    architecture, and exact tool versions; cached binaries are version-checked
+    before use. Mutable Cargo registry, Git source, and build-output trees are
+    deliberately excluded from the cache boundary.
+13. Do not expose `NVIDIA_NIM_API_KEY`, reviewer credentials, publication
     credentials, or any LLM secret to ordinary Rust CI.
 
 ## Consequences
@@ -54,8 +58,9 @@ claiming that the temporal, event, database, GPU, or psychometric layers exist.
 - A new crate cannot enter the workspace accidentally.
 - Branch coverage is reproducible but depends on a separate nightly lane; stable
   compiler behavior remains the numerical and build reference.
-- Tool installation costs CI time. Future optimization may use verified,
-  attested prebuilt tools, but may not replace version and provenance pinning.
+- Cold CI still compiles pinned quality tools once, while later commits in the
+  same protected PR lineage restore only verified binaries. Dependency source
+  trees and build outputs remain fresh and reviewable.
 - The foundation PR cannot claim scientific correctness, database readiness,
   GPU parity, or release readiness. Those require their later plan tasks and
   exact-head evidence.
@@ -68,11 +73,16 @@ claiming that the temporal, event, database, GPU, or psychometric layers exist.
   missing line/branch totals.
 - CI runs formatting, compile, Clippy, nextest, doctest, rustdoc,
   cargo-deny, stable line coverage, and nightly branch coverage.
+- The CI contract rejects unpinned Actions, forbidden credentials, and mutable
+  Cargo registry/Git cache paths.
 
 ## References
 
 The Cargo Team. (n.d.). *Workspaces*. In *The Cargo Book*. Retrieved August 5,
 2026, from https://doc.rust-lang.org/cargo/reference/workspaces.html
+
+GitHub. (2026). *Cache* (Version 5.0.5) [GitHub Action].
+https://github.com/actions/cache
 
 The Rust Release Team. (2026, July 16). *Announcing Rust 1.97.1*. Rust Blog.
 https://blog.rust-lang.org/2026/07/16/Rust-1.97.1/
