@@ -38,6 +38,7 @@ keywords = ["psychometrics", "temporal", "events", "topic-modeling", "rust"]
 categories = ["science", "algorithms"]
 
 [workspace.dependencies]
+sha2 = { version = "=0.10.9", default-features = false }
 uuid = { version = "=1.24.0", features = ["v7"] }
 
 [workspace.lints.rust]

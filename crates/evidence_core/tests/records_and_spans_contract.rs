@@ -45,10 +45,15 @@ fn source_artifact_rejects_empty_and_oversized_content() {
 fn content_digest_parsing_is_exact_and_canonical() {
     let uppercase = ALPHA_SHA256.to_uppercase();
     let digest = ContentDigest::from_str(&uppercase).expect("uppercase hexadecimal is valid");
+    let non_ascii = "é".repeat(32);
 
     assert_eq!(digest.to_string(), ALPHA_SHA256);
     assert_eq!(
         ContentDigest::from_str("00").unwrap_err(),
+        EvidenceError::InvalidContentDigest
+    );
+    assert_eq!(
+        ContentDigest::from_str(&non_ascii).unwrap_err(),
         EvidenceError::InvalidContentDigest
     );
     assert_eq!(
@@ -108,18 +113,25 @@ fn source_span_preserves_exact_byte_and_scalar_coordinates() {
 }
 
 #[test]
-fn source_span_rejects_invalid_ranges_and_document_mismatch() {
+fn source_span_rejects_empty_reversed_and_out_of_bounds_ranges() {
     let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
     let document =
         DocumentRecord::from_text(artifact.id(), "Aé🧠Z").expect("document must be valid");
-    let other = DocumentRecord::from_text(artifact.id(), "other").expect("document must be valid");
 
     assert_eq!(
-        SourceSpan::new(&document, 1, 1, 1, 1, None).unwrap_err(),
+        SourceSpan::new(&document, 1, 1, 1, 2, None).unwrap_err(),
         EvidenceError::EmptySourceSpan
     );
     assert_eq!(
-        SourceSpan::new(&document, 7, 1, 3, 1, None).unwrap_err(),
+        SourceSpan::new(&document, 1, 3, 1, 1, None).unwrap_err(),
+        EvidenceError::EmptySourceSpan
+    );
+    assert_eq!(
+        SourceSpan::new(&document, 7, 1, 1, 3, None).unwrap_err(),
+        EvidenceError::InvalidSourceSpanOrder
+    );
+    assert_eq!(
+        SourceSpan::new(&document, 1, 7, 3, 1, None).unwrap_err(),
         EvidenceError::InvalidSourceSpanOrder
     );
     assert_eq!(
@@ -127,11 +139,32 @@ fn source_span_rejects_invalid_ranges_and_document_mismatch() {
         EvidenceError::ByteRangeOutOfBounds
     );
     assert_eq!(
+        SourceSpan::new(&document, 1, 7, 1, 5, None).unwrap_err(),
+        EvidenceError::ByteRangeOutOfBounds
+    );
+}
+
+#[test]
+fn source_span_rejects_invalid_boundaries_coordinates_and_documents() {
+    let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
+    let document =
+        DocumentRecord::from_text(artifact.id(), "Aé🧠Z").expect("document must be valid");
+    let other = DocumentRecord::from_text(artifact.id(), "other").expect("document must be valid");
+
+    assert_eq!(
         SourceSpan::new(&document, 2, 7, 1, 3, None).unwrap_err(),
         EvidenceError::InvalidUtf8Boundary
     );
     assert_eq!(
+        SourceSpan::new(&document, 1, 2, 1, 2, None).unwrap_err(),
+        EvidenceError::InvalidUtf8Boundary
+    );
+    assert_eq!(
         SourceSpan::new(&document, 1, 7, 0, 3, None).unwrap_err(),
+        EvidenceError::CharacterRangeMismatch
+    );
+    assert_eq!(
+        SourceSpan::new(&document, 1, 7, 1, 2, None).unwrap_err(),
         EvidenceError::CharacterRangeMismatch
     );
 
@@ -164,11 +197,23 @@ fn page_location_validates_finite_in_page_bounds() {
         EvidenceError::InvalidPageGeometry
     );
     assert_eq!(
+        PageLocation::new(1, 0.0, 200.0, 0.0, 0.0, 10.0, 10.0).unwrap_err(),
+        EvidenceError::InvalidPageGeometry
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 200.0, f64::NAN, 0.0, 10.0, 10.0).unwrap_err(),
+        EvidenceError::InvalidLayoutBounds
+    );
+    assert_eq!(
         PageLocation::new(1, 100.0, 200.0, -1.0, 0.0, 10.0, 10.0).unwrap_err(),
         EvidenceError::InvalidLayoutBounds
     );
     assert_eq!(
         PageLocation::new(1, 100.0, 200.0, 90.0, 0.0, 11.0, 10.0).unwrap_err(),
+        EvidenceError::LayoutOutOfBounds
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 200.0, 0.0, 190.0, 10.0, 11.0).unwrap_err(),
         EvidenceError::LayoutOutOfBounds
     );
 }
