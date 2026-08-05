@@ -66,6 +66,25 @@ No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests
 exist.
 
+## Immutable evidence boundary
+
+Task 2 begins the executable `evidence_core` boundary. Stable RFC 9562 `UUIDv7`
+identities are independent from canonical `SHA-256` content digests. Source
+bytes and UTF-8 document text are copied into immutable owned storage, bounded
+before allocation, and verified without exposing mutable fields.
+
+A source span records an owning document, a half-open UTF-8 byte range, the
+matching half-open Unicode-scalar range, and optional page/layout geometry. It
+fails closed for empty or reversed ranges, byte or scalar overflow,
+mid-code-point boundaries, coordinate disagreement, cross-document use,
+nonfinite geometry, nonpositive dimensions, and rectangles outside the page.
+Scalar coordinates are evidence locations rather than grapheme, word, or
+sentence boundaries; language-tailored segmentation remains a later module.
+
+Domain fields remain private. Versioned persistence and API DTOs will be added
+explicitly so PostgreSQL, JSON, JSON-LD, and GraphML contracts depend inward on
+validated domain values rather than defining them.
+
 ## Quality architecture
 
 The workspace centralizes package metadata and Rust/Clippy lints. Every member
@@ -78,7 +97,9 @@ Stable Rust 1.97.1 is the compile, lint, test, and line-coverage reference.
 Branch coverage runs in a pinned nightly lane because LLVM branch coverage
 remains unstable in Rust. `cargo-nextest` runs tests without retries, while
 doctests remain a separate `cargo test --doc` gate. `cargo-deny` enforces
-advisory, license, ban, and source policy.
+advisory, license, ban, and source policy. Failed Rust coverage gates print the
+exact missing source locations from the same instrumented run without weakening
+the 100% contract.
 
 ## Temporal invariants
 

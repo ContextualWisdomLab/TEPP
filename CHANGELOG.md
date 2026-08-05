@@ -19,6 +19,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Repository contract, public-rustdoc, line-coverage, and nightly branch-coverage gates.
 - Pinned `cargo-nextest` 0.9.140, `cargo-llvm-cov` 0.8.6, `cargo-deny` 0.19.7, and Coverage.py 7.15.2 quality tooling.
 - Task 1 architecture decision and workspace-foundation validation report.
+- Immutable `evidence_core` records with independent RFC 9562 `UUIDv7` identities, canonical `SHA-256` content digests, owned source bytes and UTF-8 text, exact byte/Unicode-scalar spans, and bounded page-layout coordinates.
+- ADR 0008 and APA 7 doctoring for evidence identity, hashing, UTF-8 boundaries, Unicode segmentation limits, and future W3C PROV integration.
+- Same-run exact missing-line and missing-branch diagnostics for failed 100% Rust coverage gates.
 
 ### Security
 
@@ -27,6 +30,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Removed completed bootstrap materializers, encoded payload fragments, readiness sentinels, and push probes from the reviewable tree.
 - Required full-commit GitHub Action pins, minimum permissions, concurrency controls, immutable audit evidence, SBOM, and provenance.
 - Kept ordinary Rust CI free of LLM and reviewer credentials and disabled persisted checkout credentials.
+- Copied caller-provided source bytes and document text before acceptance and kept validated evidence fields private.
+- Made empty, oversized, malformed-digest, invalid UTF-8-boundary, coordinate-mismatch, cross-document, nonfinite-geometry, and out-of-page evidence fail closed with content-redacting errors.
 
 ### Quality
 
@@ -35,5 +40,6 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Added 100% statement and branch coverage for the repository quality-gate scripts.
 - Made a zero executable-code coverage denominator explicit for the skeleton-only slice rather than treating it as evidence of implemented behavior.
 - Denied warnings, missing public documentation, and unsafe Rust across the workspace.
+- Added known digest vectors, mutation detection, hostile multibyte Unicode, exact-coordinate, page-boundary, stable-error, and invalid-input regression tests for the first evidence slice.
 
 [Unreleased]: https://github.com/ContextualWisdomLab/TEPP/compare/HEAD...HEAD

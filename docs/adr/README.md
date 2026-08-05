@@ -11,5 +11,6 @@ TEPP uses numbered ADRs for decisions that constrain latent-variable meaning, te
 | 0005 | Posterior-aware ESEM/DSEM and valid compositional coordinates |
 | 0006 | VRAM-adaptive GPU compute and NVIDIA NIM/OpenCode orchestration boundary |
 | 0007 | Explicit Rust workspace, pinned toolchains, and exact quality gates |
+| 0008 | Immutable evidence identities, `SHA-256` digests, and exact UTF-8/page spans |
 
 ADR status changes require a pull request, source traceability, tests for affected invariants, and corresponding PRD/architecture updates where the approved measurement target changes.
