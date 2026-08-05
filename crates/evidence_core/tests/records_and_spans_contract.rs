@@ -46,6 +46,8 @@ fn content_digest_parsing_is_exact_and_canonical() {
     let uppercase = ALPHA_SHA256.to_uppercase();
     let digest = ContentDigest::from_str(&uppercase).expect("uppercase hexadecimal is valid");
     let non_ascii = "é".repeat(32);
+    let invalid_second_nibble = format!("0z{}", "00".repeat(31));
+    let invalid_last_pair = format!("{}zz", "00".repeat(31));
 
     assert_eq!(digest.to_string(), ALPHA_SHA256);
     assert_eq!(
@@ -54,6 +56,14 @@ fn content_digest_parsing_is_exact_and_canonical() {
     );
     assert_eq!(
         ContentDigest::from_str(&non_ascii).unwrap_err(),
+        EvidenceError::InvalidContentDigest
+    );
+    assert_eq!(
+        ContentDigest::from_str(&invalid_second_nibble).unwrap_err(),
+        EvidenceError::InvalidContentDigest
+    );
+    assert_eq!(
+        ContentDigest::from_str(&invalid_last_pair).unwrap_err(),
         EvidenceError::InvalidContentDigest
     );
     assert_eq!(
@@ -201,11 +211,43 @@ fn page_location_validates_finite_in_page_bounds() {
         EvidenceError::InvalidPageGeometry
     );
     assert_eq!(
+        PageLocation::new(1, 100.0, f64::NAN, 0.0, 0.0, 10.0, 10.0).unwrap_err(),
+        EvidenceError::InvalidPageGeometry
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 0.0, 0.0, 0.0, 10.0, 10.0).unwrap_err(),
+        EvidenceError::InvalidPageGeometry
+    );
+    assert_eq!(
         PageLocation::new(1, 100.0, 200.0, f64::NAN, 0.0, 10.0, 10.0).unwrap_err(),
         EvidenceError::InvalidLayoutBounds
     );
     assert_eq!(
         PageLocation::new(1, 100.0, 200.0, -1.0, 0.0, 10.0, 10.0).unwrap_err(),
+        EvidenceError::InvalidLayoutBounds
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 200.0, 0.0, f64::NAN, 10.0, 10.0).unwrap_err(),
+        EvidenceError::InvalidLayoutBounds
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 200.0, 0.0, -1.0, 10.0, 10.0).unwrap_err(),
+        EvidenceError::InvalidLayoutBounds
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 200.0, 0.0, 0.0, f64::NAN, 10.0).unwrap_err(),
+        EvidenceError::InvalidLayoutBounds
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 200.0, 0.0, 0.0, 0.0, 10.0).unwrap_err(),
+        EvidenceError::InvalidLayoutBounds
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 200.0, 0.0, 0.0, 10.0, f64::NAN).unwrap_err(),
+        EvidenceError::InvalidLayoutBounds
+    );
+    assert_eq!(
+        PageLocation::new(1, 100.0, 200.0, 0.0, 0.0, 10.0, 0.0).unwrap_err(),
         EvidenceError::InvalidLayoutBounds
     );
     assert_eq!(
