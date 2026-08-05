@@ -6,6 +6,13 @@ on:
       - agent/bootstrap-tepp-planning
     paths:
       - .bootstrap/READY
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
 
 permissions:
   contents: write
@@ -17,6 +24,7 @@ concurrency:
 jobs:
   materialize:
     name: Reconstruct and validate repository baseline
+    if: github.event_name == 'push' || github.head_ref == 'agent/bootstrap-tepp-planning'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
