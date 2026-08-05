@@ -1,0 +1,50 @@
+name: Materialize TEPP Bootstrap
+
+on:
+  push:
+    branches:
+      - agent/bootstrap-tepp-planning
+    paths:
+      - .bootstrap/READY
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tepp-bootstrap-materialize
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Reconstruct and validate repository baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout bootstrap branch
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: agent/bootstrap-tepp-planning
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reconstruct, verify, and extract payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .bootstrap/chunk-*.txt | base64 --decode > /tmp/tepp-bootstrap.zip
+          echo "1eb9bad2acd82744903848083028f65168c0d54d27cd0fe7b8336ff384e1f81f  /tmp/tepp-bootstrap.zip" | sha256sum --check -
+          python3 -m zipfile -e /tmp/tepp-bootstrap.zip .
+          rm -rf .bootstrap
+          rm -f .github/workflows/bootstrap-materialize.yml
+          python3 scripts/validate_documentation.py
+
+      - name: Commit materialized repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "docs: add approved TEPP planning baseline"
+          git push origin HEAD:agent/bootstrap-tepp-planning
