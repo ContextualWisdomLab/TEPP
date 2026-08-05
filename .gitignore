@@ -1,0 +1,8 @@
+/target/
+/coverage/
+/.coverage
+coverage.json
+coverage-branches.json
+__pycache__/
+*.py[cod]
+.pytest_cache/
