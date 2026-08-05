@@ -6,7 +6,8 @@
 //! `UUIDv7` identifiers, canonical `SHA-256` digests, immutable byte and text
 //! records, and source spans whose byte, Unicode-scalar, page, and layout
 //! coordinates are validated before entering later temporal or psychometric
-//! layers.
+//! layers. The validation report records the retained RED → GREEN history,
+//! hostile-input cases, and exact line and branch coverage evidence.
 
 mod artifact;
 mod digest;
