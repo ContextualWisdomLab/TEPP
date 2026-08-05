@@ -59,9 +59,7 @@ impl fmt::Display for EvidenceError {
             Self::SpanDocumentMismatch => "source span belongs to a different document",
             Self::InvalidPageNumber => "page number must be positive",
             Self::InvalidPageGeometry => "page geometry must be finite and positive",
-            Self::InvalidLayoutBounds => {
-                "layout bounds must be finite, nonnegative, and nonempty"
-            }
+            Self::InvalidLayoutBounds => "layout bounds must be finite, nonnegative, and nonempty",
             Self::LayoutOutOfBounds => "layout bounds exceed the page geometry",
         };
         formatter.write_str(message)
