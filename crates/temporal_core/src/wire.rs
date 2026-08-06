@@ -292,7 +292,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        BoundaryKind, BoundaryWire, SerializationFailure, deserialize_wire,
+        BoundaryKind, BoundaryWire, ClockWire, SerializationFailure, deserialize_wire,
         map_instant_boundary, reconstruct_exact, serialize_wire, validate_header,
     };
     use crate::{
@@ -307,7 +307,7 @@ mod tests {
             Err(TemporalError::InvalidWirePayload)
         );
         assert_eq!(
-            deserialize_wire::<Vec<u8>>("not JSON"),
+            deserialize_wire::<ClockWire>("not JSON").map(|_| ()),
             Err(TemporalError::InvalidWirePayload)
         );
     }
