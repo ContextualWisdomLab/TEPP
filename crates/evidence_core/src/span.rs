@@ -192,10 +192,7 @@ impl SourceSpan {
     ///
     /// Returns a fail-closed wire, identifier, coordinate, UTF-8, page, layout,
     /// or document-ownership error when the payload is not an exact valid span.
-    pub fn from_wire_json(
-        payload: &str,
-        document: &DocumentRecord,
-    ) -> Result<Self, EvidenceError> {
+    pub fn from_wire_json(payload: &str, document: &DocumentRecord) -> Result<Self, EvidenceError> {
         crate::wire::deserialize_source_span(payload, document)
     }
 
