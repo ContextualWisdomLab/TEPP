@@ -157,11 +157,7 @@ fn direct_contradiction_is_atomic_and_does_not_fabricate_an_accepted_identifier(
 fn reasoner_rejects_invalid_limits_foreign_variables_empty_relations_and_capacity_overflow() {
     for invalid_limits in [(0, 1, 1), (1, 0, 1), (1, 1, 0)] {
         assert_eq!(
-            TemporalReasonerLimits::new(
-                invalid_limits.0,
-                invalid_limits.1,
-                invalid_limits.2,
-            ),
+            TemporalReasonerLimits::new(invalid_limits.0, invalid_limits.1, invalid_limits.2),
             Err(TemporalReasonerError::InvalidLimits)
         );
     }
