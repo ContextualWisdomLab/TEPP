@@ -1,4 +1,4 @@
-# ADR 0008: Immutable evidence identities, digests, and exact spans
+# ADR 0008: Immutable evidence identities, digests, exact spans, and wire records
 
 - **Status:** Accepted
 - **Date:** 2026-08-05
@@ -9,18 +9,20 @@
 
 Every later temporal, event, multilingual, and psychometric claim must be
 traceable to source evidence without depending on a mutable caller buffer,
-ambiguous text offsets, or an identifier that changes when content is rehashed.
-UTF-8 byte coordinates alone are unsafe for human-facing text selection because
-a byte offset can fall inside a multibyte code point. Character-only offsets do
-not preserve the byte-exact source location required for audit, hashing, and
-interchange. PDF or page-derived evidence additionally needs validated layout
-coordinates.
+ambiguous text offsets, an identifier that changes when content is rehashed, or
+a wire payload that can bypass domain validation. UTF-8 byte coordinates alone
+are unsafe for human-facing text selection because a byte offset can fall inside
+a multibyte code point. Character-only offsets do not preserve the byte-exact
+source location required for audit, hashing, and interchange. PDF or
+page-derived evidence additionally needs validated layout coordinates.
 
 A content digest is evidence that bytes differ or agree under the selected hash
 algorithm; it is not a substitute for a stable record identity, authorization,
 authenticity, a signature, or provenance. The domain layer must therefore keep
-identity, content verification, source ownership, and location as separate
-contracts.
+identity, content verification, source ownership, location, and interchange as
+separate contracts. External JSON must not deserialize directly into private
+domain fields or silently accept unknown fields, unsupported versions, altered
+content, or coordinates that no longer match the reconstructed document.
 
 ## Decision
 
@@ -42,12 +44,21 @@ contracts.
    mid-code-point, out-of-bounds, and cross-document spans fail closed.
 7. Use one-based positive page numbers, finite positive page dimensions, finite
    nonnegative offsets, positive rectangle dimensions, and in-page bounds.
-8. Keep domain fields private. Persistence and external serialization will use
-   explicit versioned DTOs rather than making storage or wire formats the domain
-   model by accident.
-9. Treat `SHA-256` equality as content-verification evidence only. Signed
-   provenance, tenant authorization, source acquisition metadata, and chain of
-   custody remain separate later contracts.
+8. Keep domain fields private. Interchange uses explicit internal DTOs carrying
+   a required `schema_version`; the current accepted version is `1`.
+9. Reject malformed JSON, missing or unknown fields, unsupported versions,
+   malformed identifiers and digests, invalid byte values, and unknown nested
+   page-layout fields with stable content-redacting errors.
+10. Reconstruct every wire record through validated domain constructors. A
+    declared digest is recomputed from the supplied bytes or UTF-8 text, and a
+    mismatch fails with `ContentDigestMismatch` before a record is accepted.
+11. Reapply configured content limits during wire reconstruction and revalidate
+    exact byte/scalar coordinates and page geometry against the supplied owning
+    document. Serialization never exposes internal caches such as scalar
+    lengths or storage representation.
+12. Treat `SHA-256` equality as content-verification evidence only. Signed
+    provenance, tenant authorization, source acquisition metadata, and chain of
+    custody remain separate later contracts.
 
 ## Consequences
 
@@ -57,11 +68,15 @@ contracts.
   or text.
 - Exact spans can round-trip across Unicode text and page-oriented evidence
   without silently snapping to nearby boundaries.
+- Strict versioned JSON can cross process or service boundaries without making
+  serde layout or private Rust fields the public domain model.
+- Wire reconstruction detects content substitution, stale document ownership,
+  unknown extensions, unsupported versions, and hostile coordinate changes.
 - Scalar offsets are not grapheme-cluster or word boundaries. User-facing text
   segmentation remains a separate locale- and language-profile concern.
 - The current slice does not yet provide source acquisition metadata,
-  signatures, JSON DTOs, database migrations, W3C PROV serialization, or
-  cryptographic chain-of-custody evidence.
+  signatures, database migrations, JSON Schema publication, W3C PROV
+  serialization, or cryptographic chain-of-custody evidence.
 
 ## Validation
 
@@ -74,9 +89,20 @@ contracts.
   cross-document use.
 - Page tests cover invalid page numbers, nonfinite and nonpositive dimensions,
   invalid rectangle components, and horizontal and vertical overflow.
+- Versioned wire tests cover identity-preserving round trips, unknown fields,
+  unsupported versions, malformed JSON, malformed identifiers and digests,
+  digest/content mismatch, content limits, invalid byte values, nested field
+  rejection, cross-document spans, invalid UTF-8 boundaries, and out-of-page
+  geometry.
+- Generated multilingual and decomposed-Unicode cases enumerate every valid
+  nonempty code-point-aligned span and prove exact JSON round trips; invalid
+  scalar and mid-code-point coordinates fail closed.
 - Production line and branch coverage remain exact 100% merge gates.
 
 ## References
+
+Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange
+format* (RFC 8259). RFC Editor. https://doi.org/10.17487/RFC8259
 
 National Institute of Standards and Technology. (2015). *Secure Hash Standard
 (SHS)* (FIPS PUB 180-4). https://doi.org/10.6028/NIST.FIPS.180-4
