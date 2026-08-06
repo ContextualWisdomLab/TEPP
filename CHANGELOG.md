@@ -20,6 +20,10 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Pinned `cargo-nextest` 0.9.140, `cargo-llvm-cov` 0.8.6, `cargo-deny` 0.19.7, and Coverage.py 7.15.2 quality tooling.
 - Task 1 architecture decision and workspace-foundation validation report.
 - Version-keyed, executable-only GitHub Actions caches for pinned Rust quality tools.
+- Immutable `evidence_core` records with independent RFC 9562 `UUIDv7` identities, canonical `SHA-256` content digests, owned source bytes and UTF-8 text, exact byte/Unicode-scalar spans, and bounded page-layout coordinates.
+- Strict versioned JSON wire contracts for artifacts, documents, exact spans, and nested page locations without exposing private domain storage.
+- ADR 0008 and APA 7 doctoring for evidence identity, hashing, JSON interchange, UTF-8 boundaries, Unicode segmentation limits, and future W3C PROV integration.
+- Same-run exact missing-line and missing-branch diagnostics for failed 100% Rust coverage gates.
 
 ### Security
 
@@ -29,6 +33,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Required full-commit GitHub Action pins, minimum permissions, concurrency controls, immutable audit evidence, SBOM, and provenance.
 - Kept ordinary Rust CI free of LLM and reviewer credentials and disabled persisted checkout credentials.
 - Refused to cache mutable Cargo registry, Git source, or target trees; cached quality binaries are keyed and checked by exact version.
+- Copied caller-provided source bytes and document text before acceptance and kept validated evidence fields private.
+- Made empty, oversized, malformed-digest, invalid UTF-8-boundary, coordinate-mismatch, cross-document, nonfinite-geometry, and out-of-page evidence fail closed with content-redacting errors.
+- Rejected malformed or extended wire payloads, unsupported schema versions, invalid identifiers and byte values, digest/content substitution, stale document ownership, and invalid nested geometry during reconstruction.
 
 ### Quality
 
@@ -37,5 +44,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Added 100% statement and branch coverage for the repository quality-gate scripts.
 - Made a zero executable-code coverage denominator explicit for the skeleton-only slice rather than treating it as evidence of implemented behavior.
 - Denied warnings, missing public documentation, and unsafe Rust across the workspace.
+- Added known digest vectors, mutation detection, hostile multibyte Unicode, exact-coordinate, page-boundary, stable-error, and invalid-input regression tests for the first evidence slice.
+- Added strict wire round trips, unknown-field and version rejection, digest reconstruction, configured-limit, hostile JSON, and generated multilingual span tests.
 
 [Unreleased]: https://github.com/ContextualWisdomLab/TEPP/compare/HEAD...HEAD

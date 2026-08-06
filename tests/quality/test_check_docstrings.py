@@ -20,10 +20,13 @@ class DocstringContractTests(unittest.TestCase):
     """Exercise Rust documentation discovery and validation."""
 
     def test_live_repository_is_documented(self) -> None:
-        """Every foundation crate contains crate-level rustdoc."""
+        """Every crate root and production module is discovered and documented."""
 
         sources = docstrings.rust_sources(REPOSITORY_ROOT)
-        self.assertEqual(len(sources), 10)
+        crate_roots = sorted(REPOSITORY_ROOT.glob("crates/*/src/lib.rs"))
+        self.assertEqual(len(crate_roots), 10)
+        self.assertTrue(set(crate_roots).issubset(sources))
+        self.assertGreaterEqual(len(sources), len(crate_roots))
         self.assertEqual(docstrings.validate_repository(REPOSITORY_ROOT), [])
 
     def test_missing_sources_fail_closed(self) -> None:
