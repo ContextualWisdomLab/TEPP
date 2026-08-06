@@ -10,6 +10,12 @@ pub enum EvidenceError {
     InvalidEvidenceId,
     /// The supplied content digest was not exactly 32 hexadecimal bytes.
     InvalidContentDigest,
+    /// A JSON wire payload was malformed, incomplete, or contained unknown fields.
+    InvalidWirePayload,
+    /// A JSON wire payload used a schema version this crate does not support.
+    UnsupportedWireVersion,
+    /// A wire record's declared digest did not match its reconstructed content.
+    ContentDigestMismatch,
     /// A source artifact contained no bytes.
     EmptySourceArtifact,
     /// A source artifact exceeded its configured byte limit.
@@ -45,6 +51,9 @@ impl fmt::Display for EvidenceError {
         let message = match self {
             Self::InvalidEvidenceId => "invalid evidence identifier",
             Self::InvalidContentDigest => "invalid content digest",
+            Self::InvalidWirePayload => "invalid evidence wire payload",
+            Self::UnsupportedWireVersion => "unsupported evidence wire version",
+            Self::ContentDigestMismatch => "wire content does not match its declared digest",
             Self::EmptySourceArtifact => "source artifact is empty",
             Self::SourceArtifactTooLarge => "source artifact exceeds the configured byte limit",
             Self::EmptyDocument => "document text is empty",
