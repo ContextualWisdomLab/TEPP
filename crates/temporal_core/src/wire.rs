@@ -10,6 +10,8 @@ use serde_json::{Value, json};
 /// The only temporal JSON wire-schema version accepted by this crate.
 pub const TEMPORAL_WIRE_SCHEMA_VERSION: u16 = 1;
 
+const STRICT_TIMESTAMP_PATTERN: &str = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})$";
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ClockWire {
@@ -77,8 +79,8 @@ pub(crate) fn deserialize_interval<T: TemporalClock>(
 ) -> Result<TemporalInterval<T>, TemporalError> {
     let wire: IntervalWire = deserialize_wire(payload)?;
     validate_header(wire.schema_version, &wire.clock_type, T::WIRE_NAME)?;
-    let lower = wire.lower.into_boundary::<T>()?;
-    let upper = wire.upper.into_boundary::<T>()?;
+    let lower = map_instant_boundary::<T>(wire.lower.into_instant_boundary()?);
+    let upper = map_instant_boundary::<T>(wire.upper.into_instant_boundary()?);
 
     match wire.certainty {
         TemporalCertainty::Exact => reconstruct_exact(lower, upper, wire.precision),
@@ -106,11 +108,7 @@ pub(crate) fn clock_json_schema<T: TemporalClock>() -> Value {
         "properties": {
             "schema_version": {"const": TEMPORAL_WIRE_SCHEMA_VERSION},
             "clock_type": {"const": T::WIRE_NAME},
-            "timestamp": {
-                "type": "string",
-                "format": "date-time",
-                "description": "Strict RFC 3339 timestamp with explicit seconds and offset."
-            }
+            "timestamp": timestamp_json_schema()
         }
     })
 }
@@ -172,17 +170,27 @@ impl BoundaryWire {
         }
     }
 
-    fn into_boundary<T: TemporalClock>(self) -> Result<TemporalBoundary<T>, TemporalError> {
+    fn into_instant_boundary(
+        self,
+    ) -> Result<TemporalBoundary<TemporalInstant>, TemporalError> {
         match (self.kind, self.timestamp) {
             (BoundaryKind::Unbounded, None) => Ok(TemporalBoundary::Unbounded),
             (BoundaryKind::Included, Some(timestamp)) => TemporalInstant::parse_rfc3339(&timestamp)
-                .map(T::from_instant)
                 .map(TemporalBoundary::Included),
             (BoundaryKind::Excluded, Some(timestamp)) => TemporalInstant::parse_rfc3339(&timestamp)
-                .map(T::from_instant)
                 .map(TemporalBoundary::Excluded),
             _ => Err(TemporalError::InvalidWirePayload),
         }
+    }
+}
+
+fn map_instant_boundary<T: TemporalClock>(
+    boundary: TemporalBoundary<TemporalInstant>,
+) -> TemporalBoundary<T> {
+    match boundary {
+        TemporalBoundary::Unbounded => TemporalBoundary::Unbounded,
+        TemporalBoundary::Included(value) => TemporalBoundary::Included(T::from_instant(value)),
+        TemporalBoundary::Excluded(value) => TemporalBoundary::Excluded(T::from_instant(value)),
     }
 }
 
@@ -215,6 +223,15 @@ fn validate_header(
     Ok(())
 }
 
+fn timestamp_json_schema() -> Value {
+    json!({
+        "type": "string",
+        "format": "date-time",
+        "pattern": STRICT_TIMESTAMP_PATTERN,
+        "description": "TEPP wire-version 1 strict RFC 3339 profile with explicit seconds, one-to-nine fractional digits, and Z or an exact numeric offset."
+    })
+}
+
 fn boundary_json_schema() -> Value {
     json!({
         "oneOf": [
@@ -230,7 +247,7 @@ fn boundary_json_schema() -> Value {
                 "required": ["kind", "timestamp"],
                 "properties": {
                     "kind": {"const": "included"},
-                    "timestamp": {"type": "string", "format": "date-time"}
+                    "timestamp": timestamp_json_schema()
                 }
             },
             {
@@ -239,7 +256,7 @@ fn boundary_json_schema() -> Value {
                 "required": ["kind", "timestamp"],
                 "properties": {
                     "kind": {"const": "excluded"},
-                    "timestamp": {"type": "string", "format": "date-time"}
+                    "timestamp": timestamp_json_schema()
                 }
             }
         ]
@@ -260,10 +277,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        BoundaryKind, BoundaryWire, deserialize_wire, reconstruct_exact, serialize_wire,
-        validate_header,
+        BoundaryKind, BoundaryWire, deserialize_wire, map_instant_boundary, reconstruct_exact,
+        serialize_wire, validate_header,
     };
-    use crate::{EventTime, TemporalBoundary, TemporalError, TemporalInterval, TemporalPrecision};
+    use crate::{
+        EventTime, TemporalBoundary, TemporalError, TemporalInstant, TemporalInterval,
+        TemporalPrecision,
+    };
     use serde::Serialize;
     use serde::ser::Serializer;
 
@@ -315,12 +335,31 @@ mod tests {
         };
 
         assert_eq!(
-            unbounded_with_timestamp.into_boundary::<EventTime>(),
+            unbounded_with_timestamp.into_instant_boundary(),
             Err(TemporalError::InvalidWirePayload)
         );
         assert_eq!(
-            included_without_timestamp.into_boundary::<EventTime>(),
+            included_without_timestamp.into_instant_boundary(),
             Err(TemporalError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn instant_boundary_mapping_preserves_all_boundary_kinds() {
+        let instant = TemporalInstant::parse_rfc3339("2026-01-01T00:00:00Z")
+            .expect("instant must parse");
+
+        assert_eq!(
+            map_instant_boundary::<EventTime>(TemporalBoundary::Unbounded),
+            TemporalBoundary::Unbounded
+        );
+        assert_eq!(
+            map_instant_boundary::<EventTime>(TemporalBoundary::Included(instant)),
+            TemporalBoundary::Included(EventTime::from_instant(instant))
+        );
+        assert_eq!(
+            map_instant_boundary::<EventTime>(TemporalBoundary::Excluded(instant)),
+            TemporalBoundary::Excluded(EventTime::from_instant(instant))
         );
     }
 
