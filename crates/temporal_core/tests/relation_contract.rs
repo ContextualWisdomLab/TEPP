@@ -175,3 +175,37 @@ fn composition_and_inverse_obey_the_converse_law_for_every_relation_pair() {
         }
     }
 }
+
+#[test]
+fn composition_matches_an_exhaustive_endpoint_oracle_for_every_relation_pair() {
+    let intervals: Vec<_> = (0_u8..8)
+        .flat_map(|start| ((start + 1)..8).map(move |end| proper_interval(start, end)))
+        .collect();
+    let mut expected = [[RelationSet::empty(); 13]; 13];
+
+    for left_interval in &intervals {
+        for middle_interval in &intervals {
+            let left_relation = classify_interval_relation(left_interval, middle_interval)
+                .expect("proper intervals must classify");
+            for right_interval in &intervals {
+                let right_relation = classify_interval_relation(middle_interval, right_interval)
+                    .expect("proper intervals must classify");
+                let composed_relation = classify_interval_relation(left_interval, right_interval)
+                    .expect("proper intervals must classify");
+                expected[left_relation as usize][right_relation as usize] = expected
+                    [left_relation as usize][right_relation as usize]
+                    .union(RelationSet::singleton(composed_relation));
+            }
+        }
+    }
+
+    for left_relation in AllenRelation::ALL {
+        for right_relation in AllenRelation::ALL {
+            assert_eq!(
+                RelationSet::singleton(left_relation)
+                    .compose(RelationSet::singleton(right_relation)),
+                expected[left_relation as usize][right_relation as usize]
+            );
+        }
+    }
+}
