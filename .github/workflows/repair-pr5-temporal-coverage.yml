@@ -58,29 +58,59 @@ jobs:
         shell: bash --noprofile --norc -e -o pipefail {0}
         run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
 
-      - name: Report exact uncovered production lines
+      - name: Report exact uncovered production regions
         shell: bash --noprofile --norc -e -o pipefail {0}
         run: |
           cargo fmt --all -- --check
-          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
+          cargo llvm-cov --workspace --all-features --json --output-path coverage-full.json
           python3 - <<'PY'
+          import json
           from pathlib import Path
 
-          current_file = None
-          uncovered: list[tuple[str, int]] = []
-          for raw_line in Path("lcov.info").read_text(encoding="utf-8").splitlines():
-              if raw_line.startswith("SF:"):
-                  current_file = raw_line[3:]
-              elif raw_line.startswith("DA:") and current_file is not None:
-                  line_number, hit_count, *_ = raw_line[3:].split(",")
-                  if int(hit_count) == 0:
-                      uncovered.append((current_file, int(line_number)))
+          report = json.loads(Path("coverage-full.json").read_text(encoding="utf-8"))
+          data = report["data"][0]
+          totals = data["totals"]["lines"]
+          print(
+              "TOTAL_LINE_SUMMARY "
+              f"covered={totals['covered']} count={totals['count']} "
+              f"percent={totals['percent']}"
+          )
 
-          if uncovered:
-              print("UNCOVERED_PRODUCTION_LINES_BEGIN")
-              for file_name, line_number in uncovered:
-                  print(f"{file_name}:{line_number}")
-              print("UNCOVERED_PRODUCTION_LINES_END")
+          incomplete_files = []
+          for file_record in data["files"]:
+              lines = file_record["summary"]["lines"]
+              if lines["covered"] != lines["count"]:
+                  incomplete_files.append(file_record)
+                  print(
+                      "INCOMPLETE_FILE "
+                      f"{file_record['filename']} "
+                      f"covered={lines['covered']} count={lines['count']} "
+                      f"percent={lines['percent']}"
+                  )
+
+                  for segment in file_record.get("segments", []):
+                      line, column, count, has_count, is_region_entry, is_gap = segment[:6]
+                      if has_count and is_region_entry and not is_gap and count == 0:
+                          print(
+                              "ZERO_SEGMENT "
+                              f"{file_record['filename']}:{line}:{column} "
+                              f"segment={segment}"
+                          )
+
+          incomplete_names = {record["filename"] for record in incomplete_files}
+          for function in data.get("functions", []):
+              if not incomplete_names.intersection(function.get("filenames", [])):
+                  continue
+              for region in function.get("regions", []):
+                  if len(region) > 4 and region[4] == 0:
+                      print(
+                          "ZERO_REGION "
+                          f"function={function.get('name', '<unknown>')} "
+                          f"filenames={function.get('filenames', [])} "
+                          f"region={region}"
+                      )
+
+          if incomplete_files:
               raise SystemExit(1)
 
           print("All production lines are covered.")
