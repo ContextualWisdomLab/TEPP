@@ -2,6 +2,7 @@
 
 use crate::{TemporalBoundary, TemporalCertainty, TemporalClock, TemporalError, TemporalInterval};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::sync::OnceLock;
 
 const ELEMENTARY_RELATION_COUNT: usize = 13;
@@ -252,12 +253,10 @@ fn classify_endpoints(
     } else if left_start == right_end {
         AllenRelation::MetBy
     } else if left_start == right_start {
-        if left_end < right_end {
-            AllenRelation::Starts
-        } else if left_end > right_end {
-            AllenRelation::StartedBy
-        } else {
-            AllenRelation::Equals
+        match left_end.cmp(&right_end) {
+            Ordering::Less => AllenRelation::Starts,
+            Ordering::Greater => AllenRelation::StartedBy,
+            Ordering::Equal => AllenRelation::Equals,
         }
     } else if left_end == right_end {
         if left_start > right_start {
