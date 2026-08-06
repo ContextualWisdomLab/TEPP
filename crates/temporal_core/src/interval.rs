@@ -239,11 +239,15 @@ mod tests {
     };
     use crate::{EventTime, TemporalError};
 
+    fn event_time(value: &str) -> EventTime {
+        EventTime::parse_rfc3339(value).expect("event time must parse")
+    }
+
     #[test]
     fn excluded_boundaries_apply_strict_inequalities() {
-        let start = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("start must parse");
-        let middle = EventTime::parse_rfc3339("2026-06-01T00:00:00Z").expect("middle must parse");
-        let end = EventTime::parse_rfc3339("2027-01-01T00:00:00Z").expect("end must parse");
+        let start = event_time("2026-01-01T00:00:00Z");
+        let middle = event_time("2026-06-01T00:00:00Z");
+        let end = event_time("2027-01-01T00:00:00Z");
         let interval = TemporalInterval::bounded(
             TemporalBoundary::Excluded(start),
             TemporalBoundary::Included(end),
@@ -258,11 +262,9 @@ mod tests {
 
     #[test]
     fn upper_open_interval_excludes_values_after_the_boundary() {
-        let earlier =
-            EventTime::parse_rfc3339("2025-01-01T00:00:00Z").expect("earlier value must parse");
-        let end = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("end must parse");
-        let later =
-            EventTime::parse_rfc3339("2027-01-01T00:00:00Z").expect("later value must parse");
+        let earlier = event_time("2025-01-01T00:00:00Z");
+        let end = event_time("2026-01-01T00:00:00Z");
+        let later = event_time("2027-01-01T00:00:00Z");
         let interval = TemporalInterval::bounded(
             TemporalBoundary::Unbounded,
             TemporalBoundary::Excluded(end),
@@ -276,6 +278,83 @@ mod tests {
     }
 
     #[test]
+    fn lower_open_interval_applies_only_the_known_boundary() {
+        let earlier = event_time("2025-01-01T00:00:00Z");
+        let start = event_time("2026-01-01T00:00:00Z");
+        let later = event_time("2027-01-01T00:00:00Z");
+        let interval = TemporalInterval::bounded(
+            TemporalBoundary::Included(start),
+            TemporalBoundary::Unbounded,
+            TemporalPrecision::Year,
+        )
+        .expect("interval must validate");
+
+        assert!(!interval.contains(earlier));
+        assert!(interval.contains(start));
+        assert!(interval.contains(later));
+    }
+
+    #[test]
+    fn closed_interval_rejects_values_outside_either_boundary() {
+        let before = event_time("2025-12-31T23:59:59Z");
+        let start = event_time("2026-01-01T00:00:00Z");
+        let middle = event_time("2026-06-01T00:00:00Z");
+        let end = event_time("2027-01-01T00:00:00Z");
+        let after = event_time("2027-01-01T00:00:01Z");
+        let interval = TemporalInterval::bounded(
+            TemporalBoundary::Included(start),
+            TemporalBoundary::Included(end),
+            TemporalPrecision::Year,
+        )
+        .expect("interval must validate");
+
+        assert!(!interval.contains(before));
+        assert!(interval.contains(start));
+        assert!(interval.contains(middle));
+        assert!(interval.contains(end));
+        assert!(!interval.contains(after));
+    }
+
+    #[test]
+    fn bounded_constructor_rejects_every_invalid_semantic_shape() {
+        let first = event_time("2026-01-01T00:00:00Z");
+        let second = event_time("2027-01-01T00:00:00Z");
+
+        assert_eq!(
+            TemporalInterval::<EventTime>::bounded(
+                TemporalBoundary::Unbounded,
+                TemporalBoundary::Unbounded,
+                TemporalPrecision::Year,
+            ),
+            Err(TemporalError::InvalidIntervalCertainty)
+        );
+        assert_eq!(
+            TemporalInterval::bounded(
+                TemporalBoundary::Included(second),
+                TemporalBoundary::Included(first),
+                TemporalPrecision::Year,
+            ),
+            Err(TemporalError::InvalidIntervalOrder)
+        );
+        assert_eq!(
+            TemporalInterval::bounded(
+                TemporalBoundary::Included(first),
+                TemporalBoundary::Excluded(first),
+                TemporalPrecision::Year,
+            ),
+            Err(TemporalError::EmptyInterval)
+        );
+        assert_eq!(
+            TemporalInterval::bounded(
+                TemporalBoundary::Included(first),
+                TemporalBoundary::Included(second),
+                TemporalPrecision::Unknown,
+            ),
+            Err(TemporalError::InvalidTemporalPrecision)
+        );
+    }
+
+    #[test]
     fn boundary_value_distinguishes_unbounded_and_known_values() {
         assert_eq!(boundary_value::<u8>(TemporalBoundary::Unbounded), None);
         assert_eq!(boundary_value(TemporalBoundary::Included(3_u8)), Some(3));
@@ -283,16 +362,19 @@ mod tests {
     }
 
     #[test]
-    fn unknown_interval_accessors_are_internally_consistent() {
+    fn unknown_interval_accessors_and_containment_are_consistent() {
         let interval = TemporalInterval::<EventTime>::unknown();
+        let candidate = event_time("2026-01-01T00:00:00Z");
+
         assert_eq!(interval.certainty(), TemporalCertainty::Unknown);
         assert_eq!(interval.precision(), TemporalPrecision::Unknown);
         assert!(!interval.is_known());
+        assert!(!interval.contains(candidate));
     }
 
     #[test]
     fn exact_interval_rejects_unknown_precision() {
-        let value = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("value must parse");
+        let value = event_time("2026-01-01T00:00:00Z");
         assert_eq!(
             TemporalInterval::exact(value, TemporalPrecision::Unknown),
             Err(TemporalError::InvalidTemporalPrecision)

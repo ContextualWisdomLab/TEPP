@@ -130,6 +130,42 @@ mod tests {
     }
 
     #[test]
+    fn strict_syntax_rejects_each_structural_failure_path() {
+        let invalid = [
+            "2026-08-06T01:30:0Z",
+            "2026-08-06T01:30:00é",
+            "2026/08-06T01:30:00Z",
+            "2026-08/06T01:30:00Z",
+            "2026-08-06t01:30:00Z",
+            "2026-08-06T01-30:00Z",
+            "2026-08-06T01:30-00Z",
+            "202x-08-06T01:30:00Z",
+            "2026-08-06T01:30:60Z",
+            "2026-08-06T01:30:00Zx",
+            "2026-08-06T01:30:00+05-30",
+            "2026-08-06T01:30:00+0x:30",
+            "2026-08-06T01:30:00+05:3x",
+            "2026-08-06T01:30:00+05:30x",
+        ];
+
+        for input in invalid {
+            assert_eq!(
+                validate_strict_rfc3339_syntax(input),
+                Err(TemporalError::InvalidTimestamp)
+            );
+        }
+    }
+
+    #[test]
+    fn parser_distinguishes_valid_offset_and_invalid_calendar_semantics() {
+        assert!(TemporalInstant::parse_rfc3339("2026-08-06T10:30:00+09:00").is_ok());
+        assert_eq!(
+            TemporalInstant::parse_rfc3339("2026-02-30T01:30:00Z"),
+            Err(TemporalError::InvalidTimestamp)
+        );
+    }
+
+    #[test]
     fn display_matches_canonical_rfc3339_output() {
         let instant = TemporalInstant::parse_rfc3339("2026-08-06T10:30:00+09:00")
             .expect("timestamp must parse");
