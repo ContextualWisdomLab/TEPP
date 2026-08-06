@@ -10,8 +10,7 @@ use serde_json::{Value, json};
 /// The only temporal JSON wire-schema version accepted by this crate.
 pub const TEMPORAL_WIRE_SCHEMA_VERSION: u16 = 1;
 
-const STRICT_TIMESTAMP_PATTERN: &str =
-    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})$";
+const STRICT_TIMESTAMP_PATTERN: &str = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})$";
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -302,7 +301,8 @@ fn deserialize_interval_wire(payload: &str) -> Result<IntervalWire, TemporalErro
 mod tests {
     use super::{
         BoundaryKind, BoundaryWire, SerializationFailure, TemporalWireEnvelope,
-        map_instant_boundary, reconstruct_exact, serialize_wire, validate_header,
+        deserialize_clock_wire, deserialize_interval_wire, map_instant_boundary, reconstruct_exact,
+        serialize_wire, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
@@ -310,11 +310,21 @@ mod tests {
     };
 
     #[test]
-    fn serialization_failures_are_redacted() {
+    fn serialization_and_deserialization_failures_are_redacted() {
         assert_eq!(
-            serialize_wire(TemporalWireEnvelope::SerializationFailure(SerializationFailure)),
+            serialize_wire(TemporalWireEnvelope::SerializationFailure(
+                SerializationFailure,
+            )),
             Err(TemporalError::InvalidWirePayload)
         );
+        let clock_error = deserialize_clock_wire("not JSON")
+            .err()
+            .expect("invalid clock JSON must fail");
+        assert_eq!(clock_error, TemporalError::InvalidWirePayload);
+        let interval_error = deserialize_interval_wire("not JSON")
+            .err()
+            .expect("invalid interval JSON must fail");
+        assert_eq!(interval_error, TemporalError::InvalidWirePayload);
     }
 
     #[test]
@@ -353,8 +363,8 @@ mod tests {
 
     #[test]
     fn instant_boundary_mapping_preserves_all_boundary_kinds() {
-        let instant = TemporalInstant::parse_rfc3339("2026-01-01T00:00:00Z")
-            .expect("instant must parse");
+        let instant =
+            TemporalInstant::parse_rfc3339("2026-01-01T00:00:00Z").expect("instant must parse");
 
         assert_eq!(
             map_instant_boundary::<EventTime>(TemporalBoundary::Unbounded),
