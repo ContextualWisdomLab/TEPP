@@ -95,6 +95,36 @@ metadata, signatures, and W3C PROV remain outward adapters or later contracts.
 They must depend inward on these validated domain values rather than defining
 them.
 
+## Executable temporal boundary
+
+Task 3 begins the executable `temporal_core` boundary. `EventTime`,
+`AssertionTime`, `DocumentTime`, `SystemTime`, `AvailableTime`, and
+`KnowledgeCutoff` are sealed nominal types over a common absolute instant. The
+type system prevents accidental substitution between clocks while retaining
+nanosecond ordering and deterministic UTC normalization.
+
+Wire version `1` accepts a bounded RFC 3339 lexical profile: a four-digit date,
+uppercase `T`, explicit seconds, an optional one-to-nine-digit fraction, and
+uppercase `Z` or an exact `±HH:MM` offset. Local timestamps, shortened offsets,
+leap seconds, bracketed time zones, RFC 9557 suffixes, malformed calendars, and
+other unsupported forms fail closed. Generated Draft 2020-12 JSON Schemas carry
+the same timestamp pattern, clock discriminator, version constant, required
+fields, and unknown-field prohibition as runtime reconstruction.
+
+`TemporalInterval<T>` retains one nominal clock and explicit precision and
+certainty. It supports exact, bounded, lower-open, upper-open, and explicitly
+unknown representations with included, excluded, or unbounded boundaries.
+Reversed intervals, empty intervals, two-unbounded known intervals, and known
+intervals with unknown precision fail closed. Unknown intervals deliberately do
+not claim universal containment.
+
+The Task 3 claim boundary stops at validated instants, intervals, errors, wire
+records, and schemas. Allen interval relations, converse/composition tables,
+closure, contradiction proofs, bounded reasoner resources, event-transition
+validation, bitemporal persistence, and leakage-safe snapshots remain later
+slices. Those layers must consume these values rather than introduce parallel
+time representations.
+
 ## Quality architecture
 
 The workspace centralizes package metadata and Rust/Clippy lints. Every member
@@ -119,7 +149,9 @@ TEPP stores event/valid time, assertion time, document time, system time, availa
 \operatorname{available\_time}(d) \leq \operatorname{knowledge\_cutoff}.
 \]
 
-Forward transition edges require a temporally valid partial order. Retrospective, revision, translation, citation, support, and contradiction relations retain their direction and provenance but do not create reverse state transitions.
+Task 3 establishes the values needed to express this invariant but does not yet claim persistence or historical-snapshot enforcement. Those controls belong to the PostgreSQL and corpus-split slices and must be tested against delayed availability, revisions, and retrospective evidence.
+
+Forward transition edges require a temporally valid partial order. Retrospective, revision, translation, citation, support, and contradiction relations retain their direction and provenance but do not create reverse state transitions. The relation-algebra and graph layers are responsible for proving those properties without weakening the typed instant and interval contracts.
 
 ## Measurement invariants
 
