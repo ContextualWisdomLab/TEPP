@@ -55,7 +55,7 @@ pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, Temp
 
 pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, TemporalError> {
     let wire: ClockWire = deserialize_wire(payload)?;
-    validate_header::<T>(wire.schema_version, &wire.clock_type)?;
+    validate_header(wire.schema_version, &wire.clock_type, T::WIRE_NAME)?;
     TemporalInstant::parse_rfc3339(&wire.timestamp).map(T::from_instant)
 }
 
@@ -76,7 +76,7 @@ pub(crate) fn deserialize_interval<T: TemporalClock>(
     payload: &str,
 ) -> Result<TemporalInterval<T>, TemporalError> {
     let wire: IntervalWire = deserialize_wire(payload)?;
-    validate_header::<T>(wire.schema_version, &wire.clock_type)?;
+    validate_header(wire.schema_version, &wire.clock_type, T::WIRE_NAME)?;
     let lower = wire.lower.into_boundary::<T>()?;
     let upper = wire.upper.into_boundary::<T>()?;
 
@@ -201,14 +201,15 @@ fn reconstruct_exact<T: TemporalClock>(
     }
 }
 
-fn validate_header<T: TemporalClock>(
+fn validate_header(
     version: u16,
     clock_type: &str,
+    expected_clock_type: &str,
 ) -> Result<(), TemporalError> {
     if version != TEMPORAL_WIRE_SCHEMA_VERSION {
         return Err(TemporalError::UnsupportedWireVersion);
     }
-    if clock_type != T::WIRE_NAME {
+    if clock_type != expected_clock_type {
         return Err(TemporalError::ClockTypeMismatch);
     }
     Ok(())
@@ -262,9 +263,7 @@ mod tests {
         BoundaryKind, BoundaryWire, deserialize_wire, reconstruct_exact, serialize_wire,
         validate_header,
     };
-    use crate::{
-        EventTime, TemporalBoundary, TemporalError, TemporalInterval, TemporalPrecision,
-    };
+    use crate::{EventTime, TemporalBoundary, TemporalError, TemporalInterval, TemporalPrecision};
     use serde::Serialize;
     use serde::ser::Serializer;
 
@@ -293,13 +292,13 @@ mod tests {
 
     #[test]
     fn header_validation_distinguishes_version_and_clock_failures() {
-        assert_eq!(validate_header::<EventTime>(1, "event_time"), Ok(()));
+        assert_eq!(validate_header(1, "event_time", "event_time"), Ok(()));
         assert_eq!(
-            validate_header::<EventTime>(2, "event_time"),
+            validate_header(2, "event_time", "event_time"),
             Err(TemporalError::UnsupportedWireVersion)
         );
         assert_eq!(
-            validate_header::<EventTime>(1, "document_time"),
+            validate_header(1, "document_time", "event_time"),
             Err(TemporalError::ClockTypeMismatch)
         );
     }
@@ -327,10 +326,8 @@ mod tests {
 
     #[test]
     fn exact_reconstruction_requires_equal_included_boundaries() {
-        let first = EventTime::parse_rfc3339("2026-01-01T00:00:00Z")
-            .expect("first must parse");
-        let second = EventTime::parse_rfc3339("2027-01-01T00:00:00Z")
-            .expect("second must parse");
+        let first = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("first must parse");
+        let second = EventTime::parse_rfc3339("2027-01-01T00:00:00Z").expect("second must parse");
 
         assert_eq!(
             reconstruct_exact(

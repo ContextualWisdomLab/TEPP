@@ -241,12 +241,9 @@ mod tests {
 
     #[test]
     fn excluded_boundaries_apply_strict_inequalities() {
-        let start = EventTime::parse_rfc3339("2026-01-01T00:00:00Z")
-            .expect("start must parse");
-        let middle = EventTime::parse_rfc3339("2026-06-01T00:00:00Z")
-            .expect("middle must parse");
-        let end = EventTime::parse_rfc3339("2027-01-01T00:00:00Z")
-            .expect("end must parse");
+        let start = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("start must parse");
+        let middle = EventTime::parse_rfc3339("2026-06-01T00:00:00Z").expect("middle must parse");
+        let end = EventTime::parse_rfc3339("2027-01-01T00:00:00Z").expect("end must parse");
         let interval = TemporalInterval::bounded(
             TemporalBoundary::Excluded(start),
             TemporalBoundary::Included(end),
@@ -261,12 +258,11 @@ mod tests {
 
     #[test]
     fn upper_open_interval_excludes_values_after_the_boundary() {
-        let earlier = EventTime::parse_rfc3339("2025-01-01T00:00:00Z")
-            .expect("earlier value must parse");
-        let end = EventTime::parse_rfc3339("2026-01-01T00:00:00Z")
-            .expect("end must parse");
-        let later = EventTime::parse_rfc3339("2027-01-01T00:00:00Z")
-            .expect("later value must parse");
+        let earlier =
+            EventTime::parse_rfc3339("2025-01-01T00:00:00Z").expect("earlier value must parse");
+        let end = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("end must parse");
+        let later =
+            EventTime::parse_rfc3339("2027-01-01T00:00:00Z").expect("later value must parse");
         let interval = TemporalInterval::bounded(
             TemporalBoundary::Unbounded,
             TemporalBoundary::Excluded(end),
@@ -296,8 +292,7 @@ mod tests {
 
     #[test]
     fn exact_interval_rejects_unknown_precision() {
-        let value = EventTime::parse_rfc3339("2026-01-01T00:00:00Z")
-            .expect("value must parse");
+        let value = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("value must parse");
         assert_eq!(
             TemporalInterval::exact(value, TemporalPrecision::Unknown),
             Err(TemporalError::InvalidTemporalPrecision)

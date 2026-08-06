@@ -16,8 +16,8 @@ fn extract<T: TemporalClock>(clock: T) -> TemporalInstant {
 
 macro_rules! assert_clock_contract {
     ($clock:ty, $wire_name:literal) => {{
-        let value = <$clock>::parse_rfc3339("2026-08-06T10:30:00+09:00")
-            .expect("clock value must parse");
+        let value =
+            <$clock>::parse_rfc3339("2026-08-06T10:30:00+09:00").expect("clock value must parse");
         let wire = value.to_wire_json().expect("clock value must serialize");
         let restored = <$clock>::from_wire_json(&wire).expect("clock value must reconstruct");
         let schema = <$clock>::wire_json_schema();
@@ -27,7 +27,10 @@ macro_rules! assert_clock_contract {
         assert_eq!(restored, value);
         assert_eq!(rebuilt, value);
         assert_eq!(extract(value), value.instant());
-        assert_eq!(schema["properties"]["clock_type"]["const"], json!($wire_name));
+        assert_eq!(
+            schema["properties"]["clock_type"]["const"],
+            json!($wire_name)
+        );
         assert_eq!(<$clock as TemporalClock>::WIRE_NAME, $wire_name);
     }};
 }

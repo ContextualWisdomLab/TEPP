@@ -5,7 +5,10 @@ use temporal_core::TemporalError;
 #[test]
 fn every_temporal_error_has_a_stable_content_redacting_message() {
     let cases = [
-        (TemporalError::InvalidTimestamp, "invalid temporal timestamp"),
+        (
+            TemporalError::InvalidTimestamp,
+            "invalid temporal timestamp",
+        ),
         (
             TemporalError::InvalidTemporalPrecision,
             "invalid temporal precision",

@@ -14,13 +14,16 @@ fn replace_field(serialized: &str, field: &str, replacement: Value) -> String {
 
 #[test]
 fn typed_clock_wire_round_trip_preserves_clock_and_normalized_instant() {
-    let value = EventTime::parse_rfc3339("2026-08-06T10:30:00+09:00")
-        .expect("event time must parse");
+    let value =
+        EventTime::parse_rfc3339("2026-08-06T10:30:00+09:00").expect("event time must parse");
     let serialized = value.to_wire_json().expect("clock must serialize");
     let json_value: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
     let restored = EventTime::from_wire_json(&serialized).expect("clock must reconstruct");
 
-    assert_eq!(json_value["schema_version"], json!(TEMPORAL_WIRE_SCHEMA_VERSION));
+    assert_eq!(
+        json_value["schema_version"],
+        json!(TEMPORAL_WIRE_SCHEMA_VERSION)
+    );
     assert_eq!(json_value["clock_type"], json!("event_time"));
     assert_eq!(json_value["timestamp"], json!("2026-08-06T01:30:00Z"));
     assert_eq!(restored, value);
@@ -28,8 +31,7 @@ fn typed_clock_wire_round_trip_preserves_clock_and_normalized_instant() {
 
 #[test]
 fn typed_clock_wire_rejects_unknown_fields_versions_types_and_invalid_timestamps() {
-    let value = EventTime::parse_rfc3339("2026-08-06T01:30:00Z")
-        .expect("event time must parse");
+    let value = EventTime::parse_rfc3339("2026-08-06T01:30:00Z").expect("event time must parse");
     let serialized = value.to_wire_json().expect("clock must serialize");
 
     let unsupported = replace_field(&serialized, "schema_version", json!(2));
@@ -65,10 +67,8 @@ fn typed_clock_wire_rejects_unknown_fields_versions_types_and_invalid_timestamps
 
 #[test]
 fn bounded_interval_wire_round_trip_preserves_boundaries_precision_and_certainty() {
-    let start = EventTime::parse_rfc3339("2026-04-01T00:00:00Z")
-        .expect("start must parse");
-    let end = EventTime::parse_rfc3339("2026-07-01T00:00:00Z")
-        .expect("end must parse");
+    let start = EventTime::parse_rfc3339("2026-04-01T00:00:00Z").expect("start must parse");
+    let end = EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("end must parse");
     let interval = TemporalInterval::bounded(
         TemporalBoundary::Included(start),
         TemporalBoundary::Excluded(end),
@@ -90,8 +90,7 @@ fn bounded_interval_wire_round_trip_preserves_boundaries_precision_and_certainty
 
 #[test]
 fn exact_and_unknown_intervals_round_trip_with_distinct_semantics() {
-    let value = EventTime::parse_rfc3339("2026-08-06T01:00:00Z")
-        .expect("event time must parse");
+    let value = EventTime::parse_rfc3339("2026-08-06T01:00:00Z").expect("event time must parse");
     let exact = TemporalInterval::exact(value, TemporalPrecision::Second)
         .expect("exact interval must validate");
     let unknown = TemporalInterval::<EventTime>::unknown();
@@ -105,7 +104,9 @@ fn exact_and_unknown_intervals_round_trip_with_distinct_semantics() {
     );
     assert_eq!(
         TemporalInterval::<EventTime>::from_wire_json(
-            &unknown.to_wire_json().expect("unknown interval must serialize")
+            &unknown
+                .to_wire_json()
+                .expect("unknown interval must serialize")
         )
         .expect("unknown interval must reconstruct"),
         unknown
@@ -114,10 +115,8 @@ fn exact_and_unknown_intervals_round_trip_with_distinct_semantics() {
 
 #[test]
 fn interval_wire_rejects_unknown_fields_wrong_clocks_and_invalid_semantics() {
-    let start = EventTime::parse_rfc3339("2026-04-01T00:00:00Z")
-        .expect("start must parse");
-    let end = EventTime::parse_rfc3339("2026-07-01T00:00:00Z")
-        .expect("end must parse");
+    let start = EventTime::parse_rfc3339("2026-04-01T00:00:00Z").expect("start must parse");
+    let end = EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("end must parse");
     let interval = TemporalInterval::bounded(
         TemporalBoundary::Included(start),
         TemporalBoundary::Excluded(end),
@@ -160,8 +159,7 @@ fn interval_wire_rejects_unknown_fields_wrong_clocks_and_invalid_semantics() {
         TemporalError::InvalidIntervalCertainty
     );
 
-    let mut unknown_field: Value =
-        serde_json::from_str(&serialized).expect("wire JSON must parse");
+    let mut unknown_field: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
     unknown_field["lower"]["inclusive"] = json!(true);
     assert_eq!(
         TemporalInterval::<EventTime>::from_wire_json(&unknown_field.to_string()).unwrap_err(),
@@ -171,8 +169,7 @@ fn interval_wire_rejects_unknown_fields_wrong_clocks_and_invalid_semantics() {
 
 #[test]
 fn interval_wire_rejects_malformed_boundary_payloads() {
-    let value = EventTime::parse_rfc3339("2026-08-06T01:00:00Z")
-        .expect("event time must parse");
+    let value = EventTime::parse_rfc3339("2026-08-06T01:00:00Z").expect("event time must parse");
     let interval = TemporalInterval::exact(value, TemporalPrecision::Second)
         .expect("exact interval must validate");
     let serialized = interval.to_wire_json().expect("interval must serialize");
@@ -258,7 +255,10 @@ fn temporal_json_schemas_are_draft_2020_12_and_clock_specific() {
 #[test]
 fn temporal_wire_errors_have_stable_redacted_messages() {
     let cases = [
-        (TemporalError::InvalidTimestamp, "invalid temporal timestamp"),
+        (
+            TemporalError::InvalidTimestamp,
+            "invalid temporal timestamp",
+        ),
         (
             TemporalError::InvalidWirePayload,
             "invalid temporal wire payload",
@@ -267,7 +267,10 @@ fn temporal_wire_errors_have_stable_redacted_messages() {
             TemporalError::UnsupportedWireVersion,
             "unsupported temporal wire version",
         ),
-        (TemporalError::ClockTypeMismatch, "temporal clock type mismatch"),
+        (
+            TemporalError::ClockTypeMismatch,
+            "temporal clock type mismatch",
+        ),
     ];
 
     for (error, expected) in cases {

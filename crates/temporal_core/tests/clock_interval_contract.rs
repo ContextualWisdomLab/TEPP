@@ -69,23 +69,23 @@ fn daylight_saving_offsets_normalize_to_the_correct_elapsed_duration() {
 
 #[test]
 fn typed_clock_values_are_totally_ordered_by_normalized_instant() {
-    let earlier = EventTime::parse_rfc3339("2026-08-06T00:00:00Z")
-        .expect("earlier event must parse");
-    let later = EventTime::parse_rfc3339("2026-08-06T00:00:00.000000001Z")
-        .expect("later event must parse");
+    let earlier =
+        EventTime::parse_rfc3339("2026-08-06T00:00:00Z").expect("earlier event must parse");
+    let later =
+        EventTime::parse_rfc3339("2026-08-06T00:00:00.000000001Z").expect("later event must parse");
 
     assert!(earlier < later);
-    assert_eq!(earlier.instant().as_nanosecond() + 1, later.instant().as_nanosecond());
+    assert_eq!(
+        earlier.instant().as_nanosecond() + 1,
+        later.instant().as_nanosecond()
+    );
 }
 
 #[test]
 fn exact_interval_contains_only_its_single_instant() {
-    let value = EventTime::parse_rfc3339("2026-08-06T01:00:00Z")
-        .expect("event time must parse");
-    let before = EventTime::parse_rfc3339("2026-08-06T00:59:59Z")
-        .expect("event time must parse");
-    let after = EventTime::parse_rfc3339("2026-08-06T01:00:01Z")
-        .expect("event time must parse");
+    let value = EventTime::parse_rfc3339("2026-08-06T01:00:00Z").expect("event time must parse");
+    let before = EventTime::parse_rfc3339("2026-08-06T00:59:59Z").expect("event time must parse");
+    let after = EventTime::parse_rfc3339("2026-08-06T01:00:01Z").expect("event time must parse");
     let interval = TemporalInterval::exact(value, TemporalPrecision::Second)
         .expect("exact interval must validate");
 
@@ -101,12 +101,9 @@ fn exact_interval_contains_only_its_single_instant() {
 
 #[test]
 fn half_open_bounded_interval_honors_inclusion_and_precision() {
-    let start = EventTime::parse_rfc3339("2026-04-01T00:00:00Z")
-        .expect("quarter start must parse");
-    let inside = EventTime::parse_rfc3339("2026-06-30T23:59:59Z")
-        .expect("inside value must parse");
-    let end = EventTime::parse_rfc3339("2026-07-01T00:00:00Z")
-        .expect("quarter end must parse");
+    let start = EventTime::parse_rfc3339("2026-04-01T00:00:00Z").expect("quarter start must parse");
+    let inside = EventTime::parse_rfc3339("2026-06-30T23:59:59Z").expect("inside value must parse");
+    let end = EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("quarter end must parse");
     let interval = TemporalInterval::bounded(
         TemporalBoundary::Included(start),
         TemporalBoundary::Excluded(end),
@@ -123,12 +120,11 @@ fn half_open_bounded_interval_honors_inclusion_and_precision() {
 
 #[test]
 fn open_ended_intervals_apply_only_the_known_boundary() {
-    let start = AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z")
-        .expect("start must parse");
-    let later = AvailableTime::parse_rfc3339("2030-01-01T00:00:00Z")
-        .expect("later value must parse");
-    let before = AvailableTime::parse_rfc3339("2025-12-31T23:59:59Z")
-        .expect("earlier value must parse");
+    let start = AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("start must parse");
+    let later =
+        AvailableTime::parse_rfc3339("2030-01-01T00:00:00Z").expect("later value must parse");
+    let before =
+        AvailableTime::parse_rfc3339("2025-12-31T23:59:59Z").expect("earlier value must parse");
     let interval = TemporalInterval::bounded(
         TemporalBoundary::Included(start),
         TemporalBoundary::Unbounded,
@@ -143,10 +139,8 @@ fn open_ended_intervals_apply_only_the_known_boundary() {
 
 #[test]
 fn invalid_bounded_intervals_fail_closed() {
-    let first = EventTime::parse_rfc3339("2026-08-06T01:00:00Z")
-        .expect("first value must parse");
-    let second = EventTime::parse_rfc3339("2026-08-06T02:00:00Z")
-        .expect("second value must parse");
+    let first = EventTime::parse_rfc3339("2026-08-06T01:00:00Z").expect("first value must parse");
+    let second = EventTime::parse_rfc3339("2026-08-06T02:00:00Z").expect("second value must parse");
 
     assert_eq!(
         TemporalInterval::bounded(
@@ -193,8 +187,8 @@ fn invalid_bounded_intervals_fail_closed() {
 #[test]
 fn unknown_interval_is_explicit_and_does_not_claim_containment() {
     let interval = TemporalInterval::<DocumentTime>::unknown();
-    let value = DocumentTime::parse_rfc3339("2026-08-06T01:00:00Z")
-        .expect("document time must parse");
+    let value =
+        DocumentTime::parse_rfc3339("2026-08-06T01:00:00Z").expect("document time must parse");
 
     assert_eq!(interval.certainty(), TemporalCertainty::Unknown);
     assert_eq!(interval.precision(), TemporalPrecision::Unknown);
