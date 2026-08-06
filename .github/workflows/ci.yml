@@ -142,7 +142,20 @@ jobs:
           cargo llvm-cov report --text --show-missing-lines
           cargo llvm-cov report --lcov --output-path coverage.lcov
           python3 - <<'PY'
+          import json
           from pathlib import Path
+
+          report = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
+          for data in report.get("data", []):
+              for file_record in data.get("files", []):
+                  lines = file_record.get("summary", {}).get("lines", {})
+                  covered = int(lines.get("covered", 0))
+                  count = int(lines.get("count", 0))
+                  if covered < count:
+                      print(
+                          "INCOMPLETE_FILE "
+                          f"{file_record.get('filename', '<unknown>')} {covered}/{count}"
+                      )
 
           current_source = None
           for raw_line in Path("coverage.lcov").read_text(encoding="utf-8").splitlines():
