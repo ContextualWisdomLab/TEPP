@@ -177,6 +177,28 @@ impl SourceSpan {
         })
     }
 
+    /// Serialize this span through the strict versioned JSON wire contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EvidenceError::InvalidWirePayload`] if JSON serialization fails.
+    pub fn to_wire_json(&self) -> Result<String, EvidenceError> {
+        crate::wire::serialize_source_span(self)
+    }
+
+    /// Reconstruct and revalidate a span from versioned JSON against `document`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed wire, identifier, coordinate, UTF-8, page, layout,
+    /// or document-ownership error when the payload is not an exact valid span.
+    pub fn from_wire_json(
+        payload: &str,
+        document: &DocumentRecord,
+    ) -> Result<Self, EvidenceError> {
+        crate::wire::deserialize_source_span(payload, document)
+    }
+
     /// Return the owning document identifier.
     #[must_use]
     pub const fn document_id(&self) -> EvidenceId {
