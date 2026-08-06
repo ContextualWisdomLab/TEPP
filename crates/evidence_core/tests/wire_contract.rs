@@ -268,11 +268,9 @@ fn generated_unicode_spans_round_trip_and_invalid_coordinates_fail_closed() {
                 );
                 assert!(matches!(
                     SourceSpan::from_wire_json(&mismatched, &document),
-                    Err(
-                        EvidenceError::EmptySourceSpan
-                            | EvidenceError::InvalidSourceSpanOrder
-                            | EvidenceError::CharacterRangeMismatch
-                    )
+                    Err(EvidenceError::EmptySourceSpan
+                        | EvidenceError::InvalidSourceSpanOrder
+                        | EvidenceError::CharacterRangeMismatch)
                 ));
             }
         }
