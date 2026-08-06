@@ -64,24 +64,46 @@ fn concrete_proper_intervals_classify_all_thirteen_relations() {
             expected
         );
     }
+
+    let excluded = TemporalInterval::bounded(
+        TemporalBoundary::Excluded(time(1)),
+        TemporalBoundary::Excluded(time(2)),
+        TemporalPrecision::Second,
+    )
+    .expect("excluded proper interval must validate");
+    assert_eq!(
+        classify_interval_relation(&excluded, &proper_interval(3, 4))
+            .expect("boundary inclusion must not change endpoint classification"),
+        AllenRelation::Before
+    );
 }
 
 #[test]
 fn qualitative_classification_rejects_exact_open_and_unknown_intervals() {
     let exact = TemporalInterval::exact(time(1), TemporalPrecision::Second)
         .expect("exact interval must validate");
-    let open = TemporalInterval::bounded(
+    let upper_open = TemporalInterval::bounded(
         TemporalBoundary::Included(time(1)),
         TemporalBoundary::Unbounded,
         TemporalPrecision::Second,
     )
-    .expect("open interval must validate");
+    .expect("upper-open interval must validate");
+    let lower_open = TemporalInterval::bounded(
+        TemporalBoundary::Unbounded,
+        TemporalBoundary::Included(time(2)),
+        TemporalPrecision::Second,
+    )
+    .expect("lower-open interval must validate");
     let unknown = TemporalInterval::<EventTime>::unknown();
     let proper = proper_interval(1, 2);
 
-    for invalid in [exact, open, unknown] {
+    for invalid in [exact, upper_open, lower_open, unknown] {
         assert_eq!(
             classify_interval_relation(&invalid, &proper),
+            Err(TemporalError::RelationRequiresProperBoundedInterval)
+        );
+        assert_eq!(
+            classify_interval_relation(&proper, &invalid),
             Err(TemporalError::RelationRequiresProperBoundedInterval)
         );
     }
@@ -125,11 +147,17 @@ fn relation_sets_support_inverse_intersection_and_complete_composition() {
         selected.intersection(RelationSet::singleton(AllenRelation::Meets)),
         RelationSet::singleton(AllenRelation::Meets)
     );
+    assert_eq!(
+        RelationSet::singleton(AllenRelation::Before)
+            .union(RelationSet::singleton(AllenRelation::Meets)),
+        selected
+    );
     assert!(selected.contains(AllenRelation::Before));
     assert!(!selected.contains(AllenRelation::After));
     assert_eq!(selected.len(), 2);
     assert!(!selected.is_empty());
     assert!(RelationSet::empty().is_empty());
+    assert_eq!(RelationSet::from_relations(&[]), RelationSet::empty());
     assert_eq!(RelationSet::all().len(), 13);
 }
 
