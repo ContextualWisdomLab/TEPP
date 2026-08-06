@@ -1,0 +1,172 @@
+name: Rust Foundation CI
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - "deny.toml"
+      - "requirements-quality.txt"
+      - ".coveragerc"
+      - ".config/**"
+      - "crates/**"
+      - "scripts/**"
+      - "tests/quality/**"
+      - ".github/workflows/ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - "deny.toml"
+      - "requirements-quality.txt"
+      - ".coveragerc"
+      - ".config/**"
+      - "crates/**"
+      - "scripts/**"
+      - "tests/quality/**"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tepp-rust-foundation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+  RUSTDOCFLAGS: -Dwarnings
+  CARGO_NEXTEST_VERSION: "0.9.140"
+  CARGO_DENY_VERSION: "0.19.7"
+  CARGO_LLVM_COV_VERSION: "0.8.6"
+
+jobs:
+  repository-contracts:
+    name: Repository contracts and Python branch coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          persist-credentials: false
+      - name: Install pinned Python quality dependency
+        run: python3 -m pip install --disable-pip-version-check --no-deps -r requirements-quality.txt
+      - name: Exercise repository tooling with branch coverage
+        run: python3 -m coverage run --branch -m unittest discover -s tests/quality -p 'test_*.py'
+      - name: Enforce repository tooling coverage
+        run: python3 -m coverage report --fail-under=100 --show-missing
+      - name: Validate workspace contract
+        run: python3 scripts/check_workspace_contract.py
+      - name: Validate Rust documentation contract
+        run: python3 scripts/check_docstrings.py
+
+  rust-quality:
+    name: Format, lint, test, rustdoc, and dependency policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+      - name: Restore pinned Rust quality tools
+        id: rust-tools-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest
+            ~/.cargo/bin/cargo-deny
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-rust-tools-nextest-${{ env.CARGO_NEXTEST_VERSION }}-deny-${{ env.CARGO_DENY_VERSION }}
+      - name: Install cargo-nextest
+        if: steps.rust-tools-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-nextest --locked --version "$CARGO_NEXTEST_VERSION"
+      - name: Install cargo-deny
+        if: steps.rust-tools-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-deny --locked --version "$CARGO_DENY_VERSION"
+      - name: Verify pinned Rust quality tool versions
+        run: |
+          cargo nextest --version | grep -F "$CARGO_NEXTEST_VERSION"
+          cargo deny --version | grep -F "$CARGO_DENY_VERSION"
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Compile all targets
+        run: cargo check --workspace --all-targets --all-features
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Run test suite without retries
+        run: cargo nextest run --workspace --all-features
+      - name: Run doctests separately
+        run: cargo test --doc --workspace --all-features
+      - name: Build warning-free documentation
+        run: cargo doc --workspace --all-features --no-deps
+      - name: Enforce dependency, license, advisory, and source policy
+        run: cargo deny check
+
+  line-coverage:
+    name: Production line coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain with LLVM tools
+        run: rustup toolchain install 1.97.1 --profile minimal --component llvm-tools-preview
+      - name: Restore pinned cargo-llvm-cov
+        id: llvm-cov-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-cargo-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}
+      - name: Install cargo-llvm-cov
+        if: steps.llvm-cov-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
+      - name: Verify pinned cargo-llvm-cov version
+        run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
+      - name: Generate exact line coverage
+        id: line-report
+        run: cargo llvm-cov --workspace --all-features --json --summary-only --output-path coverage.json
+      - name: Enforce complete line coverage
+        run: python3 scripts/check_coverage.py coverage.json --kind lines
+      - name: Show exact missing line diagnostics
+        if: ${{ failure() && steps.line-report.outcome == 'success' }}
+        run: cargo llvm-cov report --text --show-missing-lines
+
+  branch-coverage:
+    name: Production branch coverage on pinned nightly
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          persist-credentials: false
+      - name: Install pinned nightly with LLVM tools
+        run: rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
+      - name: Restore pinned cargo-llvm-cov
+        id: llvm-cov-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-cargo-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}
+      - name: Install cargo-llvm-cov
+        if: steps.llvm-cov-cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
+      - name: Verify pinned cargo-llvm-cov version
+        run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
+      - name: Generate exact branch coverage
+        id: branch-report
+        run: cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json
+      - name: Enforce complete branch coverage
+        run: python3 scripts/check_coverage.py coverage-branches.json --kind branches
+      - name: Show exact missing branch diagnostics
+        if: ${{ failure() && steps.branch-report.outcome == 'success' }}
+        run: cargo +nightly-2026-08-01 llvm-cov report --branch --text --show-missing-lines

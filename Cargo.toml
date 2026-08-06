@@ -1,0 +1,53 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/evidence_core",
+    "crates/temporal_core",
+    "crates/event_core",
+    "crates/relation_graph",
+    "crates/membership_core",
+    "crates/persistence_postgres",
+    "crates/corpus_split",
+    "crates/tepp_simulation",
+    "crates/validation_core",
+    "crates/tepp_api",
+]
+default-members = [
+    "crates/evidence_core",
+    "crates/temporal_core",
+    "crates/event_core",
+    "crates/relation_graph",
+    "crates/membership_core",
+    "crates/persistence_postgres",
+    "crates/corpus_split",
+    "crates/tepp_simulation",
+    "crates/validation_core",
+    "crates/tepp_api",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+authors = ["Contextual Wisdom Lab"]
+repository = "https://github.com/ContextualWisdomLab/TEPP"
+homepage = "https://github.com/ContextualWisdomLab/TEPP"
+readme = "README.md"
+keywords = ["psychometrics", "temporal", "events", "topic-modeling", "rust"]
+categories = ["science", "algorithms"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+warnings = "deny"
+rust_2018_idioms = { level = "deny", priority = -1 }
+unused_lifetimes = "deny"
+unused_qualifications = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+multiple_crate_versions = "allow"
+module_name_repetitions = "allow"

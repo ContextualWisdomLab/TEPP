@@ -1,0 +1,17 @@
+[package]
+name = "temporal_core"
+description = "Six-clock temporal values, uncertain intervals, and temporal relations."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true

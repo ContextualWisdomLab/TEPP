@@ -43,6 +43,43 @@ flowchart LR
 
 Every boundary must be independently usable and expose versioned contracts for integration with organization repositories, `naruon`, and `contextual-orchestrator`.
 
+## Implemented foundation topology
+
+Task 1 materializes the first storage-independent workspace boundaries. The
+crate names are stable implementation identifiers, while the broader service
+boundaries above remain the target modular MSA architecture.
+
+| Rust crate | Initial responsibility |
+|---|---|
+| `evidence_core` | immutable evidence domain primitives |
+| `temporal_core` | typed clocks, intervals, and temporal reasoning |
+| `event_core` | event instances, mentions, roles, and provenance |
+| `relation_graph` | typed relations and forward-transition validation |
+| `membership_core` | time-varying cross-classified multiple membership |
+| `persistence_postgres` | PostgreSQL repositories and migrations |
+| `corpus_split` | cutoff-safe, relation-aware partitioning |
+| `tepp_simulation` | known-truth temporal/event data generation |
+| `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
+| `tepp_api` | versioned DTO, schema, and export contracts |
+
+No crate exposes placeholder production behavior in Task 1. This prevents an
+empty façade from becoming a de facto public API before its invariants and tests
+exist.
+
+## Quality architecture
+
+The workspace centralizes package metadata and Rust/Clippy lints. Every member
+inherits `unsafe_code = "forbid"`, `missing_docs = "deny"`, and warning denial.
+Repository contract scripts independently verify the approved crate set,
+workspace inheritance, action SHA pinning, absence of LLM credentials from
+ordinary CI, and complete Rust documentation.
+
+Stable Rust 1.97.1 is the compile, lint, test, and line-coverage reference.
+Branch coverage runs in a pinned nightly lane because LLVM branch coverage
+remains unstable in Rust. `cargo-nextest` runs tests without retries, while
+doctests remain a separate `cargo test --doc` gate. `cargo-deny` enforces
+advisory, license, ban, and source policy.
+
 ## Temporal invariants
 
 TEPP stores event/valid time, assertion time, document time, system time, available time, and knowledge cutoff independently. A historical analysis may include a document only when:
