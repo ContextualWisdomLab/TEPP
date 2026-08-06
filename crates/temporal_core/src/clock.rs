@@ -5,6 +5,7 @@ use serde_json::Value;
 use std::fmt;
 
 mod sealed {
+    /// Prevents downstream crates from inventing unreviewed clock semantics.
     pub trait Sealed {}
 }
 
