@@ -26,18 +26,10 @@ fn closure_derives_inverse_relations_with_conservative_provenance() {
     let third = reasoner.add_variable().expect("variable must fit");
 
     let first_constraint = reasoner
-        .assert_relation(
-            first,
-            second,
-            RelationSet::singleton(AllenRelation::Before),
-        )
+        .assert_relation(first, second, RelationSet::singleton(AllenRelation::Before))
         .expect("constraint must validate");
     let second_constraint = reasoner
-        .assert_relation(
-            second,
-            third,
-            RelationSet::singleton(AllenRelation::Meets),
-        )
+        .assert_relation(second, third, RelationSet::singleton(AllenRelation::Meets))
         .expect("constraint must validate");
 
     let report = reasoner.close().expect("network must be consistent");
@@ -88,25 +80,13 @@ fn contradictory_cycles_return_the_supporting_assertions() {
     let third = reasoner.add_variable().expect("variable must fit");
 
     let first_constraint = reasoner
-        .assert_relation(
-            first,
-            second,
-            RelationSet::singleton(AllenRelation::Before),
-        )
+        .assert_relation(first, second, RelationSet::singleton(AllenRelation::Before))
         .expect("constraint must validate");
     let second_constraint = reasoner
-        .assert_relation(
-            second,
-            third,
-            RelationSet::singleton(AllenRelation::Before),
-        )
+        .assert_relation(second, third, RelationSet::singleton(AllenRelation::Before))
         .expect("constraint must validate");
     let third_constraint = reasoner
-        .assert_relation(
-            third,
-            first,
-            RelationSet::singleton(AllenRelation::Before),
-        )
+        .assert_relation(third, first, RelationSet::singleton(AllenRelation::Before))
         .expect("constraint must validate before closure");
 
     let TemporalReasonerError::Contradiction(contradiction) =
@@ -118,6 +98,7 @@ fn contradictory_cycles_return_the_supporting_assertions() {
     assert!(contradiction.support().contains(&first_constraint));
     assert!(contradiction.support().contains(&second_constraint));
     assert!(contradiction.support().contains(&third_constraint));
+    assert_eq!(contradiction.attempted_relations(), None);
     assert_ne!(contradiction.left(), contradiction.right());
     assert_eq!(
         contradiction.to_string(),
@@ -126,11 +107,64 @@ fn contradictory_cycles_return_the_supporting_assertions() {
 }
 
 #[test]
-fn reasoner_rejects_invalid_limits_unknown_variables_empty_relations_and_capacity_overflow() {
-    assert_eq!(
-        TemporalReasonerLimits::new(0, 1, 1),
-        Err(TemporalReasonerError::InvalidLimits)
-    );
+fn direct_contradiction_is_atomic_and_does_not_fabricate_an_accepted_identifier() {
+    let mut reasoner = TemporalReasoner::with_limits(limits(2, 3, 100));
+    let left = reasoner.add_variable().expect("left variable must fit");
+    let right = reasoner.add_variable().expect("right variable must fit");
+    let before = RelationSet::singleton(AllenRelation::Before);
+    let after = RelationSet::singleton(AllenRelation::After);
+
+    let first_constraint = reasoner
+        .assert_relation(left, right, before)
+        .expect("first assertion must validate");
+    let TemporalReasonerError::Contradiction(contradiction) = reasoner
+        .assert_relation(left, right, after)
+        .expect_err("incompatible direct assertion must fail")
+    else {
+        panic!("expected direct contradiction evidence");
+    };
+
+    assert_eq!(contradiction.left(), left);
+    assert_eq!(contradiction.right(), right);
+    assert_eq!(contradiction.support(), &[first_constraint]);
+    assert_eq!(contradiction.attempted_relations(), Some(after));
+
+    let unchanged = reasoner
+        .relation(left, right)
+        .expect("rejected assertion must leave relation intact");
+    assert_eq!(unchanged.relations(), before);
+    assert_eq!(unchanged.support(), &[first_constraint]);
+
+    let second_constraint = reasoner
+        .assert_relation(left, right, before)
+        .expect("a later compatible assertion must remain admissible");
+    assert_ne!(first_constraint, second_constraint);
+    let repeated = reasoner
+        .relation(left, right)
+        .expect("accepted repeated assertion must be observable");
+    assert_eq!(repeated.support(), &[first_constraint, second_constraint]);
+
+    let mut other = TemporalReasoner::with_limits(limits(2, 1, 100));
+    let other_left = other.add_variable().expect("other left must fit");
+    let other_right = other.add_variable().expect("other right must fit");
+    let other_constraint = other
+        .assert_relation(other_left, other_right, before)
+        .expect("other assertion must validate");
+    assert_ne!(first_constraint, other_constraint);
+}
+
+#[test]
+fn reasoner_rejects_invalid_limits_foreign_variables_empty_relations_and_capacity_overflow() {
+    for invalid_limits in [(0, 1, 1), (1, 0, 1), (1, 1, 0)] {
+        assert_eq!(
+            TemporalReasonerLimits::new(
+                invalid_limits.0,
+                invalid_limits.1,
+                invalid_limits.2,
+            ),
+            Err(TemporalReasonerError::InvalidLimits)
+        );
+    }
 
     let mut bounded = TemporalReasoner::with_limits(limits(2, 1, 10));
     let first = bounded.add_variable().expect("first variable must fit");
@@ -143,61 +177,47 @@ fn reasoner_rejects_invalid_limits_unknown_variables_empty_relations_and_capacit
     );
 
     bounded
-        .assert_relation(
-            first,
-            second,
-            RelationSet::singleton(AllenRelation::Before),
-        )
+        .assert_relation(first, second, RelationSet::singleton(AllenRelation::Before))
         .expect("first constraint must fit");
     assert_eq!(
-        bounded.assert_relation(
-            first,
-            second,
-            RelationSet::singleton(AllenRelation::Meets),
-        ),
+        bounded.assert_relation(first, second, RelationSet::empty()),
+        Err(TemporalReasonerError::EmptyRelationSet)
+    );
+    assert_eq!(
+        bounded.assert_relation(first, second, RelationSet::singleton(AllenRelation::Meets)),
         Err(TemporalReasonerError::LimitExceeded(
             ReasonerLimitKind::Constraints
         ))
     );
 
-    let mut other = TemporalReasoner::with_limits(limits(3, 3, 10));
-    other.add_variable().expect("variable must fit");
-    other.add_variable().expect("variable must fit");
-    let foreign = other.add_variable().expect("variable must fit");
+    let mut other = TemporalReasoner::with_limits(limits(2, 2, 10));
+    let foreign_same_index = other.add_variable().expect("foreign variable must fit");
     assert_eq!(
-        bounded.relation(first, foreign),
+        bounded.relation(first, foreign_same_index),
         Err(TemporalReasonerError::UnknownVariable)
     );
-
-    let mut empty_guard = TemporalReasoner::with_limits(limits(2, 2, 10));
-    let left = empty_guard.add_variable().expect("variable must fit");
-    let right = empty_guard.add_variable().expect("variable must fit");
     assert_eq!(
-        empty_guard.assert_relation(left, right, RelationSet::empty()),
-        Err(TemporalReasonerError::EmptyRelationSet)
+        bounded.assert_relation(
+            first,
+            foreign_same_index,
+            RelationSet::singleton(AllenRelation::Before),
+        ),
+        Err(TemporalReasonerError::UnknownVariable)
     );
 }
 
 #[test]
-fn propagation_work_is_bounded_and_fails_closed() {
+fn propagation_work_is_bounded_and_failure_restores_the_preclosure_network() {
     let mut reasoner = TemporalReasoner::with_limits(limits(3, 3, 1));
     let first = reasoner.add_variable().expect("variable must fit");
     let second = reasoner.add_variable().expect("variable must fit");
     let third = reasoner.add_variable().expect("variable must fit");
 
     reasoner
-        .assert_relation(
-            first,
-            second,
-            RelationSet::singleton(AllenRelation::Before),
-        )
+        .assert_relation(first, second, RelationSet::singleton(AllenRelation::Before))
         .expect("constraint must validate");
     reasoner
-        .assert_relation(
-            second,
-            third,
-            RelationSet::singleton(AllenRelation::Before),
-        )
+        .assert_relation(second, third, RelationSet::singleton(AllenRelation::Before))
         .expect("constraint must validate");
 
     assert_eq!(
@@ -205,5 +225,51 @@ fn propagation_work_is_bounded_and_fails_closed() {
         Err(TemporalReasonerError::LimitExceeded(
             ReasonerLimitKind::PropagationSteps
         ))
+    );
+    let restored = reasoner
+        .relation(first, third)
+        .expect("rollback must preserve an unconstrained pair");
+    assert_eq!(restored.relations(), RelationSet::all());
+    assert!(!restored.is_observed());
+    assert!(restored.support().is_empty());
+}
+
+#[test]
+fn reasoner_error_messages_are_stable_and_content_redacting() {
+    let errors = [
+        (
+            TemporalReasonerError::InvalidLimits,
+            "invalid temporal reasoner limits",
+        ),
+        (
+            TemporalReasonerError::UnknownVariable,
+            "unknown temporal reasoner variable",
+        ),
+        (
+            TemporalReasonerError::EmptyRelationSet,
+            "temporal relation set is empty",
+        ),
+        (
+            TemporalReasonerError::LimitExceeded(ReasonerLimitKind::Variables),
+            "temporal reasoner resource limit exceeded",
+        ),
+    ];
+
+    for (error, message) in errors {
+        assert_eq!(error.to_string(), message);
+    }
+
+    let mut reasoner = TemporalReasoner::with_limits(limits(1, 1, 10));
+    let variable = reasoner.add_variable().expect("variable must fit");
+    let contradiction = reasoner
+        .assert_relation(
+            variable,
+            variable,
+            RelationSet::singleton(AllenRelation::Before),
+        )
+        .expect_err("self-before must contradict identity");
+    assert_eq!(
+        contradiction.to_string(),
+        "temporal relation network is contradictory"
     );
 }
