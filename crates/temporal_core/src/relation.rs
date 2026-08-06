@@ -1,8 +1,6 @@
 //! Allen-style qualitative relations over proper bounded temporal intervals.
 
-use crate::{
-    TemporalBoundary, TemporalCertainty, TemporalClock, TemporalError, TemporalInterval,
-};
+use crate::{TemporalBoundary, TemporalCertainty, TemporalClock, TemporalError, TemporalInterval};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
@@ -227,9 +225,6 @@ fn proper_endpoints<T: TemporalClock>(
     let Some(end) = boundary_nanosecond(interval.upper()) else {
         return Err(TemporalError::RelationRequiresProperBoundedInterval);
     };
-    if start >= end {
-        return Err(TemporalError::RelationRequiresProperBoundedInterval);
-    }
     Ok((start, end))
 }
 
@@ -283,29 +278,23 @@ fn classify_endpoints(
     }
 }
 
-fn composition_table() -> &'static [[RelationSet; ELEMENTARY_RELATION_COUNT]; ELEMENTARY_RELATION_COUNT]
-{
-    static TABLE: OnceLock<
-        [[RelationSet; ELEMENTARY_RELATION_COUNT]; ELEMENTARY_RELATION_COUNT],
-    > = OnceLock::new();
+fn composition_table()
+-> &'static [[RelationSet; ELEMENTARY_RELATION_COUNT]; ELEMENTARY_RELATION_COUNT] {
+    static TABLE: OnceLock<[[RelationSet; ELEMENTARY_RELATION_COUNT]; ELEMENTARY_RELATION_COUNT]> =
+        OnceLock::new();
     TABLE.get_or_init(build_composition_table)
 }
 
-fn build_composition_table(
-) -> [[RelationSet; ELEMENTARY_RELATION_COUNT]; ELEMENTARY_RELATION_COUNT] {
-    let mut table =
-        [[RelationSet::empty(); ELEMENTARY_RELATION_COUNT]; ELEMENTARY_RELATION_COUNT];
+fn build_composition_table() -> [[RelationSet; ELEMENTARY_RELATION_COUNT]; ELEMENTARY_RELATION_COUNT]
+{
+    let mut table = [[RelationSet::empty(); ELEMENTARY_RELATION_COUNT]; ELEMENTARY_RELATION_COUNT];
 
     for left_start in 0_i128..6 {
         for left_end in (left_start + 1)..6 {
             for middle_start in 0_i128..6 {
                 for middle_end in (middle_start + 1)..6 {
-                    let left_relation = classify_endpoints(
-                        left_start,
-                        left_end,
-                        middle_start,
-                        middle_end,
-                    );
+                    let left_relation =
+                        classify_endpoints(left_start, left_end, middle_start, middle_end);
                     for right_start in 0_i128..6 {
                         for right_end in (right_start + 1)..6 {
                             let right_relation = classify_endpoints(
@@ -314,14 +303,9 @@ fn build_composition_table(
                                 right_start,
                                 right_end,
                             );
-                            let composed_relation = classify_endpoints(
-                                left_start,
-                                left_end,
-                                right_start,
-                                right_end,
-                            );
-                            let current =
-                                table[left_relation.index()][right_relation.index()];
+                            let composed_relation =
+                                classify_endpoints(left_start, left_end, right_start, right_end);
+                            let current = table[left_relation.index()][right_relation.index()];
                             table[left_relation.index()][right_relation.index()] =
                                 current.with(composed_relation);
                         }
