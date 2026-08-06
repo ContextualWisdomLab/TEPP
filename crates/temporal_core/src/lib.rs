@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
-//! Six nominal clocks, strict absolute instants, and uncertain intervals.
+//! Six nominal clocks, strict absolute instants, uncertain intervals, and bounded temporal reasoning.
 //!
 //! TEPP distinguishes the time at which an event occurred, a claim was made,
 //! a document was created, the platform observed data, evidence became
@@ -20,11 +20,18 @@
 //! semantics. Known intervals retain source precision; unknown intervals do not
 //! claim containment. JSON interchange is explicit, versioned, clock-specific,
 //! and reconstructed through the same domain validation boundary.
+//!
+//! Proper bounded intervals can be classified with Allen's thirteen elementary
+//! relations. Relation sets support inverse and complete composition, while a
+//! resource-bounded path-consistency reasoner preserves direct assertions,
+//! derived narrowing, and conservative supporting-assertion provenance.
 
 mod clock;
 mod error;
 mod instant;
 mod interval;
+mod reasoner;
+mod relation;
 mod wire;
 
 /// The time at which a source asserted a claim about an event or state.
@@ -53,5 +60,29 @@ pub use interval::TemporalCertainty;
 pub use interval::TemporalInterval;
 /// The source precision retained for a temporal value or interval.
 pub use interval::TemporalPrecision;
+/// Summary of one successful bounded closure operation.
+pub use reasoner::ClosureReport;
+/// An opaque identifier for one observed relation assertion.
+pub use reasoner::ConstraintId;
+/// One observed or derived relation returned by the reasoner.
+pub use reasoner::DerivedRelation;
+/// The bounded resource whose configured maximum was exceeded.
+pub use reasoner::ReasonerLimitKind;
+/// Evidence that a qualitative temporal network has no possible relation.
+pub use reasoner::TemporalContradiction;
+/// A bounded qualitative interval-constraint network.
+pub use reasoner::TemporalReasoner;
+/// A fail-closed temporal-reasoner error.
+pub use reasoner::TemporalReasonerError;
+/// Explicit capacity bounds for one temporal reasoner instance.
+pub use reasoner::TemporalReasonerLimits;
+/// An opaque identifier for one interval variable in a reasoner instance.
+pub use reasoner::TemporalVariableId;
+/// Classify two proper, two-sided, nonzero intervals with Allen's algebra.
+pub use relation::classify_interval_relation;
+/// One of Allen's thirteen elementary relations between proper intervals.
+pub use relation::AllenRelation;
+/// A compact set of possible elementary interval relations.
+pub use relation::RelationSet;
 /// The only temporal JSON wire-schema version accepted by this crate.
 pub use wire::TEMPORAL_WIRE_SCHEMA_VERSION;
