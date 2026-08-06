@@ -57,13 +57,7 @@ fn validate_strict_rfc3339_syntax(input: &str) -> Result<(), TemporalError> {
     if bytes.len() < 20 || !input.is_ascii() {
         return Err(TemporalError::InvalidTimestamp);
     }
-    for (index, expected) in [
-        (4, b'-'),
-        (7, b'-'),
-        (10, b'T'),
-        (13, b':'),
-        (16, b':'),
-    ] {
+    for (index, expected) in [(4, b'-'), (7, b'-'), (10, b'T'), (13, b':'), (16, b':')] {
         if bytes.get(index) != Some(&expected) {
             return Err(TemporalError::InvalidTimestamp);
         }
@@ -85,7 +79,7 @@ fn validate_strict_rfc3339_syntax(input: &str) -> Result<(), TemporalError> {
             cursor += 1;
         }
         let fraction_length = cursor - fraction_start;
-        if !(1..=9).contains(&fraction_length) {
+        if fraction_length == 0 || fraction_length > 9 {
             return Err(TemporalError::InvalidTimestamp);
         }
     }
