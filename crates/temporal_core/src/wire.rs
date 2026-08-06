@@ -193,9 +193,7 @@ impl BoundaryWire {
         }
     }
 
-    fn into_instant_boundary(
-        self,
-    ) -> Result<TemporalBoundary<TemporalInstant>, TemporalError> {
+    fn into_instant_boundary(self) -> Result<TemporalBoundary<TemporalInstant>, TemporalError> {
         match (self.kind, self.timestamp) {
             (BoundaryKind::Unbounded, None) => Ok(TemporalBoundary::Unbounded),
             (BoundaryKind::Included, Some(timestamp)) => {
@@ -304,8 +302,8 @@ fn deserialize_interval_wire(payload: &str) -> Result<IntervalWire, TemporalErro
 mod tests {
     use super::{
         BoundaryKind, BoundaryWire, SerializationFailure, TemporalWireEnvelope,
-        deserialize_clock_wire, deserialize_interval_wire, map_instant_boundary,
-        reconstruct_exact, serialize_wire, validate_header,
+        deserialize_clock_wire, deserialize_interval_wire, map_instant_boundary, reconstruct_exact,
+        serialize_wire, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
@@ -315,19 +313,17 @@ mod tests {
     #[test]
     fn serialization_and_deserialization_failures_are_redacted() {
         assert_eq!(
-            serialize_wire(TemporalWireEnvelope::SerializationFailure(
-                SerializationFailure,
-            )),
+            serialize_wire(TemporalWireEnvelope::SerializationFailure(SerializationFailure)),
             Err(TemporalError::InvalidWirePayload)
         );
-        assert!(matches!(
-            deserialize_clock_wire("not JSON"),
-            Err(TemporalError::InvalidWirePayload)
-        ));
-        assert!(matches!(
-            deserialize_interval_wire("not JSON"),
-            Err(TemporalError::InvalidWirePayload)
-        ));
+        let clock_error = deserialize_clock_wire("not JSON")
+            .err()
+            .expect("invalid clock JSON must fail");
+        assert_eq!(clock_error, TemporalError::InvalidWirePayload);
+        let interval_error = deserialize_interval_wire("not JSON")
+            .err()
+            .expect("invalid interval JSON must fail");
+        assert_eq!(interval_error, TemporalError::InvalidWirePayload);
     }
 
     #[test]
