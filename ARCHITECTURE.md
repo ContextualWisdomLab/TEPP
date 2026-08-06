@@ -81,9 +81,19 @@ nonfinite geometry, nonpositive dimensions, and rectangles outside the page.
 Scalar coordinates are evidence locations rather than grapheme, word, or
 sentence boundaries; language-tailored segmentation remains a later module.
 
-Domain fields remain private. Versioned persistence and API DTOs will be added
-explicitly so PostgreSQL, JSON, JSON-LD, and GraphML contracts depend inward on
-validated domain values rather than defining them.
+The boundary now exposes a strict JSON wire version `1` without exposing private
+Rust fields. Artifacts, documents, spans, and nested page locations are serialized
+through explicit DTOs with unknown-field rejection. Reconstruction parses and
+revalidates RFC 9562 identifiers, canonical digests, content limits, exact text
+coordinates, document ownership, and page geometry. Artifact bytes and document
+text are rehashed during reconstruction, and digest substitution fails closed.
+Malformed JSON, unsupported versions, invalid byte values, and unknown nested
+fields produce stable content-redacting errors.
+
+Persistence, JSON Schema publication, JSON-LD, GraphML, source acquisition
+metadata, signatures, and W3C PROV remain outward adapters or later contracts.
+They must depend inward on these validated domain values rather than defining
+them.
 
 ## Quality architecture
 
