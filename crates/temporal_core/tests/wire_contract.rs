@@ -2,8 +2,8 @@
 
 use serde_json::{Value, json};
 use temporal_core::{
-    EventTime, TemporalBoundary, TemporalCertainty, TemporalError, TemporalInterval,
-    TemporalPrecision, TEMPORAL_WIRE_SCHEMA_VERSION,
+    EventTime, TEMPORAL_WIRE_SCHEMA_VERSION, TemporalBoundary, TemporalError, TemporalInterval,
+    TemporalPrecision,
 };
 
 fn replace_field(serialized: &str, field: &str, replacement: Value) -> String {
