@@ -62,7 +62,7 @@ pub use interval::TemporalInterval;
 pub use interval::TemporalPrecision;
 /// Summary of one successful bounded closure operation.
 pub use reasoner::ClosureReport;
-/// An opaque identifier for one observed relation assertion.
+/// An opaque identifier for one accepted relation assertion.
 pub use reasoner::ConstraintId;
 /// One observed or derived relation returned by the reasoner.
 pub use reasoner::DerivedRelation;
@@ -78,11 +78,11 @@ pub use reasoner::TemporalReasonerError;
 pub use reasoner::TemporalReasonerLimits;
 /// An opaque identifier for one interval variable in a reasoner instance.
 pub use reasoner::TemporalVariableId;
-/// Classify two proper, two-sided, nonzero intervals with Allen's algebra.
-pub use relation::classify_interval_relation;
 /// One of Allen's thirteen elementary relations between proper intervals.
 pub use relation::AllenRelation;
 /// A compact set of possible elementary interval relations.
 pub use relation::RelationSet;
+/// Classify two proper, two-sided, nonzero intervals with Allen's algebra.
+pub use relation::classify_interval_relation;
 /// The only temporal JSON wire-schema version accepted by this crate.
 pub use wire::TEMPORAL_WIRE_SCHEMA_VERSION;
