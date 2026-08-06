@@ -281,8 +281,8 @@ mod tests {
         serialize_wire, validate_header,
     };
     use crate::{
-        EventTime, TemporalBoundary, TemporalError, TemporalInstant, TemporalInterval,
-        TemporalPrecision,
+        EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
+        TemporalInterval, TemporalPrecision,
     };
     use serde::Serialize;
     use serde::ser::Serializer;
