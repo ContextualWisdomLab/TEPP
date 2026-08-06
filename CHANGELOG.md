@@ -24,6 +24,10 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Strict versioned JSON wire contracts for artifacts, documents, exact spans, and nested page locations without exposing private domain storage.
 - ADR 0008 and APA 7 doctoring for evidence identity, hashing, JSON interchange, UTF-8 boundaries, Unicode segmentation limits, and future W3C PROV integration.
 - Same-run exact missing-line and missing-branch diagnostics for failed 100% Rust coverage gates.
+- Sealed `EventTime`, `AssertionTime`, `DocumentTime`, `SystemTime`, `AvailableTime`, and `KnowledgeCutoff` nominal types over nanosecond-resolution absolute instants.
+- Exact, bounded, lower-open, upper-open, and explicitly unknown `TemporalInterval<T>` values with included, excluded, and unbounded boundaries plus explicit precision and certainty.
+- Strict temporal JSON wire version `1` and Draft 2020-12 JSON Schemas whose timestamp patterns match the runtime RFC 3339 lexical profile.
+- Task 3 architecture, ADR, and APA 7 doctoring for absolute timestamps, temporal uncertainty, wire interchange, and the boundary between typed intervals and future relation reasoning.
 
 ### Security
 
@@ -36,6 +40,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Copied caller-provided source bytes and document text before acceptance and kept validated evidence fields private.
 - Made empty, oversized, malformed-digest, invalid UTF-8-boundary, coordinate-mismatch, cross-document, nonfinite-geometry, and out-of-page evidence fail closed with content-redacting errors.
 - Rejected malformed or extended wire payloads, unsupported schema versions, invalid identifiers and byte values, digest/content substitution, stale document ownership, and invalid nested geometry during reconstruction.
+- Rejected local timestamps without offsets, shortened or malformed offsets, leap seconds, bracketed zones, unsupported RFC 9557 suffixes, malformed calendars, cross-clock wire payloads, and semantically inconsistent temporal boundaries.
+- Kept temporal errors stable and content-redacting so rejected timestamps and hostile wire values are not echoed into logs or downstream messages.
 
 ### Quality
 
@@ -46,5 +52,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Denied warnings, missing public documentation, and unsafe Rust across the workspace.
 - Added known digest vectors, mutation detection, hostile multibyte Unicode, exact-coordinate, page-boundary, stable-error, and invalid-input regression tests for the first evidence slice.
 - Added strict wire round trips, unknown-field and version rejection, digest reconstruction, configured-limit, hostile JSON, and generated multilingual span tests.
+- Added six-clock parity, nanosecond ordering, explicit-offset and daylight-saving normalization, exact and uncertain interval, hostile temporal wire, schema/runtime parity, and stable-error regression tests.
+- Split Task 3 claims from deferred Allen relation algebra, closure, event graphs, persistence, leakage snapshots, and synthetic-truth recovery so documentation cannot overstate executable evidence.
 
 [Unreleased]: https://github.com/ContextualWisdomLab/TEPP/compare/HEAD...HEAD
