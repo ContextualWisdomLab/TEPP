@@ -138,7 +138,21 @@ jobs:
         run: python3 scripts/check_coverage.py coverage.json --kind lines
       - name: Show exact missing line diagnostics
         if: ${{ failure() && steps.line-report.outcome == 'success' }}
-        run: cargo llvm-cov report --text --show-missing-lines
+        run: |
+          cargo llvm-cov report --text --show-missing-lines
+          cargo llvm-cov report --lcov --output-path coverage.lcov
+          python3 - <<'PY'
+          from pathlib import Path
+
+          current_source = None
+          for raw_line in Path("coverage.lcov").read_text(encoding="utf-8").splitlines():
+              if raw_line.startswith("SF:"):
+                  current_source = raw_line[3:]
+              elif raw_line.startswith("DA:") and current_source is not None:
+                  line_number, count, *_ = raw_line[3:].split(",")
+                  if int(count) == 0:
+                      print(f"UNCOVERED_LINE {current_source}:{line_number}")
+          PY
 
   branch-coverage:
     name: Production branch coverage on pinned nightly
