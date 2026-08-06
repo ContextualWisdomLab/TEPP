@@ -200,10 +200,12 @@ fn reconstruct_exact<T: TemporalClock>(
     precision: TemporalPrecision,
 ) -> Result<TemporalInterval<T>, TemporalError> {
     match (lower, upper) {
-        (TemporalBoundary::Included(lower), TemporalBoundary::Included(upper))
-            if lower == upper =>
-        {
-            TemporalInterval::exact(lower, precision)
+        (TemporalBoundary::Included(lower), TemporalBoundary::Included(upper)) => {
+            if lower == upper {
+                TemporalInterval::exact(lower, precision)
+            } else {
+                Err(TemporalError::InvalidIntervalCertainty)
+            }
         }
         _ => Err(TemporalError::InvalidIntervalCertainty),
     }
