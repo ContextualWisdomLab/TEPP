@@ -303,8 +303,8 @@ fn deserialize_interval_wire(payload: &str) -> Result<IntervalWire, TemporalErro
 mod tests {
     use super::{
         BoundaryKind, BoundaryWire, SerializationFailure, TemporalWireEnvelope,
-        deserialize_clock_wire, deserialize_interval_wire, map_instant_boundary,
-        reconstruct_exact, serialize_wire, validate_header,
+        deserialize_clock_wire, deserialize_interval_wire, map_instant_boundary, reconstruct_exact,
+        serialize_wire, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
@@ -319,14 +319,14 @@ mod tests {
             )),
             Err(TemporalError::InvalidWirePayload)
         );
-        assert!(matches!(
-            deserialize_clock_wire("not JSON"),
+        assert_eq!(
+            deserialize_clock_wire("not JSON").map(|_| ()),
             Err(TemporalError::InvalidWirePayload)
-        ));
-        assert!(matches!(
-            deserialize_interval_wire("not JSON"),
+        );
+        assert_eq!(
+            deserialize_interval_wire("not JSON").map(|_| ()),
             Err(TemporalError::InvalidWirePayload)
-        ));
+        );
     }
 
     #[test]
