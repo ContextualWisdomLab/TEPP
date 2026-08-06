@@ -2,6 +2,8 @@
 
 This register traces TEPP's methodological and engineering contracts to authoritative standards and primary research. References use APA 7th style. Implementations must link claims, equations, tests, and ADRs to the most specific applicable source.
 
+Implementation-specific doctoring supplements this register. The executable Task 3 timestamp, interval, wire, schema, security, and claim-boundary mapping is documented in [`task-3-temporal-wire-foundations.md`](task-3-temporal-wire-foundations.md).
+
 ## Psychometrics and latent-variable modeling
 
 American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
@@ -58,13 +60,21 @@ Raw topic proportions are not ordinary Euclidean measurements. TEPP uses logisti
 
 International Organization for Standardization. (2012). *Language resource management—Semantic annotation framework (SemAF)—Part 1: Time and events (SemAF-Time, ISO-TimeML)* (ISO Standard No. 24617-1:2012).
 
+International Organization for Standardization. (2019a). *Date and time—Representations for information interchange—Part 1: Basic rules* (ISO Standard No. 8601-1:2019). https://www.iso.org/standard/70907.html
+
+International Organization for Standardization. (2019b). *Date and time—Representations for information interchange—Part 2: Extensions* (ISO Standard No. 8601-2:2019). https://www.iso.org/standard/70908.html
+
+Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). RFC Editor. https://doi.org/10.17487/RFC3339
+
+Sharma, U., & Bormann, C. (2024). *Date and time on the Internet: Timestamps with additional information* (RFC 9557). RFC Editor. https://doi.org/10.17487/RFC9557
+
 Hobbs, J. R., & Pan, F. (2017). *Time ontology in OWL* (W3C Recommendation). World Wide Web Consortium. https://www.w3.org/TR/owl-time/
 
 Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information organization*. Kluwer Academic Publishers.
 
 Papadakis, N., Stravoskoufos, K., Baratis, E., & Plexousakis, D. (2013). CHRONOS: A reasoner for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 502–511. https://doi.org/10.1016/j.procs.2013.09.130
 
-TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers.
+TEPP Task 3 uses a deliberately narrow, versioned RFC 3339 profile for validated instants and typed uncertain intervals. RFC 9557 and ISO 8601-2 extensions are tracked but are not silently accepted in wire version `1`. Interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers remain explicit later contracts.
 
 ## Unicode, language tags, and multilingual structure
 
@@ -82,6 +92,10 @@ The original source is preserved. NFC is used for canonical analysis views; comp
 
 Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange format* (RFC 8259). RFC Editor. https://doi.org/10.17487/RFC8259
 
+Hutton, B., Andrews, H., Wright, A., & Dennis, G. (2022). *JSON Schema: A media type for describing JSON documents* (Draft 2020-12). JSON Schema. https://json-schema.org/draft/2020-12/json-schema-core.html
+
+Wright, A., Hutton, B., Andrews, H., & Dennis, G. (2022). *JSON Schema validation: A vocabulary for structural validation of JSON* (Draft 2020-12). JSON Schema. https://json-schema.org/draft/2020-12/json-schema-validation.html
+
 Davis, K., Peabody, B., & Leach, P. (2024). *Universally unique identifier (UUID)* (RFC 9562). RFC Editor. https://doi.org/10.17487/RFC9562
 
 National Institute of Standards and Technology. (2015). *Secure Hash Standard (SHS)* (FIPS PUB 180-4). https://doi.org/10.6028/NIST.FIPS.180-4
@@ -92,7 +106,7 @@ Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology
 
 Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
 
-TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
+TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. JSON Schema records structural and lexical constraints but never substitutes for Rust semantic validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
 
 ## AI risk, security, accessibility, and software supply chain
 
