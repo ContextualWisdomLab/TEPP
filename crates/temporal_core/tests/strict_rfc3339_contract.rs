@@ -42,10 +42,7 @@ fn strict_parser_rejects_bad_offset_shape_and_digits() {
 
 #[test]
 fn strict_parser_rejects_empty_and_excessive_fractional_precision() {
-    for input in [
-        "2026-08-06T01:30:00.Z",
-        "2026-08-06T01:30:00.1234567890Z",
-    ] {
+    for input in ["2026-08-06T01:30:00.Z", "2026-08-06T01:30:00.1234567890Z"] {
         assert_eq!(
             EventTime::parse_rfc3339(input).unwrap_err(),
             TemporalError::InvalidTimestamp
