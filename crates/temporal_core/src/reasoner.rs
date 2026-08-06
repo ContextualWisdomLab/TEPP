@@ -3,21 +3,37 @@
 use crate::RelationSet;
 use std::collections::BTreeSet;
 use std::fmt;
+use uuid::Uuid;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct ReasonerInstanceId(Uuid);
+
+impl ReasonerInstanceId {
+    fn new() -> Self {
+        Self(Uuid::now_v7())
+    }
+}
 
 /// An opaque identifier for one interval variable in a reasoner instance.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TemporalVariableId(usize);
+pub struct TemporalVariableId {
+    reasoner_instance_id: ReasonerInstanceId,
+    variable_index: usize,
+}
 
-/// An opaque identifier for one observed relation assertion.
+/// An opaque identifier for one accepted relation assertion.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ConstraintId(usize);
+pub struct ConstraintId {
+    reasoner_instance_id: ReasonerInstanceId,
+    constraint_index: usize,
+}
 
 /// The bounded resource whose configured maximum was exceeded.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReasonerLimitKind {
     /// The maximum number of interval variables.
     Variables,
-    /// The maximum number of observed constraints.
+    /// The maximum number of accepted constraints.
     Constraints,
     /// The maximum number of path-consistency propagation steps.
     PropagationSteps,
@@ -43,10 +59,7 @@ impl TemporalReasonerLimits {
         maximum_constraints: usize,
         maximum_propagation_steps: usize,
     ) -> Result<Self, TemporalReasonerError> {
-        if maximum_variables == 0
-            || maximum_constraints == 0
-            || maximum_propagation_steps == 0
-        {
+        if maximum_variables == 0 || maximum_constraints == 0 || maximum_propagation_steps == 0 {
             Err(TemporalReasonerError::InvalidLimits)
         } else {
             Ok(Self {
@@ -64,6 +77,7 @@ pub struct TemporalContradiction {
     left: TemporalVariableId,
     right: TemporalVariableId,
     support: Vec<ConstraintId>,
+    attempted_relations: Option<RelationSet>,
 }
 
 impl TemporalContradiction {
@@ -79,21 +93,29 @@ impl TemporalContradiction {
         self.right
     }
 
-    /// Return the conservative set of observed assertions supporting the contradiction.
+    /// Return accepted assertions supporting the contradiction.
     #[must_use]
     pub fn support(&self) -> &[ConstraintId] {
         &self.support
+    }
+
+    /// Return the rejected direct assertion when contradiction occurred before closure.
+    #[must_use]
+    pub const fn attempted_relations(&self) -> Option<RelationSet> {
+        self.attempted_relations
     }
 
     fn from_support(
         left: TemporalVariableId,
         right: TemporalVariableId,
         support: BTreeSet<ConstraintId>,
+        attempted_relations: Option<RelationSet>,
     ) -> Self {
         Self {
             left,
             right,
             support: support.into_iter().collect(),
+            attempted_relations,
         }
     }
 }
@@ -114,11 +136,11 @@ pub enum TemporalReasonerError {
     InvalidLimits,
     /// A variable identifier does not belong to this reasoner instance.
     UnknownVariable,
-    /// An observed constraint supplied no possible elementary relation.
+    /// An asserted constraint supplied no possible elementary relation.
     EmptyRelationSet,
     /// A configured reasoner resource maximum was exceeded.
     LimitExceeded(ReasonerLimitKind),
-    /// Constraint propagation proved that no relation remains possible.
+    /// An assertion or propagation step proved that no relation remains possible.
     Contradiction(TemporalContradiction),
 }
 
@@ -158,7 +180,7 @@ impl DerivedRelation {
         self.observed
     }
 
-    /// Return the conservative observed-assertion support for this relation.
+    /// Return the conservative accepted-assertion support for this relation.
     #[must_use]
     pub fn support(&self) -> &[ConstraintId] {
         &self.support
@@ -222,8 +244,11 @@ impl RelationCell {
 /// The reasoner stores direct assertions separately from derived narrowing,
 /// propagates inverse relations, and applies path consistency until stable.
 /// Failed closure is atomic: contradiction or resource exhaustion restores the
-/// network to its pre-closure state.
+/// network to its pre-closure state. Opaque variable and constraint identifiers
+/// are scoped to one reasoner instance and fail closed when mixed across
+/// instances.
 pub struct TemporalReasoner {
+    reasoner_instance_id: ReasonerInstanceId,
     limits: TemporalReasonerLimits,
     cells: Vec<Vec<RelationCell>>,
     constraint_count: usize,
@@ -232,8 +257,9 @@ pub struct TemporalReasoner {
 impl TemporalReasoner {
     /// Create an empty reasoner with validated explicit limits.
     #[must_use]
-    pub const fn with_limits(limits: TemporalReasonerLimits) -> Self {
+    pub fn with_limits(limits: TemporalReasonerLimits) -> Self {
         Self {
+            reasoner_instance_id: ReasonerInstanceId::new(),
             limits,
             cells: Vec::new(),
             constraint_count: 0,
@@ -253,12 +279,12 @@ impl TemporalReasoner {
             ));
         }
 
-        let identifier = TemporalVariableId(self.cells.len());
+        let identifier = self.variable_id(self.cells.len());
         for row in &mut self.cells {
             row.push(RelationCell::unconstrained());
         }
         let mut new_row = vec![RelationCell::unconstrained(); self.cells.len() + 1];
-        new_row[identifier.0] = RelationCell::identity();
+        new_row[identifier.variable_index] = RelationCell::identity();
         self.cells.push(new_row);
         Ok(identifier)
     }
@@ -267,6 +293,8 @@ impl TemporalReasoner {
     ///
     /// The reverse pair is narrowed by the inverse relation set. The returned
     /// identifier is retained as provenance for later derived relations.
+    /// Rejected assertions neither consume constraint capacity nor receive an
+    /// accepted [`ConstraintId`].
     ///
     /// # Errors
     ///
@@ -279,35 +307,38 @@ impl TemporalReasoner {
         relations: RelationSet,
     ) -> Result<ConstraintId, TemporalReasonerError> {
         self.validate_pair(left, right)?;
+        if relations.is_empty() {
+            return Err(TemporalReasonerError::EmptyRelationSet);
+        }
         if self.constraint_count >= self.limits.maximum_constraints {
             return Err(TemporalReasonerError::LimitExceeded(
                 ReasonerLimitKind::Constraints,
             ));
         }
-        if relations.is_empty() {
-            return Err(TemporalReasonerError::EmptyRelationSet);
-        }
 
-        let identifier = ConstraintId(self.constraint_count);
-        let narrowed = self.cells[left.0][right.0]
+        let narrowed = self.cells[left.variable_index][right.variable_index]
             .relations
             .intersection(relations);
         if narrowed.is_empty() {
-            let mut support = self.cells[left.0][right.0].support.clone();
-            support.insert(identifier);
+            let support = self.cells[left.variable_index][right.variable_index]
+                .support
+                .clone();
             return Err(TemporalReasonerError::Contradiction(
-                TemporalContradiction::from_support(left, right, support),
+                TemporalContradiction::from_support(left, right, support, Some(relations)),
             ));
         }
 
-        let mut support = self.cells[left.0][right.0].support.clone();
+        let identifier = self.constraint_id(self.constraint_count);
+        let mut support = self.cells[left.variable_index][right.variable_index]
+            .support
+            .clone();
         support.insert(identifier);
-        self.cells[left.0][right.0] = RelationCell {
+        self.cells[left.variable_index][right.variable_index] = RelationCell {
             relations: narrowed,
             observed: true,
             support: support.clone(),
         };
-        self.cells[right.0][left.0] = RelationCell {
+        self.cells[right.variable_index][left.variable_index] = RelationCell {
             relations: narrowed.inverse(),
             observed: true,
             support,
@@ -345,7 +376,7 @@ impl TemporalReasoner {
         right: TemporalVariableId,
     ) -> Result<DerivedRelation, TemporalReasonerError> {
         self.validate_pair(left, right)?;
-        let cell = &self.cells[left.0][right.0];
+        let cell = &self.cells[left.variable_index][right.variable_index];
         Ok(DerivedRelation {
             relations: cell.relations,
             observed: cell.observed,
@@ -353,12 +384,30 @@ impl TemporalReasoner {
         })
     }
 
+    fn variable_id(&self, variable_index: usize) -> TemporalVariableId {
+        TemporalVariableId {
+            reasoner_instance_id: self.reasoner_instance_id,
+            variable_index,
+        }
+    }
+
+    fn constraint_id(&self, constraint_index: usize) -> ConstraintId {
+        ConstraintId {
+            reasoner_instance_id: self.reasoner_instance_id,
+            constraint_index,
+        }
+    }
+
     fn validate_pair(
         &self,
         left: TemporalVariableId,
         right: TemporalVariableId,
     ) -> Result<(), TemporalReasonerError> {
-        if left.0 >= self.cells.len() || right.0 >= self.cells.len() {
+        if left.reasoner_instance_id != self.reasoner_instance_id
+            || right.reasoner_instance_id != self.reasoner_instance_id
+            || left.variable_index >= self.cells.len()
+            || right.variable_index >= self.cells.len()
+        {
             Err(TemporalReasonerError::UnknownVariable)
         } else {
             Ok(())
@@ -401,9 +450,10 @@ impl TemporalReasoner {
                             ]);
                             return Err(TemporalReasonerError::Contradiction(
                                 TemporalContradiction::from_support(
-                                    TemporalVariableId(left),
-                                    TemporalVariableId(right),
+                                    self.variable_id(left),
+                                    self.variable_id(right),
                                     support,
+                                    None,
                                 ),
                             ));
                         }
