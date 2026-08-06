@@ -69,7 +69,7 @@ pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, Temp
 }
 
 pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, TemporalError> {
-    let wire = deserialize_clock_wire(payload)?;
+    let wire: ClockWire = deserialize_wire(payload)?;
     validate_header(wire.schema_version, &wire.clock_type, T::WIRE_NAME)?;
     TemporalInstant::parse_rfc3339(&wire.timestamp).map(T::from_instant)
 }
@@ -90,7 +90,7 @@ pub(crate) fn serialize_interval<T: TemporalClock>(
 pub(crate) fn deserialize_interval<T: TemporalClock>(
     payload: &str,
 ) -> Result<TemporalInterval<T>, TemporalError> {
-    let wire = deserialize_interval_wire(payload)?;
+    let wire: IntervalWire = deserialize_wire(payload)?;
     validate_header(wire.schema_version, &wire.clock_type, T::WIRE_NAME)?;
     let lower = map_instant_boundary::<T>(wire.lower.into_instant_boundary()?);
     let upper = map_instant_boundary::<T>(wire.upper.into_instant_boundary()?);
@@ -282,20 +282,18 @@ fn serialize_wire<T: Serialize>(value: &T) -> Result<String, TemporalError> {
     serde_json::to_string(value).map_err(|_| TemporalError::InvalidWirePayload)
 }
 
-fn deserialize_clock_wire(payload: &str) -> Result<ClockWire, TemporalError> {
-    serde_json::from_str(payload).map_err(|_| TemporalError::InvalidWirePayload)
-}
-
-fn deserialize_interval_wire(payload: &str) -> Result<IntervalWire, TemporalError> {
+fn deserialize_wire<'payload, T>(payload: &'payload str) -> Result<T, TemporalError>
+where
+    T: Deserialize<'payload>,
+{
     serde_json::from_str(payload).map_err(|_| TemporalError::InvalidWirePayload)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        BoundaryKind, BoundaryWire, SerializationFailure, deserialize_clock_wire,
-        deserialize_interval_wire, map_instant_boundary, reconstruct_exact, serialize_wire,
-        validate_header,
+        BoundaryKind, BoundaryWire, SerializationFailure, deserialize_wire,
+        map_instant_boundary, reconstruct_exact, serialize_wire, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
@@ -309,11 +307,7 @@ mod tests {
             Err(TemporalError::InvalidWirePayload)
         );
         assert_eq!(
-            deserialize_clock_wire("not JSON").map(|_| ()),
-            Err(TemporalError::InvalidWirePayload)
-        );
-        assert_eq!(
-            deserialize_interval_wire("not JSON").map(|_| ()),
+            deserialize_wire::<Vec<u8>>("not JSON"),
             Err(TemporalError::InvalidWirePayload)
         );
     }
