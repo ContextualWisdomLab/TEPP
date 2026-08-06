@@ -138,7 +138,44 @@ jobs:
         run: python3 scripts/check_coverage.py coverage.json --kind lines
       - name: Show exact missing line diagnostics
         if: ${{ failure() && steps.line-report.outcome == 'success' }}
-        run: cargo llvm-cov report --text --show-missing-lines
+        run: |
+          cargo llvm-cov report --text --show-missing-lines
+          cargo llvm-cov report --lcov --output-path coverage.lcov
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
+          for data in report.get("data", []):
+              for file_record in data.get("files", []):
+                  lines = file_record.get("summary", {}).get("lines", {})
+                  covered = int(lines.get("covered", 0))
+                  count = int(lines.get("count", 0))
+                  if covered < count:
+                      print(
+                          "INCOMPLETE_FILE "
+                          f"{file_record.get('filename', '<unknown>')} {covered}/{count}"
+                      )
+
+          current_source = None
+          for raw_line in Path("coverage.lcov").read_text(encoding="utf-8").splitlines():
+              if raw_line.startswith("SF:"):
+                  current_source = raw_line[3:]
+              elif raw_line.startswith("DA:") and current_source is not None:
+                  line_number, count, *_ = raw_line[3:].split(",")
+                  if int(count) == 0:
+                      print(f"UNCOVERED_LINE {current_source}:{line_number}")
+          PY
+      - name: Upload exact line coverage diagnostics
+        if: ${{ failure() && steps.line-report.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: line-coverage-diagnostics
+          path: |
+            coverage.json
+            coverage.lcov
+          if-no-files-found: error
+          retention-days: 1
 
   branch-coverage:
     name: Production branch coverage on pinned nightly

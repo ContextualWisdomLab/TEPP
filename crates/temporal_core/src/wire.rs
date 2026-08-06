@@ -47,6 +47,19 @@ enum BoundaryKind {
     Excluded,
 }
 
+#[cfg(test)]
+struct SerializationFailure;
+
+#[cfg(test)]
+impl Serialize for SerializationFailure {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        Err(serde::ser::Error::custom("intentional test failure"))
+    }
+}
+
 pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, TemporalError> {
     serialize_wire(&ClockWire {
         schema_version: TEMPORAL_WIRE_SCHEMA_VERSION,
@@ -56,7 +69,7 @@ pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, Temp
 }
 
 pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, TemporalError> {
-    let wire: ClockWire = deserialize_wire(payload)?;
+    let wire = deserialize_clock_wire(payload)?;
     validate_header(wire.schema_version, &wire.clock_type, T::WIRE_NAME)?;
     TemporalInstant::parse_rfc3339(&wire.timestamp).map(T::from_instant)
 }
@@ -77,7 +90,7 @@ pub(crate) fn serialize_interval<T: TemporalClock>(
 pub(crate) fn deserialize_interval<T: TemporalClock>(
     payload: &str,
 ) -> Result<TemporalInterval<T>, TemporalError> {
-    let wire: IntervalWire = deserialize_wire(payload)?;
+    let wire = deserialize_interval_wire(payload)?;
     validate_header(wire.schema_version, &wire.clock_type, T::WIRE_NAME)?;
     let lower = map_instant_boundary::<T>(wire.lower.into_instant_boundary()?);
     let upper = map_instant_boundary::<T>(wire.upper.into_instant_boundary()?);
@@ -200,10 +213,12 @@ fn reconstruct_exact<T: TemporalClock>(
     precision: TemporalPrecision,
 ) -> Result<TemporalInterval<T>, TemporalError> {
     match (lower, upper) {
-        (TemporalBoundary::Included(lower), TemporalBoundary::Included(upper))
-            if lower == upper =>
-        {
-            TemporalInterval::exact(lower, precision)
+        (TemporalBoundary::Included(lower), TemporalBoundary::Included(upper)) => {
+            if lower == upper {
+                TemporalInterval::exact(lower, precision)
+            } else {
+                Err(TemporalError::InvalidIntervalCertainty)
+            }
         }
         _ => Err(TemporalError::InvalidIntervalCertainty),
     }
@@ -267,36 +282,25 @@ fn serialize_wire<T: Serialize>(value: &T) -> Result<String, TemporalError> {
     serde_json::to_string(value).map_err(|_| TemporalError::InvalidWirePayload)
 }
 
-fn deserialize_wire<'payload, T>(payload: &'payload str) -> Result<T, TemporalError>
-where
-    T: Deserialize<'payload>,
-{
+fn deserialize_clock_wire(payload: &str) -> Result<ClockWire, TemporalError> {
+    serde_json::from_str(payload).map_err(|_| TemporalError::InvalidWirePayload)
+}
+
+fn deserialize_interval_wire(payload: &str) -> Result<IntervalWire, TemporalError> {
     serde_json::from_str(payload).map_err(|_| TemporalError::InvalidWirePayload)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        BoundaryKind, BoundaryWire, deserialize_wire, map_instant_boundary, reconstruct_exact,
-        serialize_wire, validate_header,
+        BoundaryKind, BoundaryWire, SerializationFailure, deserialize_clock_wire,
+        deserialize_interval_wire, map_instant_boundary, reconstruct_exact, serialize_wire,
+        validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
         TemporalInterval, TemporalPrecision,
     };
-    use serde::Serialize;
-    use serde::ser::Serializer;
-
-    struct SerializationFailure;
-
-    impl Serialize for SerializationFailure {
-        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            Err(serde::ser::Error::custom("intentional test failure"))
-        }
-    }
 
     #[test]
     fn serialization_and_deserialization_failures_are_redacted() {
@@ -305,7 +309,11 @@ mod tests {
             Err(TemporalError::InvalidWirePayload)
         );
         assert_eq!(
-            deserialize_wire::<Vec<u8>>("not JSON"),
+            deserialize_clock_wire("not JSON").map(|_| ()),
+            Err(TemporalError::InvalidWirePayload)
+        );
+        assert_eq!(
+            deserialize_interval_wire("not JSON").map(|_| ()),
             Err(TemporalError::InvalidWirePayload)
         );
     }
@@ -364,7 +372,7 @@ mod tests {
     }
 
     #[test]
-    fn exact_reconstruction_requires_equal_included_boundaries() {
+    fn exact_reconstruction_requires_equal_included_boundaries_and_known_precision() {
         let first = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("first must parse");
         let second = EventTime::parse_rfc3339("2027-01-01T00:00:00Z").expect("second must parse");
 
@@ -375,6 +383,22 @@ mod tests {
                 TemporalPrecision::Year,
             ),
             Err(TemporalError::InvalidIntervalCertainty)
+        );
+        assert_eq!(
+            reconstruct_exact(
+                TemporalBoundary::Excluded(first),
+                TemporalBoundary::Included(first),
+                TemporalPrecision::Year,
+            ),
+            Err(TemporalError::InvalidIntervalCertainty)
+        );
+        assert_eq!(
+            reconstruct_exact(
+                TemporalBoundary::Included(first),
+                TemporalBoundary::Included(first),
+                TemporalPrecision::Unknown,
+            ),
+            Err(TemporalError::InvalidTemporalPrecision)
         );
         assert_eq!(
             reconstruct_exact(
