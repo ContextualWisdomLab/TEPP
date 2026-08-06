@@ -42,9 +42,9 @@ pub enum ReasonerLimitKind {
 /// Explicit capacity bounds for one temporal reasoner instance.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TemporalReasonerLimits {
-    maximum_variables: usize,
-    maximum_constraints: usize,
-    maximum_propagation_steps: usize,
+    variable_limit: usize,
+    constraint_limit: usize,
+    propagation_budget: usize,
 }
 
 impl TemporalReasonerLimits {
@@ -63,9 +63,9 @@ impl TemporalReasonerLimits {
             Err(TemporalReasonerError::InvalidLimits)
         } else {
             Ok(Self {
-                maximum_variables,
-                maximum_constraints,
-                maximum_propagation_steps,
+                variable_limit: maximum_variables,
+                constraint_limit: maximum_constraints,
+                propagation_budget: maximum_propagation_steps,
             })
         }
     }
@@ -273,7 +273,7 @@ impl TemporalReasoner {
     /// Returns [`TemporalReasonerError::LimitExceeded`] when the configured
     /// variable capacity is exhausted.
     pub fn add_variable(&mut self) -> Result<TemporalVariableId, TemporalReasonerError> {
-        if self.cells.len() >= self.limits.maximum_variables {
+        if self.cells.len() >= self.limits.variable_limit {
             return Err(TemporalReasonerError::LimitExceeded(
                 ReasonerLimitKind::Variables,
             ));
@@ -310,7 +310,7 @@ impl TemporalReasoner {
         if relations.is_empty() {
             return Err(TemporalReasonerError::EmptyRelationSet);
         }
-        if self.constraint_count >= self.limits.maximum_constraints {
+        if self.constraint_count >= self.limits.constraint_limit {
             return Err(TemporalReasonerError::LimitExceeded(
                 ReasonerLimitKind::Constraints,
             ));
@@ -430,7 +430,7 @@ impl TemporalReasoner {
                         if middle == left || middle == right {
                             continue;
                         }
-                        if propagation_steps >= self.limits.maximum_propagation_steps {
+                        if propagation_steps >= self.limits.propagation_budget {
                             return Err(TemporalReasonerError::LimitExceeded(
                                 ReasonerLimitKind::PropagationSteps,
                             ));
