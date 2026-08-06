@@ -58,7 +58,7 @@ jobs:
         shell: bash --noprofile --norc -e -o pipefail {0}
         run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
 
-      - name: Report exact uncovered production regions
+      - name: Report exact uncovered production segments
         shell: bash --noprofile --norc -e -o pipefail {0}
         run: |
           cargo fmt --all -- --check
@@ -79,35 +79,23 @@ jobs:
           incomplete_files = []
           for file_record in data["files"]:
               lines = file_record["summary"]["lines"]
-              if lines["covered"] != lines["count"]:
-                  incomplete_files.append(file_record)
-                  print(
-                      "INCOMPLETE_FILE "
-                      f"{file_record['filename']} "
-                      f"covered={lines['covered']} count={lines['count']} "
-                      f"percent={lines['percent']}"
-                  )
-
-                  for segment in file_record.get("segments", []):
-                      line, column, count, has_count, is_region_entry, is_gap = segment[:6]
-                      if has_count and is_region_entry and not is_gap and count == 0:
-                          print(
-                              "ZERO_SEGMENT "
-                              f"{file_record['filename']}:{line}:{column} "
-                              f"segment={segment}"
-                          )
-
-          incomplete_names = {record["filename"] for record in incomplete_files}
-          for function in data.get("functions", []):
-              if not incomplete_names.intersection(function.get("filenames", [])):
+              if lines["covered"] == lines["count"]:
                   continue
-              for region in function.get("regions", []):
-                  if len(region) > 4 and region[4] == 0:
+
+              incomplete_files.append(file_record)
+              print(
+                  "INCOMPLETE_FILE "
+                  f"{file_record['filename']} "
+                  f"covered={lines['covered']} count={lines['count']} "
+                  f"percent={lines['percent']}"
+              )
+              for segment in file_record.get("segments", []):
+                  line, column, count, has_count, is_region_entry, is_gap = segment[:6]
+                  if has_count and count == 0:
                       print(
-                          "ZERO_REGION "
-                          f"function={function.get('name', '<unknown>')} "
-                          f"filenames={function.get('filenames', [])} "
-                          f"region={region}"
+                          "ZERO_COUNT_SEGMENT "
+                          f"{file_record['filename']}:{line}:{column} "
+                          f"entry={is_region_entry} gap={is_gap} segment={segment}"
                       )
 
           if incomplete_files:
