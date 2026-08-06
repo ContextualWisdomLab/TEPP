@@ -166,6 +166,16 @@ jobs:
                   if int(count) == 0:
                       print(f"UNCOVERED_LINE {current_source}:{line_number}")
           PY
+      - name: Upload exact line coverage diagnostics
+        if: ${{ failure() && steps.line-report.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: line-coverage-diagnostics
+          path: |
+            coverage.json
+            coverage.lcov
+          if-no-files-found: error
+          retention-days: 1
 
   branch-coverage:
     name: Production branch coverage on pinned nightly
