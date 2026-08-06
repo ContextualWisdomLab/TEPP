@@ -93,7 +93,7 @@ fn relation_sets_support_inverse_intersection_and_complete_composition() {
         .compose(RelationSet::singleton(AllenRelation::Overlaps));
     assert_eq!(
         overlaps_twice,
-        RelationSet::from_relations([
+        RelationSet::from_relations(&[
             AllenRelation::Before,
             AllenRelation::Meets,
             AllenRelation::Overlaps,
@@ -116,10 +116,10 @@ fn relation_sets_support_inverse_intersection_and_complete_composition() {
         RelationSet::singleton(AllenRelation::During)
     );
 
-    let selected = RelationSet::from_relations([AllenRelation::Before, AllenRelation::Meets]);
+    let selected = RelationSet::from_relations(&[AllenRelation::Before, AllenRelation::Meets]);
     assert_eq!(
         selected.inverse(),
-        RelationSet::from_relations([AllenRelation::After, AllenRelation::MetBy])
+        RelationSet::from_relations(&[AllenRelation::After, AllenRelation::MetBy])
     );
     assert_eq!(
         selected.intersection(RelationSet::singleton(AllenRelation::Meets)),
