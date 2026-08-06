@@ -171,7 +171,7 @@ impl<T: TemporalClock> TemporalInterval<T> {
         if !self.is_known() {
             return false;
         }
-        lower_contains(self.lower, value) && upper_contains(self.upper, value)
+        lower_contains(self.lower, &value) && upper_contains(self.upper, &value)
     }
 
     /// Serialize this interval through the strict versioned JSON contract.
@@ -216,19 +216,19 @@ fn boundary_value<T: Copy>(boundary: TemporalBoundary<T>) -> Option<T> {
     }
 }
 
-fn lower_contains<T: Ord>(boundary: TemporalBoundary<T>, value: T) -> bool {
+fn lower_contains<T: Ord>(boundary: TemporalBoundary<T>, value: &T) -> bool {
     match boundary {
         TemporalBoundary::Unbounded => true,
-        TemporalBoundary::Included(lower) => value >= lower,
-        TemporalBoundary::Excluded(lower) => value > lower,
+        TemporalBoundary::Included(lower) => value >= &lower,
+        TemporalBoundary::Excluded(lower) => value > &lower,
     }
 }
 
-fn upper_contains<T: Ord>(boundary: TemporalBoundary<T>, value: T) -> bool {
+fn upper_contains<T: Ord>(boundary: TemporalBoundary<T>, value: &T) -> bool {
     match boundary {
         TemporalBoundary::Unbounded => true,
-        TemporalBoundary::Included(upper) => value <= upper,
-        TemporalBoundary::Excluded(upper) => value < upper,
+        TemporalBoundary::Included(upper) => value <= &upper,
+        TemporalBoundary::Excluded(upper) => value < &upper,
     }
 }
 
