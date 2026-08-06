@@ -57,13 +57,16 @@ fn validate_strict_rfc3339_syntax(input: &str) -> Result<(), TemporalError> {
     if bytes.len() < 20 || !input.is_ascii() {
         return Err(TemporalError::InvalidTimestamp);
     }
-    if bytes.get(4) != Some(&b'-')
-        || bytes.get(7) != Some(&b'-')
-        || bytes.get(10) != Some(&b'T')
-        || bytes.get(13) != Some(&b':')
-        || bytes.get(16) != Some(&b':')
-    {
-        return Err(TemporalError::InvalidTimestamp);
+    for (index, expected) in [
+        (4, b'-'),
+        (7, b'-'),
+        (10, b'T'),
+        (13, b':'),
+        (16, b':'),
+    ] {
+        if bytes.get(index) != Some(&expected) {
+            return Err(TemporalError::InvalidTimestamp);
+        }
     }
     for index in [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18] {
         if !bytes[index].is_ascii_digit() {
@@ -134,11 +137,6 @@ mod tests {
         let invalid = [
             "2026-08-06T01:30:0Z",
             "2026-08-06T01:30:00é",
-            "2026/08-06T01:30:00Z",
-            "2026-08/06T01:30:00Z",
-            "2026-08-06t01:30:00Z",
-            "2026-08-06T01-30:00Z",
-            "2026-08-06T01:30-00Z",
             "202x-08-06T01:30:00Z",
             "2026-08-06T01:30:60Z",
             "2026-08-06T01:30:00Zx",
@@ -154,6 +152,30 @@ mod tests {
                 Err(TemporalError::InvalidTimestamp)
             );
         }
+    }
+
+    #[test]
+    fn strict_syntax_rejects_each_required_separator_position() {
+        assert_eq!(
+            validate_strict_rfc3339_syntax("2026/08-06T01:30:00Z"),
+            Err(TemporalError::InvalidTimestamp)
+        );
+        assert_eq!(
+            validate_strict_rfc3339_syntax("2026-08/06T01:30:00Z"),
+            Err(TemporalError::InvalidTimestamp)
+        );
+        assert_eq!(
+            validate_strict_rfc3339_syntax("2026-08-06t01:30:00Z"),
+            Err(TemporalError::InvalidTimestamp)
+        );
+        assert_eq!(
+            validate_strict_rfc3339_syntax("2026-08-06T01-30:00Z"),
+            Err(TemporalError::InvalidTimestamp)
+        );
+        assert_eq!(
+            validate_strict_rfc3339_syntax("2026-08-06T01:30-00Z"),
+            Err(TemporalError::InvalidTimestamp)
+        );
     }
 
     #[test]
