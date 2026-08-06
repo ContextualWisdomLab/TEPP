@@ -6,6 +6,8 @@ use temporal_core::{
     TemporalPrecision,
 };
 
+const STRICT_TIMESTAMP_PATTERN: &str = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})$";
+
 fn replace_field(serialized: &str, field: &str, replacement: Value) -> String {
     let mut value: Value = serde_json::from_str(serialized).expect("wire JSON must parse");
     value[field] = replacement;
@@ -208,9 +210,11 @@ fn interval_wire_rejects_malformed_boundary_payloads() {
 }
 
 #[test]
-fn temporal_json_schemas_are_draft_2020_12_and_clock_specific() {
+fn temporal_json_schemas_are_draft_2020_12_and_match_the_runtime_timestamp_profile() {
     let clock_schema = EventTime::wire_json_schema();
     let interval_schema = TemporalInterval::<EventTime>::wire_json_schema();
+    let lower_schema = &interval_schema["properties"]["lower"];
+    let upper_schema = &interval_schema["properties"]["upper"];
 
     assert_eq!(
         clock_schema["$schema"],
@@ -224,6 +228,10 @@ fn temporal_json_schemas_are_draft_2020_12_and_clock_specific() {
     assert_eq!(
         clock_schema["properties"]["timestamp"]["format"],
         json!("date-time")
+    );
+    assert_eq!(
+        clock_schema["properties"]["timestamp"]["pattern"],
+        json!(STRICT_TIMESTAMP_PATTERN)
     );
     assert_eq!(
         interval_schema["$schema"],
@@ -249,6 +257,23 @@ fn temporal_json_schemas_are_draft_2020_12_and_clock_specific() {
             "year",
             "unknown"
         ])
+    );
+    assert!(lower_schema["oneOf"][0]["properties"]["timestamp"].is_null());
+    assert_eq!(
+        lower_schema["oneOf"][1]["properties"]["timestamp"]["pattern"],
+        json!(STRICT_TIMESTAMP_PATTERN)
+    );
+    assert_eq!(
+        lower_schema["oneOf"][2]["properties"]["timestamp"]["pattern"],
+        json!(STRICT_TIMESTAMP_PATTERN)
+    );
+    assert_eq!(
+        upper_schema["oneOf"][1]["properties"]["timestamp"]["pattern"],
+        json!(STRICT_TIMESTAMP_PATTERN)
+    );
+    assert_eq!(
+        upper_schema["oneOf"][2]["properties"]["timestamp"]["pattern"],
+        json!(STRICT_TIMESTAMP_PATTERN)
     );
 }
 
