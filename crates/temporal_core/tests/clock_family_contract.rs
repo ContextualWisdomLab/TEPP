@@ -38,16 +38,16 @@ macro_rules! assert_clock_contract {
 
 macro_rules! assert_interval_contract {
     ($clock:ty) => {{
-        let before = <$clock>::parse_rfc3339("2025-12-31T23:59:59Z")
-            .expect("before value must parse");
+        let before =
+            <$clock>::parse_rfc3339("2025-12-31T23:59:59Z").expect("before value must parse");
         let lower =
             <$clock>::parse_rfc3339("2026-01-01T00:00:00Z").expect("lower value must parse");
         let middle =
             <$clock>::parse_rfc3339("2026-06-01T00:00:00Z").expect("middle value must parse");
         let upper =
             <$clock>::parse_rfc3339("2027-01-01T00:00:00Z").expect("upper value must parse");
-        let after = <$clock>::parse_rfc3339("2027-01-01T00:00:01Z")
-            .expect("after value must parse");
+        let after =
+            <$clock>::parse_rfc3339("2027-01-01T00:00:01Z").expect("after value must parse");
 
         assert_eq!(
             TemporalInterval::<$clock>::bounded(
