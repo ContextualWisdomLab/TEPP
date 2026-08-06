@@ -29,6 +29,16 @@ fn unknown_certainty_rejects_known_precision_or_known_boundaries() {
         TemporalInterval::<EventTime>::from_wire_json(&known_lower).unwrap_err(),
         TemporalError::InvalidIntervalCertainty
     );
+
+    let known_upper = mutate(
+        &serialized,
+        "upper",
+        json!({"kind":"included","timestamp":"2026-08-06T00:00:00Z"}),
+    );
+    assert_eq!(
+        TemporalInterval::<EventTime>::from_wire_json(&known_upper).unwrap_err(),
+        TemporalError::InvalidIntervalCertainty
+    );
 }
 
 #[test]

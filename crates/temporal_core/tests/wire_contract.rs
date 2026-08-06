@@ -198,6 +198,16 @@ fn interval_wire_rejects_malformed_boundary_payloads() {
         TemporalInterval::<EventTime>::from_wire_json(&invalid_kind).unwrap_err(),
         TemporalError::InvalidWirePayload
     );
+
+    let invalid_upper_timestamp = replace_field(
+        &serialized,
+        "upper",
+        json!({"kind":"included","timestamp":"2026-08-06"}),
+    );
+    assert_eq!(
+        TemporalInterval::<EventTime>::from_wire_json(&invalid_upper_timestamp).unwrap_err(),
+        TemporalError::InvalidTimestamp
+    );
 }
 
 #[test]

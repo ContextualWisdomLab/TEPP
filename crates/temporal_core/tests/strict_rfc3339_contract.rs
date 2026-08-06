@@ -28,6 +28,8 @@ fn strict_parser_rejects_bad_offset_shape_and_digits() {
         "2026-08-06T01:30:00+0x:30",
         "2026-08-06T01:30:00+05:3x",
         "2026-08-06T01:30:00z",
+        "2026-08-06T01:30:00Zx",
+        "2026-08-06T01:30:00+05:30x",
     ];
 
     for input in invalid {
