@@ -1,8 +1,7 @@
 //! Versioned, fail-closed JSON wire contracts for immutable evidence records.
 
 use evidence_core::{
-    DocumentRecord, EvidenceError, PageLocation, SourceArtifact, SourceSpan,
-    WIRE_SCHEMA_VERSION,
+    DocumentRecord, EvidenceError, PageLocation, SourceArtifact, SourceSpan, WIRE_SCHEMA_VERSION,
 };
 use serde_json::{Value, json};
 
@@ -31,7 +30,10 @@ fn source_artifact_wire_round_trip_preserves_identity_digest_and_bytes() {
         value["content_sha256"],
         json!(artifact.content_digest().to_string())
     );
-    assert_eq!(value["content_bytes"], json!([0, 115, 111, 117, 114, 99, 101, 255]));
+    assert_eq!(
+        value["content_bytes"],
+        json!([0, 115, 111, 117, 114, 99, 101, 255])
+    );
     assert_eq!(restored, artifact);
 }
 
@@ -53,11 +55,7 @@ fn source_artifact_wire_rejects_unknown_version_fields_and_digest_mismatch() {
         EvidenceError::InvalidWirePayload
     );
 
-    let mismatch = replace_field(
-        &serialized,
-        "content_sha256",
-        json!("00".repeat(32)),
-    );
+    let mismatch = replace_field(&serialized, "content_sha256", json!("00".repeat(32)));
     assert_eq!(
         SourceArtifact::from_wire_json(&mismatch).unwrap_err(),
         EvidenceError::ContentDigestMismatch
@@ -124,11 +122,7 @@ fn document_wire_rejects_unknown_version_fields_digest_mismatch_and_limits() {
         EvidenceError::InvalidWirePayload
     );
 
-    let mismatch = replace_field(
-        &serialized,
-        "content_sha256",
-        json!("00".repeat(32)),
-    );
+    let mismatch = replace_field(&serialized, "content_sha256", json!("00".repeat(32)));
     assert_eq!(
         DocumentRecord::from_wire_json(&mismatch).unwrap_err(),
         EvidenceError::ContentDigestMismatch
@@ -153,8 +147,8 @@ fn source_span_wire_round_trip_revalidates_exact_coordinates_and_page_location()
     let (_, document) = artifact_and_document("Aé🧠Z");
     let location = PageLocation::new(2, 100.0, 200.0, 10.0, 20.0, 30.0, 40.0)
         .expect("page location must be valid");
-    let span = SourceSpan::new(&document, 1, 7, 1, 3, Some(location))
-        .expect("source span must be valid");
+    let span =
+        SourceSpan::new(&document, 1, 7, 1, 3, Some(location)).expect("source span must be valid");
     let serialized = span.to_wire_json().expect("span must serialize");
     let value: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
     let restored =
@@ -213,8 +207,7 @@ fn page_location_wire_rejects_unknown_nested_fields_and_invalid_geometry() {
     let (_, document) = artifact_and_document("page");
     let location = PageLocation::new(1, 100.0, 100.0, 0.0, 0.0, 10.0, 10.0)
         .expect("page location must be valid");
-    let span = SourceSpan::new(&document, 0, 4, 0, 4, Some(location))
-        .expect("span must be valid");
+    let span = SourceSpan::new(&document, 0, 4, 0, 4, Some(location)).expect("span must be valid");
     let serialized = span.to_wire_json().expect("span must serialize");
     let mut unknown: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
     unknown["page_location"]["rotation"] = json!(90);
@@ -224,8 +217,7 @@ fn page_location_wire_rejects_unknown_nested_fields_and_invalid_geometry() {
         EvidenceError::InvalidWirePayload
     );
 
-    let mut out_of_bounds: Value =
-        serde_json::from_str(&serialized).expect("wire JSON must parse");
+    let mut out_of_bounds: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
     out_of_bounds["page_location"]["width"] = json!(101.0);
     assert_eq!(
         SourceSpan::from_wire_json(&out_of_bounds.to_string(), &document).unwrap_err(),
