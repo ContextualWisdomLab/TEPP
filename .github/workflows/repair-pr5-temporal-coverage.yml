@@ -1,29 +1,29 @@
-name: Repair PR 5 temporal coverage
+name: Diagnose PR 5 temporal coverage
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/task-3-six-clock-intervals
+      - main
     paths:
       - .github/workflows/repair-pr5-temporal-coverage.yml
+      - crates/temporal_core/**
+      - Cargo.toml
+      - Cargo.lock
 
 permissions:
   contents: read
 
 concurrency:
-  group: repair-pr5-temporal-coverage
-  cancel-in-progress: false
+  group: diagnose-pr5-temporal-coverage-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
-  repair:
+  diagnose:
     if: >-
       github.repository == 'ContextualWisdomLab/TEPP' &&
-      github.actor == 'seonghobae' &&
-      github.ref == 'refs/heads/agent/task-3-six-clock-intervals'
-    permissions:
-      contents: write
+      github.event.pull_request.head.ref == 'agent/task-3-six-clock-intervals'
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 25
     env:
       CARGO_TERM_COLOR: always
       RUSTFLAGS: -Dwarnings
@@ -35,91 +35,16 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout exact trigger without persisted credentials
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87 # v6.0.2
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Apply the minimal Clippy and open-boundary coverage repair
+      - name: Install pinned Rust coverage toolchain
         shell: bash --noprofile --norc -e -o pipefail {0}
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          interval_path = Path('crates/temporal_core/src/interval.rs')
-          interval = interval_path.read_text(encoding='utf-8')
-          replacements = {
-              '        lower_contains(self.lower, value) && upper_contains(self.upper, value)\n':
-                  '        lower_contains(self.lower, &value) && upper_contains(self.upper, &value)\n',
-              'fn lower_contains<T: Ord>(boundary: TemporalBoundary<T>, value: T) -> bool {\n':
-                  'fn lower_contains<T: Ord>(boundary: TemporalBoundary<T>, value: &T) -> bool {\n',
-              '        TemporalBoundary::Included(lower) => value >= lower,\n':
-                  '        TemporalBoundary::Included(lower) => value >= &lower,\n',
-              '        TemporalBoundary::Excluded(lower) => value > lower,\n':
-                  '        TemporalBoundary::Excluded(lower) => value > &lower,\n',
-              'fn upper_contains<T: Ord>(boundary: TemporalBoundary<T>, value: T) -> bool {\n':
-                  'fn upper_contains<T: Ord>(boundary: TemporalBoundary<T>, value: &T) -> bool {\n',
-              '        TemporalBoundary::Included(upper) => value <= upper,\n':
-                  '        TemporalBoundary::Included(upper) => value <= &upper,\n',
-              '        TemporalBoundary::Excluded(upper) => value < upper,\n':
-                  '        TemporalBoundary::Excluded(upper) => value < &upper,\n',
-          }
-          for old, new in replacements.items():
-              if interval.count(old) != 1:
-                  raise SystemExit(f'interval repair anchor is not unique: {old!r}')
-              interval = interval.replace(old, new, 1)
-          interval_path.write_text(interval, encoding='utf-8')
-
-          contract_path = Path('crates/temporal_core/tests/clock_family_contract.rs')
-          contract = contract_path.read_text(encoding='utf-8')
-          anchor = '''        let exact = TemporalInterval::<$clock>::exact(middle, TemporalPrecision::Second)
-            .expect("exact interval must validate");
-        assert!(exact.contains(middle));
-        assert!(!exact.contains(lower));
-
-        let unknown = TemporalInterval::<$clock>::unknown();
-'''
-          replacement = '''        let lower_open = TemporalInterval::<$clock>::bounded(
-            TemporalBoundary::Included(lower),
-            TemporalBoundary::Unbounded,
-            TemporalPrecision::Year,
-        )
-        .expect("lower-open interval must validate");
-        assert!(!lower_open.contains(before));
-        assert!(lower_open.contains(lower));
-        assert!(lower_open.contains(after));
-
-        let upper_open = TemporalInterval::<$clock>::bounded(
-            TemporalBoundary::Unbounded,
-            TemporalBoundary::Excluded(upper),
-            TemporalPrecision::Year,
-        )
-        .expect("upper-open interval must validate");
-        assert!(upper_open.contains(before));
-        assert!(!upper_open.contains(upper));
-        assert!(!upper_open.contains(after));
-
-        let exact = TemporalInterval::<$clock>::exact(middle, TemporalPrecision::Second)
-            .expect("exact interval must validate");
-        assert!(exact.contains(middle));
-        assert!(!exact.contains(lower));
-
-        let unknown = TemporalInterval::<$clock>::unknown();
-'''
-          if contract.count(anchor) != 1:
-              raise SystemExit('clock-family open-boundary anchor is not unique')
-          contract = contract.replace(anchor, replacement, 1)
-          contract_path.write_text(contract, encoding='utf-8')
-          PY
-          git diff --check
-
-      - name: Install pinned stable and nightly Rust toolchains
-        shell: bash --noprofile --norc -e -o pipefail {0}
-        run: |
-          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt --component llvm-tools-preview
-          rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
+        run: rustup toolchain install 1.97.1 --profile minimal --component llvm-tools-preview
 
       - name: Restore pinned cargo-llvm-cov
         id: llvm-cov-cache
@@ -133,42 +58,30 @@ jobs:
         shell: bash --noprofile --norc -e -o pipefail {0}
         run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
 
-      - name: Verify formatting, Clippy, tests, and complete coverage
+      - name: Report exact uncovered production lines
         shell: bash --noprofile --norc -e -o pipefail {0}
         run: |
-          cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
           cargo fmt --all -- --check
-          cargo check --workspace --all-targets --all-features
-          cargo clippy --workspace --all-targets --all-features -- -D warnings
-          cargo test --workspace --all-features
-          cargo llvm-cov --workspace --all-features --json --summary-only --output-path coverage.json
-          python3 scripts/check_coverage.py coverage.json --kind lines
-          cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json
-          python3 scripts/check_coverage.py coverage-branches.json --kind branches
-          git diff --check
+          cargo llvm-cov --workspace --all-features --lcov --output-path lcov.info
+          python3 - <<'PY'
+          from pathlib import Path
 
-      - name: Publish only the verified repair and remove the transient workflow
-        env:
-          EXPECTED_HEAD: ${{ github.sha }}
-          SOURCE_BRANCH: agent/task-3-six-clock-intervals
-          PUSH_TOKEN: ${{ github.token }}
-        shell: bash --noprofile --norc -e -o pipefail {0}
-        run: |
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          remote_head="$(git ls-remote origin "refs/heads/${SOURCE_BRANCH}" | cut -f1)"
-          test "$remote_head" = "$EXPECTED_HEAD"
-          rm .github/workflows/repair-pr5-temporal-coverage.yml
-          git add \
-            crates/temporal_core/src/interval.rs \
-            crates/temporal_core/tests/clock_family_contract.rs \
-            .github/workflows/repair-pr5-temporal-coverage.yml
-          git diff --cached --check
-          git diff --cached --quiet && { echo 'No verified repair generated.' >&2; exit 1; }
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "test(temporal): cover open interval boundaries"
-          auth_header="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 | tr -d '\n')"
-          echo "::add-mask::$auth_header"
-          git -c http.extraheader="AUTHORIZATION: basic ${auth_header}" \
-            push --force-with-lease="refs/heads/${SOURCE_BRANCH}:${EXPECTED_HEAD}" \
-            origin "HEAD:refs/heads/${SOURCE_BRANCH}"
+          current_file = None
+          uncovered: list[tuple[str, int]] = []
+          for raw_line in Path("lcov.info").read_text(encoding="utf-8").splitlines():
+              if raw_line.startswith("SF:"):
+                  current_file = raw_line[3:]
+              elif raw_line.startswith("DA:") and current_file is not None:
+                  line_number, hit_count, *_ = raw_line[3:].split(",")
+                  if int(hit_count) == 0:
+                      uncovered.append((current_file, int(line_number)))
+
+          if uncovered:
+              print("UNCOVERED_PRODUCTION_LINES_BEGIN")
+              for file_name, line_number in uncovered:
+                  print(f"{file_name}:{line_number}")
+              print("UNCOVERED_PRODUCTION_LINES_END")
+              raise SystemExit(1)
+
+          print("All production lines are covered.")
+          PY
