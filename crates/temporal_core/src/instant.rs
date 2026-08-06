@@ -35,7 +35,7 @@ impl TemporalInstant {
 
     /// Return the signed number of nanoseconds since the Unix epoch.
     #[must_use]
-    pub const fn as_nanosecond(self) -> i128 {
+    pub fn as_nanosecond(self) -> i128 {
         self.0.as_nanosecond()
     }
 
