@@ -41,12 +41,7 @@ impl DocumentRecord {
         maximum_bytes: usize,
     ) -> Result<Self, EvidenceError> {
         let text = text.as_ref();
-        if text.is_empty() {
-            return Err(EvidenceError::EmptyDocument);
-        }
-        if text.len() > maximum_bytes {
-            return Err(EvidenceError::DocumentTooLarge);
-        }
+        validate_text(text, maximum_bytes)?;
 
         Ok(Self {
             id: EvidenceId::new(),
@@ -54,6 +49,61 @@ impl DocumentRecord {
             content_digest: ContentDigest::sha256(text.as_bytes()),
             scalar_length: text.chars().count(),
             text: Arc::from(text),
+        })
+    }
+
+    /// Serialize this document through the strict versioned JSON wire contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EvidenceError::InvalidWirePayload`] if JSON serialization
+    /// cannot represent the validated document.
+    pub fn to_wire_json(&self) -> Result<String, EvidenceError> {
+        crate::wire::serialize_document(self)
+    }
+
+    /// Reconstruct and validate a document from versioned JSON using the default limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed wire, identifier, digest, size, or content-integrity
+    /// error when the payload does not reconstruct this domain type exactly.
+    pub fn from_wire_json(payload: &str) -> Result<Self, EvidenceError> {
+        Self::from_wire_json_with_limit(payload, DEFAULT_DOCUMENT_BYTE_LIMIT)
+    }
+
+    /// Reconstruct and validate a document from versioned JSON with a byte limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed wire, identifier, digest, size, or content-integrity
+    /// error when the payload does not reconstruct this domain type exactly.
+    pub fn from_wire_json_with_limit(
+        payload: &str,
+        maximum_bytes: usize,
+    ) -> Result<Self, EvidenceError> {
+        crate::wire::deserialize_document(payload, maximum_bytes)
+    }
+
+    pub(crate) fn from_wire_parts(
+        id: EvidenceId,
+        source_artifact_id: EvidenceId,
+        content_digest: ContentDigest,
+        text: String,
+        maximum_bytes: usize,
+    ) -> Result<Self, EvidenceError> {
+        validate_text(&text, maximum_bytes)?;
+        if ContentDigest::sha256(text.as_bytes()) != content_digest {
+            return Err(EvidenceError::ContentDigestMismatch);
+        }
+        let scalar_length = text.chars().count();
+
+        Ok(Self {
+            id,
+            source_artifact_id,
+            content_digest,
+            text: Arc::from(text),
+            scalar_length,
         })
     }
 
@@ -98,4 +148,14 @@ impl DocumentRecord {
     pub fn verify_text(&self, candidate: impl AsRef<str>) -> bool {
         ContentDigest::sha256(candidate.as_ref().as_bytes()) == self.content_digest
     }
+}
+
+fn validate_text(text: &str, maximum_bytes: usize) -> Result<(), EvidenceError> {
+    if text.is_empty() {
+        return Err(EvidenceError::EmptyDocument);
+    }
+    if text.len() > maximum_bytes {
+        return Err(EvidenceError::DocumentTooLarge);
+    }
+    Ok(())
 }
