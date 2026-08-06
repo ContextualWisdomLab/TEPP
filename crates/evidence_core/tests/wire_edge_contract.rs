@@ -52,8 +52,8 @@ fn artifact_wire_rejects_invalid_identifiers_digests_and_empty_content() {
 #[test]
 fn document_wire_rejects_invalid_identifiers_digests_and_empty_text() {
     let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
-    let document = DocumentRecord::from_text(artifact.id(), "document")
-        .expect("document must be valid");
+    let document =
+        DocumentRecord::from_text(artifact.id(), "document").expect("document must be valid");
     let serialized = document.to_wire_json().expect("document must serialize");
 
     let malformed_document = replace_field(&serialized, "document_id", json!("invalid"));
@@ -84,8 +84,8 @@ fn document_wire_rejects_invalid_identifiers_digests_and_empty_text() {
 #[test]
 fn source_span_wire_rejects_malformed_document_identifier() {
     let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
-    let document = DocumentRecord::from_text(artifact.id(), "document")
-        .expect("document must be valid");
+    let document =
+        DocumentRecord::from_text(artifact.id(), "document").expect("document must be valid");
     let span = SourceSpan::new(&document, 0, 8, 0, 8, None).expect("span must be valid");
     let serialized = span.to_wire_json().expect("span must serialize");
     let malformed = replace_field(&serialized, "document_id", json!("invalid"));
