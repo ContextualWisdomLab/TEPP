@@ -1,0 +1,40 @@
+name: Documentation Quality
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - "**/*.json"
+      - ".github/workflows/**"
+      - "scripts/validate_documentation.py"
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.md"
+      - "**/*.json"
+      - ".github/workflows/**"
+      - "scripts/validate_documentation.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate planning and governance contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          persist-credentials: false
+      - name: Validate documentation
+        run: python3 scripts/validate_documentation.py
+      - name: Reject whitespace errors
+        run: git diff --check HEAD^ HEAD || git diff --check
