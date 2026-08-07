@@ -19,8 +19,9 @@ impl TemporalInstant {
     ///
     /// Accepted input requires a four-digit date, `T` separator, explicit
     /// seconds, an optional one-to-nine-digit fractional second, and either
-    /// `Z` or an exact `±HH:MM` offset. Leap-second values, bracketed time-zone
-    /// annotations, shortened offsets, spaces, and offset seconds are rejected.
+    /// `Z` or a known exact `±HH:MM` offset. Leap-second values, the RFC 3339
+    /// unknown-local-offset marker `-00:00`, bracketed time-zone annotations,
+    /// shortened offsets, spaces, and offset seconds are rejected.
     ///
     /// # Errors
     ///
@@ -94,6 +95,9 @@ fn validate_strict_rfc3339_syntax(input: &str) -> Result<(), TemporalError> {
                 if !bytes[index].is_ascii_digit() {
                     return Err(TemporalError::InvalidTimestamp);
                 }
+            }
+            if bytes[cursor] == b'-' && &bytes[cursor + 1..cursor + 6] == b"00:00" {
+                return Err(TemporalError::InvalidTimestamp);
             }
             Ok(())
         }
