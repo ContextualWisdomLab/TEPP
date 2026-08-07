@@ -12,7 +12,7 @@ pub const TEMPORAL_WIRE_SCHEMA_VERSION: u16 = 1;
 
 const STRICT_TIMESTAMP_PATTERN: &str = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})$";
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ClockWire {
     schema_version: u16,
@@ -20,7 +20,7 @@ struct ClockWire {
     timestamp: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct IntervalWire {
     schema_version: u16,
@@ -47,12 +47,14 @@ enum BoundaryKind {
     Excluded,
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, TemporalError> {
-    serialize_wire(&ClockWire {
-        schema_version: TEMPORAL_WIRE_SCHEMA_VERSION,
-        clock_type: T::WIRE_NAME.to_owned(),
-        timestamp: clock.instant().to_rfc3339(),
+    Ok(json!({
+        "schema_version": TEMPORAL_WIRE_SCHEMA_VERSION,
+        "clock_type": T::WIRE_NAME,
+        "timestamp": clock.instant().to_rfc3339(),
     })
+    .to_string())
 }
 
 pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, TemporalError> {
@@ -61,17 +63,19 @@ pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, Te
     TemporalInstant::parse_rfc3339(&wire.timestamp).map(T::from_instant)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn serialize_interval<T: TemporalClock>(
     interval: TemporalInterval<T>,
 ) -> Result<String, TemporalError> {
-    serialize_wire(&IntervalWire {
-        schema_version: TEMPORAL_WIRE_SCHEMA_VERSION,
-        clock_type: T::WIRE_NAME.to_owned(),
-        certainty: interval.certainty(),
-        precision: interval.precision(),
-        lower: BoundaryWire::from_boundary(interval.lower()),
-        upper: BoundaryWire::from_boundary(interval.upper()),
+    Ok(json!({
+        "schema_version": TEMPORAL_WIRE_SCHEMA_VERSION,
+        "clock_type": T::WIRE_NAME,
+        "certainty": interval.certainty(),
+        "precision": interval.precision(),
+        "lower": BoundaryWire::from_boundary(interval.lower()),
+        "upper": BoundaryWire::from_boundary(interval.upper()),
     })
+    .to_string())
 }
 
 pub(crate) fn deserialize_interval<T: TemporalClock>(
@@ -265,10 +269,6 @@ fn boundary_json_schema() -> Value {
     })
 }
 
-fn serialize_wire<T: Serialize>(value: &T) -> Result<String, TemporalError> {
-    serde_json::to_string(value).map_err(|_| TemporalError::InvalidWirePayload)
-}
-
 fn deserialize_wire<'payload, T>(payload: &'payload str) -> Result<T, TemporalError>
 where
     T: Deserialize<'payload>,
@@ -279,13 +279,47 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        BoundaryKind, BoundaryWire, ClockWire, deserialize_wire, map_instant_boundary,
-        reconstruct_exact, validate_header,
+        BoundaryKind, BoundaryWire, ClockWire, clock_json_schema, deserialize_clock,
+        deserialize_interval, deserialize_wire, interval_json_schema, map_instant_boundary,
+        reconstruct_exact, serialize_clock, serialize_interval, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
         TemporalInterval, TemporalPrecision,
     };
+    use serde_json::json;
+
+    #[test]
+    fn generic_wire_functions_execute_in_the_library_test_binary() {
+        let value =
+            EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("event time must parse");
+        let clock_wire = serialize_clock(value).expect("validated clock must serialize");
+        assert_eq!(
+            deserialize_clock::<EventTime>(&clock_wire).expect("clock must reconstruct"),
+            value
+        );
+        assert_eq!(
+            clock_json_schema::<EventTime>()["properties"]["clock_type"]["const"],
+            json!("event_time")
+        );
+
+        let interval = TemporalInterval::exact(value, TemporalPrecision::Second)
+            .expect("exact interval must validate");
+        let interval_wire =
+            serialize_interval(interval).expect("validated interval must serialize");
+        assert_eq!(
+            deserialize_interval::<EventTime>(&interval_wire).expect("interval must reconstruct"),
+            interval
+        );
+        assert_eq!(
+            interval_json_schema::<EventTime>()["properties"]["clock_type"]["const"],
+            json!("event_time")
+        );
+        assert!(matches!(
+            BoundaryWire::from_boundary(TemporalBoundary::Included(value)).kind,
+            BoundaryKind::Included
+        ));
+    }
 
     #[test]
     fn deserialization_failures_are_redacted() {
