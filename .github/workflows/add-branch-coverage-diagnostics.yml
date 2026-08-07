@@ -1,0 +1,71 @@
+name: Add branch coverage diagnostics
+
+on:
+  push:
+    branches:
+      - agent/task-4-interval-reasoner
+    paths:
+      - .github/workflows/add-branch-coverage-diagnostics.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tepp-add-branch-coverage-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    name: Patch diagnostics, verify, commit, and self-delete
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout interval-reasoner branch
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: agent/task-4-interval-reasoner
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Add exact branch-coverage artifact upload
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow_path = Path(".github/workflows/ci.yml")
+          workflow_text = workflow_path.read_text(encoding="utf-8")
+          previous = '''      - name: Show exact missing branch diagnostics
+                if: ${{ failure() && steps.branch-report.outcome == 'success' }}
+                run: cargo +nightly-2026-08-01 llvm-cov report --branch --text --show-missing-lines
+          '''
+          replacement = '''      - name: Show exact missing branch diagnostics
+                if: ${{ failure() && steps.branch-report.outcome == 'success' }}
+                run: cargo +nightly-2026-08-01 llvm-cov report --branch --text --show-missing-lines
+              - name: Upload exact branch coverage diagnostics
+                if: ${{ failure() && steps.branch-report.outcome == 'success' }}
+                uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+                with:
+                  name: branch-coverage-diagnostics
+                  path: coverage-branches.json
+                  if-no-files-found: error
+                  retention-days: 1
+          '''
+          if workflow_text.count(previous) != 1:
+              raise SystemExit("expected exactly one branch diagnostics anchor")
+          workflow_path.write_text(workflow_text.replace(previous, replacement), encoding="utf-8")
+          PY
+
+      - name: Validate repository contracts
+        run: |
+          python3 scripts/check_workspace_contract.py
+          git diff --check
+
+      - name: Commit diagnostics and remove this workflow
+        run: |
+          rm .github/workflows/add-branch-coverage-diagnostics.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/ci.yml .github/workflows/add-branch-coverage-diagnostics.yml
+          git commit -m "ci: preserve exact branch coverage diagnostics"
+          git push origin HEAD:agent/task-4-interval-reasoner
