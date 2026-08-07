@@ -174,9 +174,13 @@ impl<T: TemporalClock> TemporalInterval<T> {
         lower_contains(self.lower, &value) && upper_contains(self.upper, &value)
     }
 
-    /// Serialize this validated interval through the strict versioned JSON contract.
-    #[must_use]
-    pub fn to_wire_json(self) -> String {
+    /// Serialize this interval through the strict versioned JSON contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TemporalError::InvalidWirePayload`] if serialization cannot
+    /// represent this validated interval.
+    pub fn to_wire_json(self) -> Result<String, TemporalError> {
         crate::wire::serialize_interval(self)
     }
 
