@@ -139,6 +139,13 @@ impl RelationSet {
         self.0 == 0
     }
 
+    /// Iterate over contained relations once in stable elementary order.
+    pub fn iter(self) -> impl Iterator<Item = AllenRelation> {
+        AllenRelation::ALL
+            .into_iter()
+            .filter(move |relation| self.contains(*relation))
+    }
+
     /// Return the intersection of two relation sets.
     #[must_use]
     pub const fn intersection(self, other: Self) -> Self {
