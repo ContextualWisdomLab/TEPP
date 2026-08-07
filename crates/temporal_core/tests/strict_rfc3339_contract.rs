@@ -41,6 +41,18 @@ fn strict_parser_rejects_bad_offset_shape_and_digits() {
 }
 
 #[test]
+fn strict_parser_rejects_unknown_negative_zero_offset() {
+    assert_eq!(
+        EventTime::parse_rfc3339("2026-08-06T01:30:00-00:00").unwrap_err(),
+        TemporalError::InvalidTimestamp
+    );
+
+    let explicit_utc = EventTime::parse_rfc3339("2026-08-06T01:30:00+00:00")
+        .expect("known zero offset must parse");
+    assert_eq!(explicit_utc.to_rfc3339(), "2026-08-06T01:30:00Z");
+}
+
+#[test]
 fn strict_parser_rejects_empty_and_excessive_fractional_precision() {
     for input in ["2026-08-06T01:30:00.Z", "2026-08-06T01:30:00.1234567890Z"] {
         assert_eq!(
