@@ -279,13 +279,47 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        BoundaryKind, BoundaryWire, ClockWire, deserialize_wire, map_instant_boundary,
-        reconstruct_exact, validate_header,
+        BoundaryKind, BoundaryWire, ClockWire, clock_json_schema, deserialize_clock,
+        deserialize_interval, deserialize_wire, interval_json_schema, map_instant_boundary,
+        reconstruct_exact, serialize_clock, serialize_interval, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
         TemporalInterval, TemporalPrecision,
     };
+
+    #[test]
+    fn generic_wire_functions_execute_in_the_library_test_binary() {
+        let value =
+            EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("event time must parse");
+        let clock_wire = serialize_clock(value).expect("validated clock must serialize");
+        assert_eq!(
+            deserialize_clock::<EventTime>(&clock_wire).expect("clock must reconstruct"),
+            value
+        );
+        assert_eq!(
+            clock_json_schema::<EventTime>()["properties"]["clock_type"]["const"],
+            json!("event_time")
+        );
+
+        let interval = TemporalInterval::exact(value, TemporalPrecision::Second)
+            .expect("exact interval must validate");
+        let interval_wire =
+            serialize_interval(interval).expect("validated interval must serialize");
+        assert_eq!(
+            deserialize_interval::<EventTime>(&interval_wire)
+                .expect("interval must reconstruct"),
+            interval
+        );
+        assert_eq!(
+            interval_json_schema::<EventTime>()["properties"]["clock_type"]["const"],
+            json!("event_time")
+        );
+        assert!(matches!(
+            BoundaryWire::from_boundary(TemporalBoundary::Included(value)).kind,
+            BoundaryKind::Included
+        ));
+    }
 
     #[test]
     fn deserialization_failures_are_redacted() {
