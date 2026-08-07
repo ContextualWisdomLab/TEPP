@@ -33,8 +33,8 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         )
         self.assertIn("steps.branch-report.outcome == 'success'", workflow)
 
-    def test_line_gate_exports_region_level_json_for_hidden_gaps(self) -> None:
-        """The artifact includes regions and functions, not summaries alone."""
+    def test_line_gate_uses_lcov_authored_lines_and_keeps_region_evidence(self) -> None:
+        """Authored lines gate on LCOV while full JSON retains hidden-region evidence."""
 
         workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
@@ -44,6 +44,18 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         )
         self.assertNotIn(
             "cargo llvm-cov --workspace --all-features --json --summary-only",
+            workflow,
+        )
+        self.assertIn(
+            "cargo llvm-cov report --lcov --output-path coverage.lcov",
+            workflow,
+        )
+        self.assertIn(
+            "python3 scripts/check_coverage.py coverage.lcov --kind lines --format lcov",
+            workflow,
+        )
+        self.assertNotIn(
+            "python3 scripts/check_coverage.py coverage.json --kind lines",
             workflow,
         )
         self.assertIn("UNCOVERED_REGION", workflow)
