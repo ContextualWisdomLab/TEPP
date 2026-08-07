@@ -47,14 +47,13 @@ enum BoundaryKind {
     Excluded,
 }
 
-#[allow(clippy::unnecessary_wraps)]
-pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, TemporalError> {
-    Ok(json!({
+pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> String {
+    json!({
         "schema_version": TEMPORAL_WIRE_SCHEMA_VERSION,
         "clock_type": T::WIRE_NAME,
         "timestamp": clock.instant().to_rfc3339(),
     })
-    .to_string())
+    .to_string()
 }
 
 pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, TemporalError> {
@@ -63,11 +62,8 @@ pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, Te
     TemporalInstant::parse_rfc3339(&wire.timestamp).map(T::from_instant)
 }
 
-#[allow(clippy::unnecessary_wraps)]
-pub(crate) fn serialize_interval<T: TemporalClock>(
-    interval: TemporalInterval<T>,
-) -> Result<String, TemporalError> {
-    Ok(json!({
+pub(crate) fn serialize_interval<T: TemporalClock>(interval: TemporalInterval<T>) -> String {
+    json!({
         "schema_version": TEMPORAL_WIRE_SCHEMA_VERSION,
         "clock_type": T::WIRE_NAME,
         "certainty": interval.certainty(),
@@ -75,7 +71,7 @@ pub(crate) fn serialize_interval<T: TemporalClock>(
         "lower": BoundaryWire::from_boundary(interval.lower()),
         "upper": BoundaryWire::from_boundary(interval.upper()),
     })
-    .to_string())
+    .to_string()
 }
 
 pub(crate) fn deserialize_interval<T: TemporalClock>(
