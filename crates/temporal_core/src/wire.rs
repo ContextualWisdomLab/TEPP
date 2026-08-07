@@ -280,12 +280,33 @@ where
 mod tests {
     use super::{
         BoundaryKind, BoundaryWire, ClockWire, deserialize_wire, map_instant_boundary,
-        reconstruct_exact, validate_header,
+        reconstruct_exact, serialize_wire, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
         TemporalInterval, TemporalPrecision,
     };
+    use serde::Serialize;
+    use serde::ser::Serializer;
+
+    struct SerializationFailure;
+
+    impl Serialize for SerializationFailure {
+        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(serde::ser::Error::custom("intentional test failure"))
+        }
+    }
+
+    #[test]
+    fn serialization_failures_are_redacted() {
+        assert_eq!(
+            serialize_wire(&SerializationFailure),
+            Err(TemporalError::InvalidWirePayload)
+        );
+    }
 
     #[test]
     fn deserialization_failures_are_redacted() {
