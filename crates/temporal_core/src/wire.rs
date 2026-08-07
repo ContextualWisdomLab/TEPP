@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 pub const TEMPORAL_WIRE_SCHEMA_VERSION: u16 = 1;
 
 const STRICT_TIMESTAMP_PATTERN: &str = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:[0-9]{2})$";
+const UNKNOWN_LOCAL_OFFSET_PATTERN: &str = r"-00:00$";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -234,7 +235,8 @@ fn timestamp_json_schema() -> Value {
         "type": "string",
         "format": "date-time",
         "pattern": STRICT_TIMESTAMP_PATTERN,
-        "description": "TEPP wire-version 1 strict RFC 3339 profile with explicit seconds, one-to-nine fractional digits, and Z or an exact numeric offset."
+        "not": {"pattern": UNKNOWN_LOCAL_OFFSET_PATTERN},
+        "description": "TEPP wire-version 1 strict RFC 3339 profile with explicit seconds, one-to-nine fractional digits, and Z or a known exact numeric offset; RFC 3339's unknown -00:00 offset is rejected."
     })
 }
 
