@@ -134,13 +134,15 @@ jobs:
       - name: Generate exact line coverage with region diagnostics
         id: line-report
         run: cargo llvm-cov --workspace --all-features --json --output-path coverage.json
-      - name: Enforce complete line coverage
-        run: python3 scripts/check_coverage.py coverage.json --kind lines
+      - name: Export exact authored line coverage
+        run: cargo llvm-cov report --lcov --output-path coverage.lcov
+      - name: Enforce complete authored line coverage
+        run: python3 scripts/check_coverage.py coverage.lcov --kind lines --format lcov
       - name: Show exact missing line diagnostics
         if: ${{ failure() && steps.line-report.outcome == 'success' }}
         run: |
           LLVM_COV_FLAGS="--show-line-counts-or-regions" cargo llvm-cov report --text --show-missing-lines --show-instantiations
-          cargo llvm-cov report --lcov --output-path coverage.lcov
+          test -f coverage.lcov || cargo llvm-cov report --lcov --output-path coverage.lcov
           python3 - <<'PY'
           import json
           from pathlib import Path
