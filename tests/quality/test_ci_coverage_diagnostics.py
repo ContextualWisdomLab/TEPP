@@ -20,6 +20,8 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
 
         self.assertIn("id: line-report", workflow)
         self.assertIn("cargo llvm-cov report --text --show-missing-lines", workflow)
+        self.assertIn("--show-instantiations", workflow)
+        self.assertIn("--show-line-counts-or-regions", workflow)
         self.assertIn("steps.line-report.outcome == 'success'", workflow)
         self.assertIn("id: branch-report", workflow)
         self.assertIn(
@@ -28,15 +30,21 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         )
         self.assertIn("steps.branch-report.outcome == 'success'", workflow)
 
-    def test_line_gate_measures_authored_source_not_macro_expansions(self) -> None:
-        """Generated derive expansion regions cannot dilute authored line coverage."""
+    def test_line_gate_exports_region_level_json_for_hidden_gaps(self) -> None:
+        """The artifact includes regions and functions, not summaries alone."""
 
         workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
         self.assertIn(
-            'LLVM_COV_FLAGS="--skip-expansions" cargo llvm-cov',
+            "cargo llvm-cov --workspace --all-features --json --output-path coverage.json",
             workflow,
         )
+        self.assertNotIn(
+            "cargo llvm-cov --workspace --all-features --json --summary-only",
+            workflow,
+        )
+        self.assertIn("UNCOVERED_REGION", workflow)
+        self.assertIn("UNCOVERED_FUNCTION", workflow)
 
 
 if __name__ == "__main__":  # pragma: no cover
