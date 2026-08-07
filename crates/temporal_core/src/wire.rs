@@ -307,8 +307,7 @@ mod tests {
         let interval_wire =
             serialize_interval(interval).expect("validated interval must serialize");
         assert_eq!(
-            deserialize_interval::<EventTime>(&interval_wire)
-                .expect("interval must reconstruct"),
+            deserialize_interval::<EventTime>(&interval_wire).expect("interval must reconstruct"),
             interval
         );
         assert_eq!(
