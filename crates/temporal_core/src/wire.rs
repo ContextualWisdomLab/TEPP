@@ -48,11 +48,11 @@ enum BoundaryKind {
 }
 
 pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, TemporalError> {
-    serialize_wire(&ClockWire {
+    Ok(serialize_wire(&ClockWire {
         schema_version: TEMPORAL_WIRE_SCHEMA_VERSION,
         clock_type: T::WIRE_NAME.to_owned(),
         timestamp: clock.instant().to_rfc3339(),
-    })
+    }))
 }
 
 pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, TemporalError> {
@@ -64,14 +64,14 @@ pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, Te
 pub(crate) fn serialize_interval<T: TemporalClock>(
     interval: TemporalInterval<T>,
 ) -> Result<String, TemporalError> {
-    serialize_wire(&IntervalWire {
+    Ok(serialize_wire(&IntervalWire {
         schema_version: TEMPORAL_WIRE_SCHEMA_VERSION,
         clock_type: T::WIRE_NAME.to_owned(),
         certainty: interval.certainty(),
         precision: interval.precision(),
         lower: BoundaryWire::from_boundary(interval.lower()),
         upper: BoundaryWire::from_boundary(interval.upper()),
-    })
+    }))
 }
 
 pub(crate) fn deserialize_interval<T: TemporalClock>(
@@ -265,12 +265,9 @@ fn boundary_json_schema() -> Value {
     })
 }
 
-fn invalid_wire_payload(_error: serde_json::Error) -> TemporalError {
-    TemporalError::InvalidWirePayload
-}
-
-fn serialize_wire<T: Serialize>(value: &T) -> Result<String, TemporalError> {
-    serde_json::to_string(value).map_err(invalid_wire_payload)
+fn serialize_wire<T: Serialize>(value: &T) -> String {
+    serde_json::to_string(value)
+        .expect("validated temporal wire records contain only serializable JSON values")
 }
 
 fn deserialize_wire<'payload, T>(payload: &'payload str) -> Result<T, TemporalError>
@@ -284,33 +281,12 @@ where
 mod tests {
     use super::{
         BoundaryKind, BoundaryWire, ClockWire, deserialize_wire, map_instant_boundary,
-        reconstruct_exact, serialize_wire, validate_header,
+        reconstruct_exact, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
         TemporalInterval, TemporalPrecision,
     };
-    use serde::Serialize;
-    use serde::ser::Serializer;
-
-    struct SerializationFailure;
-
-    impl Serialize for SerializationFailure {
-        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            Err(serde::ser::Error::custom("intentional test failure"))
-        }
-    }
-
-    #[test]
-    fn serialization_failures_are_redacted() {
-        assert_eq!(
-            serialize_wire(&SerializationFailure),
-            Err(TemporalError::InvalidWirePayload)
-        );
-    }
 
     #[test]
     fn deserialization_failures_are_redacted() {
