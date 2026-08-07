@@ -139,7 +139,7 @@ jobs:
       - name: Show exact missing line diagnostics
         if: ${{ failure() && steps.line-report.outcome == 'success' }}
         run: |
-          cargo llvm-cov report --text --show-missing-lines --show-instantiations --show-line-counts-or-regions
+          LLVM_COV_FLAGS="--show-line-counts-or-regions" cargo llvm-cov report --text --show-missing-lines --show-instantiations
           cargo llvm-cov report --lcov --output-path coverage.lcov
           python3 - <<'PY'
           import json
