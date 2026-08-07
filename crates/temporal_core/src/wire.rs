@@ -47,6 +47,7 @@ enum BoundaryKind {
     Excluded,
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, TemporalError> {
     Ok(serialize_wire(&ClockWire {
         schema_version: TEMPORAL_WIRE_SCHEMA_VERSION,
@@ -61,6 +62,7 @@ pub(crate) fn deserialize_clock<T: TemporalClock>(payload: &str) -> Result<T, Te
     TemporalInstant::parse_rfc3339(&wire.timestamp).map(T::from_instant)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub(crate) fn serialize_interval<T: TemporalClock>(
     interval: TemporalInterval<T>,
 ) -> Result<String, TemporalError> {
@@ -281,12 +283,26 @@ where
 mod tests {
     use super::{
         BoundaryKind, BoundaryWire, ClockWire, deserialize_wire, map_instant_boundary,
-        reconstruct_exact, validate_header,
+        reconstruct_exact, serialize_wire, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
         TemporalInterval, TemporalPrecision,
     };
+
+    #[test]
+    fn validated_clock_wire_serializes_as_json() {
+        let wire = ClockWire {
+            schema_version: 1,
+            clock_type: "event_time".to_owned(),
+            timestamp: "2026-01-01T00:00:00Z".to_owned(),
+        };
+
+        assert_eq!(
+            serialize_wire(&wire),
+            r#"{"schema_version":1,"clock_type":"event_time","timestamp":"2026-01-01T00:00:00Z"}"#
+        );
+    }
 
     #[test]
     fn deserialization_failures_are_redacted() {
