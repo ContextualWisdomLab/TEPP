@@ -12,9 +12,7 @@ fn mutate(serialized: &str, field: &str, replacement: Value) -> String {
 #[test]
 fn unknown_certainty_rejects_known_precision_or_known_boundaries() {
     let unknown = TemporalInterval::<EventTime>::unknown();
-    let serialized = unknown
-        .to_wire_json()
-        .expect("unknown interval must serialize");
+    let serialized = unknown.to_wire_json();
 
     let known_precision = mutate(&serialized, "precision", json!("day"));
     assert_eq!(
@@ -46,9 +44,7 @@ fn unknown_certainty_rejects_known_precision_or_known_boundaries() {
 #[test]
 fn excluded_boundary_requires_a_timestamp() {
     let unknown = TemporalInterval::<EventTime>::unknown();
-    let serialized = unknown
-        .to_wire_json()
-        .expect("unknown interval must serialize");
+    let serialized = unknown.to_wire_json();
     let malformed = mutate(&serialized, "lower", json!({"kind":"excluded"}));
 
     assert_eq!(
