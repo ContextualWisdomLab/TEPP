@@ -125,6 +125,46 @@ validation, bitemporal persistence, and leakage-safe snapshots remain later
 slices. Those layers must consume these values rather than introduce parallel
 time representations.
 
+## Qualitative interval reasoning boundary
+
+Task 4 extends `temporal_core` with Allen's thirteen elementary relations for
+proper, two-sided, nonzero bounded intervals. Exact instants, open-ended
+intervals, and explicitly unknown intervals remain valid Task 3 values but are
+rejected by the proper-interval classifier. Included and excluded endpoint
+metadata does not change the qualitative endpoint-order relation.
+
+`RelationSet` is a closed thirteen-bit representation. It supports exact
+inverse, intersection, union, membership, iteration, and complete composition.
+The production composition table is generated deterministically from every
+proper interval over six ordered endpoint ranks. An independent test oracle
+uses eight ranks and verifies every elementary pair, while the converse law
+checks that inverse and composition agree in both directions.
+
+`TemporalReasoner` stores a dense ordered-pair relation matrix and applies the
+bounded path-consistency rule:
+
+\[
+R_{ij} \leftarrow R_{ij} \cap (R_{ik} \circ R_{kj}).
+\]
+
+Every accepted direct assertion propagates its exact inverse. Cells retain the
+current possible relations, whether the ordered pair was directly observed,
+and conservative accepted-assertion provenance. Variable and constraint
+identifiers are scoped to one reasoner instance with UUIDv7 identity, so equal
+numeric indices from another network fail closed.
+
+Variable, accepted-constraint, and propagation limits are explicit and nonzero.
+Closure snapshots the relation matrix before propagation; contradiction or
+budget exhaustion restores the pre-closure state. Directly rejected assertions
+do not consume capacity or receive an accepted constraint identifier.
+
+An empty narrowed pair is sound contradiction evidence. A successful closure
+establishes path consistency only; it is not presented as proof of global
+satisfiability for unrestricted disjunctive Allen networks. Complete scenario
+search, tractable-subalgebra detection, minimal contradiction cores, metric
+constraints, event-transition policies, persistence, and historical snapshots
+remain separate future slices.
+
 ## Quality architecture
 
 The workspace centralizes package metadata and Rust/Clippy lints. Every member
