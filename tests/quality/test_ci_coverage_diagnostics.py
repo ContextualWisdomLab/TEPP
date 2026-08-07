@@ -28,6 +28,16 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         )
         self.assertIn("steps.branch-report.outcome == 'success'", workflow)
 
+    def test_line_gate_measures_authored_source_not_macro_expansions(self) -> None:
+        """Generated derive expansion regions cannot dilute authored line coverage."""
+
+        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "--json --summary-only --skip-expansions --output-path coverage.json",
+            workflow,
+        )
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
