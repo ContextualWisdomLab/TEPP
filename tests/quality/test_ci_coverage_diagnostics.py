@@ -21,7 +21,10 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         self.assertIn("id: line-report", workflow)
         self.assertIn("cargo llvm-cov report --text --show-missing-lines", workflow)
         self.assertIn("--show-instantiations", workflow)
-        self.assertIn("--show-line-counts-or-regions", workflow)
+        self.assertIn(
+            'LLVM_COV_FLAGS="--show-line-counts-or-regions" cargo llvm-cov report',
+            workflow,
+        )
         self.assertIn("steps.line-report.outcome == 'success'", workflow)
         self.assertIn("id: branch-report", workflow)
         self.assertIn(
