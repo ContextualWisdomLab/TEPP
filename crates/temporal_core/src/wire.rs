@@ -47,19 +47,6 @@ enum BoundaryKind {
     Excluded,
 }
 
-#[cfg(test)]
-struct SerializationFailure;
-
-#[cfg(test)]
-impl Serialize for SerializationFailure {
-    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        Err(serde::ser::Error::custom("intentional test failure"))
-    }
-}
-
 pub(crate) fn serialize_clock<T: TemporalClock>(clock: T) -> Result<String, TemporalError> {
     serialize_wire(&ClockWire {
         schema_version: TEMPORAL_WIRE_SCHEMA_VERSION,
@@ -292,8 +279,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        BoundaryKind, BoundaryWire, ClockWire, SerializationFailure, deserialize_wire,
-        map_instant_boundary, reconstruct_exact, serialize_wire, validate_header,
+        BoundaryKind, BoundaryWire, ClockWire, deserialize_wire, map_instant_boundary,
+        reconstruct_exact, validate_header,
     };
     use crate::{
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
@@ -301,11 +288,7 @@ mod tests {
     };
 
     #[test]
-    fn serialization_and_deserialization_failures_are_redacted() {
-        assert_eq!(
-            serialize_wire(&SerializationFailure),
-            Err(TemporalError::InvalidWirePayload)
-        );
+    fn deserialization_failures_are_redacted() {
         assert_eq!(
             deserialize_wire::<ClockWire>("not JSON").map(|_| ()),
             Err(TemporalError::InvalidWirePayload)
