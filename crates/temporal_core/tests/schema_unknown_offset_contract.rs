@@ -15,8 +15,8 @@ fn clock_and_interval_schemas_reject_negative_zero_offsets() {
     for boundary_name in ["lower", "upper"] {
         for variant_index in [1, 2] {
             assert_eq!(
-                interval_schema["properties"][boundary_name]["oneOf"][variant_index]
-                    ["properties"]["timestamp"]["not"]["pattern"],
+                interval_schema["properties"][boundary_name]["oneOf"][variant_index]["properties"]
+                    ["timestamp"]["not"]["pattern"],
                 json!("-00:00$")
             );
         }
