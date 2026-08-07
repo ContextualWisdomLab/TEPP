@@ -34,7 +34,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         workflow = CI_WORKFLOW.read_text(encoding="utf-8")
 
         self.assertIn(
-            "--json --summary-only --skip-expansions --output-path coverage.json",
+            'LLVM_COV_FLAGS="--skip-expansions" cargo llvm-cov',
             workflow,
         )
 
