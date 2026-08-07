@@ -133,7 +133,7 @@ jobs:
         run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
       - name: Generate exact authored-source line coverage
         id: line-report
-        run: cargo llvm-cov --workspace --all-features --json --summary-only --skip-expansions --output-path coverage.json
+        run: LLVM_COV_FLAGS="--skip-expansions" cargo llvm-cov --workspace --all-features --json --summary-only --output-path coverage.json
       - name: Enforce complete line coverage
         run: python3 scripts/check_coverage.py coverage.json --kind lines
       - name: Show exact missing line diagnostics
