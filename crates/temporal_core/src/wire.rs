@@ -287,6 +287,7 @@ mod tests {
         EventTime, TemporalBoundary, TemporalClock, TemporalError, TemporalInstant,
         TemporalInterval, TemporalPrecision,
     };
+    use serde_json::json;
 
     #[test]
     fn generic_wire_functions_execute_in_the_library_test_binary() {
