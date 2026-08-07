@@ -131,15 +131,15 @@ jobs:
         run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
       - name: Verify pinned cargo-llvm-cov version
         run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
-      - name: Generate exact authored-source line coverage
+      - name: Generate exact line coverage with region diagnostics
         id: line-report
-        run: LLVM_COV_FLAGS="--skip-expansions" cargo llvm-cov --workspace --all-features --json --summary-only --output-path coverage.json
+        run: cargo llvm-cov --workspace --all-features --json --output-path coverage.json
       - name: Enforce complete line coverage
         run: python3 scripts/check_coverage.py coverage.json --kind lines
       - name: Show exact missing line diagnostics
         if: ${{ failure() && steps.line-report.outcome == 'success' }}
         run: |
-          cargo llvm-cov report --text --show-missing-lines
+          cargo llvm-cov report --text --show-missing-lines --show-instantiations --show-line-counts-or-regions
           cargo llvm-cov report --lcov --output-path coverage.lcov
           python3 - <<'PY'
           import json
@@ -148,14 +148,36 @@ jobs:
           report = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
           for data in report.get("data", []):
               for file_record in data.get("files", []):
+                  filename = file_record.get("filename", "<unknown>")
                   lines = file_record.get("summary", {}).get("lines", {})
                   covered = int(lines.get("covered", 0))
                   count = int(lines.get("count", 0))
                   if covered < count:
-                      print(
-                          "INCOMPLETE_FILE "
-                          f"{file_record.get('filename', '<unknown>')} {covered}/{count}"
-                      )
+                      print(f"INCOMPLETE_FILE {filename} {covered}/{count}")
+                  for segment in file_record.get("segments", []):
+                      if len(segment) < 6:
+                          continue
+                      line_number, column_number, execution_count = segment[:3]
+                      has_count, is_region_entry, is_gap_region = segment[3:6]
+                      if (
+                          has_count
+                          and is_region_entry
+                          and not is_gap_region
+                          and int(execution_count) == 0
+                      ):
+                          print(
+                              "UNCOVERED_REGION "
+                              f"{filename}:{line_number}:{column_number}"
+                          )
+              for function_record in data.get("functions", []):
+                  if int(function_record.get("count", 0)) != 0:
+                      continue
+                  filenames = function_record.get("filenames", [])
+                  filename = filenames[0] if filenames else "<unknown>"
+                  print(
+                      "UNCOVERED_FUNCTION "
+                      f"{filename} {function_record.get('name', '<unknown>')}"
+                  )
 
           current_source = None
           for raw_line in Path("coverage.lcov").read_text(encoding="utf-8").splitlines():
