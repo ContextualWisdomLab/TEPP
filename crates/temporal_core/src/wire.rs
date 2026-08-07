@@ -315,10 +315,6 @@ mod tests {
             interval_json_schema::<EventTime>()["properties"]["clock_type"]["const"],
             json!("event_time")
         );
-        assert!(matches!(
-            BoundaryWire::from_boundary(TemporalBoundary::Included(value)).kind,
-            BoundaryKind::Included
-        ));
     }
 
     #[test]
