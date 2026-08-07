@@ -11,8 +11,7 @@ fn mutate(serialized: &str, field: &str, replacement: Value) -> String {
 
 #[test]
 fn exact_interval_round_trip_executes_edge_binary_reconstruction() {
-    let value = EventTime::parse_rfc3339("2026-08-06T00:00:00Z")
-        .expect("event time must parse");
+    let value = EventTime::parse_rfc3339("2026-08-06T00:00:00Z").expect("event time must parse");
     let interval = TemporalInterval::exact(value, TemporalPrecision::Second)
         .expect("exact interval must validate");
     let serialized = interval
