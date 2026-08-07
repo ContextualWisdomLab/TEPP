@@ -59,13 +59,9 @@ macro_rules! define_clock {
                 self.0
             }
 
-            /// Serialize this clock through the strict versioned JSON contract.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`TemporalError::InvalidWirePayload`] if serialization
-            /// cannot represent this validated clock.
-            pub fn to_wire_json(self) -> Result<String, TemporalError> {
+            /// Serialize this validated clock through the strict versioned JSON contract.
+            #[must_use]
+            pub fn to_wire_json(self) -> String {
                 crate::wire::serialize_clock(self)
             }
 
