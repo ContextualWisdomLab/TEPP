@@ -23,12 +23,12 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Immutable `evidence_core` records with independent RFC 9562 `UUIDv7` identities, canonical `SHA-256` content digests, owned source bytes and UTF-8 text, exact byte/Unicode-scalar spans, and bounded page-layout coordinates.
 - Strict versioned JSON wire contracts for artifacts, documents, exact spans, and nested page locations without exposing private domain storage.
 - ADR 0008 and APA 7 doctoring for evidence identity, hashing, JSON interchange, UTF-8 boundaries, Unicode segmentation limits, and future W3C PROV integration.
-- Same-run exact missing-line and missing-branch diagnostics for failed 100% Rust coverage gates.
+- Same-run exact missing-line, uncovered-region, zero-count-function, and missing-branch diagnostics for failed 100% Rust coverage gates.
 - Sealed `EventTime`, `AssertionTime`, `DocumentTime`, `SystemTime`, `AvailableTime`, and `KnowledgeCutoff` nominal types over nanosecond-resolution absolute instants.
 - Exact, bounded, lower-open, upper-open, and explicitly unknown `TemporalInterval<T>` values with included, excluded, and unbounded boundaries plus explicit precision and certainty.
-- Strict temporal JSON wire version `1` and Draft 2020-12 JSON Schemas whose timestamp patterns match the runtime RFC 3339 lexical profile.
+- Strict temporal JSON wire version `1` and Draft 2020-12 JSON Schemas whose timestamp constraints match the runtime RFC 3339 known-offset profile.
 - Task 3 architecture, ADR, and APA 7 doctoring for absolute timestamps, temporal uncertainty, wire interchange, and the boundary between typed intervals and future relation reasoning.
-- All thirteen elementary Allen interval relations, exact inverse pairs, compact relation sets, complete composition, and proper bounded-interval classification.
+- All thirteen elementary Allen interval relations, exact inverse pairs, compact relation sets, stable elementary-order iteration, complete composition, and proper bounded-interval classification.
 - Resource-bounded path-consistency closure with inverse propagation, direct-versus-derived status, conservative accepted-assertion provenance, contradiction evidence, instance-scoped identifiers, and atomic rollback.
 - Task 4 ADR and APA 7 doctoring that delimit path consistency from global satisfiability, complete scenario search, and minimal contradiction cores.
 
@@ -43,7 +43,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Copied caller-provided source bytes and document text before acceptance and kept validated evidence fields private.
 - Made empty, oversized, malformed-digest, invalid UTF-8-boundary, coordinate-mismatch, cross-document, nonfinite-geometry, and out-of-page evidence fail closed with content-redacting errors.
 - Rejected malformed or extended wire payloads, unsupported schema versions, invalid identifiers and byte values, digest/content substitution, stale document ownership, and invalid nested geometry during reconstruction.
-- Rejected local timestamps without offsets, shortened or malformed offsets, leap seconds, bracketed zones, unsupported RFC 9557 suffixes, malformed calendars, cross-clock wire payloads, and semantically inconsistent temporal boundaries.
+- Rejected local timestamps without offsets, RFC 3339's semantically unknown `-00:00` marker, shortened or malformed offsets, leap seconds, bracketed zones, unsupported RFC 9557 suffixes, malformed calendars, cross-clock wire payloads, and semantically inconsistent temporal boundaries.
 - Kept temporal errors stable and content-redacting so rejected timestamps and hostile wire values are not echoed into logs or downstream messages.
 - Bounded qualitative reasoner variables, accepted constraints, and propagation work; rejected foreign identifiers and empty relation sets; and restored pre-closure state after contradiction or resource exhaustion.
 
@@ -56,8 +56,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Denied warnings, missing public documentation, and unsafe Rust across the workspace.
 - Added known digest vectors, mutation detection, hostile multibyte Unicode, exact-coordinate, page-boundary, stable-error, and invalid-input regression tests for the first evidence slice.
 - Added strict wire round trips, unknown-field and version rejection, digest reconstruction, configured-limit, hostile JSON, and generated multilingual span tests.
-- Added six-clock parity, nanosecond ordering, explicit-offset and daylight-saving normalization, exact and uncertain interval, hostile temporal wire, schema/runtime parity, and stable-error regression tests.
+- Added six-clock parity, nanosecond ordering, known-offset and daylight-saving normalization, unknown-offset rejection, exact and uncertain interval, hostile temporal wire, schema/runtime parity, and stable-error regression tests.
 - Split Task 3 claims from deferred Allen relation algebra, closure, event graphs, persistence, leakage snapshots, and synthetic-truth recovery so documentation cannot overstate executable evidence.
-- Added independent exhaustive composition-oracle, converse-law, all-relation classification, closure-idempotence, contradiction, provenance, identifier-isolation, limit, and atomic-rollback tests for Task 4.
+- Added independent exhaustive composition-oracle, converse-law, all-relation classification, stable relation-set iteration, closure-idempotence, contradiction, provenance, identifier-isolation, limit, and atomic-rollback tests for Task 4.
 
 [Unreleased]: https://github.com/ContextualWisdomLab/TEPP/compare/HEAD...HEAD
