@@ -26,6 +26,14 @@ class CoverageContractTests(unittest.TestCase):
         return path
 
     @staticmethod
+    def write_lcov(directory: str, content: str) -> Path:
+        """Write an LCOV report and return its path."""
+
+        path = Path(directory) / "coverage.lcov"
+        path.write_text(content, encoding="utf-8")
+        return path
+
+    @staticmethod
     def payload(
         *,
         line_count: int = 2,
@@ -108,6 +116,55 @@ class CoverageContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "contain totals"):
                 coverage_contract.load_totals(path)
 
+    def test_lcov_authored_line_totals_and_incomplete_detection(self) -> None:
+        """LCOV counts unique authored source lines and exposes zero-hit lines."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            complete = self.write_lcov(
+                temporary,
+                "TN:\nSF:/workspace/src/lib.rs\nDA:10,2\nDA:11,1,checksum\nend_of_record\n",
+            )
+            self.assertEqual(
+                coverage_contract.load_lcov_line_totals(complete),
+                {"lines": {"count": 2, "covered": 2}},
+            )
+            self.assertEqual(
+                coverage_contract.validate_report(complete, ["lines"], "lcov"),
+                ["lines coverage: PASS (2/2, 100%)"],
+            )
+
+            incomplete = self.write_lcov(
+                temporary,
+                "SF:/workspace/src/lib.rs\nDA:10,1\nDA:11,0\nend_of_record\n",
+            )
+            with self.assertRaisesRegex(ValueError, "incomplete: 1/2"):
+                coverage_contract.validate_report(incomplete, ["lines"], "lcov")
+
+    def test_malformed_lcov_reports_fail_closed(self) -> None:
+        """Missing sources, invalid fields, duplicates, and empty reports fail."""
+
+        malformed_reports = (
+            ("", "no authored source lines"),
+            ("SF:\nDA:1,1\n", "source path must not be empty"),
+            ("DA:1,1\n", "must follow a source record"),
+            ("SF:/src/lib.rs\nDA:1\n", "must contain line and count"),
+            ("SF:/src/lib.rs\nDA:x,1\n", "must be integers"),
+            ("SF:/src/lib.rs\nDA:0,1\n", "invalid values"),
+            ("SF:/src/lib.rs\nDA:1,-1\n", "invalid values"),
+            ("SF:/src/lib.rs\nDA:1,1\nDA:1,1\n", "duplicate source line"),
+            (
+                "SF:/src/lib.rs\nend_of_record\nDA:1,1\n",
+                "must follow a source record",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, (content, message) in enumerate(malformed_reports):
+                with self.subTest(content=content):
+                    path = Path(temporary) / f"invalid-{index}.lcov"
+                    path.write_text(content, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, message):
+                        coverage_contract.load_lcov_line_totals(path)
+
     def test_validate_report_and_main(self) -> None:
         """The CLI validates requested kinds and reports stable diagnostics."""
 
@@ -129,6 +186,22 @@ class CoverageContractTests(unittest.TestCase):
                     0,
                 )
             self.assertIn("branches coverage", standard_output.getvalue())
+
+            lcov_path = self.write_lcov(
+                temporary,
+                "SF:/workspace/src/lib.rs\nDA:10,1\nend_of_record\n",
+            )
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(
+                    coverage_contract.main(
+                        [str(lcov_path), "--kind", "lines", "--format", "lcov"]
+                    ),
+                    0,
+                )
+            with self.assertRaisesRegex(ValueError, "exactly the lines kind"):
+                coverage_contract.validate_report(lcov_path, ["branches"], "lcov")
+            with self.assertRaisesRegex(ValueError, "unsupported"):
+                coverage_contract.validate_report(path, ["lines"], "unknown")
 
             invalid_path = Path(temporary) / "invalid.json"
             invalid_path.write_text("{", encoding="utf-8")
@@ -165,6 +238,11 @@ class CoverageContractTests(unittest.TestCase):
             namespace = parser.parse_args([str(path), "--kind", "lines"])
             self.assertEqual(namespace.report, path)
             self.assertEqual(namespace.kinds, ["lines"])
+            self.assertEqual(namespace.report_format, "json")
+            explicit = parser.parse_args(
+                [str(path), "--kind", "lines", "--format", "lcov"]
+            )
+            self.assertEqual(explicit.report_format, "lcov")
             with mock.patch.object(
                 sys, "argv", ["checker", str(path), "--kind", "lines"]
             ):
