@@ -19,7 +19,7 @@ macro_rules! assert_clock_contract {
     ($clock:ty, $wire_name:literal) => {{
         let value =
             <$clock>::parse_rfc3339("2026-08-06T10:30:00+09:00").expect("clock value must parse");
-        let wire = value.to_wire_json().expect("clock value must serialize");
+        let wire = value.to_wire_json();
         let restored = <$clock>::from_wire_json(&wire).expect("clock value must reconstruct");
         let schema = <$clock>::wire_json_schema();
         let rebuilt = reconstruct::<$clock>(value.instant());
