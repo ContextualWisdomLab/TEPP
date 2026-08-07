@@ -105,11 +105,14 @@ nanosecond ordering and deterministic UTC normalization.
 
 Wire version `1` accepts a bounded RFC 3339 lexical profile: a four-digit date,
 uppercase `T`, explicit seconds, an optional one-to-nine-digit fraction, and
-uppercase `Z` or an exact `±HH:MM` offset. Local timestamps, shortened offsets,
-leap seconds, bracketed time zones, RFC 9557 suffixes, malformed calendars, and
-other unsupported forms fail closed. Generated Draft 2020-12 JSON Schemas carry
-the same timestamp pattern, clock discriminator, version constant, required
-fields, and unknown-field prohibition as runtime reconstruction.
+uppercase `Z` or a known exact `±HH:MM` offset. RFC 3339's `-00:00` marker is
+unknown rather than UTC and therefore fails closed in both runtime parsing and
+generated JSON Schemas. Local timestamps, shortened offsets, leap seconds,
+bracketed time zones, RFC 9557 suffixes, malformed calendars, and other
+unsupported forms also fail closed. Generated Draft 2020-12 JSON Schemas carry
+the same timestamp pattern, unknown-offset exclusion, clock discriminator,
+version constant, required fields, and unknown-field prohibition as runtime
+reconstruction.
 
 `TemporalInterval<T>` retains one nominal clock and explicit precision and
 certainty. It supports exact, bounded, lower-open, upper-open, and explicitly
@@ -134,11 +137,11 @@ rejected by the proper-interval classifier. Included and excluded endpoint
 metadata does not change the qualitative endpoint-order relation.
 
 `RelationSet` is a closed thirteen-bit representation. It supports exact
-inverse, intersection, union, membership, iteration, and complete composition.
-The production composition table is generated deterministically from every
-proper interval over six ordered endpoint ranks. An independent test oracle
-uses eight ranks and verifies every elementary pair, while the converse law
-checks that inverse and composition agree in both directions.
+inverse, intersection, union, membership, stable iteration, and complete
+composition. The production composition table is generated deterministically
+from every proper interval over six ordered endpoint ranks. An independent test
+oracle uses eight ranks and verifies every elementary pair, while the converse
+law checks that inverse and composition agree in both directions.
 
 `TemporalReasoner` stores a dense ordered-pair relation matrix and applies the
 bounded path-consistency rule:
@@ -177,9 +180,9 @@ Stable Rust 1.97.1 is the compile, lint, test, and line-coverage reference.
 Branch coverage runs in a pinned nightly lane because LLVM branch coverage
 remains unstable in Rust. `cargo-nextest` runs tests without retries, while
 doctests remain a separate `cargo test --doc` gate. `cargo-deny` enforces
-advisory, license, ban, and source policy. Failed Rust coverage gates print the
-exact missing source locations from the same instrumented run without weakening
-the 100% contract.
+advisory, license, ban, and source policy. Failed Rust coverage gates print exact
+missing source lines, uncovered regions, and zero-count functions from the same
+instrumented run without weakening the 100% contract.
 
 ## Temporal invariants
 
