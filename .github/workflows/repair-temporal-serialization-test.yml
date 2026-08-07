@@ -6,6 +6,7 @@ on:
       - agent/task-3-six-clock-intervals
     paths:
       - .github/workflows/repair-temporal-serialization-test.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
