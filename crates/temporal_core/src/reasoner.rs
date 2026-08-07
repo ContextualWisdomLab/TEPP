@@ -329,6 +329,7 @@ impl TemporalReasoner {
         }
 
         let identifier = self.constraint_id(self.constraint_count);
+        let inverse_was_observed = self.cells[right.variable_index][left.variable_index].observed;
         let mut support = self.cells[left.variable_index][right.variable_index]
             .support
             .clone();
@@ -340,7 +341,7 @@ impl TemporalReasoner {
         };
         self.cells[right.variable_index][left.variable_index] = RelationCell {
             relations: narrowed.inverse(),
-            observed: true,
+            observed: inverse_was_observed || left == right,
             support,
         };
         self.constraint_count += 1;
@@ -467,6 +468,7 @@ impl TemporalReasoner {
                             &self.cells[middle][right].support,
                         ]);
                         let observed = self.cells[left][right].observed;
+                        let inverse_observed = self.cells[right][left].observed;
                         self.cells[left][right] = RelationCell {
                             relations: narrowed,
                             observed,
@@ -474,7 +476,7 @@ impl TemporalReasoner {
                         };
                         self.cells[right][left] = RelationCell {
                             relations: narrowed.inverse(),
-                            observed,
+                            observed: inverse_observed,
                             support,
                         };
                         revisions += 1;
