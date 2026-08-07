@@ -26,6 +26,30 @@ fn exact_interval_round_trip_executes_edge_binary_reconstruction() {
 }
 
 #[test]
+fn boundary_wire_rejects_duplicate_fields() {
+    let duplicate_kind = r#"{
+        "schema_version": 1,
+        "clock_type": "event_time",
+        "certainty": "bounded",
+        "precision": "day",
+        "lower": {
+            "kind": "included",
+            "kind": "excluded",
+            "timestamp": "2026-08-06T00:00:00Z"
+        },
+        "upper": {
+            "kind": "included",
+            "timestamp": "2026-08-07T00:00:00Z"
+        }
+    }"#;
+
+    assert_eq!(
+        TemporalInterval::<EventTime>::from_wire_json(duplicate_kind).unwrap_err(),
+        TemporalError::InvalidWirePayload
+    );
+}
+
+#[test]
 fn unknown_certainty_rejects_known_precision_or_known_boundaries() {
     let unknown = TemporalInterval::<EventTime>::unknown();
     let serialized = unknown
