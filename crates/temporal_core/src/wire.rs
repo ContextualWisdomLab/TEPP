@@ -265,8 +265,12 @@ fn boundary_json_schema() -> Value {
     })
 }
 
+fn invalid_wire_payload(_error: serde_json::Error) -> TemporalError {
+    TemporalError::InvalidWirePayload
+}
+
 fn serialize_wire<T: Serialize>(value: &T) -> Result<String, TemporalError> {
-    serde_json::to_string(value).map_err(|_| TemporalError::InvalidWirePayload)
+    serde_json::to_string(value).map_err(invalid_wire_payload)
 }
 
 fn deserialize_wire<'payload, T>(payload: &'payload str) -> Result<T, TemporalError>
