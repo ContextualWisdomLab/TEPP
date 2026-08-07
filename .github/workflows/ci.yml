@@ -131,9 +131,9 @@ jobs:
         run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
       - name: Verify pinned cargo-llvm-cov version
         run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
-      - name: Generate exact line coverage
+      - name: Generate exact authored-source line coverage
         id: line-report
-        run: cargo llvm-cov --workspace --all-features --json --summary-only --output-path coverage.json
+        run: cargo llvm-cov --workspace --all-features --json --summary-only --skip-expansions --output-path coverage.json
       - name: Enforce complete line coverage
         run: python3 scripts/check_coverage.py coverage.json --kind lines
       - name: Show exact missing line diagnostics
@@ -207,3 +207,11 @@ jobs:
       - name: Show exact missing branch diagnostics
         if: ${{ failure() && steps.branch-report.outcome == 'success' }}
         run: cargo +nightly-2026-08-01 llvm-cov report --branch --text --show-missing-lines
+      - name: Upload exact branch coverage diagnostics
+        if: ${{ failure() && steps.branch-report.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: branch-coverage-diagnostics
+          path: coverage-branches.json
+          if-no-files-found: error
+          retention-days: 1
