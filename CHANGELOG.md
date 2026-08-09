@@ -7,6 +7,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ### Added
 
 - Approved Temporal Event Psychometrics Platform PRD v0.4 baseline.
+- Canonical technical documentation map, TRD, UML/scientific runtime views, logical/planned ERD, scientific test strategy, operability/recovery guide, and requirements/research/evidence traceability with explicit implemented-main, active-PR, and accepted-target maturity.
 - Eight-phase delivery roadmap and Temporal/Event Foundation implementation plan.
 - Immutable evidence, six-clock temporal semantics, interval reasoning, event ontology, typed relation graph, and time-varying multiple-membership contracts.
 - Shared-latent multilingual topic measurement architecture with native lexical channels and language-profile validation.
