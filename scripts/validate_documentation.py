@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_FILES = (
+    "DOCUMENTATION.md",
     "AGENTS.md",
     "CLAUDE.md",
     "ARCHITECTURE.md",
@@ -17,6 +18,13 @@ REQUIRED_FILES = (
     "CONTRIBUTING.md",
     "SECURITY.md",
     "GOVERNANCE.md",
+    "docs/TRD.md",
+    "docs/UML.md",
+    "docs/ERD.md",
+    "docs/TEST_STRATEGY.md",
+    "docs/OPERABILITY.md",
+    "docs/TRACEABILITY.md",
+    "docs/adr/README.md",
     "docs/product/prd-v0.4-approved.md",
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
     "docs/superpowers/plans/2026-08-05-temporal-event-foundation.md",
@@ -41,7 +49,7 @@ def markdown_files() -> list[Path]:
 
 
 def validate_required_files() -> None:
-    """Require the approved governance and planning baseline."""
+    """Require the approved governance, product, and technical documentation baseline."""
 
     missing = [path for path in REQUIRED_FILES if not (ROOT / path).is_file()]
     if missing:
