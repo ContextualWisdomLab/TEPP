@@ -24,7 +24,7 @@ TEPP's approved PRD v0.4 and implementation plan are already the primary product
 
 ## Maturity vocabulary
 
-- **implemented-main** — source and tests are present on protected `main`.
+- **implemented-main** — promotion follows the canonical rule in [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md): source is integrated on protected `main` and the relevant exact-current-head tests, scientific/recovery/validation evidence, security and supply-chain gates, and qualifying independent review all pass.
 - **active-PR** — implemented only on an open PR and not yet a protected-main claim.
 - **accepted-target** — approved PRD/ADR architecture not yet implemented.
 - **conceptual** — logical entity/service/model contract; not evidence of a migration or deployment.
