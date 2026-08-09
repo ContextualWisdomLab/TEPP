@@ -45,11 +45,18 @@ erDiagram
     EVENT_INSTANCE ||--o{ EVENT_MENTION : realized_by
     EVENT_INSTANCE ||--o{ EVENT_RELATION : source_event
     EVENT_INSTANCE ||--o{ EVENT_RELATION : target_event
+    TEXT_SEGMENT ||--o{ EVENT_RELATION : relation_evidence
     ENTITY_RECORD ||--o{ ENTITY_ROLE_ASSIGNMENT : assigned
     EVENT_INSTANCE ||--o{ ENTITY_ROLE_ASSIGNMENT : contextualizes
     PROJECT_RECORD ||--o{ ENTITY_ROLE_ASSIGNMENT : contextualizes
-    DOCUMENT_RECORD ||--o{ MEMBERSHIP_ASSIGNMENT : observed_unit
-    ENTITY_RECORD ||--o{ MEMBERSHIP_ASSIGNMENT : membership_target
+    DOCUMENT_RECORD ||--o{ MEMBERSHIP_ASSIGNMENT : document_observation
+    TEXT_SEGMENT ||--o{ MEMBERSHIP_ASSIGNMENT : segment_observation
+    ENTITY_RECORD ||--o{ MEMBERSHIP_ASSIGNMENT : entity_membership_target
+    PROJECT_RECORD ||--o{ MEMBERSHIP_ASSIGNMENT : project_membership_target
+    CORPUS_SPLIT_MANIFEST ||--o{ MODEL_RUN : supplies_split
+    REPRODUCIBILITY_MANIFEST ||--o{ MODEL_RUN : binds_run
+    REPRODUCIBILITY_MANIFEST ||--o{ MODEL_ARTIFACT : governs
+    MODEL_RUN ||--o{ MODEL_ARTIFACT : publishes
     MODEL_RUN ||--o{ TOPIC_DEFINITION : estimates
     MODEL_RUN ||--o{ TOPIC_SCORE : estimates
     MODEL_RUN ||--o{ VALIDATION_METRIC : reports
@@ -165,16 +172,47 @@ erDiagram
     MEMBERSHIP_ASSIGNMENT {
       uuid membership_assignment_id PK
       uuid document_record_id FK
-      uuid membership_target_id
+      uuid text_segment_id FK
+      uuid target_entity_id FK
+      uuid target_project_id FK
       text membership_type_code
       numeric membership_weight
       timestamptz valid_from
       timestamptz valid_to
     }
 
+    CORPUS_SPLIT_MANIFEST {
+      uuid corpus_split_manifest_id PK
+      text split_manifest_hash UK
+      text relation_component_hash
+      text split_policy_version
+      timestamptz knowledge_cutoff
+      text train_partition_hash
+      text validation_partition_hash
+      text test_partition_hash
+      timestamptz created_at
+    }
+
+    REPRODUCIBILITY_MANIFEST {
+      uuid reproducibility_manifest_id PK
+      text reproducibility_manifest_hash UK
+      text source_manifest_hash
+      text evidence_manifest_hash
+      text preprocessing_version
+      text concept_dictionary_version
+      text model_contract_version
+      text configuration_hash
+      text dependency_lock_hash
+      text git_commit_sha
+      text provenance_manifest_hash
+      timestamptz created_at
+    }
+
     MODEL_RUN {
       uuid model_run_id PK
       uuid tenant_record_id FK
+      uuid corpus_split_manifest_id FK
+      uuid reproducibility_manifest_id FK
       text corpus_hash
       text engine_version
       text configuration_hash
@@ -182,6 +220,16 @@ erDiagram
       text random_seed_manifest_hash
       timestamptz knowledge_cutoff
       timestamptz created_at
+    }
+
+    MODEL_ARTIFACT {
+      uuid model_artifact_id PK
+      uuid model_run_id FK
+      uuid reproducibility_manifest_id FK
+      text artifact_type_code
+      text artifact_content_hash
+      text protected_object_ref
+      timestamptz published_at
     }
 
     TOPIC_DEFINITION {
@@ -267,17 +315,46 @@ erDiagram
 - Event/valid time and system/record time are distinct.
 - `available_time` gates historical inclusion through `knowledge_cutoff`.
 - Retrospective evidence may describe an earlier event while retaining its later availability/system time.
-- Transition edges never derive a reverse state transition from a backward-pointing citation/revision/retrospective edge.
 - A future physical schema must represent uncertain/open intervals without coercing them to false exact timestamps.
+
+### Typed event-relation contract
+
+`transition_edge` is not an independent free-form flag. It is derived/validated from a closed relation vocabulary.
+
+**Forward state-transition relation types** that may set `transition_edge=true` are:
+
+`causes`, `enables`, `intervenes_on`, `leads_to`, `transitions_to`, `input_to`, `process_to`, and `outcome_of`.
+
+**Evidence/provenance relation types** such as `references`, `summarizes`, `revises`, `retrospectively_reports`, `supports`, and `contradicts` MUST have `transition_edge=false`, even when the source document is observed later than the event it describes. Future extensions add a typed relation through an ADR/schema migration rather than bypassing this vocabulary.
+
+The future physical schema must enforce the relation/flag combination with an enum/check constraint or an equivalent generated/derived transition class. Before any relation is admitted to the as-built transition subgraph, application/database validation must also verify that the source and target event intervals are compatible with the required forward temporal order. Because that validation spans referenced event rows and may involve uncertain intervals, it cannot be represented honestly as a single-row Boolean check alone. Backward-pointing evidence relations remain valid provenance but never become reverse state transitions.
 
 ## Multiple-membership invariant
 
-Customer/partner/competitor/author/department/project roles are contextual time-varying assignments. They are not static attributes on `entity_record`. One document/event may have multiple weighted memberships.
+Customer/partner/competitor/author/department/project/opportunity roles are contextual time-varying assignments rather than static attributes on `entity_record`.
+
+`MEMBERSHIP_ASSIGNMENT` has two independent exactly-one target constraints in the accepted physical design:
+
+1. **Observed unit:** exactly one of `document_record_id` or `text_segment_id` is non-null.
+2. **Membership target:** exactly one of `target_entity_id` or `target_project_id` is non-null.
+
+All four identifiers are typed UUID foreign keys to their named entities; there is no untyped polymorphic `membership_target_id`. This permits document-level and exact-segment weighted membership while preserving relational integrity. If event-level membership is added later, it must be an explicit typed foreign key plus an updated exactly-one constraint and ADR/data-model change.
+
+## Reproducibility and relation-aware split invariant
+
+Every `MODEL_RUN` binds two immutable identities:
+
+- `corpus_split_manifest_id`: the exact relation-aware train/validation/test split, including the relation-component digest, split policy version, partition hashes, and knowledge cutoff used to prevent translation/revision/episode leakage;
+- `reproducibility_manifest_id`: the exact source/evidence manifests, preprocessing and concept-dictionary versions, model contract/configuration, dependency lock, Git commit, and provenance-manifest identity used for the run.
+
+A published `MODEL_ARTIFACT` stores its own content hash and points to both the originating run and its reproducibility manifest. The artifact/manifest relationship is therefore immutable evidence of what produced the object rather than an inference from `AUDIT_EVENT.evidence_digest`. A run or published artifact whose referenced manifest/split digest does not resolve exactly fails provenance validation.
+
+Audit events remain bounded operational evidence and do not replace the reproducibility manifest.
 
 ## Provenance/reproducibility invariant
 
-Every published analytical artifact must be traceable to source hashes, evidence spans, preprocessing/concept versions, model/configuration/seed, compute backend, dependency lock, and Git commit. Audit records store bounded evidence/digests rather than copying protected source text unnecessarily.
+Every published analytical artifact must be traceable to source hashes, evidence spans, preprocessing/concept versions, model/configuration/seed, compute backend, relation-aware split, dependency lock, and Git commit. Audit records store bounded evidence/digests rather than copying protected source text unnecessarily.
 
 ## Migration acceptance
 
-Before this planned ERD becomes as-built, migrations must include rollback, tenant/RLS policy, temporal constraints/indexes, lineage integrity, idempotency/concurrency, retention/deletion, backup/recovery, and synthetic known-truth integration tests. The documentation maturity label then changes only after protected-main integration.
+Before this planned ERD becomes as-built, migrations must include rollback, tenant/RLS policy, temporal relation constraints/indexes, exactly-one membership constraints, relation-aware split/manifests, lineage integrity, idempotency/concurrency, retention/deletion, backup/recovery, and synthetic known-truth integration tests. The documentation maturity label then changes only after protected-main integration and exact-current-head evidence.
