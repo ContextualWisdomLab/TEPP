@@ -48,4 +48,4 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Added known digest vectors, mutation detection, hostile multibyte Unicode, exact-coordinate, page-boundary, stable-error, and invalid-input regression tests for the first evidence slice.
 - Added strict wire round trips, unknown-field and version rejection, digest reconstruction, configured-limit, hostile JSON, and generated multilingual span tests.
 
-[Unreleased]: https://github.com/ContextualWisdomLab/TEPP/compare/HEAD...HEAD
+The repository has not yet cut a stable implementation release, so no compare reference is published for `[Unreleased]` yet.
