@@ -1,15 +1,20 @@
 # TEPP Documentation Map
 
-TEPP's approved PRD v0.4 and implementation plan are already the primary product baseline. This index makes the remaining technical, data, quality, and operating contracts discoverable without duplicating that source material.
+TEPP's approved PRD v0.4 and implementation plan are the primary product baseline. This index makes the technical, data, scientific, security/privacy, integration, quality, operating, and assurance contracts discoverable without duplicating that source material.
 
 | Area | Canonical document |
 |---|---|
 | Approved product requirements | [`docs/product/prd-v0.4-approved.md`](docs/product/prd-v0.4-approved.md) |
 | Technical requirements | [`docs/TRD.md`](docs/TRD.md) |
 | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Modular/API integration contract | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
 | Logical/physical ERD | [`docs/ERD.md`](docs/ERD.md) |
 | Security policy | [`SECURITY.md`](SECURITY.md) |
+| Threat model | [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) |
+| Privacy and data governance | [`docs/PRIVACY_DATA_GOVERNANCE.md`](docs/PRIVACY_DATA_GOVERNANCE.md) |
+| Compliance/assurance readiness | [`docs/COMPLIANCE_READINESS.md`](docs/COMPLIANCE_READINESS.md) |
+| LLM orchestration/test-time compute | [`docs/LLM_ORCHESTRATION.md`](docs/LLM_ORCHESTRATION.md) |
 | Test/scientific validation strategy | [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md) |
 | Operability/recovery/release | [`docs/OPERABILITY.md`](docs/OPERABILITY.md) |
 | Requirement/research/evidence traceability | [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) |
@@ -29,5 +34,13 @@ TEPP's approved PRD v0.4 and implementation plan are already the primary product
 - **accepted-target** — approved PRD/ADR architecture not yet implemented.
 - **conceptual** — logical entity/service/model contract; not evidence of a migration or deployment.
 - **research-only** — evaluated research direction not accepted as production behavior.
+- **deployment-owned** — evidence depends on a concrete deployed environment or organization and cannot be claimed by repository design alone.
+- **external-assurance** — certification, attestation, legal opinion, or other independent assessment that TEPP cannot self-issue.
 
-At the time of this review, immutable evidence records/exact spans and the Rust workspace quality foundation are implemented-main. PR #5 typed six-clock values/uncertain intervals and PR #6 Allen interval algebra/bounded closure are active-PR. Event ontology, PostgreSQL persistence, shared-latent topic estimation, GPU kernels, TDT/CHRONOS intelligence, longitudinal ESEM/DSEM, and visual analytics remain later accepted-target work.
+## Documentation fitness
+
+The documentation graph is **design-sufficient** when a reviewer can reconstruct TEPP's product requirements, technical/scientific estimands, authority boundaries, temporal/event/membership semantics, data model, failure modes, security/privacy controls, validation strategy, API/integration contract, operability, research basis, and release acceptance without chat history.
+
+It is **protected-main-sufficient** only after the canonical documents are integrated on protected `main`, remain semantically current with live code, and their required exact-head documentation/security/review gates pass. An active documentation PR can therefore be design-sufficient while the protected branch remains documentation-insufficient.
+
+At the time of this review, immutable evidence records/exact spans and the Rust workspace quality foundation are implemented-main. PR #5 typed six-clock values/uncertain intervals and PR #6 Allen interval algebra/bounded closure are active-PR. Event ontology, PostgreSQL persistence, shared-latent topic estimation, GPU kernels, TDT/CHRONOS intelligence, longitudinal ESEM/DSEM, visual analytics, production HTTP services, and deployment assurance remain later accepted-target or deployment-owned work.
