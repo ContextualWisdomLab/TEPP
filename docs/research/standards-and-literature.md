@@ -1,12 +1,14 @@
 # Standards and Research Foundations
 
-This register traces TEPP's methodological and engineering contracts to authoritative standards and primary research. References use APA 7th style. Implementations must link claims, equations, tests, and ADRs to the most specific applicable source.
+This register traces TEPP's methodological, engineering, governance, privacy, and orchestration contracts to authoritative standards and primary research. References use APA 7th style. Implementations must link claims, equations, tests, and ADRs to the most specific applicable source.
 
 ## Psychometrics and latent-variable modeling
 
 American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
 
 Asparouhov, T., Hamaker, E. L., & Muthén, B. (2018). Dynamic structural equation models. *Structural Equation Modeling: A Multidisciplinary Journal, 25*(3), 359–388. https://doi.org/10.1080/10705511.2017.1406803
+
+Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. *Structural Equation Modeling: A Multidisciplinary Journal, 16*(3), 397–438. https://doi.org/10.1080/10705510903008204
 
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
@@ -62,7 +64,7 @@ Hobbs, J. R., & Pan, F. (2017). *Time ontology in OWL* (W3C Recommendation). Wor
 
 Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information organization*. Kluwer Academic Publishers.
 
-Papadakis, N., Stravoskoufos, K., Baratis, E., & Plexousakis, D. (2013). CHRONOS: A reasoner for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 502–511. https://doi.org/10.1016/j.procs.2013.09.130
+Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reasoning engine for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 70–77. https://doi.org/10.1016/j.procs.2013.09.082
 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers.
 
@@ -94,11 +96,23 @@ Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World 
 
 TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
 
-## AI risk, security, accessibility, and software supply chain
+## AI risk, management systems, and assurance readiness
 
-National Institute of Standards and Technology. (2023). *Artificial intelligence risk management framework (AI RMF 1.0)* (NIST AI 100-1). https://doi.org/10.6028/NIST.AI.100-1
+International Organization for Standardization. (2023). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
 
-National Institute of Standards and Technology. (2024). *Artificial intelligence risk management framework: Generative artificial intelligence profile* (NIST AI 600-1). https://doi.org/10.6028/NIST.AI.600-1
+International Organization for Standardization. (2023). *Information technology—Artificial intelligence—Management system* (ISO/IEC Standard No. 42001:2023). https://www.iso.org/standard/81230.html
+
+Tabassi, E. (2023). *Artificial intelligence risk management framework (AI RMF 1.0)* (NIST AI 100-1). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.AI.100-1
+
+Autio, C., Schwartz, R., Dunietz, J., Jain, S., Stanley, M., Tabassi, E., Hall, P., & Roberts, K. (2024). *Artificial intelligence risk management framework: Generative artificial intelligence profile* (NIST AI 600-1). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.AI.600-1
+
+American Institute of Certified Public Accountants. (2023). *2017 Trust services criteria for security, availability, processing integrity, confidentiality, and privacy (with revised points of focus—2022)*. AICPA & CIMA.
+
+한국인터넷진흥원. (2025). *2025년 클라우드 서비스 보안인증제 안내서 (2025.02)*. KISA.
+
+TEPP uses these sources as management/risk/readiness inputs, not as self-certification authority. ISO/IEC 42001:2023 and ISO/IEC 23894:2023 are published international standards. NIST AI RMF 1.0 remains the published framework while NIST is preparing a revision; the repository tracks the revision but does not silently treat an unpublished successor as normative. CSAP and SOC 2 evidence depend on actual deployment/organization controls and independent assessment.
+
+## Security, accessibility, and software supply chain
 
 World Wide Web Consortium. (2023). *Web content accessibility guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/
 
@@ -106,6 +120,12 @@ OpenSSF. (2023). *Supply-chain Levels for Software Artifacts (SLSA) specificatio
 
 TEPP treats documents and model output as untrusted, requires exact evidence and fail-closed validation, supplies accessible exact-value alternatives to graphics, and emits SBOM and provenance evidence for releases.
 
-## LLM orchestration research register
+## LLM orchestration and test-time compute
 
-Fugu-, Conductor-, and TRINITY-style orchestration claims require a dedicated literature-review ADR before production implementation. The implementation study must identify the exact primary papers and versions, compare direct routing with deeper role-based orchestration, vary reasoning effort, decomposition, recursion, workflow stages, and access lists, and record accuracy, calibration, disagreement, token use, cost, and failure modes. No ambiguous project name is treated as a verified citation.
+Xu, J., Sun, Q., Schwendeman, P., Nielsen, S., Cetin, E., & Tang, Y. (2026). TRINITY: An evolved LLM coordinator. In *International Conference on Learning Representations (ICLR 2026)*. https://arxiv.org/abs/2512.04695
+
+Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2026). Learning to orchestrate agents in natural language with the Conductor. In *International Conference on Learning Representations (ICLR 2026)*. https://arxiv.org/abs/2512.04388
+
+Tang, Y., Cetin, E., Xu, J., Sun, Q., Nielsen, S., Richard, V., Goda, H., Tymchenko, I., Nguyen, N., Lee, H., Ashiga, M., Kotyan, S., Kuroki, S., & Clanuwat, T. (2026). *Sakana Fugu technical report* [Preprint]. arXiv. https://arxiv.org/abs/2606.21228
+
+TRINITY motivates lightweight learned model/role delegation over multiple turns; Conductor motivates query-adaptive natural-language workflow/topology/instruction generation and recursive test-time scaling; Fugu demonstrates a production-oriented family of query-adaptive agentic scaffolds building on these research lines. TEPP therefore treats direct routing, verification, fixed multi-agent workflows, adaptive orchestration, stage count, decomposition, recursion, access lists, role-specific reasoning effort, and total test-time budget as explicit experimental variables. Deeper/more-agent orchestration is never assumed better by default. Comparable-budget ablation, evidence support, calibration, disagreement, safety, cost, and failure behavior are required before a production claim.
