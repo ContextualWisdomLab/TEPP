@@ -8,6 +8,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 - Approved Temporal Event Psychometrics Platform PRD v0.4 baseline.
 - Canonical technical documentation map, TRD, UML/scientific runtime views, logical/planned ERD, scientific test strategy, operability/recovery guide, and requirements/research/evidence traceability with explicit implemented-main, active-PR, and accepted-target maturity.
+- Whole-conversation documentation fitness assessment plus canonical API/MSA contract, threat model, privacy/data-governance contract, CSAP/SOC 2/ISO/NIST assurance-readiness mapping, and adaptive LLM orchestration/test-time-compute contract.
+- ADRs for purpose-bound PII governance without blanket masking, adaptive direct-versus-multi-agent LLM orchestration, and standalone/modular CWL service authority.
+- Verified APA 7 research traceability for ICLR 2026 TRINITY and Conductor, the 2026 Sakana Fugu technical report, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF/GAI Profile, AICPA Trust Services Criteria, and KISA CSAP guidance.
 - Eight-phase delivery roadmap and Temporal/Event Foundation implementation plan.
 - Immutable evidence, six-clock temporal semantics, interval reasoning, event ontology, typed relation graph, and time-varying multiple-membership contracts.
 - Shared-latent multilingual topic measurement architecture with native lexical channels and language-profile validation.
@@ -29,6 +32,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ### Security
 
 - Prohibited `COPILOT_GITHUB_TOKEN` and reserved `NVIDIA_NIM_API_KEY` for approved LLM test and development workflows.
+- Defined purpose-bound PII access, opaque analytical identifiers, separately protected identity mapping, selective model-provider disclosure, retention/deletion, and privileged audit controls instead of destructive blanket masking.
+- Added explicit threat classes for temporal leakage, relation/membership poisoning, model/artifact poisoning, numerical divergence, cross-tenant disclosure, prompt injection, evidence substitution, resource exhaustion, and scientific-integrity failures.
 - Removed the bootstrap branch's credential-co-resident OpenCode workflow: no model process may receive repository-write authority, and scheduled product development remains disabled until proposal, independent verification, and late publication authority are separated across fresh jobs.
 - Removed completed bootstrap materializers, encoded payload fragments, readiness sentinels, and push probes from the reviewable tree.
 - Required full-commit GitHub Action pins, minimum permissions, concurrency controls, immutable audit evidence, SBOM, and provenance.
@@ -42,6 +47,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 - Required 100% production line and branch coverage and complete public API docstrings.
 - Required true-parameter recovery, RMSE, bias, interval coverage, temporal leakage, graph recovery, invariance, and CPU/GPU parity evidence.
+- Added documentation contracts requiring threat/privacy/assurance/API/orchestration/fitness documents and ADR 0009–0011 to remain discoverable.
 - Added 100% statement and branch coverage for the repository quality-gate scripts.
 - Made a zero executable-code coverage denominator explicit for the skeleton-only slice rather than treating it as evidence of implemented behavior.
 - Denied warnings, missing public documentation, and unsafe Rust across the workspace.
