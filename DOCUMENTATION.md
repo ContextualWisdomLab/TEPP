@@ -5,6 +5,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Area | Canonical document |
 |---|---|
 | Approved product requirements | [`docs/product/prd-v0.4-approved.md`](docs/product/prd-v0.4-approved.md) |
+| Whole-conversation documentation fitness | [`docs/DOCUMENTATION_ASSESSMENT.md`](docs/DOCUMENTATION_ASSESSMENT.md) |
 | Technical requirements | [`docs/TRD.md`](docs/TRD.md) |
 | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Modular/API integration contract | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) |
