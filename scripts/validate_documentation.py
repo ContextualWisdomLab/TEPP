@@ -18,13 +18,22 @@ REQUIRED_FILES = (
     "CONTRIBUTING.md",
     "SECURITY.md",
     "GOVERNANCE.md",
+    "docs/API_CONTRACT.md",
+    "docs/COMPLIANCE_READINESS.md",
+    "docs/DOCUMENTATION_ASSESSMENT.md",
+    "docs/ERD.md",
+    "docs/LLM_ORCHESTRATION.md",
+    "docs/OPERABILITY.md",
+    "docs/PRIVACY_DATA_GOVERNANCE.md",
+    "docs/TEST_STRATEGY.md",
+    "docs/THREAT_MODEL.md",
+    "docs/TRACEABILITY.md",
     "docs/TRD.md",
     "docs/UML.md",
-    "docs/ERD.md",
-    "docs/TEST_STRATEGY.md",
-    "docs/OPERABILITY.md",
-    "docs/TRACEABILITY.md",
     "docs/adr/README.md",
+    "docs/adr/0009-purpose-bound-pii-governance.md",
+    "docs/adr/0010-adaptive-llm-orchestration.md",
+    "docs/adr/0011-standalone-modular-msa-boundary.md",
     "docs/product/prd-v0.4-approved.md",
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
     "docs/superpowers/plans/2026-08-05-temporal-event-foundation.md",
@@ -41,6 +50,15 @@ PLACEHOLDER_PATTERNS = (
 ACTION_REFERENCE = re.compile(r"uses:\s*[^\s@]+@([^\s#]+)")
 FULL_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
+CANONICAL_LINKS = (
+    "docs/API_CONTRACT.md",
+    "docs/COMPLIANCE_READINESS.md",
+    "docs/DOCUMENTATION_ASSESSMENT.md",
+    "docs/LLM_ORCHESTRATION.md",
+    "docs/PRIVACY_DATA_GOVERNANCE.md",
+    "docs/THREAT_MODEL.md",
+)
+
 
 def markdown_files() -> list[Path]:
     """Return all version-controlled Markdown candidates under the repository."""
@@ -54,6 +72,22 @@ def validate_required_files() -> None:
     missing = [path for path in REQUIRED_FILES if not (ROOT / path).is_file()]
     if missing:
         raise AssertionError(f"missing required documentation: {missing}")
+
+
+def validate_documentation_map() -> None:
+    """Require cross-cutting canonical documents to be discoverable from the root map."""
+
+    documentation = (ROOT / "DOCUMENTATION.md").read_text(encoding="utf-8")
+    missing_links = [path for path in CANONICAL_LINKS if path not in documentation]
+    if missing_links:
+        raise AssertionError(
+            f"canonical documentation map is missing links: {missing_links}"
+        )
+
+    adr_index = (ROOT / "docs/adr/README.md").read_text(encoding="utf-8")
+    for number in ("0009", "0010", "0011"):
+        if number not in adr_index:
+            raise AssertionError(f"ADR index is missing decision {number}")
 
 
 def validate_markdown() -> None:
@@ -114,6 +148,7 @@ def main() -> None:
     """Run all deterministic documentation validation groups."""
 
     validate_required_files()
+    validate_documentation_map()
     validate_markdown()
     validate_workflows()
     validate_json()
