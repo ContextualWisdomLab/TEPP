@@ -7,7 +7,7 @@
 
 TEPP uses LLMs for bounded semantic unitization, blinded model review, evidence-grounded interpretation, and claim verification. The workload ranges from low-ambiguity schema-constrained classification to complex multilingual evidence synthesis. A fixed single-model policy wastes reasoning budget on simple cases, while a fixed deep multi-agent graph can add cost, disagreement, and failure surface without improving scientific validity.
 
-Recent TRINITY, Conductor, and Fugu work motivates adaptive delegation, role assignment, communication topology, and recursive/test-time compute scaling. These results are evidence for experimentation, not authority to replace TEPP's deterministic/statistical gates.
+Recent [TRINITY (ORCH-TRINITY-2026)](../research/standards-and-literature.md#orch-trinity-2026), [Conductor (ORCH-CONDUCTOR-2026)](../research/standards-and-literature.md#orch-conductor-2026), and [Fugu (ORCH-FUGU-2026)](../research/standards-and-literature.md#orch-fugu-2026) work motivates adaptive delegation, role assignment, communication topology, and recursive/test-time compute scaling. These results are evidence for experimentation, not authority to replace TEPP's deterministic/statistical gates.
 
 ## Decision
 

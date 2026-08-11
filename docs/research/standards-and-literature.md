@@ -98,9 +98,9 @@ TEPP separates stable record identity, content equality, exact text location, wi
 
 ## AI risk, management systems, and assurance readiness
 
-International Organization for Standardization. (2023). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
+International Organization for Standardization. (2023a). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
 
-International Organization for Standardization. (2023). *Information technology—Artificial intelligence—Management system* (ISO/IEC Standard No. 42001:2023). https://www.iso.org/standard/81230.html
+International Organization for Standardization. (2023b). *Information technology—Artificial intelligence—Management system* (ISO/IEC Standard No. 42001:2023). https://www.iso.org/standard/81230.html
 
 Tabassi, E. (2023). *Artificial intelligence risk management framework (AI RMF 1.0)* (NIST AI 100-1). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.AI.100-1
 
@@ -110,7 +110,11 @@ American Institute of Certified Public Accountants. (2023). *2017 Trust services
 
 한국인터넷진흥원. (2025). *2025년 클라우드 서비스 보안인증제 안내서 (2025.02)*. KISA.
 
-TEPP uses these sources as management/risk/readiness inputs, not as self-certification authority. ISO/IEC 42001:2023 and ISO/IEC 23894:2023 are published international standards. NIST AI RMF 1.0 remains the published framework while NIST is preparing a revision; the repository tracks the revision but does not silently treat an unpublished successor as normative. CSAP and SOC 2 evidence depend on actual deployment/organization controls and independent assessment.
+National Institute of Standards and Technology. (n.d.). *AI risk management framework*. Retrieved August 11, 2026, from https://www.nist.gov/itl/ai-risk-management-framework
+
+한국인터넷진흥원. (n.d.). *클라우드서비스 보안인증제 제도소개*. Retrieved August 11, 2026, from https://isms.kisa.or.kr/main/csap/intro/index.jsp
+
+TEPP uses these sources as management/risk/readiness inputs, not as self-certification authority. ISO/IEC 42001:2023 and ISO/IEC 23894:2023 are published international standards (International Organization for Standardization, 2023a, 2023b). NIST AI RMF 1.0 remains the published framework while NIST is preparing a revision (Tabassi, 2023; National Institute of Standards and Technology, n.d.); the repository tracks the revision but does not silently treat an unpublished successor as normative. AICPA Trust Services Criteria are readiness inputs rather than self-issued attestation (American Institute of Certified Public Accountants, 2023). KISA currently describes CSAP service types as IaaS, SaaS, and DaaS and grades as high, medium, and low, while noting that the high and medium grades await later implementation (한국인터넷진흥원, n.d.). CSAP and SOC 2 evidence depend on actual deployment/organization controls and independent assessment.
 
 ## Security, accessibility, and software supply chain
 
@@ -122,10 +126,16 @@ TEPP treats documents and model output as untrusted, requires exact evidence and
 
 ## LLM orchestration and test-time compute
 
+### ORCH-TRINITY-2026
+
 Xu, J., Sun, Q., Schwendeman, P., Nielsen, S., Cetin, E., & Tang, Y. (2026). TRINITY: An evolved LLM coordinator. In *International Conference on Learning Representations (ICLR 2026)*. https://arxiv.org/abs/2512.04695
+
+### ORCH-CONDUCTOR-2026
 
 Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2026). Learning to orchestrate agents in natural language with the Conductor. In *International Conference on Learning Representations (ICLR 2026)*. https://arxiv.org/abs/2512.04388
 
+### ORCH-FUGU-2026
+
 Tang, Y., Cetin, E., Xu, J., Sun, Q., Nielsen, S., Richard, V., Goda, H., Tymchenko, I., Nguyen, N., Lee, H., Ashiga, M., Kotyan, S., Kuroki, S., & Clanuwat, T. (2026). *Sakana Fugu technical report* [Preprint]. arXiv. https://arxiv.org/abs/2606.21228
 
-TRINITY motivates lightweight learned model/role delegation over multiple turns; Conductor motivates query-adaptive natural-language workflow/topology/instruction generation and recursive test-time scaling; Fugu demonstrates a production-oriented family of query-adaptive agentic scaffolds building on these research lines. TEPP therefore treats direct routing, verification, fixed multi-agent workflows, adaptive orchestration, stage count, decomposition, recursion, access lists, role-specific reasoning effort, and total test-time budget as explicit experimental variables. Deeper/more-agent orchestration is never assumed better by default. Comparable-budget ablation, evidence support, calibration, disagreement, safety, cost, and failure behavior are required before a production claim.
+TRINITY motivates lightweight learned model/role delegation over multiple turns; Conductor motivates query-adaptive natural-language workflow/topology/instruction generation and recursive test-time scaling; Fugu demonstrates a production-oriented family of query-adaptive agentic scaffolds building on these research lines (Xu et al., 2026; Nielsen et al., 2026; Tang et al., 2026). TEPP therefore treats direct routing, verification, fixed multi-agent workflows, adaptive orchestration, stage count, decomposition, recursion, access lists, role-specific reasoning effort, and total test-time budget as explicit experimental variables. Deeper/more-agent orchestration is never assumed better by default. Comparable-budget ablation, evidence support, calibration, disagreement, safety, cost, and failure behavior are required before a production claim.

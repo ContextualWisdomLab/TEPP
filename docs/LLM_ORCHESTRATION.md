@@ -13,9 +13,9 @@ The product must allocate test-time compute adaptively rather than assume that e
 
 The orchestration design is informed by three 2026 Sakana AI research lines:
 
-- **TRINITY**: a lightweight coordinator selects a model and Thinker/Worker/Verifier role over multiple turns, showing learned adaptive delegation under budget constraints.
-- **Conductor**: a learned coordinator generates communication topology and focused natural-language instructions for a heterogeneous model pool, including recursive test-time scaling.
-- **Sakana Fugu**: production-oriented query-adaptive scaffolds combining learned orchestration approaches and exposing the orchestration system behind a model-compatible API.
+- **TRINITY** ([ORCH-TRINITY-2026](research/standards-and-literature.md#orch-trinity-2026)): a lightweight coordinator selects a model and Thinker/Worker/Verifier role over multiple turns, showing learned adaptive delegation under budget constraints.
+- **Conductor** ([ORCH-CONDUCTOR-2026](research/standards-and-literature.md#orch-conductor-2026)): a learned coordinator generates communication topology and focused natural-language instructions for a heterogeneous model pool, including recursive test-time scaling.
+- **Sakana Fugu** ([ORCH-FUGU-2026](research/standards-and-literature.md#orch-fugu-2026)): production-oriented query-adaptive scaffolds combining learned orchestration approaches and exposing the orchestration system behind a model-compatible API.
 
 These results motivate experiments; they do not prove that deeper orchestration is always superior for TEPP workloads.
 

@@ -59,4 +59,4 @@ A target becomes `implemented-main` only when its source is integrated on protec
 
 ## Documentation rule
 
-When a scientific estimand, time meaning, ontology relation, membership structure, compute backend, privacy/authorization model, service authority, persistence contract, orchestration policy, or accepted evidence threshold changes, update the corresponding PRD version/ADR where required plus this matrix and the exact tests/doctoring in the same reviewed change.
+When a scientific estimand, time meaning, ontology relation, membership structure, compute backend, privacy/authorization model, service authority, persistence contract, orchestration policy, or accepted evidence threshold changes, update the corresponding PRD version/ADR where required plus this matrix, the exact affected tests and validation evidence, and the corresponding standards/research documentation in the same reviewed change.
