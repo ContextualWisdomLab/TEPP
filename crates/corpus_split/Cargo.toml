@@ -13,5 +13,12 @@ keywords.workspace = true
 categories.workspace = true
 publish = false
 
+[dependencies]
+temporal_core = { path = "../temporal_core", version = "0.1.0" }
+uuid.workspace = true
+
+[dev-dependencies]
+uuid.workspace = true
+
 [lints]
 workspace = true
