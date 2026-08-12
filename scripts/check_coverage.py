@@ -23,12 +23,14 @@ def load_totals(path: Path) -> Mapping[str, Any]:
 
 
 def load_lcov_line_totals(path: Path) -> Mapping[str, Any]:
-    """Load authored source-line totals from an LLVM LCOV report."""
+    """Load authored source-line totals from a fully framed LLVM LCOV report."""
 
     source_path: str | None = None
     line_counts: dict[tuple[str, int], int] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         if raw_line.startswith("SF:"):
+            if source_path is not None:
+                raise ValueError("LCOV source record must end with end_of_record")
             source_path = raw_line[3:]
             if not source_path:
                 raise ValueError("LCOV source path must not be empty")
@@ -50,8 +52,12 @@ def load_lcov_line_totals(path: Path) -> Mapping[str, Any]:
                 raise ValueError("LCOV report contains a duplicate source line")
             line_counts[key] = execution_count
         elif raw_line == "end_of_record":
+            if source_path is None:
+                raise ValueError("LCOV end_of_record must close a source record")
             source_path = None
 
+    if source_path is not None:
+        raise ValueError("LCOV source record must end with end_of_record")
     if not line_counts:
         raise ValueError("LCOV report contains no authored source lines")
     covered = sum(execution_count > 0 for execution_count in line_counts.values())
