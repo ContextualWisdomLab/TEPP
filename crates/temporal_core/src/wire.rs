@@ -122,7 +122,7 @@ pub(crate) fn interval_json_schema<T: TemporalClock>() -> Value {
     json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": format!("TEPP {} interval wire record", T::WIRE_NAME),
-        "description": "TEPP interval wire version 1. Runtime validation additionally enforces interval ordering and emptiness. Exact certainty requires two included boundaries with matching included timestamps; JSON Schema cannot express cross-field timestamp equality, so runtime reconstruction remains authoritative.",
+        "description": "TEPP interval wire version 1. Runtime validation additionally enforces interval ordering and emptiness. exact certainty requires two included boundaries with matching included timestamps; JSON Schema cannot express cross-field timestamp equality, so runtime reconstruction remains authoritative.",
         "type": "object",
         "additionalProperties": false,
         "required": [

@@ -1,6 +1,8 @@
 //! Nonempty interval contracts at nanosecond resolution.
 
-use temporal_core::{EventTime, TemporalBoundary, TemporalError, TemporalInterval, TemporalPrecision};
+use temporal_core::{
+    EventTime, TemporalBoundary, TemporalError, TemporalInterval, TemporalPrecision,
+};
 
 fn time(value: &str) -> EventTime {
     EventTime::parse_rfc3339(value).expect("test timestamp must parse")

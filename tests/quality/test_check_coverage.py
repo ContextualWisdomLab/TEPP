@@ -152,7 +152,7 @@ class CoverageContractTests(unittest.TestCase):
             ("SF:/src/lib.rs\nDA:0,1\n", "invalid values"),
             ("SF:/src/lib.rs\nDA:1,-1\n", "invalid values"),
             ("SF:/src/lib.rs\nDA:1,1\nDA:1,1\n", "duplicate source line"),
-            (
+            (\n                "SF:/src/lib.rs\nSF:/src/other.rs\nDA:1,1\nend_of_record\n",\n                "source record must end with end_of_record",\n            ),\n            (\n                "end_of_record\nSF:/src/lib.rs\nDA:1,1\nend_of_record\n",\n                "end_of_record must close a source record",\n            ),\n            (
                 "SF:/src/lib.rs\nend_of_record\nDA:1,1\n",
                 "must follow a source record",
             ),

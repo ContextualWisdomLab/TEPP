@@ -115,9 +115,7 @@ impl<T: TemporalClock> TemporalInterval<T> {
             }
             if matches!(lower, TemporalBoundary::Excluded(_))
                 && matches!(upper, TemporalBoundary::Excluded(_))
-                && upper_value.instant().as_nanosecond()
-                    - lower_value.instant().as_nanosecond()
-                    == 1
+                && upper_value.instant().as_nanosecond() - lower_value.instant().as_nanosecond() == 1
             {
                 return Err(TemporalError::EmptyInterval);
             }
