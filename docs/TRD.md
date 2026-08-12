@@ -27,7 +27,7 @@ PR #8 implements the typed-value, interval, wire, and schema primitives for this
 
 Forward state-transition/input→process→outcome edges must satisfy temporally valid partial order. Retrospective, revision, citation, translation, support, and contradiction edges may point backward as provenance but never create reverse state transitions.
 
-The Task 4 bounded Allen closure represented by legacy PR #6, once replayed onto the canonical lineage and independently revalidated, establishes path consistency only within its stated algebra/limits; it must not be documented as a proof of global satisfiability for unrestricted disjunctive interval networks.
+The Task 4 bounded Allen closure represented by replay PR #9, once replayed onto the canonical lineage and independently revalidated, establishes path consistency only within its stated algebra/limits; it must not be documented as a proof of global satisfiability for unrestricted disjunctive interval networks.
 
 ## 5. Event/relation/membership target
 

@@ -16,6 +16,8 @@ pub enum TemporalError {
     EmptyInterval,
     /// Interval boundaries, precision, and certainty disagreed.
     InvalidIntervalCertainty,
+    /// Qualitative relation classification received a nonproper or open interval.
+    RelationRequiresProperBoundedInterval,
     /// A JSON wire payload was malformed, incomplete, or contained unknown fields.
     InvalidWirePayload,
     /// A JSON wire payload used a schema version this crate does not support.
@@ -32,6 +34,9 @@ impl fmt::Display for TemporalError {
             Self::InvalidIntervalOrder => "invalid temporal interval order",
             Self::EmptyInterval => "temporal interval is empty",
             Self::InvalidIntervalCertainty => "invalid temporal interval certainty",
+            Self::RelationRequiresProperBoundedInterval => {
+                "temporal relation requires proper bounded intervals"
+            }
             Self::InvalidWirePayload => "invalid temporal wire payload",
             Self::UnsupportedWireVersion => "unsupported temporal wire version",
             Self::ClockTypeMismatch => "temporal clock type mismatch",
