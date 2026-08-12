@@ -133,107 +133,110 @@ pub(crate) fn interval_json_schema<T: TemporalClock>() -> Value {
             "lower",
             "upper"
         ],
-        "properties": {
-            "schema_version": {"const": TEMPORAL_WIRE_SCHEMA_VERSION},
-            "clock_type": {"const": T::WIRE_NAME},
-            "certainty": {"enum": ["exact", "bounded", "unknown"]},
-            "precision": {
-                "enum": [
-                    "nanosecond",
-                    "microsecond",
-                    "millisecond",
-                    "second",
-                    "minute",
-                    "hour",
-                    "day",
-                    "month",
-                    "quarter",
-                    "year",
-                    "unknown"
-                ]
-            },
-            "lower": boundary_json_schema(),
-            "upper": boundary_json_schema()
-        },
-        "allOf": interval_certainty_conditionals()
+        "properties": interval_schema_properties::<T>(),
+        "allOf": interval_schema_certainty_rules()
     })
 }
 
-fn interval_certainty_conditionals() -> Value {
+fn interval_schema_properties<T: TemporalClock>() -> Value {
+    json!({
+        "schema_version": {"const": TEMPORAL_WIRE_SCHEMA_VERSION},
+        "clock_type": {"const": T::WIRE_NAME},
+        "certainty": {"enum": ["exact", "bounded", "unknown"]},
+        "precision": {
+            "enum": [
+                "nanosecond",
+                "microsecond",
+                "millisecond",
+                "second",
+                "minute",
+                "hour",
+                "day",
+                "month",
+                "quarter",
+                "year",
+                "unknown"
+            ]
+        },
+        "lower": boundary_json_schema(),
+        "upper": boundary_json_schema()
+    })
+}
+
+fn interval_schema_certainty_rules() -> Value {
     json!([
-            {
-                "if": {
-                    "properties": {"certainty": {"const": "unknown"}},
-                    "required": ["certainty"]
-                },
-                "then": {
-                    "properties": {
-                        "precision": {"const": "unknown"},
-                        "lower": {
-                            "properties": {"kind": {"const": "unbounded"}},
-                            "required": ["kind"]
-                        },
-                        "upper": {
-                            "properties": {"kind": {"const": "unbounded"}},
-                            "required": ["kind"]
-                        }
-                    }
-                }
+        {
+            "if": {
+                "properties": {"certainty": {"const": "unknown"}},
+                "required": ["certainty"]
             },
-            {
-                "if": {
-                    "properties": {"certainty": {"const": "exact"}},
-                    "required": ["certainty"]
-                },
-                "then": {
-                    "properties": {
-                        "precision": {"not": {"const": "unknown"}},
-                        "lower": {
-                            "properties": {"kind": {"const": "included"}},
-                            "required": ["kind", "timestamp"]
-                        },
-                        "upper": {
-                            "properties": {"kind": {"const": "included"}},
-                            "required": ["kind", "timestamp"]
-                        }
-                    }
-                }
-            },
-            {
-                "if": {
-                    "properties": {"certainty": {"const": "bounded"}},
-                    "required": ["certainty"]
-                },
-                "then": {
-                    "properties": {
-                        "precision": {"not": {"const": "unknown"}}
+            "then": {
+                "properties": {
+                    "precision": {"const": "unknown"},
+                    "lower": {
+                        "properties": {"kind": {"const": "unbounded"}},
+                        "required": ["kind"]
                     },
-                    "anyOf": [
-                        {
-                            "properties": {
-                                "lower": {
-                                    "properties": {
-                                        "kind": {"enum": ["included", "excluded"]}
-                                    },
-                                    "required": ["kind"]
-                                }
-                            }
-                        },
-                        {
-                            "properties": {
-                                "upper": {
-                                    "properties": {
-                                        "kind": {"enum": ["included", "excluded"]}
-                                    },
-                                    "required": ["kind"]
-                                }
-                            }
-                        }
-                    ]
+                    "upper": {
+                        "properties": {"kind": {"const": "unbounded"}},
+                        "required": ["kind"]
+                    }
                 }
             }
-        ]
-    )
+        },
+        {
+            "if": {
+                "properties": {"certainty": {"const": "exact"}},
+                "required": ["certainty"]
+            },
+            "then": {
+                "properties": {
+                    "precision": {"not": {"const": "unknown"}},
+                    "lower": {
+                        "properties": {"kind": {"const": "included"}},
+                        "required": ["kind", "timestamp"]
+                    },
+                    "upper": {
+                        "properties": {"kind": {"const": "included"}},
+                        "required": ["kind", "timestamp"]
+                    }
+                }
+            }
+        },
+        {
+            "if": {
+                "properties": {"certainty": {"const": "bounded"}},
+                "required": ["certainty"]
+            },
+            "then": {
+                "properties": {
+                    "precision": {"not": {"const": "unknown"}}
+                },
+                "anyOf": [
+                    {
+                        "properties": {
+                            "lower": {
+                                "properties": {
+                                    "kind": {"enum": ["included", "excluded"]}
+                                },
+                                "required": ["kind"]
+                            }
+                        }
+                    },
+                    {
+                        "properties": {
+                            "upper": {
+                                "properties": {
+                                    "kind": {"enum": ["included", "excluded"]}
+                                },
+                                "required": ["kind"]
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
 }
 
 impl BoundaryWire {

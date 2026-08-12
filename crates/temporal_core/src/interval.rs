@@ -113,11 +113,7 @@ impl<T: TemporalClock> TemporalInterval<T> {
             if lower_value == upper_value {
                 return Err(TemporalError::EmptyInterval);
             }
-            if matches!(lower, TemporalBoundary::Excluded(_))
-                && matches!(upper, TemporalBoundary::Excluded(_))
-                && upper_value.instant().as_nanosecond() - lower_value.instant().as_nanosecond()
-                    == 1
-            {
+            if is_empty_open_unit_gap(lower, upper) {
                 return Err(TemporalError::EmptyInterval);
             }
         }
@@ -215,6 +211,22 @@ fn validate_known_precision(precision: TemporalPrecision) -> Result<(), Temporal
         Err(TemporalError::InvalidTemporalPrecision)
     } else {
         Ok(())
+    }
+}
+
+/// Return true when two exclusive bounds leave no representable nanosecond.
+///
+/// At TEPP nanosecond resolution, `Excluded(t)` and `Excluded(t + 1ns)` form an
+/// empty open interval because no instant satisfies `t < x < t + 1ns`.
+fn is_empty_open_unit_gap<T: TemporalClock>(
+    lower: TemporalBoundary<T>,
+    upper: TemporalBoundary<T>,
+) -> bool {
+    match (lower, upper) {
+        (TemporalBoundary::Excluded(lower_value), TemporalBoundary::Excluded(upper_value)) => {
+            upper_value.instant().as_nanosecond() - lower_value.instant().as_nanosecond() == 1
+        }
+        _ => false,
     }
 }
 
@@ -388,5 +400,53 @@ mod tests {
             TemporalInterval::exact(value, TemporalPrecision::Unknown),
             Err(TemporalError::InvalidTemporalPrecision)
         );
+    }
+
+    #[test]
+    fn nonadjacent_excluded_bounds_remain_nonempty_and_strict() {
+        let start = event_time("2026-08-12T00:00:00.000000000Z");
+        let middle = event_time("2026-08-12T00:00:00.000000001Z");
+        let end = event_time("2026-08-12T00:00:00.000000002Z");
+        let interval = TemporalInterval::bounded(
+            TemporalBoundary::Excluded(start),
+            TemporalBoundary::Excluded(end),
+            TemporalPrecision::Nanosecond,
+        )
+        .expect("two-nanosecond exclusive span must remain nonempty");
+
+        assert!(!interval.contains(start));
+        assert!(interval.contains(middle));
+        assert!(!interval.contains(end));
+        assert!(!super::is_empty_open_unit_gap(
+            TemporalBoundary::Excluded(start),
+            TemporalBoundary::Excluded(end),
+        ));
+        assert!(!super::is_empty_open_unit_gap(
+            TemporalBoundary::Excluded(start),
+            TemporalBoundary::Included(end),
+        ));
+        assert!(super::is_empty_open_unit_gap(
+            TemporalBoundary::Excluded(start),
+            TemporalBoundary::Excluded(middle),
+        ));
+    }
+
+    #[test]
+    fn adjacent_excluded_bounds_are_empty_at_nanosecond_resolution() {
+        let start = event_time("2026-08-12T00:00:00.000000000Z");
+        let next = event_time("2026-08-12T00:00:00.000000001Z");
+
+        assert_eq!(
+            TemporalInterval::bounded(
+                TemporalBoundary::Excluded(start),
+                TemporalBoundary::Excluded(next),
+                TemporalPrecision::Nanosecond,
+            ),
+            Err(TemporalError::EmptyInterval)
+        );
+        assert!(super::is_empty_open_unit_gap(
+            TemporalBoundary::Excluded(start),
+            TemporalBoundary::Excluded(next),
+        ));
     }
 }
