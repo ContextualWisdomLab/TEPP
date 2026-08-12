@@ -6,6 +6,7 @@ import os
 import stat
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 from types import ModuleType
 
@@ -215,7 +216,7 @@ class PrepareAgentPrMessageHardeningTests(unittest.TestCase):
         source = self.root / "race.md"
         source.write_text("title\n\nbody\n", encoding="utf-8")
 
-        with unittest.mock.patch(
+        with mock.patch(
             "scripts.prepare_agent_pr_message.os.open", side_effect=OSError("denied")
         ):
             with self.assertRaises(ValueError):
@@ -230,7 +231,7 @@ class PrepareAgentPrMessageHardeningTests(unittest.TestCase):
                 (info.st_mode & ~stat.S_IFREG, *info[1:])
             )
 
-        with unittest.mock.patch(
+        with mock.patch(
             "scripts.prepare_agent_pr_message.os.fstat", side_effect=fake_fstat
         ):
             with self.assertRaises(ValueError):
@@ -243,7 +244,7 @@ class PrepareAgentPrMessageHardeningTests(unittest.TestCase):
             values[1] = info.st_ino + 99
             return os.stat_result(values)
 
-        with unittest.mock.patch(
+        with mock.patch(
             "scripts.prepare_agent_pr_message.os.fstat", side_effect=identity_shift2
         ):
             with self.assertRaises(ValueError):
@@ -251,7 +252,7 @@ class PrepareAgentPrMessageHardeningTests(unittest.TestCase):
 
     def test_write_and_read_finally_close_paths(self) -> None:
         path = self.root / "out.txt"
-        with unittest.mock.patch(
+        with mock.patch(
             "scripts.prepare_agent_pr_message.os.fdopen",
             side_effect=OSError("write-fail"),
         ):
@@ -264,7 +265,7 @@ class PrepareAgentPrMessageHardeningTests(unittest.TestCase):
         def boom(*args, **kwargs):  # noqa: ANN001, ANN002
             raise OSError("read-fail")
 
-        with unittest.mock.patch(
+        with mock.patch(
             "scripts.prepare_agent_pr_message.os.fdopen", side_effect=boom
         ):
             with self.assertRaises(OSError):
@@ -277,7 +278,7 @@ class PrepareAgentPrMessageHardeningTests(unittest.TestCase):
         source.write_text("feat: entry\n\nBody text for entrypoint coverage.\n", encoding="utf-8")
         title = self.root / "t.txt"
         body = self.root / "b.md"
-        with unittest.mock.patch(
+        with mock.patch(
             "sys.argv",
             [
                 "prepare_agent_pr_message.py",
@@ -300,7 +301,7 @@ class PrepareAgentPrMessageHardeningTests(unittest.TestCase):
                 return False
             return real_hasattr(obj, name)
 
-        with unittest.mock.patch(
+        with mock.patch(
             "scripts.prepare_agent_pr_message.hasattr", side_effect=selective_hasattr
         ):
             payload = self.parser._read_regular_file(source, 100)
