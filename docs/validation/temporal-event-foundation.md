@@ -18,7 +18,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
 | Multiple membership | `membership_core` | partial | active-PR (PR #25 ESS follow-on) | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Forward transition DAG | `relation_graph` | accepted-target | active-PR (PR #14) | unit + cycle rejection | Task 6 / PR #14 |
-| Bitemporal persistence + live SQL port | `persistence_postgres` | partial | active-PR (PR #23) | migration contracts + recording transport | Task 8 / PR #16 + #23 |
+| Bitemporal persistence + live SQL port | `persistence_postgres` | partial | active-PR (PR #27 live-sqlx) | migration contracts + recording transport + optional PgPool | Task 8 / PR #16 + #23 + #26 + #27 |
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | accepted-target | active-PR (PR #19) | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |

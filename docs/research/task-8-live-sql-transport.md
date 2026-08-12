@@ -8,9 +8,10 @@ Extends Task 8 / ADR 0013 with:
 2. migration SQL statement splitting and ordered batch application;
 3. parameterized document/audit SQL rendering for bitemporal tables;
 4. `LiveDocumentRepository` over any `SqlSession`;
-5. fail-closed `DATABASE_URL` configuration gate for future `SQLx` pool wiring.
+5. fail-closed `DATABASE_URL` configuration gate for `SQLx` pool wiring;
+6. optional `live-sqlx` feature compiling a real `SQLx`/`PgPool` open/execute driver behind validated URL and pool options.
 
-A live PostgreSQL process is not required in CI. Pool construction is the remaining optional driver step.
+A live PostgreSQL process is not required in default CI. Offline/`RecordingSqlSession` backends keep deterministic tests; `live-sqlx` fails closed without a reachable server. Full physical ERD, RLS, concurrent write stress, backup/restore, and live-Postgres CI remain follow-ons.
 
 ## Authority
 

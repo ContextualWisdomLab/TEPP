@@ -6,8 +6,7 @@
 //! in-memory bitemporal adapters, live SQL session/migration ports, document
 //! SQL contracts, a fail-closed `DATABASE_URL` gate, and a fail-closed live
 //! pool open path with validated sizing options (ADR 0013). In-process
-//! transports keep CI deterministic; production `SQLx` driver attachment
-//! remains a separate accepted-target slice after URL validation.
+//! transports keep CI deterministic; optional `live-sqlx` feature compiles a real `PgPool` driver behind validated URL/options.
 
 mod cutoff;
 mod document_sql;
@@ -19,6 +18,8 @@ mod migration;
 mod naming;
 mod sql_session;
 mod sqlx_gate;
+#[cfg(feature = "live-sqlx")]
+mod sqlx_live;
 
 /// Knowledge-cutoff eligibility for historical analytical reads.
 pub use cutoff::is_cutoff_eligible;

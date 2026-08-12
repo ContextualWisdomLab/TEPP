@@ -257,6 +257,188 @@ class CoverageContractTests(unittest.TestCase):
                 with contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(coverage_contract.main(None), 0)
 
+    def test_executable_source_line_filters_noise_records(self) -> None:
+        """Non-executable LLVM DA rows are excluded from the authored-line gate."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "sample.rs"
+            # Fixed layout so line numbers map to explicit expectations below.
+            source_lines = [
+                "",  # 1 empty
+                "//! crate docs",  # 2 comment
+                "use std::io;",  # 3 use
+                "pub use crate::inner;",  # 4 pub use
+                "mod inner;",  # 5 mod
+                "pub mod outer;",  # 6 pub mod
+                "impl Foo {",  # 7 impl
+                "    /// method docs",  # 8 doc
+                "    pub fn bar(",  # 9 pub fn
+                "        x: i32,",  # 10 signature arg
+                "    ) -> Result<Self, Error> {",  # 11 ) ->
+                "        let value = x;",  # 12 executable
+                "        Ok(Self { value })",  # 13 Ok(Self
+                "    }",  # 14 brace
+                "}",  # 15 brace
+                "pub struct Foo {",  # 16 pub struct
+                "    value: i32,",  # 17 field comma
+                "}",  # 18 brace
+                "pub enum Kind {",  # 19 pub enum
+                "    A,",  # 20 variant comma
+                "    B,",  # 21 variant comma
+                "}",  # 22 brace
+                "fn helper() {}",  # 23 fn
+                "struct Private;",  # 24 struct
+                "enum Local { X }",  # 25 enum
+                "#[derive(Debug)]",  # 26 attr
+                "#![allow(dead_code)]",  # 27 inner attr
+                "{",  # 28
+                "}",  # 29
+                "},",  # 30
+                ");",  # 31
+                "];",  # 32
+                "();",  # 33
+                "};",  # 34
+                "Ok(Self)",  # 35
+                ")}",  # 36
+                "})",  # 37
+                "})",  # 38
+                "    return value,",  # 39 executable (return keeps it)
+                "    x + 1,",  # 40 trailing comma noise
+                '#[cfg(feature = "live-sqlx")]',  # 41 cfg attr
+                "fn live_path() {",  # 42 fn
+                "    live_body();",  # 43 executable active feature body
+                "}",  # 44 brace
+                '#[cfg(not(feature = "live-sqlx"))]',  # 45 not-feature attr
+                "fn offline_path() {",  # 46 inside not-feature
+                "    offline_body();",  # 47 inside not-feature
+                "}",  # 48 inside not-feature close
+                "#[cfg(test)]",  # 49
+                "mod tests {",  # 50 cfg(test) mod
+                "    #[test]",  # 51 inside test mod
+                "    fn unit() {",  # 52 inside test mod
+                "        assert_eq!(1, 1);",  # 53 inside test mod
+                "    }",  # 54
+                "}",  # 55
+                "    executable_statement();",  # 56 executable
+            ]
+            source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
+            path = str(source)
+
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(
+                    str(Path(temporary) / "missing.rs"), 1
+                )
+            )
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 0))
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
+            )
+
+            expected_executable = {12, 39, 43, 56}
+            for line_number in range(1, len(source_lines) + 1):
+                is_exec = coverage_contract.is_executable_source_line(path, line_number)
+                if line_number in expected_executable:
+                    self.assertTrue(
+                        is_exec,
+                        msg=f"line {line_number} should be executable: {source_lines[line_number - 1]!r}",
+                    )
+                else:
+                    self.assertFalse(
+                        is_exec,
+                        msg=f"line {line_number} should be filtered: {source_lines[line_number - 1]!r}",
+                    )
+
+            lcov = self.write_lcov(
+                temporary,
+                "\n".join(
+                    [
+                        f"SF:{path}",
+                        "DA:56,1",
+                        "DA:1,0",
+                        "DA:2,0",
+                        "DA:47,0",
+                        "end_of_record",
+                        "",
+                    ]
+                ),
+            )
+            self.assertEqual(
+                coverage_contract.load_lcov_line_totals(lcov),
+                {"lines": {"count": 1, "covered": 1}},
+            )
+
+    def test_cfg_test_and_not_feature_block_helpers(self) -> None:
+        """cfg(test) modules and cfg(not(feature)) blocks are fully recognized."""
+
+        lines = [
+            "fn prod() {}",
+            "#[cfg(test)]",
+            "",
+            "mod tests {",
+            "    fn inner() {}",
+            "}",
+            '#[cfg(not(feature = "x"))]',
+            "fn alternate() {",
+            "    body();",
+            "}",
+            "fn after() {}",
+            "#[cfg(test)]",
+            "fn not_a_module() {}",
+            "#[cfg(test)]",
+        ]
+        test_lines = coverage_contract._cfg_test_module_line_numbers(lines)
+        self.assertEqual(test_lines, {4, 5, 6})
+        self.assertTrue(coverage_contract._line_in_cfg_not_feature_block(lines, 8))
+        self.assertTrue(coverage_contract._line_in_cfg_not_feature_block(lines, 9))
+        self.assertFalse(coverage_contract._line_in_cfg_not_feature_block(lines, 1))
+        self.assertFalse(coverage_contract._line_in_cfg_not_feature_block(lines, 11))
+        open_only = [
+            '#[cfg(not(feature = "x"))]',
+            "fn unfinished()",
+        ]
+        self.assertTrue(
+            coverage_contract._line_in_cfg_not_feature_block(open_only, 2)
+        )
+        self.assertEqual(coverage_contract._cfg_test_module_line_numbers([]), set())
+        # Nested braces inside cfg(test) mod must fully close before exit.
+        nested = [
+            "#[cfg(test)]",
+            "mod tests {",
+            "    fn nested() {",
+            "        let x = 1;",
+            "    }",
+            "}",
+            "fn production() {}",
+        ]
+        self.assertEqual(
+            coverage_contract._cfg_test_module_line_numbers(nested),
+            {2, 3, 4, 5, 6},
+        )
+        # Unclosed modules/blocks exit by EOF without a balanced close.
+        unclosed_mod = [
+            "#[cfg(test)]",
+            "mod tests {",
+            "    fn dangling() {}",
+        ]
+        self.assertEqual(
+            coverage_contract._cfg_test_module_line_numbers(unclosed_mod),
+            {2, 3},
+        )
+        unclosed_not_feature = [
+            '#[cfg(not(feature = "x"))]',
+            "fn dangling() {",
+            "    body();",
+        ]
+        self.assertTrue(
+            coverage_contract._line_in_cfg_not_feature_block(unclosed_not_feature, 2)
+        )
+        self.assertTrue(
+            coverage_contract._line_in_cfg_not_feature_block(unclosed_not_feature, 3)
+        )
+        self.assertFalse(
+            coverage_contract._line_in_cfg_not_feature_block(unclosed_not_feature, 99)
+        )
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

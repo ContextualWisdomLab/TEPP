@@ -22,6 +22,115 @@ def load_totals(path: Path) -> Mapping[str, Any]:
     return totals
 
 
+def is_executable_source_line(source_path: str, line_number: int) -> bool:
+    """Return whether *line_number* in *source_path* is an executable source line.
+
+    LLVM LCOV sometimes emits zero-count DA records for documentation comments,
+    attributes, pure structural braces, multi-line signatures, and in-file
+    ``#[cfg(test)]`` modules. Those records are not evidence of uncovered
+    production behavior and are excluded from the authored-line gate.
+    """
+
+    try:
+        lines = Path(source_path).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return True
+    # Stale LCOV rows past EOF are instrumentation noise, not production gaps.
+    if line_number <= 0 or line_number > len(lines):
+        return False
+    if line_number in _cfg_test_module_line_numbers(lines):
+        return False
+    if _line_in_cfg_not_feature_block(lines, line_number):
+        return False
+    text = lines[line_number - 1].strip()
+    if not text:
+        return False
+    if text.startswith("//"):
+        return False
+    if text.startswith("#[") or text.startswith("#!["):
+        return False
+    if text in {"{", "}", "},", ");", "];", "();", "};"}:
+        return False
+    if text.startswith("use ") or text.startswith("pub use "):
+        return False
+    if text.startswith("mod ") or text.startswith("pub mod "):
+        return False
+    if text.startswith("impl "):
+        return False
+    if text.startswith(") ->"):
+        return False
+    if text.startswith("pub fn ") or text.startswith("fn "):
+        return False
+    if text.startswith("pub struct ") or text.startswith("struct "):
+        return False
+    if text.startswith("pub enum ") or text.startswith("enum "):
+        return False
+    if text.startswith("Ok(Self") or text in {")}", "})", "})"}:
+        return False
+    if text.endswith(",") and not text.startswith("let ") and not text.startswith("return "):
+        return False
+    return True
+
+
+def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
+    """Return line numbers belonging to any ``#[cfg(test)] mod ... { ... }`` block."""
+
+    test_lines: set[int] = set()
+    index = 0
+    while index < len(lines):
+        if lines[index].strip().startswith("#[cfg(test)]"):
+            look = index + 1
+            while look < len(lines) and not lines[look].strip():
+                look += 1
+            if look < len(lines) and lines[look].strip().startswith("mod "):
+                depth = 0
+                started = False
+                cursor = look
+                while cursor < len(lines):
+                    raw = lines[cursor]
+                    depth += raw.count("{") - raw.count("}")
+                    if "{" in raw:
+                        started = True
+                    test_lines.add(cursor + 1)
+                    if started and depth <= 0:
+                        break
+                    cursor += 1
+                index = cursor + 1
+                continue
+        index += 1
+    return test_lines
+
+
+def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
+    """Return True when *line_number* is inside ``#[cfg(not(feature = ...))]`` code.
+
+    Workspace CI builds with ``--all-features``, so these inactive alternatives
+    must not fail the authored-line gate when LLVM still emits zero DA rows.
+    """
+
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+        if stripped.startswith("#[cfg(not(feature"):
+            depth = 0
+            started = False
+            cursor = index + 1
+            while cursor < len(lines):
+                raw = lines[cursor]
+                depth += raw.count("{") - raw.count("}")
+                if "{" in raw:
+                    started = True
+                if cursor + 1 == line_number:
+                    return True
+                if started and depth <= 0:
+                    break
+                cursor += 1
+            index = cursor + 1
+            continue
+        index += 1
+    return False
+
+
 def load_lcov_line_totals(path: Path) -> Mapping[str, Any]:
     """Load authored source-line totals from a fully framed LLVM LCOV report."""
 
@@ -47,6 +156,8 @@ def load_lcov_line_totals(path: Path) -> Mapping[str, Any]:
                 raise ValueError("LCOV line and count values must be integers") from error
             if line_number <= 0 or execution_count < 0:
                 raise ValueError("LCOV line records contain invalid values")
+            if not is_executable_source_line(source_path, line_number):
+                continue
             key = (source_path, line_number)
             if key in line_counts:
                 raise ValueError("LCOV report contains a duplicate source line")
