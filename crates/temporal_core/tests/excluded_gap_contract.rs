@@ -2,19 +2,20 @@
 
 use temporal_core::{
     AssertionTime, AvailableTime, DocumentTime, EventTime, KnowledgeCutoff, SystemTime,
-    TemporalBoundary, TemporalClock, TemporalError, TemporalInterval, TemporalPrecision,
+    TemporalBoundary, TemporalClock, TemporalError, TemporalInstant, TemporalInterval,
+    TemporalPrecision,
 };
 
 fn assert_adjacent_excluded_bounds_are_empty<T: TemporalClock>() {
-    let lower = T::parse_rfc3339("2026-08-12T00:00:00.000000000Z")
+    let lower = TemporalInstant::parse_rfc3339("2026-08-12T00:00:00.000000000Z")
         .expect("lower test timestamp must parse");
-    let upper = T::parse_rfc3339("2026-08-12T00:00:00.000000001Z")
+    let upper = TemporalInstant::parse_rfc3339("2026-08-12T00:00:00.000000001Z")
         .expect("upper test timestamp must parse");
 
     assert_eq!(
         TemporalInterval::<T>::bounded(
-            TemporalBoundary::Excluded(lower),
-            TemporalBoundary::Excluded(upper),
+            TemporalBoundary::Excluded(T::from_instant(lower)),
+            TemporalBoundary::Excluded(T::from_instant(upper)),
             TemporalPrecision::Nanosecond,
         ),
         Err(TemporalError::EmptyInterval)
