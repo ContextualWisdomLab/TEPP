@@ -456,6 +456,10 @@ dependencies = [
 [[package]]
 name = "validation_core"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "version_check"

@@ -16,6 +16,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | event ontology/evidence mentions | PRD; ADR 0003 | future `event_core` | accepted-target |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | future `membership_core` | accepted-target |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | future `corpus_split` | accepted-target |
+| recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; ADR 0007/0014; scientific acceptance | active `validation_core` PR; exact-head evidence pending merge | active-PR |
 | PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts + in-memory bitemporal adapters; live SQLx remaining | partial |
 | immutable split/run/reproducibility manifests | ADR 0013; ERD | future persistence/model-run artifact chain | accepted-target |
 | multilingual shared latent semantic space | PRD; ADR 0004 | future semantic/concept/topic crates | accepted-target |
