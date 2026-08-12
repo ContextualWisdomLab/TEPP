@@ -248,6 +248,11 @@ mod tests {
         assert_eq!(escaped.len(), 2);
         assert!(escaped[0].contains("it''s;ok"));
 
+        // Closing quote as the final character exercises the short-circuit false
+        // path of `index + 1 < len` when deciding whether `''` is an escape.
+        let quote_at_eof = split_sql_statements("SELECT 'done'").expect("quote at eof");
+        assert_eq!(quote_at_eof, vec!["SELECT 'done'".to_owned()]);
+
         // Bare `$` / incomplete tags are not dollar quotes; trailing content without
         // a terminating `;` still yields a final statement fragment.
         let bare = split_sql_statements("SELECT $100; SELECT $bad-tag$; SELECT $$")
