@@ -15,8 +15,9 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | forward-only transition subgraph | PRD; ADR 0002/0003 | future `relation_graph` validation | accepted-target |
 | event ontology/evidence mentions | PRD; ADR 0003 | future `event_core` | accepted-target |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | future `membership_core` | accepted-target |
-| leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` cutoff snapshots + relation co-partition contracts | partial |
+| leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts + in-memory bitemporal adapters; live SQLx remaining | partial |
+| known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | PR #18 `tepp_simulation` deterministic corpora + digests; recovery metrics remaining | active-PR |
 | immutable split/run/reproducibility manifests | ADR 0013; ERD | future persistence/model-run artifact chain | accepted-target |
 | multilingual shared latent semantic space | PRD; ADR 0004 | future semantic/concept/topic crates | accepted-target |
 | TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004 | future `topic_measurement` | accepted-target |
