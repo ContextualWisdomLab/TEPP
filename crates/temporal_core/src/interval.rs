@@ -85,6 +85,8 @@ impl<T: TemporalClock> TemporalInterval<T> {
     ///
     /// At least one boundary must be known. Equal known boundaries are rejected
     /// because exact single-instant representations must use [`Self::exact`].
+    /// Two excluded boundaries separated by only one nanosecond are also empty
+    /// because no representable TEPP instant lies strictly between them.
     ///
     /// # Errors
     ///
@@ -109,6 +111,14 @@ impl<T: TemporalClock> TemporalInterval<T> {
                 return Err(TemporalError::InvalidIntervalOrder);
             }
             if lower_value == upper_value {
+                return Err(TemporalError::EmptyInterval);
+            }
+            if matches!(lower, TemporalBoundary::Excluded(_))
+                && matches!(upper, TemporalBoundary::Excluded(_))
+                && upper_value.instant().as_nanosecond()
+                    - lower_value.instant().as_nanosecond()
+                    == 1
+            {
                 return Err(TemporalError::EmptyInterval);
             }
         }
