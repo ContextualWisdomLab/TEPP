@@ -20,6 +20,8 @@ pub enum PersistenceError {
     SqlExecutionFailed,
     /// A live database URL failed scheme/host validation.
     DatabaseUrlInvalid,
+    /// Live pool sizing or acquire options failed validation.
+    PoolOptionsInvalid,
     /// Live `SQLx` wiring was requested without a configured transport URL.
     LiveAdapterNotConfigured,
 }
@@ -34,6 +36,7 @@ impl fmt::Display for PersistenceError {
             Self::EmptySqlBatch => "empty sql batch",
             Self::SqlExecutionFailed => "sql execution failed",
             Self::DatabaseUrlInvalid => "database url invalid",
+            Self::PoolOptionsInvalid => "pool options invalid",
             Self::LiveAdapterNotConfigured => "live adapter not configured",
         };
         formatter.write_str(message)
@@ -103,6 +106,10 @@ mod tests {
         assert_eq!(
             PersistenceError::DatabaseUrlInvalid.to_string(),
             "database url invalid"
+        );
+        assert_eq!(
+            PersistenceError::PoolOptionsInvalid.to_string(),
+            "pool options invalid"
         );
         assert_eq!(
             PersistenceError::LiveAdapterNotConfigured.to_string(),
