@@ -22,7 +22,7 @@ pub trait SqlSession {
 ///
 /// Strips `--` line comments, ignores empty fragments, and fails closed when no
 /// statements remain. Statement boundaries are `;` outside single quotes and
-/// PostgreSQL dollar-quoted strings (`$tag$ ... $tag$`), so `DO` blocks remain
+/// `PostgreSQL` dollar-quoted strings (`$tag$ ... $tag$`), so `DO` blocks remain
 /// intact.
 ///
 /// # Errors
@@ -83,18 +83,17 @@ fn split_on_semicolons_respecting_quotes(sql: &str) -> Vec<String> {
                 current.push('\'');
                 index += 1;
             }
-            '$' => match read_dollar_tag(&chars[index..]) {
-                Some(tag) => {
+            '$' => {
+                if let Some(tag) = read_dollar_tag(&chars[index..]) {
                     let tag_len = tag.chars().count();
                     current.push_str(&tag);
                     index += tag_len;
                     dollar_tag = Some(tag);
-                }
-                None => {
+                } else {
                     current.push('$');
                     index += 1;
                 }
-            },
+            }
             ';' => {
                 let trimmed = current.trim();
                 if !trimmed.is_empty() {
