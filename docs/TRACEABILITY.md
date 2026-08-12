@@ -15,21 +15,12 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; full intelligence stack remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
-| Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` reasoner on protected main; bounded path-consistency claim only | implemented-main |
-| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
-| event ontology/evidence mentions | PRD; ADR 0003 | PR #13 `event_core` mention/instance boundary on protected main; broader ontology target remains | partial |
-| time-varying cross-classified multiple membership | PRD; ADR 0003 | PR #12 `membership_core` on protected main; PR #25 ESS/design-effect follow-on | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
-| recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; ADR 0007/0014; scientific acceptance | `validation_core` on protected main | implemented-main |
+| recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
 | PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` driver; full physical ERD/RLS/live CI PG remaining | partial |
 | known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | `tepp_simulation` on protected main; recovery metrics in `validation_core` | implemented-main |
-| versioned service/API contracts and exports | PRD; API contract; ADR 0011 | active `tepp_api` PR; HTTP service remaining accepted-target | active-PR |
-| immutable split/run/reproducibility manifests | ADR 0013; ERD | future persistence/model-run artifact chain | accepted-target |
-| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | PR #16 migration contracts + in-memory bitemporal adapters on main; PR #23 live SQL transport port | partial |
-| known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | PR #18 `tepp_simulation` deterministic corpora + digests on protected main | implemented-main |
-| immutable split/run/reproducibility manifests | ADR 0013; ERD | active API manifest contract plus future persistence/model-run artifact chain | accepted-target |
-| recovery metrics and SE-aware Monte Carlo gates | PRD; Test Strategy; ADR 0014 | PR #19 `validation_core` RMSE/bias/coverage/graph/temporal metrics | active-PR |
-| versioned analysis-run and export contracts | ADR 0011/0013; API contract | PR #21 `tepp_api` request/error/manifest/JSON-LD/GraphML contracts | active-PR |
+| versioned service/API contracts and exports | PRD; API contract; ADR 0011/0013 | `tepp_api` analysis-run/export/JSON-LD/GraphML contracts on protected main (PR #21); HTTP service remaining accepted-target | partial |
+| immutable split/run/reproducibility manifests | ADR 0013; ERD | `tepp_api` reproducibility manifest contract on protected main; persistence/model-run artifact chain remaining | partial |
 | multilingual shared latent semantic space | PRD; ADR 0004 | future semantic/concept/topic crates | accepted-target |
 | TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004 | future `topic_measurement` | accepted-target |
 | global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
@@ -45,20 +36,17 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | future authorization/persistence/export/provider adapters | accepted-target |
 | tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | future service/persistence boundaries | accepted-target |
 | standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; future service ports | partial |
-| naruon modular artifact consumer boundary | ADR 0011; API contract | `docs/connectors/naruon-artifact-consumer.md` + example payload; HTTP service remaining | partial |
+| naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract on protected main; HTTP service remaining | partial |
 | contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `docs/connectors/contextual-orchestrator-interpretation-port.md`; live port remaining | partial |
 | autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | future safe OpenCode/NVIDIA autonomous-development workflow | accepted-target |
-| standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; active API/connector contracts; future service ports | partial |
-| naruon consumer boundary | ADR 0011/0012; API contract | PR #22 versioned TEPP artifact consumer contract; no lexical heuristic substitution or cross-service DB access | active-PR |
 | contextual-orchestrator execution boundary | ADR 0010/0011 | provider-neutral orchestration port; TEPP retains scientific authority | accepted-target |
-| autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | PR #11 credential-separated NIM proposal, deterministic verifier, and publisher workflow | active-PR |
-| foundation validation / release-readiness ledger | ADR 0014; Test Strategy | PR #24 `docs/validation/temporal-event-foundation.md` | active-PR |
+| foundation validation / release-readiness ledger | ADR 0014; Test Strategy | PR #24 `docs/validation/temporal-event-foundation.md` on protected main | implemented-main |
 | scientific claim promotion separated from design/implementation/release | ADR 0014; ADR policy | documentation/CI/domain validation/release evidence | partial |
 | CSAP/SOC 2/ISO/NIST assurance readiness | `docs/COMPLIANCE_READINESS.md`; research register | repository controls + future deployment evidence | accepted-target / deployment-owned |
 | threat-model controls and scientific-integrity security | `SECURITY.md`; `docs/THREAT_MODEL.md` | deterministic security/privacy/scientific validation gates | partial |
 | accessible bitemporal/network/drift/invariance views | PRD/UML | future `visual_analytics`; Figma in approved visual phase | accepted-target |
 | 100% production line/branch/public docs | ADR 0007; AGENTS | CI/repository contracts | implemented-main and required for future source |
-| SBOM/provenance/reproducible release | ADR 0014; Operability/Compliance | future exact-release evidence bundle | accepted-target |
+| SBOM/provenance/reproducible release | ADR 0014; Operability/Compliance | `scripts/release_evidence.py` CycloneDX SBOM + exact-head provenance + checksums in CI; full package/image release bundle remaining | partial |
 
 ## Scientific evidence promotion
 
