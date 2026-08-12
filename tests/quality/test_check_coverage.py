@@ -122,7 +122,7 @@ class CoverageContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             complete = self.write_lcov(
                 temporary,
-                "TN:\nSF:/workspace/src/lib.rs\nDA:10,2\nDA:11,1,checksum\nend_of_record\n",
+                "TN:\nSF:src/lib.rs\nDA:10,2\nDA:11,1,checksum\nend_of_record\n",
             )
             self.assertEqual(
                 coverage_contract.load_lcov_line_totals(complete),
@@ -135,7 +135,7 @@ class CoverageContractTests(unittest.TestCase):
 
             incomplete = self.write_lcov(
                 temporary,
-                "SF:/workspace/src/lib.rs\nDA:10,1\nDA:11,0\nend_of_record\n",
+                "SF:src/lib.rs\nDA:10,1\nDA:11,0\nend_of_record\n",
             )
             with self.assertRaisesRegex(ValueError, "incomplete: 1/2"):
                 coverage_contract.validate_report(incomplete, ["lines"], "lcov")
@@ -147,21 +147,21 @@ class CoverageContractTests(unittest.TestCase):
             ("", "no authored source lines"),
             ("SF:\nDA:1,1\n", "source path must not be empty"),
             ("DA:1,1\n", "must follow a source record"),
-            ("SF:/src/lib.rs\nDA:1\n", "must contain line and count"),
-            ("SF:/src/lib.rs\nDA:x,1\n", "must be integers"),
-            ("SF:/src/lib.rs\nDA:0,1\n", "invalid values"),
-            ("SF:/src/lib.rs\nDA:1,-1\n", "invalid values"),
-            ("SF:/src/lib.rs\nDA:1,1\nDA:1,1\n", "duplicate source line"),
+            ("SF:src/lib.rs\nDA:1\n", "must contain line and count"),
+            ("SF:src/lib.rs\nDA:x,1\n", "must be integers"),
+            ("SF:src/lib.rs\nDA:0,1\n", "invalid values"),
+            ("SF:src/lib.rs\nDA:1,-1\n", "invalid values"),
+            ("SF:src/lib.rs\nDA:1,1\nDA:1,1\n", "duplicate source line"),
             (
-                "SF:/src/lib.rs\nSF:/src/other.rs\nDA:1,1\nend_of_record\n",
+                "SF:src/lib.rs\nSF:src/other.rs\nDA:1,1\nend_of_record\n",
                 "source record must end with end_of_record",
             ),
             (
-                "end_of_record\nSF:/src/lib.rs\nDA:1,1\nend_of_record\n",
+                "end_of_record\nSF:src/lib.rs\nDA:1,1\nend_of_record\n",
                 "end_of_record must close a source record",
             ),
             (
-                "SF:/src/lib.rs\nend_of_record\nDA:1,1\n",
+                "SF:src/lib.rs\nend_of_record\nDA:1,1\n",
                 "must follow a source record",
             ),
         )
@@ -197,7 +197,7 @@ class CoverageContractTests(unittest.TestCase):
 
             lcov_path = self.write_lcov(
                 temporary,
-                "SF:/workspace/src/lib.rs\nDA:10,1\nend_of_record\n",
+                "SF:src/lib.rs\nDA:10,1\nend_of_record\n",
             )
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(
@@ -364,9 +364,32 @@ class CoverageContractTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(
-                coverage_contract.load_lcov_line_totals(lcov),
+                coverage_contract.load_lcov_line_totals(
+                    lcov, repository_root=Path(temporary)
+                ),
                 {"lines": {"count": 1, "covered": 1}},
             )
+
+    def test_lcov_rejects_source_paths_outside_repository(self) -> None:
+        """Untrusted SF paths that escape the repository fail closed."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            outside = root.resolve().parent / "outside-secret.rs"
+            try:
+                outside.write_text("fn steal() {}\n", encoding="utf-8")
+                lcov = root / "escape.lcov"
+                lcov.write_text(
+                    f"SF:{outside}\nDA:1,0\nend_of_record\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(ValueError, "escapes repository root"):
+                    coverage_contract.load_lcov_line_totals(
+                        lcov, repository_root=root
+                    )
+            finally:
+                if outside.exists():
+                    outside.unlink()
 
     def test_cfg_test_and_not_feature_block_helpers(self) -> None:
         """cfg(test) modules and cfg(not(feature)) blocks are fully recognized."""
