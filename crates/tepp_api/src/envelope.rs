@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// Fields are private so callers cannot emit empty codes or unredacted free-form
 /// struct literals. Prefer [`ErrorEnvelope::from_api_error`] for typed mapping.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+/// Deserialization re-runs the same nonempty validation as [`ErrorEnvelope::new`].
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ErrorEnvelope {
     /// Stable machine-readable error code (`snake_case`).
@@ -19,6 +20,31 @@ pub struct ErrorEnvelope {
     request_id: String,
     /// Whether a client may retry the same operation.
     retryable: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ErrorEnvelopeWire {
+    error_code: String,
+    message: String,
+    request_id: String,
+    retryable: bool,
+}
+
+impl<'de> Deserialize<'de> for ErrorEnvelope {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = ErrorEnvelopeWire::deserialize(deserializer)?;
+        Self::new(
+            wire.error_code,
+            wire.message,
+            wire.request_id,
+            wire.retryable,
+        )
+        .map_err(serde::de::Error::custom)
+    }
 }
 
 impl ErrorEnvelope {
@@ -139,12 +165,31 @@ mod tests {
             ErrorEnvelope::new("c", "m", "", false),
             Err(ApiError::InvalidWirePayload)
         );
-        // Deserialized empty fields must fail closed on serialize.
-        let forged: ErrorEnvelope = serde_json::from_str(
-            r#"{"error_code":"","message":"m","request_id":"r","retryable":false}"#,
+        // Invalid JSON must fail at deserialize, not only at re-serialize.
+        assert!(
+            serde_json::from_str::<ErrorEnvelope>(
+                r#"{"error_code":"","message":"m","request_id":"r","retryable":false}"#,
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<ErrorEnvelope>(
+                r#"{"error_code":"c","message":"","request_id":"r","retryable":false}"#,
+            )
+            .is_err()
+        );
+        assert!(
+            serde_json::from_str::<ErrorEnvelope>(
+                r#"{"error_code":"c","message":"m","request_id":"","retryable":false}"#,
+            )
+            .is_err()
+        );
+        let parsed: ErrorEnvelope = serde_json::from_str(
+            r#"{"error_code":"invalid_wire_payload","message":"invalid API wire payload","request_id":"req-2","retryable":false}"#,
         )
-        .expect("deser");
-        assert_eq!(forged.to_json(), Err(ApiError::InvalidWirePayload));
+        .expect("valid deser");
+        assert_eq!(parsed.error_code(), "invalid_wire_payload");
+        assert_eq!(parsed.request_id(), "req-2");
         for error in [
             ApiError::InvalidWirePayload,
             ApiError::UnsupportedContractVersion,
