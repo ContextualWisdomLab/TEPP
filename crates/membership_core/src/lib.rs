@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
+#![allow(clippy::cast_precision_loss)]
 //! Time-varying cross-classified and multiple-membership assignments.
 //!
 //! TEPP models documents and other observations as members of many simultaneous
@@ -11,6 +12,7 @@
 
 mod assignment;
 mod error;
+mod ess;
 mod identifier;
 mod network;
 mod role;
@@ -30,3 +32,10 @@ pub use network::MembershipNetwork;
 pub use role::MembershipRole;
 /// Finite non-negative membership weight.
 pub use weight::MembershipWeight;
+
+/// Design effect `n / ESS` for membership weights.
+pub use ess::design_effect;
+/// Group-normalized Kish ESS for co-partitioned membership weights.
+pub use ess::group_normalized_kish_ess;
+/// Kish effective sample size for membership weights.
+pub use ess::kish_effective_sample_size;
