@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `validation_core` recovery metrics: parameter matching, RMSE/bias with standard errors, interval coverage with Wilson bounds, relation-edge precision/recall, temporal-order accuracy, Monte Carlo summaries, and SE-aware acceptance gates with machine-readable reports.
 - `relation_graph` forward-only state-transition DAG with past-pointing provenance edges and cycle rejection.
 - `tepp_simulation` deterministic truth-corpus generator with delayed reporting, multilevel memberships, method-effect variants, relation noise, and digest-bound truth manifests.
 - `corpus_split` leakage-safe knowledge-cutoff snapshots, relation-connected co-partition groups, rolling-origin windows, and group-normalized ESS weight contracts.

@@ -148,11 +148,11 @@
 
 **Produces:** parameter matching, RMSE, bias, interval coverage, relation precision/recall, temporal-order accuracy, calibration, Monte Carlo uncertainty.
 
-- [ ] Write failing oracle tests for every metric, including degenerate and missing cases.
-- [ ] Implement confidence intervals or standard-error-aware acceptance rather than raw nominal point thresholds.
-- [ ] Add end-to-end truth-versus-recovered foundation studies.
-- [ ] Emit machine-readable and human-readable validation artifacts.
-- [ ] Commit metrics with formula and primary-source traceability.
+- [x] Write failing oracle tests for every metric, including degenerate and missing cases.
+- [x] Implement confidence intervals or standard-error-aware acceptance rather than raw nominal point thresholds.
+- [x] Add end-to-end truth-versus-recovered foundation studies.
+- [x] Emit machine-readable and human-readable validation artifacts.
+- [x] Commit metrics with formula and primary-source traceability.
 
 ## Task 12 — Versioned service/API contracts and exports
 

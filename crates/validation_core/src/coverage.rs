@@ -1,0 +1,160 @@
+//! Interval coverage for recovered confidence/credible intervals.
+
+use crate::ValidationError;
+
+/// Empirical coverage of closed intervals `[lower, upper]` for truth values.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when vectors are empty, lengths
+/// differ, bounds are non-finite, or any interval is inverted (`lower > upper`).
+pub fn interval_coverage(
+    truth: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+) -> Result<f64, ValidationError> {
+    if truth.is_empty() || truth.len() != lower.len() || truth.len() != upper.len() {
+        return Err(ValidationError::InvalidInput);
+    }
+    let mut covered = 0usize;
+    for index in 0..truth.len() {
+        let t = truth[index];
+        let lo = lower[index];
+        let hi = upper[index];
+        if !t.is_finite() || !lo.is_finite() || !hi.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        if lo > hi {
+            return Err(ValidationError::InvalidInput);
+        }
+        let low_ok = t >= lo;
+        let high_ok = t <= hi;
+        if low_ok && high_ok {
+            covered += 1;
+        }
+    }
+    Ok(covered as f64 / truth.len() as f64)
+}
+
+/// Wilson score lower/upper bounds for a binomial coverage proportion.
+///
+/// Returns `(lower, upper)` for the empirical coverage rate at the stated
+/// normal critical value `z` (for example `1.96` for nominal 95%).
+///
+/// # Errors
+///
+/// Returns configuration errors for non-finite `z` or `z <= 0`, and input
+/// errors for empty/invalid interval triples.
+pub fn wilson_coverage_interval(
+    truth: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    z: f64,
+) -> Result<(f64, f64), ValidationError> {
+    if !z.is_finite() || z <= 0.0 {
+        return Err(ValidationError::InvalidConfiguration);
+    }
+    let p = interval_coverage(truth, lower, upper)?;
+    let n = truth.len() as f64;
+    let z2 = z * z;
+    if !z2.is_finite() {
+        return Err(ValidationError::InvalidConfiguration);
+    }
+    let denominator = 1.0 + z2 / n;
+    let center = p + z2 / (2.0 * n);
+    let radical = (p * (1.0 - p) / n) + z2 / (4.0 * n * n);
+    // With finite z² and coverage p in [0,1], Wilson terms remain finite.
+    let margin = z * radical.sqrt();
+    // radical and z are finite and non-negative; margin/bounds stay finite in [0,1].
+    let low = ((center - margin) / denominator).clamp(0.0, 1.0);
+    let high = ((center + margin) / denominator).clamp(0.0, 1.0);
+    Ok((low, high))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{interval_coverage, wilson_coverage_interval};
+    use crate::ValidationError;
+
+    #[test]
+    fn coverage_and_wilson_bounds_are_oracle_correct() {
+        let truth = [0.0, 1.0, 2.0, 3.0];
+        let lower = [-0.5, 0.5, 1.5, 4.0];
+        let upper = [0.5, 1.5, 2.5, 5.0];
+        // first three covered, last not → 0.75
+        assert!((interval_coverage(&truth, &lower, &upper).expect("cov") - 0.75).abs() < 1e-12);
+        let (lo, hi) = wilson_coverage_interval(&truth, &lower, &upper, 1.96).expect("wilson");
+        assert!(lo <= 0.75);
+        assert!(0.75 <= hi);
+        assert_eq!(
+            interval_coverage(&[], &[], &[]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            interval_coverage(&[1.0], &[2.0], &[1.0]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            interval_coverage(&[1.0], &[0.0, 1.0], &[2.0]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            interval_coverage(&[1.0], &[0.0], &[2.0, 3.0]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            interval_coverage(&[f64::NAN], &[0.0], &[1.0]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            interval_coverage(&[0.5], &[f64::NAN], &[1.0]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            interval_coverage(&[0.5], &[0.0], &[f64::INFINITY]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, 0.0),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, -1.0),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, f64::NAN),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, f64::MAX),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        // Finite z whose scaled Wilson terms still overflow.
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, 1e200),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        // uncovered: above interval and below interval
+        let miss_high = interval_coverage(&[0.0], &[-2.0], &[-1.0]).expect("miss high");
+        assert!((miss_high - 0.0).abs() < 1e-12);
+        let miss_low = interval_coverage(&[0.0], &[1.0], &[2.0]).expect("miss low");
+        assert!((miss_low - 0.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn wilson_nonfinite_guards() {
+        let truth = [0.0];
+        let lower = [-1.0];
+        let upper = [1.0];
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, f64::MAX),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        // Finite z whose scaled Wilson terms still overflow.
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, 1e200),
+            Err(ValidationError::InvalidConfiguration)
+        );
+    }
+}
