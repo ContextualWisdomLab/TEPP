@@ -160,11 +160,11 @@
 
 **Produces:** versioned ingestion, temporal query, event/relation, membership, snapshot/split, simulation, and validation contracts.
 
-- [ ] Write failing schema tests for unknown fields, bounds, hostile nesting, tenant identifiers, exact evidence, temporal precision, and error redaction.
-- [ ] Implement domain-to-DTO adapters without leaking persistence internals.
-- [ ] Add JSON-LD and GraphML exports plus reproducibility manifests.
-- [ ] Test backward compatibility and explicit version rejection.
-- [ ] Commit API contracts and examples.
+- [x] Write failing schema tests for unknown fields, bounds, hostile nesting, tenant identifiers, exact evidence, temporal precision, and error redaction.
+- [x] Implement domain-to-DTO adapters without leaking persistence internals.
+- [x] Add JSON-LD and GraphML exports plus reproducibility manifests.
+- [x] Test backward compatibility and explicit version rejection.
+- [x] Commit API contracts and examples.
 
 ## Task 13 — Complete foundation verification and release-readiness report
 

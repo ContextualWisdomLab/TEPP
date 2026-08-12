@@ -19,7 +19,8 @@ Current protected main exposes Rust library/domain contracts, not a production H
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | LLM interpretation provider port | TEPP interpretation gateway | contextual-orchestrator | accepted-target |
-| model/artifact/export API | future TEPP artifact service | standalone UI/CWL consumers | accepted-target |
+| model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
+| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
 
 ## 3. Versioning
 
