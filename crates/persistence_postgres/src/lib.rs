@@ -9,7 +9,9 @@
 //! path with validated sizing options (ADR 0013). In-process transports keep
 //! default CI deterministic; optional `live-sqlx` feature compiles a real
 //! `PgPool` driver behind validated URL/options, with a gated live `PostgreSQL`
-//! CI job (`TEPP_LIVE_POSTGRES=1`).
+//! CI job (`TEPP_LIVE_POSTGRES=1`). Append-only reproducibility-manifest SQL
+//! contracts bind evidence digests, code commit, dependency lock, and knowledge
+//! cutoff for run provenance (ADR 0013).
 
 mod cutoff;
 mod document_sql;
@@ -17,6 +19,7 @@ mod document_store;
 mod error;
 mod live_pool;
 mod live_repository;
+mod manifest_sql;
 mod migration;
 mod naming;
 mod sql_session;
@@ -61,6 +64,14 @@ pub use live_pool::open_live_sqlx_pool;
 pub use live_repository::LiveDocumentRepository;
 /// Migration application failures on the live path.
 pub use live_repository::LiveMigrationError;
+/// Append-only reproducibility manifest row.
+pub use manifest_sql::ReproducibilityManifestRecord;
+/// Render insert SQL for a reproducibility manifest.
+pub use manifest_sql::insert_reproducibility_manifest_sql;
+/// Render selection SQL by digest triple.
+pub use manifest_sql::select_reproducibility_manifest_by_digests_sql;
+/// Render selection SQL by primary key.
+pub use manifest_sql::select_reproducibility_manifest_by_id_sql;
 /// Embedded and ad-hoc migration catalogs.
 pub use migration::MigrationCatalog;
 /// Validate migration SQL against TEPP contracts.
