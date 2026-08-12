@@ -64,11 +64,12 @@ identity, expiration, base SHA, file count, byte count, and Git modes before
 applying the patch.
 
 The verifier receives neither model nor publication credentials. It installs
-the hash-locked Python environment and runs dependency integrity, product-gap
-audit, Ruff and docstrings, compileall, document and prompt checks, all
-non-hosted tests with 100% statement and branch coverage, and distribution
-build. It rejects any verification mutation and proves the post-verification
-patch is byte-identical.
+the hash-locked Python environment, compiles the quality scripts and tests,
+validates the workspace and documentation contracts, runs the quality tests
+with 100% statement and branch coverage, and executes the pinned Rust format,
+lint, test, documentation, dependency, line-coverage, and branch-coverage
+gates. Coverage artifacts remain under `$RUNNER_TEMP`. It rejects any
+verification mutation and proves the post-verification patch is byte-identical.
 
 ### 3. Fresh publisher
 
@@ -105,7 +106,6 @@ Stable no-op reasons are:
 - `open_pull_request`
 - `nim_api_key_unavailable`
 - `maintainer_app_unavailable`
-- `ready_dry_run_without_credentials`
 
 A failed model candidate is discarded before a later candidate runs. A cleanup
 or reinstall failure stops fallback. A failed verifier publishes nothing. A

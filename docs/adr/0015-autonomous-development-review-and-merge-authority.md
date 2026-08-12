@@ -1,7 +1,7 @@
 # ADR 0015 — Autonomous development, review, and merge authority separation
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — hourly credential-separated product-development workflow is active-PR/implemented once merged; independent review and merge authority remain deployment/policy owned  
+**Implementation maturity:** active-PR — the hourly credential-separated product-development workflow remains unmerged; independent review and merge authority remain deployment/policy owned
 **Date:** 2026-08-12  
 **Supersedes:** None; narrows and clarifies the automation clauses previously mixed into ADR 0006.
 

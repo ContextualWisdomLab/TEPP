@@ -180,8 +180,10 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "cargo clippy --workspace --all-targets --all-features -- -D warnings",
             "cargo nextest run --workspace --all-features",
             "cargo deny check",
-            "python3 scripts/check_coverage.py coverage.lcov --kind lines --format lcov",
-            "python3 scripts/check_coverage.py coverage-branches.json --kind branches",
+            'line_coverage="$RUNNER_TEMP/coverage.lcov"',
+            'branch_coverage="$RUNNER_TEMP/coverage-branches.json"',
+            'python3 scripts/check_coverage.py "$line_coverage" --kind lines --format lcov',
+            'python3 scripts/check_coverage.py "$branch_coverage" --kind branches',
         ):
             self.assertIn(command, verifier)
 

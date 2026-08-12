@@ -316,7 +316,7 @@ jobs:
       && needs.propose_product_increment.outputs.has_changes == 'true'
     needs: propose_product_increment
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     permissions:
       actions: read
       contents: read
@@ -369,20 +369,43 @@ jobs:
           git apply --check --binary "$patch"
           git apply --index --binary "$patch"
           git diff --cached --check
-          ! git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'
+          if git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'; then
+            echo '::error::Symlink or gitlink proposals are forbidden'
+            exit 1
+          fi
           actual_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
           [ "$actual_files" = "${{ needs.propose_product_increment.outputs.changed_files }}" ]
 
       - name: Install immutable verification environment
         run: python3 -m pip install --disable-pip-version-check --no-deps --require-hashes -r requirements-quality.txt
 
+      - name: Restore pinned Rust quality tools
+        id: rust-tools-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest
+            ~/.cargo/bin/cargo-deny
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-rust-tools-nextest-0.9.140-deny-0.19.7
+
+      - name: Restore pinned cargo-llvm-cov
+        id: llvm-cov-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-cargo-llvm-cov-0.8.6
+
       - name: Install pinned Rust quality tools
         shell: bash
         run: |
           set -euo pipefail
-          cargo install cargo-nextest --locked --version 0.9.140
-          cargo install cargo-deny --locked --version 0.19.7
-          cargo install cargo-llvm-cov --locked --version 0.8.6
+          if [ "${{ steps.rust-tools-cache.outputs.cache-hit }}" != true ]; then
+            cargo install cargo-nextest --locked --version 0.9.140
+            cargo install cargo-deny --locked --version 0.19.7
+          fi
+          if [ "${{ steps.llvm-cov-cache.outputs.cache-hit }}" != true ]; then
+            cargo install cargo-llvm-cov --locked --version 0.8.6
+          fi
           rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
 
       - name: Run every release-quality gate
@@ -408,10 +431,12 @@ jobs:
           cargo test --doc --workspace --all-features
           cargo doc --workspace --all-features --no-deps
           cargo deny check
-          cargo llvm-cov --workspace --all-features --lcov --output-path coverage.lcov
-          python3 scripts/check_coverage.py coverage.lcov --kind lines --format lcov
-          cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json
-          python3 scripts/check_coverage.py coverage-branches.json --kind branches
+          line_coverage="$RUNNER_TEMP/coverage.lcov"
+          branch_coverage="$RUNNER_TEMP/coverage-branches.json"
+          cargo llvm-cov --workspace --all-features --lcov --output-path "$line_coverage"
+          python3 scripts/check_coverage.py "$line_coverage" --kind lines --format lcov
+          cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path "$branch_coverage"
+          python3 scripts/check_coverage.py "$branch_coverage" --kind branches
           [ -z "$(git diff --name-only)" ]
           [ -z "$(git ls-files --others --exclude-standard)" ]
           post_patch="$RUNNER_TEMP/post-verify.patch"
@@ -476,7 +501,10 @@ jobs:
           git apply --check --binary "$patch"
           git apply --index --binary "$patch"
           git diff --cached --check
-          ! git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'
+          if git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'; then
+            echo '::error::Symlink or gitlink proposals are forbidden'
+            exit 1
+          fi
           actual_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
           [ "$actual_files" = "${{ needs.propose_product_increment.outputs.changed_files }}" ]
 
