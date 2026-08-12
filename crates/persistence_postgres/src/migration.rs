@@ -403,6 +403,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn rls_contracts_fail_closed_when_declared() {
         let missing_role = MigrationCatalog::from_sql(
             r"
