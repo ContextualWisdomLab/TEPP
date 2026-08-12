@@ -116,10 +116,12 @@ fn split_on_semicolons_respecting_quotes(sql: &str) -> Vec<String> {
     statements
 }
 
+/// Parse a dollar-quote tag starting at `chars[0] == '$'`.
+///
+/// Returns `None` when the opener is incomplete or contains characters outside
+/// the `PostgreSQL` tag alphabet (ASCII alphanumeric and `_`).
 fn read_dollar_tag(chars: &[char]) -> Option<String> {
-    if chars.first() != Some(&'$') {
-        return None;
-    }
+    // Caller only invokes this after matching a leading `$`.
     let mut end = 1usize;
     while end < chars.len() {
         let ch = chars[end];
@@ -245,6 +247,20 @@ mod tests {
         let escaped = split_sql_statements("SELECT 'it''s;ok'; SELECT 2;").expect("escaped quotes");
         assert_eq!(escaped.len(), 2);
         assert!(escaped[0].contains("it''s;ok"));
+
+        // Bare `$` / incomplete tags are not dollar quotes; trailing content without
+        // a terminating `;` still yields a final statement fragment.
+        let bare = split_sql_statements("SELECT $100; SELECT $bad-tag$; SELECT $$")
+            .expect("non-tag dollars");
+        assert_eq!(bare.len(), 3);
+        assert!(bare[0].contains("$100"));
+        assert!(bare[1].contains("$bad-tag$"));
+        assert_eq!(bare[2], "SELECT $$");
+
+        // Unclosed dollar body keeps interior `;` from splitting statements.
+        let unclosed = split_sql_statements("DO $x$ BEGIN PERFORM 1; SELECT 2").expect("unclosed");
+        assert_eq!(unclosed.len(), 1);
+        assert!(unclosed[0].contains("PERFORM 1;"));
     }
 
     #[test]

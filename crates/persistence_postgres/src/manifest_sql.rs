@@ -196,9 +196,14 @@ mod tests {
 
         assert!(validate_sha256_hex(&"ff".repeat(32)).is_ok());
         assert!(validate_sha256_hex("zz").is_err());
+        // Length-correct but non-hex must fail closed (branch vs wrong length).
+        assert!(validate_sha256_hex(&"g".repeat(64)).is_err());
         assert!(validate_commit_sha("abc123").is_ok());
+        assert!(validate_commit_sha("deadbeef-cafe_01").is_ok());
         assert!(validate_commit_sha("").is_err());
         assert!(validate_commit_sha(&"x".repeat(65)).is_err());
+        // Invalid character outside hex/_/-.
+        assert!(validate_commit_sha("abc!def").is_err());
         assert_eq!(super::escape_literal("a'b"), "a''b");
     }
 }

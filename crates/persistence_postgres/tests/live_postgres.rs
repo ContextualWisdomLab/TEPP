@@ -158,7 +158,8 @@ fn live_postgres_applies_migrations_and_document_sql() {
         knowledge_cutoff: available,
         evidence_digest: content_digest,
         code_commit_sha: "a".repeat(40),
-        dependency_lock_digest: "b".repeat(32),
+        // SHA-256 hex is always 64 characters (same contract as content_digest).
+        dependency_lock_digest: "b".repeat(64),
         system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("sys"),
         available_time: available,
     };
