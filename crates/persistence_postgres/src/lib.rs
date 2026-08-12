@@ -6,7 +6,7 @@
 //! in-memory bitemporal adapters, live SQL session/migration ports, document
 //! SQL contracts, a fail-closed `DATABASE_URL` gate, and a fail-closed live
 //! pool open path with validated sizing options (ADR 0013). In-process
-//! transports keep CI deterministic; optional `live-sqlx` feature compiles a real `PgPool` driver behind validated URL/options.
+//! transports keep default CI deterministic; optional `live-sqlx` feature compiles a real `PgPool` driver behind validated URL/options, with a gated live `PostgreSQL` CI job (`TEPP_LIVE_POSTGRES=1`).
 
 mod cutoff;
 mod document_sql;

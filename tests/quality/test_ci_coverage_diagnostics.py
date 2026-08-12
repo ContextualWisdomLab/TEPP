@@ -61,6 +61,22 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         self.assertIn("UNCOVERED_REGION", workflow)
         self.assertIn("UNCOVERED_FUNCTION", workflow)
 
+    def test_live_postgres_job_is_gated_and_service_backed(self) -> None:
+        """Live SQLx evidence requires a Postgres service and explicit env gate."""
+
+        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn("live-postgres:", workflow)
+        self.assertIn("name: Live PostgreSQL integration", workflow)
+        self.assertIn("image: postgres:16.9-alpine", workflow)
+        self.assertIn('TEPP_LIVE_POSTGRES: "1"', workflow)
+        self.assertIn("DATABASE_URL: postgres://tepp:tepp_ci@localhost:5432/tepp", workflow)
+        self.assertIn(
+            "cargo test -p persistence_postgres --features live-sqlx --test live_postgres",
+            workflow,
+        )
+        self.assertIn("migrations/**", workflow)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
