@@ -31,9 +31,15 @@ REQUIRED_FILES = (
     "docs/TRD.md",
     "docs/UML.md",
     "docs/adr/README.md",
+    "docs/adr/ADR_POLICY.md",
     "docs/adr/0009-purpose-bound-pii-governance.md",
     "docs/adr/0010-adaptive-llm-orchestration.md",
     "docs/adr/0011-standalone-modular-msa-boundary.md",
+    "docs/adr/0012-temporal-relational-shared-latent-topic-measurement.md",
+    "docs/adr/0013-bitemporal-persistence-reproducibility-and-split-authority.md",
+    "docs/adr/0014-scientific-claim-promotion-and-release-evidence.md",
+    "docs/adr/0015-autonomous-development-review-and-merge-authority.md",
+    "docs/adr/0016-tdt-chronos-event-intelligence-boundary.md",
     "docs/product/prd-v0.4-approved.md",
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
     "docs/superpowers/plans/2026-08-05-temporal-event-foundation.md",
@@ -52,7 +58,24 @@ FULL_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 MARKDOWN_LINK = re.compile(
     r'(?<!!)\[[^]\n]+\]\((?P<target>[^)\s]+)(?:\s+"[^"]*")?\)'
 )
-ADR_TABLE_ROW = re.compile(r"^\|\s*(?P<number>\d{4})\s*\|", re.MULTILINE)
+ADR_TABLE_ROW = re.compile(r"^\|\s*\[(?P<number>\d{4})\]", re.MULTILINE)
+ADR_FILE_NAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
+ADR_DECISION_STATUS = re.compile(
+    r"^\*\*Decision status:\*\*\s*(Accepted|Proposed|Superseded|Rejected)\b",
+    re.MULTILINE,
+)
+ADR_IMPLEMENTATION_STATUS = re.compile(
+    r"^\*\*Implementation maturity:\*\*\s*"
+    r"(implemented-main|active-PR|partial|accepted-target|research-only|out-of-scope)\b",
+    re.MULTILINE,
+)
+ADR_REQUIRED_HEADINGS = (
+    "## Context",
+    "## Decision",
+    "## Alternatives considered",
+    "## Consequences",
+    "## Verification",
+)
 
 CANONICAL_LINKS = (
     "docs/product/prd-v0.4-approved.md",
@@ -71,6 +94,7 @@ CANONICAL_LINKS = (
     "docs/OPERABILITY.md",
     "docs/TRACEABILITY.md",
     "docs/adr/README.md",
+    "docs/adr/ADR_POLICY.md",
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
     "docs/superpowers/plans/2026-08-05-temporal-event-foundation.md",
     "docs/research/standards-and-literature.md",
@@ -108,13 +132,48 @@ def validate_documentation_map() -> None:
             f"canonical documentation map is missing links: {missing_links}"
         )
 
-    adr_index = (ROOT / "docs/adr/README.md").read_text(encoding="utf-8")
-    registered_adrs = {
+
+def validate_adr_graph() -> None:
+    """Require every numbered ADR to be indexed and carry unambiguous authority metadata."""
+
+    adr_root = ROOT / "docs" / "adr"
+    adr_index = (adr_root / "README.md").read_text(encoding="utf-8")
+    indexed_numbers = {
         match.group("number") for match in ADR_TABLE_ROW.finditer(adr_index)
     }
-    for number in ("0009", "0010", "0011"):
-        if number not in registered_adrs:
-            raise AssertionError(f"ADR index is missing decision {number}")
+
+    adr_files: dict[str, Path] = {}
+    for path in sorted(adr_root.glob("[0-9][0-9][0-9][0-9]-*.md")):
+        match = ADR_FILE_NAME.fullmatch(path.name)
+        if not match:
+            raise AssertionError(f"invalid ADR filename: {path.relative_to(ROOT)}")
+        adr_files[match.group("number")] = path
+
+    file_numbers = set(adr_files)
+    if indexed_numbers != file_numbers:
+        raise AssertionError(
+            "ADR index/file mismatch: "
+            f"index_only={sorted(indexed_numbers - file_numbers)}, "
+            f"file_only={sorted(file_numbers - indexed_numbers)}"
+        )
+
+    failures: list[str] = []
+    for number, path in adr_files.items():
+        text = path.read_text(encoding="utf-8")
+        if ADR_DECISION_STATUS.search(text) is None:
+            failures.append(f"ADR {number} lacks a valid Decision status")
+        if ADR_IMPLEMENTATION_STATUS.search(text) is None:
+            failures.append(f"ADR {number} lacks a valid Implementation maturity")
+        if "**Supersedes:**" not in text and "**Supersession:**" not in text:
+            failures.append(f"ADR {number} lacks explicit supersession metadata")
+        for heading in ADR_REQUIRED_HEADINGS:
+            if heading not in text:
+                failures.append(f"ADR {number} lacks required heading {heading!r}")
+        if "## Rollback" not in text:
+            failures.append(f"ADR {number} lacks rollback/supersession behavior")
+
+    if failures:
+        raise AssertionError("\n".join(failures))
 
 
 def validate_markdown() -> None:
@@ -176,6 +235,7 @@ def main() -> None:
 
     validate_required_files()
     validate_documentation_map()
+    validate_adr_graph()
     validate_markdown()
     validate_workflows()
     validate_json()
