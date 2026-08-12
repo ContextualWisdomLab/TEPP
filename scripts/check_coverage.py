@@ -55,7 +55,7 @@ def is_executable_source_line(source_path: str, line_number: int) -> bool:
         return False
     if text.startswith("mod ") or text.startswith("pub mod "):
         return False
-    if text.startswith("impl "):
+    if text.startswith("impl ") or text.startswith("impl<"):
         return False
     if text.startswith(") ->"):
         return False
