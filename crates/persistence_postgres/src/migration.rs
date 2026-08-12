@@ -500,6 +500,48 @@ mod tests {
             validate_migration_catalog(&missing_policy),
             Err(MigrationContractError::MissingRlsPolicy)
         );
+
+        // Policy exists and is multi-word, but does not mention tenant_record_id.
+        let policy_without_tenant_predicate = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            CREATE ROLE tepp_app_runtime NOSUPERUSER;
+            -- bind GUC name for scan: tepp.current_tenant_record_id
+            ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_record_tenant_isolation ON tenant_record
+                FOR ALL USING (true);
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&policy_without_tenant_predicate),
+            Err(MigrationContractError::MissingRlsPolicy)
+        );
+
+        // Second CREATE POLICY window + IF NOT EXISTS / empty policy name edges.
+        assert!(!super::table_has_tenant_policy(
+            "create policy other_table_isolation on other_table using (tenant_record_id = 1); \
+             create policy tenant_record_tenant_isolation on tenant_record using (true);",
+            "tenant_record",
+        ));
+        assert!(super::table_has_tenant_policy(
+            "create policy other_table_isolation on other_table using (true); \
+             create policy tenant_record_tenant_isolation on tenant_record using (tenant_record_id = 1);",
+            "tenant_record",
+        ));
+        assert!(super::parse_create_policy_names("CREATE POLICY \"weird\" ON t;").is_empty());
+        assert!(super::table_body(
+            "CREATE TABLE IF NOT EXISTS tenant_record (tenant_record_id uuid PRIMARY KEY, system_time timestamptz NOT NULL);",
+            "tenant_record",
+        )
+        .is_some());
+        assert!(
+            super::table_body("CREATE TABLE tenant_record NO_PARENS;", "tenant_record").is_none()
+        );
     }
 
     #[test]
