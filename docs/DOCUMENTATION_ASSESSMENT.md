@@ -93,9 +93,8 @@ Documentation completeness must not be confused with product completeness.
 
 - **implemented-main:** Rust workspace/quality foundation, immutable evidence/exact-span boundary, and canonical documentation/ADR authority graph through PR #7.
 - **active-PR:** PR #8 typed six-clock/uncertain interval foundation on the exact current protected-main lineage.
-- **legacy active work:** PR #6 Allen relation algebra/bounded path consistency is based on superseded PR #5 and must be replayed onto the canonical Task 3 lineage before it can qualify as current implementation evidence.
+- **accepted-target:** Task 4 Allen relation algebra/bounded path consistency remains accepted-target until the unique legacy PR #6 behavior is replayed onto the canonical Task 3 lineage and revalidated; the same maturity also covers event ontology/graph/membership, persistence/splits, multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, TDT/CHRONOS, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority and production service APIs.
 - **partial:** selected repository-quality and standalone crate boundaries are implemented, while complete estimator/service/release authorities remain target work.
-- **accepted-target:** event ontology/graph/membership, persistence/splits, multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, TDT/CHRONOS, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority and production service APIs.
 - **deployment-owned/external-assurance:** production infrastructure controls, measured SLO/RPO/RTO, CSAP certification, SOC 2 attestation and jurisdiction-specific legal determinations.
 
 ## 6. Remaining documentation work is event-driven
