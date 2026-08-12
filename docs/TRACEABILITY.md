@@ -17,6 +17,10 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | PR #12 `membership_core` on protected main; PR #25 ESS/design-effect follow-on | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; ADR 0007/0014; scientific acceptance | `validation_core` on protected main | implemented-main |
+| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, `DATABASE_URL` SQLx gate; live pool/query driver remaining | partial |
+| known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | `tepp_simulation` on protected main; recovery metrics in `validation_core` | implemented-main |
+| versioned service/API contracts and exports | PRD; API contract; ADR 0011 | active `tepp_api` PR; HTTP service remaining accepted-target | active-PR |
+| immutable split/run/reproducibility manifests | ADR 0013; ERD | future persistence/model-run artifact chain | accepted-target |
 | PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | PR #16 migration contracts + in-memory bitemporal adapters on main; PR #23 live SQL transport port | partial |
 | known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | PR #18 `tepp_simulation` deterministic corpora + digests on protected main | implemented-main |
 | immutable split/run/reproducibility manifests | ADR 0013; ERD | active API manifest contract plus future persistence/model-run artifact chain | accepted-target |
