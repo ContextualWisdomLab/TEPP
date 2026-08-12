@@ -20,10 +20,12 @@ pub trait SqlSession {
 
 /// Split migration SQL into executable statements without executing them.
 ///
-/// Strips `--` line comments, ignores empty fragments, and fails closed when no
-/// statements remain. Statement boundaries are `;` outside single quotes and
-/// `PostgreSQL` dollar-quoted strings (`$tag$ ... $tag$`), so `DO` blocks remain
-/// intact.
+/// Strips `--` line comments (line-oriented, migration-oriented), ignores empty
+/// fragments, and fails closed when no statements remain. Statement boundaries
+/// are `;` outside single quotes and `PostgreSQL` dollar-quoted strings
+/// (`$tag$ ... $tag$`), so `DO` blocks remain intact. This is not a full SQL
+/// lexer: `E'...'` backslash escapes and `--` inside quoted literals are out of
+/// scope for foundation/RLS migration batches.
 ///
 /// # Errors
 ///

@@ -375,9 +375,16 @@ class CoverageContractTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            outside = root.resolve().parent / "outside-secret.rs"
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".rs",
+                dir=root.resolve().parent,
+                delete=False,
+                encoding="utf-8",
+            ) as outside_file:
+                outside = Path(outside_file.name)
+                outside_file.write("fn steal() {}\n")
             try:
-                outside.write_text("fn steal() {}\n", encoding="utf-8")
                 lcov = root / "escape.lcov"
                 lcov.write_text(
                     f"SF:{outside}\nDA:1,0\nend_of_record\n",
@@ -386,6 +393,10 @@ class CoverageContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "escapes repository root"):
                     coverage_contract.load_lcov_line_totals(
                         lcov, repository_root=root
+                    )
+                with self.assertRaisesRegex(ValueError, "escapes repository root"):
+                    coverage_contract.resolve_repository_source_path(
+                        "/etc/passwd", root
                     )
             finally:
                 if outside.exists():

@@ -7,8 +7,8 @@ use uuid::Uuid;
 /// Immutable reproducibility manifest row bound to a tenant and digests.
 ///
 /// Maps to `reproducibility_manifest` in migration `0001`. Digests are
-/// lowercase hex `SHA-256` strings; `code_commit_sha` is a non-empty Git
-/// commit identity (typically 40-character lowercase hex).
+/// lowercase hex `SHA-256` strings (exactly 64 `0-9a-f` characters);
+/// `code_commit_sha` is a full Git object id (exactly 40 or 64 lowercase hex).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ReproducibilityManifestRecord {
     /// Primary key for this manifest identity.
@@ -109,20 +109,21 @@ pub fn select_reproducibility_manifest_by_id_sql(reproducibility_manifest_id: Uu
     )
 }
 
+fn is_lowercase_hex(value: &str) -> bool {
+    value
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+}
+
 fn validate_sha256_hex(value: &str) -> Result<(), PersistenceError> {
-    if value.len() != 64 || !value.chars().all(|ch| ch.is_ascii_hexdigit()) {
+    if value.len() != 64 || !is_lowercase_hex(value) {
         return Err(PersistenceError::InvalidContentDigest);
     }
     Ok(())
 }
 
 fn validate_commit_sha(value: &str) -> Result<(), PersistenceError> {
-    if value.is_empty()
-        || value.len() > 64
-        || !value
-            .chars()
-            .all(|ch| ch.is_ascii_hexdigit() || ch == '_' || ch == '-')
-    {
+    if !matches!(value.len(), 40 | 64) || !is_lowercase_hex(value) {
         return Err(PersistenceError::InvalidContentDigest);
     }
     Ok(())
@@ -196,14 +197,16 @@ mod tests {
 
         assert!(validate_sha256_hex(&"ff".repeat(32)).is_ok());
         assert!(validate_sha256_hex("zz").is_err());
-        // Length-correct but non-hex must fail closed (branch vs wrong length).
+        // Length-correct but non-hex / uppercase must fail closed.
         assert!(validate_sha256_hex(&"g".repeat(64)).is_err());
-        assert!(validate_commit_sha("abc123").is_ok());
-        assert!(validate_commit_sha("deadbeef-cafe_01").is_ok());
+        assert!(validate_sha256_hex(&"FF".repeat(32)).is_err());
+        assert!(validate_commit_sha(&"ab".repeat(20)).is_ok());
+        assert!(validate_commit_sha(&"cd".repeat(32)).is_ok());
+        assert!(validate_commit_sha("abc123").is_err());
         assert!(validate_commit_sha("").is_err());
-        assert!(validate_commit_sha(&"x".repeat(65)).is_err());
-        // Invalid character outside hex/_/-.
-        assert!(validate_commit_sha("abc!def").is_err());
+        assert!(validate_commit_sha(&"a".repeat(41)).is_err());
+        assert!(validate_commit_sha(&"A".repeat(40)).is_err());
+        assert!(validate_commit_sha("deadbeef-cafe_01").is_err());
         assert_eq!(super::escape_literal("a'b"), "a''b");
     }
 }

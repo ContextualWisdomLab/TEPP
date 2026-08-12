@@ -18,14 +18,21 @@ BEGIN
     ]
     LOOP
         IF to_regclass(format('public.%I', table_name)) IS NOT NULL THEN
+            -- Schema-qualify public.* so a hostile search_path cannot retarget drops.
             EXECUTE format(
-                'DROP POLICY IF EXISTS %I ON %I',
+                'DROP POLICY IF EXISTS %I ON public.%I',
                 table_name || '_tenant_isolation',
                 table_name
             );
-            EXECUTE format('ALTER TABLE %I NO FORCE ROW LEVEL SECURITY', table_name);
-            EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', table_name);
-            EXECUTE format('REVOKE ALL ON TABLE %I FROM tepp_app_runtime', table_name);
+            EXECUTE format(
+                'ALTER TABLE public.%I NO FORCE ROW LEVEL SECURITY',
+                table_name
+            );
+            EXECUTE format('ALTER TABLE public.%I DISABLE ROW LEVEL SECURITY', table_name);
+            EXECUTE format(
+                'REVOKE ALL ON TABLE public.%I FROM tepp_app_runtime',
+                table_name
+            );
         END IF;
     END LOOP;
 
