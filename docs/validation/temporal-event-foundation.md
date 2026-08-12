@@ -19,7 +19,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Multiple membership | `membership_core` | partial | unit + ESS weights | Task 7 / PR #12 |
 | Forward transition DAG | `relation_graph` | active-PR | unit + cycle rejection | Task 5 / PR #14 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial / active-PR | migration contracts + recording transport | Task 8 / PR #16 + #23 |
-| Leakage-safe splits | `corpus_split` | active-PR | cutoff + co-partition tests | Task 9 / PR #17 |
+| Leakage-safe splits | `corpus_split` | implemented-main | cutoff + co-partition tests | Task 9 / PR #17 |
 | Truth corpora / manifests | `tepp_simulation` | active-PR | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | active-PR | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | active-PR | unknown-field/version/limit tests | Task 12 / PR #21 |
