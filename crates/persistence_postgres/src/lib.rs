@@ -4,14 +4,16 @@
 //!
 //! This crate owns migration SQL contracts, knowledge-cutoff eligibility,
 //! in-memory bitemporal adapters, live SQL session/migration ports, document
-//! SQL contracts, and a fail-closed `DATABASE_URL` gate for `SQLx` pool wiring
-//! (ADR 0013). In-process transports keep CI deterministic; a validated live
-//! URL is required before any production pool is opened.
+//! SQL contracts, a fail-closed `DATABASE_URL` gate, and optional `SQLx` pool
+//! construction behind the `live-sqlx` feature (ADR 0013). In-process
+//! transports keep CI deterministic; a validated live URL is required before
+//! any production pool is opened.
 
 mod cutoff;
 mod document_sql;
 mod document_store;
 mod error;
+mod live_pool;
 mod live_repository;
 mod migration;
 mod naming;
@@ -40,6 +42,16 @@ pub use document_store::DocumentStore;
 pub use error::MigrationContractError;
 /// Fail-closed persistence domain errors.
 pub use error::PersistenceError;
+/// Default pool acquire timeout in milliseconds.
+pub use live_pool::DEFAULT_ACQUIRE_TIMEOUT_MS;
+/// Default maximum pool connections.
+pub use live_pool::DEFAULT_MAX_CONNECTIONS;
+/// Live `SQLx` pool handle implementing [`SqlSession`].
+pub use live_pool::LiveSqlxPool;
+/// Operator-facing live pool sizing options.
+pub use live_pool::LiveSqlxPoolOptions;
+/// Open a live `SQLx` pool from validated configuration.
+pub use live_pool::open_live_sqlx_pool;
 /// Live document repository over a SQL transport.
 pub use live_repository::LiveDocumentRepository;
 /// Migration application failures on the live path.
