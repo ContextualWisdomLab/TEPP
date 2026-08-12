@@ -1,3 +1,5 @@
+//! Nonempty interval contracts at nanosecond resolution.
+
 use temporal_core::{EventTime, TemporalBoundary, TemporalError, TemporalInterval, TemporalPrecision};
 
 fn time(value: &str) -> EventTime {
