@@ -53,4 +53,4 @@ A foundation release may be cut only when:
 
 ## References
 
-See `docs/research/` doctoring notes for Task 2–12 primary sources (APA 7).
+See `docs/research/` doctoring notes for Task 2–12 primary sources (APA 7), including `docs/research/multilevel-multiple-membership-measurement.md`.
