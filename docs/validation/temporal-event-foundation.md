@@ -10,20 +10,20 @@ This report tracks exact-head scientific and engineering evidence required befor
 
 ## Capability ledger
 
-| Capability | Owning crate / contract | Protected-main maturity | Required evidence | Notes |
-|---|---|---|---|---|
-| Immutable evidence + spans | `evidence_core` | implemented-main | unit + wire + coverage | Task 2 |
-| Six-clock temporal | `temporal_core` | implemented-main | unit + wire | Task 3 / PR #8 |
-| Allen path-consistency | `temporal_core` | implemented-main | unit + budget tests | Task 4 / PR #9 |
-| Event mention/instance | `event_core` | partial | unit + fail-closed promotion | Task 6 / PR #13 |
-| Multiple membership | `membership_core` | partial | unit + ESS weights | Task 7 / PR #12 |
-| Forward transition DAG | `relation_graph` | active-PR | unit + cycle rejection | Task 5 / PR #14 |
-| Bitemporal persistence + live SQL port | `persistence_postgres` | partial / active-PR | migration contracts + recording transport | Task 8 / PR #16 + #23 |
-| Leakage-safe splits | `corpus_split` | implemented-main | cutoff + co-partition tests | Task 9 / PR #17 |
-| Truth corpora / manifests | `tepp_simulation` | active-PR | deterministic generator tests | Task 10 / PR #18 |
-| Recovery metrics | `validation_core` | active-PR | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
-| Versioned API/export contracts | `tepp_api` | active-PR | unknown-field/version/limit tests | Task 12 / PR #21 |
-| CWL modular connectors | `docs/connectors/*` | active-PR | contract docs + examples | PR #22 |
+| Capability | Owning crate / contract | Protected-main maturity | Open PR status | Required evidence | Notes |
+|---|---|---|---|---|---|
+| Immutable evidence + spans | `evidence_core` | implemented-main | — | unit + wire + coverage | Task 2 |
+| Six-clock temporal | `temporal_core` | implemented-main | — | unit + wire | Task 3 / PR #8 |
+| Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
+| Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
+| Multiple membership | `membership_core` | partial | active-PR (PR #25 ESS follow-on) | unit + ESS weights | Task 7 / PR #12 + #25 |
+| Forward transition DAG | `relation_graph` | accepted-target | active-PR (PR #14) | unit + cycle rejection | Task 6 / PR #14 |
+| Bitemporal persistence + live SQL port | `persistence_postgres` | partial | active-PR (PR #23) | migration contracts + recording transport | Task 8 / PR #16 + #23 |
+| Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
+| Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
+| Recovery metrics | `validation_core` | accepted-target | active-PR (PR #19) | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
+| Versioned API/export contracts | `tepp_api` | accepted-target | active-PR (PR #21) | unknown-field/version/limit tests | Task 12 / PR #21 |
+| CWL modular connectors | `docs/connectors/*` | accepted-target | active-PR (PR #22) | contract docs + examples | PR #22 |
 
 ## Scientific acceptance checklist (foundation)
 
