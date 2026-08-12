@@ -13,6 +13,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `corpus_split` leakage-safe knowledge-cutoff snapshots, relation-connected co-partition groups, rolling-origin windows, and group-normalized ESS weight contracts.
 - `persistence_postgres` live SQL port: `SqlSession` transport, migration batch applicator, document/audit SQL contracts, `LiveDocumentRepository`, and fail-closed `DATABASE_URL`/`LiveSqlxConfig` gate for SQLx pool wiring (live pool/query driver remains accepted-target).
 - `membership_core` Kish effective sample size, design effect, and group-normalized ESS helpers for multiple-membership estimation inputs.
+- Documented modular naruon consumer contract for TEPP analysis-run and export surfaces, with a committed example request payload.
+- Documented contextual-orchestrator interpretation port boundary and credential separation for TEPP.
 - Foundation validation/release-readiness ledger at `docs/validation/temporal-event-foundation.md` tracking capability maturity and scientific acceptance gates.
 - Research doctoring for multilevel/multiple-membership measurement and atomistic fallacy prevention.
 - `persistence_postgres` bitemporal foundation: multi-word migration contracts, knowledge-cutoff eligibility, and in-memory as-known-at / as-valid-at document replay (live SQLx/PostgreSQL execution remains accepted-target).
