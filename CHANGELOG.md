@@ -7,13 +7,13 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ### Added
 
 - `persistence_postgres` `live-sqlx` feature: real `SQLx`/`PgPool` open/execute behind validated `DATABASE_URL` and `LiveSqlxPoolOptions`, with offline/live executor backends and CI coverage exclusion for the transport module.
-- `persistence_postgres` live pool open gate: validated `LiveSqlxPoolOptions`, fail-closed `open_live_sqlx_pool` / `LiveSqlxPool` (`SqlSession`) with offline test backend; production `SQLx` driver attach remains accepted-target after `DATABASE_URL` validation.
+- `persistence_postgres` live pool open gate: validated `LiveSqlxPoolOptions`, fail-closed `open_live_sqlx_pool` / `LiveSqlxPool` (`SqlSession`) with offline test backend; optional `live-sqlx` attaches real `SQLx`/`PgPool` after `DATABASE_URL` validation.
 - `validation_core` recovery metrics: parameter matching, RMSE/bias with standard errors, interval coverage with Wilson bounds, relation-edge precision/recall, temporal-order accuracy, Monte Carlo summaries, and SE-aware acceptance gates with machine-readable reports.
 - `tepp_api` versioned analysis-run DTOs, content-redacting error envelopes, reproducibility manifests, JSON-LD and GraphML export contracts, purpose-bound export authorization (no blanket PII masking), plus committed schemas/examples.
 - `relation_graph` forward-only state-transition DAG with past-pointing provenance edges and cycle rejection.
 - `tepp_simulation` deterministic truth-corpus generator with delayed reporting, multilevel memberships, method-effect variants, relation noise, and digest-bound truth manifests.
 - `corpus_split` leakage-safe knowledge-cutoff snapshots, relation-connected co-partition groups, rolling-origin windows, and group-normalized ESS weight contracts.
-- `persistence_postgres` live SQL port: `SqlSession` transport, migration batch applicator, document/audit SQL contracts, `LiveDocumentRepository`, and fail-closed `DATABASE_URL`/`LiveSqlxConfig` gate for SQLx pool wiring (live pool/query driver remains accepted-target).
+- `persistence_postgres` live SQL port: `SqlSession` transport, migration batch applicator, document/audit SQL contracts, `LiveDocumentRepository`, and fail-closed `DATABASE_URL`/`LiveSqlxConfig` gate for SQLx pool wiring (optional `live-sqlx` driver attaches `PgPool`).
 - `membership_core` Kish effective sample size, design effect, and group-normalized ESS helpers for multiple-membership estimation inputs.
 - Credential-separated hourly NVIDIA NIM/OpenCode product-development workflow (issue #2): proposal, independent verification, and late Maintainer-App publication with `NVIDIA_NIM_API_KEY` only for model work.
 - Documented modular naruon consumer contract for TEPP analysis-run and export surfaces, with a committed example request payload.
