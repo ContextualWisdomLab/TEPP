@@ -1,7 +1,9 @@
 # ADR 0011 — Standalone operation and modular CWL MSA boundary
 
-**Status:** Accepted  
-**Date:** 2026-08-10
+**Decision status:** Accepted  
+**Implementation maturity:** partial — Rust crates are independently usable; production service/API/persistence integrations remain accepted-target  
+**Date:** 2026-08-10  
+**Supersedes:** The broad cross-service ownership wording in ADR 0001. ADR 0001 remains authoritative for Rust-first numerical architecture.
 
 ## Context
 
@@ -32,7 +34,7 @@ Authority boundaries:
 - Each service owns its credentials, migrations, retention, and application persistence.
 - Cross-service workflows use opaque identifiers and explicit authorization rather than implicit shared state.
 - Breaking contract changes require compatibility/migration notes and an ADR where product/scientific meaning changes.
-- Integration tests must exercise both standalone and representative modular paths.
+- Integration tests exercise both standalone and representative modular paths.
 
 ## Failure and recovery
 
@@ -42,10 +44,14 @@ If an integration service is unavailable, TEPP either uses an approved local/pro
 
 Least-privilege service identities and purpose-bound access apply at every interface. A service receives only the evidence/artifact fields it is authorized to process. No service credential is reused as a model/reviewer/release credential simply because the services share an organization.
 
+## Compatibility and migration
+
+Every public API/artifact contract is versioned. A breaking consumer/provider change requires migration/rollback guidance and dual-version or negotiated compatibility where necessary. Persistence migrations remain TEPP-owned under ADR 0013; consumers never migrate TEPP tables directly.
+
 ## Verification
 
 Required tests cover contract version negotiation, unauthorized cross-service access, idempotency, stale artifact/model identities, missing dependencies, standalone CPU operation, contextual-orchestrator optional integration, naruon consumer contracts, and absence of direct cross-service database coupling.
 
-## Supersession
+## Rollback and supersession
 
-Supersede only through an ADR that establishes a clearer ownership model without reducing standalone deployability, scientific authority separation, migration safety, or auditability.
+Rollback removes/disables an integration adapter without breaking standalone TEPP or rewriting scientific artifacts. Supersede only through an ADR that establishes a clearer ownership model without reducing standalone deployability, scientific authority separation, migration safety, or auditability.
