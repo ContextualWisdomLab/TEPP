@@ -6,8 +6,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
-- `persistence_postgres` tenant row-level security migration (`0002`) with `FORCE ROW LEVEL SECURITY`, `tepp_app_runtime` least-privilege role, session GUC helpers, catalog validation, and live CI isolation exercise.
-- `persistence_postgres` live PostgreSQL CI: `live-postgres` job with Postgres 16 service, `TEPP_LIVE_POSTGRES=1` gate, and integration coverage for pool open, foundation migrations, document insert/revise/as-of, and audit SQL.
+- `persistence_postgres` tenant row-level security: migration `0002_tenant_row_level_security`, `tepp_app_runtime` role, session GUC `tepp.current_tenant_record_id`, multi-word isolation policies with FORCE RLS, session helpers, contract validation, and live isolation proof under `TEPP_LIVE_POSTGRES=1`.
+- `persistence_postgres` live PostgreSQL CI: `live-postgres` job with Postgres 16 service, `TEPP_LIVE_POSTGRES=1` gate, and integration coverage for pool open, foundation+RLS migrations, document insert/revise/as-of, audit SQL, and tenant isolation.
 - Repository release evidence tooling: `scripts/release_evidence.py` generates CycloneDX 1.5 SBOM, exact-head provenance, and SHA-256 checksums from `Cargo.lock`/`Cargo.toml`, with fail-closed validation and CI generation on every quality gate.
 - `persistence_postgres` `live-sqlx` feature: real `SQLx`/`PgPool` open/execute behind validated `DATABASE_URL` and `LiveSqlxPoolOptions`, with offline/live executor backends and CI coverage exclusion for the transport module.
 - `persistence_postgres` live pool open gate: validated `LiveSqlxPoolOptions`, fail-closed `open_live_sqlx_pool` / `LiveSqlxPool` (`SqlSession`) with offline test backend; optional `live-sqlx` attaches real `SQLx`/`PgPool` after `DATABASE_URL` validation.

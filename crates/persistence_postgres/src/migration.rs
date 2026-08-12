@@ -323,7 +323,9 @@ mod tests {
         assert!(!has_domain_time_column("system_time timestamptz"));
         assert!(declares_row_level_security("ENABLE ROW LEVEL SECURITY"));
         assert!(declares_row_level_security("CREATE POLICY x ON y"));
-        assert!(!declares_row_level_security("CREATE TABLE document_record ()"));
+        assert!(!declares_row_level_security(
+            "CREATE TABLE document_record ()"
+        ));
         assert!(table_has_rls_enabled(
             "alter table document_record enable row level security; alter table document_record force row level security;",
             "document_record"
