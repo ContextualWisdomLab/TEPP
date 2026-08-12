@@ -10,6 +10,7 @@ on:
       - ".coveragerc"
       - ".config/**"
       - "crates/**"
+      - "migrations/**"
       - "scripts/**"
       - "tests/quality/**"
       - ".github/workflows/ci.yml"
@@ -24,6 +25,7 @@ on:
       - ".coveragerc"
       - ".config/**"
       - "crates/**"
+      - "migrations/**"
       - "scripts/**"
       - "tests/quality/**"
       - ".github/workflows/ci.yml"
@@ -249,3 +251,34 @@ jobs:
           path: coverage-branches.json
           if-no-files-found: error
           retention-days: 1
+
+  live-postgres:
+    name: Live PostgreSQL integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.9-alpine
+        env:
+          POSTGRES_USER: tepp
+          POSTGRES_PASSWORD: tepp_ci
+          POSTGRES_DB: tepp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tepp -d tepp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEPP_LIVE_POSTGRES: "1"
+      DATABASE_URL: postgres://tepp:tepp_ci@localhost:5432/tepp
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Run live-sqlx PostgreSQL integration
+        run: cargo test -p persistence_postgres --features live-sqlx --test live_postgres -- --nocapture
