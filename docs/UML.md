@@ -54,8 +54,8 @@ sequenceDiagram
     Analyst->>Evidence: authorized immutable document/artifact
     Evidence->>Evidence: bound + hash + exact spans
     Evidence->>Temporal: document/event/assertion/availability clocks
-    Temporal->>Temporal: enforce cutoff/leakage semantics
-    Temporal->>Graph: typed intervals/relations
+    Temporal->>Temporal: expose typed clocks and interval primitives
+    Temporal->>Graph: typed intervals/relations (target integration)
     Evidence->>Semantic: exact source spans
     Semantic->>Semantic: validated multilingual concept evidence
     Semantic->>Topic: sparse concept/native lexical channels
@@ -66,6 +66,8 @@ sequenceDiagram
     Graph->>Artifact: event/provenance graph
     Artifact-->>Analyst: accessible tables/graphs/manifest
 ```
+
+PR #8 provides typed clock/interval primitives only. Persistence/corpus-split enforcement of historical cutoff eligibility and graph integration remain accepted-target rather than as-built leakage protection.
 
 ## Six-clock availability state rule
 
