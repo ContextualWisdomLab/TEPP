@@ -9,7 +9,7 @@ Task 8 delivers storage-contract foundations for TEPP persistence under ADR 0013
 3. knowledge-cutoff eligibility (`available_time <= knowledge_cutoff`);
 4. in-memory bitemporal document versions with `as_known_at` / `as_valid_at` replay and append-only audit identity.
 
-Live SQLx repositories, RLS, concurrent write stress, backup/restore, and relation-aware split manifests remain accepted-target follow-ons behind the same contracts.
+Live SQLx repositories and tenant RLS isolation are implemented; concurrent write stress, backup/restore, and full relation-aware split persistence remain accepted-target follow-ons behind the same contracts.
 
 ## Authoritative sources
 

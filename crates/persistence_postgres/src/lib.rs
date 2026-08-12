@@ -4,9 +4,12 @@
 //!
 //! This crate owns migration SQL contracts, knowledge-cutoff eligibility,
 //! in-memory bitemporal adapters, live SQL session/migration ports, document
-//! SQL contracts, a fail-closed `DATABASE_URL` gate, and a fail-closed live
-//! pool open path with validated sizing options (ADR 0013). In-process
-//! transports keep default CI deterministic; optional `live-sqlx` feature compiles a real `PgPool` driver behind validated URL/options, with a gated live `PostgreSQL` CI job (`TEPP_LIVE_POSTGRES=1`).
+//! SQL contracts, tenant session GUC / application-role helpers for row-level
+//! security, a fail-closed `DATABASE_URL` gate, and a fail-closed live pool open
+//! path with validated sizing options (ADR 0013). In-process transports keep
+//! default CI deterministic; optional `live-sqlx` feature compiles a real
+//! `PgPool` driver behind validated URL/options, with a gated live `PostgreSQL`
+//! CI job (`TEPP_LIVE_POSTGRES=1`).
 
 mod cutoff;
 mod document_sql;
@@ -20,6 +23,7 @@ mod sql_session;
 mod sqlx_gate;
 #[cfg(feature = "live-sqlx")]
 mod sqlx_live;
+mod tenant_session;
 
 /// Knowledge-cutoff eligibility for historical analytical reads.
 pub use cutoff::is_cutoff_eligible;
@@ -79,3 +83,15 @@ pub use sqlx_gate::LiveSqlxConfig;
 pub use sqlx_gate::require_live_sqlx_config;
 /// Require live `SQLx` configuration from an explicit optional value.
 pub use sqlx_gate::require_live_sqlx_config_from;
+/// Non-superuser application role name for RLS-bound connections.
+pub use tenant_session::APP_RUNTIME_ROLE;
+/// Session GUC name that carries the active tenant UUID for RLS.
+pub use tenant_session::TENANT_SESSION_GUC;
+/// Render `SET ROLE` SQL for the application runtime role.
+pub use tenant_session::assume_app_runtime_role_sql;
+/// Render SQL that clears the session tenant GUC.
+pub use tenant_session::clear_session_tenant_sql;
+/// Render `RESET ROLE` SQL after application work.
+pub use tenant_session::reset_app_runtime_role_sql;
+/// Render SQL that binds the session tenant GUC.
+pub use tenant_session::set_session_tenant_sql;

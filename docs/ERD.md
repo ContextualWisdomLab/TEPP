@@ -1,9 +1,9 @@
 # TEPP Logical and Persistence ERD
 
 **Status:** Accepted logical target model with current implementation maturity explicitly marked.  
-**Last reviewed:** 2026-08-09
+**Last reviewed:** 2026-08-13
 
-Protected main currently implements storage-independent evidence domain objects only. PR #5/#6 add temporal domain behavior on active branches. PostgreSQL migrations/tables are accepted-target and are **not implemented** on protected main yet.
+Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`) and tenant row-level security (`0002`) as executable migration contracts with live CI. Broader planned ERD entities, exactly-one membership constraints, and backup/recovery gates remain accepted-target until each lands with exact-head evidence.
 
 ## Current domain foundation
 
