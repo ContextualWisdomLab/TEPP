@@ -1,7 +1,7 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — PR #5 implements typed clocks/intervals; downstream transition/split enforcement remains accepted-target  
+**Implementation maturity:** active-PR — PR #8 is the canonical replacement implementing typed clocks/intervals on current protected main; superseded/conflicted PR #5 is historical lineage only; downstream transition/split enforcement remains accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0013 owns persistence/split representation; ADR 0016 owns event-intelligence reasoning above these temporal primitives.
 
@@ -19,7 +19,7 @@ Historical analysis includes evidence only when its governed availability interv
 
 Forward transition, state-change, and input→process→outcome edges require a valid event-time partial order. Citation, revision, translation, support, contradiction, summary, and retrospective-reporting edges may point to the past but cannot become reverse transitions. Derived interval relations retain source evidence and the reasoner claim boundary.
 
-PR #6 Allen/path-consistency work may narrow possible interval relations, but path consistency is not documented as unrestricted global satisfiability.
+Legacy PR #6 contains Allen/path-consistency work stacked on the superseded PR #5 lineage. It may narrow possible interval relations, but it is not eligible to advance until its unique Task 4 work is replayed on the canonical PR #8 lineage (or the exact protected-main descendant after PR #8 merges) and revalidated. Path consistency is not documented as unrestricted global satisfiability.
 
 ## Non-goals
 
@@ -53,6 +53,8 @@ Wire/database/API contracts retain clock type, interval boundaries, precision, a
 ## Verification
 
 Property and integration tests cover nominal clock separation, interval algebra, uncertain/open boundaries, timezone/DST normalization, contradiction detection, transition cycles, historical snapshots, delayed availability, cutoff-crossing uncertainty, rolling-origin/relation-aware partitioning, and synthetic truth with known event and document processes.
+
+PR #8 must re-run exact-head repository, line/branch coverage, rustdoc, dependency/security, and current-review gates on the replacement lineage. Historical checks from PR #5 do not transfer as merge evidence even though the tested production/test blobs preserve its TDD implementation lineage.
 
 ## Rollback and supersession
 
