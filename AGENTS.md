@@ -16,29 +16,34 @@ TEPP is the Temporal Event Psychometrics Platform: a multilingual, temporal, rel
 8. Production line and branch coverage are 100%. All public modules, traits, structs, enums, functions, methods, error variants, configuration fields, and safety contracts have complete docstrings.
 9. Scientific acceptance requires realistic synthetic truth: parameter recovery, RMSE, bias, interval coverage, temporal ordering, graph recovery, invariance, and CPU/GPU parity. Skipped or ignored GPU tests are not evidence.
 10. LLM live tests use `NVIDIA_NIM_API_KEY`. `COPILOT_GITHUB_TOKEN` is prohibited. Existing independent review-agent credentials must not be repurposed.
-11. LLM orchestration allocates test-time computation between direct routing and deeper multi-agent workflows. Workflow depth, decomposition, access lists, recursion, role-specific reasoning effort, and ablations are recorded.
+11. LLM orchestration allocates test-time computation between direct routing and deeper multi-agent workflows. Workflow depth, decomposition, access lists, recursion, role-specific reasoning effort, verification/adjudication, and comparable-budget ablations are recorded. LLM output never replaces deterministic/statistical scientific authority.
 12. Database object names contain at least two words and use `snake_case` by default. CamelCase or PascalCase is permitted only where language conventions require it.
 13. Every scientific or standards claim is traced to an authoritative primary source and cited in APA 7th style in `docs/research/`.
-14. Changes that alter latent-variable meaning, temporal semantics, event ontology, multilingual invariance, or estimator targets require an ADR and PRD version change.
+14. Changes that alter latent-variable meaning, temporal semantics, event ontology, multilingual invariance, estimator targets, privacy authority, or service authority require an ADR and a PRD version change when the approved product/measurement target changes.
+15. Do not blanket-mask PII when doing so destroys valid authorship, temporal, longitudinal, event, entity-role, or multiple-membership measurement. Use purpose-bound authorization, opaque analytical identifiers, separately protected identity mapping, encryption, selective disclosure, retention/deletion, and auditable privileged access.
+16. Design toward CSAP and SOC 2 evidence readiness and align AI governance with current published ISO/NIST guidance where applicable, but never claim certification, attestation, conformance, or legal sufficiency without external evidence.
+17. Preserve standalone operation and modular MSA composition. `naruon`, `contextual-orchestrator`, and other CWL services integrate through versioned APIs/artifacts; no direct cross-service application-table access is permitted.
+18. Documents, external metadata, serialized payloads, model checkpoints, and LLM outputs are untrusted until their owning boundary validates identity, provenance, size/depth, authorization, and scientific semantics.
+19. Figma/Product Design becomes authoritative only for a stable product interaction contract; UI design never overrides the PRD, data model, numerical/scientific contract, or protected-main implementation truth.
 
 ## Repository architecture
 
-Use modular MSA boundaries. Each service or crate must work independently and through stable contracts when imported by CWL organization repositories, `naruon`, or `contextual-orchestrator`. Avoid hidden global state and repository-specific coupling.
+Use modular MSA boundaries. Each service or crate must work independently and through stable contracts when imported by CWL organization repositories, `naruon`, or `contextual-orchestrator`. Avoid hidden global state and repository-specific coupling. Read `DOCUMENTATION.md` for the canonical product/technical/security/privacy/API/operability/traceability graph.
 
-## Pull-request loop
+## Pull-request and autonomous execution loop
 
 For every open PR:
 
 1. inspect unresolved reviews and exact-head checks;
-2. reproduce each actionable defect with a failing test;
+2. reproduce each actionable defect with a failing test where applicable;
 3. implement the smallest scientifically and architecturally valid fix;
 4. rerun focused and complete verification;
-5. update ADRs, architecture, references, CHANGELOG, and manifests;
-6. merge only after current-head required checks and independent approvals pass;
+5. update ADRs, architecture, references, CHANGELOG, manifests, and canonical documentation when affected;
+6. merge only after current-head required checks and qualifying independent approvals pass;
 7. re-enumerate the queue and continue.
 
-When the queue reaches zero, select one buyer-visible product gap, implement one bounded vertical slice, open a PR, and resume the same loop. Never bypass branch protection or claim queued checks have passed.
+A merge, review request, documentation update, queued check, blocked PR, or one completed product slice is an intermediate state while another safe action exists. Waiting on one branch blocks only that branch. After every mutation, merge, or defer decision, rebuild the executable queue. When the PR/issue queue reaches zero, select the highest-impact bounded buyer-visible, scientific-validity, security, privacy, operability, or ecosystem gap, implement it, open/review/merge its PR, then continue. Never bypass branch protection or claim queued/stale evidence has passed.
 
 ## Release contract
 
-A release requires a clean PR queue, exact-head CI/security evidence, reproducible artifacts, SBOM and provenance, validated migrations, updated `CHANGELOG.md`, version consistency, rollback instructions, and no unresolved scientific or security blocker.
+A release requires a clean integration state, exact protected-head CI/security evidence, scientific/recovery acceptance appropriate to changed capabilities, reproducible artifacts, SBOM and provenance, validated migrations/rollback/recovery where present, updated `CHANGELOG.md`, version consistency, accessibility/operability evidence for user-facing components, and no unresolved scientific, privacy, security, or supply-chain blocker.

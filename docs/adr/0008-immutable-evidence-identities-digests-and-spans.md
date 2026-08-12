@@ -1,121 +1,78 @@
-# ADR 0008: Immutable evidence identities, digests, exact spans, and wire records
+# ADR 0008 — Immutable evidence identities, digests, exact spans, and wire records
 
-- **Status:** Accepted
-- **Date:** 2026-08-05
-- **Decision owners:** Contextual Wisdom Lab
-- **Supersedes:** None
+**Decision status:** Accepted  
+**Implementation maturity:** implemented-main  
+**Date:** 2026-08-05  
+**Decision owners:** Contextual Wisdom Lab  
+**Supersedes:** None. ADR 0013 owns future persistence, reproducibility-manifest, and relation-aware split authority.
 
 ## Context
 
-Every later temporal, event, multilingual, and psychometric claim must be
-traceable to source evidence without depending on a mutable caller buffer,
-ambiguous text offsets, an identifier that changes when content is rehashed, or
-a wire payload that can bypass domain validation. UTF-8 byte coordinates alone
-are unsafe for human-facing text selection because a byte offset can fall inside
-a multibyte code point. Character-only offsets do not preserve the byte-exact
-source location required for audit, hashing, and interchange. PDF or
-page-derived evidence additionally needs validated layout coordinates.
+Every later temporal, event, multilingual, and psychometric claim must be traceable to source evidence without depending on a mutable caller buffer, ambiguous text offsets, an identifier that changes when content is rehashed, or a wire payload that can bypass domain validation. UTF-8 byte coordinates alone can point inside a multibyte code point, while character-only offsets do not preserve the byte-exact source location required for audit and interchange. Page-derived evidence additionally needs validated geometry.
 
-A content digest is evidence that bytes differ or agree under the selected hash
-algorithm; it is not a substitute for a stable record identity, authorization,
-authenticity, a signature, or provenance. The domain layer must therefore keep
-identity, content verification, source ownership, location, and interchange as
-separate contracts. External JSON must not deserialize directly into private
-domain fields or silently accept unknown fields, unsupported versions, altered
-content, or coordinates that no longer match the reconstructed document.
+A content digest proves only byte equality/difference under the selected algorithm. It is not stable record identity, authorization, authenticity, signature, or provenance. Identity, content verification, source ownership, exact location, and interchange must therefore remain separate contracts.
 
 ## Decision
 
 1. Generate independent record identifiers as RFC 9562 `UUIDv7` values.
-2. Hash immutable source bytes and UTF-8 document text with `SHA-256` and expose
-   the digest as a canonical lower-case 64-character hexadecimal value.
-3. Copy caller-provided bytes and text into owned immutable storage before a
-   record is accepted. Later mutation of the caller's buffer cannot change the
-   accepted record.
-4. Reject empty artifacts and documents and enforce explicit byte limits before
-   allocating immutable records.
-5. Represent a text span with all of the following:
-   - owning document identifier;
-   - inclusive byte start and exclusive byte end;
-   - inclusive Unicode-scalar start and exclusive Unicode-scalar end; and
-   - optional validated page and layout coordinates.
-6. Validate byte bounds, UTF-8 boundaries, scalar bounds, and exact agreement
-   between byte and Unicode-scalar coordinates. Empty, reversed, mismatched,
-   mid-code-point, out-of-bounds, and cross-document spans fail closed.
-7. Use one-based positive page numbers, finite positive page dimensions, finite
-   nonnegative offsets, positive rectangle dimensions, and in-page bounds.
-8. Keep domain fields private. Interchange uses explicit internal DTOs carrying
-   a required `schema_version`; the current accepted version is `1`.
-9. Reject malformed JSON, missing or unknown fields, unsupported versions,
-   malformed identifiers and digests, invalid byte values, and unknown nested
-   page-layout fields with stable content-redacting errors.
-10. Reconstruct every wire record through validated domain constructors. A
-    declared digest is recomputed from the supplied bytes or UTF-8 text, and a
-    mismatch fails with `ContentDigestMismatch` before a record is accepted.
-11. Reapply configured content limits during wire reconstruction and revalidate
-    exact byte/scalar coordinates and page geometry against the supplied owning
-    document. Serialization never exposes internal caches such as scalar
-    lengths or storage representation.
-12. Treat `SHA-256` equality as content-verification evidence only. Signed
-    provenance, tenant authorization, source acquisition metadata, and chain of
-    custody remain separate later contracts.
+2. Hash immutable source bytes and UTF-8 document text with SHA-256 and expose a canonical lowercase hexadecimal digest.
+3. Copy caller-provided bytes/text into owned immutable storage before acceptance.
+4. Enforce explicit bounded content limits before allocating accepted records.
+5. Represent a text span with owning document identity, half-open UTF-8 byte coordinates, matching half-open Unicode-scalar coordinates, and optional validated page/layout geometry.
+6. Reject empty/reversed/out-of-bounds/mismatched/mid-code-point/cross-document spans and invalid/non-finite/out-of-page geometry.
+7. Keep domain fields private. Public interchange uses explicit versioned DTOs; unknown fields and unsupported versions fail closed.
+8. Reconstruct every wire record through validated domain constructors and recompute content digests rather than trusting declared hashes.
+9. Reapply configured content limits and ownership/coordinate/geometry validation during reconstruction.
+10. Treat SHA-256 as content-verification evidence only; provenance, authorization, acquisition metadata, signatures, and chain of custody are separate authorities.
+
+## Non-goals
+
+- do not treat scalar offsets as grapheme/word/sentence boundaries;
+- do not use digest equality as proof of provenance or authorization;
+- do not allow serde/private struct layout to become the public wire contract;
+- do not define the database/run-manifest model here; ADR 0013 owns that layer.
+
+## Alternatives considered
+
+1. **Content hash as record primary identity** — rejected because identical bytes can legitimately exist in different provenance/authorization contexts.
+2. **Only byte offsets or only character offsets** — rejected because neither alone satisfies both byte-exact audit and Unicode-safe human location.
+3. **Direct deserialization into private domain structs** — rejected because it can bypass invariants and couples wire compatibility to implementation layout.
+4. **Independent opaque identity + canonical digest + dual coordinates + strict versioned reconstruction** — accepted.
 
 ## Consequences
 
-- Evidence records remain stable even when identical content is ingested into
-  distinct provenance contexts.
-- Callers can verify content without receiving mutable access to accepted bytes
-  or text.
-- Exact spans can round-trip across Unicode text and page-oriented evidence
-  without silently snapping to nearby boundaries.
-- Strict versioned JSON can cross process or service boundaries without making
-  serde layout or private Rust fields the public domain model.
-- Wire reconstruction detects content substitution, stale document ownership,
-  unknown extensions, unsupported versions, and hostile coordinate changes.
-- Scalar offsets are not grapheme-cluster or word boundaries. User-facing text
-  segmentation remains a separate locale- and language-profile concern.
-- The current slice does not yet provide source acquisition metadata,
-  signatures, database migrations, JSON Schema publication, W3C PROV
-  serialization, or cryptographic chain-of-custody evidence.
+Evidence records remain stable even when identical content is ingested into distinct provenance contexts. Exact spans round-trip across Unicode/page evidence. Strict wire reconstruction detects substitution, stale ownership, unknown extensions, unsupported versions, and hostile coordinate changes. Locale/language segmentation remains a separate concern under ADR 0004.
 
-## Validation
+## Failure and recovery
 
-- RFC 9562 vectors and generated `UUIDv7` identifiers are tested.
-- Known `SHA-256` vectors, canonical hexadecimal round trips, malformed digests,
-  caller-buffer mutation, empty input, and byte limits are tested.
-- Hostile multibyte Unicode text verifies byte and scalar counts.
-- Exact-span tests cover valid selections, empty and reversed ranges,
-  out-of-bounds coordinates, both UTF-8 boundaries, scalar mismatches, and
-  cross-document use.
-- Page tests cover invalid page numbers, nonfinite and nonpositive dimensions,
-  invalid rectangle components, and horizontal and vertical overflow.
-- Versioned wire tests cover identity-preserving round trips, unknown fields,
-  unsupported versions, malformed JSON, malformed identifiers and digests,
-  digest/content mismatch, content limits, invalid byte values, nested field
-  rejection, cross-document spans, invalid UTF-8 boundaries, and out-of-page
-  geometry.
-- Generated multilingual and decomposed-Unicode cases enumerate every valid
-  nonempty code-point-aligned span and prove exact JSON round trips; invalid
-  scalar and mid-code-point coordinates fail closed.
-- Production line and branch coverage remain exact 100% merge gates.
+Malformed JSON, unsupported versions, invalid identifiers/digests/bytes, content-digest mismatch, configured-limit overflow, invalid UTF-8 boundaries, scalar disagreement, cross-document ownership, or bad page geometry fails closed with content-redacting errors. Recovery requires corrected authorized evidence or a versioned migration; it never mutates an accepted record in place to make reconstruction succeed.
+
+## Security, privacy, and governance impact
+
+Immutable evidence and exact spans are necessary for audit but can expose sensitive source context. Authorization and PII use follow ADR 0009. Ordinary logs should carry opaque IDs/digests and bounded diagnostics rather than raw source text. Digest equality does not grant access.
+
+## Compatibility and migration
+
+Wire records carry explicit schema versions. A new version must preserve or intentionally migrate identity/content/location semantics and keep old artifacts reconstructable or explicitly unsupported with migration tooling. Persistence/run-manifest binding is defined by ADR 0013.
+
+## Verification
+
+Tests cover RFC 9562 identifiers, SHA-256 vectors and mutation detection, owned-buffer immutability, hostile multibyte Unicode, exact byte/scalar span enumeration, page boundaries, stable redacted errors, strict round trips, unknown-field/version rejection, digest/content mismatch, configured limits, invalid byte values, nested field rejection, cross-document spans, invalid UTF-8 boundaries, and generated multilingual/decomposed-Unicode cases. Production line/branch coverage remains exact 100%.
+
+## Rollback and supersession
+
+Rollback uses the previous supported wire/domain version without rewriting immutable records. Supersede only with a decision that preserves independent record identity, canonical content verification, exact source-location semantics, strict reconstruction, and provenance/authorization separation.
 
 ## References
 
-Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange
-format* (RFC 8259). RFC Editor. https://doi.org/10.17487/RFC8259
+Bray, T. (Ed.). (2017). *The JavaScript Object Notation (JSON) data interchange format* (RFC 8259). RFC Editor. https://doi.org/10.17487/RFC8259
 
-National Institute of Standards and Technology. (2015). *Secure Hash Standard
-(SHS)* (FIPS PUB 180-4). https://doi.org/10.6028/NIST.FIPS.180-4
+Davis, K., Peabody, B., & Leach, P. (2024). *Universally unique identifier (UUID)* (RFC 9562). RFC Editor. https://doi.org/10.17487/RFC9562
 
-The Unicode Consortium. (2025). *Unicode Standard Annex #29: Unicode text
-segmentation* (Revision 47).
-https://www.unicode.org/reports/tr29/tr29-47.html
+National Institute of Standards and Technology. (2015). *Secure Hash Standard (SHS)* (FIPS PUB 180-4). https://doi.org/10.6028/NIST.FIPS.180-4
 
-Yergeau, F. (2003). *UTF-8, a transformation format of ISO 10646* (RFC 3629).
-RFC Editor. https://doi.org/10.17487/RFC3629
+Yergeau, F. (2003). *UTF-8, a transformation format of ISO 10646* (RFC 3629). RFC Editor. https://doi.org/10.17487/RFC3629
 
-Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*.
-World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
+Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
 
-Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV
-ontology*. World Wide Web Consortium. https://www.w3.org/TR/prov-o/
+Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology*. World Wide Web Consortium. https://www.w3.org/TR/prov-o/

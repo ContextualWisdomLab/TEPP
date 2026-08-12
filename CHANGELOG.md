@@ -7,6 +7,16 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ### Added
 
 - Approved Temporal Event Psychometrics Platform PRD v0.4 baseline.
+- Canonical technical documentation map, TRD, UML/scientific runtime views, logical/planned ERD, scientific test strategy, operability/recovery guide, and requirements/research/evidence traceability with explicit implementation maturity.
+- Whole-conversation documentation fitness assessment plus canonical API/MSA contract, threat model, privacy/data-governance contract, CSAP/SOC 2/ISO/NIST assurance-readiness mapping, and adaptive LLM orchestration/test-time-compute contract.
+- ADR policy separating architectural **Decision status** from **Implementation maturity**, defining partial supersession, and making the ADR index the canonical decision-ownership map.
+- ADR 0009 for purpose-bound PII governance without blanket masking, ADR 0010 for adaptive direct-versus-multi-agent LLM orchestration, and ADR 0011 for standalone/modular CWL service authority.
+- ADR 0012 for Temporal Relational Shared-Latent Topic Measurement (TRSL-TM), global topic identity/backend compatibility/method-effect/model-selection authority.
+- ADR 0013 for bitemporal persistence, immutable reproducibility/run/split manifests, relation-aware partitions, recovery, and PostgreSQL adapter authority.
+- ADR 0014 separating accepted design, protected-main implementation, scientific/product claim promotion, and release evidence authority.
+- ADR 0015 separating autonomous model proposal, deterministic verification, publication, independent review, and merge/release authority.
+- ADR 0016 separating Event Ontology observation, TDT detection/tracking, CHRONOS schema prediction, symbolic temporal consistency, and promoted transition authority.
+- Verified APA 7 research traceability for ICLR 2026 TRINITY and Conductor, the 2026 Sakana Fugu technical report, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF/GAI Profile, AICPA Trust Services Criteria, and KISA CSAP guidance.
 - Eight-phase delivery roadmap and Temporal/Event Foundation implementation plan.
 - Immutable evidence, six-clock temporal semantics, interval reasoning, event ontology, typed relation graph, and time-varying multiple-membership contracts.
 - Shared-latent multilingual topic measurement architecture with native lexical channels and language-profile validation.
@@ -25,9 +35,17 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - ADR 0008 and APA 7 doctoring for evidence identity, hashing, JSON interchange, UTF-8 boundaries, Unicode segmentation limits, and future W3C PROV integration.
 - Same-run exact missing-line and missing-branch diagnostics for failed 100% Rust coverage gates.
 
+### Changed
+
+- Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
+- Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
+- Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
+
 ### Security
 
 - Prohibited `COPILOT_GITHUB_TOKEN` and reserved `NVIDIA_NIM_API_KEY` for approved LLM test and development workflows.
+- Defined purpose-bound PII access, opaque analytical identifiers, separately protected identity mapping, selective model-provider disclosure, retention/deletion, and privileged audit controls instead of destructive blanket masking.
+- Added explicit threat classes for temporal leakage, relation/membership poisoning, model/artifact poisoning, numerical divergence, cross-tenant disclosure, prompt injection, evidence substitution, resource exhaustion, and scientific-integrity failures.
 - Removed the bootstrap branch's credential-co-resident OpenCode workflow: no model process may receive repository-write authority, and scheduled product development remains disabled until proposal, independent verification, and late publication authority are separated across fresh jobs.
 - Removed completed bootstrap materializers, encoded payload fragments, readiness sentinels, and push probes from the reviewable tree.
 - Required full-commit GitHub Action pins, minimum permissions, concurrency controls, immutable audit evidence, SBOM, and provenance.
@@ -41,10 +59,12 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 - Required 100% production line and branch coverage and complete public API docstrings.
 - Required true-parameter recovery, RMSE, bias, interval coverage, temporal leakage, graph recovery, invariance, and CPU/GPU parity evidence.
+- Expanded documentation contracts to require the canonical threat/privacy/assurance/API/orchestration/fitness documents, ADR policy, and every numbered ADR 0001–0016 to remain indexed and structurally complete.
+- Added deterministic validation that ADR files and the index have identical decision numbers and that every ADR declares valid decision status, implementation maturity, supersession scope, core decision sections, verification, and rollback behavior.
 - Added 100% statement and branch coverage for the repository quality-gate scripts.
 - Made a zero executable-code coverage denominator explicit for the skeleton-only slice rather than treating it as evidence of implemented behavior.
 - Denied warnings, missing public documentation, and unsafe Rust across the workspace.
 - Added known digest vectors, mutation detection, hostile multibyte Unicode, exact-coordinate, page-boundary, stable-error, and invalid-input regression tests for the first evidence slice.
 - Added strict wire round trips, unknown-field and version rejection, digest reconstruction, configured-limit, hostile JSON, and generated multilingual span tests.
 
-[Unreleased]: https://github.com/ContextualWisdomLab/TEPP/compare/HEAD...HEAD
+The repository has not yet cut a stable implementation release, so no compare reference is published for `[Unreleased]` yet.
