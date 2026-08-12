@@ -1,7 +1,7 @@
 # TEPP UML and Scientific Runtime Views
 
 **Status:** Accepted diagrams aligned to PRD v0.4; as-built versus target maturity is explicit.  
-**Last reviewed:** 2026-08-09
+**Last reviewed:** 2026-08-12
 
 ## Platform component view
 
@@ -36,7 +36,7 @@ flowchart LR
     INT --> ART
 ```
 
-On current protected main only the workspace/evidence foundation is implemented. Temporal values are PR #5 active-PR; interval reasoning is PR #6 active-PR. Later boxes are accepted-target.
+On current protected main the workspace/evidence foundation and canonical documentation/ADR authority graph are implemented. Typed six-clock values/uncertain intervals are on canonical replacement PR #8. Legacy PR #6 contains Task 4 Allen/path-consistency work on the superseded PR #5 stack and is not current-lineage implementation evidence until replayed and revalidated. Later boxes are accepted-target.
 
 ## Evidence-to-analysis sequence
 
@@ -54,8 +54,8 @@ sequenceDiagram
     Analyst->>Evidence: authorized immutable document/artifact
     Evidence->>Evidence: bound + hash + exact spans
     Evidence->>Temporal: document/event/assertion/availability clocks
-    Temporal->>Temporal: enforce cutoff/leakage semantics
-    Temporal->>Graph: typed intervals/relations
+    Temporal->>Temporal: expose typed clocks and interval primitives
+    Temporal->>Graph: typed intervals/relations (target integration)
     Evidence->>Semantic: exact source spans
     Semantic->>Semantic: validated multilingual concept evidence
     Semantic->>Topic: sparse concept/native lexical channels
@@ -66,6 +66,8 @@ sequenceDiagram
     Graph->>Artifact: event/provenance graph
     Artifact-->>Analyst: accessible tables/graphs/manifest
 ```
+
+PR #8 provides typed clock/interval primitives only. Persistence/corpus-split enforcement of historical cutoff eligibility and graph integration remain accepted-target rather than as-built leakage protection.
 
 ## Six-clock availability state rule
 
@@ -80,7 +82,7 @@ stateDiagram-v2
     analysis_snapshot --> [*]
 ```
 
-A later document may report an earlier event, but it cannot be inserted into an earlier historical analysis before its availability time.
+A later document may report an earlier event, but it cannot be inserted into an earlier historical analysis before its availability time. PR #8 implements the typed clock/interval primitives; persistence/split enforcement of `cutoff_eligible` remains accepted-target.
 
 ## Relation authority view
 
@@ -137,17 +139,21 @@ GPU may be absent or fall back to CPU. A GPU result is not accepted merely becau
 ```mermaid
 stateDiagram-v2
     [*] --> workspace_foundation
-    workspace_foundation --> immutable_evidence: main
-    immutable_evidence --> six_clock_temporal: PR_5_active
-    six_clock_temporal --> interval_reasoning: PR_6_active_stacked
-    interval_reasoning --> event_relation_membership: future
-    event_relation_membership --> persistence_and_splits: future
-    persistence_and_splits --> topic_measurement: future
-    topic_measurement --> gpu_and_model_selection: future
-    gpu_and_model_selection --> event_intelligence_and_psychometrics: future
-    event_intelligence_and_psychometrics --> visual_interpretation_release: future
+    workspace_foundation --> immutable_evidence: protected_main
+    immutable_evidence --> six_clock_temporal: PR_8_active_replacement
+    six_clock_temporal --> interval_reasoning: Task_4_replay_required
+    interval_reasoning --> event_relation_membership: accepted_target
+    event_relation_membership --> persistence_and_splits: accepted_target
+    persistence_and_splits --> topic_measurement: accepted_target
+    topic_measurement --> gpu_and_model_selection: accepted_target
+    gpu_and_model_selection --> event_intelligence_and_psychometrics: accepted_target
+    event_intelligence_and_psychometrics --> visual_interpretation_release: accepted_target
 ```
+
+### Legacy stack note
+
+PR #5 is superseded/conflicted lineage for Task 3. PR #6 remains a legacy Draft carrying Task 4 implementation history but is based on that superseded lineage. Its unique behavior must be replayed onto PR #8 or the exact protected-main descendant after PR #8 merges; old checks/reviews do not transfer.
 
 ## Maintenance rule
 
-Update these views when a scientific estimand, clock/interval semantics, relation authority, membership model, compute backend, persistence boundary, or implementation maturity changes. Active PRs become as-built only after protected-main integration and fresh required evidence.
+Update these views when a scientific estimand, clock/interval semantics, relation authority, membership model, compute backend, persistence boundary, implementation lineage, or maturity changes. Active PRs become as-built only after protected-main integration and fresh required evidence.

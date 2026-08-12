@@ -7,7 +7,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | ADR | Decision | Decision status | Implementation maturity | Clarification / supersession |
 |---|---|---|---|---|
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
-| [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | PR #5 implements typed clocks/intervals; later graph/split enforcement remains target work. |
+| [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | Unmerged PR #8 is the canonical Task 3 replacement implementing typed clocks/intervals against the current protected-main lineage; conflicted PR #5 is superseded lineage. Later graph/split enforcement remains target work. |
 | [0003](0003-relational-event-multiple-membership.md) | Relational event ontology and time-varying cross-classified multiple membership | Accepted | accepted-target | ADR 0016 adds event-intelligence task authority without replacing ontology/membership semantics. |
 | [0004](0004-shared-multilingual-latent-space.md) | One shared multilingual latent space with explicit invariance status | Accepted | accepted-target | ADR 0012 owns the full topic-estimator/backend/global-topic contract. |
 | [0005](0005-posterior-esem-dsem.md) | Posterior-aware ESEM/DSEM and valid compositional coordinates | Accepted | accepted-target | Downstream psychometric authority; upstream topic/network model is clarified by ADR 0012. |

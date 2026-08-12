@@ -1,8 +1,8 @@
 # TEPP Whole-Conversation Documentation Assessment
 
 **Assessment date:** 2026-08-12  
-**Scope:** Durable TEPP decisions established in the product conversation, approved PRD v0.4/planning pack, protected-main implementation, and active PRs #5/#6/#7.  
-**Verdict:** **Design-sufficient on this documentation branch after ADR clarification; protected-main-insufficient until PR #7 (or its verified successor) is integrated and exact-head gates pass.**
+**Scope:** Durable TEPP decisions established in the product conversation, approved PRD v0.4/planning pack, protected-main implementation through merged PR #7, canonical Task 3 replacement PR #8, and legacy Task 4 PR #6.  
+**Verdict:** **The canonical documentation/ADR graph is protected-main authority after PR #7; implementation maturity remains independently tracked and is not promoted by documentation completeness.**
 
 ## 1. Assessment rule
 
@@ -21,52 +21,48 @@ Decision status and implementation maturity are separate. ADR `Accepted` means t
 
 ## 2. Documentation family assessment
 
-| Family | Before reconciliation | Current branch | Evidence / action |
-|---|---|---|---|
-| PRD | PRESENT-CURRENT | PRESENT-CURRENT | approved `docs/product/prd-v0.4-approved.md`; six clocks, temporal/event psychometrics, multilingual shared latent space, ESEM/DSEM, TDT/CHRONOS |
-| TRD | PRESENT-CURRENT | PRESENT-CURRENT | `docs/TRD.md` separates as-built/active-PR/target technical contracts |
-| Architecture | PRESENT-CURRENT | PRESENT-CURRENT | root `ARCHITECTURE.md` owns service/crate boundaries and scientific/compute invariants |
-| UML / system flows | PRESENT-CURRENT | PRESENT-CURRENT | `docs/UML.md` covers component, sequence, clock state, relation authority, membership, compute and implementation states |
-| ERD / logical data model | PRESENT-CURRENT | PRESENT-CURRENT | `docs/ERD.md` distinguishes current domain objects from planned PostgreSQL entities and preserves uncertain time/membership/provenance |
-| ADR index / core decisions | PARTIAL | PRESENT-CURRENT | 0001–0016 now cover numerical authority, clocks, event/membership, multilingual semantics, ESEM/DSEM, GPU, quality, evidence, PII, LLM orchestration, MSA, topic measurement, persistence/manifests/splits, claim promotion/release, autonomous-development authority, and TDT/CHRONOS boundaries |
-| ADR status/maturity/supersession policy | MISSING | PRESENT-CURRENT | `docs/adr/ADR_POLICY.md` makes `Accepted` vs implemented/released explicit and requires exact partial-supersession scope |
-| API / modular integration | MISSING | PRESENT-CURRENT | `docs/API_CONTRACT.md` defines versioning, target async lifecycle, authority and naruon/contextual-orchestrator boundaries |
-| Security | PARTIAL | PRESENT-CURRENT | `SECURITY.md` plus `docs/THREAT_MODEL.md` |
-| Privacy / PII / data lifecycle | MISSING | PRESENT-CURRENT | `docs/PRIVACY_DATA_GOVERNANCE.md` + ADR 0009; purpose-bound separation instead of blanket masking |
-| Compliance/assurance readiness | MISSING | PRESENT-CURRENT | `docs/COMPLIANCE_READINESS.md`; CSAP/SOC 2/ISO/NIST mappings without certification claims |
-| Test / scientific validation | PRESENT-CURRENT | PRESENT-CURRENT | `docs/TEST_STRATEGY.md`; true-parameter recovery, uncertainty, leakage, invariance and CPU/GPU parity |
-| Operability / recovery / release | PRESENT-CURRENT | PRESENT-CURRENT | `docs/OPERABILITY.md` with explicit target maturity; ADR 0014 separates release authority from green CI |
-| LLM orchestration / test-time compute | PARTIAL | PRESENT-CURRENT | `docs/LLM_ORCHESTRATION.md` + ADR 0010; verified Fugu/Conductor/TRINITY research is experimental evidence, not release authority |
-| Autonomous development/review/merge authority | PARTIAL | PRESENT-CURRENT as design | ADR 0015 separates model proposal, deterministic verification, publication, independent review, and merge/release authority; implementation remains accepted-target |
-| Standards / APA 7 doctoring | PARTIAL | PRESENT-CURRENT | research register covers psychometrics/topic/time/event/Unicode/security/AI-governance/orchestration foundations |
-| Traceability | PRESENT-CURRENT | PRESENT-CURRENT | `docs/TRACEABILITY.md` maps durable requirements and maturity; additional ADR rows are updated with implementation evidence |
-| Agent/maintainer authority | PRESENT-CURRENT | PRESENT-CURRENT | AGENTS/CLAUDE plus ADR 0015 and canonical map |
-| CHANGELOG | PRESENT-CURRENT | PRESENT-CURRENT | Unreleased documentation and ADR reconciliation recorded |
-| Figma/UI detailed design | NOT-APPLICABLE now | NOT-APPLICABLE now | PRD deliberately defers Figma until stable data/statistical contracts in the visual-analytics phase |
-| Physical database migrations | NOT-APPLICABLE now | NOT-APPLICABLE now | planned ERD/ADR 0013 are not as-built table claims; migrations become mandatory with persistence implementation |
-| Deployment SLO/RPO/RTO evidence | MISSING as deployed evidence | deployment-owned | target operability is documented; numeric commitments require measured deployment evidence |
-| CSAP/SOC 2 certification | NOT-APPLICABLE as repo claim | external-assurance | repository may build readiness evidence but cannot self-issue certification/attestation |
+| Family | Current status | Evidence / action |
+|---|---|---|
+| PRD | PRESENT-CURRENT | approved `docs/product/prd-v0.4-approved.md`; six clocks, temporal/event psychometrics, multilingual shared latent space, ESEM/DSEM, TDT/CHRONOS |
+| TRD | PRESENT-CURRENT | `docs/TRD.md` separates protected-main, canonical active-PR, legacy lineage, and accepted-target contracts |
+| Architecture | PRESENT-CURRENT | root `ARCHITECTURE.md` owns service/crate boundaries and scientific/compute invariants |
+| UML / system flows | PRESENT-CURRENT | `docs/UML.md` covers component, sequence, clock state, relation authority, membership, compute and implementation lineage |
+| ERD / logical data model | PRESENT-CURRENT | `docs/ERD.md` distinguishes current domain objects from planned PostgreSQL entities and preserves uncertain time/membership/provenance |
+| ADR index / core decisions | PRESENT-CURRENT | ADR 0001–0016 cover numerical authority, clocks, event/membership, multilingual semantics, ESEM/DSEM, GPU, quality, evidence, PII, LLM orchestration, MSA, topic measurement, persistence/manifests/splits, claim promotion/release, autonomous-development authority, and TDT/CHRONOS boundaries |
+| ADR status/maturity/supersession policy | PRESENT-CURRENT | `docs/adr/ADR_POLICY.md` makes `Accepted` vs implemented/released explicit and requires exact partial-supersession scope |
+| API / modular integration | PRESENT-CURRENT | `docs/API_CONTRACT.md` defines versioning, target async lifecycle, authority and naruon/contextual-orchestrator boundaries |
+| Security | PRESENT-CURRENT | `SECURITY.md` plus `docs/THREAT_MODEL.md` |
+| Privacy / PII / data lifecycle | PRESENT-CURRENT | `docs/PRIVACY_DATA_GOVERNANCE.md` + ADR 0009; purpose-bound separation instead of blanket masking |
+| Compliance/assurance readiness | PRESENT-CURRENT | `docs/COMPLIANCE_READINESS.md`; CSAP/SOC 2/ISO/NIST mappings without certification claims |
+| Test / scientific validation | PRESENT-CURRENT | `docs/TEST_STRATEGY.md`; true-parameter recovery, uncertainty, leakage, invariance, CPU/GPU parity and replacement-lineage evidence rules |
+| Operability / recovery / release | PRESENT-CURRENT | `docs/OPERABILITY.md`; ADR 0014 separates release authority from green CI |
+| LLM orchestration / test-time compute | PRESENT-CURRENT | `docs/LLM_ORCHESTRATION.md` + ADR 0010; Fugu/Conductor/TRINITY motivate tested allocation, not authority |
+| Autonomous development/review/merge authority | PRESENT-CURRENT as design | ADR 0015 separates model proposal, deterministic verification, publication, independent review, and merge/release authority; implementation remains accepted-target |
+| Standards / APA 7 doctoring | PRESENT-CURRENT | research register covers psychometrics/topic/time/event/Unicode/security/AI-governance/orchestration foundations |
+| Traceability | PRESENT-CURRENT | `docs/TRACEABILITY.md` maps requirements, owning ADRs, canonical replacement lineage, and maturity |
+| Agent/maintainer authority | PRESENT-CURRENT | AGENTS/CLAUDE plus ADR 0015 and canonical map |
+| CHANGELOG | PRESENT-CURRENT | Unreleased documentation and ADR reconciliation is protected-main history; feature changes continue to update it when accepted |
+| Figma/UI detailed design | NOT-APPLICABLE now | PRD defers Figma until stable data/statistical contracts in the visual-analytics phase |
+| Physical database migrations | NOT-APPLICABLE now | planned ERD/ADR 0013 are not as-built table claims; migrations become mandatory with persistence implementation |
+| Deployment SLO/RPO/RTO evidence | deployment-owned | target operability is documented; numeric commitments require measured deployment evidence |
+| CSAP/SOC 2 certification | external-assurance | repository may build readiness evidence but cannot self-issue certification/attestation |
 
 ## 3. ADR clarity finding and remediation
 
-The ADR set was **not fully clear** before this review for three reasons:
-
-1. several ADRs used `Status: Accepted` without an independent implementation-maturity field, making accepted design easy to confuse with shipped behavior;
-2. ADR 0001 overlapped cross-service MSA authority later made explicit in ADR 0011, and ADR 0006 mixed GPU/VRAM, LLM orchestration, credentials, and autonomous-development concerns;
-3. major durable decisions from the conversation — the TRSL-TM topic-measurement contract, bitemporal persistence/reproducibility/split authority, scientific claim-promotion/release authority, autonomous-development authority, and TDT/CHRONOS event-intelligence boundary — lacked dedicated ADR ownership.
-
-The current branch corrects these defects by:
+The ADR set was not fully clear before the PR #7 reconciliation because accepted design could be confused with implementation, some ownership overlapped, and several durable decisions lacked dedicated ADRs. Merged PR #7 corrected this by:
 
 - defining independent **Decision status** and **Implementation maturity** axes in `ADR_POLICY.md`;
 - adding a linked ownership/supersession map to `docs/adr/README.md`;
-- clarifying ADR 0001 and 0006 so their later refinements are explicitly scoped rather than contradictory;
-- expanding ADR 0002–0005 and 0009–0011 with context, alternatives, failure/recovery, compatibility, verification, rollback/supersession and maturity where missing;
-- adding ADRs 0012–0016 for the previously unowned durable decisions; and
-- making `scripts/validate_documentation.py` fail when numbered ADR files/index diverge, required decision/maturity metadata is missing, or core ADR sections disappear.
+- clarifying ADR 0001 and 0006 so later refinements are explicitly scoped rather than contradictory;
+- expanding ADR 0002–0005 and 0009–0011 with context, alternatives, failure/recovery, compatibility, verification and rollback/supersession;
+- adding ADRs 0012–0016 for previously unowned durable decisions; and
+- making `scripts/validate_documentation.py` fail when numbered ADR files/index diverge or required ADR metadata/sections disappear.
+
+PR #8 now exercises that policy by updating ADR 0002, the ADR index, TRD/UML/Test Strategy/Traceability, and this assessment to identify the canonical Task 3 replacement lineage rather than leaving stale PR #5 maturity claims.
 
 ## 4. Durable conversation decisions covered
 
-The canonical graph now explicitly preserves:
+The canonical graph explicitly preserves:
 
 - TEPP as the product, with TRSL-TM as the topic-measurement family and compliant backend substitution rather than one hard-coded algorithm;
 - one global topic identity policy for the first longitudinal product line, with activity/dormancy/reactivation and later explicit lineage for birth/split/merge/retirement;
@@ -95,16 +91,17 @@ The canonical graph now explicitly preserves:
 
 Documentation completeness must not be confused with product completeness.
 
-- **implemented-main:** Rust workspace/quality foundation and immutable evidence/exact-span boundary.
-- **active-PR:** #5 typed six-clock/uncertain interval foundation; #6 Allen relation algebra/bounded path consistency.
-- **partial:** selected repository-quality and standalone crate boundaries are implemented, while the complete estimator/service/release authorities remain target work.
-- **accepted-target:** event ontology/graph/membership, persistence/splits, multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, TDT/CHRONOS, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority and production service APIs.
+- **implemented-main:** Rust workspace/quality foundation, immutable evidence/exact-span boundary, and canonical documentation/ADR authority graph through PR #7.
+- **active-PR:** PR #8 typed six-clock/uncertain interval foundation on the exact current protected-main lineage.
+- **accepted-target:** Task 4 Allen relation algebra/bounded path consistency remains accepted-target until the unique legacy PR #6 behavior is replayed onto the canonical Task 3 lineage and revalidated; the same maturity also covers event ontology/graph/membership, persistence/splits, multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, TDT/CHRONOS, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority and production service APIs.
+- **partial:** selected repository-quality and standalone crate boundaries are implemented, while complete estimator/service/release authorities remain target work.
 - **deployment-owned/external-assurance:** production infrastructure controls, measured SLO/RPO/RTO, CSAP certification, SOC 2 attestation and jurisdiction-specific legal determinations.
 
 ## 6. Remaining documentation work is event-driven
 
 No additional large parallel documentation pack should be created merely for completeness. Future documentation changes are triggered by actual implementation or accepted-decision changes:
 
+- temporal Task 3/4 integration → promote maturity only after exact-head protected-main evidence;
 - API implementation → machine-readable OpenAPI/AsyncAPI/JSON Schema and exact consumer contracts;
 - PostgreSQL implementation → real migrations, RLS, physical constraints/indexes, rollback and ERD/ADR 0013 reconciliation;
 - GPU implementation → backend/precision/memory contract and measured hardware profiles;
@@ -114,4 +111,4 @@ No additional large parallel documentation pack should be created merely for com
 
 ## 7. Exit criterion
 
-The canonical design is considered protected-main-sufficient only when PR #7 (or its verified successor) is merged from an unchanged exact head with all repository-required documentation/security/review gates satisfied. Until then the improved documentation and ADR clarity exist only as active-PR evidence.
+The canonical documentation design is already protected-main authority through merged PR #7. Future documentation fitness is event-driven and must stay synchronized with actual implementation lineage. PR #8 can promote the Task 3 temporal capability only after its unchanged exact head satisfies all live repository gates and is merged to protected main; the same rule applies independently to the future Task 4 replay.
