@@ -5,6 +5,7 @@ source =
     scripts.check_workspace_contract
     scripts.check_docstrings
     scripts.check_coverage
+    scripts.prepare_agent_pr_message
 
 [report]
 fail_under = 100

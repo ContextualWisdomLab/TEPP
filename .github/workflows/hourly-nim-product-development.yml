@@ -1,0 +1,601 @@
+name: Hourly NVIDIA NIM Product Development
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Evaluate the gate and task contract without running OpenCode
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: "47 * * * *"
+
+concurrency:
+  group: hourly-nim-product-development-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  DEFAULT_BRANCH: main
+  # Upstream 1.18.13 was observed during implementation, but this workflow keeps
+  # the independently checksum-verified 1.17.13 archive until a reviewed digest
+  # for the newer Linux x64 asset is committed.
+  OPENCODE_VERSION: "1.17.13"
+  OPENCODE_SHA256: 157afa289d1a8d9372de0ce19ac726119b937a1f6b201808d46f06e4e59bb348
+  OPENCODE_MODELS: >-
+    nvidia-nim/nvidia/llama-3.3-nemotron-super-49b-v1.5
+    nvidia-nim/nvidia/nemotron-3-super-120b-a12b
+    nvidia-nim/deepseek-ai/deepseek-v4-pro
+  OPENCODE_RUN_TIMEOUT_SECONDS: "900"
+  OPENCODE_KILL_GRACE_SECONDS: "30"
+  MAX_CHANGED_FILES: "40"
+  MAX_DIFF_BYTES: "500000"
+  MAX_PR_TITLE_BYTES: "120"
+  MAX_PR_BODY_BYTES: "20000"
+
+jobs:
+  propose_product_increment:
+    if: github.repository == 'ContextualWisdomLab/TEPP'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      has_changes: ${{ steps.proposal.outputs.has_changes }}
+      base_sha: ${{ steps.base.outputs.base_sha }}
+      patch_sha256: ${{ steps.proposal.outputs.patch_sha256 }}
+      changed_files: ${{ steps.proposal.outputs.changed_files }}
+      diff_bytes: ${{ steps.proposal.outputs.diff_bytes }}
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    env:
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+    steps:
+      - name: Enforce zero-open-PR single-flight gate
+        id: gate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NIM_CONFIGURED: ${{ secrets.NVIDIA_NIM_API_KEY != '' }}
+          APP_ID_CONFIGURED: ${{ vars.TEPP_MAINTAINER_APP_CLIENT_ID != '' }}
+          APP_KEY_CONFIGURED: ${{ secrets.TEPP_MAINTAINER_APP_PRIVATE_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if ! open_prs="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 1 --json number,url)"; then
+            echo 'dispatch=false' >>"$GITHUB_OUTPUT"
+            echo 'reason=pull_request_inventory_unavailable' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$(jq 'length' <<<"$open_prs")" -gt 0 ]; then
+            echo 'dispatch=false' >>"$GITHUB_OUTPUT"
+            echo 'reason=open_pull_request' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$NIM_CONFIGURED" != true ] && [ "$DRY_RUN" != true ]; then
+            echo 'dispatch=false' >>"$GITHUB_OUTPUT"
+            echo 'reason=nim_api_key_unavailable' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if { [ "$APP_ID_CONFIGURED" != true ] || [ "$APP_KEY_CONFIGURED" != true ]; } \
+            && [ "$DRY_RUN" != true ]; then
+            echo 'dispatch=false' >>"$GITHUB_OUTPUT"
+            echo 'reason=maintainer_app_unavailable' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo 'dispatch=true' >>"$GITHUB_OUTPUT"
+          echo 'reason=ready' >>"$GITHUB_OUTPUT"
+
+      - name: Prepare bounded commercial-quality task
+        if: steps.gate.outputs.dispatch == 'true'
+        shell: bash
+        run: |
+          cat >"$RUNNER_TEMP/agent-prompt.md" <<'PROMPT'
+          Continue commercial-quality product development for ContextualWisdomLab/TEPP.
+          Read AGENTS.md, CLAUDE.md, ARCHITECTURE.md, README.md, CHANGELOG.md,
+          product, technical, operations, security, doctoring, source, prompts,
+          tests, workflows, releases, issues, and recently merged pull requests.
+          Select the single highest-value buyer-visible Gap that fits exactly one bounded pull request.
+
+          Preserve standalone operation and modular MSA integration with
+          ContextualWisdomLab/.github, naruon, contextual-orchestrator, and other
+          CWL services. Do not alter existing reviewer-agent identity, credentials,
+          or provider routing. Work test-first and preserve RED-to-GREEN evidence.
+          Maintain 100% production statement and branch coverage and 100% public
+          docstring coverage. Public behavior must be beginner-readable.
+
+          For LLM paths, use or improve contextual-orchestrator and ground
+          test-time compute in Fugu, Conductor, and TRINITY. Allocate between
+          single-model routing and deep multi-agent orchestration; tune workflow
+          stages, recursive depth, task decomposition, and access lists; use
+          role-specific reasoning effort; and perform reasoning-level ablation.
+          Speed is not a priority. Deterministic calculation evidence remains immutable.
+
+          Use current authoritative standards, primary documentation, and
+          peer-reviewed research. Record APA 7 sources and claim boundaries in
+          docs/doctoring. Use Figma only for a genuinely visual user flow. Any new
+          database object must use a descriptive two-word-or-longer snake_case name.
+          Update CHANGELOG.md and affected architecture, API, security, operations,
+          support, and buyer documentation. Run the complete verification gate.
+
+          Do not merge. Do not release. Do not deploy. Do not publish. Do not
+          weaken exact-head review, Checks, security, privacy, coverage, docstring,
+          credential, deterministic-grounding, or fail-closed controls. Leave one
+          coherent working-tree increment and create PR_MESSAGE.md: title first,
+          then a body with Gap, design, RED/GREEN evidence, verification, APA 7
+          sources, version decision, and residual risk.
+          PROMPT
+
+      - name: Record dry-run task contract
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN == 'true'
+        run: cat "$RUNNER_TEMP/agent-prompt.md" >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Check out trusted default branch without persisted credentials
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: requirements-quality.txt
+
+      - name: Capture exact base and install dependencies
+        id: base
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_sha="$(git rev-parse HEAD)"
+          [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "base_sha=$base_sha" >>"$GITHUB_OUTPUT"
+          python3 -m pip install --disable-pip-version-check --no-deps --require-hashes -r requirements-quality.txt
+
+      - name: Install checksum-pinned OpenCode CLI
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/opencode-linux-x64.tar.gz"
+          curl --fail --silent --show-error --location --proto '=https' \
+            --connect-timeout 10 --max-time 120 --output "$archive" \
+            "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
+          printf '%s  %s\n' "$OPENCODE_SHA256" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          install -D -m 0755 "$RUNNER_TEMP/opencode" "$HOME/.opencode/bin/opencode"
+          echo "$HOME/.opencode/bin" >>"$GITHUB_PATH"
+
+      - name: Configure OpenCode for NVIDIA NIM only
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          cat >"$RUNNER_TEMP/opencode.json" <<'CONFIG'
+          {
+            "$schema": "https://opencode.ai/config.json",
+            "share": "disabled",
+            "autoupdate": false,
+            "lsp": false,
+            "mcp": {},
+            "enabled_providers": ["nvidia-nim"],
+            "permission": {
+              "*": "allow",
+              "external_directory": "deny",
+              "task": "deny",
+              "question": "deny",
+              "webfetch": "deny",
+              "websearch": "deny",
+              "bash": {
+                "*": "allow",
+                "curl *": "deny",
+                "wget *": "deny",
+                "ssh *": "deny",
+                "git clone *": "deny",
+                "git fetch *": "deny",
+                "git pull *": "deny",
+                "git commit *": "deny",
+                "git push *": "deny",
+                "git tag *": "deny",
+                "git remote *": "deny",
+                "gh *": "deny"
+              }
+            },
+            "provider": {
+              "nvidia-nim": {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": "NVIDIA NIM",
+                "options": {
+                  "baseURL": "https://integrate.api.nvidia.com/v1",
+                  "apiKey": "{env:NVIDIA_NIM_API_KEY}"
+                },
+                "models": {
+                  "nvidia/llama-3.3-nemotron-super-49b-v1.5": {"tool_call": true},
+                  "nvidia/nemotron-3-super-120b-a12b": {"tool_call": true},
+                  "deepseek-ai/deepseek-v4-pro": {"tool_call": true}
+                }
+              }
+            }
+          }
+          CONFIG
+          chmod 0400 "$RUNNER_TEMP/opencode.json"
+
+      - name: Run bounded NVIDIA NIM fallback
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        env:
+          NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
+          OPENCODE_CONFIG: ${{ runner.temp }}/opencode.json
+          OPENCODE_DISABLE_AUTOUPDATE: 'true'
+          XDG_CONFIG_HOME: ${{ runner.temp }}/opencode-config
+          XDG_CACHE_HOME: ${{ runner.temp }}/opencode-cache
+        run: |
+          set -euo pipefail
+          prompt="$(cat "$RUNNER_TEMP/agent-prompt.md")"
+          status=1
+          read -r -a models <<<"$OPENCODE_MODELS"
+          model_count=${#models[@]}
+          for ((model_index = 0; model_index < model_count; model_index++)); do
+            model="${models[$model_index]}"
+            if timeout --kill-after="${OPENCODE_KILL_GRACE_SECONDS}s" \
+              "${OPENCODE_RUN_TIMEOUT_SECONDS}s" \
+              env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
+              -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL \
+              -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_RUNTIME_URL \
+              -u ACTIONS_RESULTS_URL -u ACTIONS_CACHE_URL \
+              -u GITHUB_ENV -u GITHUB_OUTPUT -u GITHUB_PATH \
+              -u GITHUB_STATE -u GITHUB_STEP_SUMMARY \
+              opencode run "$prompt" --agent build --model "$model"; then
+              status=0
+              break
+            fi
+            if [ "$model_index" -eq $((model_count - 1)) ]; then
+              break
+            fi
+            git reset --hard HEAD
+            git clean -fdx
+            env -u NVIDIA_NIM_API_KEY \
+              timeout --kill-after=15s 180s \
+              python3 -m pip install --disable-pip-version-check --no-deps --require-hashes -r requirements-quality.txt
+          done
+          [ "$status" -eq 0 ] || { echo '::error::All NIM candidates failed'; exit 1; }
+
+      - name: Verify, bound, and export the uncredentialed proposal
+        id: proposal
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain)" ]; then
+            echo 'has_changes=false' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git add -A
+          git diff --cached --check
+          if git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'; then
+            echo '::error::Symlink or gitlink proposals are forbidden'
+            exit 1
+          fi
+          changed_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
+          proposal_dir="$RUNNER_TEMP/tepp-product-proposal"
+          install -d -m 0700 "$proposal_dir"
+          git diff --cached --binary --full-index >"$proposal_dir/proposal.patch"
+          diff_bytes="$(wc -c <"$proposal_dir/proposal.patch" | tr -d '[:space:]')"
+          [ "$changed_files" -le "$MAX_CHANGED_FILES" ]
+          [ "$diff_bytes" -le "$MAX_DIFF_BYTES" ]
+          patch_sha256="$(sha256sum "$proposal_dir/proposal.patch" | awk '{print $1}')"
+          {
+            echo 'has_changes=true'
+            echo "patch_sha256=$patch_sha256"
+            echo "changed_files=$changed_files"
+            echo "diff_bytes=$diff_bytes"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Upload bounded proposal patch
+        id: upload
+        if: steps.proposal.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tepp-product-proposal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tepp-product-proposal/proposal.patch
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: false
+
+  package_product_increment:
+    if: >-
+      github.repository == 'ContextualWisdomLab/TEPP'
+      && needs.propose_product_increment.outputs.has_changes == 'true'
+    needs: propose_product_increment
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out exact proposal base without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.propose_product_increment.outputs.base_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: requirements-quality.txt
+
+      - name: Download exact immutable proposal
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.propose_product_increment.outputs.artifact_id }}
+          path: ${{ runner.temp }}/tepp-product-proposal
+
+      - name: Verify immutable artifact identity and apply proposal
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.propose_product_increment.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.propose_product_increment.outputs.artifact_digest }}
+          EXPECTED_PATCH: ${{ needs.propose_product_increment.outputs.patch_sha256 }}
+          EXPECTED_DIFF_BYTES: ${{ needs.propose_product_increment.outputs.diff_bytes }}
+          EXPECTED_CHANGED_FILES: ${{ needs.propose_product_increment.outputs.changed_files }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch="$RUNNER_TEMP/tepp-product-proposal/proposal.patch"
+          artifact_id="$ARTIFACT_ID"
+          artifact_name="tepp-product-proposal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          expected_artifact_digest="$EXPECTED_ARTIFACT_DIGEST"
+          expected_patch="$EXPECTED_PATCH"
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Malformed artifact ID'; exit 1; }
+          [[ "$expected_artifact_digest" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed artifact digest'; exit 1; }
+          [[ "$expected_patch" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed patch digest'; exit 1; }
+          artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}")"
+          downloaded_digest="$(jq -r '.digest // empty' <<<"$artifact_json")"
+          [[ "$downloaded_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [ "${downloaded_digest#sha256:}" = "$expected_artifact_digest" ]
+          jq -e --argjson artifact_id "$artifact_id" --arg artifact_name "$artifact_name" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            '.id == $artifact_id and .name == $artifact_name and .expired == false and .workflow_run.id == $run_id' \
+            <<<"$artifact_json" >/dev/null
+          printf '%s  %s\n' "$expected_patch" "$patch" | sha256sum -c -
+          [ "$(wc -c <"$patch" | tr -d '[:space:]')" = "$EXPECTED_DIFF_BYTES" ]
+          git apply --check --binary "$patch"
+          git apply --index --binary "$patch"
+          git diff --cached --check
+          if git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'; then
+            echo '::error::Symlink or gitlink proposals are forbidden'
+            exit 1
+          fi
+          actual_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
+          [ "$actual_files" = "$EXPECTED_CHANGED_FILES" ]
+
+      - name: Restore pinned Rust quality tools
+        id: rust-tools-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ~/.cargo/bin/cargo-nextest
+            ~/.cargo/bin/cargo-deny
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-rust-tools-nextest-0.9.140-deny-0.19.7
+
+      - name: Restore pinned cargo-llvm-cov
+        id: llvm-cov-cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cargo/bin/cargo-llvm-cov
+          key: ${{ runner.os }}-${{ runner.arch }}-tepp-cargo-llvm-cov-0.8.6
+
+      - name: Install pinned Rust quality tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.rust-tools-cache.outputs.cache-hit }}" != true ]; then
+            cargo install cargo-nextest --locked --version 0.9.140
+            cargo install cargo-deny --locked --version 0.19.7
+          fi
+          if [ "${{ steps.llvm-cov-cache.outputs.cache-hit }}" != true ]; then
+            cargo install cargo-llvm-cov --locked --version 0.8.6
+          fi
+          rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
+
+      - name: Run every release-quality gate
+        env:
+          EXPECTED_PATCH: ${{ needs.propose_product_increment.outputs.patch_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset GH_TOKEN GITHUB_TOKEN REPOSITORY_TOKEN
+          unset ACTIONS_ID_TOKEN_REQUEST_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL
+          unset ACTIONS_RUNTIME_TOKEN ACTIONS_RUNTIME_URL
+          unset ACTIONS_RESULTS_URL ACTIONS_CACHE_URL
+          unset GITHUB_ENV GITHUB_OUTPUT GITHUB_PATH
+          unset GITHUB_STATE GITHUB_STEP_SUMMARY
+          python3 -m pip install --disable-pip-version-check --no-deps --require-hashes -r requirements-quality.txt
+          python3 -m compileall -q scripts tests/quality
+          python3 scripts/check_workspace_contract.py
+          python3 scripts/check_docstrings.py
+          python3 -m coverage run --branch -m unittest discover -s tests/quality -p 'test_*.py'
+          python3 -m coverage report --fail-under=100 --show-missing
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt --component llvm-tools-preview
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          cargo nextest run --workspace --all-features
+          cargo test --doc --workspace --all-features
+          cargo doc --workspace --all-features --no-deps
+          cargo deny check
+          line_coverage="$RUNNER_TEMP/coverage.lcov"
+          branch_coverage="$RUNNER_TEMP/coverage-branches.json"
+          cargo llvm-cov --workspace --all-features --lcov --output-path "$line_coverage"
+          python3 scripts/check_coverage.py "$line_coverage" --kind lines --format lcov
+          cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path "$branch_coverage"
+          python3 scripts/check_coverage.py "$branch_coverage" --kind branches
+          [ -z "$(git diff --name-only)" ]
+          [ -z "$(git ls-files --others --exclude-standard)" ]
+          post_patch="$RUNNER_TEMP/post-verify.patch"
+          git diff --cached --binary --full-index >"$post_patch"
+          [ "$(sha256sum "$post_patch" | awk '{print $1}')" = "$EXPECTED_PATCH" ]
+
+  publish_product_increment:
+    if: >-
+      github.repository == 'ContextualWisdomLab/TEPP'
+      && needs.propose_product_increment.outputs.has_changes == 'true'
+      && needs.package_product_increment.result == 'success'
+    needs:
+      - propose_product_increment
+      - package_product_increment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out exact base for non-executing publication
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.propose_product_increment.outputs.base_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Preserve trusted metadata parser before applying the proposal
+        run: install -m 0500 scripts/prepare_agent_pr_message.py "$RUNNER_TEMP/prepare_agent_pr_message.py"
+
+      - name: Download the same immutable proposal
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.propose_product_increment.outputs.artifact_id }}
+          path: ${{ runner.temp }}/tepp-product-proposal
+
+      - name: Verify and apply immutable proposal without executing it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.propose_product_increment.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.propose_product_increment.outputs.artifact_digest }}
+          EXPECTED_PATCH: ${{ needs.propose_product_increment.outputs.patch_sha256 }}
+          EXPECTED_DIFF_BYTES: ${{ needs.propose_product_increment.outputs.diff_bytes }}
+          EXPECTED_CHANGED_FILES: ${{ needs.propose_product_increment.outputs.changed_files }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch="$RUNNER_TEMP/tepp-product-proposal/proposal.patch"
+          artifact_id="$ARTIFACT_ID"
+          artifact_name="tepp-product-proposal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          expected_artifact_digest="$EXPECTED_ARTIFACT_DIGEST"
+          expected_patch="$EXPECTED_PATCH"
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Malformed artifact ID'; exit 1; }
+          [[ "$expected_artifact_digest" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed artifact digest'; exit 1; }
+          [[ "$expected_patch" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed patch digest'; exit 1; }
+          artifact_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}")"
+          downloaded_digest="$(jq -r '.digest // empty' <<<"$artifact_json")"
+          [[ "$downloaded_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [ "${downloaded_digest#sha256:}" = "$expected_artifact_digest" ]
+          jq -e --argjson artifact_id "$artifact_id" --arg artifact_name "$artifact_name" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            '.id == $artifact_id and .name == $artifact_name and .expired == false and .workflow_run.id == $run_id' \
+            <<<"$artifact_json" >/dev/null
+          printf '%s  %s\n' "$expected_patch" "$patch" | sha256sum -c -
+          [ "$(wc -c <"$patch" | tr -d '[:space:]')" = "$EXPECTED_DIFF_BYTES" ]
+          git apply --check --binary "$patch"
+          git apply --index --binary "$patch"
+          git diff --cached --check
+          if git diff --cached --raw | grep -Eq '(^| )(120000|160000)( |$)'; then
+            echo '::error::Symlink or gitlink proposals are forbidden'
+            exit 1
+          fi
+          actual_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
+          [ "$actual_files" = "$EXPECTED_CHANGED_FILES" ]
+
+      - name: Parse bounded untrusted pull-request metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          title_file="$RUNNER_TEMP/pr-title.txt"
+          body_file="$RUNNER_TEMP/pr-body.md"
+          if [ -e PR_MESSAGE.md ] || [ -L PR_MESSAGE.md ]; then
+            MAX_PR_TITLE_BYTES="$MAX_PR_TITLE_BYTES" MAX_PR_BODY_BYTES="$MAX_PR_BODY_BYTES" \
+              python "$RUNNER_TEMP/prepare_agent_pr_message.py" PR_MESSAGE.md "$title_file" "$body_file"
+            rm -f PR_MESSAGE.md
+          else
+            printf '%s' 'TEPP autonomous product increment' >"$title_file"
+            printf '%s\n' 'OpenCode produced one bounded proposal for exact-head review.' >"$body_file"
+            chmod 0600 "$title_file" "$body_file"
+          fi
+          git add -A
+          git diff --cached --check
+
+      - name: Mint dedicated maintainer App token only for publication
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1
+        with:
+          client-id: ${{ vars.TEPP_MAINTAINER_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TEPP_MAINTAINER_APP_PRIVATE_KEY }}
+          owner: ContextualWisdomLab
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-metadata: read
+          permission-pull-requests: write
+
+      - name: Revalidate queue and default-branch head
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          EXPECTED_BASE: ${{ needs.propose_product_increment.outputs.base_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$(git rev-parse HEAD)" = "$EXPECTED_BASE" ] || { echo '::error::base_branch_advanced'; exit 1; }
+          if ! open_prs="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 1 --json number,url)"; then
+            echo '::error::pull_request_inventory_unavailable_after_generation'
+            exit 1
+          fi
+          [ "$(jq 'length' <<<"$open_prs")" -eq 0 ] || { echo '::error::open_pull_request_after_generation'; exit 1; }
+          live_base="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${DEFAULT_BRANCH}" --jq '.object.sha')"
+          [ "$live_base" = "$expected_base" ] || { echo '::error::base_branch_advanced'; exit 1; }
+
+      - name: Package exactly one pull request in a trusted step
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          title="$(cat "$RUNNER_TEMP/pr-title.txt")"
+          body_file="$RUNNER_TEMP/pr-body.md"
+          branch="nim-agent/product-dev-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
+          git -c core.hooksPath=/dev/null commit -m "$title"
+          gh auth setup-git
+          set +e
+          git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1
+          remote_status=$?
+          set -e
+          case "$remote_status" in
+            0)
+              echo '::error::proposal_branch_already_exists'
+              exit 1
+              ;;
+            2) ;;
+            *)
+              echo '::error::proposal_branch_inventory_unavailable'
+              exit 1
+              ;;
+          esac
+          cleanup() { git push origin --delete "$branch" >/dev/null 2>&1 || true; }
+          trap cleanup ERR
+          git push origin "HEAD:refs/heads/${branch}"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base "$DEFAULT_BRANCH" \
+            --head "$branch" --title "$title" --body-file "$body_file"
+          trap - ERR

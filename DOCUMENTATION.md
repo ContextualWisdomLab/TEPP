@@ -30,6 +30,8 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Governance | [`GOVERNANCE.md`](GOVERNANCE.md) |
 | Agent development rules | [`AGENTS.md`](AGENTS.md) |
 | Agent context | [`CLAUDE.md`](CLAUDE.md) |
+| Hourly NIM product-development operations | [`docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md`](docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md) |
+| Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
 ## Maturity vocabulary
