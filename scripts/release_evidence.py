@@ -7,8 +7,12 @@ import hashlib
 import json
 import sys
 import tomllib
+import uuid
 from pathlib import Path
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
+
+# Stable namespace so serialNumber is a deterministic RFC 4122 UUID for a lock digest.
+_TEPP_SBOM_NAMESPACE = uuid.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
 
 
 REQUIRED_SBOM_KEYS = (
@@ -126,7 +130,7 @@ def build_sbom(
     if len(cargo_lock_sha256) != 64:
         raise ValueError("cargo_lock_sha256 must be a 64-character hex digest")
     components = [component_from_package(package) for package in packages]
-    serial = f"urn:uuid:tepp-{cargo_lock_sha256[:32]}"
+    serial = f"urn:uuid:{uuid.uuid5(_TEPP_SBOM_NAMESPACE, cargo_lock_sha256)}"
     return {
         "bomFormat": "CycloneDX",
         "specVersion": "1.5",
@@ -308,8 +312,9 @@ def validate_provenance(path: Path, *, expected_git_commit: str | None = None) -
     )
 
 
-def validate_checksums(path: Path, evidence_directory: Path) -> str:
-    """Validate checksums file digests against files in *evidence_directory*."""
+
+def _read_checksum_records(path: Path) -> dict[str, str]:
+    """Parse a checksums.sha256 file into name -> digest mappings."""
 
     records: dict[str, str] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -325,13 +330,31 @@ def validate_checksums(path: Path, evidence_directory: Path) -> str:
         if name in records:
             raise ValueError(f"duplicate checksum entry for {name}")
         records[name] = digest
+    return records
+
+
+def validate_checksums(
+    path: Path,
+    evidence_directory: Path,
+    *,
+    repository_root: Path | None = None,
+) -> str:
+    """Validate checksums file digests against evidence and optional repository root."""
+
+    records = _read_checksum_records(path)
     if "sbom.cdx.json" not in records or "provenance.json" not in records:
         raise ValueError("checksums must include sbom.cdx.json and provenance.json")
+    if "Cargo.lock" not in records:
+        raise ValueError("checksums must include Cargo.lock")
     for name, expected in records.items():
         if name == "Cargo.lock":
-            # Cargo.lock lives at the repository root, not the evidence directory.
-            continue
-        target = evidence_directory / name
+            if repository_root is None:
+                # File binding requires repository_root; provenance cross-check
+                # still verifies the recorded digest in validate_evidence_bundle.
+                continue
+            target = repository_root / "Cargo.lock"
+        else:
+            target = evidence_directory / name
         if not target.is_file():
             raise ValueError(f"checksum target missing: {name}")
         actual = sha256_file(target)
@@ -343,6 +366,7 @@ def validate_checksums(path: Path, evidence_directory: Path) -> str:
 def validate_evidence_bundle(
     evidence_directory: Path,
     *,
+    repository_root: Path,
     expected_git_commit: str | None = None,
 ) -> list[str]:
     """Validate SBOM, provenance, and checksums for one evidence directory."""
@@ -356,12 +380,20 @@ def validate_evidence_bundle(
     messages = [
         validate_sbom(sbom_path),
         validate_provenance(provenance_path, expected_git_commit=expected_git_commit),
-        validate_checksums(checksums_path, evidence_directory),
+        validate_checksums(
+            checksums_path,
+            evidence_directory,
+            repository_root=repository_root,
+        ),
     ]
     provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
     sbom_digest = sha256_file(sbom_path)
     if provenance.get("sbom_sha256") != sbom_digest:
         raise ValueError("provenance sbom_sha256 does not match sbom.cdx.json")
+    checksum_records = _read_checksum_records(checksums_path)
+    if checksum_records.get("Cargo.lock") != provenance.get("cargo_lock_sha256"):
+        raise ValueError("checksums Cargo.lock digest does not match provenance")
+    # Cargo.lock file digest is already verified against checksums via validate_checksums.
     return messages
 
 
@@ -379,6 +411,12 @@ def build_parser() -> argparse.ArgumentParser:
     validate = subparsers.add_parser("validate", help="Validate an evidence bundle")
     validate.add_argument("--evidence-directory", type=Path, required=True)
     validate.add_argument("--expected-git-commit", default=None)
+    validate.add_argument(
+        "--repository-root",
+        type=Path,
+        required=True,
+        help="Repository root containing Cargo.lock for digest binding",
+    )
 
     return parser
 
@@ -404,6 +442,7 @@ def main(arguments: Iterable[str] | None = None) -> int:
         messages = validate_evidence_bundle(
             namespace.evidence_directory,
             expected_git_commit=namespace.expected_git_commit,
+            repository_root=namespace.repository_root,
         )
         for message in messages:
             print(message)

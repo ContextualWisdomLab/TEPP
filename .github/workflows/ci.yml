@@ -72,6 +72,7 @@ jobs:
             --git-commit "${GITHUB_SHA}"
           python3 scripts/release_evidence.py validate \
             --evidence-directory "${RUNNER_TEMP}/tepp-release-evidence" \
+            --repository-root . \
             --expected-git-commit "${GITHUB_SHA}"
 
   rust-quality:

@@ -7,8 +7,8 @@ import io
 import json
 import tempfile
 import unittest
+import unittest.mock as mock
 from pathlib import Path
-from unittest import mock
 
 from scripts import release_evidence as release_evidence
 
@@ -69,11 +69,16 @@ class ReleaseEvidenceTests(unittest.TestCase):
             self.assertIn("sbom.cdx.json", digests)
             self.assertIn("provenance.json", digests)
             messages = release_evidence.validate_evidence_bundle(
-                output, expected_git_commit="abc123"
+                output,
+                expected_git_commit="abc123",
+                repository_root=root,
             )
             self.assertEqual(len(messages), 3)
             sbom = json.loads((output / "sbom.cdx.json").read_text(encoding="utf-8"))
             self.assertEqual(sbom["bomFormat"], "CycloneDX")
+            self.assertTrue(str(sbom["serialNumber"]).startswith("urn:uuid:"))
+            uuid_part = str(sbom["serialNumber"]).removeprefix("urn:uuid:")
+            self.assertEqual(len(uuid_part), 36)
             self.assertEqual(len(sbom["components"]), 2)
             self.assertEqual(sbom["components"][0]["hashes"][0]["content"], "a" * 64)
             provenance = json.loads(
@@ -310,8 +315,22 @@ class ReleaseEvidenceTests(unittest.TestCase):
                 f"{'a' * 64}  sbom.cdx.json\n{'b' * 64}  provenance.json\n",
                 encoding="utf-8",
             )
+            with self.assertRaisesRegex(ValueError, "checksums must include Cargo.lock"):
+                release_evidence.validate_checksums(missing_checksums, missing_dir)
+            missing_checksums.write_text(
+                f"{'a' * 64}  sbom.cdx.json\n"
+                f"{'b' * 64}  provenance.json\n"
+                f"{'c' * 64}  Cargo.lock\n",
+                encoding="utf-8",
+            )
             with self.assertRaisesRegex(ValueError, "checksum target missing"):
                 release_evidence.validate_checksums(missing_checksums, missing_dir)
+            with self.assertRaisesRegex(ValueError, "checksum target missing"):
+                release_evidence.validate_checksums(
+                    missing_checksums,
+                    missing_dir,
+                    repository_root=missing_dir,
+                )
 
     def test_generate_missing_inputs_and_cli(self) -> None:
         """Missing repository inputs and CLI paths remain usable."""
@@ -352,6 +371,8 @@ class ReleaseEvidenceTests(unittest.TestCase):
                             "validate",
                             "--evidence-directory",
                             str(output),
+                            "--repository-root",
+                            str(root),
                             "--expected-git-commit",
                             "deadbeef",
                         ]
@@ -363,23 +384,50 @@ class ReleaseEvidenceTests(unittest.TestCase):
             payload = json.loads(provenance_path.read_text(encoding="utf-8"))
             payload["sbom_sha256"] = "0" * 64
             provenance_path.write_text(json.dumps(payload), encoding="utf-8")
+            lock_digest = release_evidence.sha256_file(root / "Cargo.lock")
             # Refresh checksums so checksum validation does not fail first.
             release_evidence.write_checksums(
                 output / "checksums.sha256",
                 {
                     "sbom.cdx.json": release_evidence.sha256_file(output / "sbom.cdx.json"),
                     "provenance.json": release_evidence.sha256_file(provenance_path),
-                    "Cargo.lock": "c" * 64,
+                    "Cargo.lock": lock_digest,
                 },
             )
             with self.assertRaisesRegex(ValueError, "sbom_sha256 does not match"):
-                release_evidence.validate_evidence_bundle(output)
+                release_evidence.validate_evidence_bundle(
+                    output, repository_root=root
+                )
+            # Cargo.lock binding fails when provenance digest is wrong.
+            payload["sbom_sha256"] = release_evidence.sha256_file(output / "sbom.cdx.json")
+            payload["cargo_lock_sha256"] = "0" * 64
+            provenance_path.write_text(json.dumps(payload), encoding="utf-8")
+            release_evidence.write_checksums(
+                output / "checksums.sha256",
+                {
+                    "sbom.cdx.json": release_evidence.sha256_file(output / "sbom.cdx.json"),
+                    "provenance.json": release_evidence.sha256_file(provenance_path),
+                    "Cargo.lock": lock_digest,
+                },
+            )
+            with self.assertRaisesRegex(
+                ValueError, "checksums Cargo.lock digest does not match provenance"
+            ):
+                release_evidence.validate_evidence_bundle(
+                    output, repository_root=root
+                )
 
             standard_error = io.StringIO()
             with contextlib.redirect_stderr(standard_error):
                 self.assertEqual(
                     release_evidence.main(
-                        ["validate", "--evidence-directory", str(root / "missing")]
+                        [
+                            "validate",
+                            "--evidence-directory",
+                            str(root / "missing"),
+                            "--repository-root",
+                            str(root),
+                        ]
                     ),
                     1,
                 )
@@ -399,7 +447,14 @@ class ReleaseEvidenceTests(unittest.TestCase):
             with mock.patch.object(
                 release_evidence.sys,
                 "argv",
-                ["release_evidence", "validate", "--evidence-directory", str(output)],
+                [
+                    "release_evidence",
+                    "validate",
+                    "--evidence-directory",
+                    str(output),
+                    "--repository-root",
+                    str(root),
+                ],
             ):
                 # Bundle is intentionally invalid after tamper; CLI returns 1.
                 with contextlib.redirect_stderr(io.StringIO()):
@@ -409,19 +464,57 @@ class ReleaseEvidenceTests(unittest.TestCase):
             good = root / "good"
             release_evidence.generate_evidence(root, good, git_commit="c")
             checksums = good / "checksums.sha256"
+            lock_digest = release_evidence.sha256_file(root / "Cargo.lock")
             checksums.write_text(
                 f"{'0' * 64}  sbom.cdx.json\n"
                 f"{release_evidence.sha256_file(good / 'provenance.json')}  provenance.json\n"
-                f"{'c' * 64}  Cargo.lock\n",
+                f"{lock_digest}  Cargo.lock\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "checksum mismatch"):
-                release_evidence.validate_checksums(checksums, good)
+                release_evidence.validate_checksums(
+                    checksums, good, repository_root=root
+                )
             # Bundle missing files.
             empty = root / "empty-dir"
             empty.mkdir()
             with self.assertRaisesRegex(ValueError, "missing evidence file"):
-                release_evidence.validate_evidence_bundle(empty)
+                release_evidence.validate_evidence_bundle(empty, repository_root=root)
+            # Missing repository Cargo.lock when root is provided.
+            orphan = root / "orphan-root"
+            orphan.mkdir()
+            release_evidence.generate_evidence(root, orphan / "ev", git_commit="c")
+            with self.assertRaisesRegex(ValueError, "checksum target missing: Cargo.lock"):
+                release_evidence.validate_evidence_bundle(
+                    orphan / "ev", repository_root=orphan
+                )
+            # Direct checksum mismatch after records parse.
+            good_checksums = good / "checksums.sha256"
+            with self.assertRaisesRegex(ValueError, "checksum mismatch"):
+                release_evidence.validate_checksums(
+                    good_checksums, good, repository_root=root
+                )
+            # Checksums Cargo.lock must match provenance cargo_lock_sha256.
+            bound = root / "bound"
+            release_evidence.generate_evidence(root, bound, git_commit="c")
+            checksums = bound / "checksums.sha256"
+            lines = checksums.read_text(encoding="utf-8").splitlines()
+            rewritten = []
+            for line in lines:
+                if line.endswith(" Cargo.lock"):
+                    rewritten.append(f"{'d' * 64}  Cargo.lock")
+                else:
+                    rewritten.append(line)
+            checksums.write_text("\n".join(rewritten) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                ValueError, "checksums Cargo.lock digest does not match provenance"
+            ):
+                # Skip file digest compare by omitting repository_root after
+                # first failing path: provide root but tamper only checksums
+                # after regenerating matching provenance would fail earlier on
+                # checksum mismatch for Cargo.lock file. Use matching file digests
+                # with mismatched provenance by rewriting provenance after.
+                release_evidence.validate_evidence_bundle(bound, repository_root=None)
 
 
 if __name__ == "__main__":  # pragma: no cover
