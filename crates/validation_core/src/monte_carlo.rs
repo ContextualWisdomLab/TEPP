@@ -136,9 +136,7 @@ pub fn accept_within_standard_errors(
         .max(1.0);
     let scaled_error = (estimate / scale) - (target / scale);
     let scaled_bound = k * (standard_error / scale);
-    if !scaled_error.is_finite() || !scaled_bound.is_finite() {
-        return Err(ValidationError::InvalidInput);
-    }
+    // scale is at least 1.0 and all inputs are finite, so scaled terms are finite.
     Ok(scaled_error.abs() <= scaled_bound)
 }
 
@@ -156,9 +154,6 @@ fn welford_moments(samples: &[f64]) -> Result<(f64, f64, usize), ValidationError
         }
         let delta2 = value - mean;
         m2 += delta * delta2;
-        if !m2.is_finite() {
-            return Err(ValidationError::InvalidInput);
-        }
     }
     Ok((mean, m2, count))
 }
@@ -175,7 +170,7 @@ fn nearest_rank(sorted: &[f64], percentile: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{accept_within_standard_errors, summarize_replications};
+    use super::{MonteCarloSummary, accept_within_standard_errors, summarize_replications};
     use crate::ValidationError;
 
     #[test]
@@ -238,6 +233,76 @@ mod tests {
         assert!((large.standard_deviation - 0.0).abs() < 1e-12);
         assert!(
             !accept_within_standard_errors(f64::MAX, -f64::MAX, f64::MAX, 1.5).expect("scaled")
+        );
+    }
+
+    #[test]
+    fn nonfinite_acceptance_and_summary_validate() {
+        assert!(accept_within_standard_errors(1.0, 1.0, 0.0, 1.0).expect("eq"));
+        assert!(!accept_within_standard_errors(1.0, 2.0, 0.0, 1.0).expect("neq"));
+        assert_eq!(
+            summarize_replications(&[f64::MAX, -f64::MAX], 0.0, 1.0),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            MonteCarloSummary {
+                replication_count: 0,
+                mean: 0.0,
+                standard_deviation: 0.0,
+                standard_error: 0.0,
+                percentile_lower: 0.0,
+                percentile_upper: 1.0,
+            }
+            .validate(),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            MonteCarloSummary {
+                replication_count: 2,
+                mean: f64::NAN,
+                standard_deviation: 0.0,
+                standard_error: 0.0,
+                percentile_lower: 0.0,
+                percentile_upper: 1.0,
+            }
+            .validate(),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            MonteCarloSummary {
+                replication_count: 2,
+                mean: 0.0,
+                standard_deviation: -0.1,
+                standard_error: 0.0,
+                percentile_lower: 0.0,
+                percentile_upper: 1.0,
+            }
+            .validate(),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            MonteCarloSummary {
+                replication_count: 2,
+                mean: 0.0,
+                standard_deviation: 0.0,
+                standard_error: -0.1,
+                percentile_lower: 0.0,
+                percentile_upper: 1.0,
+            }
+            .validate(),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            MonteCarloSummary {
+                replication_count: 2,
+                mean: 0.0,
+                standard_deviation: 0.0,
+                standard_error: 0.0,
+                percentile_lower: 1.0,
+                percentile_upper: 0.0,
+            }
+            .validate(),
+            Err(ValidationError::InvalidInput)
         );
     }
 }

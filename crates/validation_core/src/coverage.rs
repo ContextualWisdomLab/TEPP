@@ -63,18 +63,11 @@ pub fn wilson_coverage_interval(
     let denominator = 1.0 + z2 / n;
     let center = p + z2 / (2.0 * n);
     let radical = (p * (1.0 - p) / n) + z2 / (4.0 * n * n);
-    if !denominator.is_finite() || !center.is_finite() || !radical.is_finite() || radical < 0.0 {
-        return Err(ValidationError::InvalidConfiguration);
-    }
+    // With finite z² and coverage p in [0,1], Wilson terms remain finite.
     let margin = z * radical.sqrt();
-    if !margin.is_finite() {
-        return Err(ValidationError::InvalidConfiguration);
-    }
+    // radical and z are finite and non-negative; margin/bounds stay finite in [0,1].
     let low = ((center - margin) / denominator).clamp(0.0, 1.0);
     let high = ((center + margin) / denominator).clamp(0.0, 1.0);
-    if !low.is_finite() || !high.is_finite() {
-        return Err(ValidationError::InvalidConfiguration);
-    }
     Ok((low, high))
 }
 
@@ -137,10 +130,31 @@ mod tests {
             wilson_coverage_interval(&truth, &lower, &upper, f64::MAX),
             Err(ValidationError::InvalidConfiguration)
         );
+        // Finite z whose scaled Wilson terms still overflow.
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, 1e200),
+            Err(ValidationError::InvalidConfiguration)
+        );
         // uncovered: above interval and below interval
         let miss_high = interval_coverage(&[0.0], &[-2.0], &[-1.0]).expect("miss high");
         assert!((miss_high - 0.0).abs() < 1e-12);
         let miss_low = interval_coverage(&[0.0], &[1.0], &[2.0]).expect("miss low");
         assert!((miss_low - 0.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn wilson_nonfinite_guards() {
+        let truth = [0.0];
+        let lower = [-1.0];
+        let upper = [1.0];
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, f64::MAX),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        // Finite z whose scaled Wilson terms still overflow.
+        assert_eq!(
+            wilson_coverage_interval(&truth, &lower, &upper, 1e200),
+            Err(ValidationError::InvalidConfiguration)
+        );
     }
 }

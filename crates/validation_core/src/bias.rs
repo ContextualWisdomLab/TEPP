@@ -53,9 +53,6 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
             return Err(ValidationError::InvalidInput);
         }
         variance_sum += square;
-        if !variance_sum.is_finite() {
-            return Err(ValidationError::InvalidInput);
-        }
     }
     let variance = variance_sum / (diffs.len() as f64 - 1.0);
     require_finite(require_finite(variance.sqrt())? / (diffs.len() as f64).sqrt())
@@ -94,6 +91,28 @@ mod tests {
         );
         assert_eq!(
             bias_standard_error(&[f64::MAX, 0.0], &[-f64::MAX, 0.0]),
+            Err(ValidationError::InvalidInput)
+        );
+    }
+
+    #[test]
+    fn overflow_and_nonfinite_intermediates_fail_closed() {
+        assert_eq!(
+            mean_bias(&[0.0, 0.0], &[f64::MAX, f64::MAX]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            mean_bias(&[-f64::MAX], &[f64::MAX]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            bias_standard_error(&[0.0, 0.0], &[f64::MAX, -f64::MAX]),
+            Err(ValidationError::InvalidInput)
+        );
+        // Squared deviation overflows for extreme residuals.
+        let huge = 1e200;
+        assert_eq!(
+            bias_standard_error(&[0.0, 0.0], &[huge, -huge]),
             Err(ValidationError::InvalidInput)
         );
     }

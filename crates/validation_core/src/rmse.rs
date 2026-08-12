@@ -19,9 +19,6 @@ pub fn root_mean_square_error(truth: &[f64], recovered: &[f64]) -> Result<f64, V
             return Err(ValidationError::InvalidInput);
         }
         square_sum += square;
-        if !square_sum.is_finite() {
-            return Err(ValidationError::InvalidInput);
-        }
     }
     require_finite((square_sum / residuals.len() as f64).sqrt())
 }
@@ -52,9 +49,6 @@ fn rmse_standard_error_from_residuals(residuals: &[f64]) -> Result<f64, Validati
         }
         squares.push(square);
         square_sum += square;
-        if !square_sum.is_finite() {
-            return Err(ValidationError::InvalidInput);
-        }
     }
     let rmse = require_finite((square_sum / n).sqrt())?;
     if rmse <= 0.0 {
@@ -72,9 +66,6 @@ fn rmse_standard_error_from_residuals(residuals: &[f64]) -> Result<f64, Validati
             return Err(ValidationError::InvalidInput);
         }
         variance_sum += square;
-        if !variance_sum.is_finite() {
-            return Err(ValidationError::InvalidInput);
-        }
     }
     let variance = variance_sum / (n - 1.0);
     require_finite(require_finite(variance.sqrt())? / (2.0 * rmse * n.sqrt()))
@@ -116,6 +107,28 @@ mod tests {
         );
         assert_eq!(
             root_mean_square_error(&[0.0], &[f64::MAX]),
+            Err(ValidationError::InvalidInput)
+        );
+    }
+
+    #[test]
+    fn overflow_and_nonfinite_intermediates_fail_closed() {
+        assert_eq!(
+            root_mean_square_error(&[0.0, 0.0], &[f64::MAX, f64::MAX]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            rmse_standard_error_from_residuals(&[f64::MAX, f64::MAX]),
+            Err(ValidationError::InvalidInput)
+        );
+        let huge = 1e200;
+        assert_eq!(
+            rmse_standard_error_from_residuals(&[huge, -huge, huge]),
+            Err(ValidationError::InvalidInput)
+        );
+        // Finite residual squares whose variance deviations overflow.
+        assert_eq!(
+            rmse_standard_error_from_residuals(&[1e154, 0.0]),
             Err(ValidationError::InvalidInput)
         );
     }
