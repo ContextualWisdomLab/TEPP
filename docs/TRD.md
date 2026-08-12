@@ -1,74 +1,313 @@
 # TEPP Technical Requirements Document
 
-**Status:** Accepted technical baseline aligned to approved PRD v0.4  
-**Last reviewed:** 2026-08-12
+**Status:** Accepted technical baseline aligned to PRD v0.5  
+**Last reviewed:** 2026-08-13
 
 ## 1. Technical objective
 
-TEPP is a multilingual temporal-event psychometrics platform whose executable core is a set of independently usable Rust crates and versioned service/data contracts. It separates immutable evidence, six-clock temporal semantics, event/relation reasoning, shared-latent topic measurement, multilevel longitudinal psychometrics, compute backends, event intelligence, interpretation, and visual artifacts so scientific validity can be tested at each boundary.
+TEPP is a multilingual temporal-event psychometrics platform whose executable
+core is a set of independently usable Rust crates and versioned service,
+persistence, job, artifact, and connector contracts. Each boundary separates
+source evidence, deterministic semantics, statistical estimation, psychometric
+claims, LLM interpretation, and release authority so validity can be tested and
+audited independently.
+
+The canonical product requirements are
+`docs/product/prd-v0.5.md`. Every implementation PR shall identify the affected
+`FR-*` identifiers, owning ADRs, source/tests/migrations/schemas, failure modes,
+rollback, and requested maturity change.
 
 ## 2. Current implementation maturity
 
-Protected main contains the Rust workspace foundation, immutable evidence records, exact source spans, strict versioned evidence JSON, stable content-redacting errors, repository quality contracts, and the canonical ADR/documentation authority graph merged through PR #7. PR #8 is the canonical active Task 3 replacement adding typed six-clock temporal values and uncertain intervals on that exact protected-main lineage. Conflicted PR #5 is superseded implementation lineage only. Legacy PR #6 contains Allen relation algebra and bounded path-consistency work stacked on #5; it cannot advance as implementation evidence until its unique Task 4 work is replayed onto PR #8 or its protected-main descendant and all exact-head gates are reacquired.
+Protected main at the PRD v0.5 authoring baseline contains:
 
-The remaining PRD architecture — event ontology, relation graph, multiple membership, PostgreSQL persistence, leakage-safe corpus splits, simulations, multilingual semantic units, topic measurement, GPU/VRAM compute, model selection, TDT/CHRONOS, longitudinal ESEM/DSEM, network analysis, interpretation, and visual analytics — is accepted-target, not as-built.
+- the Rust workspace and exact repository-quality gates;
+- immutable evidence records and exact source spans;
+- typed six-clock values and uncertain intervals;
+- bounded Allen interval path consistency;
+- forward-only state-transition relation graphs;
+- event mention/instance separation;
+- time-varying weighted multiple-membership and ESS helpers;
+- leakage-safe knowledge-cutoff snapshots and relation-connected splits;
+- deterministic temporal/event known-truth simulation;
+- recovery metrics including RMSE, bias, interval coverage, relation recovery,
+  temporal order, and Monte Carlo uncertainty;
+- bitemporal PostgreSQL contracts, live SQL ports, and selected SQLx execution;
+- versioned analysis-run, reproducibility, JSON-LD, and GraphML artifacts;
+- modular naruon and contextual-orchestrator connector contracts;
+- SBOM, provenance, checksum, and validation-ledger foundations.
 
-## 3. Immutable evidence requirements
+Tenant FORCE RLS and runtime-role restrictions are active on PR #30 until exact
+protected-main integration. `docs/TRACEABILITY.md` is the authoritative maturity
+ledger.
 
-Every source artifact and document must have immutable opaque identity distinct from SHA-256 content identity. Source bytes/text are bounded before allocation, owned immutably, and rehashed on reconstruction. Exact spans use half-open UTF-8 byte and Unicode-scalar coordinates plus optional page geometry; cross-document, mid-code-point, inconsistent, non-finite, out-of-page, reversed, or empty locations fail closed.
+Multilingual semantic measurement, the TRSL-TM estimator, candidate-K selection,
+topic networks/clusters, GPU compute, TDT/CHRONOS intelligence, longitudinal
+ESEM/DSEM, interpretation, coordinated visual analytics, and the complete
+production job/API service remain separately gated target slices.
 
-Evidence wire formats are explicitly versioned, reject unknown fields, and reconstruct through domain validation rather than bypassing invariants.
+## 3. Module boundaries
 
-## 4. Temporal requirements
+| Module / port | Responsibility | PRD families |
+|---|---|---|
+| `evidence_core` | Immutable source identity, digest, exact spans, geometry, strict wire reconstruction | `FR-EVD-*` |
+| `temporal_core` | Six clocks, strict instants, uncertain intervals, Allen relations and bounded closure | `FR-TMP-*` |
+| `relation_graph` | Typed forward transition and provenance edges with acyclicity | `FR-TMP-005`, `FR-REL-*` |
+| `event_core` | Event mentions, governed instances, roles, validity, promotion boundaries | `FR-EVT-001`, `FR-REL-*` |
+| `membership_core` | Weighted time-varying cross-classified memberships and ESS/design effects | `FR-MEM-*` |
+| `persistence_postgres` | Bitemporal storage, migrations, tenant/purpose controls, audit, replay | `FR-EVD-005`, `FR-SEC-*`, `FR-OPS-*` |
+| `corpus_split` | Cutoff eligibility, relation grouping, rolling-origin and leakage-safe partitions | `FR-TMP-003`, `FR-REL-003` |
+| `tepp_simulation` | Deterministic known-truth corpora and manifests | scientific acceptance |
+| `validation_core` | Matching, bias/RMSE/coverage, graph/time recovery, Monte Carlo gates | all scientific families |
+| `tepp_api` | Versioned DTOs, jobs/artifacts, errors, manifests, exports, compatibility | `FR-API-*`, `FR-EXP-*` |
+| semantic measurement target | Segmentation, language profiles, semantic units, concepts, method sources | `FR-LNG-*`, `FR-SEM-*` |
+| `topic_measurement` target | TRSL-TM CPU reference, posterior, covariates and drift | `FR-TOP-*` |
+| `model_selection` target | Candidate plan, hard gates, Pareto frontier, blinded review | `FR-KSEL-*` |
+| `network_analysis` target | Valid-coordinate associations and consensus clusters | `FR-NET-*` |
+| `psychometric_core` target | Construct-role, ESEM/DSEM, invariance and continuous time | `FR-PSY-*` |
+| `compute_backend` target | Bounded CPU pools, GPU kernels, VRAM admission and parity | `FR-CMP-*` |
+| `event_intelligence` target | TDT tasks, CHRONOS schemas/prediction/calibration | `FR-EVT-002/003/004` |
+| `interpretation_gateway` target | Evidence-bounded interpreter/verifier and claim states | `FR-LLM-*` |
+| `visual_analytics` target | Accessible coordinated views and exact-value exports | `FR-EXP-*` |
 
-TEPP treats event/valid time, assertion time, document time, system time, available time, and knowledge cutoff as distinct nominal types. Analyses enforce `available_time <= knowledge_cutoff`. Exact, uncertain, open-ended, and unknown intervals preserve source precision and boundary semantics.
+Each module shall remain independently testable. Cross-module communication uses
+public Rust types, versioned schemas, ports, artifacts, or events rather than
+private storage access.
 
-PR #8 implements the typed-value, interval, wire, and schema primitives for this requirement. Historical-snapshot enforcement remains owned by the future persistence/corpus-split layers; active-PR primitives must not be described as protected-main enforcement before merge.
+## 4. Evidence and data-boundary requirements
 
-Forward state-transition/input→process→outcome edges must satisfy temporally valid partial order. Retrospective, revision, citation, translation, support, and contradiction edges may point backward as provenance but never create reverse state transitions.
+### 4.1 Trust boundary
 
-The Task 4 bounded Allen closure represented by replay PR #9, once replayed onto the canonical lineage and independently revalidated, establishes path consistency only within its stated algebra/limits; it must not be documented as a proof of global satisfiability for unrestricted disjunctive interval networks.
+Source documents, embedded metadata, LLM output, connector output, imported
+schemas, and model artifacts are untrusted until validated. Active content is
+not executed. Source bytes/text are copied into bounded owned storage, hashed,
+and assigned opaque identity before downstream use.
 
-## 5. Event/relation/membership target
+### 4.2 Exact locations
 
-Event mentions and event instances are distinct evidence/latent objects. Relations are typed and provenance-bearing. Entity roles such as customer, partner, competitor, author, department, project, and opportunity pool are time-varying assignments rather than static entity types.
+Evidence locations use half-open UTF-8 byte and Unicode-scalar coordinates and
+optional page/layout geometry. Coordinate conversions must remain deterministic
+and reject invalid boundaries rather than repair them silently.
 
-Observation/model structures support cross-classified and multiple-membership assignments with explicit weights and validity intervals. A document or segment may belong to multiple organizational/project/event contexts simultaneously.
+### 4.3 Version lineage
 
-## 6. Multilingual measurement target
+A revision creates a new document state with valid-time and system-time lineage.
+No frozen corpus, model run, or published claim mutates its parent artifact.
+Supersession is explicit and queryable.
 
-All supported languages share global topic identities and latent coordinates while native lexical/morphological channels remain language-specific. Concept/semantic-unit mapping must be span-grounded and versioned. Unknown meaning is isolated rather than silently forced into a known concept.
+## 5. Temporal and relation requirements
 
-Language support is a validation claim, not a feature flag: each language profile requires alignment/invariance/error evidence. Repeated template/style/report wording is modeled as method/background structure rather than removed through indiscriminate stopword/TF-IDF/BM25 heuristics.
+TEPP represents event/valid, assertion, document, system, availability, and
+knowledge-cutoff time as nominally distinct types. Historical eligibility is
+based on availability policy rather than event/document date.
 
-## 7. Topic and psychometric target
+Uncertain/open/unknown intervals retain certainty, precision, inclusion, and
+provenance. Interval reasoning is resource-bounded and reports path consistency,
+not unrestricted global satisfiability.
 
-Shared-latent temporal/relational topic estimation provides posterior uncertainty and covariate effects. Topic proportions are compositional; downstream correlation/ESEM uses logistic-normal coordinates or appropriate orthonormal log-ratio coordinates rather than naïve raw-proportion Pearson correlation.
+Transition and input→process→outcome edges require valid forward temporal order
+and acyclicity. Citation, translation, revision, support, contradiction,
+summary, and retrospective reporting remain provenance/evidence relations and
+may point backward without becoming reverse transitions.
 
-Longitudinal ESEM/DSEM must distinguish stable between-unit differences from within-unit temporal change, test measurement invariance where comparisons require it, account for irregular intervals when necessary, and propagate topic-posterior uncertainty through plausible values or joint estimation.
+## 6. Event and membership requirements
 
-## 8. Compute requirements
+Event mentions are source-bound fallible observations. Event instances require
+explicit promotion with evidence and policy. Event schemas and forecasts remain
+hypotheses until temporal, evidence, calibration, and claim-promotion gates pass.
 
-Production mathematical/psychometric arithmetic is Rust. CPU `f64` is the numerical reference. CPU parallelism uses bounded fixed worker pools/thread-local sufficient statistics to reduce context switching and oversubscription. GPU execution is introduced only when computationally material, streamed under a VRAM budget, and parity-tested against the CPU reference. OOM triggers bounded batch reduction and safe CPU fallback rather than uncontrolled failure.
+Customers, partners, competitors, authors, departments, organizations, projects,
+opportunities, templates, languages, locations, and episodes are represented as
+contextual time-varying role/membership assignments. Observations may be
+multiply assigned. Supplied, normalized, inferred, and estimated weights remain
+distinguishable.
 
-## 9. Persistence and data-contract target
+## 7. Persistence requirements
 
-PostgreSQL is the reference relational store. Persistent objects use descriptive two-or-more-word `snake_case` names and explicit tenant, provenance, temporal validity/system-time, version, lifecycle, and audit dimensions where applicable. Exact physical tables/migrations are not implemented on current main; `docs/ERD.md` distinguishes current domain objects from planned persistence.
+PostgreSQL is the reference relational store. Persistent objects use descriptive
+two-or-more-word `snake_case` names. Tenant-scoped tables require explicit
+tenant identity and, when exposed to application runtime roles, FORCE RLS or an
+equivalent fail-closed boundary proven by live cross-tenant tests.
 
-Exports/API artifacts are versioned and may use JSON Schema/JSON-LD, GraphML, Arrow/Parquet, and accessible SVG/PDF/tabular views where appropriate. Export formats must carry source/model/config/provenance hashes sufficient for reproducibility.
+Persistence shall preserve:
 
-## 10. Leakage-safe data splits
+- opaque identities and content digests;
+- valid-time and system-time history;
+- immutable corpus/model/artifact manifests;
+- tenant, purpose, role, retention, and disclosure policy;
+- relation, membership, evidence, and claim provenance;
+- audit events and deletion/legal-hold receipts;
+- migrations, rollback, backup/restore, and compatibility evidence.
 
-Training/validation/test and rolling-origin evaluation must respect availability time and related-document/event lineage. Revision, translation, copied template, shared episode, or related-document variants cannot leak across partitions when doing so would inflate validation.
+In-memory adapters are test/reference implementations and cannot establish live
+database, RLS, migration, or operational claims.
 
-## 11. Scientific validation
+## 8. Multilingual semantic measurement target
 
-Every estimator/reasoner has synthetic known-truth tests appropriate to its claim: parameter recovery, bias, RMSE, interval coverage, convergence, temporal ordering, graph/edge recovery, clustering recovery, invariance, alignment, calibration, and CPU/GPU parity. Monte Carlo acceptance accounts for simulation error rather than arbitrary point thresholds.
+The pipeline shall preserve original text, use NFC for analysis where declared,
+limit NFKC to explicit auxiliary keys, and combine Unicode boundaries,
+language/script tailoring, layout, headings, lists, tables, morphology, universal
+part of speech, dependency phrases, negation, modality, quantity, and temporal
+expressions.
 
-## 12. LLM boundary
+Stopword deletion is not the default. POS is a soft source/model input rather
+than a universal deletion rule. TF-IDF/BM25 may support retrieval but cannot
+weight inferential topic, correlation, ESEM, or DSEM calculations.
 
-Documents and LLM outputs are untrusted data. Live model tests use `NVIDIA_NIM_API_KEY`; `COPILOT_GITHUB_TOKEN` is prohibited. LLMs may assist semantic unitization, model review, interpretation, or verification only behind strict schemas/evidence bundles and cannot replace deterministic/statistical acceptance, mutate source evidence, execute document instructions, or gain merge/release authority.
+LLM semantic-unit proposals must be exact-span and schema validated against a
+versioned concept dictionary. Free-form model prose cannot enter statistical
+input tables. Unknown meanings are preserved as governed unknowns.
 
-## 13. Quality and release
+All supported profiles share global topic identity and latent coordinates while
+retaining native lexical/morphological channels. Language validity is promoted
+per task/domain from benchmark and invariance evidence.
 
-Production Rust line and branch coverage are exactly 100%; public API rustdoc is complete; format/build/Clippy/tests/rustdoc/supply-chain/security gates are warning-free/current-head. Releases additionally require validated migrations/rollback, SBOM/provenance, reproducible artifacts, current protected-head review/security, CHANGELOG/version consistency, operational recovery, and no unresolved scientific blocker.
+## 9. TRSL-TM estimator target
+
+The CPU f64 Rust implementation is the numerical reference. Conceptually:
+
+\[
+\eta_d = \mu(t_d) + X_d\Gamma
++ \sum_{g\in G_d} w_{dg}u_g(t_d)
++ r_d + \epsilon_d,
+\qquad
+\theta_d=\operatorname{softmax}(\eta_d),
+\]
+
+where structural covariates, temporal state, multiple memberships, relations,
+and method sources are explicit. The implementation shall expose objectives,
+convergence, posterior coordinates, parameter uncertainty, diagnostics, and
+artifacts sufficient for true-parameter recovery and an independent oracle.
+
+The model distinguishes prevalence, semantic, lexical, measurement, method, and
+reporting drift. P0 uses one global topic identity across the analysis window
+with activation/dormancy/reactivation; explicit birth/split/merge/retirement is a
+later versioned capability.
+
+External topic backends are adapters, not substitutes for TEPP contracts. They
+must pass posterior, temporal, relation, invariance, provenance, recovery, and
+compatibility conformance before registration.
+
+## 10. Candidate-K selection target
+
+A candidate plan freezes topic counts/search rule, model families, seeds,
+resamples, folds, time windows, cutoffs, partitions, compute budget, convergence,
+collapse, and escalation policy.
+
+Non-converged, collapsed, redundant, unstable, misaligned, unfair, infeasible, or
+scientifically invalid candidates are rejected before LLM review. Survivors are
+compared on a Pareto frontier across fit, posterior checks, coherence,
+exclusivity, coverage, redundancy, stability, parsimony, alignment, fairness,
+and compute feasibility.
+
+Blinded LLM review receives evidence bundles and cannot override hard gates. The
+selection artifact records recommended and acceptable candidates, rejected
+reasons, trade-offs, reviewer disagreement, human escalation, and decision
+authority.
+
+## 11. Network and cluster target
+
+Raw topic proportions are compositional and cannot be passed directly to naïve
+Pearson correlation. The product uses logistic-normal coordinates or declared
+orthonormal balances and propagates posterior uncertainty.
+
+Every edge records estimate, interval, selection probability, bootstrap/seed
+stability, sample basis, coordinate transform, and correction policy. Positive
+stable edges feed repeated Leiden or approved community detection and a
+co-assignment consensus matrix. Negative associations are modeled/displayed as
+tension rather than positive cluster membership.
+
+## 12. Psychometric target
+
+A construct-role gate separates reflective, formative/composite, network, and
+unresolved structures. Topic posterior means are not error-free indicators;
+ESEM/DSEM uses plausible values or a joint strategy.
+
+Longitudinal comparison tests applicable configural, metric, scalar, residual,
+method, partial, or time-varying invariance. Stable between-unit differences are
+separated from within-unit change. Irregular observation gaps use a
+continuous-time model or an explicit approximation justified by sensitivity
+analysis.
+
+Input→process/intervention→outcome paths require valid temporal order. Causal
+wording requires an identified design and assumptions; otherwise output remains
+associational or predictive.
+
+## 13. Compute requirements
+
+Production mathematical and psychometric arithmetic is Rust-first. CPU f64 is
+the reference. CPU execution uses bounded worker pools, sparse matrices,
+thread-local sufficient statistics, controlled reductions, and oversubscription
+protection.
+
+GPU execution is admitted by a backend-neutral compute profile. The VRAM
+controller measures availability, reserves margin, predicts peak memory, tunes
+micro-batches, streams responsibilities, accumulates stable sufficient
+statistics, bounds OOM retries, and falls back safely. Real-device parity is
+required for every marketed GPU profile.
+
+Local LLM and topic-model weights are phase scheduled when their concurrent
+residency would violate the VRAM profile.
+
+## 14. API, job, and export requirements
+
+Public contracts are semantic-versioned. Long analyses expose idempotent create,
+status/progress, cancel, retry/replay, and artifact discovery. Typed errors
+distinguish invalid evidence, temporal ineligibility, relation contradiction,
+authorization, model unavailability, scientific invalidity, resource admission,
+provider failure, inconclusive evidence, incompatibility, and release-gate
+failure.
+
+naruon and other consumers use versioned TEPP artifacts/ports and cannot
+substitute keyword heuristics for unavailable topic inference.
+`contextual-orchestrator` may execute bounded provider workflows, while TEPP
+retains evidence, statistical, scientific, artifact, claim, and release
+authority.
+
+Published artifacts carry corpus/relation/cutoff/config/code/dependency/model/
+prompt/seed/backend identities and checksums. SVG/PDF/CSV/JSON/JSON-LD/GraphML/
+Arrow/Parquet outputs derive from the same approved source artifact.
+
+## 15. Privacy and security requirements
+
+PII required for valid authorship, linkage, multiple membership, deduplication,
+or audit is protected through purpose-bound authorization, tenant/service
+identity, least privilege, opaque analytical identifiers, separately protected
+identity mapping, encryption/KMS, selective provider disclosure, retention,
+deletion/legal hold, export controls, and immutable privileged audit rather than
+blanket masking.
+
+Before provider disclosure, TEPP records provider/region, disclosed fields/spans,
+transformation, purpose/authorization, retention/training policy, model/version,
+request/response digest, and audit identity.
+
+Scientific integrity is a security property. Temporal leakage, relation or
+membership poisoning, evidence substitution, unsupported equivalence,
+uncalibrated confidence, backend divergence, causal overclaiming, or
+unverifiable interpretation fails closed.
+
+## 16. Verification requirements
+
+Every estimator/reasoner has known-truth tests appropriate to its claim,
+including parameter matching, bias, RMSE, interval coverage, convergence,
+temporal order, relation/event/network/cluster recovery, invariance, alignment,
+calibration, and CPU/GPU parity. Monte Carlo gates account for simulation error.
+
+Owned production line and branch coverage is exactly 100%. Public APIs and
+safety contracts have complete documentation. Required CI/security/review is
+bound to the unchanged exact head. Skipped required hardware, predecessor-head,
+local-only, status-only, queued, or synthetic-only evidence cannot promote a
+claim.
+
+## 17. Operability and release
+
+Workers use bounded queues, cancellation, backpressure, idempotent state changes,
+redacted observability, and crash-safe publication. Deployment-specific SLO,
+RPO, RTO, capacity, regional, KMS, backup/restore, and incident claims require
+measured evidence.
+
+A release requires exact integrated protected-head software, scientific,
+security/privacy, migration/rollback/recovery, accessibility, package, SBOM,
+provenance, checksum, compatibility, and approval evidence. Version and
+CHANGELOG are updated only when the integrated release candidate satisfies the
+applicable PRD slice.
