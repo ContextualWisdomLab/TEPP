@@ -1,7 +1,7 @@
 # ADR 0003 — Relational event ontology and time-varying multiple membership
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — weighted time-varying multiple-membership assignments and in-memory network are active-PR; full multilevel estimators and persistence remain accepted-target  
+**Implementation maturity:** partial — membership network implemented-main; event mention/instance separation active-PR; full ontology graph, multilevel estimators, and persistence remain accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0016 owns TDT/CHRONOS event-intelligence task semantics; this ADR remains authoritative for ontology, relation, role, and membership structure.
 

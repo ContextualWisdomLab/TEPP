@@ -96,6 +96,13 @@ dependencies = [
 [[package]]
 name = "event_core"
 version = "0.1.0"
+dependencies = [
+ "evidence_core",
+ "serde",
+ "serde_json",
+ "temporal_core",
+ "uuid",
+]
 
 [[package]]
 name = "evidence_core"
@@ -220,6 +227,12 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 [[package]]
 name = "membership_core"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "temporal_core",
+ "uuid",
+]
 
 [[package]]
 name = "memchr"
@@ -432,6 +445,7 @@ checksum = "bf3923a6f5c4c6382e0b653c4117f48d631ea17f38ed86e2a828e6f7412f5239"
 dependencies = [
  "getrandom",
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 
