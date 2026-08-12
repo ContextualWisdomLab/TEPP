@@ -23,6 +23,10 @@ fn every_temporal_error_has_a_stable_content_redacting_message() {
             "invalid temporal interval certainty",
         ),
         (
+            TemporalError::RelationRequiresProperBoundedInterval,
+            "temporal relation requires proper bounded intervals",
+        ),
+        (
             TemporalError::InvalidWirePayload,
             "invalid temporal wire payload",
         ),
