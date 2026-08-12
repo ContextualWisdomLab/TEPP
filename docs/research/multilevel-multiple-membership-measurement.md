@@ -2,17 +2,17 @@
 
 ## Claim boundary
 
-TEPP documents and events may simultaneously belong to authors, departments, customers, partners, competitors, projects, opportunity pools, templates, languages, and event episodes. Treating documents as independent atoms produces atomistic fallacy, inflates effective sample size, and can leak related units across validation splits (ADR 0003; AGENTS.md §6).
+TEPP documents and events may simultaneously belong to authors, departments, customers, partners, competitors, projects, opportunity pools, templates, languages, and event episodes. Treating documents as independent atoms produces atomistic fallacy, overstates independent information and the effective sample size estimated under independence, and can leak related units across validation splits (ADR 0003; AGENTS.md §6).
 
 ## Implemented foundation
 
 - `membership_core` encodes time-varying weighted multiple membership with contextual roles and event-time validity.
-- `corpus_split` (active PR) must co-partition relation-connected groups and honor knowledge cutoffs.
-- `relation_graph` (active PR) separates forward transitions from provenance edges that may point backward.
+- `corpus_split` is implemented-main (PR #17), co-partitions relation-connected groups, and honors knowledge cutoffs.
+- `relation_graph` (active PR #14) separates forward transitions from provenance edges that may point backward.
 
 ## Estimator target (future)
 
-Production multilevel estimators (cross-classified / multiple-membership ESEM/DSEM) remain accepted-target in `psychometric_core`. Recovery studies must use realistic synthetic truth with known multilevel structure and report RMSE, bias, and coverage via `validation_core`.
+Production multilevel estimators (cross-classified / multiple-membership ESEM/DSEM) remain accepted-target in `psychometric_core`. Recovery studies must use realistic synthetic truth with known multilevel structure and report RMSE, bias, and coverage via `validation_core`; those metrics are a non-exhaustive subset of the acceptance contract. ADR 0005 additionally requires posterior-uncertainty propagation, construct-specific model classification, measurement invariance, within/between separation, irregular-time handling, and event-time ordering.
 
 ## Authority sources
 
