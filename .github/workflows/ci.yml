@@ -55,7 +55,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned Python quality dependency
-        run: python3 -m pip install --disable-pip-version-check --no-deps -r requirements-quality.txt
+        run: python3 -m pip install --disable-pip-version-check --no-deps --require-hashes -r requirements-quality.txt
       - name: Exercise repository tooling with branch coverage
         run: python3 -m coverage run --branch -m unittest discover -s tests/quality -p 'test_*.py'
       - name: Enforce repository tooling coverage
