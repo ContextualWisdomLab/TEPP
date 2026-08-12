@@ -176,4 +176,4 @@
 - [ ] Run production line and branch coverage and public-docstring gates at 100%.
 - [ ] Run deterministic and Monte Carlo temporal/event/membership/relation recovery studies and report RMSE, bias, coverage, precision/recall, and uncertainty.
 - [ ] Generate SBOM, provenance, checksums, dependency/license/advisory reports, and reproducibility manifest.
-- [ ] Update ADRs, architecture, research citations, CHANGELOG, operating limits, rollback, and next-phase interfaces; release only if every protected gate passes.
+- [ ] Update ADRs, architecture, research citations, CHANGELOG, operating limits, rollback, and next-phase interfaces; ledger and doctoring remain in progress, and release is still gated.
