@@ -26,10 +26,10 @@ The six Rust types share an absolute instant representation but are not assignme
 Wire version `1` accepts only:
 
 ```text
-YYYY-MM-DDTHH:MM:SS[.1-9 fractional digits](Z|known ±HH:MM)
+YYYY-MM-DDTHH:MM:SS[.fraction](Z|known ±HH:MM)
 ```
 
-The parser then applies calendar and offset validation and normalizes the accepted instant to UTC. The profile is intentionally narrower than every syntax that a general date-time library or a future standard extension might understand.
+The `.fraction` component is optional; when present it contains 1–9 ASCII decimal digits. The parser then applies calendar and offset validation and normalizes the accepted instant to UTC. The profile is intentionally narrower than every syntax that a general date-time library or a future standard extension might understand.
 
 RFC 3339 defines `-00:00` as an unknown-local-offset convention that is semantically different from `Z` and `+00:00`. TEPP wire version `1` requires a known relationship to UTC, so runtime parsing and generated JSON Schemas reject `-00:00` rather than silently normalizing it as UTC.
 
@@ -56,7 +56,7 @@ RFC 9557 updates RFC 3339 with additional information. TEPP does not silently ac
 - precision from nanosecond through year; and
 - exact, bounded, or unknown certainty.
 
-An explicitly unknown interval is not treated as an interval containing every instant. Reversed boundaries, equal boundaries presented as bounded rather than exact, two-unbounded known intervals, and known intervals carrying unknown precision fail closed.
+An explicitly unknown interval is not treated as an interval containing every instant. Reversed boundaries, equal boundaries presented as bounded rather than exact, two-unbounded known intervals, and known intervals carrying unknown precision fail closed. Because the absolute representation has nanosecond resolution, two excluded boundaries one nanosecond apart are also empty and fail closed.
 
 ISO 8601-2 defines broader extension syntax for uncertain, approximate, unspecified, set-valued, and extended interval representations. Task 3 does not claim that syntax. TEPP currently models its bounded uncertainty through typed domain values and its own versioned JSON records.
 
@@ -71,9 +71,7 @@ Clock and interval JSON records:
 - distinguish malformed JSON, unsupported versions, clock mismatch, invalid timestamps, invalid precision, invalid certainty, invalid order, and empty intervals through stable redacting errors; and
 - publish Draft 2020-12 JSON Schemas.
 
-The generated schemas combine the strict timestamp lexical pattern with a `not` constraint for RFC 3339's `-00:00` unknown-offset marker. `format: date-time` remains an interoperability annotation; the explicit constraints record TEPP's narrower known-offset contract before runtime calendar validation.
-
-JSON Schema alone does not prove calendar validity, UTC normalization, interval order, exact-boundary equality, or certainty consistency. Those semantic invariants remain runtime domain validation.
+The generated schemas combine the strict timestamp lexical pattern with a `not` constraint for RFC 3339's `-00:00` unknown-offset marker. `format: date-time` remains an interoperability annotation; the explicit constraints record TEPP's narrower known-offset contract before runtime calendar validation. Interval schemas also publish cross-field certainty/precision/boundary constraints that JSON Schema can express. Exact timestamp equality, interval order, nanosecond-resolution emptiness, and calendar/offset-range validity remain runtime domain validation and are documented as such in the schema descriptions.
 
 ## Standards-to-code traceability
 
@@ -83,10 +81,10 @@ JSON Schema alone does not prove calendar validity, UTC normalization, interval 
 | ISO 8601-2:2019 | informs the distinction between exact and uncertain temporal information | extension syntax is not accepted in wire version `1` |
 | RFC 3339 | Internet timestamp baseline with explicit date, time, seconds, and offset; `-00:00` is treated as unknown rather than UTC | TEPP requires known offsets and rejects leap seconds and other forms outside its strict profile |
 | RFC 9557 | records the current extension path for timestamp annotations | bracketed annotations and suffixes are rejected in wire version `1` |
-| JSON Schema Draft 2020-12 | object shape, required fields, constants, enums, patterns, negation, and unknown-field control | semantic temporal validation remains in Rust |
+| JSON Schema Draft 2020-12 | object shape, required fields, constants, enums, patterns, conditional composition, negation, and unknown-field control | semantic temporal validation remains in Rust |
 | OWL-Time | future vocabulary for instants, intervals, and qualitative temporal relations | Allen-style relation reasoning is deferred to Task 4 |
 
-At the implementation date, ISO 8601-1:2019 remained the published international standard, while a second-edition committee draft was under development. TEPP therefore binds wire version `1` to the published 2019 edition and requires an explicit compatibility review rather than following a draft automatically.
+As of 2026-08-12, ISO 8601-1:2019 remains the published current international standard and was last confirmed in 2024. ISO/CD 8601-1 Edition 2, ISO work item 90784, is under development and is intended to replace the 2019 edition. TEPP therefore binds wire version `1` to the published 2019 edition and requires an explicit compatibility review rather than following an unpublished draft automatically.
 
 ## Security and failure behavior
 
@@ -112,9 +110,9 @@ The executable test suite covers:
 | calendar semantics | invalid dates and times rejected after lexical acceptance |
 | normalization | equivalent known offsets, nanosecond ordering, and daylight-saving offset examples |
 | nominal typing | every clock exposes the same contract without losing its clock identity |
-| interval semantics | exact, bounded, included, excluded, open-ended, reversed, empty, and unknown cases |
-| wire reconstruction | malformed JSON, unknown fields, versions, clock mismatches, boundary shapes, precision, and certainty |
-| schema parity | Draft 2020-12 marker, constants, required fields, enums, known-offset exclusion, and strict timestamp patterns |
+| interval semantics | exact, bounded, included, excluded, open-ended, reversed, empty, adjacent-excluded, and unknown cases |
+| wire reconstruction | malformed JSON, unknown fields, versions, clock mismatches, boundary shapes, precision, certainty, and runtime semantic parity |
+| schema parity | Draft 2020-12 marker, constants, required fields, enums, certainty conditionals, known-offset exclusion, and strict timestamp patterns |
 | trust boundary | stable content-redacting errors and no hidden error source |
 
 Line and branch coverage are merge gates, but coverage is not treated as proof that deferred relation algebra, persistence, leakage prevention, or event modeling exists.
@@ -141,6 +139,8 @@ Hutton, B., Andrews, H., Wright, A., & Dennis, G. (2022). *JSON Schema: A media 
 International Organization for Standardization. (2019a). *Date and time—Representations for information interchange—Part 1: Basic rules* (ISO Standard No. 8601-1:2019). https://www.iso.org/standard/70907.html
 
 International Organization for Standardization. (2019b). *Date and time—Representations for information interchange—Part 2: Extensions* (ISO Standard No. 8601-2:2019). https://www.iso.org/standard/70908.html
+
+International Organization for Standardization. (2026). *Date and time—Representations for information interchange—Part 1: Basic rules* (ISO/CD 8601-1, Edition 2; work item 90784) [Committee Draft, under development]. https://www.iso.org/standard/90784.html
 
 Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). RFC Editor. https://doi.org/10.17487/RFC3339
 
