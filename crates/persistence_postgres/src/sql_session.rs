@@ -257,6 +257,24 @@ mod tests {
         assert!(bare[1].contains("$bad-tag$"));
         assert_eq!(bare[2], "SELECT $$");
 
+        // EOF while scanning a potential tag (alphanumeric run, no closing `$`)
+        // must fall through without treating the opener as a dollar quote.
+        let eof_tag = split_sql_statements("SELECT $abc").expect("eof incomplete tag");
+        assert_eq!(eof_tag.len(), 1);
+        assert!(eof_tag[0].contains("$abc"));
+
+        // Underscore is legal in dollar-quote tags; mismatched interior tags and
+        // short remaining windows must not close the active body early.
+        let underscored = split_sql_statements(
+            "DO $my_tag$ BEGIN PERFORM $y$; PERFORM 1; END $my_tag$; SELECT 1",
+        )
+        .expect("underscore tag");
+        assert_eq!(underscored.len(), 2);
+        assert!(underscored[0].contains("$my_tag$"));
+        assert!(underscored[0].contains("PERFORM $y$;"));
+        assert!(underscored[0].contains("PERFORM 1;"));
+        assert_eq!(underscored[1], "SELECT 1");
+
         // Unclosed dollar body keeps interior `;` from splitting statements.
         let unclosed = split_sql_statements("DO $x$ BEGIN PERFORM 1; SELECT 2").expect("unclosed");
         assert_eq!(unclosed.len(), 1);
