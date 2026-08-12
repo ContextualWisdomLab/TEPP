@@ -1,7 +1,7 @@
 # TEPP Test and Scientific Validation Strategy
 
 **Status:** Accepted quality baseline aligned to PRD v0.4  
-**Last reviewed:** 2026-08-09
+**Last reviewed:** 2026-08-12
 
 ## Mandatory repository gates
 
@@ -15,7 +15,7 @@
 - current-head SAST/security/review;
 - documentation-contract validation.
 
-Queued, cancelled, skipped-required, absent, stale, predecessor-head, or synthetic-only evidence is not passing.
+Queued, cancelled, skipped-required, absent, stale, predecessor-head, superseded-lineage, or synthetic-only evidence is not passing. A replacement branch may preserve source/test lineage for auditability, but it must reacquire every exact-head merge gate.
 
 ## Evidence-domain tests
 
@@ -23,9 +23,9 @@ Verify immutable source bytes/text, canonical SHA-256, UUIDv7 identifiers, size 
 
 ## Temporal tests
 
-PR #5 must prove six nominal clock types cannot be accidentally interchanged, strict RFC 3339/UTC normalization, precision retention, interval boundary semantics, unknown/open intervals, reversed/empty rejection, strict wire schemas, and non-reflecting errors.
+Canonical Task 3 replacement PR #8 must prove six nominal clock types cannot be accidentally interchanged, strict known-offset RFC 3339/UTC normalization, precision retention, interval boundary semantics, unknown/open intervals, reversed/empty rejection, strict wire schemas, schema/runtime parity, and non-reflecting errors. PR #5 is historical TDD lineage only and its old checks/reviews are not current evidence.
 
-PR #6 must prove all 13 Allen relations, inverse/composition laws, independent composition verification, proper-interval classification, bounded path-consistency, contradiction evidence, provenance, resource limits, and atomic rollback. It must not overclaim global satisfiability.
+Task 4 must prove all 13 Allen relations, inverse/composition laws, independent composition verification, proper-interval classification, bounded path-consistency, contradiction evidence, provenance, resource limits, and atomic rollback. Legacy PR #6 contains this work on the superseded #5 stack; before promotion it must be replayed onto PR #8 or its exact protected-main descendant and pass fresh tests/coverage/review. It must not overclaim global satisfiability.
 
 ## Leakage tests
 
@@ -65,4 +65,4 @@ Simulation thresholds account for Monte Carlo standard error and interval uncert
 
 ## Release acceptance
 
-A release requires one integrated protected head with all relevant scientific, numerical, security, migration, packaging, SBOM/provenance, accessibility, operational, and independent-review evidence passing. Planning validation and local-only results are supporting evidence, not release proof.
+A release requires one integrated protected head with all relevant scientific, numerical, security, migration, packaging, SBOM/provenance, accessibility, operational, and independent-review evidence passing. Planning validation, superseded-branch results, and local-only results are supporting evidence, not release proof.
