@@ -1,7 +1,9 @@
 # ADR 0010 — Adaptive LLM orchestration and test-time compute
 
-**Status:** Accepted  
-**Date:** 2026-08-10
+**Decision status:** Accepted  
+**Implementation maturity:** accepted-target  
+**Date:** 2026-08-10  
+**Supersedes:** The LLM orchestration-selection/ablation clauses previously co-located in ADR 0006. ADR 0006 remains authoritative for GPU/VRAM and model-credential separation; ADR 0015 governs autonomous repository-write/review/merge authority.
 
 ## Context
 
@@ -33,6 +35,10 @@ Statistical estimation, temporal eligibility, event-relation validity, measureme
 ## Security and privacy
 
 Documents cannot change orchestration policy, allowed tools, provider credentials, access lists, or role authority. Calls use evidence-minimized payloads and raw secrets are never exposed to models. Live development/model tests use `NVIDIA_NIM_API_KEY`; `COPILOT_GITHUB_TOKEN` is prohibited. Review-agent identities and credentials remain separate.
+
+## Compatibility and migration
+
+Orchestration policies, model pools, role definitions, prompts, access lists, and budget/stopping rules are versioned. A provider/model replacement does not silently inherit prior calibration or quality claims. Integration with `contextual-orchestrator` remains optional under ADR 0011 and cannot change TEPP estimands.
 
 ## Verification
 
