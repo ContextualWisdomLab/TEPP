@@ -30,12 +30,41 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
+    /// Reject non-finite numeric fields before serialization or export.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] when any `f64` field or the
+    /// optional Monte Carlo summary violates finiteness / summary invariants.
+    pub fn validate(&self) -> Result<(), ValidationError> {
+        for value in [
+            self.rmse,
+            self.rmse_standard_error,
+            self.mean_bias,
+            self.bias_standard_error,
+            self.interval_coverage,
+            self.coverage_wilson_lower,
+            self.coverage_wilson_upper,
+            self.temporal_order_accuracy,
+        ] {
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+        if let Some(summary) = self.monte_carlo_rmse {
+            summary.validate()?;
+        }
+        Ok(())
+    }
+
     /// Serialize to canonical JSON.
     ///
     /// # Errors
     ///
-    /// Returns [`ValidationError::InvalidInput`] when serialization fails.
+    /// Returns [`ValidationError::InvalidInput`] when fields are non-finite or
+    /// serialization fails.
     pub fn to_json(&self) -> Result<String, ValidationError> {
+        self.validate()?;
         serde_json::to_string(self).map_err(|_| ValidationError::InvalidInput)
     }
 
@@ -88,21 +117,23 @@ impl<'de> Deserialize<'de> for MonteCarloSummary {
             percentile_upper: f64,
         }
         let raw = Raw::deserialize(deserializer)?;
-        Ok(Self {
+        Self {
             replication_count: raw.replication_count,
             mean: raw.mean,
             standard_deviation: raw.standard_deviation,
             standard_error: raw.standard_error,
             percentile_lower: raw.percentile_lower,
             percentile_upper: raw.percentile_upper,
-        })
+        }
+        .validate()
+        .map_err(serde::de::Error::custom)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::ValidationReport;
-    use crate::MonteCarloSummary;
+    use crate::{MonteCarloSummary, ValidationError};
 
     #[test]
     fn report_json_and_human_summary_round_trip() {
@@ -131,9 +162,18 @@ mod tests {
         assert!(report.to_human_summary().contains("rmse=0.100000"));
         let none_report = ValidationReport {
             monte_carlo_rmse: None,
-            ..report
+            ..report.clone()
         };
         assert!(none_report.to_json().expect("json").contains("null"));
+        let mut invalid = report.clone();
+        invalid.rmse = f64::NAN;
+        assert_eq!(invalid.to_json(), Err(ValidationError::InvalidInput));
+        let bad_summary = r#"{"replication_count":0,"mean":0.0,"standard_deviation":0.0,"standard_error":0.0,"percentile_lower":0.0,"percentile_upper":1.0}"#;
+        assert!(serde_json::from_str::<MonteCarloSummary>(bad_summary).is_err());
+        let bad_order = r#"{"replication_count":2,"mean":0.0,"standard_deviation":0.0,"standard_error":0.0,"percentile_lower":1.0,"percentile_upper":0.0}"#;
+        assert!(serde_json::from_str::<MonteCarloSummary>(bad_order).is_err());
+        let bad_sd = r#"{"replication_count":2,"mean":0.0,"standard_deviation":-1.0,"standard_error":0.0,"percentile_lower":0.0,"percentile_upper":1.0}"#;
+        assert!(serde_json::from_str::<MonteCarloSummary>(bad_sd).is_err());
     }
 
     #[test]

@@ -11,11 +11,15 @@ use crate::input::require_paired_finite;
 /// empty, or any value is non-finite.
 pub fn absolute_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, ValidationError> {
     require_paired_finite(truth, recovered)?;
-    Ok(truth
-        .iter()
-        .zip(recovered)
-        .map(|(t, r)| (t - r).abs())
-        .collect())
+    let mut residuals = Vec::with_capacity(truth.len());
+    for (t, r) in truth.iter().zip(recovered) {
+        let residual = (t - r).abs();
+        if !residual.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        residuals.push(residual);
+    }
+    Ok(residuals)
 }
 
 /// Count exact matches within absolute tolerance `epsilon`.
@@ -74,6 +78,11 @@ mod tests {
         );
         assert_eq!(
             match_count(&truth, &recovered, f64::NAN),
+            Err(ValidationError::InvalidInput)
+        );
+        // Opposite-sign extremes overflow the residual to infinity.
+        assert_eq!(
+            absolute_residuals(&[f64::MAX], &[-f64::MAX]),
             Err(ValidationError::InvalidInput)
         );
     }

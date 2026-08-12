@@ -1,6 +1,7 @@
 //! Monte Carlo aggregation of recovery metrics.
 
 use crate::ValidationError;
+use crate::input::require_finite;
 
 /// Summary of Monte Carlo replications for a scalar metric.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -19,14 +20,48 @@ pub struct MonteCarloSummary {
     pub percentile_upper: f64,
 }
 
+impl MonteCarloSummary {
+    /// Validate structural invariants for a Monte Carlo summary payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] when counts or numeric fields
+    /// violate the summary contract.
+    pub fn validate(self) -> Result<Self, ValidationError> {
+        if self.replication_count == 0 {
+            return Err(ValidationError::InvalidInput);
+        }
+        for value in [
+            self.mean,
+            self.standard_deviation,
+            self.standard_error,
+            self.percentile_lower,
+            self.percentile_upper,
+        ] {
+            if !value.is_finite() {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+        if self.standard_deviation < 0.0 || self.standard_error < 0.0 {
+            return Err(ValidationError::InvalidInput);
+        }
+        if self.percentile_lower > self.percentile_upper {
+            return Err(ValidationError::InvalidInput);
+        }
+        Ok(self)
+    }
+}
+
 /// Aggregate Monte Carlo metric replications with percentile bounds.
 ///
 /// Percentiles use the inclusive nearest-rank method on sorted finite samples.
+/// Mean and variance use Welford accumulation so large finite samples do not
+/// overflow intermediate sums.
 ///
 /// # Errors
 ///
-/// Returns input errors for empty/non-finite samples and configuration errors
-/// for invalid percentile bounds.
+/// Returns input errors for empty/non-finite samples or non-finite summaries,
+/// and configuration errors for invalid percentile bounds.
 ///
 /// # Panics
 ///
@@ -47,33 +82,29 @@ pub fn summarize_replications(
     }
     let mut sorted = samples.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let n = sorted.len() as f64;
-    let mean = sorted.iter().sum::<f64>() / n;
-    let standard_deviation = if sorted.len() == 1 {
+    let (mean, m2, count) = welford_moments(&sorted)?;
+    let n = count as f64;
+    let standard_deviation = if count == 1 {
         0.0
     } else {
-        let variance = sorted
-            .iter()
-            .map(|value| {
-                let delta = value - mean;
-                delta * delta
-            })
-            .sum::<f64>()
-            / (n - 1.0);
-        variance.sqrt()
+        require_finite((m2 / (n - 1.0)).sqrt())?
     };
-    let standard_error = standard_deviation / n.sqrt();
-    Ok(MonteCarloSummary {
+    let standard_error = require_finite(standard_deviation / n.sqrt())?;
+    let summary = MonteCarloSummary {
         replication_count: sorted.len(),
-        mean,
+        mean: require_finite(mean)?,
         standard_deviation,
         standard_error,
         percentile_lower: nearest_rank(&sorted, lower_percentile),
         percentile_upper: nearest_rank(&sorted, upper_percentile),
-    })
+    };
+    summary.validate()
 }
 
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
+///
+/// Comparison scales all terms by a shared finite magnitude so opposite-sign
+/// extremes do not overflow both sides of the inequality to infinity.
 ///
 /// # Errors
 ///
@@ -94,7 +125,42 @@ pub fn accept_within_standard_errors(
     if k < 0.0 || standard_error < 0.0 {
         return Err(ValidationError::InvalidConfiguration);
     }
-    Ok((estimate - target).abs() <= k * standard_error)
+    if standard_error == 0.0 {
+        // Exact recovery only: zero SE admits no estimation residual.
+        return Ok(estimate.total_cmp(&target).is_eq());
+    }
+    let scale = estimate
+        .abs()
+        .max(target.abs())
+        .max(standard_error)
+        .max(1.0);
+    let scaled_error = (estimate / scale) - (target / scale);
+    let scaled_bound = k * (standard_error / scale);
+    if !scaled_error.is_finite() || !scaled_bound.is_finite() {
+        return Err(ValidationError::InvalidInput);
+    }
+    Ok(scaled_error.abs() <= scaled_bound)
+}
+
+/// Welford one-pass mean and sum of squared deviations.
+fn welford_moments(samples: &[f64]) -> Result<(f64, f64, usize), ValidationError> {
+    let mut mean = 0.0_f64;
+    let mut m2 = 0.0_f64;
+    let mut count = 0_usize;
+    for value in samples {
+        count += 1;
+        let delta = value - mean;
+        mean += delta / count as f64;
+        if !mean.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        let delta2 = value - mean;
+        m2 += delta * delta2;
+        if !m2.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+    }
+    Ok((mean, m2, count))
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -166,5 +232,12 @@ mod tests {
         // equal percentiles
         let edge = summarize_replications(&[1.0, 2.0], 0.5, 0.5).expect("eq");
         assert!((edge.percentile_lower - edge.percentile_upper).abs() < 1e-12);
+        // Large finite samples must not overflow the summary path.
+        let large = summarize_replications(&[f64::MAX, f64::MAX], 0.0, 1.0).expect("large");
+        assert!((large.mean - f64::MAX).abs() < 1.0);
+        assert!((large.standard_deviation - 0.0).abs() < 1e-12);
+        assert!(
+            !accept_within_standard_errors(f64::MAX, -f64::MAX, f64::MAX, 1.5).expect("scaled")
+        );
     }
 }

@@ -1,41 +1,64 @@
 //! Signed mean bias recovery metric.
 
 use crate::ValidationError;
-use crate::input::require_paired_finite;
+use crate::input::{require_finite, require_paired_finite};
 
 /// Mean signed bias `mean(recovered − truth)`.
 ///
 /// # Errors
 ///
-/// Returns [`ValidationError::InvalidInput`] for empty, unequal-length, or
-/// non-finite inputs.
+/// Returns [`ValidationError::InvalidInput`] for empty, unequal-length,
+/// non-finite inputs, or arithmetic overflow to a non-finite mean.
 pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     require_paired_finite(truth, recovered)?;
-    let sum: f64 = truth.iter().zip(recovered).map(|(t, r)| r - t).sum();
-    Ok(sum / truth.len() as f64)
+    let mut sum = 0.0_f64;
+    for (t, r) in truth.iter().zip(recovered) {
+        let diff = r - t;
+        if !diff.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        sum += diff;
+        if !sum.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+    }
+    require_finite(sum / truth.len() as f64)
 }
 
 /// Standard error of the mean signed bias under independent observations.
 ///
 /// # Errors
 ///
-/// Returns [`ValidationError::InvalidInput`] for invalid pairs or `n < 2`.
+/// Returns [`ValidationError::InvalidInput`] for invalid pairs, `n < 2`, or
+/// non-finite intermediate bias arithmetic.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     if truth.len() < 2 {
         return Err(ValidationError::InvalidInput);
     }
     require_paired_finite(truth, recovered)?;
-    let diffs: Vec<f64> = truth.iter().zip(recovered).map(|(t, r)| r - t).collect();
-    let mean = diffs.iter().sum::<f64>() / diffs.len() as f64;
-    let variance = diffs
-        .iter()
-        .map(|diff| {
-            let delta = diff - mean;
-            delta * delta
-        })
-        .sum::<f64>()
-        / (diffs.len() as f64 - 1.0);
-    Ok(variance.sqrt() / (diffs.len() as f64).sqrt())
+    let mut diffs = Vec::with_capacity(truth.len());
+    for (t, r) in truth.iter().zip(recovered) {
+        let diff = r - t;
+        if !diff.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        diffs.push(diff);
+    }
+    let mean = require_finite(diffs.iter().sum::<f64>() / diffs.len() as f64)?;
+    let mut variance_sum = 0.0_f64;
+    for diff in &diffs {
+        let delta = diff - mean;
+        let square = delta * delta;
+        if !square.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        variance_sum += square;
+        if !variance_sum.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+    }
+    let variance = variance_sum / (diffs.len() as f64 - 1.0);
+    require_finite(require_finite(variance.sqrt())? / (diffs.len() as f64).sqrt())
 }
 
 #[cfg(test)]
@@ -65,5 +88,13 @@ mod tests {
         );
         let se_var = bias_standard_error(&[0.0, 0.0], &[1.0, -1.0]).expect("se");
         assert!(se_var > 0.0);
+        assert_eq!(
+            mean_bias(&[f64::MAX], &[-f64::MAX]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            bias_standard_error(&[f64::MAX, 0.0], &[-f64::MAX, 0.0]),
+            Err(ValidationError::InvalidInput)
+        );
     }
 }

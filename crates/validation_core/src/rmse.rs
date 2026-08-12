@@ -1,18 +1,29 @@
 //! Root-mean-square error recovery metric.
 
 use crate::ValidationError;
+use crate::input::require_finite;
 use crate::matching::absolute_residuals;
 
 /// Compute RMSE between truth and recovered parameter vectors.
 ///
 /// # Errors
 ///
-/// Returns [`ValidationError::InvalidInput`] for empty, unequal-length, or
-/// non-finite inputs.
+/// Returns [`ValidationError::InvalidInput`] for empty, unequal-length,
+/// non-finite inputs, or squared-residual overflow.
 pub fn root_mean_square_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     let residuals = absolute_residuals(truth, recovered)?;
-    let mean_square = residuals.iter().map(|r| r * r).sum::<f64>() / residuals.len() as f64;
-    Ok(mean_square.sqrt())
+    let mut square_sum = 0.0_f64;
+    for residual in &residuals {
+        let square = residual * residual;
+        if !square.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        square_sum += square;
+        if !square_sum.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+    }
+    require_finite((square_sum / residuals.len() as f64).sqrt())
 }
 
 /// Approximate standard error of the RMSE under independent squared residuals.
@@ -32,28 +43,41 @@ pub fn rmse_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 #[inline(never)]
 fn rmse_standard_error_from_residuals(residuals: &[f64]) -> Result<f64, ValidationError> {
     let n = residuals.len() as f64;
-    let mean_square = residuals.iter().map(|r| r * r).sum::<f64>() / n;
-    let rmse = mean_square.sqrt();
-    if !rmse.is_finite() {
-        return Err(ValidationError::InvalidInput);
+    let mut square_sum = 0.0_f64;
+    let mut squares = Vec::with_capacity(residuals.len());
+    for residual in residuals {
+        let square = residual * residual;
+        if !square.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        squares.push(square);
+        square_sum += square;
+        if !square_sum.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
     }
+    let rmse = require_finite((square_sum / n).sqrt())?;
     if rmse <= 0.0 {
         return Ok(0.0);
     }
     if residuals.len() < 2 {
         return Err(ValidationError::InvalidInput);
     }
-    let squares: Vec<f64> = residuals.iter().map(|r| r * r).collect();
-    let mean = squares.iter().sum::<f64>() / n;
-    let variance = squares
-        .iter()
-        .map(|value| {
-            let delta = value - mean;
-            delta * delta
-        })
-        .sum::<f64>()
-        / (n - 1.0);
-    Ok(variance.sqrt() / (2.0 * rmse * n.sqrt()))
+    let mean = require_finite(squares.iter().sum::<f64>() / n)?;
+    let mut variance_sum = 0.0_f64;
+    for value in &squares {
+        let delta = value - mean;
+        let square = delta * delta;
+        if !square.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+        variance_sum += square;
+        if !variance_sum.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+    }
+    let variance = variance_sum / (n - 1.0);
+    require_finite(require_finite(variance.sqrt())? / (2.0 * rmse * n.sqrt()))
 }
 
 #[cfg(test)]
@@ -88,6 +112,10 @@ mod tests {
         // Squared residual overflow yields non-finite RMSE.
         assert_eq!(
             rmse_standard_error_from_residuals(&[f64::MAX, f64::MAX]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            root_mean_square_error(&[0.0], &[f64::MAX]),
             Err(ValidationError::InvalidInput)
         );
     }
