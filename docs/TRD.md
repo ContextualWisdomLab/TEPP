@@ -1,7 +1,7 @@
 # TEPP Technical Requirements Document
 
 **Status:** Accepted technical baseline aligned to approved PRD v0.4  
-**Last reviewed:** 2026-08-09
+**Last reviewed:** 2026-08-12
 
 ## 1. Technical objective
 
@@ -9,7 +9,7 @@ TEPP is a multilingual temporal-event psychometrics platform whose executable co
 
 ## 2. Current implementation maturity
 
-Protected main currently contains the Rust workspace foundation plus immutable evidence records, exact source spans, strict versioned evidence JSON, stable content-redacting errors, and repository quality contracts. PR #5 adds typed six-clock temporal values and uncertain intervals. PR #6, stacked on #5, adds Allen relation algebra and bounded path-consistency closure. Those PR capabilities remain active-PR until merged.
+Protected main contains the Rust workspace foundation, immutable evidence records, exact source spans, strict versioned evidence JSON, stable content-redacting errors, repository quality contracts, and the canonical ADR/documentation authority graph merged through PR #7. PR #8 is the canonical active Task 3 replacement adding typed six-clock temporal values and uncertain intervals on that exact protected-main lineage. Conflicted PR #5 is superseded implementation lineage only. Legacy PR #6 contains Allen relation algebra and bounded path-consistency work stacked on #5; it cannot advance as implementation evidence until its unique Task 4 work is replayed onto PR #8 or its protected-main descendant and all exact-head gates are reacquired.
 
 The remaining PRD architecture — event ontology, relation graph, multiple membership, PostgreSQL persistence, leakage-safe corpus splits, simulations, multilingual semantic units, topic measurement, GPU/VRAM compute, model selection, TDT/CHRONOS, longitudinal ESEM/DSEM, network analysis, interpretation, and visual analytics — is accepted-target, not as-built.
 
@@ -23,9 +23,11 @@ Evidence wire formats are explicitly versioned, reject unknown fields, and recon
 
 TEPP treats event/valid time, assertion time, document time, system time, available time, and knowledge cutoff as distinct nominal types. Analyses enforce `available_time <= knowledge_cutoff`. Exact, uncertain, open-ended, and unknown intervals preserve source precision and boundary semantics.
 
+PR #8 implements the typed-value, interval, wire, and schema primitives for this requirement. Historical-snapshot enforcement remains owned by the future persistence/corpus-split layers; active-PR primitives must not be described as protected-main enforcement before merge.
+
 Forward state-transition/input→process→outcome edges must satisfy temporally valid partial order. Retrospective, revision, citation, translation, support, and contradiction edges may point backward as provenance but never create reverse state transitions.
 
-PR #6's bounded Allen closure, if merged, establishes path consistency only within its stated algebra/limits; it must not be documented as a proof of global satisfiability for unrestricted disjunctive interval networks.
+The Task 4 bounded Allen closure represented by legacy PR #6, once replayed onto the canonical lineage and independently revalidated, establishes path consistency only within its stated algebra/limits; it must not be documented as a proof of global satisfiability for unrestricted disjunctive interval networks.
 
 ## 5. Event/relation/membership target
 
