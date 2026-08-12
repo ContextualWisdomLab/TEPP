@@ -196,11 +196,14 @@ mod tests {
         );
 
         assert!(validate_sha256_hex(&"ff".repeat(32)).is_ok());
+        // Digit branch of is_lowercase_hex (0-9) must be exercised.
+        assert!(validate_sha256_hex(&"09".repeat(32)).is_ok());
         assert!(validate_sha256_hex("zz").is_err());
         // Length-correct but non-hex / uppercase must fail closed.
         assert!(validate_sha256_hex(&"g".repeat(64)).is_err());
         assert!(validate_sha256_hex(&"FF".repeat(32)).is_err());
         assert!(validate_commit_sha(&"ab".repeat(20)).is_ok());
+        assert!(validate_commit_sha(&"12".repeat(20)).is_ok());
         assert!(validate_commit_sha(&"cd".repeat(32)).is_ok());
         assert!(validate_commit_sha("abc123").is_err());
         assert!(validate_commit_sha("").is_err());
