@@ -1,7 +1,8 @@
 # ADR 0013 — Bitemporal persistence, reproducibility manifests, and split authority
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** partial — migration contracts, cutoff eligibility, and in-memory bitemporal document/audit adapters implemented; live PostgreSQL/SQLx execution and full physical ERD remain accepted-target  
+
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 (temporal semantics), ADR 0008 (evidence identity), and ADR 0011 (service ownership).
 
