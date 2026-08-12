@@ -21,10 +21,10 @@ impl LiveSqlxPoolOptions {
     ///
     /// # Errors
     ///
-    /// Returns [`PersistenceError::DatabaseUrlInvalid`] when either limit is zero.
+    /// Returns [`PersistenceError::PoolOptionsInvalid`] when either limit is zero.
     pub fn new(max_connections: u32, acquire_timeout_ms: u64) -> Result<Self, PersistenceError> {
         if max_connections == 0 || acquire_timeout_ms == 0 {
-            return Err(PersistenceError::DatabaseUrlInvalid);
+            return Err(PersistenceError::PoolOptionsInvalid);
         }
         Ok(Self {
             max_connections,
@@ -92,7 +92,9 @@ pub struct LiveSqlxPool {
     options: LiveSqlxPoolOptions,
 }
 
+/// Offline recording backend used by crate unit tests until a live driver exists.
 #[derive(Debug)]
+#[cfg_attr(not(test), allow(dead_code))]
 enum LiveSqlxBackend {
     Offline(RecordingSqlSession),
 }
@@ -116,8 +118,12 @@ impl LiveSqlxPool {
     }
 
     /// Construct an offline pool for deterministic repository tests.
+    ///
+    /// Crate-local only so production callers cannot bypass
+    /// [`open_live_sqlx_pool`] with a no-op SQL backend.
+    #[cfg(test)]
     #[must_use]
-    pub fn offline_for_tests(options: LiveSqlxPoolOptions) -> Self {
+    pub(crate) fn offline_for_tests(options: LiveSqlxPoolOptions) -> Self {
         Self {
             backend: LiveSqlxBackend::Offline(RecordingSqlSession::new()),
             options,
@@ -168,11 +174,11 @@ mod tests {
     fn pool_options_and_open_gate_fail_closed_without_live_driver() {
         assert_eq!(
             LiveSqlxPoolOptions::new(0, 1_000),
-            Err(PersistenceError::DatabaseUrlInvalid)
+            Err(PersistenceError::PoolOptionsInvalid)
         );
         assert_eq!(
             LiveSqlxPoolOptions::new(4, 0),
-            Err(PersistenceError::DatabaseUrlInvalid)
+            Err(PersistenceError::PoolOptionsInvalid)
         );
         let opts = LiveSqlxPoolOptions::new(4, 2_500).expect("opts");
         assert_eq!(opts.max_connections(), 4);

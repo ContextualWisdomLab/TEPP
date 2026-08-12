@@ -4,10 +4,10 @@
 //!
 //! This crate owns migration SQL contracts, knowledge-cutoff eligibility,
 //! in-memory bitemporal adapters, live SQL session/migration ports, document
-//! SQL contracts, a fail-closed `DATABASE_URL` gate, and optional `SQLx` pool
-//! construction behind the `live-sqlx` feature (ADR 0013). In-process
-//! transports keep CI deterministic; a validated live URL is required before
-//! any production pool is opened.
+//! SQL contracts, a fail-closed `DATABASE_URL` gate, and a fail-closed live
+//! pool open path with validated sizing options (ADR 0013). In-process
+//! transports keep CI deterministic; production `SQLx` driver attachment
+//! remains a separate accepted-target slice after URL validation.
 
 mod cutoff;
 mod document_sql;
