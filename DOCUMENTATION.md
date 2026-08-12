@@ -19,7 +19,8 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Test/scientific validation strategy | [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md) |
 | Operability/recovery/release | [`docs/OPERABILITY.md`](docs/OPERABILITY.md) |
 | Requirement/research/evidence traceability | [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) |
-| Architecture decisions | [`docs/adr/README.md`](docs/adr/README.md) |
+| Architecture decision index / ownership map | [`docs/adr/README.md`](docs/adr/README.md) |
+| ADR status, maturity, and supersession policy | [`docs/adr/ADR_POLICY.md`](docs/adr/ADR_POLICY.md) |
 | Delivery roadmap | [`docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md`](docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md) |
 | Foundation implementation plan | [`docs/superpowers/plans/2026-08-05-temporal-event-foundation.md`](docs/superpowers/plans/2026-08-05-temporal-event-foundation.md) |
 | Standards and APA 7 literature | [`docs/research/standards-and-literature.md`](docs/research/standards-and-literature.md) |
@@ -30,17 +31,21 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 
 ## Maturity vocabulary
 
-- **implemented-main** — promotion follows the canonical rule in [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md): source is integrated on protected `main` and the relevant exact-current-head tests, scientific/recovery/validation evidence, security and supply-chain gates, and qualifying independent review all pass.
-- **active-PR** — implemented only on an open PR and not yet a protected-main claim.
-- **accepted-target** — approved PRD/ADR architecture not yet implemented.
-- **conceptual** — logical entity/service/model contract; not evidence of a migration or deployment.
+The canonical implementation-maturity vocabulary is defined in [`docs/adr/ADR_POLICY.md`](docs/adr/ADR_POLICY.md) and promotion evidence in [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md). In particular, **an ADR with decision status `Accepted` is not automatically implemented or shipped.**
+
+- **implemented-main** — source is integrated on protected `main` and the relevant exact-current-head tests, scientific/recovery/validation evidence, security and supply-chain gates, and qualifying review required by live policy pass.
+- **active-PR** — implementation exists only on an open PR and is not a protected-main claim.
+- **partial** — an explicitly identified subset is implemented on protected main while the rest remains target work.
+- **accepted-target** — accepted PRD/ADR architecture not yet integrated.
 - **research-only** — evaluated research direction not accepted as production behavior.
+- **out-of-scope** — explicitly outside TEPP ownership.
+- **conceptual** — logical entity/service/model contract; not evidence of a migration or deployment.
 - **deployment-owned** — evidence depends on a concrete deployed environment or organization and cannot be claimed by repository design alone.
 - **external-assurance** — certification, attestation, legal opinion, or other independent assessment that TEPP cannot self-issue.
 
 ## Documentation fitness
 
-The documentation graph is **design-sufficient** when a reviewer can reconstruct TEPP's product requirements, technical/scientific estimands, authority boundaries, temporal/event/membership semantics, data model, failure modes, security/privacy controls, validation strategy, API/integration contract, operability, research basis, and release acceptance without chat history.
+The documentation graph is **design-sufficient** when a reviewer can reconstruct TEPP's product requirements, technical/scientific estimands, authority boundaries, temporal/event/membership semantics, data model, failure modes, security/privacy controls, validation strategy, API/integration contract, operability, research basis, ADR ownership/supersession, and release acceptance without chat history.
 
 It is **protected-main-sufficient** only after the canonical documents are integrated on protected `main`, remain semantically current with live code, and their required exact-head documentation/security/review gates pass. An active documentation PR can therefore be design-sufficient while the protected branch remains documentation-insufficient.
 
