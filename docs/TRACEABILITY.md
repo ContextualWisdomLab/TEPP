@@ -15,16 +15,22 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; full intelligence stack remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
+| Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` reasoner on protected main; bounded path-consistency claim only | implemented-main |
+| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
+| event ontology/evidence mentions | PRD; ADR 0003 | PR #13 `event_core` mention/instance boundary on protected main; broader ontology target remains | partial |
+| time-varying cross-classified multiple membership | PRD; ADR 0003 | PR #12 `membership_core` on protected main; PR #25 ESS/design-effect follow-on | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; ADR 0007/0014; scientific acceptance | `validation_core` on protected main | implemented-main |
-| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, `DATABASE_URL` SQLx gate; live pool/query driver remaining | partial |
-| known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | `tepp_simulation` on protected main; recovery metrics in `validation_core` | implemented-main |
-| immutable split/run/reproducibility manifests | ADR 0013; ERD | future persistence/model-run artifact chain | accepted-target |
+| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | PR #16 migration contracts + in-memory bitemporal adapters on main; PR #23 live SQL transport port | partial |
+| known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | PR #18 `tepp_simulation` deterministic corpora + digests on protected main | implemented-main |
+| immutable split/run/reproducibility manifests | ADR 0013; ERD | active API manifest contract plus future persistence/model-run artifact chain | accepted-target |
+| recovery metrics and SE-aware Monte Carlo gates | PRD; Test Strategy; ADR 0014 | PR #19 `validation_core` RMSE/bias/coverage/graph/temporal metrics | active-PR |
+| versioned analysis-run and export contracts | ADR 0011/0013; API contract | PR #21 `tepp_api` request/error/manifest/JSON-LD/GraphML contracts | active-PR |
 | multilingual shared latent semantic space | PRD; ADR 0004 | future semantic/concept/topic crates | accepted-target |
 | TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004 | future `topic_measurement` | accepted-target |
 | global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
-| report template/section/copied/style/modality method effects | ADR 0004/0012 | future preprocessing/topic model | accepted-target |
+| report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
 | candidate K statistical/Pareto gates + blinded LLM review | ADR 0012; research | future `model_selection` | accepted-target |
 | compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
@@ -38,6 +44,11 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | naruon modular artifact consumer boundary | ADR 0011; API contract | `docs/connectors/naruon-artifact-consumer.md` + example payload; HTTP service remaining | partial |
 | contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `docs/connectors/contextual-orchestrator-interpretation-port.md`; live port remaining | partial |
 | autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | future safe OpenCode/NVIDIA autonomous-development workflow | accepted-target |
+| standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; active API/connector contracts; future service ports | partial |
+| naruon consumer boundary | ADR 0011/0012; API contract | PR #22 versioned TEPP artifact consumer contract; no lexical heuristic substitution or cross-service DB access | active-PR |
+| contextual-orchestrator execution boundary | ADR 0010/0011 | provider-neutral orchestration port; TEPP retains scientific authority | accepted-target |
+| autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | PR #11 credential-separated NIM proposal, deterministic verifier, and publisher workflow | active-PR |
+| foundation validation / release-readiness ledger | ADR 0014; Test Strategy | PR #24 `docs/validation/temporal-event-foundation.md` | active-PR |
 | scientific claim promotion separated from design/implementation/release | ADR 0014; ADR policy | documentation/CI/domain validation/release evidence | partial |
 | CSAP/SOC 2/ISO/NIST assurance readiness | `docs/COMPLIANCE_READINESS.md`; research register | repository controls + future deployment evidence | accepted-target / deployment-owned |
 | threat-model controls and scientific-integrity security | `SECURITY.md`; `docs/THREAT_MODEL.md` | deterministic security/privacy/scientific validation gates | partial |
@@ -49,7 +60,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 
 Promotion rules are governed by ADR 0014 and `docs/adr/ADR_POLICY.md`. A decision can be `Accepted` while implementation remains `accepted-target`. A target becomes `implemented-main` only when its source is integrated on protected main and the relevant exact-head tests, scientific/recovery/validation evidence, security/supply-chain checks, and qualifying review required by live policy pass. Planning documents, simulations that do not exercise production code, queued checks, predecessor-head results, or LLM judgments cannot promote implementation maturity.
 
-A replacement PR inherits source/test lineage only for auditability; it does **not** inherit current-head CI, security, review, or approval evidence. PR #8 therefore reacquires all merge evidence even though its initial implementation blobs preserve Task 3's prior RED→GREEN history. Legacy PR #6 remains non-promotable until its unique Task 4 behavior is replayed onto the canonical Task 3 lineage and independently revalidated.
+Replacement or replay PRs inherit source/test lineage only for auditability; they do **not** inherit current-head CI, security, review, or approval evidence. PRs #8 and #9 reacquired those gates before their protected-main merges. Every active PR listed above must independently reacquire the same exact-head evidence before its capability can be promoted.
 
 ## Claim discipline
 

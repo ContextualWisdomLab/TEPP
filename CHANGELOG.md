@@ -14,6 +14,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `membership_core` Kish effective sample size, design effect, and group-normalized ESS helpers for multiple-membership estimation inputs.
 - Documented modular naruon consumer contract for TEPP analysis-run and export surfaces, with a committed example request payload.
 - Documented contextual-orchestrator interpretation port boundary and credential separation for TEPP.
+- Foundation validation/release-readiness ledger at `docs/validation/temporal-event-foundation.md` tracking capability maturity and scientific acceptance gates.
+- Research doctoring for multilevel/multiple-membership measurement and atomistic fallacy prevention.
 - `persistence_postgres` bitemporal foundation: multi-word migration contracts, knowledge-cutoff eligibility, and in-memory as-known-at / as-valid-at document replay (live SQLx/PostgreSQL execution remains accepted-target).
 - `event_core` mention/instance separation with explicit promotion, typed roles, event-time validity, and fail-closed mention-as-instance refusal.
 - `membership_core` time-varying weighted multiple-membership network with contextual roles, event-time validity, and atomistic-fallacy prevention contracts.
