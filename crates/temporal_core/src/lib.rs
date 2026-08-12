@@ -8,7 +8,7 @@
 //! absolute nanosecond-resolution representation while remaining distinct Rust
 //! types.
 //!
-//! ```compile_fail
+//! ```compile_fail,E0308
 //! use temporal_core::{DocumentTime, EventTime};
 //!
 //! let event = EventTime::parse_rfc3339("2026-08-06T01:00:00Z")?;
