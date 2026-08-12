@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `persistence_postgres` `live-sqlx` feature: real `SQLx`/`PgPool` open/execute behind validated `DATABASE_URL` and `LiveSqlxPoolOptions`, with offline/live executor backends and CI coverage exclusion for the transport module.
 - `persistence_postgres` live pool open gate: validated `LiveSqlxPoolOptions`, fail-closed `open_live_sqlx_pool` / `LiveSqlxPool` (`SqlSession`) with offline test backend; production `SQLx` driver attach remains accepted-target after `DATABASE_URL` validation.
 - `validation_core` recovery metrics: parameter matching, RMSE/bias with standard errors, interval coverage with Wilson bounds, relation-edge precision/recall, temporal-order accuracy, Monte Carlo summaries, and SE-aware acceptance gates with machine-readable reports.
 - `tepp_api` versioned analysis-run DTOs, content-redacting error envelopes, reproducibility manifests, JSON-LD and GraphML export contracts, purpose-bound export authorization (no blanket PII masking), plus committed schemas/examples.

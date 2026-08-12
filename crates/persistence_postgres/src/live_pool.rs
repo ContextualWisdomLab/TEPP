@@ -2,6 +2,7 @@
 
 use crate::sqlx_gate::LiveSqlxConfig;
 use crate::{PersistenceError, RecordingSqlSession, SqlSession};
+use std::fmt;
 
 /// Default maximum connections for a live analytical pool.
 pub const DEFAULT_MAX_CONNECTIONS: u32 = 8;
@@ -60,20 +61,18 @@ impl Default for LiveSqlxPoolOptions {
     }
 }
 
+type LiveSqlExecutor = dyn FnMut(&str) -> Result<(), PersistenceError> + Send;
+
 /// Open a live pool after validating configuration and options.
 ///
-/// Production `SQLx` driver attachment is intentionally separate from this gate:
-/// CI and offline verification keep deterministic transports. When a process
-/// lacks a live driver registration (the default for TEPP foundation builds),
-/// this function fails closed with
-/// [`PersistenceError::LiveAdapterNotConfigured`] even if `DATABASE_URL` is
-/// present, so operators cannot accidentally believe a pool is open without a
-/// compiled live driver.
+/// When the `live-sqlx` feature is enabled, opens a real `SQLx`/`PostgreSQL`
+/// pool. Otherwise fails closed with
+/// [`PersistenceError::LiveAdapterNotConfigured`].
 ///
 /// # Errors
 ///
-/// Returns [`PersistenceError::LiveAdapterNotConfigured`] until a live driver
-/// is linked for this process.
+/// Returns configuration or transport failures without opening a half-initialized
+/// handle.
 pub fn open_live_sqlx_pool(
     config: &LiveSqlxConfig,
     options: LiveSqlxPoolOptions,
@@ -82,21 +81,25 @@ pub fn open_live_sqlx_pool(
 }
 
 /// Live pool handle implementing [`SqlSession`].
-///
-/// Foundation builds carry an offline recording backend so repository wiring
-/// can be exercised without `PostgreSQL`. The public open path refuses to
-/// return a handle until a live driver is registered for the process.
-#[derive(Debug)]
 pub struct LiveSqlxPool {
     backend: LiveSqlxBackend,
     options: LiveSqlxPoolOptions,
 }
 
-/// Offline recording backend used by crate unit tests until a live driver exists.
-#[derive(Debug)]
-#[cfg_attr(not(test), allow(dead_code))]
+impl fmt::Debug for LiveSqlxPool {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("LiveSqlxPool")
+            .field("is_live", &self.is_live())
+            .field("options", &self.options)
+            .finish_non_exhaustive()
+    }
+}
+
+#[allow(dead_code)] // Offline is test-only; Live is feature-gated construction.
 enum LiveSqlxBackend {
     Offline(RecordingSqlSession),
+    Live(Box<LiveSqlExecutor>),
 }
 
 impl LiveSqlxPool {
@@ -109,18 +112,15 @@ impl LiveSqlxPool {
         config: &LiveSqlxConfig,
         options: LiveSqlxPoolOptions,
     ) -> Result<Self, PersistenceError> {
-        // Touch validated URL so configuration is not dead in the open path.
-        let _url = config.database_url();
-        let _ = options.max_connections();
-        let _ = options.acquire_timeout_ms();
-        // Live driver registration is intentionally absent in foundation CI.
-        Err(PersistenceError::LiveAdapterNotConfigured)
+        let touched = (
+            config.database_url(),
+            options.max_connections(),
+            options.acquire_timeout_ms(),
+        );
+        open_with_optional_sqlx(config, options, touched)
     }
 
     /// Construct an offline pool for deterministic repository tests.
-    ///
-    /// Crate-local only so production callers cannot bypass
-    /// [`open_live_sqlx_pool`] with a no-op SQL backend.
     #[cfg(test)]
     #[must_use]
     pub(crate) fn offline_for_tests(options: LiveSqlxPoolOptions) -> Self {
@@ -130,12 +130,23 @@ impl LiveSqlxPool {
         }
     }
 
+    /// Wrap a live executor produced by the compiled `SQLx` driver or tests.
+    #[must_use]
+    #[cfg_attr(not(any(test, feature = "live-sqlx")), allow(dead_code))]
+    pub(crate) fn from_live_executor(
+        executor: Box<LiveSqlExecutor>,
+        options: LiveSqlxPoolOptions,
+    ) -> Self {
+        Self {
+            backend: LiveSqlxBackend::Live(executor),
+            options,
+        }
+    }
+
     /// Whether this handle is a live (non-offline) transport.
     #[must_use]
-    pub const fn is_live(&self) -> bool {
-        match self.backend {
-            LiveSqlxBackend::Offline(_) => false,
-        }
+    pub fn is_live(&self) -> bool {
+        matches!(self.backend, LiveSqlxBackend::Live(_))
     }
 
     /// Pool options used when the handle was constructed.
@@ -149,14 +160,36 @@ impl LiveSqlxPool {
     pub fn offline_executed(&self) -> Option<&[String]> {
         match &self.backend {
             LiveSqlxBackend::Offline(session) => Some(session.executed()),
+            LiveSqlxBackend::Live(_) => None,
         }
     }
+}
+
+#[cfg(feature = "live-sqlx")]
+fn open_with_optional_sqlx(
+    config: &LiveSqlxConfig,
+    options: LiveSqlxPoolOptions,
+    touched: (&str, u32, u64),
+) -> Result<LiveSqlxPool, PersistenceError> {
+    let _ = touched;
+    crate::sqlx_live::open_sqlx_pool(config, options)
+}
+
+#[cfg(not(feature = "live-sqlx"))]
+fn open_with_optional_sqlx(
+    _config: &LiveSqlxConfig,
+    _options: LiveSqlxPoolOptions,
+    touched: (&str, u32, u64),
+) -> Result<LiveSqlxPool, PersistenceError> {
+    let _ = touched;
+    Err(PersistenceError::LiveAdapterNotConfigured)
 }
 
 impl SqlSession for LiveSqlxPool {
     fn execute(&mut self, sql: &str) -> Result<(), PersistenceError> {
         match &mut self.backend {
             LiveSqlxBackend::Offline(session) => session.execute(sql),
+            LiveSqlxBackend::Live(executor) => executor(sql),
         }
     }
 }
@@ -189,21 +222,17 @@ mod tests {
         assert_eq!(LiveSqlxPoolOptions::default(), defaults);
 
         let cfg = LiveSqlxConfig::parse("postgres://127.0.0.1:5432/tepp").expect("cfg");
+        let result = open_live_sqlx_pool(&cfg, defaults);
         assert!(matches!(
-            open_live_sqlx_pool(&cfg, defaults),
-            Err(PersistenceError::LiveAdapterNotConfigured)
-        ));
-        assert!(matches!(
-            LiveSqlxPool::connect(&cfg, opts),
-            Err(PersistenceError::LiveAdapterNotConfigured)
+            result,
+            Err(PersistenceError::LiveAdapterNotConfigured | PersistenceError::SqlExecutionFailed)
         ));
 
         let mut offline = LiveSqlxPool::offline_for_tests(defaults);
         assert!(!offline.is_live());
         assert_eq!(offline.options(), defaults);
         offline.execute("SELECT 1").expect("offline");
-        let executed = offline.offline_executed().expect("offline log");
-        assert_eq!(executed, ["SELECT 1"]);
+        assert_eq!(offline.offline_executed().expect("log"), ["SELECT 1"]);
         let mut failing = LiveSqlxPool {
             backend: super::LiveSqlxBackend::Offline(crate::RecordingSqlSession::failing_on(
                 "boom",
@@ -214,5 +243,35 @@ mod tests {
             failing.execute("do boom now"),
             Err(PersistenceError::SqlExecutionFailed)
         );
+        let _ = format!("{offline:?}");
+    }
+
+    #[test]
+    fn live_executor_backend_covers_success_and_failure() {
+        let defaults = LiveSqlxPoolOptions::production_defaults();
+        let mut live = LiveSqlxPool::from_live_executor(Box::new(|_sql| Ok(())), defaults);
+        assert!(live.is_live());
+        assert!(live.offline_executed().is_none());
+        live.execute("SELECT 1").expect("ok");
+        let _ = format!("{live:?}");
+        let mut failing = LiveSqlxPool::from_live_executor(
+            Box::new(|_sql| Err(PersistenceError::SqlExecutionFailed)),
+            defaults,
+        );
+        assert_eq!(
+            failing.execute("SELECT 1"),
+            Err(PersistenceError::SqlExecutionFailed)
+        );
+    }
+
+    #[cfg(feature = "live-sqlx")]
+    #[test]
+    fn compiled_sqlx_driver_fails_closed_on_unreachable_host() {
+        let cfg = LiveSqlxConfig::parse("postgres://127.0.0.1:1/tepp_no_listener").expect("cfg");
+        let opts = LiveSqlxPoolOptions::new(1, 250).expect("opts");
+        assert!(matches!(
+            open_live_sqlx_pool(&cfg, opts),
+            Err(PersistenceError::SqlExecutionFailed)
+        ));
     }
 }

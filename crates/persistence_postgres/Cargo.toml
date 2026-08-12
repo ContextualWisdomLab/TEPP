@@ -13,9 +13,16 @@ keywords.workspace = true
 categories.workspace = true
 publish = false
 
+[features]
+default = []
+## Enable compiled `SQLx`/`PostgreSQL` pool construction and query transport.
+live-sqlx = ["dep:sqlx", "dep:tokio"]
+
 [dependencies]
 temporal_core = { path = "../temporal_core", version = "0.1.0" }
 uuid.workspace = true
+sqlx = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
 uuid.workspace = true
