@@ -215,6 +215,8 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
                 "feat: 시간별 NIM 제품 개발 루프 추가",
             )
             self.assertIn("구매자가 체감하는 제품 Gap", body_path.read_text(encoding="utf-8"))
+            for path in (title_path, body_path):
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
 
     def test_supporting_runbook_and_doctoring_exist(self) -> None:
         """Keep operations and research doctoring discoverable."""

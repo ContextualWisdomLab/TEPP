@@ -345,14 +345,19 @@ jobs:
       - name: Verify immutable artifact identity and apply proposal
         env:
           GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.propose_product_increment.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.propose_product_increment.outputs.artifact_digest }}
+          EXPECTED_PATCH: ${{ needs.propose_product_increment.outputs.patch_sha256 }}
+          EXPECTED_DIFF_BYTES: ${{ needs.propose_product_increment.outputs.diff_bytes }}
+          EXPECTED_CHANGED_FILES: ${{ needs.propose_product_increment.outputs.changed_files }}
         shell: bash
         run: |
           set -euo pipefail
           patch="$RUNNER_TEMP/tepp-product-proposal/proposal.patch"
-          artifact_id="${{ needs.propose_product_increment.outputs.artifact_id }}"
+          artifact_id="$ARTIFACT_ID"
           artifact_name="tepp-product-proposal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          expected_artifact_digest="${{ needs.propose_product_increment.outputs.artifact_digest }}"
-          expected_patch="${{ needs.propose_product_increment.outputs.patch_sha256 }}"
+          expected_artifact_digest="$EXPECTED_ARTIFACT_DIGEST"
+          expected_patch="$EXPECTED_PATCH"
           [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Malformed artifact ID'; exit 1; }
           [[ "$expected_artifact_digest" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed artifact digest'; exit 1; }
           [[ "$expected_patch" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed patch digest'; exit 1; }
@@ -365,7 +370,7 @@ jobs:
             '.id == $artifact_id and .name == $artifact_name and .expired == false and .workflow_run.id == $run_id' \
             <<<"$artifact_json" >/dev/null
           printf '%s  %s\n' "$expected_patch" "$patch" | sha256sum -c -
-          [ "$(wc -c <"$patch" | tr -d '[:space:]')" = "${{ needs.propose_product_increment.outputs.diff_bytes }}" ]
+          [ "$(wc -c <"$patch" | tr -d '[:space:]')" = "$EXPECTED_DIFF_BYTES" ]
           git apply --check --binary "$patch"
           git apply --index --binary "$patch"
           git diff --cached --check
@@ -374,10 +379,7 @@ jobs:
             exit 1
           fi
           actual_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
-          [ "$actual_files" = "${{ needs.propose_product_increment.outputs.changed_files }}" ]
-
-      - name: Install immutable verification environment
-        run: python3 -m pip install --disable-pip-version-check --no-deps --require-hashes -r requirements-quality.txt
+          [ "$actual_files" = "$EXPECTED_CHANGED_FILES" ]
 
       - name: Restore pinned Rust quality tools
         id: rust-tools-cache
@@ -409,6 +411,8 @@ jobs:
           rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
 
       - name: Run every release-quality gate
+        env:
+          EXPECTED_PATCH: ${{ needs.propose_product_increment.outputs.patch_sha256 }}
         shell: bash
         run: |
           set -euo pipefail
@@ -441,7 +445,7 @@ jobs:
           [ -z "$(git ls-files --others --exclude-standard)" ]
           post_patch="$RUNNER_TEMP/post-verify.patch"
           git diff --cached --binary --full-index >"$post_patch"
-          [ "$(sha256sum "$post_patch" | awk '{print $1}')" = "${{ needs.propose_product_increment.outputs.patch_sha256 }}" ]
+          [ "$(sha256sum "$post_patch" | awk '{print $1}')" = "$EXPECTED_PATCH" ]
 
   publish_product_increment:
     if: >-
@@ -477,14 +481,19 @@ jobs:
       - name: Verify and apply immutable proposal without executing it
         env:
           GH_TOKEN: ${{ github.token }}
+          ARTIFACT_ID: ${{ needs.propose_product_increment.outputs.artifact_id }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.propose_product_increment.outputs.artifact_digest }}
+          EXPECTED_PATCH: ${{ needs.propose_product_increment.outputs.patch_sha256 }}
+          EXPECTED_DIFF_BYTES: ${{ needs.propose_product_increment.outputs.diff_bytes }}
+          EXPECTED_CHANGED_FILES: ${{ needs.propose_product_increment.outputs.changed_files }}
         shell: bash
         run: |
           set -euo pipefail
           patch="$RUNNER_TEMP/tepp-product-proposal/proposal.patch"
-          artifact_id="${{ needs.propose_product_increment.outputs.artifact_id }}"
+          artifact_id="$ARTIFACT_ID"
           artifact_name="tepp-product-proposal-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          expected_artifact_digest="${{ needs.propose_product_increment.outputs.artifact_digest }}"
-          expected_patch="${{ needs.propose_product_increment.outputs.patch_sha256 }}"
+          expected_artifact_digest="$EXPECTED_ARTIFACT_DIGEST"
+          expected_patch="$EXPECTED_PATCH"
           [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Malformed artifact ID'; exit 1; }
           [[ "$expected_artifact_digest" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed artifact digest'; exit 1; }
           [[ "$expected_patch" =~ ^[0-9a-f]{64}$ ]] || { echo '::error::Malformed patch digest'; exit 1; }
@@ -497,7 +506,7 @@ jobs:
             '.id == $artifact_id and .name == $artifact_name and .expired == false and .workflow_run.id == $run_id' \
             <<<"$artifact_json" >/dev/null
           printf '%s  %s\n' "$expected_patch" "$patch" | sha256sum -c -
-          [ "$(wc -c <"$patch" | tr -d '[:space:]')" = "${{ needs.propose_product_increment.outputs.diff_bytes }}" ]
+          [ "$(wc -c <"$patch" | tr -d '[:space:]')" = "$EXPECTED_DIFF_BYTES" ]
           git apply --check --binary "$patch"
           git apply --index --binary "$patch"
           git diff --cached --check
@@ -506,7 +515,7 @@ jobs:
             exit 1
           fi
           actual_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
-          [ "$actual_files" = "${{ needs.propose_product_increment.outputs.changed_files }}" ]
+          [ "$actual_files" = "$EXPECTED_CHANGED_FILES" ]
 
       - name: Parse bounded untrusted pull-request metadata
         shell: bash
@@ -542,11 +551,11 @@ jobs:
       - name: Revalidate queue and default-branch head
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
+          EXPECTED_BASE: ${{ needs.propose_product_increment.outputs.base_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          expected_base="${{ needs.propose_product_increment.outputs.base_sha }}"
-          [ "$(git rev-parse HEAD)" = "$expected_base" ] || { echo '::error::base_branch_advanced'; exit 1; }
+          [ "$(git rev-parse HEAD)" = "$EXPECTED_BASE" ] || { echo '::error::base_branch_advanced'; exit 1; }
           if ! open_prs="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 1 --json number,url)"; then
             echo '::error::pull_request_inventory_unavailable_after_generation'
             exit 1
