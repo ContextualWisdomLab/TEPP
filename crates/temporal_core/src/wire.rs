@@ -155,7 +155,12 @@ pub(crate) fn interval_json_schema<T: TemporalClock>() -> Value {
             "lower": boundary_json_schema(),
             "upper": boundary_json_schema()
         },
-        "allOf": [
+        "allOf": interval_certainty_conditionals()
+    })
+}
+
+fn interval_certainty_conditionals() -> Value {
+    json!([
             {
                 "if": {
                     "properties": {"certainty": {"const": "unknown"}},
@@ -228,7 +233,7 @@ pub(crate) fn interval_json_schema<T: TemporalClock>() -> Value {
                 }
             }
         ]
-    })
+    )
 }
 
 impl BoundaryWire {

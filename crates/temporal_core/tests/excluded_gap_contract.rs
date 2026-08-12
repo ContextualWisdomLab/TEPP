@@ -11,6 +11,8 @@ fn assert_adjacent_excluded_bounds_are_empty<T: TemporalClock>() {
         .expect("lower test timestamp must parse");
     let upper = TemporalInstant::parse_rfc3339("2026-08-12T00:00:00.000000001Z")
         .expect("upper test timestamp must parse");
+    let separated_upper = TemporalInstant::parse_rfc3339("2026-08-12T00:00:00.000000002Z")
+        .expect("separated upper test timestamp must parse");
 
     assert_eq!(
         TemporalInterval::<T>::bounded(
@@ -19,6 +21,14 @@ fn assert_adjacent_excluded_bounds_are_empty<T: TemporalClock>() {
             TemporalPrecision::Nanosecond,
         ),
         Err(TemporalError::EmptyInterval)
+    );
+    assert!(
+        TemporalInterval::<T>::bounded(
+            TemporalBoundary::Excluded(T::from_instant(lower)),
+            TemporalBoundary::Excluded(T::from_instant(separated_upper)),
+            TemporalPrecision::Nanosecond,
+        )
+        .is_ok()
     );
 }
 
