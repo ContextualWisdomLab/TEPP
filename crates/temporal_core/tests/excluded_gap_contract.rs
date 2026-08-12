@@ -1,26 +1,34 @@
 //! Nonempty interval contracts at nanosecond resolution.
 
 use temporal_core::{
-    EventTime, TemporalBoundary, TemporalError, TemporalInterval, TemporalPrecision,
+    AssertionTime, AvailableTime, DocumentTime, EventTime, KnowledgeCutoff, SystemTime,
+    TemporalBoundary, TemporalClock, TemporalError, TemporalInterval, TemporalPrecision,
 };
 
-fn time(value: &str) -> EventTime {
-    EventTime::parse_rfc3339(value).expect("test timestamp must parse")
-}
-
-#[test]
-fn adjacent_excluded_nanosecond_bounds_are_empty() {
-    let lower = time("2026-08-12T00:00:00.000000000Z");
-    let upper = time("2026-08-12T00:00:00.000000001Z");
+fn assert_adjacent_excluded_bounds_are_empty<T: TemporalClock>() {
+    let lower = T::parse_rfc3339("2026-08-12T00:00:00.000000000Z")
+        .expect("lower test timestamp must parse");
+    let upper = T::parse_rfc3339("2026-08-12T00:00:00.000000001Z")
+        .expect("upper test timestamp must parse");
 
     assert_eq!(
-        TemporalInterval::bounded(
+        TemporalInterval::<T>::bounded(
             TemporalBoundary::Excluded(lower),
             TemporalBoundary::Excluded(upper),
             TemporalPrecision::Nanosecond,
         ),
         Err(TemporalError::EmptyInterval)
     );
+}
+
+#[test]
+fn adjacent_excluded_nanosecond_bounds_are_empty() {
+    assert_adjacent_excluded_bounds_are_empty::<EventTime>();
+    assert_adjacent_excluded_bounds_are_empty::<AssertionTime>();
+    assert_adjacent_excluded_bounds_are_empty::<DocumentTime>();
+    assert_adjacent_excluded_bounds_are_empty::<SystemTime>();
+    assert_adjacent_excluded_bounds_are_empty::<AvailableTime>();
+    assert_adjacent_excluded_bounds_are_empty::<KnowledgeCutoff>();
 }
 
 #[test]
