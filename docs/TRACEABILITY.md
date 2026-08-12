@@ -10,8 +10,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring | implemented-main |
 | Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
-| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #5 `temporal_core` + tests/doctoring | active-PR |
-| Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #6 `temporal_core` + tests/doctoring | active-PR |
+| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 replacement `temporal_core` + tests/doctoring; PR #5 historical only | active-PR |
+| Allen relation algebra/bounded closure | ADR 0002; temporal research | legacy PR #6 unique Task 4 work must be replayed on PR #8/current-main lineage before promotion | accepted-target / legacy active work |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | future `relation_graph` validation | accepted-target |
 | event ontology/evidence mentions | PRD; ADR 0003 | future `event_core` | accepted-target |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | future `membership_core` | accepted-target |
@@ -47,9 +47,11 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 
 Promotion rules are governed by ADR 0014 and `docs/adr/ADR_POLICY.md`. A decision can be `Accepted` while implementation remains `accepted-target`. A target becomes `implemented-main` only when its source is integrated on protected main and the relevant exact-head tests, scientific/recovery/validation evidence, security/supply-chain checks, and qualifying review required by live policy pass. Planning documents, simulations that do not exercise production code, queued checks, predecessor-head results, or LLM judgments cannot promote implementation maturity.
 
+A replacement PR inherits source/test lineage only for auditability; it does **not** inherit current-head CI, security, review, or approval evidence. PR #8 therefore reacquires all merge evidence even though its initial implementation blobs preserve Task 3's prior RED→GREEN history. Legacy PR #6 remains non-promotable until its unique Task 4 behavior is replayed onto the canonical Task 3 lineage and independently revalidated.
+
 ## Claim discipline
 
-- PR #6 path consistency must not be promoted into unrestricted global satisfiability proof.
+- Allen path consistency must not be promoted into unrestricted global satisfiability proof.
 - Language support is not promoted from architecture alone; each profile needs validation/invariance evidence.
 - GPU support is not promoted if required hardware tests are skipped or only a software fallback ran when hardware parity is claimed.
 - Dynamic ESEM/DSEM effects are not promoted to causal claims without an identified design and corresponding evidence.
@@ -64,4 +66,4 @@ Promotion rules are governed by ADR 0014 and `docs/adr/ADR_POLICY.md`. A decisio
 
 ## Documentation rule
 
-When a scientific estimand, time meaning, ontology relation, membership structure, topic/backend identity, compute backend, privacy/authorization model, service authority, persistence/reproducibility contract, orchestration policy, autonomous-development authority, event-intelligence claim, or accepted evidence threshold changes, update the owning ADR/PRD where required plus this matrix, affected architecture/data/API documents, exact tests/validation evidence, and standards/research documentation in the same reviewed change.
+When a scientific estimand, time meaning, ontology relation, membership structure, topic/backend identity, compute backend, privacy/authorization model, service authority, persistence/reproducibility contract, orchestration policy, autonomous-development authority, event-intelligence claim, implementation-lineage authority, or accepted evidence threshold changes, update the owning ADR/PRD where required plus this matrix, affected architecture/data/API documents, exact tests/validation evidence, and standards/research documentation in the same reviewed change.
