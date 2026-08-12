@@ -70,11 +70,10 @@ fn concrete_proper_intervals_classify_all_thirteen_relations() {
         TemporalBoundary::Excluded(time(2)),
         TemporalPrecision::Second,
     )
-    .expect("excluded proper interval must validate");
+    .expect("excluded bounds remain valid TEPP intervals");
     assert_eq!(
-        classify_interval_relation(&excluded, &proper_interval(3, 4))
-            .expect("boundary inclusion must not change endpoint classification"),
-        AllenRelation::Before
+        classify_interval_relation(&excluded, &proper_interval(3, 4)),
+        Err(TemporalError::RelationRequiresProperBoundedInterval)
     );
 }
 
@@ -94,10 +93,16 @@ fn qualitative_classification_rejects_exact_open_and_unknown_intervals() {
         TemporalPrecision::Second,
     )
     .expect("lower-open interval must validate");
+    let half_open = TemporalInterval::bounded(
+        TemporalBoundary::Included(time(1)),
+        TemporalBoundary::Excluded(time(3)),
+        TemporalPrecision::Second,
+    )
+    .expect("half-open interval must validate");
     let unknown = TemporalInterval::<EventTime>::unknown();
     let proper = proper_interval(1, 2);
 
-    for invalid in [exact, upper_open, lower_open, unknown] {
+    for invalid in [exact, upper_open, lower_open, half_open, unknown] {
         assert_eq!(
             classify_interval_relation(&invalid, &proper),
             Err(TemporalError::RelationRequiresProperBoundedInterval)

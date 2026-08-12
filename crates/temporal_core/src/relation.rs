@@ -198,10 +198,9 @@ impl RelationSet {
 
 /// Classify two proper, two-sided, nonzero intervals with Allen's algebra.
 ///
-/// Boundary inclusion does not change the qualitative endpoint relation. Exact,
-/// open-ended, and explicitly unknown intervals are rejected because Allen's
-/// elementary interval algebra assumes proper intervals with distinct starts
-/// and ends.
+/// Exact, open-ended, half-open, open, and explicitly unknown intervals are
+/// rejected because Allen's elementary interval algebra assumes closed proper
+/// intervals with distinct included starts and ends.
 ///
 /// # Errors
 ///
@@ -227,22 +226,19 @@ fn proper_endpoints<T: TemporalClock>(
     if interval.certainty() != TemporalCertainty::Bounded {
         return Err(TemporalError::RelationRequiresProperBoundedInterval);
     }
-    let Some(start) = boundary_nanosecond(interval.lower()) else {
+    // Allen elementary classification assumes closed proper intervals. Open or
+    // half-open bounds are representable as TEPP intervals but are not Allen
+    // elementary inputs; reject them rather than silently treating Excluded as
+    // Included endpoints.
+    let (TemporalBoundary::Included(start), TemporalBoundary::Included(end)) =
+        (interval.lower(), interval.upper())
+    else {
         return Err(TemporalError::RelationRequiresProperBoundedInterval);
     };
-    let Some(end) = boundary_nanosecond(interval.upper()) else {
-        return Err(TemporalError::RelationRequiresProperBoundedInterval);
-    };
-    Ok((start, end))
-}
-
-fn boundary_nanosecond<T: TemporalClock>(boundary: TemporalBoundary<T>) -> Option<i128> {
-    match boundary {
-        TemporalBoundary::Unbounded => None,
-        TemporalBoundary::Included(value) | TemporalBoundary::Excluded(value) => {
-            Some(value.instant().as_nanosecond())
-        }
-    }
+    Ok((
+        start.instant().as_nanosecond(),
+        end.instant().as_nanosecond(),
+    ))
 }
 
 fn classify_endpoints(

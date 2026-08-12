@@ -10,8 +10,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring | implemented-main |
 | Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
-| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 replacement `temporal_core` + tests/doctoring; PR #5 historical only | active-PR |
-| Allen relation algebra/bounded closure | ADR 0002; temporal research | replay PR #9 unique Task 4 work must be replayed on PR #8/current-main lineage before promotion | accepted-target |
+| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |
+| Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 replay on protected-main temporal foundation; exact-head evidence pending merge | active-PR |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | future `relation_graph` validation | accepted-target |
 | event ontology/evidence mentions | PRD; ADR 0003 | future `event_core` | accepted-target |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | future `membership_core` | accepted-target |

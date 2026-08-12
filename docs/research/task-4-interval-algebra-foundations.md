@@ -39,11 +39,11 @@ Every relation has an exact inverse. `equals` is self-inverse. The stable enum o
 
 For relations \(R_{xy}\) and \(R_{yz}\), composition returns every elementary relation \(R_{xz}\) admitted by at least one compatible triple of proper intervals:
 
-\[
+```math
 R_{xy} \circ R_{yz}
 =
 \{R_{xz}: \exists x,y,z\; R_{xy}(x,y) \land R_{yz}(y,z)\}.
-\]
+```
 
 The production table is generated once from all proper intervals over six ordered endpoint ranks. Six ranks are sufficient because three proper intervals contain at most six distinct endpoints; every equality and strict-order pattern can be order-preservingly mapped into those ranks. The result is deterministic and immutable after `OnceLock` initialization.
 
@@ -52,9 +52,9 @@ The implementation is independently checked against:
 - classification examples for all thirteen elementary relations;
 - known composition entries;
 - the converse law
-  \[
+  ```math
   (R \circ S)^{-1}=S^{-1}\circ R^{-1};
-  \]
+  ```
 - nonempty composition for every elementary pair; and
 - a separate exhaustive oracle built from all proper intervals over eight endpoint ranks.
 
@@ -64,11 +64,11 @@ The eight-rank oracle is deliberately not the production table generator. It is 
 
 For every distinct variable triple \((i,k,j)\), closure applies the monotone narrowing rule
 
-\[
+```math
 R_{ij}
 \leftarrow
 R_{ij}\cap(R_{ik}\circ R_{kj}).
-\]
+```
 
 The reverse cell is updated with the exact inverse relation set. Iteration continues until no relation set changes, a pair becomes empty, or the configured propagation budget is exhausted.
 
