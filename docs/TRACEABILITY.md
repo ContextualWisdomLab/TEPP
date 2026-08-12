@@ -38,6 +38,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | naruon consumer boundary | ADR 0011/0012; API contract | versioned TEPP artifacts/API; no lexical heuristic substitution | accepted-target |
 | contextual-orchestrator execution boundary | ADR 0010/0011 | provider-neutral orchestration port; TEPP retains scientific authority | accepted-target |
 | autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | future safe OpenCode/NVIDIA autonomous-development workflow | accepted-target |
+| foundation validation / release-readiness ledger | ADR 0014; Test Strategy | `docs/validation/temporal-event-foundation.md` | partial |
 | scientific claim promotion separated from design/implementation/release | ADR 0014; ADR policy | documentation/CI/domain validation/release evidence | partial |
 | CSAP/SOC 2/ISO/NIST assurance readiness | `docs/COMPLIANCE_READINESS.md`; research register | repository controls + future deployment evidence | accepted-target / deployment-owned |
 | threat-model controls and scientific-integrity security | `SECURITY.md`; `docs/THREAT_MODEL.md` | deterministic security/privacy/scientific validation gates | partial |
