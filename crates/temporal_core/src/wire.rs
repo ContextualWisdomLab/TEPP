@@ -122,6 +122,7 @@ pub(crate) fn interval_json_schema<T: TemporalClock>() -> Value {
     json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": format!("TEPP {} interval wire record", T::WIRE_NAME),
+        "description": "TEPP interval wire version 1. Runtime validation additionally enforces interval ordering and emptiness. Exact certainty requires two included boundaries with matching included timestamps; JSON Schema cannot express cross-field timestamp equality, so runtime reconstruction remains authoritative.",
         "type": "object",
         "additionalProperties": false,
         "required": [
@@ -153,7 +154,58 @@ pub(crate) fn interval_json_schema<T: TemporalClock>() -> Value {
             },
             "lower": boundary_json_schema(),
             "upper": boundary_json_schema()
-        }
+        },
+        "allOf": [
+            {
+                "if": {
+                    "properties": {"certainty": {"const": "unknown"}},
+                    "required": ["certainty"]
+                },
+                "then": {
+                    "properties": {
+                        "precision": {"const": "unknown"},
+                        "lower": {
+                            "properties": {"kind": {"const": "unbounded"}},
+                            "required": ["kind"]
+                        },
+                        "upper": {
+                            "properties": {"kind": {"const": "unbounded"}},
+                            "required": ["kind"]
+                        }
+                    }
+                }
+            },
+            {
+                "if": {
+                    "properties": {"certainty": {"const": "exact"}},
+                    "required": ["certainty"]
+                },
+                "then": {
+                    "properties": {
+                        "precision": {"not": {"const": "unknown"}},
+                        "lower": {
+                            "properties": {"kind": {"const": "included"}},
+                            "required": ["kind", "timestamp"]
+                        },
+                        "upper": {
+                            "properties": {"kind": {"const": "included"}},
+                            "required": ["kind", "timestamp"]
+                        }
+                    }
+                }
+            },
+            {
+                "if": {
+                    "properties": {"certainty": {"const": "bounded"}},
+                    "required": ["certainty"]
+                },
+                "then": {
+                    "properties": {
+                        "precision": {"not": {"const": "unknown"}}
+                    }
+                }
+            }
+        ]
     })
 }
 
@@ -236,7 +288,7 @@ fn timestamp_json_schema() -> Value {
         "format": "date-time",
         "pattern": STRICT_TIMESTAMP_PATTERN,
         "not": {"pattern": UNKNOWN_LOCAL_OFFSET_PATTERN},
-        "description": "TEPP wire-version 1 strict RFC 3339 profile with explicit seconds, one-to-nine fractional digits, and Z or a known exact numeric offset; RFC 3339's unknown -00:00 offset is rejected."
+        "description": "TEPP wire-version 1 strict RFC 3339 lexical profile with explicit seconds, optional one-to-nine fractional ASCII digits, and Z or a known numeric offset. Runtime parsing additionally validates Gregorian calendar values and numeric offset ranges and rejects RFC 3339's unknown -00:00 offset."
     })
 }
 
