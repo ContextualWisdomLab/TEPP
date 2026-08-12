@@ -32,6 +32,8 @@ pub enum RelationKind {
     Summarizes,
     /// Revision of an earlier document or claim (provenance).
     Revises,
+    /// Translation of an earlier document or claim (provenance).
+    Translates,
     /// Retrospective reporting of an earlier event (provenance).
     RetrospectivelyReports,
     /// Supportive evidence relation (provenance).
@@ -77,6 +79,7 @@ impl RelationKind {
             "references" => Ok(Self::References),
             "summarizes" => Ok(Self::Summarizes),
             "revises" => Ok(Self::Revises),
+            "translates" => Ok(Self::Translates),
             "retrospectively_reports" => Ok(Self::RetrospectivelyReports),
             "supports" => Ok(Self::Supports),
             "contradicts" => Ok(Self::Contradicts),
@@ -100,6 +103,7 @@ impl RelationKind {
             Self::References => "references",
             Self::Summarizes => "summarizes",
             Self::Revises => "revises",
+            Self::Translates => "translates",
             Self::RetrospectivelyReports => "retrospectively_reports",
             Self::Supports => "supports",
             Self::Contradicts => "contradicts",
@@ -139,6 +143,7 @@ mod tests {
             RelationKind::References,
             RelationKind::Summarizes,
             RelationKind::Revises,
+            RelationKind::Translates,
             RelationKind::RetrospectivelyReports,
             RelationKind::Supports,
             RelationKind::Contradicts,
