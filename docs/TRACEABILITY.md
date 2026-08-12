@@ -11,10 +11,10 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |
-| Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 replay on protected-main temporal foundation; exact-head evidence pending merge | active-PR |
+| Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
-| event ontology/evidence mentions | PRD; ADR 0003 | future `event_core` | accepted-target |
-| time-varying cross-classified multiple membership | PRD; ADR 0003 | future `membership_core` | accepted-target |
+| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; full intelligence stack remaining | partial |
+| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; ADR 0007/0014; scientific acceptance | `validation_core` on protected main | implemented-main |
 | PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, `DATABASE_URL` SQLx gate; live pool/query driver remaining | partial |
