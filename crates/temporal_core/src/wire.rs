@@ -202,7 +202,29 @@ pub(crate) fn interval_json_schema<T: TemporalClock>() -> Value {
                 "then": {
                     "properties": {
                         "precision": {"not": {"const": "unknown"}}
-                    }
+                    },
+                    "anyOf": [
+                        {
+                            "properties": {
+                                "lower": {
+                                    "properties": {
+                                        "kind": {"enum": ["included", "excluded"]}
+                                    },
+                                    "required": ["kind"]
+                                }
+                            }
+                        },
+                        {
+                            "properties": {
+                                "upper": {
+                                    "properties": {
+                                        "kind": {"enum": ["included", "excluded"]}
+                                    },
+                                    "required": ["kind"]
+                                }
+                            }
+                        }
+                    ]
                 }
             }
         ]

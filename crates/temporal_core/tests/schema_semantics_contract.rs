@@ -1,6 +1,6 @@
 //! JSON Schema parity contracts for temporal interval wire semantics.
 
-use serde_json::Value;
+use serde_json::{Value, json};
 use temporal_core::{EventTime, TemporalInterval};
 
 #[test]
@@ -43,4 +43,21 @@ fn unknown_certainty_schema_forbids_included_or_excluded_boundaries() {
     let encoded = serde_json::to_string(conditionals).expect("schema must serialize");
     assert!(encoded.contains("unbounded"));
     assert!(encoded.contains("precision"));
+}
+
+#[test]
+fn bounded_certainty_schema_forbids_two_unbounded_boundaries() {
+    let schema = TemporalInterval::<EventTime>::wire_json_schema();
+    let bounded = &schema["allOf"][2]["then"];
+    let alternatives = bounded["anyOf"]
+        .as_array()
+        .expect("bounded certainty must require a finite boundary");
+
+    assert_eq!(alternatives.len(), 2);
+    for (alternative, boundary) in alternatives.iter().zip(["lower", "upper"]) {
+        assert_eq!(
+            alternative["properties"][boundary]["properties"]["kind"]["enum"],
+            json!(["included", "excluded"])
+        );
+    }
 }
