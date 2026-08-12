@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `membership_core` time-varying weighted multiple-membership network with contextual roles, event-time validity, and atomistic-fallacy prevention contracts.
 - Bounded Allen interval algebra and path-consistency reasoner in `temporal_core` (Task 4; PR #9), with identity-isolated variables, resource budgets, inverse/composition, and conservative provenance.
 - Approved Temporal Event Psychometrics Platform PRD v0.4 baseline.
 - Canonical technical documentation map, TRD, UML/scientific runtime views, logical/planned ERD, scientific test strategy, operability/recovery guide, and requirements/research/evidence traceability with explicit implementation maturity.
