@@ -11,7 +11,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 replacement `temporal_core` + tests/doctoring; PR #5 historical only | active-PR |
-| Allen relation algebra/bounded closure | ADR 0002; temporal research | legacy PR #6 unique Task 4 work must be replayed on PR #8/current-main lineage before promotion | accepted-target / legacy active work |
+| Allen relation algebra/bounded closure | ADR 0002; temporal research | legacy PR #6 unique Task 4 work must be replayed on PR #8/current-main lineage before promotion | accepted-target |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | future `relation_graph` validation | accepted-target |
 | event ontology/evidence mentions | PRD; ADR 0003 | future `event_core` | accepted-target |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | future `membership_core` | accepted-target |
