@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `relation_graph` forward-only state-transition DAG with past-pointing provenance edges and cycle rejection.
 - `persistence_postgres` bitemporal foundation: multi-word migration contracts, knowledge-cutoff eligibility, and in-memory as-known-at / as-valid-at document replay (live SQLx/PostgreSQL execution remains accepted-target).
 - `event_core` mention/instance separation with explicit promotion, typed roles, event-time validity, and fail-closed mention-as-instance refusal.
 - `membership_core` time-varying weighted multiple-membership network with contextual roles, event-time validity, and atomistic-fallacy prevention contracts.
