@@ -69,9 +69,6 @@ def is_executable_source_line(source_path: str, line_number: int) -> bool:
         return False
     if text.endswith(",") and not text.startswith("let ") and not text.startswith("return "):
         return False
-    # cfg-gated alternative definitions that are inactive under --all-features.
-    if text.startswith("#[cfg"):
-        return False
     return True
 
 
