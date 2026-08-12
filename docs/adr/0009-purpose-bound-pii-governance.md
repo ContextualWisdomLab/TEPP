@@ -1,7 +1,9 @@
 # ADR 0009 — Purpose-bound PII governance without blanket masking
 
-**Status:** Accepted  
-**Date:** 2026-08-10
+**Decision status:** Accepted  
+**Implementation maturity:** accepted-target  
+**Date:** 2026-08-10  
+**Supersedes:** None.
 
 ## Context
 
@@ -31,10 +33,18 @@ Direct identity is removed from ordinary compute artifacts whenever the estimand
 
 An authorization/purpose decision that cannot be evaluated fails closed. If a provider or export would exceed the approved disclosure scope, TEPP abstains or requires explicit higher-authority approval. Privacy incidents preserve bounded forensic/audit evidence without copying unnecessary source text.
 
+## Security, privacy, and governance impact
+
+This ADR is the privacy/data-use authority for TEPP. It does not claim that a particular deployment is CSAP-certified, SOC 2-attested, or compliant merely because these controls are specified. Deployment evidence is assessed separately under the compliance-readiness and release-evidence contracts.
+
+## Compatibility and migration
+
+Identity mappings, access-purpose vocabularies, retention policy, provider disclosure policy, and tenant boundaries are versioned. A migration may tighten or separate access but may not silently erase linkage needed to interpret already-published analytical artifacts.
+
 ## Verification
 
-Cross-tenant denial, expired-purpose denial, provider-payload minimization, log/source separation, export/re-identification authorization, retention/deletion, audit replay, and realistic multi-membership cases are required tests.
+Cross-tenant denial, expired-purpose denial, provider-payload minimization, log/source separation, export/re-identification authorization, retention/deletion/legal-hold, audit replay, and realistic multi-membership cases are required tests.
 
-## Supersession
+## Rollback and supersession
 
-Supersede only if a later ADR demonstrates an equally usable privacy architecture that preserves the psychometric/temporal estimands and provides stronger verifiable controls.
+Rollback disables an unsafe provider/export/re-identification path and retains the last validated authorization policy. Supersede only if a later ADR demonstrates an equally usable privacy architecture that preserves psychometric/temporal estimands and provides stronger verifiable controls.
