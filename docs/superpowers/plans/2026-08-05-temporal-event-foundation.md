@@ -158,13 +158,14 @@
 
 **Files:** `crates/tepp_api/src/*`, `schemas/*.json`, `examples/*.json`, API tests.
 
-**Produces:** versioned ingestion, temporal query, event/relation, membership, snapshot/split, simulation, and validation contracts.
+**Produces (this slice):** versioned analysis-run request/accepted DTOs, content-redacting error envelopes, purpose-bound export authorization, reproducibility manifests, and JSON-LD/GraphML export envelopes. Broader ingestion/temporal-query/event/relation/membership/snapshot domain DTO adapters and HTTP routing remain accepted-target.
 
-- [ ] Write failing schema tests for unknown fields, bounds, hostile nesting, tenant identifiers, exact evidence, temporal precision, and error redaction.
-- [ ] Implement domain-to-DTO adapters without leaking persistence internals.
-- [ ] Add JSON-LD and GraphML exports plus reproducibility manifests.
-- [ ] Test backward compatibility and explicit version rejection.
-- [ ] Commit API contracts and examples.
+- [x] Write failing wire tests for unknown fields, bounds, byte limits, tenant/workspace identities, error redaction, and unsupported contract versions.
+- [ ] Implement remaining domain-to-DTO adapters (temporal query, event/relation, membership, snapshot/split, simulation, validation) without leaking persistence internals.
+- [x] Add JSON-LD and GraphML exports plus reproducibility manifests.
+- [x] Test explicit contract version rejection (v1-only; multi-version backward compatibility deferred).
+- [x] Commit API contracts, JSON Schema, and examples.
+- [x] Purpose-bound export authorization without blanket PII masking.
 
 ## Task 13 — Complete foundation verification and release-readiness report
 

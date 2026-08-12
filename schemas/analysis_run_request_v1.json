@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tepp.local/schemas/analysis_run_request_v1.json",
+  "title": "AnalysisRunRequestV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "idempotency_key",
+    "tenant_workspace_id",
+    "snapshot_id",
+    "knowledge_cutoff",
+    "model_contract_version",
+    "output_profile"
+  ],
+  "properties": {
+    "contract_version": { "type": "integer", "const": 1 },
+    "idempotency_key": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "tenant_workspace_id": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "snapshot_id": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "knowledge_cutoff": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "model_contract_version": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "output_profile": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+  }
+}
