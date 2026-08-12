@@ -21,8 +21,9 @@ pub trait SqlSession {
 /// Split migration SQL into executable statements without executing them.
 ///
 /// Strips `--` line comments, ignores empty fragments, and fails closed when no
-/// statements remain. Statement boundaries are plain `;` separators; TEPP
-/// foundation migrations do not embed quoted semicolons.
+/// statements remain. Statement boundaries are `;` outside single quotes and
+/// PostgreSQL dollar-quoted strings (`$tag$ ... $tag$`), so `DO` blocks remain
+/// intact.
 ///
 /// # Errors
 ///
@@ -30,17 +31,108 @@ pub trait SqlSession {
 /// executable statements.
 pub fn split_sql_statements(sql: &str) -> Result<Vec<String>, PersistenceError> {
     let without_line_comments = strip_line_comments(sql);
-    let mut statements = Vec::new();
-    for fragment in without_line_comments.split(';') {
-        let trimmed = fragment.trim();
-        if !trimmed.is_empty() {
-            statements.push(trimmed.to_owned());
-        }
-    }
+    let statements = split_on_semicolons_respecting_quotes(&without_line_comments);
     if statements.is_empty() {
         return Err(PersistenceError::EmptySqlBatch);
     }
     Ok(statements)
+}
+
+fn split_on_semicolons_respecting_quotes(sql: &str) -> Vec<String> {
+    let chars: Vec<char> = sql.chars().collect();
+    let mut statements = Vec::new();
+    let mut current = String::new();
+    let mut index = 0usize;
+    let mut in_single_quote = false;
+    let mut dollar_tag: Option<String> = None;
+
+    while index < chars.len() {
+        if let Some(tag) = dollar_tag.as_ref() {
+            let tag_len = tag.chars().count();
+            if index + tag_len <= chars.len() {
+                let candidate: String = chars[index..index + tag_len].iter().collect();
+                if candidate == *tag {
+                    current.push_str(&candidate);
+                    index += tag_len;
+                    dollar_tag = None;
+                    continue;
+                }
+            }
+            current.push(chars[index]);
+            index += 1;
+            continue;
+        }
+
+        if in_single_quote {
+            current.push(chars[index]);
+            if chars[index] == '\'' {
+                if index + 1 < chars.len() && chars[index + 1] == '\'' {
+                    current.push(chars[index + 1]);
+                    index += 2;
+                    continue;
+                }
+                in_single_quote = false;
+            }
+            index += 1;
+            continue;
+        }
+
+        match chars[index] {
+            '\'' => {
+                in_single_quote = true;
+                current.push('\'');
+                index += 1;
+            }
+            '$' => match read_dollar_tag(&chars[index..]) {
+                Some(tag) => {
+                    let tag_len = tag.chars().count();
+                    current.push_str(&tag);
+                    index += tag_len;
+                    dollar_tag = Some(tag);
+                }
+                None => {
+                    current.push('$');
+                    index += 1;
+                }
+            },
+            ';' => {
+                let trimmed = current.trim();
+                if !trimmed.is_empty() {
+                    statements.push(trimmed.to_owned());
+                }
+                current.clear();
+                index += 1;
+            }
+            other => {
+                current.push(other);
+                index += 1;
+            }
+        }
+    }
+
+    let trimmed = current.trim();
+    if !trimmed.is_empty() {
+        statements.push(trimmed.to_owned());
+    }
+    statements
+}
+
+fn read_dollar_tag(chars: &[char]) -> Option<String> {
+    if chars.first() != Some(&'$') {
+        return None;
+    }
+    let mut end = 1usize;
+    while end < chars.len() {
+        let ch = chars[end];
+        if ch == '$' {
+            return Some(chars[..=end].iter().collect());
+        }
+        if !(ch.is_ascii_alphanumeric() || ch == '_') {
+            return None;
+        }
+        end += 1;
+    }
+    None
 }
 
 /// Apply every statement from `sql` through `session` in order.
@@ -138,6 +230,22 @@ mod tests {
             Err(PersistenceError::EmptySqlBatch)
         );
         assert!(strip_line_comments("a -- b\nc").contains('c'));
+    }
+
+    #[test]
+    fn split_preserves_dollar_quoted_and_single_quoted_semicolons() {
+        let statements =
+            split_sql_statements("DO $tepp$ BEGIN PERFORM 1; END $tepp$;\nSELECT 'a;b';")
+                .expect("two statements");
+        assert_eq!(statements.len(), 2);
+        assert!(statements[0].contains("DO $tepp$"));
+        assert!(statements[0].contains("PERFORM 1;"));
+        assert!(statements[0].contains("END $tepp$"));
+        assert_eq!(statements[1], "SELECT 'a;b'");
+
+        let escaped = split_sql_statements("SELECT 'it''s;ok'; SELECT 2;").expect("escaped quotes");
+        assert_eq!(escaped.len(), 2);
+        assert!(escaped[0].contains("it''s;ok"));
     }
 
     #[test]
