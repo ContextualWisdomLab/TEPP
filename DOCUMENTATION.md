@@ -1,10 +1,14 @@
 # TEPP Documentation Map
 
-TEPP's approved PRD v0.4 and implementation plan are the primary product baseline. This index makes the technical, data, scientific, security/privacy, integration, quality, operating, and assurance contracts discoverable without duplicating that source material.
+TEPP's concrete PRD v0.5 is the canonical product-requirements contract. The
+approved v0.4 design remains historical evidence. This map makes the product,
+technical, data, scientific, security/privacy, integration, quality, operating,
+and assurance contracts discoverable without chat reconstruction.
 
 | Area | Canonical document |
 |---|---|
-| Approved product requirements | [`docs/product/prd-v0.4-approved.md`](docs/product/prd-v0.4-approved.md) |
+| Current product requirements | [`docs/product/prd-v0.5.md`](docs/product/prd-v0.5.md) |
+| Historical approved v0.4 design | [`docs/product/prd-v0.4-approved.md`](docs/product/prd-v0.4-approved.md) |
 | Whole-conversation documentation fitness | [`docs/DOCUMENTATION_ASSESSMENT.md`](docs/DOCUMENTATION_ASSESSMENT.md) |
 | Technical requirements | [`docs/TRD.md`](docs/TRD.md) |
 | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
@@ -34,24 +38,72 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
+## PRD v0.5 concreteness
+
+The current PRD adds stable requirement identifiers and acceptance evidence for:
+
+- immutable evidence, six clocks, relations, events, and multiple membership;
+- multilingual semantic units, concept governance, method effects, and language
+  profile promotion;
+- TRSL-TM posterior estimation, candidate-K hard gates/Pareto review, valid
+  compositional networks, and consensus clusters;
+- ESEM/DSEM construct-role, uncertainty, invariance, within/between, irregular
+  time, and causal-language gates;
+- LLM interpreter/verifier separation and test-time-compute ablation;
+- CPU/GPU/VRAM profiles and resource admission;
+- APIs, exports, purpose-bound PII, tenant isolation, audit, operability, and
+  release evidence;
+- user workflows, lifecycle state machines, error taxonomy, product surfaces,
+  scale tiers, commercial metrics, and phased exit criteria.
+
 ## Maturity vocabulary
 
-The canonical implementation-maturity vocabulary is defined in [`docs/adr/ADR_POLICY.md`](docs/adr/ADR_POLICY.md) and promotion evidence in [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md). In particular, **an ADR with decision status `Accepted` is not automatically implemented or shipped.**
+The canonical implementation-maturity vocabulary is defined in
+[`docs/adr/ADR_POLICY.md`](docs/adr/ADR_POLICY.md), with promotion evidence in
+[`docs/TRACEABILITY.md`](docs/TRACEABILITY.md). In particular, **an ADR or PRD
+requirement being accepted does not mean the capability is implemented or
+released.**
 
-- **implemented-main** — source is integrated on protected `main` and the relevant exact-current-head tests, scientific/recovery/validation evidence, security and supply-chain gates, and qualifying review required by live policy pass.
-- **active-PR** — implementation exists only on an open PR and is not a protected-main claim.
-- **partial** — an explicitly identified subset is implemented on protected main while the rest remains target work.
+- **implemented-main** — source is integrated on protected `main` and the
+  relevant exact-current-head tests, scientific/recovery/validation evidence,
+  security and supply-chain gates, and qualifying review required by live
+  policy pass.
+- **active-PR** — implementation exists only on an open PR and is not a
+  protected-main claim.
+- **partial** — an explicitly identified subset is implemented on protected
+  main while the rest remains target work.
 - **accepted-target** — accepted PRD/ADR architecture not yet integrated.
-- **research-only** — evaluated research direction not accepted as production behavior.
+- **research-only** — evaluated research direction not accepted as production
+  behavior.
 - **out-of-scope** — explicitly outside TEPP ownership.
-- **conceptual** — logical entity/service/model contract; not evidence of a migration or deployment.
-- **deployment-owned** — evidence depends on a concrete deployed environment or organization and cannot be claimed by repository design alone.
-- **external-assurance** — certification, attestation, legal opinion, or other independent assessment that TEPP cannot self-issue.
+- **conceptual** — logical entity/service/model contract; not evidence of a
+  migration or deployment.
+- **deployment-owned** — evidence depends on a concrete deployed environment or
+  organization and cannot be claimed by repository design alone.
+- **external-assurance** — certification, attestation, legal opinion, or other
+  independent assessment that TEPP cannot self-issue.
 
 ## Documentation fitness
 
-The documentation graph is **design-sufficient** when a reviewer can reconstruct TEPP's product requirements, technical/scientific estimands, authority boundaries, temporal/event/membership semantics, data model, failure modes, security/privacy controls, validation strategy, API/integration contract, operability, research basis, ADR ownership/supersession, and release acceptance without chat history.
+The documentation graph is **design-sufficient** when a reviewer can reconstruct
+TEPP's product workflows, requirements, technical/scientific estimands,
+authority boundaries, temporal/event/membership semantics, data model, failure
+modes, security/privacy controls, validation strategy, API/integration contract,
+operability, research basis, ADR ownership/supersession, and release acceptance
+without chat history.
 
-It is **protected-main-sufficient** only after the canonical documents are integrated on protected `main`, remain semantically current with live code, and their required exact-head documentation/security/review gates pass. An active documentation PR can therefore be design-sufficient while the protected branch remains documentation-insufficient.
+It is **protected-main-sufficient** only after the canonical documents are
+integrated on protected `main`, remain semantically current with live code, and
+their required exact-head documentation/security/review gates pass. A reviewable
+documentation PR may therefore be design-sufficient while protected main remains
+product-documentation-insufficient.
 
-At the time of this review, immutable evidence records/exact spans, the Rust workspace quality foundation, and typed six-clock values/uncertain intervals (PR #8) are implemented-main. PR #9 is the active-PR that replays Task 4 Allen interval algebra and bounded path-consistency reasoner work onto that protected-main temporal foundation. Superseded PRs #5 and #6 remain historical lineage only. Event ontology, PostgreSQL persistence, shared-latent topic estimation, GPU kernels, TDT/CHRONOS intelligence, longitudinal ESEM/DSEM, visual analytics, production HTTP services, and deployment assurance remain later accepted-target or deployment-owned work.
+At the inspected baseline, immutable evidence/exact spans, typed six-clock
+values, bounded interval reasoning, forward-only relation graphs, leakage-safe
+corpus splitting, deterministic simulations, recovery metrics, and selected API
+and export contracts are implemented-main. Event/membership/persistence/API
+surfaces are partial. FORCE RLS and runtime-role isolation are active on PR #30
+until merged. Multilingual semantic measurement, TRSL-TM estimation,
+candidate-K selection, topic networks/clusters, GPU kernels, TDT/CHRONOS,
+longitudinal ESEM/DSEM, evidence-bounded interpretation, and visual analytics
+remain separately gated product slices.
