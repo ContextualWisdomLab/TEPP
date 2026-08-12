@@ -6,6 +6,7 @@ source =
     scripts.check_docstrings
     scripts.check_coverage
     scripts.prepare_agent_pr_message
+    scripts.release_evidence
 
 [report]
 fail_under = 100

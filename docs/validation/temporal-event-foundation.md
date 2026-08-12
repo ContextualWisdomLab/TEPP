@@ -34,7 +34,8 @@ This report tracks exact-head scientific and engineering evidence required befor
 - [ ] CPU `f64` reference path present for every estimator (future measurement crates)
 - [ ] 100% production line and branch coverage on exact head
 - [ ] Independent review approval on each merge-critical PR
-- [ ] SBOM/provenance/reproducibility package for release cut
+- [x] Repository SBOM/provenance generator + CI validation (`scripts/release_evidence.py`)
+- [ ] Full package/image SBOM/provenance/reproducibility package for release cut
 
 ## Release decision rule
 

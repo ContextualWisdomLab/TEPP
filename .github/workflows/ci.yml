@@ -64,6 +64,15 @@ jobs:
         run: python3 scripts/check_workspace_contract.py
       - name: Validate Rust documentation contract
         run: python3 scripts/check_docstrings.py
+      - name: Generate and validate release SBOM/provenance evidence
+        run: |
+          python3 scripts/release_evidence.py generate \
+            --repository-root . \
+            --output-directory "${RUNNER_TEMP}/tepp-release-evidence" \
+            --git-commit "${GITHUB_SHA}"
+          python3 scripts/release_evidence.py validate \
+            --evidence-directory "${RUNNER_TEMP}/tepp-release-evidence" \
+            --expected-git-commit "${GITHUB_SHA}"
 
   rust-quality:
     name: Format, lint, test, rustdoc, and dependency policy

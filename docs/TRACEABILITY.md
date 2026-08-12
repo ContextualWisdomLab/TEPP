@@ -58,7 +58,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | threat-model controls and scientific-integrity security | `SECURITY.md`; `docs/THREAT_MODEL.md` | deterministic security/privacy/scientific validation gates | partial |
 | accessible bitemporal/network/drift/invariance views | PRD/UML | future `visual_analytics`; Figma in approved visual phase | accepted-target |
 | 100% production line/branch/public docs | ADR 0007; AGENTS | CI/repository contracts | implemented-main and required for future source |
-| SBOM/provenance/reproducible release | ADR 0014; Operability/Compliance | future exact-release evidence bundle | accepted-target |
+| SBOM/provenance/reproducible release | ADR 0014; Operability/Compliance | `scripts/release_evidence.py` CycloneDX SBOM + exact-head provenance + checksums in CI; full package/image release bundle remaining | partial |
 
 ## Scientific evidence promotion
 
