@@ -1,3 +1,5 @@
+//! JSON Schema parity contracts for temporal interval wire semantics.
+
 use serde_json::Value;
 use temporal_core::{EventTime, TemporalInterval};
 
