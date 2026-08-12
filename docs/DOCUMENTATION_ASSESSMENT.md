@@ -1,114 +1,201 @@
 # TEPP Whole-Conversation Documentation Assessment
 
-**Assessment date:** 2026-08-12  
-**Scope:** Durable TEPP decisions established in the product conversation, approved PRD v0.4/planning pack, protected-main implementation through merged PR #7, canonical Task 3 replacement PR #8, and legacy Task 4 PR #6.  
-**Verdict:** **The canonical documentation/ADR graph is protected-main authority after PR #7; implementation maturity remains independently tracked and is not promoted by documentation completeness.**
+**Assessment date:** 2026-08-13  
+**Scope:** Durable TEPP decisions from the full product conversation, PRD v0.4,
+concrete PRD v0.5, protected `main` at
+`1832026121e7ad92d21e0592fdd0ad5a59f40cff`, open persistence PR #30, and the
+canonical ADR/TRD/Architecture/UML/ERD/security/privacy/test/operability graph.  
+**Verdict:** **The documentation set is design-sufficient after PRD v0.5, but
+protected-main sufficiency and product maturity remain separately gated by
+integration, current-head checks, scientific evidence, and deployment evidence.**
 
-## 1. Assessment rule
+## 1. Assessment method
 
-A file existing is not evidence of completeness. Each documentation family is evaluated against durable product decisions and current implementation maturity.
+A file existing is not evidence that the product contract is complete or that a
+capability is shipped. Each documentation family is evaluated against:
+
+1. durable user decisions;
+2. current ADR authority and supersession;
+3. protected-main source and migrations;
+4. open pull requests and their exact heads;
+5. scientific claim and recovery requirements;
+6. security, privacy, operability, and release evidence;
+7. whether a qualified reviewer can implement or audit the product without chat
+   reconstruction.
 
 Status vocabulary:
 
-- **PRESENT-CURRENT** — canonical and semantically aligned to current product truth;
-- **PRESENT-STALE** — exists but contradicts current decisions/code;
+- **PRESENT-CURRENT** — canonical and semantically aligned to current product
+  truth;
+- **PRESENT-STALE** — exists but contradicts current decisions or source;
 - **PARTIAL** — useful but missing a material contract;
 - **MISSING** — no adequate canonical artifact;
-- **NOT-APPLICABLE** — intentionally not required for current product boundary;
-- **SUPERSEDED** — retained only as historical material.
+- **NOT-APPLICABLE** — intentionally not required for the current boundary;
+- **SUPERSEDED** — retained only as historical evidence;
+- **deployment-owned** — requires a measured deployment;
+- **external-assurance** — requires an independent assessor or authority.
 
-Decision status and implementation maturity are separate. ADR `Accepted` means the decision is authoritative; it does not mean the capability is shipped. Implementation maturity uses the canonical vocabulary in `docs/adr/ADR_POLICY.md` and `docs/TRACEABILITY.md`.
+Decision status and implementation maturity remain independent. An `Accepted`
+ADR or PRD requirement is not automatically implemented or released.
 
 ## 2. Documentation family assessment
 
-| Family | Current status | Evidence / action |
+| Family | Status | Evidence / action |
 |---|---|---|
-| PRD | PRESENT-CURRENT | approved `docs/product/prd-v0.4-approved.md`; six clocks, temporal/event psychometrics, multilingual shared latent space, ESEM/DSEM, TDT/CHRONOS |
-| TRD | PRESENT-CURRENT | `docs/TRD.md` separates protected-main, canonical active-PR, legacy lineage, and accepted-target contracts |
-| Architecture | PRESENT-CURRENT | root `ARCHITECTURE.md` owns service/crate boundaries and scientific/compute invariants |
-| UML / system flows | PRESENT-CURRENT | `docs/UML.md` covers component, sequence, clock state, relation authority, membership, compute and implementation lineage |
-| ERD / logical data model | PRESENT-CURRENT | `docs/ERD.md` distinguishes current domain objects from planned PostgreSQL entities and preserves uncertain time/membership/provenance |
-| ADR index / core decisions | PRESENT-CURRENT | ADR 0001–0016 cover numerical authority, clocks, event/membership, multilingual semantics, ESEM/DSEM, GPU, quality, evidence, PII, LLM orchestration, MSA, topic measurement, persistence/manifests/splits, claim promotion/release, autonomous-development authority, and TDT/CHRONOS boundaries |
-| ADR status/maturity/supersession policy | PRESENT-CURRENT | `docs/adr/ADR_POLICY.md` makes `Accepted` vs implemented/released explicit and requires exact partial-supersession scope |
-| API / modular integration | PRESENT-CURRENT | `docs/API_CONTRACT.md` defines versioning, target async lifecycle, authority and naruon/contextual-orchestrator boundaries |
-| Security | PRESENT-CURRENT | `SECURITY.md` plus `docs/THREAT_MODEL.md` |
-| Privacy / PII / data lifecycle | PRESENT-CURRENT | `docs/PRIVACY_DATA_GOVERNANCE.md` + ADR 0009; purpose-bound separation instead of blanket masking |
-| Compliance/assurance readiness | PRESENT-CURRENT | `docs/COMPLIANCE_READINESS.md`; CSAP/SOC 2/ISO/NIST mappings without certification claims |
-| Test / scientific validation | PRESENT-CURRENT | `docs/TEST_STRATEGY.md`; true-parameter recovery, uncertainty, leakage, invariance, CPU/GPU parity and replacement-lineage evidence rules |
-| Operability / recovery / release | PRESENT-CURRENT | `docs/OPERABILITY.md`; ADR 0014 separates release authority from green CI |
-| LLM orchestration / test-time compute | PRESENT-CURRENT | `docs/LLM_ORCHESTRATION.md` + ADR 0010; Fugu/Conductor/TRINITY motivate tested allocation, not authority |
-| Autonomous development/review/merge authority | PRESENT-CURRENT as design | ADR 0015 separates model proposal, deterministic verification, publication, independent review, and merge/release authority; implementation remains accepted-target |
-| Standards / APA 7 doctoring | PRESENT-CURRENT | research register covers psychometrics/topic/time/event/Unicode/security/AI-governance/orchestration foundations |
-| Traceability | PRESENT-CURRENT | `docs/TRACEABILITY.md` maps requirements, owning ADRs, canonical replacement lineage, and maturity |
-| Agent/maintainer authority | PRESENT-CURRENT | AGENTS/CLAUDE plus ADR 0015 and canonical map |
-| CHANGELOG | PRESENT-CURRENT | Unreleased documentation and ADR reconciliation is protected-main history; feature changes continue to update it when accepted |
-| Figma/UI detailed design | NOT-APPLICABLE now | PRD defers Figma until stable data/statistical contracts in the visual-analytics phase |
-| Physical database migrations | NOT-APPLICABLE now | planned ERD/ADR 0013 are not as-built table claims; migrations become mandatory with persistence implementation |
-| Deployment SLO/RPO/RTO evidence | deployment-owned | target operability is documented; numeric commitments require measured deployment evidence |
-| CSAP/SOC 2 certification | external-assurance | repository may build readiness evidence but cannot self-issue certification/attestation |
+| PRD | PRESENT-CURRENT | `docs/product/prd-v0.5.md` is the concrete canonical contract; v0.4 is historical evidence |
+| Stable requirement identifiers | PRESENT-CURRENT | PRD v0.5 defines `FR-EVD-*` through `FR-OPS-*`, fail-closed behavior, and acceptance evidence |
+| User/workflow/state contracts | PRESENT-CURRENT | PRD v0.5 defines product surfaces, deployment modes, input/output contracts, evidence/corpus/model/claim/release lifecycles, and error taxonomy |
+| Scientific claim promotion | PRESENT-CURRENT | PRD v0.5 claim matrix plus ADR 0014 and Test Strategy |
+| TRD | PRESENT-CURRENT | `docs/TRD.md` defines technical/scientific boundaries and implementation maturity |
+| Architecture | PRESENT-CURRENT | root `ARCHITECTURE.md` owns service/crate and compute boundaries |
+| UML/system flows | PRESENT-CURRENT | `docs/UML.md` covers temporal/event/membership/compute flows; future UI-specific flows remain event-driven |
+| ERD/logical data model | PRESENT-CURRENT | `docs/ERD.md` distinguishes domain objects, planned persistence, and as-built claims |
+| ADR index and policy | PRESENT-CURRENT | ADR 0001–0016 plus decision/maturity/supersession policy and ownership map |
+| API and connectors | PRESENT-CURRENT | API contract plus naruon and contextual-orchestrator ports; production HTTP/jobs remain partial |
+| Security and threat model | PRESENT-CURRENT | `SECURITY.md` and `docs/THREAT_MODEL.md` include scientific-integrity threats |
+| Privacy/PII governance | PRESENT-CURRENT | purpose-bound PII controls without blanket masking, identity separation, provider disclosure, retention, and audit |
+| Compliance readiness | PRESENT-CURRENT | CSAP/SOC 2/ISO/NIST readiness mapping without certification claims |
+| Test/scientific validation | PRESENT-CURRENT | true-parameter recovery, Monte Carlo uncertainty, leakage, invariance, parity, event/network/cluster and LLM tests |
+| Operability/recovery/release | PRESENT-CURRENT | job/recovery/release target contract; measured SLO/RPO/RTO remain deployment-owned |
+| LLM orchestration | PRESENT-CURRENT | direct/verifier/committee/conductor boundaries and Fugu/Conductor/TRINITY-based ablation contract |
+| Traceability | PRESENT-CURRENT | `docs/TRACEABILITY.md` maps PRD v0.5 families to ADRs, source, tests, PRs, and maturity |
+| Research/APA 7 doctoring | PRESENT-CURRENT | primary standards and research register remains canonical; implementation-specific doctoring expands with each slice |
+| AGENTS/CLAUDE/Governance | PRESENT-CURRENT | development, authority, quality, and naming contracts are discoverable |
+| CHANGELOG | PARTIAL | implementation changes are recorded; PRD v0.5 entry is added by the same reviewed change |
+| Figma interaction design | NOT-APPLICABLE now | PRD v0.5 specifies required surfaces/states; detailed Figma work begins when visual data contracts are stable |
+| Physical persistence/RLS | active-PR / partial | base persistence exists; tenant FORCE RLS/runtime-role isolation remains PR #30 until integration |
+| Production SLO/RPO/RTO evidence | deployment-owned | targets must be measured in a concrete environment |
+| CSAP certification / SOC 2 attestation | external-assurance | repository controls cannot self-issue certification or attestation |
 
-## 3. ADR clarity finding and remediation
+## 3. Why PRD v0.4 was not concrete enough
 
-The ADR set was not fully clear before the PR #7 reconciliation because accepted design could be confused with implementation, some ownership overlapped, and several durable decisions lacked dedicated ADRs. Merged PR #7 corrected this by:
+PRD v0.4 correctly fixed the product direction but was primarily a design
+baseline. It did not provide enough detail for product delivery and acquisition
+diligence in these areas:
 
-- defining independent **Decision status** and **Implementation maturity** axes in `ADR_POLICY.md`;
-- adding a linked ownership/supersession map to `docs/adr/README.md`;
-- clarifying ADR 0001 and 0006 so later refinements are explicitly scoped rather than contradictory;
-- expanding ADR 0002–0005 and 0009–0011 with context, alternatives, failure/recovery, compatibility, verification and rollback/supersession;
-- adding ADRs 0012–0016 for previously unowned durable decisions; and
-- making `scripts/validate_documentation.py` fail when numbered ADR files/index diverge or required ADR metadata/sections disappear.
+- stable requirement identifiers for PR/test/issue traceability;
+- complete buyer problems, roles, product surfaces, and deployment modes;
+- input, output, artifact, and lifecycle state contracts;
+- requirement-specific fail-closed behavior and acceptance evidence;
+- language-profile promotion criteria;
+- model-selection candidate plan and decision schema;
+- scientific claim-promotion wording;
+- compute admission and corpus scale profiles;
+- purpose-bound PII and model-provider disclosure behavior at product level;
+- accessible visual product states;
+- error taxonomy, phased release slices, commercial metrics, and exact release
+  acceptance checklist.
 
-PR #8 now exercises that policy by updating ADR 0002, the ADR index, TRD/UML/Test Strategy/Traceability, and this assessment to identify the canonical Task 3 replacement lineage rather than leaving stale PR #5 maturity claims.
+PRD v0.5 fills these gaps without changing the approved TEPP estimands or
+architecture decisions.
 
 ## 4. Durable conversation decisions covered
 
-The canonical graph explicitly preserves:
+The canonical documentation graph now explicitly preserves:
 
-- TEPP as the product, with TRSL-TM as the topic-measurement family and compliant backend substitution rather than one hard-coded algorithm;
-- one global topic identity policy for the first longitudinal product line, with activity/dormancy/reactivation and later explicit lineage for birth/split/merge/retirement;
-- one shared multilingual latent semantic space, native lexical channels, language-profile validity status, and exact-span semantic evidence;
-- no default stopword deletion and no TF-IDF/BM25 inferential weighting; POS/dependency/method-source information is modeled rather than destructively deleted;
-- report template, section, copied wording, prompt, style, modality and background as method sources;
-- document/segment/event/entity/project relations rather than independent-document clustering;
-- event/valid, assertion, document, system, available, and knowledge-cutoff clocks;
-- partial-order intervals and forward-only transition/input→process→outcome authority, with retrospective/citation evidence separated;
-- time-varying cross-classified multiple membership for authors, departments, customers, partners, competitors, projects and opportunity pools;
-- bitemporal persistence, immutable run/split/reproducibility manifests, relation-aware partitions and exact historical replay;
-- posterior topic coordinates, compositional/log-ratio network semantics and uncertainty;
-- longitudinal ESEM/DSEM, measurement invariance, within/between separation, irregular time and posterior uncertainty propagation;
-- TDT detection/tracking, CHRONOS-style schema prediction and symbolic temporal consistency kept distinct from ontology observation and promoted transition authority;
-- Rust CPU `f64` numerical reference, bounded low-context-switch parallelism, GPU/VRAM streaming and exact parity evidence;
-- LLM as fallible semantic/interpreter rater rather than estimator/evidence/release authority;
-- adaptive direct-versus-multi-agent test-time compute with role-specific reasoning effort and comparable-budget ablations;
-- standalone operation plus modular MSA integration with `naruon`/`contextual-orchestrator` and no cross-service database coupling;
-- PII utility preservation through purpose-bound authorization, opaque identifiers, separate identity mapping, encryption, selective disclosure, retention/deletion and audit rather than blanket masking;
-- strict separation of autonomous model proposal, deterministic verification, publication, independent review, and merge/release authority;
-- CSAP/SOC 2/AI-governance evidence readiness without false certification claims;
-- explicit claim-promotion/release evidence separating accepted design, protected-main implementation, scientific validity and release readiness;
-- 100% owned production line/branch coverage, complete public docs, realistic scientific recovery tests, SBOM/provenance/reproducible release gates.
+- TEPP as the product and TRSL-TM as the topic-measurement family;
+- immutable source evidence and exact spans;
+- event/valid, assertion, document, system, availability, and knowledge-cutoff
+  clocks;
+- partial-order interval reasoning and forward-only transitions;
+- document, passage, event, entity-role, membership, topic, factor, and evidence
+  graphs;
+- time-varying cross-classified multiple membership;
+- one shared multilingual latent topic identity with native lexical channels;
+- launch validation profiles for English, Korean, Japanese, Simplified and
+  Traditional Chinese, Vietnamese, Indonesian, French, German, and Turkish;
+- no default stopword deletion and no TF-IDF/BM25 inferential weighting;
+- template/section/copied/prompt/style/modality/background method sources;
+- Rust CPU f64 numerical authority, bounded CPU parallelism, GPU/VRAM streaming,
+  and parity evidence;
+- statistically gated candidate-K selection plus blinded LLM review;
+- valid compositional coordinates, posterior networks, and consensus clusters;
+- reflective/formative/network construct-role gates and posterior-aware
+  longitudinal ESEM/DSEM;
+- TDT and CHRONOS task/claim separation;
+- LLMs as fallible semantic/interpreter raters rather than statistical or
+  release authority;
+- standalone and modular MSA behavior with no cross-service table coupling;
+- purpose-bound PII access and separately protected identity mappings rather
+  than destructive blanket masking;
+- CSAP/SOC 2/AI-governance readiness without false certification claims;
+- 100% owned production line/branch coverage, complete public docs, realistic
+  recovery tests, SBOM, provenance, rollback, and reproducible release gates.
 
 ## 5. Implementation truth
 
 Documentation completeness must not be confused with product completeness.
 
-- **implemented-main:** Rust workspace/quality foundation, immutable evidence/exact-span boundary, typed six-clock/uncertain interval foundation (PR #8), and canonical documentation/ADR authority graph through PR #7/#8.
-- **active-PR:** PR #9 Allen relation algebra and bounded path-consistency reasoner replayed onto protected-main temporal foundation; promote only after exact-head gates and merge.
-- **accepted-target:** Event ontology/graph, multilevel estimators beyond the membership network surface, persistence/splits, multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, TDT/CHRONOS, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority, and production service APIs.
-- **partial:** selected repository-quality and standalone crate boundaries are implemented, while complete estimator/service/release authorities remain target work.
-- **deployment-owned/external-assurance:** production infrastructure controls, measured SLO/RPO/RTO, CSAP certification, SOC 2 attestation and jurisdiction-specific legal determinations.
+### Implemented-main
 
-## 6. Remaining documentation work is event-driven
+- Rust workspace and exact quality gates;
+- immutable evidence and exact source spans;
+- typed six-clock values and uncertain intervals;
+- bounded Allen path consistency;
+- forward-only transition graph;
+- leakage-safe snapshots and relation-connected splits;
+- deterministic temporal/event simulations;
+- core recovery metrics;
+- selected API/export/reproducibility contracts;
+- foundation validation and release-evidence tooling.
 
-No additional large parallel documentation pack should be created merely for completeness. Future documentation changes are triggered by actual implementation or accepted-decision changes:
+### Partial
 
-- temporal Task 3/4 integration → promote maturity only after exact-head protected-main evidence;
-- API implementation → machine-readable OpenAPI/AsyncAPI/JSON Schema and exact consumer contracts;
-- PostgreSQL implementation → real migrations, RLS, physical constraints/indexes, rollback and ERD/ADR 0013 reconciliation;
-- GPU implementation → backend/precision/memory contract and measured hardware profiles;
-- model implementation/release → model/data card, validation report, claim-promotion record and immutable provenance bundle;
-- visual analytics → Figma design system and accessibility/exact-value interaction states;
-- production deployment → measured SLO, backup/restore, RPO/RTO, incident and assurance evidence.
+- event mention/instance and membership surfaces;
+- PostgreSQL bitemporal and live SQL port;
+- API/service contracts and modular connectors;
+- privacy/security/operability implementation beyond repository contracts.
 
-## 7. Exit criterion
+### Active PR
 
-The canonical documentation design is already protected-main authority through merged PR #7. Future documentation fitness is event-driven and must stay synchronized with actual implementation lineage. PR #8 can promote the Task 3 temporal capability only after its unchanged exact head satisfies all live repository gates and is merged to protected main; the same rule applies independently to the future Task 4 replay.
+- PR #30 tenant FORCE RLS, runtime role restrictions, session helpers, and live
+  cross-tenant PostgreSQL tests until exact-head integration.
+
+### Accepted target
+
+- multilingual semantic units and governed concepts;
+- TRSL-TM CPU estimator and posterior;
+- candidate-K selection;
+- topic networks and clusters;
+- GPU/VRAM compute;
+- TDT/CHRONOS intelligence;
+- longitudinal ESEM/DSEM;
+- evidence-bounded interpretation;
+- coordinated accessible visual analytics;
+- production job/API and deployment operations.
+
+### Deployment-owned / external-assurance
+
+- measured service SLO, RPO, RTO, capacity, regional controls, and backup/restore;
+- CSAP certification, SOC 2 attestation, and jurisdiction-specific legal
+  conclusions.
+
+## 6. Remaining documentation work is implementation-triggered
+
+No second parallel documentation authority is required. Future changes occur in
+the canonical graph when implementation advances:
+
+- semantic measurement → concept/language profile schemas and benchmark reports;
+- topic estimator → model/data cards, posterior schemas, recovery reports, and
+  compatibility artifacts;
+- candidate selection → candidate plan, Pareto, review, and decision schemas;
+- GPU → measured backend, precision, memory, and parity profiles;
+- psychometrics → estimand, invariance, missingness, and recovery artifacts;
+- visual analytics → Figma design system, interaction/state diagrams,
+  accessibility, and exact-value export contracts;
+- deployment → OpenAPI/AsyncAPI, measured SLO/RPO/RTO, KMS, backup/restore,
+  incident, and assurance evidence.
+
+## 7. Sufficiency conclusion
+
+The TEPP documentation graph is **design-sufficient** after PRD v0.5 because a
+qualified reviewer can reconstruct the buyer problem, product workflows, data
+and model boundaries, fail-closed semantics, scientific claims, security/privacy
+controls, visual surfaces, acceptance evidence, phased release scope, and
+implementation maturity without chat history.
+
+It becomes **protected-main-sufficient** only after this exact PRD/documentation
+change integrates under repository rules and remains current with protected-main
+source. Product completeness still requires implementation and scientific,
+security/privacy, operational, accessibility, and commercial evidence for the
+remaining PRD slices.

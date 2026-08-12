@@ -1,74 +1,135 @@
 # TEPP Requirements, Research, and Evidence Traceability
 
-**Status:** Accepted cross-cutting traceability baseline  
-**Last reviewed:** 2026-08-12
+**Status:** Accepted cross-cutting traceability baseline aligned to PRD v0.5  
+**Last reviewed:** 2026-08-13
 
-The full APA 7th standards/literature register remains `docs/research/standards-and-literature.md`. This matrix links durable requirements to their owning decisions and implementation/evidence maturity without duplicating the bibliography.
+The full APA 7 standards/literature register remains
+`docs/research/standards-and-literature.md`. This matrix links the stable PRD v0.5
+requirement families to their owning decisions, implementation boundaries, and
+claim maturity without duplicating the bibliography.
 
-| Requirement / decision | Canonical basis | Source/evidence boundary | Maturity |
+## Product requirement families
+
+| PRD family | Product obligation | Owning authority | Current source/evidence boundary | Maturity |
+|---|---|---|---|---|
+| `FR-EVD-*` | Immutable evidence, exact spans, quarantine, version lineage, no active-content execution | ADR 0008; Architecture; TRD | `evidence_core` and evidence wire/security tests | implemented-main |
+| `FR-TMP-*` | Six clocks, uncertain intervals, historical eligibility, interval reasoning, forward-only transitions | ADR 0002; ADR 0013 | `temporal_core`, `relation_graph`, `corpus_split` | implemented-main |
+| `FR-REL-*` | Typed relations, observed/inferred separation, relation-aware partitions | ADR 0003; ADR 0016 | `relation_graph`, `corpus_split`; broader evidence graph remains partial | partial |
+| `FR-MEM-*` | Cross-classified multiple membership, time-varying roles, ESS/design effects, atomistic-fallacy control | ADR 0003; ADR 0005 | `membership_core`; multilevel estimators remain accepted-target | partial |
+| `FR-LNG-*` | Span-level language profiles, shared latent identity, profile promotion | ADR 0004; ADR 0012 | language/semantic/topic crates not yet integrated | accepted-target |
+| `FR-SEM-*` | Non-destructive Unicode, language-tailored boundaries, POS/dependency/method sources, governed concepts, LLM proposal validation | ADR 0004; ADR 0012 | simulation method factors exist; semantic measurement remains accepted-target | partial |
+| `FR-TOP-*` | Rust CPU f64 TRSL-TM, structural covariates, posterior uncertainty, drift, global topic identity, adapter conformance | ADR 0001; ADR 0012 | `topic_measurement` not yet integrated | accepted-target |
+| `FR-KSEL-*` | Candidate plans, statistical hard gates, Pareto frontier, blinded LLM review, escalation | ADR 0010; ADR 0012; ADR 0014 | `model_selection` not yet integrated | accepted-target |
+| `FR-NET-*` | Valid compositional coordinates, posterior edges, conditional networks, consensus clusters | ADR 0005; ADR 0012 | `network_analysis` not yet integrated | accepted-target |
+| `FR-EVT-*` | Mention/instance separation, TDT tasks, schema-hypothesis authority, forecast calibration | ADR 0003; ADR 0016 | `event_core` mention/instance separation implemented; intelligence stack remaining | partial |
+| `FR-PSY-*` | Construct-role gate, posterior propagation, invariance, within/between, irregular time, ordered paths, causal-language control | ADR 0005; ADR 0014 | `psychometric_core` not yet integrated | accepted-target |
+| `FR-LLM-*` | Untrusted output, interpreter/verifier, unsupported claims, orchestration ablation, credential and authority boundaries | ADR 0010; ADR 0015 | connector and workflow contracts exist; analytical interpretation port remains partial | partial |
+| `FR-CMP-*` | Compute profiles, bounded CPU pools, VRAM admission, streaming statistics, CPU/GPU parity, phase scheduling | ADR 0001; ADR 0006; ADR 0007 | reference workspace/quality gates exist; numerical/GPU backends remain accepted-target | partial |
+| `FR-API-*` | Versioned contracts, async jobs, no cross-service table coupling, naruon/contextual-orchestrator authority | ADR 0011; ADR 0013 | `tepp_api` DTO/export contracts and connector documents; HTTP/jobs remaining | partial |
+| `FR-EXP-*` | Accessible exact values, source-consistent exports, cutoff audit, reproducibility manifests | ADR 0011; ADR 0013; ADR 0014 | JSON-LD/GraphML/reproducibility contracts exist; visual/export suite remains partial | partial |
+| `FR-SEC-*` | Tenant isolation, purpose-bound PII, identity separation, keys, audit, retention/deletion | ADR 0009; ADR 0013 | persistence contracts are partial; FORCE RLS/runtime-role work is active on PR #30 | active-PR |
+| `FR-OPS-*` | Observability, crash recovery, backup/restore, capacity profiles, release evidence | ADR 0014; Operability | release-evidence tooling exists; deployment evidence remains partial/deployment-owned | partial |
+
+## Protected-main implementation trace
+
+| Capability | Canonical basis | Protected-main evidence | Maturity |
 |---|---|---|---|
-| immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring | implemented-main |
-| Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
-| Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
-| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |
-| Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
-| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
-| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; full intelligence stack remaining | partial |
-| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
-| leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
-| recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
-| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, tenant RLS (`0002` + session GUC/role helpers), `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` driver, exact-head live PostgreSQL CI with isolation proof; remaining physical ERD/constraints/backup remaining | partial |
-| known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | `tepp_simulation` on protected main; recovery metrics in `validation_core` | implemented-main |
-| versioned service/API contracts and exports | PRD; API contract; ADR 0011/0013 | `tepp_api` analysis-run/export/JSON-LD/GraphML contracts on protected main (PR #21); HTTP service remaining accepted-target | partial |
-| immutable split/run/reproducibility manifests | ADR 0013; ERD | `tepp_api` reproducibility manifest contract on protected main; persistence/model-run artifact chain remaining | partial |
-| multilingual shared latent semantic space | PRD; ADR 0004 | future semantic/concept/topic crates | accepted-target |
-| TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004 | future `topic_measurement` | accepted-target |
-| global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
-| no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
-| report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
-| candidate K statistical/Pareto gates + blinded LLM review | ADR 0012; research | future `model_selection` | accepted-target |
-| compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
-| posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
-| CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
-| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
-| evidence-bounded LLM interpretation | ADR 0010/0012; PRD | future `interpretation_gateway` | accepted-target |
-| adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | future contextual-orchestrator integration + ablation evidence | accepted-target |
-| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | future authorization/persistence/export/provider adapters | accepted-target |
-| tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | future service/persistence boundaries | accepted-target |
-| standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; future service ports | partial |
-| naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract on protected main; HTTP service remaining | partial |
-| contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `docs/connectors/contextual-orchestrator-interpretation-port.md`; live port remaining | partial |
-| autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | future safe OpenCode/NVIDIA autonomous-development workflow | accepted-target |
-| contextual-orchestrator execution boundary | ADR 0010/0011 | provider-neutral orchestration port; TEPP retains scientific authority | accepted-target |
-| foundation validation / release-readiness ledger | ADR 0014; Test Strategy | PR #24 `docs/validation/temporal-event-foundation.md` on protected main | implemented-main |
-| scientific claim promotion separated from design/implementation/release | ADR 0014; ADR policy | documentation/CI/domain validation/release evidence | partial |
-| CSAP/SOC 2/ISO/NIST assurance readiness | `docs/COMPLIANCE_READINESS.md`; research register | repository controls + future deployment evidence | accepted-target / deployment-owned |
-| threat-model controls and scientific-integrity security | `SECURITY.md`; `docs/THREAT_MODEL.md` | deterministic security/privacy/scientific validation gates | partial |
-| accessible bitemporal/network/drift/invariance views | PRD/UML | future `visual_analytics`; Figma in approved visual phase | accepted-target |
-| 100% production line/branch/public docs | ADR 0007; AGENTS | CI/repository contracts | implemented-main and required for future source |
-| SBOM/provenance/reproducible release | ADR 0014; Operability/Compliance | `scripts/release_evidence.py` CycloneDX SBOM + exact-head provenance + checksums in CI; full package/image release bundle remaining | partial |
+| immutable source evidence and exact spans | PRD `FR-EVD-*`; ADR 0008 | `evidence_core`, Task 2 tests and doctoring | implemented-main |
+| Rust workspace and exact quality gates | PRD `FR-CMP-*`; ADR 0007 | workspace/CI/repository contracts | implemented-main |
+| six distinct clocks and uncertain intervals | PRD `FR-TMP-001/002`; ADR 0002 | `temporal_core` | implemented-main |
+| Allen relation algebra and bounded path consistency | PRD `FR-TMP-004`; ADR 0002 | `temporal_core` relation/reasoner contracts | implemented-main |
+| forward-only transition subgraph | PRD `FR-TMP-005`; ADR 0002/0003 | `relation_graph` | implemented-main |
+| event mention/instance separation | PRD `FR-EVT-001`; ADR 0003 | `event_core` promotion boundary | partial |
+| weighted multiple membership and ESS helpers | PRD `FR-MEM-*`; ADR 0003 | `membership_core` | partial |
+| leakage-safe cutoff snapshots and relation-connected splits | PRD `FR-TMP-003`, `FR-REL-003`; ADR 0002/0013 | `corpus_split` | implemented-main |
+| known-truth temporal/event simulation | PRD scientific acceptance; Test Strategy | `tepp_simulation` | implemented-main |
+| RMSE, bias, coverage, graph, temporal-order, and Monte Carlo SE-aware gates | PRD acceptance; ADR 0007/0014 | `validation_core` | implemented-main |
+| bitemporal persistence contracts and live SQL port | PRD `FR-EVD-005`, `FR-SEC-*`; ADR 0013 | `persistence_postgres`, SQLx/live PostgreSQL CI | partial |
+| tenant FORCE RLS and runtime-role restrictions | PRD `FR-SEC-001`; ADR 0009/0013 | PR #30 at exact head until protected-main integration | active-PR |
+| versioned analysis-run DTOs and exports | PRD `FR-API-*`, `FR-EXP-*`; ADR 0011/0013 | `tepp_api`, JSON-LD/GraphML/reproducibility contracts | partial |
+| naruon modular artifact consumer | PRD `FR-API-004`; ADR 0011/0012 | connector contract and protected-main consumer artifacts | partial |
+| contextual-orchestrator interpretation boundary | PRD `FR-API-005`, `FR-LLM-*`; ADR 0010/0011 | connector and credential-separation documents | partial |
+| release SBOM/provenance/checksum evidence | PRD `FR-OPS-005`; ADR 0014 | `scripts/release_evidence.py` and CI artifacts | partial |
+| foundation validation ledger | PRD release slices; ADR 0014 | `docs/validation/temporal-event-foundation.md` | implemented-main |
+
+## Accepted target trace
+
+| Product slice | Required PRD evidence before promotion | Planned implementation boundary |
+|---|---|---|
+| Multilingual semantic measurement | `FR-LNG-*`, `FR-SEM-*`; human-gold span/concept/calibration/profile evidence | semantic preprocessing, concept dictionary, language-profile artifacts |
+| TRSL-TM CPU reference | `FR-TOP-*`; objective/convergence/posterior/recovery/independent oracle | `topic_measurement` Rust estimator |
+| Candidate-K selection | `FR-KSEL-*`; candidate manifests, hard gates, Pareto and blinded review | `model_selection` |
+| Topic network and clusters | `FR-NET-*`; valid-coordinate recovery, edge uncertainty, ARI/NMI/stability | `network_analysis` |
+| Longitudinal ESEM/DSEM | `FR-PSY-*`; invariance, within/between, irregular time, path recovery | `psychometric_core` |
+| GPU and VRAM control | `FR-CMP-*`; real-device parity and 4/6/8/12/24-GB profiles | `compute_backend` |
+| TDT and CHRONOS event intelligence | `FR-EVT-002/003/004`; task metrics, hypothesis authority, calibration | `event_intelligence` |
+| Evidence-bounded interpretation | `FR-LLM-*`; support, verifier, disagreement, abstention and injection evidence | `interpretation_gateway` |
+| Coordinated visual analytics | `FR-EXP-*`; Figma interaction contract, exact-value and accessibility evidence | `visual_analytics` |
+| Production API/job service | `FR-API-001/002`; idempotent job lifecycle, backpressure and compatibility evidence | API server and workers |
+| Enterprise operations | `FR-SEC-*`, `FR-OPS-*`; deployment, KMS, audit, backup/restore, measured SLO evidence | deployment-owned adapters and runbooks |
 
 ## Scientific evidence promotion
 
-Promotion rules are governed by ADR 0014 and `docs/adr/ADR_POLICY.md`. A decision can be `Accepted` while implementation remains `accepted-target`. A target becomes `implemented-main` only when its source is integrated on protected main and the relevant exact-head tests, scientific/recovery/validation evidence, security/supply-chain checks, and qualifying review required by live policy pass. Planning documents, simulations that do not exercise production code, queued checks, predecessor-head results, or LLM judgments cannot promote implementation maturity.
+Promotion rules are governed by ADR 0014 and `docs/adr/ADR_POLICY.md`.
+A PRD requirement or accepted decision may remain `accepted-target`. A capability
+becomes `implemented-main` only when its source is integrated on protected main
+and the applicable exact-head software, scientific, security/privacy,
+supply-chain, migration/recovery, accessibility, and qualifying review gates
+pass.
 
-Replacement or replay PRs inherit source/test lineage only for auditability; they do **not** inherit current-head CI, security, review, or approval evidence. PRs #8 and #9 reacquired those gates before their protected-main merges. Every active PR listed above must independently reacquire the same exact-head evidence before its capability can be promoted.
+Planning documents, local-only results, simulations that do not exercise the
+production path, skipped hardware tests, queued or predecessor-head checks,
+status-only bot output, or LLM agreement cannot promote implementation maturity.
+An open PR is evidence of an `active-PR` only.
 
 ## Claim discipline
 
-- Allen path consistency must not be promoted into unrestricted global satisfiability proof.
-- Language support is not promoted from architecture alone; each profile needs validation/invariance evidence.
-- GPU support is not promoted if required hardware tests are skipped or only a software fallback ran when hardware parity is claimed.
-- Dynamic ESEM/DSEM effects are not promoted to causal claims without an identified design and corresponding evidence.
-- Topic clusters, event links, TDT tracking, CHRONOS predictions, and LLM agreement are not observed fact or causal evidence by identity.
-- LLM or multi-agent agreement does not establish measurement truth; source evidence and scientific gates remain authoritative.
-- CSAP readiness, SOC 2 readiness, ISO/NIST alignment, and repository controls are not certification or attestation.
-- A `200억 달러` acquisition bar is a prioritization heuristic, not a valuation result.
+- Allen path consistency is not unrestricted global satisfiability.
+- Language support requires versioned task/domain validation and applicable
+  invariance; architecture alone is insufficient.
+- GPU support requires real-device execution and CPU-reference parity.
+- Dynamic ESEM/DSEM paths are not causal without an identified design and
+  assumptions.
+- Topic clusters, event links, TDT tracking, CHRONOS predictions, and LLM
+  agreement are model-derived claims rather than observed fact.
+- Raw topic proportions are not passed to naïve Pearson correlation or ordinary
+  Gaussian ESEM as unconstrained observations.
+- LLMs do not establish measurement truth, deterministic authority, merge
+  authority, or release authority.
+- CSAP/SOC 2/ISO/NIST readiness and repository controls are not certification or
+  attestation.
+- The `200억 달러` acquisition bar is a prioritization standard, not a valuation
+  result.
+
+## PRD v0.5 requirement evidence rule
+
+Each implementation PR that claims a PRD v0.5 requirement shall identify:
+
+1. the exact `FR-*` requirement identifiers;
+2. the owning ADR and affected technical documents;
+3. RED→GREEN or equivalent pre-fix evidence for changed behavior;
+4. exact source, tests, migrations, schemas, and artifacts;
+5. scientific acceptance metrics where applicable;
+6. current-head CI/security/review evidence;
+7. rollback, compatibility, and failure-mode evidence;
+8. maturity change requested after protected-main integration.
 
 ## Documentation fitness trace
 
-`docs/DOCUMENTATION_ASSESSMENT.md` evaluates the full canonical graph and distinguishes design sufficiency from protected-main sufficiency. `docs/adr/README.md` is the decision ownership/supersession map; `docs/adr/ADR_POLICY.md` defines decision status independently from implementation maturity. New documentation or accepted architecture does not become protected-main implementation evidence until the exact documentation/implementation PR is integrated under repository policy.
+`docs/DOCUMENTATION_ASSESSMENT.md` evaluates the canonical graph and distinguishes
+design sufficiency from protected-main sufficiency. `docs/adr/README.md` is the
+decision ownership/supersession map; `docs/adr/ADR_POLICY.md` defines decision
+status independently from implementation maturity. `docs/product/prd-v0.5.md`
+is the current detailed product contract; v0.4 remains historical evidence.
 
 ## Documentation rule
 
-When a scientific estimand, time meaning, ontology relation, membership structure, topic/backend identity, compute backend, privacy/authorization model, service authority, persistence/reproducibility contract, orchestration policy, autonomous-development authority, event-intelligence claim, implementation-lineage authority, or accepted evidence threshold changes, update the owning ADR/PRD where required plus this matrix, affected architecture/data/API documents, exact tests/validation evidence, and standards/research documentation in the same reviewed change.
+When a scientific estimand, clock meaning, relation authority, ontology,
+membership structure, language-equivalence claim, topic/backend identity,
+compute backend, privacy/authorization model, service authority,
+persistence/reproducibility contract, orchestration policy, autonomous
+development authority, event-intelligence claim, implementation-lineage
+authority, or accepted evidence threshold changes, update the owning ADR and PRD
+version where required, this matrix, affected architecture/data/API documents,
+exact tests/validation evidence, and standards/research documentation in the same
+reviewed change.

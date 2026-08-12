@@ -40,6 +40,7 @@ REQUIRED_FILES = (
     "docs/adr/0014-scientific-claim-promotion-and-release-evidence.md",
     "docs/adr/0015-autonomous-development-review-and-merge-authority.md",
     "docs/adr/0016-tdt-chronos-event-intelligence-boundary.md",
+    "docs/product/prd-v0.5.md",
     "docs/product/prd-v0.4-approved.md",
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
     "docs/superpowers/plans/2026-08-05-temporal-event-foundation.md",
@@ -78,6 +79,7 @@ ADR_REQUIRED_HEADINGS = (
 )
 
 CANONICAL_LINKS = (
+    "docs/product/prd-v0.5.md",
     "docs/product/prd-v0.4-approved.md",
     "docs/DOCUMENTATION_ASSESSMENT.md",
     "docs/TRD.md",
