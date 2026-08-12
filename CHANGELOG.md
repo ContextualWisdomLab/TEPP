@@ -10,6 +10,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `relation_graph` forward-only state-transition DAG with past-pointing provenance edges and cycle rejection.
 - `tepp_simulation` deterministic truth-corpus generator with delayed reporting, multilevel memberships, method-effect variants, relation noise, and digest-bound truth manifests.
 - `corpus_split` leakage-safe knowledge-cutoff snapshots, relation-connected co-partition groups, rolling-origin windows, and group-normalized ESS weight contracts.
+- `persistence_postgres` live SQL port: `SqlSession` transport, migration batch applicator, document/audit SQL contracts, `LiveDocumentRepository`, and fail-closed `DATABASE_URL`/`LiveSqlxConfig` gate for SQLx pool wiring (live pool/query driver remains accepted-target).
 - `persistence_postgres` bitemporal foundation: multi-word migration contracts, knowledge-cutoff eligibility, and in-memory as-known-at / as-valid-at document replay (live SQLx/PostgreSQL execution remains accepted-target).
 - `event_core` mention/instance separation with explicit promotion, typed roles, event-time validity, and fail-closed mention-as-instance refusal.
 - `membership_core` time-varying weighted multiple-membership network with contextual roles, event-time validity, and atomistic-fallacy prevention contracts.
