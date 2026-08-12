@@ -16,7 +16,7 @@ publish = false
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-temporal_core = { path = "../temporal_core", version = "0.1.0" }
+temporal_core = { path = "../temporal_core", version = "=0.1.0" }
 uuid.workspace = true
 
 [dev-dependencies]
