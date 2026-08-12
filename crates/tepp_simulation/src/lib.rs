@@ -20,12 +20,12 @@ mod truth_manifest;
 pub use configuration::SimulationConfig;
 /// Method-effect labels for generated documents.
 pub use document_process::DocumentMethodEffect;
+/// Synthetic non-wrapping calendar bound in hours.
+pub use document_process::SYNTHETIC_YEAR_HOURS;
 /// Simulated document observation.
 pub use document_process::SimulatedDocument;
 /// Simulated multilevel membership assignment.
 pub use document_process::SimulatedMembership;
-/// Synthetic non-wrapping calendar bound in hours.
-pub use document_process::SYNTHETIC_YEAR_HOURS;
 /// Construct delayed event/document/available clocks.
 pub use document_process::delayed_clocks;
 /// Membership role vocabulary helper.
@@ -426,15 +426,22 @@ mod tests {
         // crosses the synthetic year and must fail closed. Exercise each variant
         // slot so every `push_variant_if_drawn` error path is covered.
         let max_report = SYNTHETIC_YEAR_HOURS - 2;
-        for (revision, translation, template) in [
-            (10_000, 0, 0),
-            (0, 10_000, 0),
-            (0, 0, 10_000),
-        ] {
+        for (revision, translation, template) in [(10_000, 0, 0), (0, 10_000, 0), (0, 0, 10_000)] {
             let mut saw_failure = false;
             for seed in 0..50_000_u64 {
                 let config = SimulationConfig::new(
-                    seed, 1, 1, 1, max_report, 0, 0, 0, 0, revision, translation, template,
+                    seed,
+                    1,
+                    1,
+                    1,
+                    max_report,
+                    0,
+                    0,
+                    0,
+                    0,
+                    revision,
+                    translation,
+                    template,
                 )
                 .expect("cfg");
                 if generate(config) == Err(SimulationError::TemporalInvariantViolation) {
@@ -451,10 +458,8 @@ mod tests {
 
     #[test]
     fn full_variant_rates_emit_derivatives_and_false_positives() {
-        let config = SimulationConfig::new(
-            17, 3, 1, 3, 6, 3, 0, 0, 10_000, 10_000, 10_000, 10_000,
-        )
-        .expect("cfg");
+        let config = SimulationConfig::new(17, 3, 1, 3, 6, 3, 0, 0, 10_000, 10_000, 10_000, 10_000)
+            .expect("cfg");
         let manifest = generate(config).expect("variants");
         assert!(manifest.document_count() > manifest.event_count());
         assert!(
