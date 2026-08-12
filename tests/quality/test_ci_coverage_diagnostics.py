@@ -20,6 +20,11 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
 
         self.assertIn("id: line-report", workflow)
         self.assertIn("cargo llvm-cov report --text --show-missing-lines", workflow)
+        self.assertIn("--show-instantiations", workflow)
+        self.assertIn(
+            'LLVM_COV_FLAGS="--show-line-counts-or-regions" cargo llvm-cov report',
+            workflow,
+        )
         self.assertIn("steps.line-report.outcome == 'success'", workflow)
         self.assertIn("id: branch-report", workflow)
         self.assertIn(
@@ -27,6 +32,34 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
             workflow,
         )
         self.assertIn("steps.branch-report.outcome == 'success'", workflow)
+
+    def test_line_gate_uses_lcov_authored_lines_and_keeps_region_evidence(self) -> None:
+        """Authored lines gate on LCOV while full JSON retains hidden-region evidence."""
+
+        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "cargo llvm-cov --workspace --all-features --json --output-path coverage.json",
+            workflow,
+        )
+        self.assertNotIn(
+            "cargo llvm-cov --workspace --all-features --json --summary-only",
+            workflow,
+        )
+        self.assertIn(
+            "cargo llvm-cov report --lcov --output-path coverage.lcov",
+            workflow,
+        )
+        self.assertIn(
+            "python3 scripts/check_coverage.py coverage.lcov --kind lines --format lcov",
+            workflow,
+        )
+        self.assertNotIn(
+            "python3 scripts/check_coverage.py coverage.json --kind lines",
+            workflow,
+        )
+        self.assertIn("UNCOVERED_REGION", workflow)
+        self.assertIn("UNCOVERED_FUNCTION", workflow)
 
 
 if __name__ == "__main__":  # pragma: no cover
