@@ -9,7 +9,8 @@ Task 12 introduces fail-closed versioned wire contracts in `tepp_api` for standa
 3. reproducibility manifests;
 4. JSON-LD export envelopes;
 5. GraphML export rendering with XML escaping;
-6. committed JSON Schema and example payloads under `schemas/` and `examples/`.
+6. committed JSON Schema and example payloads under `schemas/` and `examples/`;
+7. purpose-bound export authorization that preserves scientific identity linkages and refuses blanket PII masking.
 
 HTTP service routing remains accepted-target. Domain estimation and persistence stay outside this crate.
 
@@ -24,6 +25,10 @@ Sporny, M., Longley, D., Kellogg, G., Lanthaler, M., Champin, P.-A., & Lindströ
 Brandes, U., Eiglsperger, M., Herman, I., Himsolt, M., & Marshall, M. S. (2002). GraphML progress report: Structural layer proposal. In *Graph Drawing* (pp. 501–512). Springer. https://doi.org/10.1007/3-540-45848-4_59
 
 Wright, A., Andrews, H., Hutton, B., & Dennis, G. (2022). *JSON Schema: A media type for describing JSON documents* (Internet-Draft). IETF.
+
+ISO/IEC. (2019). *ISO/IEC 27701:2019 Security techniques — Extension to ISO/IEC 27001 and ISO/IEC 27002 for privacy information management — Requirements and guidelines*. International Organization for Standardization.
+
+National Institute of Standards and Technology. (2020). *NIST Privacy Framework: A tool for improving privacy through enterprise risk management* (Version 1.0). U.S. Department of Commerce. https://doi.org/10.6028/NIST.CSWP.01162020
 
 ## Verification
 

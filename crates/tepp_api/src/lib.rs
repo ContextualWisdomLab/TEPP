@@ -7,6 +7,7 @@
 //! scientific crates; this crate only defines fail-closed interchange shapes.
 
 mod analysis_run;
+mod authorization;
 mod envelope;
 mod error;
 mod export;
@@ -34,3 +35,14 @@ pub use export::GraphMlExport;
 pub use export::JsonLdExport;
 /// Reproducibility manifest.
 pub use export::ReproducibilityManifest;
+
+/// Analytical export purpose.
+pub use authorization::AnalyticalPurpose;
+/// Purpose-bound export authorization decision.
+pub use authorization::ExportAuthorizationDecision;
+/// Purpose-bound export authorization request.
+pub use authorization::ExportAuthorizationRequest;
+/// Authorize an export under purpose-bound policy.
+pub use authorization::authorize_export;
+/// Fail closed when an export decision is denied.
+pub use authorization::require_export_allowed;
