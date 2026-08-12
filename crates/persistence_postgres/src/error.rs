@@ -14,6 +14,14 @@ pub enum PersistenceError {
     HistoricalVersionNotFound,
     /// A document digest failed closed validation.
     InvalidContentDigest,
+    /// A live SQL batch was empty after comment/whitespace stripping.
+    EmptySqlBatch,
+    /// A live SQL statement or transport operation failed closed.
+    SqlExecutionFailed,
+    /// A live database URL failed scheme/host validation.
+    DatabaseUrlInvalid,
+    /// Live `SQLx` wiring was requested without a configured transport URL.
+    LiveAdapterNotConfigured,
 }
 
 impl fmt::Display for PersistenceError {
@@ -23,6 +31,10 @@ impl fmt::Display for PersistenceError {
             Self::ImmutableAuditViolation => "immutable audit violation",
             Self::HistoricalVersionNotFound => "historical version not found",
             Self::InvalidContentDigest => "invalid content digest",
+            Self::EmptySqlBatch => "empty sql batch",
+            Self::SqlExecutionFailed => "sql execution failed",
+            Self::DatabaseUrlInvalid => "database url invalid",
+            Self::LiveAdapterNotConfigured => "live adapter not configured",
         };
         formatter.write_str(message)
     }
@@ -79,6 +91,22 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidContentDigest.to_string(),
             "invalid content digest"
+        );
+        assert_eq!(
+            PersistenceError::EmptySqlBatch.to_string(),
+            "empty sql batch"
+        );
+        assert_eq!(
+            PersistenceError::SqlExecutionFailed.to_string(),
+            "sql execution failed"
+        );
+        assert_eq!(
+            PersistenceError::DatabaseUrlInvalid.to_string(),
+            "database url invalid"
+        );
+        assert_eq!(
+            PersistenceError::LiveAdapterNotConfigured.to_string(),
+            "live adapter not configured"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),
