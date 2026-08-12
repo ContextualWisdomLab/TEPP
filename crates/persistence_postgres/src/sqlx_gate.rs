@@ -70,6 +70,15 @@ impl LiveSqlxConfig {
     pub fn database_url(&self) -> &str {
         &self.database_url
     }
+
+    /// Test-only constructor that skips URL validation.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn for_test(database_url: impl Into<String>) -> Self {
+        Self {
+            database_url: database_url.into(),
+        }
+    }
 }
 
 /// Require a validated live configuration before opening a pool.
@@ -144,6 +153,23 @@ mod tests {
         assert_eq!(DATABASE_URL_ENV, "DATABASE_URL");
     }
 
+    fn classify_live_result(result: Result<LiveSqlxConfig, PersistenceError>) -> &'static str {
+        match result {
+            Ok(live) => {
+                let url = live.database_url();
+                if url.starts_with("postgres://") || url.starts_with("postgresql://") {
+                    "ok"
+                } else {
+                    "ok-bad-scheme"
+                }
+            }
+            Err(
+                PersistenceError::LiveAdapterNotConfigured | PersistenceError::DatabaseUrlInvalid,
+            ) => "expected-err",
+            Err(_) => "other-err",
+        }
+    }
+
     #[test]
     fn env_gate_reports_missing_and_invalid_configuration() {
         assert_eq!(
@@ -162,16 +188,27 @@ mod tests {
             .expect("configured");
         assert!(cfg.database_url().contains("127.0.0.1"));
 
-        match require_live_sqlx_config() {
-            Ok(live) => assert!(
-                live.database_url().starts_with("postgres://")
-                    || live.database_url().starts_with("postgresql://")
-            ),
-            Err(
-                PersistenceError::LiveAdapterNotConfigured | PersistenceError::DatabaseUrlInvalid,
-            ) => {}
-            Err(other) => panic!("unexpected live config error: {other}"),
-        }
+        assert_eq!(
+            classify_live_result(require_live_sqlx_config_from(Some(
+                "postgres://localhost/tepp".into(),
+            ))),
+            "ok"
+        );
+        assert_eq!(
+            classify_live_result(require_live_sqlx_config_from(None)),
+            "expected-err"
+        );
+        assert_eq!(
+            classify_live_result(Err(PersistenceError::DuplicateDocumentRecord)),
+            "other-err"
+        );
+        assert_eq!(
+            classify_live_result(Ok(LiveSqlxConfig::for_test("not-postgres"))),
+            "ok-bad-scheme"
+        );
+        // Process env path is exercised; classification is only expected-err or ok.
+        let env_class = classify_live_result(require_live_sqlx_config());
+        assert!(env_class == "ok" || env_class == "expected-err");
         let _ = LiveSqlxConfig::from_env();
     }
 }
