@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `persistence_postgres` tenant row-level security migration (`0002`) with `FORCE ROW LEVEL SECURITY`, `tepp_app_runtime` least-privilege role, session GUC helpers, catalog validation, and live CI isolation exercise.
 - `persistence_postgres` live PostgreSQL CI: `live-postgres` job with Postgres 16 service, `TEPP_LIVE_POSTGRES=1` gate, and integration coverage for pool open, foundation migrations, document insert/revise/as-of, and audit SQL.
 - Repository release evidence tooling: `scripts/release_evidence.py` generates CycloneDX 1.5 SBOM, exact-head provenance, and SHA-256 checksums from `Cargo.lock`/`Cargo.toml`, with fail-closed validation and CI generation on every quality gate.
 - `persistence_postgres` `live-sqlx` feature: real `SQLx`/`PgPool` open/execute behind validated `DATABASE_URL` and `LiveSqlxPoolOptions`, with offline/live executor backends and CI coverage exclusion for the transport module.

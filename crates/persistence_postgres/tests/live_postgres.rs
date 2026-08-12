@@ -8,7 +8,9 @@
 
 use persistence_postgres::{
     AuditEvent, DocumentRecord, LiveDocumentRepository, LiveSqlxPoolOptions, MigrationCatalog,
-    SqlSession, apply_sql_batch, open_live_sqlx_pool, require_live_sqlx_config,
+    SqlSession, apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql,
+    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
+    set_session_tenant_sql,
 };
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
@@ -72,7 +74,9 @@ fn live_postgres_applies_migrations_and_document_sql() {
     let config = require_live_sqlx_config().expect(
         "DATABASE_URL must be set and valid when TEPP_LIVE_POSTGRES=1 (live Postgres CI gate)",
     );
-    let options = LiveSqlxPoolOptions::new(2, 5_000).expect("pool options");
+    // Single connection so SET ROLE / tenant GUC session state survives between
+    // SqlSession::execute calls (pool acquire must reuse the same backend session).
+    let options = LiveSqlxPoolOptions::new(1, 5_000).expect("pool options");
     let pool = open_live_sqlx_pool(&config, options)
         .expect("live-sqlx pool must open against the CI PostgreSQL service");
     assert!(pool.is_live());
@@ -83,12 +87,14 @@ fn live_postgres_applies_migrations_and_document_sql() {
         .expect("SELECT 1 through live transport");
 
     let catalog = MigrationCatalog::from_embedded().expect("embedded foundation catalog");
-    // Re-run safe: down is IF EXISTS, then apply the authoritative up contract.
-    apply_sql_batch(repo.session_mut(), catalog.down_sql())
-        .expect("foundation down migration must apply (IF EXISTS)");
+    // Best-effort reset: empty service DBs lack tables/role; re-runs clean residual objects.
+    let _ = apply_sql_batch(repo.session_mut(), catalog.down_sql());
+    let _ = repo
+        .session_mut()
+        .execute("DROP ROLE IF EXISTS tepp_app_runtime");
     let applied = repo
         .apply_migrations(&catalog)
-        .expect("foundation migrations must apply on live PostgreSQL");
+        .expect("foundation+RLS migrations must apply on live PostgreSQL");
     assert!(applied >= 1);
 
     let tenant_record_id = Uuid::now_v7();
@@ -143,4 +149,85 @@ fn live_postgres_applies_migrations_and_document_sql() {
         recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
     };
     repo.append_audit(&audit).expect("append audit_event");
+
+    prove_tenant_rls_isolation(&mut repo);
+}
+
+/// Superuser seeds two tenants; `tepp_app_runtime` must only see the bound tenant.
+fn prove_tenant_rls_isolation(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+) {
+    let tenant_a = Uuid::now_v7();
+    let tenant_b = Uuid::now_v7();
+    let artifact_a = Uuid::now_v7();
+    let artifact_b = Uuid::now_v7();
+    let digest_a = "11".repeat(32);
+    let digest_b = "22".repeat(32);
+
+    seed_tenant_and_artifact(repo, tenant_a, artifact_a, &digest_a);
+    seed_tenant_and_artifact(repo, tenant_b, artifact_b, &digest_b);
+
+    repo.session_mut()
+        .execute(&assume_app_runtime_role_sql())
+        .expect("SET ROLE tepp_app_runtime");
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_a))
+        .expect("bind tenant A session GUC");
+
+    repo.session_mut()
+        .execute(&format!(
+            "SELECT 1 FROM source_artifact WHERE source_artifact_id = '{artifact_a}'::uuid \
+             AND content_sha256 = '{digest_a}'"
+        ))
+        .expect("tenant A must read own source_artifact under RLS");
+
+    repo.session_mut()
+        .execute(&format!(
+            "DO $tepp$ BEGIN \
+               IF EXISTS ( \
+                 SELECT 1 FROM source_artifact WHERE source_artifact_id = '{artifact_b}'::uuid \
+               ) THEN \
+                 RAISE EXCEPTION 'cross-tenant source_artifact visible under RLS'; \
+               END IF; \
+             END $tepp$"
+        ))
+        .expect("tenant A must not read tenant B source_artifact");
+
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_b))
+        .expect("bind tenant B session GUC");
+    repo.session_mut()
+        .execute(&format!(
+            "DO $tepp$ BEGIN \
+               IF EXISTS ( \
+                 SELECT 1 FROM source_artifact WHERE source_artifact_id = '{artifact_a}'::uuid \
+               ) THEN \
+                 RAISE EXCEPTION 'cross-tenant source_artifact visible under RLS'; \
+               END IF; \
+             END $tepp$"
+        ))
+        .expect("tenant B must not read tenant A source_artifact");
+    repo.session_mut()
+        .execute(&format!(
+            "SELECT 1 FROM source_artifact WHERE source_artifact_id = '{artifact_b}'::uuid \
+             AND content_sha256 = '{digest_b}'"
+        ))
+        .expect("tenant B must read own source_artifact under RLS");
+
+    repo.session_mut()
+        .execute(&clear_session_tenant_sql())
+        .expect("clear tenant GUC");
+    repo.session_mut()
+        .execute(
+            "DO $tepp$ BEGIN \
+               IF EXISTS (SELECT 1 FROM source_artifact LIMIT 1) THEN \
+                 RAISE EXCEPTION 'unset tenant GUC must hide all source_artifact rows'; \
+               END IF; \
+             END $tepp$",
+        )
+        .expect("cleared tenant GUC must deny all rows");
+
+    repo.session_mut()
+        .execute(&reset_app_runtime_role_sql())
+        .expect("RESET ROLE");
 }

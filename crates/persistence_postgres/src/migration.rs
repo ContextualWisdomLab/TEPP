@@ -7,6 +7,8 @@ use std::collections::BTreeSet;
 const FOUNDATION_UP: &str = include_str!("../../../migrations/0001_bitemporal_foundation.up.sql");
 const FOUNDATION_DOWN: &str =
     include_str!("../../../migrations/0001_bitemporal_foundation.down.sql");
+const RLS_UP: &str = include_str!("../../../migrations/0002_tenant_row_level_security.up.sql");
+const RLS_DOWN: &str = include_str!("../../../migrations/0002_tenant_row_level_security.down.sql");
 
 /// Forward and rollback SQL for one migration unit.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -16,14 +18,16 @@ pub struct MigrationCatalog {
 }
 
 impl MigrationCatalog {
-    /// Load the embedded foundation migrations shipped with this crate.
+    /// Load the embedded foundation and tenant RLS migrations shipped with this crate.
     ///
     /// # Errors
     ///
     /// Returns [`MigrationContractError::EmptyMigrationSql`] when embedded
     /// sources are unexpectedly empty.
     pub fn from_embedded() -> Result<Self, MigrationContractError> {
-        Self::from_sources(FOUNDATION_UP, FOUNDATION_DOWN)
+        let up_sql = format!("{FOUNDATION_UP}\n{RLS_UP}");
+        let down_sql = format!("{RLS_DOWN}\n{FOUNDATION_DOWN}");
+        Self::from_sources(&up_sql, &down_sql)
     }
 
     fn from_sources(up_sql: &str, down_sql: &str) -> Result<Self, MigrationContractError> {
@@ -60,9 +64,12 @@ impl MigrationCatalog {
 
 /// Validate migration SQL against TEPP persistence contracts.
 ///
+/// When the catalog declares row-level security, every tenant-scoped table must
+/// enable RLS and name multi-word isolation policies.
+///
 /// # Errors
 ///
-/// Returns naming, tenant, temporal, or emptiness failures.
+/// Returns naming, tenant, temporal, RLS, or emptiness failures.
 pub fn validate_migration_catalog(
     catalog: &MigrationCatalog,
 ) -> Result<(), MigrationContractError> {
@@ -82,6 +89,10 @@ pub fn validate_migration_catalog(
         let body =
             table_body(catalog.up_sql(), table).ok_or(MigrationContractError::EmptyMigrationSql)?;
         validate_table_body(table, body)?;
+    }
+
+    if declares_row_level_security(catalog.up_sql()) {
+        validate_tenant_rls_contract(catalog.up_sql(), &tables)?;
     }
 
     Ok(())
@@ -106,6 +117,70 @@ fn validate_table_body(table: &str, body: &str) -> Result<(), MigrationContractE
         return Err(MigrationContractError::MissingTemporalColumns);
     }
     Ok(())
+}
+
+fn validate_tenant_rls_contract(
+    up_sql: &str,
+    tables: &BTreeSet<String>,
+) -> Result<(), MigrationContractError> {
+    let lower = up_sql.to_ascii_lowercase();
+    if !lower.contains("tepp_app_runtime") {
+        return Err(MigrationContractError::MissingAppRuntimeRole);
+    }
+    if !lower.contains("tepp.current_tenant_record_id") {
+        return Err(MigrationContractError::MissingTenantSessionGuc);
+    }
+
+    let policies = parse_create_policy_names(up_sql);
+    if policies.is_empty() {
+        return Err(MigrationContractError::MissingRlsPolicy);
+    }
+    for policy in &policies {
+        if !is_multi_word_snake_case(policy) {
+            return Err(MigrationContractError::SingleWordObjectName);
+        }
+    }
+
+    for table in tables {
+        if !table_has_rls_enabled(&lower, table) {
+            return Err(MigrationContractError::MissingRlsEnable);
+        }
+        if !table_has_tenant_policy(&lower, table) {
+            return Err(MigrationContractError::MissingRlsPolicy);
+        }
+    }
+    Ok(())
+}
+
+fn declares_row_level_security(up_sql: &str) -> bool {
+    let lower = up_sql.to_ascii_lowercase();
+    let has_enable = lower.contains("enable row level security");
+    let has_policy = lower.contains("create policy");
+    has_enable | has_policy
+}
+
+fn table_has_rls_enabled(lower_sql: &str, table: &str) -> bool {
+    let enable = format!("alter table {table} enable row level security");
+    let force = format!("alter table {table} force row level security");
+    lower_sql.contains(&enable) & lower_sql.contains(&force)
+}
+
+fn table_has_tenant_policy(lower_sql: &str, table: &str) -> bool {
+    let on_table = format!(" on {table}");
+    let mut search_from = 0usize;
+    while let Some(rel) = lower_sql[search_from..].find("create policy") {
+        let abs = search_from + rel;
+        let after_policy = &lower_sql[abs..];
+        let window_end = after_policy[13..]
+            .find("create policy")
+            .map_or(after_policy.len(), |idx| 13 + idx);
+        let window = &after_policy[..window_end];
+        if window.contains(&on_table) && window.contains("tenant_record_id") {
+            return true;
+        }
+        search_from = abs + "create policy".len();
+    }
+    false
 }
 
 fn requires_tenant_boundary(table: &str) -> bool {
@@ -158,6 +233,29 @@ fn parse_create_table_names(sql: &str) -> BTreeSet<String> {
     names
 }
 
+fn parse_create_policy_names(sql: &str) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let upper = sql.to_ascii_uppercase();
+    let mut search_from = 0usize;
+    while let Some(rel) = upper[search_from..].find("CREATE POLICY") {
+        let abs = search_from + rel + "CREATE POLICY".len();
+        let rest = sql[abs..].trim_start();
+        let name: String = rest
+            .chars()
+            .take_while(|ch| {
+                let alphanumeric = ch.is_ascii_alphanumeric();
+                let underscore = *ch == '_';
+                alphanumeric | underscore
+            })
+            .collect();
+        if !name.is_empty() {
+            names.insert(name.to_ascii_lowercase());
+        }
+        search_from = abs;
+    }
+    names
+}
+
 fn table_body<'a>(sql: &'a str, table: &str) -> Option<&'a str> {
     let lower = sql.to_ascii_lowercase();
     let needles = [
@@ -195,14 +293,21 @@ mod tests {
         let catalog = MigrationCatalog::from_embedded().expect("embedded");
         validate_migration_catalog(&catalog).expect("valid");
         assert!(catalog.up_sql().contains("CREATE TABLE"));
+        assert!(catalog.up_sql().contains("ENABLE ROW LEVEL SECURITY"));
+        assert!(catalog.up_sql().contains("CREATE POLICY"));
+        assert!(catalog.up_sql().contains("tepp_app_runtime"));
+        assert!(catalog.up_sql().contains("tepp.current_tenant_record_id"));
         assert!(catalog.down_sql().contains("DROP TABLE"));
+        assert!(catalog.down_sql().contains("DROP POLICY"));
+        assert!(catalog.down_sql().contains("DROP ROLE"));
     }
 
     #[test]
     fn helper_predicates_are_exhaustive() {
         use super::{
-            has_domain_time_column, has_system_time_column, is_registry_or_audit_table,
-            requires_tenant_boundary,
+            declares_row_level_security, has_domain_time_column, has_system_time_column,
+            is_registry_or_audit_table, parse_create_policy_names, requires_tenant_boundary,
+            table_has_rls_enabled, table_has_tenant_policy,
         };
         assert!(requires_tenant_boundary("document_record"));
         assert!(!requires_tenant_boundary("tenant_record"));
@@ -216,6 +321,29 @@ mod tests {
         assert!(has_domain_time_column("available_time timestamptz"));
         assert!(has_domain_time_column("valid_from timestamptz"));
         assert!(!has_domain_time_column("system_time timestamptz"));
+        assert!(declares_row_level_security("ENABLE ROW LEVEL SECURITY"));
+        assert!(declares_row_level_security("CREATE POLICY x ON y"));
+        assert!(!declares_row_level_security("CREATE TABLE document_record ()"));
+        assert!(table_has_rls_enabled(
+            "alter table document_record enable row level security; alter table document_record force row level security;",
+            "document_record"
+        ));
+        assert!(!table_has_rls_enabled(
+            "alter table document_record enable row level security;",
+            "document_record"
+        ));
+        assert!(table_has_tenant_policy(
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id = 'x'::uuid)",
+            "document_record"
+        ));
+        assert!(!table_has_tenant_policy(
+            "create policy other_table_policy on other_table using (tenant_record_id = 'x'::uuid)",
+            "document_record"
+        ));
+        let policies = parse_create_policy_names(
+            "CREATE POLICY document_record_tenant_isolation ON document_record FOR ALL USING (true);",
+        );
+        assert!(policies.contains("document_record_tenant_isolation"));
     }
 
     #[test]
@@ -273,6 +401,106 @@ mod tests {
     }
 
     #[test]
+    fn rls_contracts_fail_closed_when_declared() {
+        let missing_role = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_record_tenant_isolation ON tenant_record
+                FOR ALL USING (
+                    tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+                );
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&missing_role),
+            Err(MigrationContractError::MissingAppRuntimeRole)
+        );
+
+        let missing_guc = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            CREATE ROLE tepp_app_runtime NOSUPERUSER;
+            ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
+            CREATE POLICY tenant_record_tenant_isolation ON tenant_record
+                FOR ALL USING (tenant_record_id IS NOT NULL);
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&missing_guc),
+            Err(MigrationContractError::MissingTenantSessionGuc)
+        );
+
+        let missing_enable = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            CREATE ROLE tepp_app_runtime NOSUPERUSER;
+            CREATE POLICY tenant_record_tenant_isolation ON tenant_record
+                FOR ALL USING (
+                    tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+                );
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&missing_enable),
+            Err(MigrationContractError::MissingRlsEnable)
+        );
+
+        let single_word_policy = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            CREATE ROLE tepp_app_runtime NOSUPERUSER;
+            ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
+            CREATE POLICY isolation ON tenant_record
+                FOR ALL USING (
+                    tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+                );
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&single_word_policy),
+            Err(MigrationContractError::SingleWordObjectName)
+        );
+
+        let missing_policy = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            CREATE ROLE tepp_app_runtime NOSUPERUSER;
+            -- tepp.current_tenant_record_id referenced for GUC scan; isolation policy omitted
+            ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&missing_policy),
+            Err(MigrationContractError::MissingRlsPolicy)
+        );
+    }
+
+    #[test]
     fn empty_and_malformed_sql_fail_closed() {
         let empty = MigrationCatalog::from_sql("   ", "DROP TABLE x;");
         assert_eq!(
@@ -290,7 +518,6 @@ mod tests {
             ),
             Err(MigrationContractError::EmptyMigrationSql)
         );
-        // `from_sql` permits empty down SQL so validate sees the down-empty branch.
         let empty_down = MigrationCatalog::from_sql(
             r"
             CREATE TABLE tenant_record (

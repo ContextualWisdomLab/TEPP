@@ -57,6 +57,14 @@ pub enum MigrationContractError {
     MissingTemporalColumns,
     /// Embedded or supplied migration SQL was empty or unreadable.
     EmptyMigrationSql,
+    /// Tenant RLS was declared without enabling FORCE RLS on a table.
+    MissingRlsEnable,
+    /// Tenant RLS was declared without a multi-word isolation policy.
+    MissingRlsPolicy,
+    /// Tenant RLS was declared without the non-superuser application role.
+    MissingAppRuntimeRole,
+    /// Tenant RLS was declared without the session tenant GUC contract.
+    MissingTenantSessionGuc,
 }
 
 impl fmt::Display for MigrationContractError {
@@ -66,6 +74,10 @@ impl fmt::Display for MigrationContractError {
             Self::MissingTenantBoundary => "missing tenant boundary column",
             Self::MissingTemporalColumns => "missing temporal columns",
             Self::EmptyMigrationSql => "empty migration sql",
+            Self::MissingRlsEnable => "missing row level security enable",
+            Self::MissingRlsPolicy => "missing tenant isolation policy",
+            Self::MissingAppRuntimeRole => "missing application runtime role",
+            Self::MissingTenantSessionGuc => "missing tenant session guc",
         };
         formatter.write_str(message)
     }
@@ -130,6 +142,22 @@ mod tests {
         assert_eq!(
             MigrationContractError::EmptyMigrationSql.to_string(),
             "empty migration sql"
+        );
+        assert_eq!(
+            MigrationContractError::MissingRlsEnable.to_string(),
+            "missing row level security enable"
+        );
+        assert_eq!(
+            MigrationContractError::MissingRlsPolicy.to_string(),
+            "missing tenant isolation policy"
+        );
+        assert_eq!(
+            MigrationContractError::MissingAppRuntimeRole.to_string(),
+            "missing application runtime role"
+        );
+        assert_eq!(
+            MigrationContractError::MissingTenantSessionGuc.to_string(),
+            "missing tenant session guc"
         );
     }
 }
