@@ -4,7 +4,7 @@ This file defines how architecture decisions are recorded and interpreted. It pr
 
 ## Two independent status axes
 
-Every ADR has two independent statuses.
+Every current numbered ADR and the ADR index carry two independent statuses.
 
 ### Decision status
 
@@ -54,6 +54,18 @@ TEPP deliberately separates adjacent authorities:
 - an LLM development agent is not review, merge, statistical, or release authority.
 
 The ADR index is the canonical map for these boundaries.
+
+## Machine-checkable ADR contract
+
+`scripts/validate_documentation.py` verifies that:
+
+- every numbered ADR file appears exactly once in the ADR index and vice versa;
+- every current ADR declares a valid `Decision status` and `Implementation maturity`;
+- every ADR states explicit supersession/supersedes metadata;
+- core Context, Decision, Alternatives, Consequences, Verification, and Rollback sections remain present; and
+- the root documentation map links both this policy and the ADR index.
+
+This turns ADR clarity into a repository gate rather than a prose convention.
 
 ## Change rule
 
