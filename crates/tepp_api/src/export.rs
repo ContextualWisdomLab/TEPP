@@ -46,9 +46,9 @@ pub struct JsonLdExport {
 /// Directed `GraphML` export built from normalized edge identities.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GraphMlExport {
-    /// Graph identifier (XML-safe opaque token).
+    /// Graph identifier (XML-escaped opaque token).
     pub graph_id: String,
-    /// Undirected edge pairs as opaque endpoint labels.
+    /// Directed edge pairs as opaque endpoint labels.
     pub edges: Vec<(String, String)>,
 }
 
@@ -171,9 +171,9 @@ impl GraphMlExport {
     ///
     /// # Errors
     ///
-    /// Returns [`ApiError::InvalidWirePayload`] when the graph id or any endpoint
-    /// is empty, and [`ApiError::LimitExceeded`] when `edges` is empty (no graph
-    /// content) or exceeds `maximum_edges`.
+    /// Returns [`ApiError::InvalidWirePayload`] when the graph id is empty, any
+    /// endpoint is empty, or `edges` is empty. Returns [`ApiError::LimitExceeded`]
+    /// only when `edges.len()` exceeds `maximum_edges`.
     pub fn new(
         graph_id: impl Into<String>,
         edges: Vec<(String, String)>,
@@ -196,7 +196,7 @@ impl GraphMlExport {
 
     /// Render a minimal `GraphML` document string with XML escaping.
     ///
-    /// Endpoint labels are XML-escaped for `&`, `<`, and `>`.
+    /// `graph_id` and endpoint labels are XML-escaped for `&`, `<`, `>`, and `"`.
     #[must_use]
     pub fn to_graphml(&self) -> String {
         let mut out = String::from(

@@ -35,15 +35,38 @@ pub struct ExportAuthorizationRequest {
 }
 
 /// Authorization decision that never masks scientific identity linkages.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+///
+/// Fields are private so callers cannot forge an allow decision. Construct only
+/// via [`authorize_export`].
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExportAuthorizationDecision {
     /// Whether the export may proceed.
-    pub allowed: bool,
+    allowed: bool,
     /// Stable machine-readable decision code.
-    pub decision_code: String,
+    decision_code: String,
     /// Content-redacting rationale safe for logs.
-    pub rationale: String,
+    rationale: String,
+}
+
+impl ExportAuthorizationDecision {
+    /// Whether the export may proceed.
+    #[must_use]
+    pub const fn is_allowed(&self) -> bool {
+        self.allowed
+    }
+
+    /// Stable machine-readable decision code.
+    #[must_use]
+    pub fn decision_code(&self) -> &str {
+        &self.decision_code
+    }
+
+    /// Content-redacting rationale safe for logs.
+    #[must_use]
+    pub fn rationale(&self) -> &str {
+        &self.rationale
+    }
 }
 
 impl AnalyticalPurpose {
@@ -61,9 +84,12 @@ impl AnalyticalPurpose {
 
 /// Authorize an export under purpose-bound policy.
 ///
-/// Free-text source bodies are denied for operational monitoring. Scientific
-/// validation and modular service consumers may receive linked opaque identities
-/// without blanket masking. Partner disclosure requires a non-empty principal.
+/// Policy is exhaustive over [`AnalyticalPurpose`]: a new purpose variant must
+/// declare its free-text source-body rule or the build fails. Opaque analytical
+/// identity linkages are never blanket-masked. Free-text source bodies are a
+/// separate disclosure class: allowed for scientific validation and modular
+/// service consumers; denied for operational monitoring and partner disclosure
+/// without an elevated grant outside this gate.
 ///
 /// # Errors
 ///
@@ -75,20 +101,34 @@ pub fn authorize_export(
     require_nonempty(&request.principal_id)?;
     require_nonempty(&request.artifact_id)?;
 
-    if request.purpose == AnalyticalPurpose::OperationalMonitoring && request.includes_source_text {
-        return Ok(ExportAuthorizationDecision {
-            allowed: false,
-            decision_code: "source_text_denied_for_purpose".into(),
-            rationale: "operational monitoring may not export free-text source bodies".into(),
-        });
-    }
+    // Exhaustive dispatch: adding a purpose requires an explicit source-text policy.
+    let denial = match (request.purpose, request.includes_source_text) {
+        (AnalyticalPurpose::OperationalMonitoring, true) => Some((
+            "source_text_denied_for_purpose",
+            "operational monitoring may not export free-text source bodies",
+        )),
+        (AnalyticalPurpose::PartnerDisclosure, true) => Some((
+            "partner_source_text_requires_elevated_grant",
+            "partner disclosure of source text requires elevated grant outside this gate",
+        )),
+        (
+            AnalyticalPurpose::ScientificValidation | AnalyticalPurpose::ModularServiceConsumer,
+            true,
+        )
+        | (
+            AnalyticalPurpose::ScientificValidation
+            | AnalyticalPurpose::ModularServiceConsumer
+            | AnalyticalPurpose::OperationalMonitoring
+            | AnalyticalPurpose::PartnerDisclosure,
+            false,
+        ) => None,
+    };
 
-    if request.purpose == AnalyticalPurpose::PartnerDisclosure && request.includes_source_text {
+    if let Some((decision_code, rationale)) = denial {
         return Ok(ExportAuthorizationDecision {
             allowed: false,
-            decision_code: "partner_source_text_requires_elevated_grant".into(),
-            rationale:
-                "partner disclosure of source text requires elevated grant outside this gate".into(),
+            decision_code: decision_code.into(),
+            rationale: rationale.into(),
         });
     }
 
@@ -103,9 +143,9 @@ pub fn authorize_export(
 ///
 /// # Errors
 ///
-/// Returns [`ApiError::AuthorizationDenied`] when `allowed` is false.
+/// Returns [`ApiError::AuthorizationDenied`] when the decision is not allowed.
 pub fn require_export_allowed(decision: &ExportAuthorizationDecision) -> Result<(), ApiError> {
-    if decision.allowed {
+    if decision.is_allowed() {
         Ok(())
     } else {
         Err(ApiError::AuthorizationDenied)
@@ -137,23 +177,31 @@ mod tests {
         let allowed =
             authorize_export(&base_request(AnalyticalPurpose::ScientificValidation, true))
                 .expect("sci");
-        assert!(allowed.allowed);
+        assert!(allowed.is_allowed());
         require_export_allowed(&allowed).expect("ok");
-        assert!(allowed.rationale.contains("scientific_validation"));
+        assert!(allowed.rationale().contains("scientific_validation"));
+        assert_eq!(allowed.decision_code(), "purpose_bound_export_allowed");
 
         let modular = authorize_export(&base_request(
+            AnalyticalPurpose::ModularServiceConsumer,
+            true,
+        ))
+        .expect("mod with source");
+        assert!(modular.is_allowed());
+        let modular_no_text = authorize_export(&base_request(
             AnalyticalPurpose::ModularServiceConsumer,
             false,
         ))
         .expect("mod");
-        assert!(modular.allowed);
+        assert!(modular_no_text.is_allowed());
 
         let ops_denied = authorize_export(&base_request(
             AnalyticalPurpose::OperationalMonitoring,
             true,
         ))
         .expect("ops");
-        assert!(!ops_denied.allowed);
+        assert!(!ops_denied.is_allowed());
+        assert_eq!(ops_denied.decision_code(), "source_text_denied_for_purpose");
         assert_eq!(
             require_export_allowed(&ops_denied),
             Err(ApiError::AuthorizationDenied)
@@ -164,17 +212,21 @@ mod tests {
             false,
         ))
         .expect("ops ok");
-        assert!(ops_ok.allowed);
+        assert!(ops_ok.is_allowed());
 
         let partner_denied =
             authorize_export(&base_request(AnalyticalPurpose::PartnerDisclosure, true))
                 .expect("partner");
-        assert!(!partner_denied.allowed);
+        assert!(!partner_denied.is_allowed());
+        assert_eq!(
+            partner_denied.decision_code(),
+            "partner_source_text_requires_elevated_grant"
+        );
 
         let partner_ok =
             authorize_export(&base_request(AnalyticalPurpose::PartnerDisclosure, false))
                 .expect("partner ok");
-        assert!(partner_ok.allowed);
+        assert!(partner_ok.is_allowed());
 
         assert_eq!(
             authorize_export(&ExportAuthorizationRequest {

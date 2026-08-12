@@ -5,17 +5,20 @@ use crate::wire::{require_nonempty, to_json};
 use serde::{Deserialize, Serialize};
 
 /// Stable wire error envelope for service responses.
+///
+/// Fields are private so callers cannot emit empty codes or unredacted free-form
+/// struct literals. Prefer [`ErrorEnvelope::from_api_error`] for typed mapping.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ErrorEnvelope {
     /// Stable machine-readable error code (`snake_case`).
-    pub error_code: String,
+    error_code: String,
     /// Content-redacting human message.
-    pub message: String,
+    message: String,
     /// Opaque request correlation identifier.
-    pub request_id: String,
+    request_id: String,
     /// Whether a client may retry the same operation.
-    pub retryable: bool,
+    retryable: bool,
 }
 
 impl ErrorEnvelope {
@@ -46,6 +49,9 @@ impl ErrorEnvelope {
 
     /// Build an envelope from a typed API error without leaking internals.
     ///
+    /// Fixed payload/edge limits map to non-retryable `limit_exceeded`. Transient
+    /// capacity limits should use a separate future error variant if introduced.
+    ///
     /// # Errors
     ///
     /// Returns [`ApiError::InvalidWirePayload`] when `request_id` is empty.
@@ -56,18 +62,51 @@ impl ErrorEnvelope {
         let (error_code, retryable) = match error {
             ApiError::InvalidWirePayload => ("invalid_wire_payload", false),
             ApiError::UnsupportedContractVersion => ("unsupported_contract_version", false),
-            ApiError::LimitExceeded => ("limit_exceeded", true),
+            ApiError::LimitExceeded => ("limit_exceeded", false),
             ApiError::AuthorizationDenied => ("authorization_denied", false),
         };
         Self::new(error_code, error.to_string(), request_id, retryable)
     }
 
-    /// Serialize to JSON.
+    /// Stable machine-readable error code.
+    #[must_use]
+    pub fn error_code(&self) -> &str {
+        &self.error_code
+    }
+
+    /// Content-redacting human message.
+    #[must_use]
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// Opaque request correlation identifier.
+    #[must_use]
+    pub fn request_id(&self) -> &str {
+        &self.request_id
+    }
+
+    /// Whether a client may retry the same operation.
+    #[must_use]
+    pub const fn retryable(&self) -> bool {
+        self.retryable
+    }
+
+    fn validate(&self) -> Result<(), ApiError> {
+        require_nonempty(&self.error_code)?;
+        require_nonempty(&self.message)?;
+        require_nonempty(&self.request_id)?;
+        Ok(())
+    }
+
+    /// Serialize to JSON after re-validating required fields.
     ///
     /// # Errors
     ///
-    /// Returns [`ApiError::InvalidWirePayload`] when serialization fails.
+    /// Returns [`ApiError::InvalidWirePayload`] when fields are empty or
+    /// serialization fails.
     pub fn to_json(&self) -> Result<String, ApiError> {
+        self.validate()?;
         to_json(self)
     }
 }
@@ -81,8 +120,10 @@ mod tests {
     fn envelope_round_trip_and_redaction() {
         let envelope =
             ErrorEnvelope::from_api_error(ApiError::LimitExceeded, "req-1").expect("env");
-        assert!(envelope.retryable);
-        assert_eq!(envelope.error_code, "limit_exceeded");
+        assert!(!envelope.retryable());
+        assert_eq!(envelope.error_code(), "limit_exceeded");
+        assert!(!envelope.message().is_empty());
+        assert_eq!(envelope.request_id(), "req-1");
         let json = envelope.to_json().expect("json");
         assert!(json.contains("limit_exceeded"));
         assert!(!json.contains("secret"));
@@ -98,13 +139,20 @@ mod tests {
             ErrorEnvelope::new("c", "m", "", false),
             Err(ApiError::InvalidWirePayload)
         );
+        // Deserialized empty fields must fail closed on serialize.
+        let forged: ErrorEnvelope = serde_json::from_str(
+            r#"{"error_code":"","message":"m","request_id":"r","retryable":false}"#,
+        )
+        .expect("deser");
+        assert_eq!(forged.to_json(), Err(ApiError::InvalidWirePayload));
         for error in [
             ApiError::InvalidWirePayload,
             ApiError::UnsupportedContractVersion,
             ApiError::AuthorizationDenied,
+            ApiError::LimitExceeded,
         ] {
             let mapped = ErrorEnvelope::from_api_error(error, "req-x").expect("map");
-            assert!(!mapped.retryable);
+            assert!(!mapped.retryable());
         }
     }
 }
