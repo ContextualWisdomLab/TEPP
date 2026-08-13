@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `tepp_api` purpose-bound provider-payload minimization: time-bounded `PurposeGrant` evaluation, fail-closed expired/not-yet-valid and cross-tenant denial, refusal to copy identity mappings into model-provider payloads or ordinary logs, preservation of opaque analytical identifiers and membership roles (no blanket PII mask), and a separately authorized scientific re-identification path.
 - `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.

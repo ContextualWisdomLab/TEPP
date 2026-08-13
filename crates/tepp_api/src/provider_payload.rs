@@ -1,0 +1,583 @@
+//! Purpose-bound provider payloads and separately authorized re-identification.
+
+use crate::ApiError;
+use crate::authorization::{
+    AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
+};
+use crate::wire::require_nonempty;
+use std::fmt;
+
+/// Time-bounded purpose grant evaluated at a decision instant.
+///
+/// `valid_from` / `valid_to` are RFC 3339 UTC instants (`YYYY-MM-DDTHH:MM:SSZ`).
+/// An omitted `valid_to` is an open-ended grant. The decision instant is the
+/// authorization's available/system time and must not use future-available
+/// evidence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PurposeGrant {
+    /// Opaque tenant/workspace identity bound to the grant.
+    pub tenant_workspace_id: String,
+    /// Opaque principal identity (not a password or token).
+    pub principal_id: String,
+    /// Declared analytical purpose.
+    pub purpose: AnalyticalPurpose,
+    /// Inclusive grant start instant.
+    pub valid_from: String,
+    /// Inclusive grant end instant, or `None` for an open-ended grant.
+    pub valid_to: Option<String>,
+    /// Whether a separate re-identification path is authorized.
+    pub reidentification_authorized: bool,
+}
+
+/// Evidence offered to a model provider or modular CWL peer.
+///
+/// Direct identity mappings must stay empty on this path. Opaque analytical
+/// identifiers and membership roles are scientific linkage and are not
+/// blanket-masked.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderEvidenceOffer {
+    /// Tenant/workspace that owns the offered evidence.
+    pub tenant_workspace_id: String,
+    /// Opaque artifact identity.
+    pub artifact_id: String,
+    /// Opaque analytical identifier retained for multilevel membership.
+    pub opaque_analytical_id: String,
+    /// Optional free-text source body.
+    pub source_text: Option<String>,
+    /// Direct identity mapping; must be absent for provider disclosure.
+    pub identity_mapping: Option<String>,
+    /// Optional contextual membership role preserved as scientific linkage.
+    pub membership_role: Option<String>,
+}
+
+/// Minimized payload that may be sent to a provider.
+///
+/// Construct only via [`minimize_provider_payload`]. The payload never carries
+/// a direct identity mapping.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MinimizedProviderPayload {
+    artifact_id: String,
+    opaque_analytical_id: String,
+    source_text: Option<String>,
+    membership_role: Option<String>,
+}
+
+impl MinimizedProviderPayload {
+    /// Opaque artifact identity.
+    #[must_use]
+    pub fn artifact_id(&self) -> &str {
+        &self.artifact_id
+    }
+
+    /// Opaque analytical identifier retained for measurement.
+    #[must_use]
+    pub fn opaque_analytical_id(&self) -> &str {
+        &self.opaque_analytical_id
+    }
+
+    /// Free-text source body when the purpose grant allows it.
+    #[must_use]
+    pub fn source_text(&self) -> Option<&str> {
+        self.source_text.as_deref()
+    }
+
+    /// Contextual membership role, if offered.
+    #[must_use]
+    pub fn membership_role(&self) -> Option<&str> {
+        self.membership_role.as_deref()
+    }
+
+    /// Direct identity mapping; always absent on the provider path.
+    #[must_use]
+    pub const fn identity_mapping(&self) -> Option<&str> {
+        None
+    }
+}
+
+/// Log-safe record of a provider disclosure decision.
+///
+/// Ordinary logs must not copy source text or direct identity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProviderDisclosureLog {
+    purpose: String,
+    included_source_text: bool,
+    included_identity_mapping: bool,
+}
+
+impl ProviderDisclosureLog {
+    /// Stable purpose wire name recorded with the decision.
+    #[must_use]
+    pub fn purpose_wire_name(&self) -> &str {
+        &self.purpose
+    }
+
+    /// Whether the minimized payload included a source body.
+    #[must_use]
+    pub const fn included_source_text(&self) -> bool {
+        self.included_source_text
+    }
+
+    /// Whether a direct identity mapping was included; always false.
+    #[must_use]
+    pub const fn included_identity_mapping(&self) -> bool {
+        self.included_identity_mapping
+    }
+}
+
+impl fmt::Display for ProviderDisclosureLog {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "provider_disclosure purpose={} source={} mapping={}",
+            self.purpose, self.included_source_text, self.included_identity_mapping
+        )
+    }
+}
+
+/// Separately protected identity mapping.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityMappingRecord {
+    /// Tenant/workspace that owns the mapping.
+    pub tenant_workspace_id: String,
+    /// Opaque analytical identifier.
+    pub opaque_analytical_id: String,
+    /// Direct identity string; never copied onto a provider payload.
+    pub direct_identity: String,
+}
+
+/// Result of an elevated re-identification disclosure.
+///
+/// Construct only via [`disclose_identity_mapping`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DisclosedIdentityMapping {
+    opaque_analytical_id: String,
+    direct_identity: String,
+}
+
+impl DisclosedIdentityMapping {
+    /// Opaque analytical identifier that was resolved.
+    #[must_use]
+    pub fn opaque_analytical_id(&self) -> &str {
+        &self.opaque_analytical_id
+    }
+
+    /// Direct identity released on the elevated path only.
+    #[must_use]
+    pub fn direct_identity(&self) -> &str {
+        &self.direct_identity
+    }
+}
+
+/// Minimize evidence for a model provider without blanket PII masking.
+///
+/// Opaque analytical identifiers and membership roles are preserved. Source
+/// text follows [`crate::authorize_export`]. Direct identity mappings are
+/// refused on this path even when re-identification is separately authorized.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for empty identities, empty
+/// optional strings, inverted grant windows, or non-canonical RFC 3339 UTC
+/// instants. Returns [`ApiError::AuthorizationDenied`] for expired or
+/// not-yet-valid grants, cross-tenant offers, attached identity mappings, or
+/// purpose-denied source text.
+pub fn minimize_provider_payload(
+    grant: &PurposeGrant,
+    offer: &ProviderEvidenceOffer,
+    decision_time: &str,
+) -> Result<(MinimizedProviderPayload, ProviderDisclosureLog), ApiError> {
+    validate_grant(grant)?;
+    require_nonempty(&offer.tenant_workspace_id)?;
+    require_nonempty(&offer.artifact_id)?;
+    require_nonempty(&offer.opaque_analytical_id)?;
+    require_optional_nonempty(offer.source_text.as_deref())?;
+    require_optional_nonempty(offer.membership_role.as_deref())?;
+    require_optional_nonempty(offer.identity_mapping.as_deref())?;
+    require_rfc3339_utc(decision_time)?;
+    if !grant_covers(grant, decision_time) {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    if offer.tenant_workspace_id != grant.tenant_workspace_id {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    if offer.identity_mapping.is_some() {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    let decision = authorize_export(&ExportAuthorizationRequest {
+        tenant_workspace_id: grant.tenant_workspace_id.clone(),
+        principal_id: grant.principal_id.clone(),
+        purpose: grant.purpose,
+        artifact_id: offer.artifact_id.clone(),
+        includes_source_text: offer.source_text.is_some(),
+    })?;
+    require_export_allowed(&decision)?;
+    let log = ProviderDisclosureLog {
+        purpose: grant.purpose.wire_name().into(),
+        included_source_text: offer.source_text.is_some(),
+        included_identity_mapping: false,
+    };
+    Ok((
+        MinimizedProviderPayload {
+            artifact_id: offer.artifact_id.clone(),
+            opaque_analytical_id: offer.opaque_analytical_id.clone(),
+            source_text: offer.source_text.clone(),
+            membership_role: offer.membership_role.clone(),
+        },
+        log,
+    ))
+}
+
+/// Disclose a direct identity mapping on the elevated scientific path.
+///
+/// This is not a provider payload. Modular consumers, operational monitoring,
+/// and partner disclosure cannot receive the mapping even when the grant flag
+/// is set.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for empty identities, inverted
+/// windows, or non-canonical instants. Returns
+/// [`ApiError::AuthorizationDenied`] when the grant is expired, not yet
+/// valid, cross-tenant, missing the elevated flag, or not
+/// [`AnalyticalPurpose::ScientificValidation`].
+pub fn disclose_identity_mapping(
+    grant: &PurposeGrant,
+    mapping: &IdentityMappingRecord,
+    decision_time: &str,
+) -> Result<DisclosedIdentityMapping, ApiError> {
+    validate_grant(grant)?;
+    require_nonempty(&mapping.tenant_workspace_id)?;
+    require_nonempty(&mapping.opaque_analytical_id)?;
+    require_nonempty(&mapping.direct_identity)?;
+    require_rfc3339_utc(decision_time)?;
+    if !grant_covers(grant, decision_time) {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    if mapping.tenant_workspace_id != grant.tenant_workspace_id {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    if !grant.reidentification_authorized
+        || grant.purpose != AnalyticalPurpose::ScientificValidation
+    {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    Ok(DisclosedIdentityMapping {
+        opaque_analytical_id: mapping.opaque_analytical_id.clone(),
+        direct_identity: mapping.direct_identity.clone(),
+    })
+}
+
+fn validate_grant(grant: &PurposeGrant) -> Result<(), ApiError> {
+    require_nonempty(&grant.tenant_workspace_id)?;
+    require_nonempty(&grant.principal_id)?;
+    require_rfc3339_utc(&grant.valid_from)?;
+    if let Some(until) = &grant.valid_to {
+        require_rfc3339_utc(until)?;
+        if until.as_str() < grant.valid_from.as_str() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+    }
+    Ok(())
+}
+
+fn grant_covers(grant: &PurposeGrant, decision_time: &str) -> bool {
+    if decision_time < grant.valid_from.as_str() {
+        return false;
+    }
+    if let Some(until) = &grant.valid_to
+        && decision_time > until.as_str()
+    {
+        return false;
+    }
+    true
+}
+
+fn require_optional_nonempty(value: Option<&str>) -> Result<(), ApiError> {
+    match value {
+        Some(text) => require_nonempty(text),
+        None => Ok(()),
+    }
+}
+
+fn require_rfc3339_utc(value: &str) -> Result<(), ApiError> {
+    if is_rfc3339_utc(value) {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidWirePayload)
+    }
+}
+
+fn is_rfc3339_utc(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 20
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes[10] == b'T'
+        && bytes[13] == b':'
+        && bytes[16] == b':'
+        && bytes[19] == b'Z'
+        && bytes[0..4].iter().all(u8::is_ascii_digit)
+        && bytes[5..7].iter().all(u8::is_ascii_digit)
+        && bytes[8..10].iter().all(u8::is_ascii_digit)
+        && bytes[11..13].iter().all(u8::is_ascii_digit)
+        && bytes[14..16].iter().all(u8::is_ascii_digit)
+        && bytes[17..19].iter().all(u8::is_ascii_digit)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        DisclosedIdentityMapping, IdentityMappingRecord, MinimizedProviderPayload,
+        ProviderDisclosureLog, ProviderEvidenceOffer, PurposeGrant, disclose_identity_mapping,
+        is_rfc3339_utc, minimize_provider_payload,
+    };
+    use crate::ApiError;
+    use crate::authorization::AnalyticalPurpose;
+
+    fn grant(purpose: AnalyticalPurpose, reidentification: bool) -> PurposeGrant {
+        PurposeGrant {
+            tenant_workspace_id: "tenant-ws-1".into(),
+            principal_id: "principal-analyst-1".into(),
+            purpose,
+            valid_from: "2026-01-01T00:00:00Z".into(),
+            valid_to: Some("2026-12-31T23:59:59Z".into()),
+            reidentification_authorized: reidentification,
+        }
+    }
+
+    fn offer(source: Option<&str>) -> ProviderEvidenceOffer {
+        ProviderEvidenceOffer {
+            tenant_workspace_id: "tenant-ws-1".into(),
+            artifact_id: "artifact-1".into(),
+            opaque_analytical_id: "entity-1".into(),
+            source_text: source.map(str::to_owned),
+            identity_mapping: None,
+            membership_role: None,
+        }
+    }
+
+    fn mapping() -> IdentityMappingRecord {
+        IdentityMappingRecord {
+            tenant_workspace_id: "tenant-ws-1".into(),
+            opaque_analytical_id: "entity-1".into(),
+            direct_identity: "Pat Lee".into(),
+        }
+    }
+
+    #[test]
+    fn rfc3339_utc_is_strict_and_windows_are_inclusive() {
+        assert!(is_rfc3339_utc("2026-01-01T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:00:00+00:00"));
+        assert!(!is_rfc3339_utc("2026-01-01 00:00:00Z"));
+        assert!(!is_rfc3339_utc("20260101T000000Z"));
+        assert!(!is_rfc3339_utc("xxxx-01-01T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-xx-01T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-xxT00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01Txx:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:xx:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:00:xxZ"));
+
+        let at_start = minimize_provider_payload(
+            &grant(AnalyticalPurpose::ScientificValidation, false),
+            &offer(None),
+            "2026-01-01T00:00:00Z",
+        )
+        .expect("start");
+        assert!(!at_start.1.included_source_text());
+        let at_end = minimize_provider_payload(
+            &grant(AnalyticalPurpose::ScientificValidation, false),
+            &offer(None),
+            "2026-12-31T23:59:59Z",
+        )
+        .expect("end");
+        assert!(at_end.0.identity_mapping().is_none());
+        assert_eq!(
+            at_end.1.to_string(),
+            "provider_disclosure purpose=scientific_validation source=false mapping=false"
+        );
+    }
+
+    #[test]
+    fn partner_and_ops_follow_export_source_rules() {
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::PartnerDisclosure, false),
+                &offer(Some("body")),
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+        let partner = minimize_provider_payload(
+            &grant(AnalyticalPurpose::PartnerDisclosure, false),
+            &offer(None),
+            "2026-06-15T12:00:00Z",
+        )
+        .expect("partner derived");
+        assert!(partner.0.source_text().is_none());
+        let ops = minimize_provider_payload(
+            &grant(AnalyticalPurpose::OperationalMonitoring, false),
+            &offer(None),
+            "2026-06-15T12:00:00Z",
+        )
+        .expect("ops derived");
+        assert_eq!(ops.1.purpose_wire_name(), "operational_monitoring");
+    }
+
+    #[test]
+    fn empty_optionals_and_grant_fields_fail_closed() {
+        let mut empty_principal = grant(AnalyticalPurpose::ScientificValidation, false);
+        empty_principal.principal_id.clear();
+        assert_eq!(
+            minimize_provider_payload(&empty_principal, &offer(None), "2026-06-15T12:00:00Z"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut empty_source = offer(Some(""));
+        empty_source.source_text = Some(String::new());
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &empty_source,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut empty_role = offer(None);
+        empty_role.membership_role = Some(String::new());
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &empty_role,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut empty_mapping_text = offer(None);
+        empty_mapping_text.identity_mapping = Some(String::new());
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &empty_mapping_text,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut empty_artifact = offer(None);
+        empty_artifact.artifact_id.clear();
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &empty_artifact,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut empty_opaque = offer(None);
+        empty_opaque.opaque_analytical_id.clear();
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &empty_opaque,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn disclose_covers_remaining_fail_closed_branches() {
+        assert_eq!(
+            disclose_identity_mapping(
+                &grant(AnalyticalPurpose::PartnerDisclosure, true),
+                &mapping(),
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+        let expired = PurposeGrant {
+            valid_to: Some("2026-02-01T00:00:00Z".into()),
+            ..grant(AnalyticalPurpose::ScientificValidation, true)
+        };
+        assert_eq!(
+            disclose_identity_mapping(&expired, &mapping(), "2026-06-15T12:00:00Z"),
+            Err(ApiError::AuthorizationDenied)
+        );
+        let inverted = PurposeGrant {
+            valid_from: "2026-12-31T00:00:00Z".into(),
+            valid_to: Some("2026-01-01T00:00:00Z".into()),
+            ..grant(AnalyticalPurpose::ScientificValidation, true)
+        };
+        assert_eq!(
+            disclose_identity_mapping(&inverted, &mapping(), "2026-06-15T12:00:00Z"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let foreign = IdentityMappingRecord {
+            tenant_workspace_id: "other-tenant".into(),
+            ..mapping()
+        };
+        assert_eq!(
+            disclose_identity_mapping(
+                &grant(AnalyticalPurpose::ScientificValidation, true),
+                &foreign,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+        let mut empty = mapping();
+        empty.direct_identity.clear();
+        assert_eq!(
+            disclose_identity_mapping(
+                &grant(AnalyticalPurpose::ScientificValidation, true),
+                &empty,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            disclose_identity_mapping(
+                &grant(AnalyticalPurpose::ScientificValidation, true),
+                &mapping(),
+                "bad",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut empty_opaque = mapping();
+        empty_opaque.opaque_analytical_id.clear();
+        assert_eq!(
+            disclose_identity_mapping(
+                &grant(AnalyticalPurpose::ScientificValidation, true),
+                &empty_opaque,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut empty_tenant = mapping();
+        empty_tenant.tenant_workspace_id.clear();
+        assert_eq!(
+            disclose_identity_mapping(
+                &grant(AnalyticalPurpose::ScientificValidation, true),
+                &empty_tenant,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let disclosed = DisclosedIdentityMapping {
+            opaque_analytical_id: "entity-1".into(),
+            direct_identity: "Pat Lee".into(),
+        };
+        assert_eq!(disclosed.opaque_analytical_id(), "entity-1");
+        assert_eq!(disclosed.direct_identity(), "Pat Lee");
+        let payload = MinimizedProviderPayload {
+            artifact_id: "a".into(),
+            opaque_analytical_id: "e".into(),
+            source_text: None,
+            membership_role: None,
+        };
+        assert_eq!(payload.artifact_id(), "a");
+        let log = ProviderDisclosureLog {
+            purpose: "scientific_validation".into(),
+            included_source_text: false,
+            included_identity_mapping: false,
+        };
+        assert!(!log.included_identity_mapping());
+    }
+}

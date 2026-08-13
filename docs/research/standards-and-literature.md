@@ -122,6 +122,16 @@ National Institute of Standards and Technology. (n.d.). *AI risk management fram
 
 한국인터넷진흥원. (n.d.). *클라우드서비스 보안인증제 제도소개*. Retrieved August 11, 2026, from https://isms.kisa.or.kr/main/csap/intro/index.jsp
 
+## Privacy purpose limitation and provider minimization
+
+ISO/IEC. (2025). *ISO/IEC 27701:2025 Information security, cybersecurity and privacy protection — Privacy information management systems — Requirements and guidance*. International Organization for Standardization.
+
+ISO/IEC. (2019). *ISO/IEC 27701:2019 Security techniques — Extension to ISO/IEC 27001 and ISO/IEC 27002 for privacy information management — Requirements and guidelines*. International Organization for Standardization.
+
+National Institute of Standards and Technology. (2020). *NIST Privacy Framework: A tool for improving privacy through enterprise risk management* (Version 1.0). U.S. Department of Commerce. https://doi.org/10.6028/NIST.CSWP.01162020
+
+TEPP applies ISO/IEC 27701:2025 purpose limitation and disclosure minimization, and the NIST Privacy Framework Control-P / Communicate-P functions, to provider payloads and separately authorized re-identification (ISO/IEC, 2025; National Institute of Standards and Technology, 2020). The 2019 edition is retained for earlier doctoring that treated PIMS as an ISO/IEC 27001 extension (ISO/IEC, 2019). These sources are readiness mappings, not certification.
+
 TEPP uses these sources as management/risk/readiness inputs, not as self-certification authority. ISO/IEC 42001:2023 and ISO/IEC 23894:2023 are published international standards (International Organization for Standardization, 2023a, 2023b). NIST AI RMF 1.0 remains the published framework while NIST is preparing a revision (Tabassi, 2023; National Institute of Standards and Technology, n.d.); the repository tracks the revision but does not silently treat an unpublished successor as normative. AICPA Trust Services Criteria are readiness inputs rather than self-issued attestation (American Institute of Certified Public Accountants, 2023). KISA currently describes CSAP service types as IaaS, SaaS, and DaaS and grades as high, medium, and low, while noting that the high and medium grades await later implementation (한국인터넷진흥원, n.d.). CSAP and SOC 2 evidence depend on actual deployment/organization controls and independent assessment.
 
 ## Security, accessibility, and software supply chain
