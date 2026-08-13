@@ -1,7 +1,7 @@
 # ADR 0009 — Purpose-bound PII governance without blanket masking
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** partial — purpose-bound export authorization and provider-payload minimization (expired-purpose denial, log/source separation, separately authorized re-identification) are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; persistence retention/deletion/legal-hold and deployment/provider-region evidence remain accepted-target  
 **Date:** 2026-08-10  
 **Supersedes:** None.
 

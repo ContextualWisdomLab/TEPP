@@ -11,6 +11,7 @@ mod authorization;
 mod envelope;
 mod error;
 mod export;
+mod provider_payload;
 mod wire;
 
 /// Analysis-run contract version constant.
@@ -46,3 +47,19 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
+/// Elevated re-identification result.
+pub use provider_payload::DisclosedIdentityMapping;
+/// Separately protected identity mapping.
+pub use provider_payload::IdentityMappingRecord;
+/// Minimized provider payload without direct identity.
+pub use provider_payload::MinimizedProviderPayload;
+/// Log-safe provider disclosure record.
+pub use provider_payload::ProviderDisclosureLog;
+/// Evidence offered to a model provider.
+pub use provider_payload::ProviderEvidenceOffer;
+/// Time-bounded purpose grant.
+pub use provider_payload::PurposeGrant;
+/// Disclose a mapping on the elevated scientific path.
+pub use provider_payload::disclose_identity_mapping;
+/// Minimize evidence for a model provider.
+pub use provider_payload::minimize_provider_payload;
