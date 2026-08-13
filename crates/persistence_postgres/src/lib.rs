@@ -12,7 +12,9 @@
 //! CI job (`TEPP_LIVE_POSTGRES=1`). Append-only reproducibility-manifest SQL
 //! contracts bind evidence digests, code commit, dependency lock, and knowledge
 //! cutoff for run provenance (ADR 0013). Model-run and model-artifact SQL
-//! contracts chain immutable run identities to those manifests.
+//! contracts chain immutable run identities to those manifests. Typed
+//! membership-assignment SQL (migration `0006`) replaces the polymorphic 0001 stub so documents
+//! can belong to multiple entities and projects without atomistic collapse.
 
 mod cutoff;
 mod document_sql;
@@ -21,6 +23,7 @@ mod error;
 mod live_pool;
 mod live_repository;
 mod manifest_sql;
+mod membership_sql;
 mod migration;
 mod model_run_sql;
 mod naming;
@@ -74,6 +77,12 @@ pub use manifest_sql::insert_reproducibility_manifest_sql;
 pub use manifest_sql::select_reproducibility_manifest_by_digests_sql;
 /// Render selection SQL by primary key.
 pub use manifest_sql::select_reproducibility_manifest_by_id_sql;
+/// Typed membership assignment row.
+pub use membership_sql::MembershipAssignmentRecord;
+/// Render insert SQL for a typed membership assignment.
+pub use membership_sql::insert_membership_assignment_sql;
+/// Render selection SQL for document-level membership assignments.
+pub use membership_sql::select_membership_assignments_for_document_sql;
 /// Embedded and ad-hoc migration catalogs.
 pub use migration::MigrationCatalog;
 /// Validate migration SQL against TEPP contracts.

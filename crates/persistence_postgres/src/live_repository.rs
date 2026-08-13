@@ -8,6 +8,10 @@ use crate::manifest_sql::{
     ReproducibilityManifestRecord, insert_reproducibility_manifest_sql,
     select_reproducibility_manifest_by_digests_sql, select_reproducibility_manifest_by_id_sql,
 };
+use crate::membership_sql::{
+    MembershipAssignmentRecord, insert_membership_assignment_sql,
+    select_membership_assignments_for_document_sql,
+};
 use crate::migration::{MigrationCatalog, validate_migration_catalog};
 use crate::model_run_sql::{
     CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord,
@@ -214,6 +218,32 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
+    /// Insert a typed membership assignment under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns exactly-one/weight validation or transport failures.
+    pub fn insert_membership_assignment(
+        &mut self,
+        record: &MembershipAssignmentRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_membership_assignment_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up document-level membership assignments by document identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_membership_assignments_for_document(
+        &mut self,
+        document_record_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_membership_assignments_for_document_sql(document_record_id);
+        self.session.execute(&sql)
+    }
+
     /// Look up a model run by primary key.
     ///
     /// # Errors
@@ -343,6 +373,44 @@ mod tests {
         );
     }
 
+    fn sample_membership() -> crate::MembershipAssignmentRecord {
+        crate::MembershipAssignmentRecord {
+            membership_assignment_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            document_record_id: Some(uuid::Uuid::nil()),
+            text_segment_id: None,
+            target_entity_id: Some(uuid::Uuid::nil()),
+            target_project_id: None,
+            membership_type_code: "author".into(),
+            membership_weight: 1.0,
+            valid_from: EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("v"),
+            valid_to: None,
+            valid_time_precision_code: "second".into(),
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        }
+    }
+
+    fn exercise_membership_assignment(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let membership = sample_membership();
+        repo.insert_membership_assignment(&membership)
+            .expect("membership insert");
+        repo.submit_membership_assignments_for_document(uuid::Uuid::nil())
+            .expect("membership lookup");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO membership_assignment"))
+        );
+        let mut invalid = membership;
+        invalid.target_entity_id = None;
+        assert_eq!(
+            repo.insert_membership_assignment(&invalid),
+            Err(PersistenceError::InvalidMembershipAssignment)
+        );
+    }
+
     #[test]
     fn live_repository_applies_migrations_and_document_sql() {
         let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
@@ -395,6 +463,7 @@ mod tests {
                 .any(|sql| sql.contains("INSERT INTO reproducibility_manifest"))
         );
         exercise_model_run_chain(&mut repo, &manifest);
+        exercise_membership_assignment(&mut repo);
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),

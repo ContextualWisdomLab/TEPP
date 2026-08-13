@@ -24,6 +24,8 @@ pub enum PersistenceError {
     PoolOptionsInvalid,
     /// Live `SQLx` wiring was requested without a configured transport URL.
     LiveAdapterNotConfigured,
+    /// A membership assignment violated exactly-one, weight, or label contracts.
+    InvalidMembershipAssignment,
 }
 
 impl fmt::Display for PersistenceError {
@@ -38,6 +40,7 @@ impl fmt::Display for PersistenceError {
             Self::DatabaseUrlInvalid => "database url invalid",
             Self::PoolOptionsInvalid => "pool options invalid",
             Self::LiveAdapterNotConfigured => "live adapter not configured",
+            Self::InvalidMembershipAssignment => "invalid membership assignment",
         };
         formatter.write_str(message)
     }
@@ -132,6 +135,10 @@ mod tests {
         assert_eq!(
             PersistenceError::LiveAdapterNotConfigured.to_string(),
             "live adapter not configured"
+        );
+        assert_eq!(
+            PersistenceError::InvalidMembershipAssignment.to_string(),
+            "invalid membership assignment"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),
