@@ -61,6 +61,6 @@ impl SqlxTransport {
         self.runtime
             .block_on(async { sqlx::query(sql).execute(&self.pool).await })
             .map(|_| ())
-            .map_err(|_| PersistenceError::SqlExecutionFailed)
+            .map_err(|err| crate::map_sql_execution_error(&err.to_string()))
     }
 }
