@@ -328,6 +328,26 @@ fn live_membership(
     }
 }
 
+fn entity_insert_sql(
+    entity_id: Uuid,
+    tenant_record_id: Uuid,
+    entity_type: &str,
+    available: AvailableTime,
+    system: SystemTime,
+) -> String {
+    format!(
+        "INSERT INTO entity_record (\
+            entity_record_id, tenant_record_id, entity_type_code, \
+            system_time, available_time\
+         ) VALUES (\
+            '{entity_id}'::uuid, '{tenant_record_id}'::uuid, '{entity_type}', \
+            '{system}'::timestamptz, '{available}'::timestamptz\
+         )",
+        system = system.to_rfc3339(),
+        available = available.to_rfc3339(),
+    )
+}
+
 fn seed_membership_targets(
     repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
     tenant_record_id: Uuid,
@@ -337,18 +357,35 @@ fn seed_membership_targets(
     available: AvailableTime,
     system: SystemTime,
 ) {
+    repo.session_mut()
+        .execute(&assume_app_runtime_role_sql())
+        .expect("SET ROLE tepp_app_runtime for membership seed");
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(Uuid::nil()))
+        .expect("bind wrong tenant GUC");
+    assert!(
+        repo.session_mut()
+            .execute(&entity_insert_sql(
+                entity_a,
+                tenant_record_id,
+                "author",
+                available,
+                system,
+            ))
+            .is_err(),
+        "wrong tenant GUC must reject entity_record insert under FORCE RLS"
+    );
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_record_id))
+        .expect("bind membership tenant GUC");
     for (entity_id, entity_type) in [(entity_a, "author"), (entity_b, "department")] {
         repo.session_mut()
-            .execute(&format!(
-                "INSERT INTO entity_record (\
-                    entity_record_id, tenant_record_id, entity_type_code, \
-                    system_time, available_time\
-                 ) VALUES (\
-                    '{entity_id}'::uuid, '{tenant_record_id}'::uuid, '{entity_type}', \
-                    '{system}'::timestamptz, '{available}'::timestamptz\
-                 )",
-                system = system.to_rfc3339(),
-                available = available.to_rfc3339(),
+            .execute(&entity_insert_sql(
+                entity_id,
+                tenant_record_id,
+                entity_type,
+                available,
+                system,
             ))
             .expect("insert entity_record");
     }
@@ -365,6 +402,12 @@ fn seed_membership_targets(
             available = available.to_rfc3339(),
         ))
         .expect("insert project_record");
+    repo.session_mut()
+        .execute(&reset_app_runtime_role_sql())
+        .expect("RESET ROLE after membership seed");
+    repo.session_mut()
+        .execute(&clear_session_tenant_sql())
+        .expect("clear tenant GUC after membership seed");
 }
 
 fn exercise_typed_membership_assignments(
