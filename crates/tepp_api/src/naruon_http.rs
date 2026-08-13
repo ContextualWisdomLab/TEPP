@@ -177,11 +177,27 @@ mod tests {
     fn origin_and_header_helpers_cover_accept_and_reject_arms() {
         assert!(compose_https_target("https://tepp.example.test", "/v1/x").is_ok());
         assert_eq!(
+            compose_https_target("", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("http://insecure.example", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             compose_https_target("https://", "/v1/x"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            compose_https_target("https:///leading", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             compose_https_target("https://user@host", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://host/path", "/v1/x"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
@@ -192,7 +208,48 @@ mod tests {
             compose_https_target("https://host#frag", "/v1/x"),
             Err(ApiError::InvalidWirePayload)
         );
+        assert_eq!(
+            compose_https_target("https://ho st", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://ho\\st", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://ho'st", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://ho;st", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://ho\u{0001}st", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://db.postgres.example", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://jdbc.example", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://api.example/sql", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://api.example/tables/x", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
         assert!(refuse_credential_headers(&[("x-trace", "1")]).is_ok());
+        assert!(refuse_credential_headers(&[]).is_ok());
+        assert_eq!(
+            refuse_credential_headers(&[("Authorization", "Bearer x")]),
+            Err(ApiError::AuthorizationDenied)
+        );
         assert_eq!(
             refuse_credential_headers(&[("cookie", "a=b")]),
             Err(ApiError::AuthorizationDenied)
@@ -205,6 +262,18 @@ mod tests {
             refuse_credential_headers(&[("x-github-token", "t")]),
             Err(ApiError::AuthorizationDenied)
         );
+        assert_eq!(
+            refuse_credential_headers(&[("x-copilot-session", "t")]),
+            Err(ApiError::AuthorizationDenied)
+        );
         assert!(naruon_may_claim_tepp_inference(NARUON_TEPP_INFERENCE_METHOD).is_ok());
+        assert_eq!(
+            naruon_may_claim_tepp_inference(""),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            naruon_may_claim_tepp_inference("other_method"),
+            Err(ApiError::InvalidWirePayload)
+        );
     }
 }
