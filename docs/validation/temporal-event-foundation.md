@@ -14,7 +14,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 |---|---|---|---|---|---|
 | Immutable evidence + spans | `evidence_core` | implemented-main | — | unit + wire + coverage | Task 2 |
 | Six-clock temporal | `temporal_core` | implemented-main | — | unit + wire | Task 3 / PR #8 |
-| Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
+| Allen path-consistency | `temporal_core` | implemented-main | predicted assertions | unit + budget tests; predicted-vs-observed rejection (active PR) | Task 4 / PR #9 + predicted assertions |
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
 | Multiple membership | `membership_core` | partial | — | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
