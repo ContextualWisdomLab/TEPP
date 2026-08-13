@@ -55,12 +55,13 @@ fn rollback_removes_rejection_triggers_without_granting_truncate() {
     let down_sql = normalized(catalog.down_sql());
 
     assert!(down_sql.contains("drop function if exists reject_append_only_mutation()"));
+    assert!(down_sql.contains(
+        "drop trigger if exists %i on %i', trigger_table || '_reject_mutation', trigger_table"
+    ));
     for table in APPEND_ONLY_TABLES {
         assert!(
-            down_sql.contains(
-                "drop trigger if exists %i on %i', trigger_table || '_reject_mutation', trigger_table"
-            ) || down_sql.contains(&format!("drop trigger if exists {table}_reject_mutation on {table}")),
-            "rollback must remove the append-only trigger for {table}"
+            down_sql.contains(&format!("'{table}'")),
+            "rollback trigger inventory must include {table}"
         );
         assert!(
             down_sql.contains(&format!(
