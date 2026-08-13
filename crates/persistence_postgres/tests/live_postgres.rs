@@ -410,6 +410,62 @@ fn exercise_typed_membership_assignments(
     .expect("insert project membership");
     repo.submit_membership_assignments_for_document(document_record_id)
         .expect("select document memberships");
+    prove_persisted_membership_rows(repo, document_record_id, entity_a, entity_b, project);
+    prove_membership_exactly_one_rejections(
+        repo,
+        tenant_record_id,
+        document_record_id,
+        entity_a,
+        project,
+        available,
+        system,
+    );
+}
+
+fn prove_persisted_membership_rows(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    document_record_id: Uuid,
+    entity_a: Uuid,
+    entity_b: Uuid,
+    project: Uuid,
+) {
+    let count_proof = format!(
+        "DO $tepp$ BEGIN \
+           IF (SELECT COUNT(*) FROM membership_assignment \
+               WHERE document_record_id = '{document_record_id}'::uuid) <> 3 THEN \
+             RAISE EXCEPTION 'expected three membership rows for one document'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM membership_assignment \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND target_entity_id = '{entity_a}'::uuid) <> 1 THEN \
+             RAISE EXCEPTION 'missing entity_a membership'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM membership_assignment \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND target_entity_id = '{entity_b}'::uuid) <> 1 THEN \
+             RAISE EXCEPTION 'missing entity_b membership'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM membership_assignment \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND target_project_id = '{project}'::uuid) <> 1 THEN \
+             RAISE EXCEPTION 'missing project membership'; \
+           END IF; \
+         END $tepp$"
+    );
+    repo.session_mut()
+        .execute(&count_proof)
+        .expect("one document must persist two entity and one project membership");
+}
+
+fn prove_membership_exactly_one_rejections(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    document_record_id: Uuid,
+    entity_a: Uuid,
+    project: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
     let dual_target = format!(
         "INSERT INTO membership_assignment (\
             membership_assignment_id, tenant_record_id, document_record_id, \
@@ -429,6 +485,42 @@ fn exercise_typed_membership_assignments(
     assert!(
         repo.session_mut().execute(&dual_target).is_err(),
         "exactly-one target check must reject dual entity+project keys"
+    );
+
+    let text_segment_id = Uuid::now_v7();
+    repo.session_mut()
+        .execute(&format!(
+            "INSERT INTO text_segment (\
+                text_segment_id, tenant_record_id, document_record_id, \
+                start_byte, end_byte, system_time, available_time\
+             ) VALUES (\
+                '{text_segment_id}'::uuid, '{tenant_record_id}'::uuid, \
+                '{document_record_id}'::uuid, 0, 8, \
+                '{system}'::timestamptz, '{available}'::timestamptz\
+             )",
+            system = system.to_rfc3339(),
+            available = available.to_rfc3339(),
+        ))
+        .expect("insert text_segment");
+    let dual_unit = format!(
+        "INSERT INTO membership_assignment (\
+            membership_assignment_id, tenant_record_id, document_record_id, \
+            text_segment_id, target_entity_id, target_project_id, \
+            membership_type_code, membership_weight, valid_from_window, \
+            valid_to_window, valid_time_precision_code, system_time, available_time\
+         ) VALUES (\
+            '{id}'::uuid, '{tenant_record_id}'::uuid, '{document_record_id}'::uuid, \
+            '{text_segment_id}'::uuid, '{entity_a}'::uuid, NULL, \
+            'invalid', 1, '[2026-01-01,2026-01-01]'::tstzrange, \
+            NULL, 'second', '{system}'::timestamptz, '{available}'::timestamptz\
+         )",
+        id = Uuid::now_v7(),
+        system = system.to_rfc3339(),
+        available = available.to_rfc3339(),
+    );
+    assert!(
+        repo.session_mut().execute(&dual_unit).is_err(),
+        "exactly-one observed-unit check must reject dual document+segment keys"
     );
 }
 

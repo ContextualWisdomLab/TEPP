@@ -33,8 +33,11 @@ https://doi.org/10.1177/1471082X0100100202
 Cross-classified and multiple-membership models exist specifically so a
 document can belong to several groups at once without collapsing those
 contexts into a single row (Snijders & Bosker, 2012; Beretvas, 2011; Browne
-et al., 2001). Typed foreign keys prevent that collapse at the storage
-boundary.
+et al., 2001). Typed foreign keys preserve target identity and referential
+integrity at the storage boundary; multiple assignment rows plus the two
+exactly-one constraints preserve those distinct contexts. Migration
+`0006_typed_membership_assignment` and
+`membership_assignment_contract` encode that storage contract.
 
 ## Verification
 
@@ -43,5 +46,6 @@ boundary.
 - unit tests refuse both-or-neither keys, non-positive weights, and hostile
   labels before SQL is rendered;
 - live PostgreSQL CI inserts two entity memberships and one project
-  membership for the same document and rejects a dual-target row when
+  membership for the same document, asserts those three rows persist,
+  and rejects both dual-target and dual observed-unit rows when
   `TEPP_LIVE_POSTGRES=1`.

@@ -40,12 +40,13 @@ pub struct MembershipAssignmentRecord {
 }
 
 impl MembershipAssignmentRecord {
-    /// Fail-closed exactly-one, weight, and label validation.
+    /// Fail-closed exactly-one, weight, window-order, and label validation.
     ///
     /// # Errors
     ///
     /// Returns [`PersistenceError::InvalidMembershipAssignment`] when the
-    /// observed unit, target, weight, or labels violate the ERD contract.
+    /// observed unit, target, weight, inverted `valid_to`, or labels violate
+    /// the ERD contract.
     pub fn validate(&self) -> Result<(), PersistenceError> {
         if !exactly_one(self.document_record_id, self.text_segment_id) {
             return Err(PersistenceError::InvalidMembershipAssignment);
@@ -54,6 +55,11 @@ impl MembershipAssignmentRecord {
             return Err(PersistenceError::InvalidMembershipAssignment);
         }
         if !self.membership_weight.is_finite() || self.membership_weight <= 0.0 {
+            return Err(PersistenceError::InvalidMembershipAssignment);
+        }
+        if let Some(end) = self.valid_to
+            && end.instant() < self.valid_from.instant()
+        {
             return Err(PersistenceError::InvalidMembershipAssignment);
         }
         validate_membership_label(&self.membership_type_code)?;
@@ -133,7 +139,7 @@ fn validate_membership_label(value: &str) -> Result<(), PersistenceError> {
     if value.is_empty()
         || value
             .chars()
-            .any(|ch| ch.is_control() || ch == '\'' || ch == ';')
+            .any(|ch| ch.is_control() || ch == '\'' || ch == ';' || ch == '\\')
     {
         return Err(PersistenceError::InvalidMembershipAssignment);
     }
@@ -247,6 +253,28 @@ mod tests {
         label.valid_time_precision_code = String::new();
         assert_eq!(
             insert_membership_assignment_sql(&label),
+            Err(PersistenceError::InvalidMembershipAssignment)
+        );
+        label.valid_time_precision_code = "second".into();
+        label.membership_type_code = "author\\".into();
+        assert_eq!(
+            insert_membership_assignment_sql(&label),
+            Err(PersistenceError::InvalidMembershipAssignment)
+        );
+        label.membership_type_code = "author\nrole".into();
+        assert_eq!(
+            insert_membership_assignment_sql(&label),
+            Err(PersistenceError::InvalidMembershipAssignment)
+        );
+    }
+
+    #[test]
+    fn inverted_valid_window_fails_closed() {
+        let mut inverted = valid_document_entity();
+        inverted.valid_to =
+            Some(EventTime::parse_rfc3339("2025-12-31T00:00:00Z").expect("earlier end"));
+        assert_eq!(
+            insert_membership_assignment_sql(&inverted),
             Err(PersistenceError::InvalidMembershipAssignment)
         );
     }

@@ -24,7 +24,7 @@ pub enum PersistenceError {
     PoolOptionsInvalid,
     /// Live `SQLx` wiring was requested without a configured transport URL.
     LiveAdapterNotConfigured,
-    /// A membership assignment violated exactly-one, weight, or label contracts.
+    /// A membership assignment violated exactly-one, weight, window, or label contracts.
     InvalidMembershipAssignment,
 }
 
