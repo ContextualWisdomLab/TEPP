@@ -45,6 +45,16 @@ pub enum RelationKind {
 }
 
 impl RelationKind {
+    /// Return whether this kind may carry an identified causal claim.
+    ///
+    /// `Causes` and `IntervenesOn` are the only vocabulary members that may be
+    /// described as causal. Temporal precedence, enabling, production, and
+    /// provenance remain non-causal until a later identified design.
+    #[must_use]
+    pub const fn is_identified_causal_claim(self) -> bool {
+        matches!(self, Self::Causes | Self::IntervenesOn)
+    }
+
     /// Return whether this kind is a forward state-transition edge.
     #[must_use]
     pub const fn is_transition_edge(self) -> bool {
@@ -112,10 +122,32 @@ impl RelationKind {
     }
 }
 
+/// Refuse treating association, precedence, or provenance as causation.
+///
+/// # Errors
+///
+/// Returns [`RelationError::CausalClaimNotIdentified`] unless `kind` is
+/// [`RelationKind::Causes`] or [`RelationKind::IntervenesOn`].
+pub fn refuse_association_as_cause(kind: RelationKind) -> Result<(), RelationError> {
+    if kind.is_identified_causal_claim() {
+        Ok(())
+    } else {
+        Err(RelationError::CausalClaimNotIdentified)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::RelationKind;
     use crate::RelationError;
+
+    #[test]
+    fn identified_causal_kinds_are_only_causes_and_intervention() {
+        assert!(RelationKind::Causes.is_identified_causal_claim());
+        assert!(RelationKind::IntervenesOn.is_identified_causal_claim());
+        assert!(!RelationKind::LeadsTo.is_identified_causal_claim());
+        super::refuse_association_as_cause(RelationKind::Causes).expect("causes");
+    }
 
     #[test]
     fn transition_vocabulary_matches_erd_contract() {

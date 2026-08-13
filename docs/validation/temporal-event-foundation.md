@@ -23,6 +23,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | — | unknown-field/version/limit tests | Task 12 / PR #21; HTTP service remaining |
+| Causal-identification gate | `relation_graph` | active-PR | association ≠ cause | LeadsTo/References denied | ADR 0003; `docs/research/causal-identification-gate.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 
