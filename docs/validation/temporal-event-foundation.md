@@ -20,6 +20,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | #36 typed membership | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005` interval CHECKs (implemented-main via #35) + `0006` typed membership (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#35 + `0006` |
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
+| Unicode NFC/NFD identity | `corpus_split` | active-PR | this PR | NFC/NFD co-partition + empty/duplicate refusal | UAX #15 / ADR 0004 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | — | unknown-field/version/limit tests | Task 12 / PR #21; HTTP service remaining |
