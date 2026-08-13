@@ -9,6 +9,9 @@ const FOUNDATION_DOWN: &str =
     include_str!("../../../migrations/0001_bitemporal_foundation.down.sql");
 const RLS_UP: &str = include_str!("../../../migrations/0002_tenant_row_level_security.up.sql");
 const RLS_DOWN: &str = include_str!("../../../migrations/0002_tenant_row_level_security.down.sql");
+const MODEL_RUN_UP: &str = include_str!("../../../migrations/0003_model_run_artifact_chain.up.sql");
+const MODEL_RUN_DOWN: &str =
+    include_str!("../../../migrations/0003_model_run_artifact_chain.down.sql");
 
 /// Forward and rollback SQL for one migration unit.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,8 +28,8 @@ impl MigrationCatalog {
     /// Returns [`MigrationContractError::EmptyMigrationSql`] when embedded
     /// sources are unexpectedly empty.
     pub fn from_embedded() -> Result<Self, MigrationContractError> {
-        let up_sql = format!("{FOUNDATION_UP}\n{RLS_UP}");
-        let down_sql = format!("{RLS_DOWN}\n{FOUNDATION_DOWN}");
+        let up_sql = format!("{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}");
+        let down_sql = format!("{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}");
         Self::from_sources(&up_sql, &down_sql)
     }
 

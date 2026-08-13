@@ -7,7 +7,8 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
-    AuditEvent, DocumentRecord, LiveDocumentRepository, LiveSqlxPoolOptions, MigrationCatalog,
+    AuditEvent, CorpusSplitManifestRecord, DocumentRecord, LiveDocumentRepository,
+    LiveSqlxPoolOptions, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
     ReproducibilityManifestRecord, SqlSession, apply_sql_batch, assume_app_runtime_role_sql,
     clear_session_tenant_sql, open_live_sqlx_pool, require_live_sqlx_config,
     reset_app_runtime_role_sql, set_session_tenant_sql,
@@ -174,7 +175,57 @@ fn live_postgres_applies_migrations_and_document_sql() {
     repo.submit_reproducibility_manifest_by_id(manifest.reproducibility_manifest_id)
         .expect("select reproducibility_manifest by id");
 
+    exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
     prove_tenant_rls_isolation(&mut repo);
+}
+
+fn exercise_model_run_artifact_chain(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    manifest: &ReproducibilityManifestRecord,
+    available: AvailableTime,
+) {
+    let system = SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("sys");
+    let split = CorpusSplitManifestRecord {
+        corpus_split_manifest_id: Uuid::now_v7(),
+        tenant_record_id,
+        split_manifest_digest: "c".repeat(64),
+        knowledge_cutoff: available,
+        system_time: system,
+        available_time: available,
+    };
+    repo.insert_corpus_split_manifest(&split)
+        .expect("insert corpus_split_manifest");
+    let model_run = ModelRunRecord {
+        model_run_id: Uuid::now_v7(),
+        tenant_record_id,
+        reproducibility_manifest_id: manifest.reproducibility_manifest_id,
+        corpus_split_manifest_id: Some(split.corpus_split_manifest_id),
+        configuration_digest: "d".repeat(64),
+        random_seed_manifest_digest: "e".repeat(64),
+        engine_version_label: "tepp-estimator/0.1.0".into(),
+        compute_backend_code: "cpu_f64".into(),
+        knowledge_cutoff: available,
+        system_time: system,
+        available_time: available,
+    };
+    repo.insert_model_run(&model_run).expect("insert model_run");
+    let artifact = ModelArtifactRecord {
+        model_artifact_id: Uuid::now_v7(),
+        tenant_record_id,
+        model_run_id: model_run.model_run_id,
+        artifact_type_code: "checkpoint".into(),
+        artifact_content_digest: "f".repeat(64),
+        protected_object_ref: None,
+        system_time: system,
+        available_time: available,
+    };
+    repo.insert_model_artifact(&artifact)
+        .expect("insert model_artifact");
+    repo.submit_model_run_by_id(model_run.model_run_id)
+        .expect("select model_run by id");
+    repo.submit_model_artifacts_by_run(model_run.model_run_id)
+        .expect("select model_artifact by run");
 }
 
 /// Superuser seeds two tenants; `tepp_app_runtime` must only see the bound tenant.

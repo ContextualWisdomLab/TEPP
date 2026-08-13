@@ -4,8 +4,8 @@
 
 Append-only `reproducibility_manifest` rows record knowledge cutoff, evidence
 digest, code commit, and dependency-lock digest under fail-closed validation
-(ADR 0013). Immutable `model_run` linkage and split-manifest artifact chaining
-remain follow-on work; this slice only proves insert/lookup SQL contracts.
+(ADR 0013). Immutable `model_run` linkage via migration `0003` is documented
+separately in `docs/research/model-run-artifact-chain-persistence.md`.
 SQL contracts live in `persistence_postgres` and remain storage-independent of
 HTTP export envelopes in `tepp_api`.
 

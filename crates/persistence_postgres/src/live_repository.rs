@@ -9,6 +9,11 @@ use crate::manifest_sql::{
     select_reproducibility_manifest_by_digests_sql, select_reproducibility_manifest_by_id_sql,
 };
 use crate::migration::{MigrationCatalog, validate_migration_catalog};
+use crate::model_run_sql::{
+    CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord,
+    insert_corpus_split_manifest_sql, insert_model_artifact_sql, insert_model_run_sql,
+    select_model_artifacts_by_run_sql, select_model_run_by_id_sql,
+};
 use crate::sql_session::{SqlSession, apply_sql_batch};
 use crate::{MigrationContractError, PersistenceError};
 use temporal_core::{EventTime, SystemTime};
@@ -172,6 +177,65 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         let sql = select_reproducibility_manifest_by_id_sql(reproducibility_manifest_id);
         self.session.execute(&sql)
     }
+
+    /// Insert an append-only corpus split manifest under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns digest validation or transport failures.
+    pub fn insert_corpus_split_manifest(
+        &mut self,
+        record: &CorpusSplitManifestRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_corpus_split_manifest_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert an append-only model run under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns digest/label validation or transport failures.
+    pub fn insert_model_run(&mut self, record: &ModelRunRecord) -> Result<(), PersistenceError> {
+        let sql = insert_model_run_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert an append-only model artifact under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns digest/label validation or transport failures.
+    pub fn insert_model_artifact(
+        &mut self,
+        record: &ModelArtifactRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_model_artifact_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up a model run by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_model_run_by_id(&mut self, model_run_id: Uuid) -> Result<(), PersistenceError> {
+        let sql = select_model_run_by_id_sql(model_run_id);
+        self.session.execute(&sql)
+    }
+
+    /// Look up model artifacts for a run identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_model_artifacts_by_run(
+        &mut self,
+        model_run_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_model_artifacts_by_run_sql(model_run_id);
+        self.session.execute(&sql)
+    }
 }
 
 /// Migration application failures distinguishing contract vs transport errors.
@@ -200,6 +264,7 @@ mod tests {
     use crate::document_store::{AuditEvent, DocumentRecord};
     use crate::manifest_sql::ReproducibilityManifestRecord;
     use crate::migration::MigrationCatalog;
+    use crate::model_run_sql::{CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord};
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};
     use temporal_core::{AvailableTime, EventTime, SystemTime};
@@ -216,6 +281,66 @@ mod tests {
             system_to: None,
             revision_number: 1,
         }
+    }
+
+    fn exercise_model_run_chain(
+        repo: &mut LiveDocumentRepository<RecordingSqlSession>,
+        manifest: &ReproducibilityManifestRecord,
+    ) {
+        let available = AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a");
+        let system = SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s");
+        let split = CorpusSplitManifestRecord {
+            corpus_split_manifest_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            split_manifest_digest: "11".repeat(32),
+            knowledge_cutoff: available,
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_corpus_split_manifest(&split)
+            .expect("split insert");
+        let run = ModelRunRecord {
+            model_run_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            reproducibility_manifest_id: manifest.reproducibility_manifest_id,
+            corpus_split_manifest_id: Some(split.corpus_split_manifest_id),
+            configuration_digest: "22".repeat(32),
+            random_seed_manifest_digest: "33".repeat(32),
+            engine_version_label: "tepp-estimator/0.1.0".into(),
+            compute_backend_code: "cpu_f64".into(),
+            knowledge_cutoff: available,
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_model_run(&run).expect("run insert");
+        let artifact = ModelArtifactRecord {
+            model_artifact_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            model_run_id: run.model_run_id,
+            artifact_type_code: "checkpoint".into(),
+            artifact_content_digest: "44".repeat(32),
+            protected_object_ref: None,
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_model_artifact(&artifact)
+            .expect("artifact insert");
+        repo.submit_model_run_by_id(run.model_run_id)
+            .expect("run by id");
+        repo.submit_model_artifacts_by_run(run.model_run_id)
+            .expect("artifacts by run");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO model_run"))
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO model_artifact"))
+        );
     }
 
     #[test]
@@ -269,6 +394,7 @@ mod tests {
                 .iter()
                 .any(|sql| sql.contains("INSERT INTO reproducibility_manifest"))
         );
+        exercise_model_run_chain(&mut repo, &manifest);
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),

@@ -11,7 +11,8 @@
 //! `PgPool` driver behind validated URL/options, with a gated live `PostgreSQL`
 //! CI job (`TEPP_LIVE_POSTGRES=1`). Append-only reproducibility-manifest SQL
 //! contracts bind evidence digests, code commit, dependency lock, and knowledge
-//! cutoff for run provenance (ADR 0013).
+//! cutoff for run provenance (ADR 0013). Model-run and model-artifact SQL
+//! contracts chain immutable run identities to those manifests.
 
 mod cutoff;
 mod document_sql;
@@ -21,6 +22,7 @@ mod live_pool;
 mod live_repository;
 mod manifest_sql;
 mod migration;
+mod model_run_sql;
 mod naming;
 mod sql_session;
 mod sqlx_gate;
@@ -76,6 +78,22 @@ pub use manifest_sql::select_reproducibility_manifest_by_id_sql;
 pub use migration::MigrationCatalog;
 /// Validate migration SQL against TEPP contracts.
 pub use migration::validate_migration_catalog;
+/// Append-only corpus split manifest row.
+pub use model_run_sql::CorpusSplitManifestRecord;
+/// Append-only model artifact row.
+pub use model_run_sql::ModelArtifactRecord;
+/// Append-only model run row.
+pub use model_run_sql::ModelRunRecord;
+/// Render insert SQL for a corpus split manifest.
+pub use model_run_sql::insert_corpus_split_manifest_sql;
+/// Render insert SQL for a model artifact.
+pub use model_run_sql::insert_model_artifact_sql;
+/// Render insert SQL for a model run.
+pub use model_run_sql::insert_model_run_sql;
+/// Render selection SQL for artifacts of one model run.
+pub use model_run_sql::select_model_artifacts_by_run_sql;
+/// Render selection SQL for a model run by primary key.
+pub use model_run_sql::select_model_run_by_id_sql;
 /// Multi-word `snake_case` database object naming.
 pub use naming::is_multi_word_snake_case;
 /// Recording SQL transport for offline contract tests.
