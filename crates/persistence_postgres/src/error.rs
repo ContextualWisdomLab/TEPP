@@ -36,6 +36,8 @@ pub enum PersistenceError {
     ConflictingSourceArtifact,
     /// A source artifact had a non-canonical digest, negative size, or hostile label.
     InvalidSourceArtifact,
+    /// An audit action code was empty, oversized, or hostile.
+    InvalidAuditEvent,
 }
 
 impl fmt::Display for PersistenceError {
@@ -56,6 +58,7 @@ impl fmt::Display for PersistenceError {
             Self::InvalidEventInstance => "invalid event instance",
             Self::ConflictingSourceArtifact => "conflicting source artifact",
             Self::InvalidSourceArtifact => "invalid source artifact",
+            Self::InvalidAuditEvent => "invalid audit event",
         };
         formatter.write_str(message)
     }
@@ -114,6 +117,7 @@ mod tests {
     use super::{MigrationContractError, PersistenceError};
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn error_messages_are_stable() {
         assert_eq!(
             PersistenceError::DuplicateDocumentRecord.to_string(),
@@ -174,6 +178,10 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidSourceArtifact.to_string(),
             "invalid source artifact"
+        );
+        assert_eq!(
+            PersistenceError::InvalidAuditEvent.to_string(),
+            "invalid audit event"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),

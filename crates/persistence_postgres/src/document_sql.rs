@@ -89,10 +89,15 @@ pub fn as_valid_at_sql(
     )
 }
 
-/// Render append-only audit insert.
-#[must_use]
-pub fn append_audit_sql(event: &AuditEvent) -> String {
-    format!(
+/// Render append-only audit insert for a validated action code.
+///
+/// # Errors
+///
+/// Returns [`PersistenceError::InvalidAuditEvent`] when `action_code` is empty,
+/// longer than 128 bytes, or contains a control character, `'`, `;`, or `\`.
+pub fn append_audit_sql(event: &AuditEvent) -> Result<String, PersistenceError> {
+    validate_audit_action(&event.action_code)?;
+    Ok(format!(
         "INSERT INTO audit_event (\
             audit_event_id, tenant_record_id, action_code, subject_record_id, recorded_system_time\
         ) VALUES (\
@@ -104,7 +109,7 @@ pub fn append_audit_sql(event: &AuditEvent) -> String {
         action = escape_literal(&event.action_code),
         subject = event.subject_record_id,
         recorded = event.recorded_system_time.to_rfc3339(),
-    )
+    ))
 }
 
 fn optional_timestamptz(value: Option<String>) -> String {
@@ -116,6 +121,18 @@ fn optional_timestamptz(value: Option<String>) -> String {
 
 fn escape_literal(value: &str) -> String {
     value.replace('\'', "''")
+}
+
+fn validate_audit_action(value: &str) -> Result<(), PersistenceError> {
+    if value.is_empty()
+        || value.len() > 128
+        || value
+            .chars()
+            .any(|ch| ch.is_control() || ch == '\'' || ch == ';' || ch == '\\')
+    {
+        return Err(PersistenceError::InvalidAuditEvent);
+    }
+    Ok(())
 }
 
 fn validate_digest(digest: &str) -> Result<(), PersistenceError> {
@@ -132,7 +149,7 @@ fn validate_digest(digest: &str) -> Result<(), PersistenceError> {
 mod tests {
     use super::{
         append_audit_sql, as_known_at_sql, as_valid_at_sql, escape_literal, insert_document_sql,
-        optional_timestamptz, revise_document_sqls, validate_digest,
+        optional_timestamptz, revise_document_sqls, validate_audit_action, validate_digest,
     };
     use crate::PersistenceError;
     use crate::document_store::{AuditEvent, DocumentRecord};
@@ -181,13 +198,26 @@ mod tests {
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
             tenant_record_id: uuid::Uuid::nil(),
-            action_code: "revise'attempt".into(),
+            action_code: "revise".into(),
             subject_record_id: uuid::Uuid::nil(),
             recorded_system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
         };
-        let audit_sql = append_audit_sql(&audit);
+        let audit_sql = append_audit_sql(&audit).expect("audit");
         assert!(audit_sql.contains("INSERT INTO audit_event"));
-        assert!(audit_sql.contains("revise''attempt"));
+        assert!(audit_sql.contains("revise"));
+        assert_eq!(
+            append_audit_sql(&AuditEvent {
+                action_code: "revise'attempt".into(),
+                ..audit.clone()
+            }),
+            Err(PersistenceError::InvalidAuditEvent)
+        );
+        assert!(validate_audit_action("revise").is_ok());
+        assert!(validate_audit_action("").is_err());
+        assert!(validate_audit_action("revise;x").is_err());
+        assert!(validate_audit_action("revise\\").is_err());
+        assert!(validate_audit_action("revise\n").is_err());
+        assert!(validate_audit_action(&"x".repeat(129)).is_err());
 
         assert_eq!(
             insert_document_sql(&DocumentRecord {
