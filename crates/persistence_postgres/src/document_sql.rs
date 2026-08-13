@@ -181,8 +181,8 @@ fn validate_digest(digest: &str) -> Result<(), PersistenceError> {
 mod tests {
     use super::{
         append_audit_sql, as_known_at_sql, as_valid_at_sql, escape_literal, insert_document_sql,
-        optional_timestamptz, revise_document_atomic_sql, revise_document_sqls, validate_audit_action,
-        validate_digest,
+        optional_timestamptz, revise_document_atomic_sql, revise_document_sqls,
+        validate_audit_action, validate_digest,
     };
     use crate::PersistenceError;
     use crate::document_store::{AuditEvent, DocumentRecord};
