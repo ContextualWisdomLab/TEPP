@@ -266,6 +266,17 @@ mod tests {
             insert_membership_assignment_sql(&label),
             Err(PersistenceError::InvalidMembershipAssignment)
         );
+        label.membership_type_code = "author;role".into();
+        assert_eq!(
+            insert_membership_assignment_sql(&label),
+            Err(PersistenceError::InvalidMembershipAssignment)
+        );
+        label.membership_type_code = "author".into();
+        label.membership_weight = f64::INFINITY;
+        assert_eq!(
+            insert_membership_assignment_sql(&label),
+            Err(PersistenceError::InvalidMembershipAssignment)
+        );
     }
 
     #[test]
@@ -290,5 +301,16 @@ mod tests {
         assert!(sql.contains("target_project_id"));
         let lookup = select_membership_assignments_for_document_sql(Uuid::nil());
         assert!(lookup.contains("WHERE document_record_id"));
+    }
+
+    #[test]
+    fn text_segment_observation_renders_without_document_key() {
+        let mut segment = valid_document_entity();
+        segment.document_record_id = None;
+        segment.text_segment_id = Some(Uuid::from_u128(3));
+        let sql = insert_membership_assignment_sql(&segment).expect("segment");
+        assert!(sql.contains("text_segment_id"));
+        assert!(sql.contains("'00000000-0000-0000-0000-000000000003'::uuid"));
+        assert!(sql.contains("NULL"));
     }
 }

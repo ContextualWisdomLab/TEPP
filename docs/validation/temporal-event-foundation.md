@@ -18,7 +18,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
 | Multiple membership | `membership_core` | partial | — | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
-| Bitemporal persistence + live SQL port | `persistence_postgres` | partial | #35 interval CHECKs / #36 typed membership | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005` interval CHECKs + `0006` typed membership | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#33 + `0005`/`0006` |
+| Bitemporal persistence + live SQL port | `persistence_postgres` | partial | #36 typed membership | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005` interval CHECKs (implemented-main via #35) + `0006` typed membership (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#35 + `0006` |
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |

@@ -3,7 +3,7 @@
 **Status:** Accepted logical target model with current implementation maturity explicitly marked.  
 **Last reviewed:** 2026-08-13
 
-Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`), tenant row-level security (`0002`), the model-run/artifact chain (`0003`), and append-only immutability triggers (`0004`) as executable migration contracts with live CI. Migration `0005` (active PR) adds temporal interval ordering CHECKs. Migration `0006` (active PR) replaces the polymorphic `membership_target_id` stub with typed exactly-one membership foreign keys. Neither `0005` nor `0006` is implemented-main until exact-head checks, review, and protected-main integration complete. Broader planned ERD entities, concurrent-write acceptance, and backup/recovery gates remain accepted-target.
+Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`), tenant row-level security (`0002`), the model-run/artifact chain (`0003`), append-only immutability triggers (`0004`), and temporal interval ordering CHECKs (`0005`) as executable migration contracts with live CI. Migration `0006` (active PR) replaces the polymorphic `membership_target_id` stub with typed exactly-one membership foreign keys and is not implemented-main until exact-head checks, review, and protected-main integration complete. Broader planned ERD entities, concurrent-write acceptance, and backup/recovery gates remain accepted-target.
 
 ## Current domain foundation
 
