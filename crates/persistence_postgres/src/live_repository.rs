@@ -12,6 +12,7 @@ use crate::membership_sql::{
     MembershipAssignmentRecord, insert_membership_assignment_sql,
     select_membership_assignments_for_document_sql,
 };
+use crate::relation_sql::{EventRelationRecord, insert_event_relation_sql};
 use crate::migration::{MigrationCatalog, validate_migration_catalog};
 use crate::model_run_sql::{
     CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord,
@@ -244,6 +245,20 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
+    /// Insert a typed event relation under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns vocabulary/flag validation or transport failures.
+    pub fn insert_event_relation(
+        &mut self,
+        record: &EventRelationRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_event_relation_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+
     /// Look up a model run by primary key.
     ///
     /// # Errors
@@ -295,6 +310,7 @@ mod tests {
     use crate::manifest_sql::ReproducibilityManifestRecord;
     use crate::migration::MigrationCatalog;
     use crate::model_run_sql::{CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord};
+    use crate::relation_sql::EventRelationRecord;
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};
     use temporal_core::{AvailableTime, EventTime, SystemTime};
@@ -411,6 +427,38 @@ mod tests {
         );
     }
 
+    fn exercise_event_relation(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let (available, system) = (
+            AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+            SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+        );
+        let relation = EventRelationRecord {
+            event_relation_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            source_event_id: uuid::Uuid::from_u128(1),
+            target_event_id: uuid::Uuid::from_u128(2),
+            relation_type_code: "causes".into(),
+            transition_edge: true,
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_event_relation(&relation)
+            .expect("relation insert");
+        let mut bad = relation;
+        bad.transition_edge = false;
+        assert_eq!(
+            repo.insert_event_relation(&bad),
+            Err(PersistenceError::InvalidEventRelation)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO event_relation"))
+        );
+    }
+
+
     #[test]
     fn live_repository_applies_migrations_and_document_sql() {
         let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
@@ -464,6 +512,7 @@ mod tests {
         );
         exercise_model_run_chain(&mut repo, &manifest);
         exercise_membership_assignment(&mut repo);
+        exercise_event_relation(&mut repo);
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
