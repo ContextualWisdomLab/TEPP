@@ -9,13 +9,12 @@ credentials are the standard ``GITHUB_TOKEN`` or ``GH_TOKEN`` variables.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import re
 import sys
-import urllib.error
 import urllib.parse
-import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping, MutableMapping, Protocol, Sequence, TextIO
@@ -125,8 +124,12 @@ class DisableOutcome:
     disabled: bool
 
 
-class UrllibTransport:
-    """Live GitHub REST transport authenticated with a standard token."""
+class GithubHttpsTransport:
+    """Live GitHub REST transport over a fixed-host HTTPS connection.
+
+    The host is the constant ``api.github.com``; only the request path varies.
+    Using ``http.client.HTTPSConnection`` avoids dynamic-URL ``urllib`` opens.
+    """
 
     def __init__(self, token: str) -> None:
         """Store *token* for the Authorization header."""
@@ -136,34 +139,32 @@ class UrllibTransport:
     def request(self, method: str, path: str) -> HttpResponse:
         """Call ``https://api.github.com`` *path* and return status/headers/body."""
 
-        request = urllib.request.Request(
-            url=f"https://{_API_HOST}{path}",
-            method=method,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {self.token}",
-                "User-Agent": "tepp-actions-workflow-fleet",
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        try:
-            with urllib.request.urlopen(request) as response:
-                return HttpResponse(
-                    status=int(response.status),
-                    headers={
-                        str(key): str(value) for key, value in response.headers.items()
-                    },
-                    body=response.read(),
-                )
-        except urllib.error.HTTPError as error:
-            return HttpResponse(
-                status=int(error.code),
-                headers={
-                    str(key): str(value)
-                    for key, value in (error.headers or {}).items()
-                },
-                body=error.read(),
+        if not path.startswith("/"):
+            raise FleetAuditError(
+                "invalid_path",
+                "GitHub REST paths must be absolute under the API host root",
             )
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {self.token}",
+            "User-Agent": "tepp-actions-workflow-fleet",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        connection = http.client.HTTPSConnection(_API_HOST, timeout=60)
+        try:
+            connection.request(method, path, headers=headers)
+            response = connection.getresponse()
+            body = response.read()
+            response_headers = {
+                str(key): str(value) for key, value in response.getheaders()
+            }
+            return HttpResponse(
+                status=int(response.status),
+                headers=response_headers,
+                body=body,
+            )
+        finally:
+            connection.close()
 
 
 def _utc_now() -> str:
@@ -185,10 +186,10 @@ def require_github_token(environ: Mapping[str, str]) -> str:
     )
 
 
-def build_transport(environ: Mapping[str, str]) -> UrllibTransport:
-    """Build the live urllib transport from the standard token environment."""
+def build_transport(environ: Mapping[str, str]) -> GithubHttpsTransport:
+    """Build the fixed-host HTTPS transport from the standard token environment."""
 
-    return UrllibTransport(require_github_token(environ))
+    return GithubHttpsTransport(require_github_token(environ))
 
 
 def normalize_workflow_path(path: str) -> str:

@@ -7,7 +7,6 @@ import json
 import os
 import unittest
 import unittest.mock
-import urllib.error
 from typing import Any
 
 from scripts import actions_workflow_fleet as fleet
@@ -751,53 +750,79 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
         }
         self.assertIn(".github/workflows/ci.yml", present)
 
-    def test_urllib_transport_maps_httperror_without_raising(self) -> None:
-        """4xx/5xx from urllib stay as HttpResponse so callers can classify them."""
+    def test_https_transport_maps_error_status_without_raising(self) -> None:
+        """4xx/5xx from GitHub stay as HttpResponse so callers can classify them."""
 
-        class _Error(urllib.error.HTTPError):
-            def __init__(self) -> None:
-                super().__init__(
-                    url="https://api.github.com/x",
-                    code=403,
-                    msg="no",
-                    hdrs={"X-GitHub": "yes"},
-                    fp=io.BytesIO(b'{"message":"no"}'),
-                )
+        class _FakeResponse:
+            status = 403
 
-        transport = fleet.UrllibTransport("secret-token")
-        with unittest.mock.patch("urllib.request.urlopen", side_effect=_Error()):
+            def read(self) -> bytes:
+                return b'{"message":"no"}'
+
+            def getheaders(self) -> list[tuple[str, str]]:
+                return [("X-GitHub", "yes")]
+
+        class _FakeConnection:
+            def request(self, *args: object, **kwargs: object) -> None:
+                return None
+
+            def getresponse(self) -> _FakeResponse:
+                return _FakeResponse()
+
+            def close(self) -> None:
+                return None
+
+        transport = fleet.GithubHttpsTransport("secret-token")
+        with unittest.mock.patch(
+            "http.client.HTTPSConnection", return_value=_FakeConnection()
+        ):
             response = transport.request("GET", "/repos/o/r")
         self.assertEqual(response.status, 403)
         self.assertEqual(response.headers["X-GitHub"], "yes")
 
-    def test_urllib_transport_maps_status_and_headers(self) -> None:
-        """The real urllib transport preserves status, headers, and body bytes."""
+    def test_https_transport_maps_status_and_headers(self) -> None:
+        """The fixed-host HTTPS transport preserves status, headers, and body bytes."""
 
-        class _FakeHttp:
-            def __init__(self) -> None:
-                self.status = 200
-                self.headers = {"Content-Type": "application/json"}
+        class _FakeResponse:
+            status = 200
 
             def read(self) -> bytes:
                 return b'{"ok":true}'
 
-            def __enter__(self) -> _FakeHttp:
-                return self
+            def getheaders(self) -> list[tuple[str, str]]:
+                return [("Content-Type", "application/json")]
 
-            def __exit__(self, *args: object) -> None:
+        class _FakeConnection:
+            def request(self, *args: object, **kwargs: object) -> None:
                 return None
 
-        transport = fleet.UrllibTransport("secret-token")
-        with unittest.mock.patch("urllib.request.urlopen", return_value=_FakeHttp()):
+            def getresponse(self) -> _FakeResponse:
+                return _FakeResponse()
+
+            def close(self) -> None:
+                return None
+
+        transport = fleet.GithubHttpsTransport("secret-token")
+        with unittest.mock.patch(
+            "http.client.HTTPSConnection", return_value=_FakeConnection()
+        ):
             response = transport.request("GET", "/repos/o/r")
         self.assertEqual(response.status, 200)
         self.assertEqual(json.loads(response.body), {"ok": True})
+
+    def test_https_transport_rejects_relative_paths(self) -> None:
+        """Paths must be absolute under the fixed GitHub API host root."""
+
+        transport = fleet.GithubHttpsTransport("secret-token")
+        with self.assertRaises(fleet.FleetAuditError) as raised:
+            transport.request("GET", "repos/o/r")
+        self.assertEqual(raised.exception.reason, "invalid_path")
 
     def test_build_transport_uses_standard_token(self) -> None:
         """build_transport reads GITHUB_TOKEN and does not invent a TEPP PAT name."""
 
         transport = fleet.build_transport({"GITHUB_TOKEN": "abc"})
-        self.assertIsInstance(transport, fleet.UrllibTransport)
+        self.assertIsInstance(transport, fleet.GithubHttpsTransport)
         self.assertEqual(transport.token, "abc")
 
     def test_audit_rejects_missing_default_branch_or_sha(self) -> None:
