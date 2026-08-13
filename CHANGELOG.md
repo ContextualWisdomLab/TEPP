@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `event_core` TDT link-detection contracts: undirected mention-pair hypotheses, fail-closed self-links, refusal to treat a detected link as an instance or state transition, and computed precision/recall plus RMSE against known-truth pairs.
 - `persistence_postgres` event-relation SQL contracts: closed ERD transition/provenance vocabulary bound to `transition_edge`, fail-closed unknown types and transition self-loops, live insert of `causes`/`references`.
 - `persistence_postgres` typed membership assignment (migration `0006`): `entity_record`, `project_record`, and `text_segment` plus exactly-one observed-unit and target constraints that replace the polymorphic `membership_target_id` stub, with SQL insert/lookup, fail-closed inverted-window and backslash-label refusal, and live proof that one document persists two entity memberships and one project membership.
 - Actions workflow fleet auditor (`scripts/actions_workflow_fleet.py`): paginated registry inventory bound to the exact default-branch SHA/tree, classification of present/orphan/disabled/GitHub-dynamic identities, and fail-closed orphan disable that confirms GitHub's official `disabled_manually` state.
