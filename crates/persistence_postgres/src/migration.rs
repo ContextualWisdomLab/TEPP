@@ -12,6 +12,10 @@ const RLS_DOWN: &str = include_str!("../../../migrations/0002_tenant_row_level_s
 const MODEL_RUN_UP: &str = include_str!("../../../migrations/0003_model_run_artifact_chain.up.sql");
 const MODEL_RUN_DOWN: &str =
     include_str!("../../../migrations/0003_model_run_artifact_chain.down.sql");
+const APPEND_ONLY_UP: &str =
+    include_str!("../../../migrations/0004_append_only_immutability_triggers.up.sql");
+const APPEND_ONLY_DOWN: &str =
+    include_str!("../../../migrations/0004_append_only_immutability_triggers.down.sql");
 
 /// Forward and rollback SQL for one migration unit.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -28,8 +32,9 @@ impl MigrationCatalog {
     /// Returns [`MigrationContractError::EmptyMigrationSql`] when embedded
     /// sources are unexpectedly empty.
     pub fn from_embedded() -> Result<Self, MigrationContractError> {
-        let up_sql = format!("{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}");
-        let down_sql = format!("{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}");
+        let up_sql = format!("{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}");
+        let down_sql =
+            format!("{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}");
         Self::from_sources(&up_sql, &down_sql)
     }
 
@@ -97,7 +102,43 @@ pub fn validate_migration_catalog(
     if declares_row_level_security(catalog.up_sql()) {
         validate_tenant_rls_contract(catalog.up_sql(), &tables)?;
     }
+    if declares_append_only_immutability(catalog.up_sql()) {
+        validate_append_only_immutability(catalog.up_sql())?;
+    }
 
+    Ok(())
+}
+
+fn declares_append_only_immutability(up_sql: &str) -> bool {
+    let lower = up_sql.to_ascii_lowercase();
+    lower.contains("reject_append_only_mutation") || lower.contains("_reject_mutation")
+}
+
+fn validate_append_only_immutability(up_sql: &str) -> Result<(), MigrationContractError> {
+    let lower = up_sql.to_ascii_lowercase();
+    if !lower.contains("create or replace function reject_append_only_mutation") {
+        return Err(MigrationContractError::MissingAppendOnlyTrigger);
+    }
+    let required = [
+        "source_artifact",
+        "audit_event",
+        "reproducibility_manifest",
+        "corpus_split_manifest",
+        "model_run",
+        "model_artifact",
+    ];
+    for table in required {
+        let trigger = format!("{table}_reject_mutation");
+        if !is_multi_word_snake_case(&trigger) {
+            return Err(MigrationContractError::SingleWordObjectName);
+        }
+        if !lower.contains(&format!("create trigger {trigger}")) {
+            return Err(MigrationContractError::MissingAppendOnlyTrigger);
+        }
+        if !lower.contains(&format!("revoke update, delete on table {table}")) {
+            return Err(MigrationContractError::MissingAppendOnlyTrigger);
+        }
+    }
     Ok(())
 }
 
@@ -546,6 +587,29 @@ mod tests {
         assert!(
             super::table_body("CREATE TABLE tenant_record NO_PARENS;", "tenant_record").is_none()
         );
+    }
+
+    #[test]
+    fn append_only_immutability_contract_fails_closed() {
+        let incomplete = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            CREATE OR REPLACE FUNCTION reject_append_only_mutation()
+            RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&incomplete),
+            Err(MigrationContractError::MissingAppendOnlyTrigger)
+        );
+        assert!(super::declares_append_only_immutability(
+            "CREATE TRIGGER source_artifact_reject_mutation"
+        ));
+        assert!(!super::declares_append_only_immutability("CREATE TABLE x"));
     }
 
     #[test]
