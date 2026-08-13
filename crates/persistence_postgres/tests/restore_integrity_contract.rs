@@ -75,6 +75,12 @@ fn restore_probe_sql_covers_digest_cutoff_window_and_triggers() {
     assert!(joined.contains("valid_to"));
     assert!(joined.contains("reject_append_only_mutation"));
     assert!(joined.contains("restore integrity failed"));
+    assert!(joined.contains("missing_manifest"));
+    assert!(joined.contains("rm.tenant_record_id = sa.tenant_record_id"));
+    assert!(joined.contains("pg_trigger"));
+    assert!(joined.contains("t.tgenabled"));
+    assert!(joined.contains("'source_artifact'"));
+    assert!(joined.contains("'model_artifact'"));
     assert!(backup_scope_tables().contains(&"source_artifact"));
     assert!(backup_scope_tables().contains(&"reproducibility_manifest"));
     assert!(backup_scope_tables().contains(&"document_record"));

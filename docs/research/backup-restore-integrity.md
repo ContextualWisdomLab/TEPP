@@ -30,6 +30,7 @@ an availability SLO.
 - valid reconstructed snapshots may be marked usable;
 - missing tenant, non-canonical digest, future-available evidence, inverted
   valid windows, and missing append-only triggers fail closed;
-- probe SQL raises `restore integrity failed` for digest, window, cutoff, and
-  trigger checks;
+- probe SQL raises `restore integrity failed` for digest, window, missing
+  same-tenant manifest, cutoff, and enabled per-table append-only triggers;
+- empty `reproducibility_manifest` or disabled/missing triggers fail closed;
 - live PostgreSQL CI runs the probes after applying the embedded catalog.

@@ -60,10 +60,24 @@ pub fn backup_scope_tables() -> &'static [&'static str] {
     BACKUP_SCOPE_TABLES
 }
 
+/// Identity tables that must keep an enabled append-only reject trigger.
+const APPEND_ONLY_TRIGGER_TABLES: &[&str] = &[
+    "source_artifact",
+    "audit_event",
+    "reproducibility_manifest",
+    "corpus_split_manifest",
+    "model_run",
+    "model_artifact",
+];
+
 /// SQL probes that fail closed when restored physical rows are unusable.
 ///
 /// Each statement is a `DO` block that raises `restore integrity failed` when
-/// a digest, tenant, temporal-window, or append-only trigger check fails.
+/// a digest, tenant, temporal-window, cutoff, or append-only trigger check
+/// fails. Cutoff probes bind each `source_artifact` to same-tenant
+/// `reproducibility_manifest` rows and fail when no applicable cutoff exists.
+/// Append-only probes require an enabled `pg_trigger` on each identity table
+/// linked to `reject_append_only_mutation`, not merely a same-named function.
 #[must_use]
 pub fn restore_integrity_probe_sqls() -> Vec<String> {
     vec![
@@ -81,18 +95,45 @@ pub fn restore_integrity_probe_sqls() -> Vec<String> {
                 OR system_to < system_from",
         ),
         probe(
-            "cutoff",
-            "SELECT 1 FROM source_artifact \
-             WHERE available_time > \
-                (SELECT MAX(knowledge_cutoff) FROM reproducibility_manifest)",
+            "missing_manifest",
+            "SELECT 1 FROM source_artifact sa \
+             WHERE NOT EXISTS (\
+                SELECT 1 FROM reproducibility_manifest rm \
+                WHERE rm.tenant_record_id = sa.tenant_record_id)",
         ),
         probe(
-            "append_only",
-            "SELECT 1 WHERE NOT EXISTS (\
-                SELECT 1 FROM pg_proc \
-                WHERE proname = 'reject_append_only_mutation')",
+            "cutoff",
+            "SELECT 1 FROM source_artifact sa \
+             WHERE available_time > (\
+                SELECT MAX(rm.knowledge_cutoff) \
+                FROM reproducibility_manifest rm \
+                WHERE rm.tenant_record_id = sa.tenant_record_id)",
         ),
+        probe("append_only", &append_only_trigger_predicate()),
     ]
+}
+
+fn append_only_trigger_predicate() -> String {
+    let tables = APPEND_ONLY_TRIGGER_TABLES
+        .iter()
+        .map(|name| format!("'{name}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        "SELECT 1 \
+         FROM unnest(ARRAY[{tables}]) AS required(table_name) \
+         WHERE NOT EXISTS (\
+            SELECT 1 \
+            FROM pg_trigger t \
+            JOIN pg_class c ON c.oid = t.tgrelid \
+            JOIN pg_namespace n ON n.oid = c.relnamespace \
+            JOIN pg_proc p ON p.oid = t.tgfoid \
+            WHERE n.nspname = current_schema() \
+              AND c.relname = required.table_name \
+              AND NOT t.tgisinternal \
+              AND t.tgenabled <> 'D' \
+              AND p.proname = 'reject_append_only_mutation')"
+    )
 }
 
 /// Revalidate a reconstructed snapshot and mark analytical state usable.
@@ -149,8 +190,8 @@ fn probe(tag: &str, predicate: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        RestoredAnalyticalSnapshot, backup_scope_tables, is_canonical_sha256,
-        mark_restored_state_usable, restore_integrity_probe_sqls,
+        APPEND_ONLY_TRIGGER_TABLES, RestoredAnalyticalSnapshot, backup_scope_tables,
+        is_canonical_sha256, mark_restored_state_usable, restore_integrity_probe_sqls,
     };
     use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff};
     use uuid::Uuid;
@@ -178,5 +219,27 @@ mod tests {
                 .any(|sql| sql.contains("$tepp_restore_digest$"))
         );
         assert!(backup_scope_tables().len() >= 8);
+    }
+
+    #[test]
+    fn probe_sql_fails_closed_without_manifest_or_enabled_triggers() {
+        let joined = restore_integrity_probe_sqls().join("\n");
+        assert!(joined.contains("$tepp_restore_missing_manifest$"));
+        assert!(joined.contains("rm.tenant_record_id = sa.tenant_record_id"));
+        assert!(joined.contains("MAX(rm.knowledge_cutoff)"));
+        assert!(joined.contains("pg_trigger"));
+        assert!(joined.contains("t.tgenabled"));
+        assert!(joined.contains("current_schema()"));
+        for table in APPEND_ONLY_TRIGGER_TABLES {
+            assert!(
+                joined.contains(&format!("'{table}'")),
+                "missing required trigger table {table}"
+            );
+        }
+        assert!(!joined.contains(
+            "SELECT 1 WHERE NOT EXISTS (\
+                SELECT 1 FROM pg_proc \
+                WHERE proname = 'reject_append_only_mutation')"
+        ));
     }
 }
