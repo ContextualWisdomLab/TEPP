@@ -32,7 +32,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
-| evidence-bounded LLM interpretation | ADR 0010/0012; PRD | future `interpretation_gateway` | accepted-target |
+| evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `interpretation_gateway` evidence-span gate and unsupported-claim rate on the active PR; live orchestration/ablation remaining | active-PR |
 | adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | future contextual-orchestrator integration + ablation evidence | accepted-target |
 | purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | future authorization/persistence/export/provider adapters | accepted-target |
 | tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | future service/persistence boundaries | accepted-target |

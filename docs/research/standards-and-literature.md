@@ -44,7 +44,7 @@ Stammbach, D., Zouhar, V., Hoyle, A., Sachan, M., & Ash, E. (2023). Revisiting a
 
 Yang, X., Zhao, H., Phung, D., Buntine, W., & Du, L. (2025). LLM reading tea leaves: Automatically evaluating topic models with large language models. *Transactions of the Association for Computational Linguistics, 13*.
 
-LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. Candidates are blinded and statistically gated before LLM review.
+LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. Candidates are blinded and statistically gated before LLM review. `interpretation_gateway` records those judgments as hypothetical proposals that must cite evidence spans and cannot become estimator results or observed facts.
 
 ## Compositional data, correlation, and clusters
 
