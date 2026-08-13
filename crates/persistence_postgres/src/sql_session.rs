@@ -20,9 +20,12 @@ pub trait SqlSession {
 
 /// Split migration SQL into executable statements without executing them.
 ///
-/// Strips `--` line comments, ignores empty fragments, and fails closed when no
-/// statements remain. Statement boundaries are plain `;` separators; TEPP
-/// foundation migrations do not embed quoted semicolons.
+/// Strips `--` line comments (line-oriented, migration-oriented), ignores empty
+/// fragments, and fails closed when no statements remain. Statement boundaries
+/// are `;` outside single quotes and `PostgreSQL` dollar-quoted strings
+/// (`$tag$ ... $tag$`), so `DO` blocks remain intact. This is not a full SQL
+/// lexer: `E'...'` backslash escapes and `--` inside quoted literals are out of
+/// scope for foundation/RLS migration batches.
 ///
 /// # Errors
 ///
@@ -30,17 +33,109 @@ pub trait SqlSession {
 /// executable statements.
 pub fn split_sql_statements(sql: &str) -> Result<Vec<String>, PersistenceError> {
     let without_line_comments = strip_line_comments(sql);
-    let mut statements = Vec::new();
-    for fragment in without_line_comments.split(';') {
-        let trimmed = fragment.trim();
-        if !trimmed.is_empty() {
-            statements.push(trimmed.to_owned());
-        }
-    }
+    let statements = split_on_semicolons_respecting_quotes(&without_line_comments);
     if statements.is_empty() {
         return Err(PersistenceError::EmptySqlBatch);
     }
     Ok(statements)
+}
+
+fn split_on_semicolons_respecting_quotes(sql: &str) -> Vec<String> {
+    let chars: Vec<char> = sql.chars().collect();
+    let mut statements = Vec::new();
+    let mut current = String::new();
+    let mut index = 0usize;
+    let mut in_single_quote = false;
+    let mut dollar_tag: Option<String> = None;
+
+    while index < chars.len() {
+        if let Some(tag) = dollar_tag.as_ref() {
+            let tag_len = tag.chars().count();
+            if index + tag_len <= chars.len() {
+                let candidate: String = chars[index..index + tag_len].iter().collect();
+                if candidate == *tag {
+                    current.push_str(&candidate);
+                    index += tag_len;
+                    dollar_tag = None;
+                    continue;
+                }
+            }
+            current.push(chars[index]);
+            index += 1;
+            continue;
+        }
+
+        if in_single_quote {
+            current.push(chars[index]);
+            if chars[index] == '\'' {
+                if index + 1 < chars.len() && chars[index + 1] == '\'' {
+                    current.push(chars[index + 1]);
+                    index += 2;
+                    continue;
+                }
+                in_single_quote = false;
+            }
+            index += 1;
+            continue;
+        }
+
+        match chars[index] {
+            '\'' => {
+                in_single_quote = true;
+                current.push('\'');
+                index += 1;
+            }
+            '$' => {
+                if let Some(tag) = read_dollar_tag(&chars[index..]) {
+                    let tag_len = tag.chars().count();
+                    current.push_str(&tag);
+                    index += tag_len;
+                    dollar_tag = Some(tag);
+                } else {
+                    current.push('$');
+                    index += 1;
+                }
+            }
+            ';' => {
+                let trimmed = current.trim();
+                if !trimmed.is_empty() {
+                    statements.push(trimmed.to_owned());
+                }
+                current.clear();
+                index += 1;
+            }
+            other => {
+                current.push(other);
+                index += 1;
+            }
+        }
+    }
+
+    let trimmed = current.trim();
+    if !trimmed.is_empty() {
+        statements.push(trimmed.to_owned());
+    }
+    statements
+}
+
+/// Parse a dollar-quote tag starting at `chars[0] == '$'`.
+///
+/// Returns `None` when the opener is incomplete or contains characters outside
+/// the `PostgreSQL` tag alphabet (ASCII alphanumeric and `_`).
+fn read_dollar_tag(chars: &[char]) -> Option<String> {
+    // Caller only invokes this after matching a leading `$`.
+    let mut end = 1usize;
+    while end < chars.len() {
+        let ch = chars[end];
+        if ch == '$' {
+            return Some(chars[..=end].iter().collect());
+        }
+        if !(ch.is_ascii_alphanumeric() || ch == '_') {
+            return None;
+        }
+        end += 1;
+    }
+    None
 }
 
 /// Apply every statement from `sql` through `session` in order.
@@ -138,6 +233,59 @@ mod tests {
             Err(PersistenceError::EmptySqlBatch)
         );
         assert!(strip_line_comments("a -- b\nc").contains('c'));
+    }
+
+    #[test]
+    fn split_preserves_dollar_quoted_and_single_quoted_semicolons() {
+        let statements =
+            split_sql_statements("DO $tepp$ BEGIN PERFORM 1; END $tepp$;\nSELECT 'a;b';")
+                .expect("two statements");
+        assert_eq!(statements.len(), 2);
+        assert!(statements[0].contains("DO $tepp$"));
+        assert!(statements[0].contains("PERFORM 1;"));
+        assert!(statements[0].contains("END $tepp$"));
+        assert_eq!(statements[1], "SELECT 'a;b'");
+
+        let escaped = split_sql_statements("SELECT 'it''s;ok'; SELECT 2;").expect("escaped quotes");
+        assert_eq!(escaped.len(), 2);
+        assert!(escaped[0].contains("it''s;ok"));
+
+        // Closing quote as the final character exercises the short-circuit false
+        // path of `index + 1 < len` when deciding whether `''` is an escape.
+        let quote_at_eof = split_sql_statements("SELECT 'done'").expect("quote at eof");
+        assert_eq!(quote_at_eof, vec!["SELECT 'done'".to_owned()]);
+
+        // Bare `$` / incomplete tags are not dollar quotes; trailing content without
+        // a terminating `;` still yields a final statement fragment.
+        let bare = split_sql_statements("SELECT $100; SELECT $bad-tag$; SELECT $$")
+            .expect("non-tag dollars");
+        assert_eq!(bare.len(), 3);
+        assert!(bare[0].contains("$100"));
+        assert!(bare[1].contains("$bad-tag$"));
+        assert_eq!(bare[2], "SELECT $$");
+
+        // EOF while scanning a potential tag (alphanumeric run, no closing `$`)
+        // must fall through without treating the opener as a dollar quote.
+        let eof_tag = split_sql_statements("SELECT $abc").expect("eof incomplete tag");
+        assert_eq!(eof_tag.len(), 1);
+        assert!(eof_tag[0].contains("$abc"));
+
+        // Underscore is legal in dollar-quote tags; mismatched interior tags and
+        // short remaining windows must not close the active body early.
+        let underscored = split_sql_statements(
+            "DO $my_tag$ BEGIN PERFORM $y$; PERFORM 1; END $my_tag$; SELECT 1",
+        )
+        .expect("underscore tag");
+        assert_eq!(underscored.len(), 2);
+        assert!(underscored[0].contains("$my_tag$"));
+        assert!(underscored[0].contains("PERFORM $y$;"));
+        assert!(underscored[0].contains("PERFORM 1;"));
+        assert_eq!(underscored[1], "SELECT 1");
+
+        // Unclosed dollar body keeps interior `;` from splitting statements.
+        let unclosed = split_sql_statements("DO $x$ BEGIN PERFORM 1; SELECT 2").expect("unclosed");
+        assert_eq!(unclosed.len(), 1);
+        assert!(unclosed[0].contains("PERFORM 1;"));
     }
 
     #[test]

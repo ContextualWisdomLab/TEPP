@@ -122,7 +122,7 @@ class CoverageContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             complete = self.write_lcov(
                 temporary,
-                "TN:\nSF:/workspace/src/lib.rs\nDA:10,2\nDA:11,1,checksum\nend_of_record\n",
+                "TN:\nSF:src/lib.rs\nDA:10,2\nDA:11,1,checksum\nend_of_record\n",
             )
             self.assertEqual(
                 coverage_contract.load_lcov_line_totals(complete),
@@ -135,7 +135,7 @@ class CoverageContractTests(unittest.TestCase):
 
             incomplete = self.write_lcov(
                 temporary,
-                "SF:/workspace/src/lib.rs\nDA:10,1\nDA:11,0\nend_of_record\n",
+                "SF:src/lib.rs\nDA:10,1\nDA:11,0\nend_of_record\n",
             )
             with self.assertRaisesRegex(ValueError, "incomplete: 1/2"):
                 coverage_contract.validate_report(incomplete, ["lines"], "lcov")
@@ -147,21 +147,21 @@ class CoverageContractTests(unittest.TestCase):
             ("", "no authored source lines"),
             ("SF:\nDA:1,1\n", "source path must not be empty"),
             ("DA:1,1\n", "must follow a source record"),
-            ("SF:/src/lib.rs\nDA:1\n", "must contain line and count"),
-            ("SF:/src/lib.rs\nDA:x,1\n", "must be integers"),
-            ("SF:/src/lib.rs\nDA:0,1\n", "invalid values"),
-            ("SF:/src/lib.rs\nDA:1,-1\n", "invalid values"),
-            ("SF:/src/lib.rs\nDA:1,1\nDA:1,1\n", "duplicate source line"),
+            ("SF:src/lib.rs\nDA:1\n", "must contain line and count"),
+            ("SF:src/lib.rs\nDA:x,1\n", "must be integers"),
+            ("SF:src/lib.rs\nDA:0,1\n", "invalid values"),
+            ("SF:src/lib.rs\nDA:1,-1\n", "invalid values"),
+            ("SF:src/lib.rs\nDA:1,1\nDA:1,1\n", "duplicate source line"),
             (
-                "SF:/src/lib.rs\nSF:/src/other.rs\nDA:1,1\nend_of_record\n",
+                "SF:src/lib.rs\nSF:src/other.rs\nDA:1,1\nend_of_record\n",
                 "source record must end with end_of_record",
             ),
             (
-                "end_of_record\nSF:/src/lib.rs\nDA:1,1\nend_of_record\n",
+                "end_of_record\nSF:src/lib.rs\nDA:1,1\nend_of_record\n",
                 "end_of_record must close a source record",
             ),
             (
-                "SF:/src/lib.rs\nend_of_record\nDA:1,1\n",
+                "SF:src/lib.rs\nend_of_record\nDA:1,1\n",
                 "must follow a source record",
             ),
         )
@@ -197,7 +197,7 @@ class CoverageContractTests(unittest.TestCase):
 
             lcov_path = self.write_lcov(
                 temporary,
-                "SF:/workspace/src/lib.rs\nDA:10,1\nend_of_record\n",
+                "SF:src/lib.rs\nDA:10,1\nend_of_record\n",
             )
             with contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(
@@ -271,55 +271,56 @@ class CoverageContractTests(unittest.TestCase):
                 "mod inner;",  # 5 mod
                 "pub mod outer;",  # 6 pub mod
                 "impl Foo {",  # 7 impl
-                "    /// method docs",  # 8 doc
-                "    pub fn bar(",  # 9 pub fn
-                "        x: i32,",  # 10 signature arg
-                "    ) -> Result<Self, Error> {",  # 11 ) ->
-                "        let value = x;",  # 12 executable
-                "        Ok(Self { value })",  # 13 Ok(Self
-                "    }",  # 14 brace
-                "}",  # 15 brace
-                "pub struct Foo {",  # 16 pub struct
-                "    value: i32,",  # 17 field comma
-                "}",  # 18 brace
-                "pub enum Kind {",  # 19 pub enum
-                "    A,",  # 20 variant comma
-                "    B,",  # 21 variant comma
-                "}",  # 22 brace
-                "fn helper() {}",  # 23 fn
-                "struct Private;",  # 24 struct
-                "enum Local { X }",  # 25 enum
-                "#[derive(Debug)]",  # 26 attr
-                "#![allow(dead_code)]",  # 27 inner attr
-                "{",  # 28
-                "}",  # 29
-                "},",  # 30
-                ");",  # 31
-                "];",  # 32
-                "();",  # 33
-                "};",  # 34
-                "Ok(Self)",  # 35
-                ")}",  # 36
-                "})",  # 37
+                "impl<T> Foo<T> {",  # 8 generic impl noise
+                "    /// method docs",  # 9 doc
+                "    pub fn bar(",  # 10 pub fn
+                "        x: i32,",  # 11 signature arg
+                "    ) -> Result<Self, Error> {",  # 12 ) ->
+                "        let value = x;",  # 13 executable
+                "        Ok(Self { value })",  # 14 Ok(Self
+                "    }",  # 15 brace
+                "}",  # 16 brace
+                "pub struct Foo {",  # 17 pub struct
+                "    value: i32,",  # 18 field comma
+                "}",  # 19 brace
+                "pub enum Kind {",  # 20 pub enum
+                "    A,",  # 21 variant comma
+                "    B,",  # 22 variant comma
+                "}",  # 23 brace
+                "fn helper() {}",  # 24 fn
+                "struct Private;",  # 25 struct
+                "enum Local { X }",  # 26 enum
+                "#[derive(Debug)]",  # 27 attr
+                "#![allow(dead_code)]",  # 28 inner attr
+                "{",  # 29
+                "}",  # 30
+                "},",  # 31
+                ");",  # 32
+                "];",  # 33
+                "();",  # 34
+                "};",  # 35
+                "Ok(Self)",  # 36
+                ")}",  # 37
                 "})",  # 38
-                "    return value,",  # 39 executable (return keeps it)
-                "    x + 1,",  # 40 trailing comma noise
-                '#[cfg(feature = "live-sqlx")]',  # 41 cfg attr
-                "fn live_path() {",  # 42 fn
-                "    live_body();",  # 43 executable active feature body
-                "}",  # 44 brace
-                '#[cfg(not(feature = "live-sqlx"))]',  # 45 not-feature attr
-                "fn offline_path() {",  # 46 inside not-feature
-                "    offline_body();",  # 47 inside not-feature
-                "}",  # 48 inside not-feature close
-                "#[cfg(test)]",  # 49
-                "mod tests {",  # 50 cfg(test) mod
-                "    #[test]",  # 51 inside test mod
-                "    fn unit() {",  # 52 inside test mod
-                "        assert_eq!(1, 1);",  # 53 inside test mod
-                "    }",  # 54
-                "}",  # 55
-                "    executable_statement();",  # 56 executable
+                "})",  # 39
+                "    return value,",  # 40 executable (return keeps it)
+                "    x + 1,",  # 41 trailing comma noise
+                '#[cfg(feature = "live-sqlx")]',  # 42 cfg attr
+                "fn live_path() {",  # 43 fn
+                "    live_body();",  # 44 executable active feature body
+                "}",  # 45 brace
+                '#[cfg(not(feature = "live-sqlx"))]',  # 46 not-feature attr
+                "fn offline_path() {",  # 47 inside not-feature
+                "    offline_body();",  # 48 inside not-feature
+                "}",  # 49 inside not-feature close
+                "#[cfg(test)]",  # 50
+                "mod tests {",  # 51 cfg(test) mod
+                "    #[test]",  # 52 inside test mod
+                "    fn unit() {",  # 53 inside test mod
+                "        assert_eq!(1, 1);",  # 54 inside test mod
+                "    }",  # 55
+                "}",  # 56
+                "    executable_statement();",  # 57 executable
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -334,7 +335,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {12, 39, 43, 56}
+            expected_executable = {13, 40, 44, 57}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -353,19 +354,53 @@ class CoverageContractTests(unittest.TestCase):
                 "\n".join(
                     [
                         f"SF:{path}",
-                        "DA:56,1",
+                        "DA:57,1",
                         "DA:1,0",
                         "DA:2,0",
-                        "DA:47,0",
+                        "DA:48,0",
                         "end_of_record",
                         "",
                     ]
                 ),
             )
             self.assertEqual(
-                coverage_contract.load_lcov_line_totals(lcov),
+                coverage_contract.load_lcov_line_totals(
+                    lcov, repository_root=Path(temporary)
+                ),
                 {"lines": {"count": 1, "covered": 1}},
             )
+
+    def test_lcov_rejects_source_paths_outside_repository(self) -> None:
+        """Untrusted SF paths that escape the repository fail closed."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".rs",
+                dir=root.resolve().parent,
+                delete=False,
+                encoding="utf-8",
+            ) as outside_file:
+                outside = Path(outside_file.name)
+                outside_file.write("fn steal() {}\n")
+            try:
+                lcov = root / "escape.lcov"
+                lcov.write_text(
+                    f"SF:{outside}\nDA:1,0\nend_of_record\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(ValueError, "escapes repository root"):
+                    coverage_contract.load_lcov_line_totals(
+                        lcov, repository_root=root
+                    )
+                with self.assertRaisesRegex(ValueError, "escapes repository root"):
+                    coverage_contract.resolve_repository_source_path(
+                        "/etc/passwd", root
+                    )
+            finally:
+                if outside.exists():
+                    outside.unlink()
 
     def test_cfg_test_and_not_feature_block_helpers(self) -> None:
         """cfg(test) modules and cfg(not(feature)) blocks are fully recognized."""

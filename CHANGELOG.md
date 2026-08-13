@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `persistence_postgres` append-only reproducibility-manifest SQL contracts and live repository methods (`insert_reproducibility_manifest`, digest/id lookup) with fail-closed SHA-256 and commit identity validation for `reproducibility_manifest`.
 - `persistence_postgres` tenant row-level security: migration `0002_tenant_row_level_security`, `tepp_app_runtime` role, session GUC `tepp.current_tenant_record_id`, multi-word isolation policies with FORCE RLS, session helpers, contract validation, and live isolation proof under `TEPP_LIVE_POSTGRES=1`.
 - `persistence_postgres` live PostgreSQL CI: `live-postgres` job with Postgres 16 service, `TEPP_LIVE_POSTGRES=1` gate, and integration coverage for pool open, foundation+RLS migrations, document insert/revise/as-of, audit SQL, and tenant isolation.
 - Repository release evidence tooling: `scripts/release_evidence.py` generates CycloneDX 1.5 SBOM, exact-head provenance, and SHA-256 checksums from `Cargo.lock`/`Cargo.toml`, with fail-closed validation and CI generation on every quality gate.

@@ -8,9 +8,9 @@
 
 use persistence_postgres::{
     AuditEvent, DocumentRecord, LiveDocumentRepository, LiveSqlxPoolOptions, MigrationCatalog,
-    SqlSession, apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql,
-    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
-    set_session_tenant_sql,
+    ReproducibilityManifestRecord, SqlSession, apply_sql_batch, assume_app_runtime_role_sql,
+    clear_session_tenant_sql, open_live_sqlx_pool, require_live_sqlx_config,
+    reset_app_runtime_role_sql, set_session_tenant_sql,
 };
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
@@ -149,6 +149,30 @@ fn live_postgres_applies_migrations_and_document_sql() {
         recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
     };
     repo.append_audit(&audit).expect("append audit_event");
+
+    // Owner inserts a reproducibility manifest for the same tenant, then proves
+    // digest lookup SQL remains executable on the live transport.
+    let manifest = ReproducibilityManifestRecord {
+        reproducibility_manifest_id: Uuid::now_v7(),
+        tenant_record_id,
+        knowledge_cutoff: available,
+        evidence_digest: content_digest,
+        code_commit_sha: "a".repeat(40),
+        // SHA-256 hex is always 64 characters (same contract as content_digest).
+        dependency_lock_digest: "b".repeat(64),
+        system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("sys"),
+        available_time: available,
+    };
+    repo.insert_reproducibility_manifest(&manifest)
+        .expect("insert reproducibility_manifest");
+    repo.submit_reproducibility_manifest_by_digests(
+        &manifest.evidence_digest,
+        &manifest.code_commit_sha,
+        &manifest.dependency_lock_digest,
+    )
+    .expect("select reproducibility_manifest by digests");
+    repo.submit_reproducibility_manifest_by_id(manifest.reproducibility_manifest_id)
+        .expect("select reproducibility_manifest by id");
 
     prove_tenant_rls_isolation(&mut repo);
 }

@@ -22,17 +22,50 @@ def load_totals(path: Path) -> Mapping[str, Any]:
     return totals
 
 
-def is_executable_source_line(source_path: str, line_number: int) -> bool:
+def resolve_repository_source_path(source_path: str, repository_root: Path) -> Path:
+    """Resolve *source_path* and require it stay under *repository_root*.
+
+    Absolute or ``..`` paths that escape the repository root fail closed so an
+    untrusted LCOV ``SF:`` record cannot force arbitrary file reads.
+    """
+
+    root = repository_root.resolve()
+    candidate = Path(source_path)
+    resolved = (
+        candidate.resolve() if candidate.is_absolute() else (root / candidate).resolve()
+    )
+    try:
+        resolved.relative_to(root)
+    except ValueError as error:
+        raise ValueError(
+            f"LCOV source path escapes repository root: {source_path}"
+        ) from error
+    return resolved
+
+
+def is_executable_source_line(
+    source_path: str,
+    line_number: int,
+    repository_root: Path | None = None,
+) -> bool:
     """Return whether *line_number* in *source_path* is an executable source line.
 
     LLVM LCOV sometimes emits zero-count DA records for documentation comments,
     attributes, pure structural braces, multi-line signatures, and in-file
     ``#[cfg(test)]`` modules. Those records are not evidence of uncovered
     production behavior and are excluded from the authored-line gate.
+
+    When *repository_root* is provided, *source_path* must resolve under that
+    root (same fail-closed rule as LCOV ``SF:`` loading).
     """
 
     try:
-        lines = Path(source_path).read_text(encoding="utf-8").splitlines()
+        path = (
+            resolve_repository_source_path(source_path, repository_root)
+            if repository_root is not None
+            else Path(source_path)
+        )
+        lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
         return True
     # Stale LCOV rows past EOF are instrumentation noise, not production gaps.
@@ -55,7 +88,7 @@ def is_executable_source_line(source_path: str, line_number: int) -> bool:
         return False
     if text.startswith("mod ") or text.startswith("pub mod "):
         return False
-    if text.startswith("impl "):
+    if text.startswith("impl ") or text.startswith("impl<"):
         return False
     if text.startswith(") ->"):
         return False
@@ -131,9 +164,12 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
     return False
 
 
-def load_lcov_line_totals(path: Path) -> Mapping[str, Any]:
+def load_lcov_line_totals(
+    path: Path, repository_root: Path | None = None
+) -> Mapping[str, Any]:
     """Load authored source-line totals from a fully framed LLVM LCOV report."""
 
+    root = (repository_root or Path.cwd()).resolve()
     source_path: str | None = None
     line_counts: dict[tuple[str, int], int] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -143,6 +179,8 @@ def load_lcov_line_totals(path: Path) -> Mapping[str, Any]:
             source_path = raw_line[3:]
             if not source_path:
                 raise ValueError("LCOV source path must not be empty")
+            # Fail closed on traversal before reading any source file content.
+            resolve_repository_source_path(source_path, root)
         elif raw_line.startswith("DA:"):
             if source_path is None:
                 raise ValueError("LCOV line record must follow a source record")
@@ -156,7 +194,7 @@ def load_lcov_line_totals(path: Path) -> Mapping[str, Any]:
                 raise ValueError("LCOV line and count values must be integers") from error
             if line_number <= 0 or execution_count < 0:
                 raise ValueError("LCOV line records contain invalid values")
-            if not is_executable_source_line(source_path, line_number):
+            if not is_executable_source_line(source_path, line_number, root):
                 continue
             key = (source_path, line_number)
             if key in line_counts:

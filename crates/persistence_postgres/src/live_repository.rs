@@ -4,6 +4,10 @@ use crate::document_sql::{
     append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql, revise_document_sqls,
 };
 use crate::document_store::{AuditEvent, DocumentRecord};
+use crate::manifest_sql::{
+    ReproducibilityManifestRecord, insert_reproducibility_manifest_sql,
+    select_reproducibility_manifest_by_digests_sql, select_reproducibility_manifest_by_id_sql,
+};
 use crate::migration::{MigrationCatalog, validate_migration_catalog};
 use crate::sql_session::{SqlSession, apply_sql_batch};
 use crate::{MigrationContractError, PersistenceError};
@@ -123,6 +127,51 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         let sql = append_audit_sql(event);
         self.session.execute(&sql)
     }
+
+    /// Insert an append-only reproducibility manifest under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns digest validation or transport failures.
+    pub fn insert_reproducibility_manifest(
+        &mut self,
+        record: &ReproducibilityManifestRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_reproducibility_manifest_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up a reproducibility manifest by the unique digest triple.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_reproducibility_manifest_by_digests(
+        &mut self,
+        evidence_digest: &str,
+        code_commit_sha: &str,
+        dependency_lock_digest: &str,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_reproducibility_manifest_by_digests_sql(
+            evidence_digest,
+            code_commit_sha,
+            dependency_lock_digest,
+        );
+        self.session.execute(&sql)
+    }
+
+    /// Look up a reproducibility manifest by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_reproducibility_manifest_by_id(
+        &mut self,
+        reproducibility_manifest_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_reproducibility_manifest_by_id_sql(reproducibility_manifest_id);
+        self.session.execute(&sql)
+    }
 }
 
 /// Migration application failures distinguishing contract vs transport errors.
@@ -149,6 +198,7 @@ impl std::error::Error for LiveMigrationError {}
 mod tests {
     use super::{LiveDocumentRepository, LiveMigrationError};
     use crate::document_store::{AuditEvent, DocumentRecord};
+    use crate::manifest_sql::ReproducibilityManifestRecord;
     use crate::migration::MigrationCatalog;
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};
@@ -193,6 +243,33 @@ mod tests {
             &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("k"),
         )
         .expect("valid");
+        let manifest = ReproducibilityManifestRecord {
+            reproducibility_manifest_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            knowledge_cutoff: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("k"),
+            evidence_digest: "ab".repeat(32),
+            code_commit_sha: "c".repeat(40),
+            dependency_lock_digest: "de".repeat(32),
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        };
+        repo.insert_reproducibility_manifest(&manifest)
+            .expect("manifest insert");
+        repo.submit_reproducibility_manifest_by_digests(
+            &manifest.evidence_digest,
+            &manifest.code_commit_sha,
+            &manifest.dependency_lock_digest,
+        )
+        .expect("manifest by digests");
+        repo.submit_reproducibility_manifest_by_id(manifest.reproducibility_manifest_id)
+            .expect("manifest by id");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO reproducibility_manifest"))
+        );
+
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
             tenant_record_id: uuid::Uuid::nil(),
