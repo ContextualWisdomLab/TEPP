@@ -329,6 +329,10 @@ fn every_record_validation_error_has_a_stable_message() {
             EvidenceError::LayoutOutOfBounds,
             "layout bounds exceed the page geometry",
         ),
+        (
+            EvidenceError::SemanticUnitBagRefused,
+            "document bag-of-words unit refused",
+        ),
     ];
 
     for (error, expected) in cases {

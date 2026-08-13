@@ -7,13 +7,15 @@
 //! records, source spans whose byte, Unicode-scalar, page, and layout
 //! coordinates are validated before entering later temporal or psychometric
 //! layers, and strict versioned JSON wire contracts that reconstruct records
-//! only through the same domain validation boundary.
+//! only through the same domain validation boundary. Paragraph semantic units
+//! preserve exact source spans so later embedding search is meaning-bearing.
 
 mod artifact;
 mod digest;
 mod document;
 mod error;
 mod identifier;
+mod semantic;
 mod span;
 mod wire;
 
@@ -27,6 +29,10 @@ pub use document::DocumentRecord;
 pub use error::EvidenceError;
 /// A validated RFC 9562 `UUIDv7` evidence identifier.
 pub use identifier::EvidenceId;
+/// Refuse collapsing a multi-paragraph document into one bag-of-words unit.
+pub use semantic::refuse_document_bag_of_words;
+/// Split a document into paragraph units with exact source spans.
+pub use semantic::semantic_paragraph_units;
 /// A validated page-relative location for source evidence.
 pub use span::PageLocation;
 /// An exact byte, Unicode-scalar, and optional page/layout span.

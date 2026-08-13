@@ -44,6 +44,8 @@ pub enum EvidenceError {
     InvalidLayoutBounds,
     /// Layout coordinates exceeded the enclosing page.
     LayoutOutOfBounds,
+    /// A multi-paragraph document was treated as one bag-of-words unit.
+    SemanticUnitBagRefused,
 }
 
 impl fmt::Display for EvidenceError {
@@ -70,6 +72,7 @@ impl fmt::Display for EvidenceError {
             Self::InvalidPageGeometry => "page geometry must be finite and positive",
             Self::InvalidLayoutBounds => "layout bounds must be finite, nonnegative, and nonempty",
             Self::LayoutOutOfBounds => "layout bounds exceed the page geometry",
+            Self::SemanticUnitBagRefused => "document bag-of-words unit refused",
         };
         formatter.write_str(message)
     }
