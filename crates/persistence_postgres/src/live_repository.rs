@@ -28,6 +28,7 @@ use crate::model_run_sql::{
     select_model_artifacts_by_run_sql, select_model_run_by_id_sql,
 };
 use crate::relation_sql::{EventRelationRecord, insert_event_relation_sql};
+use crate::restore_integrity::restore_integrity_probe_sqls;
 use crate::sql_session::{SqlSession, apply_sql_batch};
 use crate::{MigrationContractError, PersistenceError};
 use temporal_core::{EventTime, SystemTime};
@@ -78,6 +79,18 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ) -> Result<usize, LiveMigrationError> {
         validate_migration_catalog(catalog).map_err(LiveMigrationError::Contract)?;
         apply_sql_batch(&mut self.session, catalog.up_sql()).map_err(LiveMigrationError::Transport)
+    }
+
+    /// Revalidate restored physical rows before analytical state is usable.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures, including a mapped restore-integrity raise.
+    pub fn assert_restore_integrity(&mut self) -> Result<(), PersistenceError> {
+        for sql in restore_integrity_probe_sqls() {
+            self.session.execute(&sql)?;
+        }
+        Ok(())
     }
 
     /// Insert the first system-time version of a document identity.
@@ -634,6 +647,14 @@ mod tests {
         let applied = repo.apply_migrations(&catalog).expect("migrate");
         assert!(applied >= 1);
         assert!(!repo.session().executed().is_empty());
+        repo.assert_restore_integrity()
+            .expect("restore integrity probes");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("restore integrity failed"))
+        );
 
         repo.insert(&sample_record()).expect("insert");
         let mut revised = sample_record();

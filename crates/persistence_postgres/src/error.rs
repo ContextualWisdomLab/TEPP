@@ -40,6 +40,8 @@ pub enum PersistenceError {
     InvalidAuditEvent,
     /// A concurrent writer won the open-row lock or serialization contest.
     ConcurrentWriteConflict,
+    /// A restored snapshot failed integrity revalidation and is not usable.
+    RestoreIntegrityFailed,
 }
 
 impl fmt::Display for PersistenceError {
@@ -62,6 +64,7 @@ impl fmt::Display for PersistenceError {
             Self::InvalidSourceArtifact => "invalid source artifact",
             Self::InvalidAuditEvent => "invalid audit event",
             Self::ConcurrentWriteConflict => "concurrent write conflict",
+            Self::RestoreIntegrityFailed => "restore integrity failed",
         };
         formatter.write_str(message)
     }
@@ -189,6 +192,10 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidAuditEvent.to_string(),
             "invalid audit event"
+        );
+        assert_eq!(
+            PersistenceError::RestoreIntegrityFailed.to_string(),
+            "restore integrity failed"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),

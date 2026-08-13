@@ -110,6 +110,8 @@ fn live_postgres_applies_migrations_and_document_sql() {
         .apply_migrations(&catalog)
         .expect("foundation+RLS migrations must apply on live PostgreSQL");
     assert!(applied >= 1);
+    repo.assert_restore_integrity()
+        .expect("empty restored catalog must pass integrity probes");
 
     let tenant_record_id = Uuid::now_v7();
     let document_record_id = Uuid::now_v7();
