@@ -403,6 +403,27 @@ mod tests {
         assert!(validate_nonempty_label("").is_err());
         assert!(validate_nonempty_label(&"x".repeat(129)).is_err());
         assert!(validate_nonempty_label("bad'label").is_err());
+        // Control-character branch of label validation.
+        assert!(validate_nonempty_label("cpu\nf64").is_err());
+        // Independent fail paths for seed digest / backend / artifact type.
+        let mut bad_seed = sample_run();
+        bad_seed.random_seed_manifest_digest = "zz".into();
+        assert_eq!(
+            insert_model_run_sql(&bad_seed),
+            Err(PersistenceError::InvalidContentDigest)
+        );
+        let mut bad_backend = sample_run();
+        bad_backend.compute_backend_code.clear();
+        assert_eq!(
+            insert_model_run_sql(&bad_backend),
+            Err(PersistenceError::InvalidContentDigest)
+        );
+        let mut bad_type = sample_artifact();
+        bad_type.artifact_type_code.clear();
+        assert_eq!(
+            insert_model_artifact_sql(&bad_type),
+            Err(PersistenceError::InvalidContentDigest)
+        );
         assert_eq!(super::escape_literal("a'b"), "a''b");
     }
 }
