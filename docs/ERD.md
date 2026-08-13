@@ -82,6 +82,7 @@ erDiagram
       text media_type_code
       text protected_object_ref
       timestamptz system_time
+      timestamptz available_time
     }
 
     DOCUMENT_RECORD {

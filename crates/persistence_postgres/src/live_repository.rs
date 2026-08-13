@@ -1,5 +1,9 @@
 //! Live document repository over a SQL transport.
 
+use crate::artifact_sql::{
+    SourceArtifactRecord, assert_source_artifact_matches_sql, insert_source_artifact_sql,
+    select_source_artifact_by_id_sql,
+};
 use crate::document_sql::{
     append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql, revise_document_sqls,
 };
@@ -303,6 +307,38 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
+    /// Insert an append-only source artifact under the active tenant.
+    ///
+    /// A retry of the same immutable identity is a no-op. A same-id payload
+    /// change fails closed after `ON CONFLICT DO NOTHING`.
+    ///
+    /// # Errors
+    ///
+    /// Returns digest/size/label validation, identity-conflict, or transport
+    /// failures.
+    pub fn insert_source_artifact(
+        &mut self,
+        record: &SourceArtifactRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_source_artifact_sql(record)?;
+        self.session.execute(&sql)?;
+        let assertion = assert_source_artifact_matches_sql(record)?;
+        self.session.execute(&assertion)
+    }
+
+    /// Look up a source artifact by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures from the underlying session.
+    pub fn submit_source_artifact_by_id(
+        &mut self,
+        source_artifact_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_source_artifact_by_id_sql(source_artifact_id);
+        self.session.execute(&sql)
+    }
+
     /// Look up a model run by primary key.
     ///
     /// # Errors
@@ -350,6 +386,7 @@ impl std::error::Error for LiveMigrationError {}
 #[cfg(test)]
 mod tests {
     use super::{LiveDocumentRepository, LiveMigrationError};
+    use crate::artifact_sql::SourceArtifactRecord;
     use crate::document_store::{AuditEvent, DocumentRecord};
     use crate::instance_sql::EventInstanceRecord;
     use crate::manifest_sql::ReproducibilityManifestRecord;
@@ -559,6 +596,37 @@ mod tests {
         );
     }
 
+    fn exercise_source_artifact(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let artifact = SourceArtifactRecord {
+            source_artifact_id: uuid::Uuid::from_u128(1),
+            tenant_record_id: uuid::Uuid::nil(),
+            content_sha256: "ab".repeat(32),
+            source_size_bytes: 4,
+            media_type_code: "text/plain".into(),
+            protected_object_ref: None,
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        };
+        repo.insert_source_artifact(&artifact)
+            .expect("artifact insert");
+        repo.insert_source_artifact(&artifact)
+            .expect("identical retry");
+        repo.submit_source_artifact_by_id(artifact.source_artifact_id)
+            .expect("artifact by id");
+        let mut invalid = artifact.clone();
+        invalid.source_size_bytes = -1;
+        assert_eq!(
+            repo.insert_source_artifact(&invalid),
+            Err(PersistenceError::InvalidSourceArtifact)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("ON CONFLICT (source_artifact_id) DO NOTHING"))
+        );
+    }
+
     #[test]
     fn live_repository_applies_migrations_and_document_sql() {
         let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
@@ -615,6 +683,7 @@ mod tests {
         exercise_event_relation(&mut repo);
         exercise_event_mention(&mut repo);
         exercise_event_instance(&mut repo);
+        exercise_source_artifact(&mut repo);
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),

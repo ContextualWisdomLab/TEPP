@@ -32,6 +32,10 @@ pub enum PersistenceError {
     InvalidEventMention,
     /// An event instance had inverted windows or a hostile label.
     InvalidEventInstance,
+    /// A source-artifact identity already exists with different immutable fields.
+    ConflictingSourceArtifact,
+    /// A source artifact had a non-canonical digest, negative size, or hostile label.
+    InvalidSourceArtifact,
 }
 
 impl fmt::Display for PersistenceError {
@@ -50,6 +54,8 @@ impl fmt::Display for PersistenceError {
             Self::InvalidEventRelation => "invalid event relation",
             Self::InvalidEventMention => "invalid event mention",
             Self::InvalidEventInstance => "invalid event instance",
+            Self::ConflictingSourceArtifact => "conflicting source artifact",
+            Self::InvalidSourceArtifact => "invalid source artifact",
         };
         formatter.write_str(message)
     }
@@ -160,6 +166,14 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidEventInstance.to_string(),
             "invalid event instance"
+        );
+        assert_eq!(
+            PersistenceError::ConflictingSourceArtifact.to_string(),
+            "conflicting source artifact"
+        );
+        assert_eq!(
+            PersistenceError::InvalidSourceArtifact.to_string(),
+            "invalid source artifact"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),
