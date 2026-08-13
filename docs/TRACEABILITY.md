@@ -8,6 +8,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | Requirement / decision | Canonical basis | Source/evidence boundary | Maturity |
 |---|---|---|---|
 | immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring | implemented-main |
+| embedded image location and non-lexical treatment | ADR 0008; research | `evidence_core` data-URI spans on the active PR | active-PR |
 | Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |

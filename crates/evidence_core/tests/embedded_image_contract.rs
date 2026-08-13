@@ -1,0 +1,42 @@
+//! Embedded base64 images keep their original location and are not lexical text.
+
+use evidence_core::{
+    DocumentRecord, EvidenceError, SourceArtifact, embedded_image_units,
+    refuse_base64_image_as_lexical_text,
+};
+
+#[test]
+fn data_uri_recovers_exact_span_and_media_type() {
+    let uri = "data:image/png;base64,iVBORw0KGgo=";
+    let text = format!("Before the figure.\n\n{uri}\n\nAfter the figure.");
+    let artifact = SourceArtifact::from_bytes(text.as_bytes()).expect("artifact");
+    let document = DocumentRecord::from_text(artifact.id(), &text).expect("document");
+
+    let units = embedded_image_units(&document).expect("units");
+    assert_eq!(units.len(), 1);
+    assert_eq!(units[0].media_type(), "image/png");
+    assert_eq!(
+        &document.text()[units[0].span().byte_start()..units[0].span().byte_end()],
+        uri
+    );
+    assert_eq!(
+        refuse_base64_image_as_lexical_text(document.text()),
+        Err(EvidenceError::EmbeddedImageIsNotLexicalText)
+    );
+    refuse_base64_image_as_lexical_text("Before the figure.").expect("plain text");
+}
+
+#[test]
+fn documents_without_images_and_empty_payloads_fail_closed() {
+    let text = "No figures in this note.";
+    let artifact = SourceArtifact::from_bytes(text.as_bytes()).expect("artifact");
+    let document = DocumentRecord::from_text(artifact.id(), text).expect("document");
+    assert_eq!(
+        embedded_image_units(&document),
+        Err(EvidenceError::EmptySourceSpan)
+    );
+    assert_eq!(
+        refuse_base64_image_as_lexical_text(""),
+        Err(EvidenceError::InvalidWirePayload)
+    );
+}

@@ -44,6 +44,8 @@ pub enum EvidenceError {
     InvalidLayoutBounds,
     /// Layout coordinates exceeded the enclosing page.
     LayoutOutOfBounds,
+    /// A base64 image data URI was treated as lexical inference text.
+    EmbeddedImageIsNotLexicalText,
 }
 
 impl fmt::Display for EvidenceError {
@@ -70,6 +72,7 @@ impl fmt::Display for EvidenceError {
             Self::InvalidPageGeometry => "page geometry must be finite and positive",
             Self::InvalidLayoutBounds => "layout bounds must be finite, nonnegative, and nonempty",
             Self::LayoutOutOfBounds => "layout bounds exceed the page geometry",
+            Self::EmbeddedImageIsNotLexicalText => "embedded image is not lexical text",
         };
         formatter.write_str(message)
     }
