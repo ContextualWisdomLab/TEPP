@@ -176,7 +176,33 @@ fn live_postgres_applies_migrations_and_document_sql() {
         .expect("select reproducibility_manifest by id");
 
     exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
+    prove_append_only_immutability(&mut repo, &manifest);
     prove_tenant_rls_isolation(&mut repo);
+}
+
+/// Append-only triggers must reject UPDATE/DELETE on identity tables.
+fn prove_append_only_immutability(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    manifest: &ReproducibilityManifestRecord,
+) {
+    let update = format!(
+        "UPDATE reproducibility_manifest SET code_commit_sha = 'deadbeef' \
+         WHERE reproducibility_manifest_id = '{}'::uuid",
+        manifest.reproducibility_manifest_id
+    );
+    assert!(
+        repo.session_mut().execute(&update).is_err(),
+        "UPDATE must fail on append-only reproducibility_manifest"
+    );
+    let delete = format!(
+        "DELETE FROM reproducibility_manifest \
+         WHERE reproducibility_manifest_id = '{}'::uuid",
+        manifest.reproducibility_manifest_id
+    );
+    assert!(
+        repo.session_mut().execute(&delete).is_err(),
+        "DELETE must fail on append-only reproducibility_manifest"
+    );
 }
 
 fn exercise_model_run_artifact_chain(

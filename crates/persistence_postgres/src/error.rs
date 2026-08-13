@@ -65,6 +65,8 @@ pub enum MigrationContractError {
     MissingAppRuntimeRole,
     /// Tenant RLS was declared without the session tenant GUC contract.
     MissingTenantSessionGuc,
+    /// Append-only immutability triggers or revoke statements were incomplete.
+    MissingAppendOnlyTrigger,
 }
 
 impl fmt::Display for MigrationContractError {
@@ -78,6 +80,7 @@ impl fmt::Display for MigrationContractError {
             Self::MissingRlsPolicy => "missing tenant isolation policy",
             Self::MissingAppRuntimeRole => "missing application runtime role",
             Self::MissingTenantSessionGuc => "missing tenant session guc",
+            Self::MissingAppendOnlyTrigger => "missing append-only immutability trigger",
         };
         formatter.write_str(message)
     }
@@ -158,6 +161,10 @@ mod tests {
         assert_eq!(
             MigrationContractError::MissingTenantSessionGuc.to_string(),
             "missing tenant session guc"
+        );
+        assert_eq!(
+            MigrationContractError::MissingAppendOnlyTrigger.to_string(),
+            "missing append-only immutability trigger"
         );
     }
 }
