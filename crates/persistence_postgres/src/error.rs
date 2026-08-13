@@ -67,6 +67,8 @@ pub enum MigrationContractError {
     MissingTenantSessionGuc,
     /// Append-only immutability triggers or revoke statements were incomplete.
     MissingAppendOnlyTrigger,
+    /// Temporal interval ordering checks were incomplete when declared.
+    MissingTemporalIntervalConstraint,
 }
 
 impl fmt::Display for MigrationContractError {
@@ -81,6 +83,7 @@ impl fmt::Display for MigrationContractError {
             Self::MissingAppRuntimeRole => "missing application runtime role",
             Self::MissingTenantSessionGuc => "missing tenant session guc",
             Self::MissingAppendOnlyTrigger => "missing append-only immutability trigger",
+            Self::MissingTemporalIntervalConstraint => "missing temporal interval constraint",
         };
         formatter.write_str(message)
     }
@@ -165,6 +168,10 @@ mod tests {
         assert_eq!(
             MigrationContractError::MissingAppendOnlyTrigger.to_string(),
             "missing append-only immutability trigger"
+        );
+        assert_eq!(
+            MigrationContractError::MissingTemporalIntervalConstraint.to_string(),
+            "missing temporal interval constraint"
         );
     }
 }
