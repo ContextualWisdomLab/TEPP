@@ -23,8 +23,9 @@
 //!
 //! Proper bounded intervals can be classified with Allen's thirteen elementary
 //! relations. Relation sets support inverse and complete composition, while a
-//! resource-bounded path-consistency reasoner preserves direct assertions,
-//! derived narrowing, and conservative supporting-assertion provenance.
+//! resource-bounded path-consistency reasoner preserves observed assertions,
+//! hypothetical predicted assertions that cannot rewrite observations, derived
+//! narrowing, and conservative supporting-assertion provenance.
 
 mod clock;
 mod error;

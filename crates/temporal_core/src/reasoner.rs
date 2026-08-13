@@ -142,6 +142,8 @@ pub enum TemporalReasonerError {
     LimitExceeded(ReasonerLimitKind),
     /// An assertion or propagation step proved that no relation remains possible.
     Contradiction(TemporalContradiction),
+    /// A predicted assertion contradicted observed evidence and was discarded.
+    PredictedRelationRejected(TemporalContradiction),
 }
 
 impl fmt::Display for TemporalReasonerError {
@@ -152,6 +154,9 @@ impl fmt::Display for TemporalReasonerError {
             Self::EmptyRelationSet => "temporal relation set is empty",
             Self::LimitExceeded(_) => "temporal reasoner resource limit exceeded",
             Self::Contradiction(_) => "temporal relation network is contradictory",
+            Self::PredictedRelationRejected(_) => {
+                "predicted temporal relation rejected by observed evidence"
+            }
         };
         formatter.write_str(message)
     }
@@ -164,6 +169,7 @@ impl std::error::Error for TemporalReasonerError {}
 pub struct DerivedRelation {
     relations: RelationSet,
     observed: bool,
+    predicted: bool,
     support: Vec<ConstraintId>,
 }
 
@@ -174,10 +180,19 @@ impl DerivedRelation {
         self.relations
     }
 
-    /// Return whether at least one direct assertion exists for this ordered pair.
+    /// Return whether at least one direct observation exists for this ordered pair.
     #[must_use]
     pub const fn is_observed(&self) -> bool {
         self.observed
+    }
+
+    /// Return whether this pair was narrowed only by a predicted assertion.
+    ///
+    /// Predicted CHRONOS/TDT relations stay hypothetical. An observed assertion
+    /// on the same ordered pair clears this flag.
+    #[must_use]
+    pub const fn is_predicted(&self) -> bool {
+        self.predicted
     }
 
     /// Return the conservative accepted-assertion support for this relation.
@@ -218,6 +233,7 @@ impl ClosureReport {
 struct RelationCell {
     relations: RelationSet,
     observed: bool,
+    predicted: bool,
     support: BTreeSet<ConstraintId>,
 }
 
@@ -226,6 +242,7 @@ impl RelationCell {
         Self {
             relations: RelationSet::all(),
             observed: false,
+            predicted: false,
             support: BTreeSet::new(),
         }
     }
@@ -234,6 +251,7 @@ impl RelationCell {
         Self {
             relations: RelationSet::singleton(crate::AllenRelation::Equals),
             observed: false,
+            predicted: false,
             support: BTreeSet::new(),
         }
     }
@@ -337,11 +355,80 @@ impl TemporalReasoner {
         self.cells[left.variable_index][right.variable_index] = RelationCell {
             relations: narrowed,
             observed: true,
+            predicted: false,
             support: support.clone(),
         };
         self.cells[right.variable_index][left.variable_index] = RelationCell {
             relations: narrowed.inverse(),
             observed: inverse_was_observed || left == right,
+            predicted: false,
+            support,
+        };
+        self.constraint_count += 1;
+        Ok(identifier)
+    }
+
+    /// Assert a hypothetical CHRONOS/TDT relation that cannot rewrite observations.
+    ///
+    /// Compatible predictions against an already-observed pair are accepted
+    /// without tightening the observed relation set. Incompatible predictions
+    /// return [`TemporalReasonerError::PredictedRelationRejected`] and leave
+    /// observed evidence unchanged. Predicted-only empty intersections remain
+    /// ordinary network contradictions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unknown-variable, empty-set, capacity, prediction-rejection,
+    /// or contradiction error when the assertion cannot be accepted.
+    pub fn assert_predicted_relation(
+        &mut self,
+        left: TemporalVariableId,
+        right: TemporalVariableId,
+        relations: RelationSet,
+    ) -> Result<ConstraintId, TemporalReasonerError> {
+        self.validate_pair(left, right)?;
+        if relations.is_empty() {
+            return Err(TemporalReasonerError::EmptyRelationSet);
+        }
+        if self.constraint_count >= self.limits.constraint_limit {
+            return Err(TemporalReasonerError::LimitExceeded(
+                ReasonerLimitKind::Constraints,
+            ));
+        }
+
+        let forward = &self.cells[left.variable_index][right.variable_index];
+        let inverse_observed = self.cells[right.variable_index][left.variable_index].observed;
+        let observed_pair = forward.observed || inverse_observed;
+        let narrowed = forward.relations.intersection(relations);
+        let existing_support = forward.support.clone();
+        if narrowed.is_empty() {
+            let contradiction =
+                TemporalContradiction::from_support(left, right, existing_support, Some(relations));
+            return Err(if observed_pair {
+                TemporalReasonerError::PredictedRelationRejected(contradiction)
+            } else {
+                TemporalReasonerError::Contradiction(contradiction)
+            });
+        }
+        if observed_pair {
+            let identifier = self.constraint_id(self.constraint_count);
+            self.constraint_count += 1;
+            return Ok(identifier);
+        }
+
+        let identifier = self.constraint_id(self.constraint_count);
+        let mut support = existing_support;
+        support.insert(identifier);
+        self.cells[left.variable_index][right.variable_index] = RelationCell {
+            relations: narrowed,
+            observed: false,
+            predicted: true,
+            support: support.clone(),
+        };
+        self.cells[right.variable_index][left.variable_index] = RelationCell {
+            relations: narrowed.inverse(),
+            observed: false,
+            predicted: true,
             support,
         };
         self.constraint_count += 1;
@@ -381,6 +468,7 @@ impl TemporalReasoner {
         Ok(DerivedRelation {
             relations: cell.relations,
             observed: cell.observed,
+            predicted: cell.predicted,
             support: cell.support.iter().copied().collect(),
         })
     }
@@ -472,15 +560,19 @@ impl TemporalReasoner {
                             &self.cells[middle][right].support,
                         ]);
                         let observed = self.cells[left][right].observed;
+                        let predicted = self.cells[left][right].predicted;
                         let inverse_observed = self.cells[right][left].observed;
+                        let inverse_predicted = self.cells[right][left].predicted;
                         self.cells[left][right] = RelationCell {
                             relations: narrowed,
                             observed,
+                            predicted,
                             support: support.clone(),
                         };
                         self.cells[right][left] = RelationCell {
                             relations: narrowed.inverse(),
                             observed: inverse_observed,
+                            predicted: inverse_predicted,
                             support,
                         };
                         revisions += 1;
