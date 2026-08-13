@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- Actions workflow fleet auditor (`scripts/actions_workflow_fleet.py`): paginated registry inventory bound to the exact default-branch SHA/tree, classification of present/orphan/disabled/GitHub-dynamic identities, and fail-closed orphan disable that confirms GitHub's official `disabled_manually` state.
 - `persistence_postgres` temporal interval ordering migration (`0005`): multi-word CHECK constraints on `document_record`, `event_instance`, and `membership_assignment` that reject inverted valid/system windows and non-positive document revisions while preserving open-ended NULL upper bounds and equal point bounds; catalog validation and live inverted-window proof.
 - `persistence_postgres` append-only immutability migration (`0004`): `reject_append_only_mutation`, statement-level `BEFORE UPDATE OR DELETE OR TRUNCATE` triggers on identity/manifest tables, `REVOKE UPDATE`/`DELETE`/`TRUNCATE` from `tepp_app_runtime`, executable DDL/rollback contracts, and live representative mutation proof.
 - `persistence_postgres` model-run artifact chain: migration `0003_model_run_artifact_chain` for append-only `corpus_split_manifest`, `model_run`, and `model_artifact` with FORCE RLS; SQL insert/lookup contracts and live repository methods binding runs to reproducibility manifests and optional splits.
@@ -68,6 +69,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Security
 
+- Disabled-state classification and live disable confirmation now accept GitHub's official `disabled_manually`, `disabled_fork`, `disabled_inactivity`, and `deleted` registry states so orphan bootstrap/repair identities can be retired without name-only heuristics.
 - Prohibited `COPILOT_GITHUB_TOKEN` and reserved `NVIDIA_NIM_API_KEY` for approved LLM test and development workflows.
 - Defined purpose-bound PII access, opaque analytical identifiers, separately protected identity mapping, selective model-provider disclosure, retention/deletion, and privileged audit controls instead of destructive blanket masking.
 - Added explicit threat classes for temporal leakage, relation/membership poisoning, model/artifact poisoning, numerical divergence, cross-tenant disclosure, prompt injection, evidence substitution, resource exhaustion, and scientific-integrity failures.

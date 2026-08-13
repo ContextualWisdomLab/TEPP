@@ -1,7 +1,7 @@
 # TEPP Operability, Recovery, and Release Guide
 
 **Status:** Accepted target operating baseline with current maturity explicit.  
-**Last reviewed:** 2026-08-09
+**Last reviewed:** 2026-08-13
 
 TEPP is still an implementation-stage research/product platform. Protected main currently contains the Rust workspace/evidence foundation; PR #5/#6 add temporal foundations. Database, model fitting, GPU, services, visual analytics, and production deployment are later targets. This guide defines the operating evidence those stages must satisfy rather than claiming they already exist.
 
@@ -61,6 +61,20 @@ A model artifact is promoted only after convergence, posterior diagnostics, true
 ## Incident RCA
 
 Trace the first failing boundary: evidence, temporal typing/reasoning, event/relation, membership, preprocessing/concept, topic estimator, psychometric estimator, compute backend, network/cluster, LLM interpretation, persistence, export/UI, or delivery pipeline. Fix the owning layer and add a realistic regression rather than compensating downstream.
+
+## Actions workflow fleet
+
+GitHub Actions registry identities survive YAML deletion. After any
+bootstrap, diagnosis, or repair workflow is removed from the tree, run
+`scripts/actions_workflow_fleet.py audit` and retain the JSON inventory
+(workflow ID, path, state, classification, default-branch SHA, timestamp,
+pagination receipts). Disable only re-fetched active orphans with
+`disable-orphans --apply`. Never disable the protected CI, documentation,
+hourly NIM, or hourly PR-maintenance paths, and never recreate deleted
+bootstrap/repair YAML. The auditor uses only `GITHUB_TOKEN`/`GH_TOKEN`.
+Product-development automation continues to use `NVIDIA_NIM_API_KEY` and
+must not receive `COPILOT_GITHUB_TOKEN`. Operator procedure:
+`docs/operations/ACTIONS_WORKFLOW_FLEET.md`.
 
 ## Release gate
 

@@ -7,6 +7,7 @@ source =
     scripts.check_coverage
     scripts.prepare_agent_pr_message
     scripts.release_evidence
+    scripts.actions_workflow_fleet
 
 [report]
 fail_under = 100

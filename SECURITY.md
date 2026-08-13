@@ -40,6 +40,7 @@ Secrets must not appear in source, logs, prompts, traces, artifacts, test snapsh
 ## Supply chain
 
 - Pin GitHub Actions by full commit SHA.
+- Inventory Actions registry identities against the protected-main tree and disable reviewed orphans; do not trust deleted YAML absence as proof the control plane is clean.
 - Lock dependencies and verify licenses and advisories.
 - Generate SBOM, provenance, checksums, and reproducible release evidence.
 - Use least-privilege workflow permissions and concurrency controls.
