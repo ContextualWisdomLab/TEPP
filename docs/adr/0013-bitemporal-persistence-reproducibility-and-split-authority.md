@@ -1,7 +1,7 @@
 # ADR 0013 — Bitemporal persistence, reproducibility manifests, and split authority
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — migration contracts, cutoff eligibility, in-memory bitemporal adapters, live SQL session/migration port, document SQL contracts, `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` open/execute driver, exact-head live PostgreSQL CI, tenant RLS (`tepp_app_runtime` + session GUC), and append-only reproducibility-manifest SQL insert/lookup implemented; full physical ERD, model-run artifact chain, concurrent write stress, and backup/restore remain accepted-target  
+**Implementation maturity:** partial — migration contracts, cutoff eligibility, in-memory bitemporal adapters, live SQL session/migration port, document SQL contracts, `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` open/execute driver, exact-head live PostgreSQL CI, tenant RLS (`tepp_app_runtime` + session GUC), append-only reproducibility-manifest SQL insert/lookup, and model-run / model-artifact / corpus-split-manifest chain (migration `0003`) implemented; full physical ERD constraints, concurrent write stress, and backup/restore remain accepted-target  
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 (temporal semantics), ADR 0008 (evidence identity), and ADR 0011 (service ownership).
 
