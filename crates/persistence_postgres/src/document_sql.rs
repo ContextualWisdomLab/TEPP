@@ -53,6 +53,38 @@ pub fn revise_document_sqls(record: &DocumentRecord) -> Result<[String; 2], Pers
     Ok([close, insert])
 }
 
+/// Render one transactional revise that fails closed unless exactly one open row closes.
+///
+/// The `DO` block updates the current `system_to IS NULL` version, requires that
+/// close to affect exactly one row, then inserts the successor. Concurrent
+/// revisers serialize on the open-row lock; the loser raises
+/// `serialization_failure` instead of leaving two open versions or a silent
+/// no-op. Digest validation matches [`insert_document_sql`].
+///
+/// # Errors
+///
+/// Returns [`PersistenceError::InvalidContentDigest`] when the digest is not a
+/// 64-character hexadecimal `SHA-256` string.
+pub fn revise_document_atomic_sql(record: &DocumentRecord) -> Result<String, PersistenceError> {
+    let insert = insert_document_sql(record)?;
+    Ok(format!(
+        "DO $tepp$ \
+         DECLARE closed_count integer; \
+         BEGIN \
+           UPDATE document_record SET system_to = '{system_from}'::timestamptz \
+            WHERE document_record_id = '{document_id}'::uuid AND system_to IS NULL; \
+           GET DIAGNOSTICS closed_count = ROW_COUNT; \
+           IF closed_count <> 1 THEN \
+             RAISE EXCEPTION 'concurrent document revision conflict' \
+               USING ERRCODE = 'serialization_failure'; \
+           END IF; \
+           {insert}; \
+         END $tepp$",
+        system_from = record.system_from.to_rfc3339(),
+        document_id = record.document_record_id,
+    ))
+}
+
 /// Render as-known-at selection for one document identity.
 #[must_use]
 pub fn as_known_at_sql(document_record_id: uuid::Uuid, known_at_rfc3339: &str) -> String {
@@ -149,7 +181,8 @@ fn validate_digest(digest: &str) -> Result<(), PersistenceError> {
 mod tests {
     use super::{
         append_audit_sql, as_known_at_sql, as_valid_at_sql, escape_literal, insert_document_sql,
-        optional_timestamptz, revise_document_sqls, validate_audit_action, validate_digest,
+        optional_timestamptz, revise_document_atomic_sql, revise_document_sqls,
+        validate_audit_action, validate_digest,
     };
     use crate::PersistenceError;
     use crate::document_store::{AuditEvent, DocumentRecord};
@@ -185,6 +218,19 @@ mod tests {
         assert!(close.contains("UPDATE document_record"));
         assert!(close.contains("system_to IS NULL"));
         assert!(reopen.contains("INSERT INTO document_record"));
+
+        let atomic = revise_document_atomic_sql(&record).expect("atomic");
+        assert!(atomic.contains("DO $tepp$"));
+        assert!(atomic.contains("GET DIAGNOSTICS closed_count = ROW_COUNT"));
+        assert!(atomic.contains("serialization_failure"));
+        assert!(atomic.contains("INSERT INTO document_record"));
+        assert_eq!(
+            revise_document_atomic_sql(&DocumentRecord {
+                content_digest: "nope".into(),
+                ..sample_record()
+            }),
+            Err(PersistenceError::InvalidContentDigest)
+        );
 
         let known = as_known_at_sql(uuid::Uuid::nil(), "2026-03-01T00:00:00Z");
         assert!(known.contains("system_from <="));

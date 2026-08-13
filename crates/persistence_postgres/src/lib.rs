@@ -15,8 +15,12 @@
 //! contracts chain immutable run identities to those manifests. Typed
 //! membership-assignment SQL (migration `0006`) replaces the polymorphic 0001 stub so documents
 //! can belong to multiple entities and projects without atomistic collapse.
+//! Concurrent document revises use one transactional `DO` block that requires
+//! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
+//! typed conflict errors.
 
 mod artifact_sql;
+mod concurrent_write;
 mod cutoff;
 mod document_sql;
 mod document_store;
@@ -47,6 +51,16 @@ pub use artifact_sql::insert_source_artifact_sql;
 pub use artifact_sql::select_source_artifact_by_id_sql;
 /// Compare two source artifacts for idempotent-retry equality.
 pub use artifact_sql::source_artifacts_are_idempotent_matches;
+/// `PostgreSQL` `deadlock_detected` SQLSTATE.
+pub use concurrent_write::DEADLOCK_DETECTED_SQLSTATE;
+/// `PostgreSQL` `exclusion_violation` SQLSTATE.
+pub use concurrent_write::EXCLUSION_VIOLATION_SQLSTATE;
+/// `PostgreSQL` `serialization_failure` SQLSTATE.
+pub use concurrent_write::SERIALIZATION_FAILURE_SQLSTATE;
+/// `PostgreSQL` `unique_violation` SQLSTATE.
+pub use concurrent_write::UNIQUE_VIOLATION_SQLSTATE;
+/// Map a racing-write SQLSTATE onto a domain persistence error.
+pub use concurrent_write::classify_write_conflict;
 /// Knowledge-cutoff eligibility for historical analytical reads.
 pub use cutoff::is_cutoff_eligible;
 /// Render append-only audit insert SQL.
@@ -57,6 +71,8 @@ pub use document_sql::as_known_at_sql;
 pub use document_sql::as_valid_at_sql;
 /// Render open-document insert SQL.
 pub use document_sql::insert_document_sql;
+/// Render one transactional revise that fails closed unless one open row closes.
+pub use document_sql::revise_document_atomic_sql;
 /// Render revise close+insert SQL pair.
 pub use document_sql::revise_document_sqls;
 /// Append-only audit event.
