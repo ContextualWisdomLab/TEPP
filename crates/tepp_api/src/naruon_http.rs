@@ -1,0 +1,210 @@
+//! Versioned HTTP interchange naruon may emit toward TEPP (ADR 0011).
+
+use crate::authorization::{
+    AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
+};
+use crate::wire::require_nonempty;
+use crate::{AnalysisRunRequest, ApiError};
+
+/// Versioned analysis-run create path naruon may call.
+pub const NARUON_ANALYSIS_RUN_PATH: &str = "/v1/analysis-runs";
+
+/// Versioned export-authorization path naruon may call.
+pub const NARUON_EXPORT_PATH: &str = "/v1/exports";
+
+/// Allowed naruon claim that a result came from TEPP inference.
+pub const NARUON_TEPP_INFERENCE_METHOD: &str = "tepp_topic_measurement";
+
+/// One fail-closed HTTP exchange naruon may send to a TEPP origin.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NaruonHttpExchange {
+    /// HTTP method (`POST` for both create and export-authorize).
+    pub method: &'static str,
+    /// Absolute `https` URL on the versioned TEPP path.
+    pub target_url: String,
+    /// Ordered header pairs; never includes review or Copilot credentials.
+    pub headers: Vec<(String, String)>,
+    /// JSON body already validated by the owning DTO.
+    pub body: String,
+}
+
+/// Build a naruon → TEPP analysis-run create exchange.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin, a
+/// table-access URL, or an invalid analysis-run body.
+pub fn naruon_analysis_run_exchange(
+    origin: &str,
+    request: &AnalysisRunRequest,
+) -> Result<NaruonHttpExchange, ApiError> {
+    naruon_analysis_run_exchange_with_headers(origin, request, &[])
+}
+
+/// Build an analysis-run exchange and refuse credential-bearing extra headers.
+///
+/// # Errors
+///
+/// Returns [`ApiError::AuthorizationDenied`] when an extra header names a
+/// review, Copilot, or bearer credential. Other failures match
+/// [`naruon_analysis_run_exchange`].
+pub fn naruon_analysis_run_exchange_with_headers(
+    origin: &str,
+    request: &AnalysisRunRequest,
+    extra_headers: &[(&str, &str)],
+) -> Result<NaruonHttpExchange, ApiError> {
+    let target_url = compose_https_target(origin, NARUON_ANALYSIS_RUN_PATH)?;
+    refuse_credential_headers(extra_headers)?;
+    let body = request.to_json()?;
+    let mut headers = standard_headers(&request.idempotency_key);
+    for (name, value) in extra_headers {
+        headers.push(((*name).to_owned(), (*value).to_owned()));
+    }
+    Ok(NaruonHttpExchange {
+        method: "POST",
+        target_url,
+        headers,
+        body,
+    })
+}
+
+/// Build a naruon → TEPP export-authorization exchange.
+///
+/// Only [`AnalyticalPurpose::ModularServiceConsumer`] is accepted. TEPP remains
+/// the purpose-bound disclosure authority.
+///
+/// # Errors
+///
+/// Returns [`ApiError::AuthorizationDenied`] when the purpose is not modular
+/// consumption or [`authorize_export`] denies the request.
+/// Returns [`ApiError::InvalidWirePayload`] for a hostile origin.
+pub fn naruon_export_exchange(
+    origin: &str,
+    request: &ExportAuthorizationRequest,
+) -> Result<NaruonHttpExchange, ApiError> {
+    if request.purpose != AnalyticalPurpose::ModularServiceConsumer {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    require_export_allowed(&authorize_export(request)?)?;
+    let target_url = compose_https_target(origin, NARUON_EXPORT_PATH)?;
+    let body = crate::wire::to_json(request)?;
+    Ok(NaruonHttpExchange {
+        method: "POST",
+        target_url,
+        headers: standard_headers(&request.principal_id),
+        body,
+    })
+}
+
+/// Refuse lexical or empty method codes as TEPP inference claims.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] unless the method is exactly
+/// [`NARUON_TEPP_INFERENCE_METHOD`].
+pub fn naruon_may_claim_tepp_inference(method_code: &str) -> Result<(), ApiError> {
+    require_nonempty(method_code)?;
+    if method_code == NARUON_TEPP_INFERENCE_METHOD {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidWirePayload)
+    }
+}
+
+fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
+    require_nonempty(origin)?;
+    if !origin.starts_with("https://") {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    let host = &origin["https://".len()..];
+    if host.is_empty()
+        || host.starts_with('/')
+        || host.contains('@')
+        || host.contains('/')
+        || host.contains('?')
+        || host.contains('#')
+        || host
+            .chars()
+            .any(|ch| ch.is_control() || matches!(ch, '\'' | ';' | '\\' | ' '))
+    {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    let lowered = origin.to_ascii_lowercase();
+    if lowered.contains("postgres")
+        || lowered.contains("jdbc")
+        || lowered.contains("/sql")
+        || lowered.contains("/tables/")
+    {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    Ok(format!("{origin}{path}"))
+}
+
+fn refuse_credential_headers(extra_headers: &[(&str, &str)]) -> Result<(), ApiError> {
+    for (name, _) in extra_headers {
+        let lowered = name.to_ascii_lowercase();
+        if lowered == "authorization"
+            || lowered == "cookie"
+            || lowered == "x-api-key"
+            || lowered.contains("token")
+            || lowered.contains("copilot")
+            || lowered.contains("github")
+        {
+            return Err(ApiError::AuthorizationDenied);
+        }
+    }
+    Ok(())
+}
+
+fn standard_headers(idempotency_key: &str) -> Vec<(String, String)> {
+    vec![
+        ("content-type".into(), "application/json".into()),
+        ("tepp-consumer".into(), "naruon".into()),
+        ("tepp-contract-version".into(), "1".into()),
+        ("idempotency-key".into(), idempotency_key.to_owned()),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        NARUON_TEPP_INFERENCE_METHOD, compose_https_target, naruon_may_claim_tepp_inference,
+        refuse_credential_headers,
+    };
+    use crate::ApiError;
+
+    #[test]
+    fn origin_and_header_helpers_cover_accept_and_reject_arms() {
+        assert!(compose_https_target("https://tepp.example.test", "/v1/x").is_ok());
+        assert_eq!(
+            compose_https_target("https://", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://user@host", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://host?q=1", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_https_target("https://host#frag", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert!(refuse_credential_headers(&[("x-trace", "1")]).is_ok());
+        assert_eq!(
+            refuse_credential_headers(&[("cookie", "a=b")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("x-api-key", "k")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("x-github-token", "t")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert!(naruon_may_claim_tepp_inference(NARUON_TEPP_INFERENCE_METHOD).is_ok());
+    }
+}

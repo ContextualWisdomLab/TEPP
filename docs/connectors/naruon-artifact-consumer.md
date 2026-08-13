@@ -1,7 +1,7 @@
 # naruon modular consumer contract for TEPP artifacts
 
-**Status:** Accepted-target modular integration contract  
-**Last reviewed:** 2026-08-12
+**Status:** Partial — versioned DTO plus HTTP interchange on the active PR; live HTTP service remaining  
+**Last reviewed:** 2026-08-13
 
 ## Boundary
 
@@ -23,6 +23,8 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | JSON-LD export envelope | `tepp_api` `JsonLdExport` v1 | TEPP → naruon |
 | GraphML relation export | `tepp_api` `GraphMlExport` | TEPP → naruon |
 | purpose-bound export auth | `tepp_api` `authorize_export` with `ModularServiceConsumer` | TEPP gate |
+| HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
+| HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 
 Committed examples live under `examples/`. Schema for analysis-run requests lives under `schemas/analysis_run_request_v1.json`.
 
@@ -35,7 +37,10 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 - unknown wire fields → reject;
 - unsupported contract version → reject;
 - knowledge cutoff / availability violations → reject in TEPP domain crates;
-- authorization deny → `authorization_denied` envelope without policy leakage.
+- authorization deny → `authorization_denied` envelope without policy leakage;
+- `postgres` / `jdbc` / `/sql` / `/tables/` or non-`https` origins → reject;
+- review, Copilot, or bearer credential headers → reject;
+- lexical method codes (`tfidf`, `bm25`, `keyword`) claiming TEPP inference → reject.
 
 ## Authority sources
 
