@@ -24,6 +24,7 @@ mod live_pool;
 mod live_repository;
 mod manifest_sql;
 mod membership_sql;
+mod mention_sql;
 mod migration;
 mod model_run_sql;
 mod naming;
@@ -84,7 +85,10 @@ pub use membership_sql::MembershipAssignmentRecord;
 pub use membership_sql::insert_membership_assignment_sql;
 /// Render selection SQL for document-level membership assignments.
 pub use membership_sql::select_membership_assignments_for_document_sql;
-/// Typed event-relation row bound to the ERD transition vocabulary.
+/// Render insert SQL for a validated event mention.
+pub use mention_sql::insert_event_mention_sql;
+/// Event-mention row that cannot collapse into an instance identity.
+pub use mention_sql::EventMentionRecord;
 /// Embedded and ad-hoc migration catalogs.
 pub use migration::MigrationCatalog;
 /// Validate migration SQL against TEPP contracts.

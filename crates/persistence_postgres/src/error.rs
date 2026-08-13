@@ -28,6 +28,8 @@ pub enum PersistenceError {
     InvalidMembershipAssignment,
     /// An event relation violated the closed ERD transition vocabulary.
     InvalidEventRelation,
+    /// An event mention reused an instance identity or had an invalid confidence.
+    InvalidEventMention,
 }
 
 impl fmt::Display for PersistenceError {
@@ -44,6 +46,7 @@ impl fmt::Display for PersistenceError {
             Self::LiveAdapterNotConfigured => "live adapter not configured",
             Self::InvalidMembershipAssignment => "invalid membership assignment",
             Self::InvalidEventRelation => "invalid event relation",
+            Self::InvalidEventMention => "invalid event mention",
         };
         formatter.write_str(message)
     }
@@ -146,6 +149,10 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidEventRelation.to_string(),
             "invalid event relation"
+        );
+        assert_eq!(
+            PersistenceError::InvalidEventMention.to_string(),
+            "invalid event mention"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),

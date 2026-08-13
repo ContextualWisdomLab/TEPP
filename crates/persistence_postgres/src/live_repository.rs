@@ -12,6 +12,7 @@ use crate::membership_sql::{
     MembershipAssignmentRecord, insert_membership_assignment_sql,
     select_membership_assignments_for_document_sql,
 };
+use crate::mention_sql::{EventMentionRecord, insert_event_mention_sql};
 use crate::migration::{MigrationCatalog, validate_migration_catalog};
 use crate::model_run_sql::{
     CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord,
@@ -258,6 +259,20 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
+    /// Insert an event mention that is not an instance identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns mention/instance or confidence validation failures, or transport
+    /// failures.
+    pub fn insert_event_mention(
+        &mut self,
+        record: &EventMentionRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_event_mention_sql(record)?;
+        self.session.execute(&sql)
+    }
+
     /// Look up a model run by primary key.
     ///
     /// # Errors
@@ -309,6 +324,7 @@ mod tests {
     use crate::manifest_sql::ReproducibilityManifestRecord;
     use crate::migration::MigrationCatalog;
     use crate::model_run_sql::{CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord};
+    use crate::mention_sql::EventMentionRecord;
     use crate::relation_sql::EventRelationRecord;
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};
@@ -457,6 +473,30 @@ mod tests {
         );
     }
 
+    fn exercise_event_mention(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let mention = EventMentionRecord {
+            event_mention_id: uuid::Uuid::from_u128(2),
+            event_instance_id: uuid::Uuid::from_u128(1),
+            tenant_record_id: uuid::Uuid::nil(),
+            confidence_score: 0.75,
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        };
+        repo.insert_event_mention(&mention).expect("mention insert");
+        let mut collapsed = mention.clone();
+        collapsed.event_mention_id = collapsed.event_instance_id;
+        assert_eq!(
+            repo.insert_event_mention(&collapsed),
+            Err(PersistenceError::InvalidEventMention)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO event_mention"))
+        );
+    }
+
     #[test]
     fn live_repository_applies_migrations_and_document_sql() {
         let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
@@ -511,6 +551,7 @@ mod tests {
         exercise_model_run_chain(&mut repo, &manifest);
         exercise_membership_assignment(&mut repo);
         exercise_event_relation(&mut repo);
+        exercise_event_mention(&mut repo);
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
