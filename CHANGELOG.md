@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `persistence_postgres` temporal interval ordering migration (`0005`): multi-word CHECK constraints on `document_record`, `event_instance`, and `membership_assignment` that reject inverted valid/system windows and non-positive document revisions while preserving open-ended NULL upper bounds and equal point bounds; catalog validation and live inverted-window proof.
 - `persistence_postgres` append-only immutability migration (`0004`): `reject_append_only_mutation`, statement-level `BEFORE UPDATE OR DELETE OR TRUNCATE` triggers on identity/manifest tables, `REVOKE UPDATE`/`DELETE`/`TRUNCATE` from `tepp_app_runtime`, executable DDL/rollback contracts, and live representative mutation proof.
 - `persistence_postgres` model-run artifact chain: migration `0003_model_run_artifact_chain` for append-only `corpus_split_manifest`, `model_run`, and `model_artifact` with FORCE RLS; SQL insert/lookup contracts and live repository methods binding runs to reproducibility manifests and optional splits.
 - `persistence_postgres` append-only reproducibility-manifest SQL contracts and live repository methods (`insert_reproducibility_manifest`, digest/id lookup) with fail-closed SHA-256 and commit identity validation for `reproducibility_manifest`.

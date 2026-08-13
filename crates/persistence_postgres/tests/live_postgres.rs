@@ -177,6 +177,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
 
     exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
     prove_append_only_immutability(&mut repo, &manifest);
+    prove_temporal_interval_ordering(&mut repo, tenant_record_id, source_artifact_id);
     prove_tenant_rls_isolation(&mut repo);
 }
 
@@ -202,6 +203,52 @@ fn prove_append_only_immutability(
     assert!(
         repo.session_mut().execute(&delete).is_err(),
         "DELETE must fail on append-only reproducibility_manifest"
+    );
+}
+
+/// Inverted valid windows and non-positive revisions must fail closed.
+fn prove_temporal_interval_ordering(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    source_artifact_id: Uuid,
+) {
+    let document_record_id = Uuid::now_v7();
+    let inverted = format!(
+        "INSERT INTO document_record (\
+            document_record_id, tenant_record_id, source_artifact_id, content_sha256, \
+            language_profile_code, assertion_time, document_time, valid_from, valid_to, \
+            system_from, system_to, available_time, revision_number\
+         ) VALUES (\
+            '{document_record_id}'::uuid, '{tenant_record_id}'::uuid, '{source_artifact_id}'::uuid, \
+            '{digest}', 'und', NULL, NULL, \
+            '2026-02-01T00:00:00Z'::timestamptz, '2026-01-01T00:00:00Z'::timestamptz, \
+            '2026-01-01T00:00:00Z'::timestamptz, NULL, \
+            '2026-01-01T00:00:00Z'::timestamptz, 1\
+         )",
+        digest = "a".repeat(64),
+    );
+    assert!(
+        repo.session_mut().execute(&inverted).is_err(),
+        "inverted valid_from/valid_to must fail document_record_valid_order"
+    );
+
+    let bad_revision = format!(
+        "INSERT INTO document_record (\
+            document_record_id, tenant_record_id, source_artifact_id, content_sha256, \
+            language_profile_code, assertion_time, document_time, valid_from, valid_to, \
+            system_from, system_to, available_time, revision_number\
+         ) VALUES (\
+            '{document_record_id}'::uuid, '{tenant_record_id}'::uuid, '{source_artifact_id}'::uuid, \
+            '{digest}', 'und', NULL, NULL, \
+            '2026-01-01T00:00:00Z'::timestamptz, NULL, \
+            '2026-01-01T00:00:00Z'::timestamptz, NULL, \
+            '2026-01-01T00:00:00Z'::timestamptz, 0\
+         )",
+        digest = "b".repeat(64),
+    );
+    assert!(
+        repo.session_mut().execute(&bad_revision).is_err(),
+        "revision_number 0 must fail document_record_revision_positive"
     );
 }
 

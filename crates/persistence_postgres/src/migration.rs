@@ -16,6 +16,10 @@ const APPEND_ONLY_UP: &str =
     include_str!("../../../migrations/0004_append_only_immutability_triggers.up.sql");
 const APPEND_ONLY_DOWN: &str =
     include_str!("../../../migrations/0004_append_only_immutability_triggers.down.sql");
+const TEMPORAL_ORDER_UP: &str =
+    include_str!("../../../migrations/0005_temporal_interval_ordering.up.sql");
+const TEMPORAL_ORDER_DOWN: &str =
+    include_str!("../../../migrations/0005_temporal_interval_ordering.down.sql");
 
 /// Forward and rollback SQL for one migration unit.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -32,9 +36,12 @@ impl MigrationCatalog {
     /// Returns [`MigrationContractError::EmptyMigrationSql`] when embedded
     /// sources are unexpectedly empty.
     pub fn from_embedded() -> Result<Self, MigrationContractError> {
-        let up_sql = format!("{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}");
-        let down_sql =
-            format!("{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}");
+        let up_sql = format!(
+            "{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}\n{TEMPORAL_ORDER_UP}"
+        );
+        let down_sql = format!(
+            "{TEMPORAL_ORDER_DOWN}\n{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}"
+        );
         Self::from_sources(&up_sql, &down_sql)
     }
 
@@ -105,6 +112,9 @@ pub fn validate_migration_catalog(
     if declares_append_only_immutability(catalog.up_sql()) {
         validate_append_only_immutability(catalog.up_sql())?;
     }
+    if declares_temporal_interval_ordering(catalog.up_sql()) {
+        validate_temporal_interval_ordering(catalog.up_sql())?;
+    }
 
     Ok(())
 }
@@ -135,6 +145,38 @@ fn validate_append_only_immutability(up_sql: &str) -> Result<(), MigrationContra
         if !lower.contains(&format!("revoke update, delete on table {table}")) {
             return Err(MigrationContractError::MissingAppendOnlyTrigger);
         }
+    }
+    Ok(())
+}
+
+fn declares_temporal_interval_ordering(up_sql: &str) -> bool {
+    let lower = up_sql.to_ascii_lowercase();
+    lower.contains("_valid_order") || lower.contains("_system_order")
+}
+
+fn validate_temporal_interval_ordering(up_sql: &str) -> Result<(), MigrationContractError> {
+    let lower = up_sql.to_ascii_lowercase();
+    let required = [
+        "document_record_valid_order",
+        "document_record_system_order",
+        "document_record_revision_positive",
+        "event_instance_valid_order",
+        "event_instance_system_order",
+        "membership_assignment_valid_order",
+    ];
+    for constraint in required {
+        if !lower.contains(&format!("constraint {constraint}")) {
+            return Err(MigrationContractError::MissingTemporalIntervalConstraint);
+        }
+    }
+    if !lower.contains("valid_to is null or valid_from <=") {
+        return Err(MigrationContractError::MissingTemporalIntervalConstraint);
+    }
+    if !lower.contains("system_to is null or system_from <=") {
+        return Err(MigrationContractError::MissingTemporalIntervalConstraint);
+    }
+    if !lower.contains("revision_number > 0") {
+        return Err(MigrationContractError::MissingTemporalIntervalConstraint);
     }
     Ok(())
 }
@@ -673,6 +715,76 @@ mod tests {
             ),
             Err(MigrationContractError::MissingAppendOnlyTrigger)
         );
+    }
+
+    #[test]
+    fn temporal_interval_ordering_contract_fails_closed() {
+        assert!(super::declares_temporal_interval_ordering(
+            "CONSTRAINT document_record_valid_order CHECK (true)"
+        ));
+        assert!(!super::declares_temporal_interval_ordering(
+            "CREATE TABLE x"
+        ));
+
+        assert_eq!(
+            super::validate_temporal_interval_ordering(
+                "CONSTRAINT document_record_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)"
+            ),
+            Err(MigrationContractError::MissingTemporalIntervalConstraint)
+        );
+
+        // Named constraints present; fail each predicate branch independently.
+        let names = r"
+            CONSTRAINT document_record_valid_order CHECK (true)
+            CONSTRAINT document_record_system_order CHECK (true)
+            CONSTRAINT document_record_revision_positive CHECK (true)
+            CONSTRAINT event_instance_valid_order CHECK (true)
+            CONSTRAINT event_instance_system_order CHECK (true)
+            CONSTRAINT membership_assignment_valid_order CHECK (true)
+        ";
+        assert_eq!(
+            super::validate_temporal_interval_ordering(names),
+            Err(MigrationContractError::MissingTemporalIntervalConstraint)
+        );
+        let missing_system_order = format!(
+            "{names}\nCHECK (valid_to IS NULL OR valid_from <= valid_to)\n\
+             CHECK (revision_number > 0)"
+        );
+        assert_eq!(
+            super::validate_temporal_interval_ordering(&missing_system_order),
+            Err(MigrationContractError::MissingTemporalIntervalConstraint)
+        );
+        let missing_revision = format!(
+            "{names}\nCHECK (valid_to IS NULL OR valid_from <= valid_to)\n\
+             CHECK (system_to IS NULL OR system_from <= system_to)"
+        );
+        assert_eq!(
+            super::validate_temporal_interval_ordering(&missing_revision),
+            Err(MigrationContractError::MissingTemporalIntervalConstraint)
+        );
+
+        // Predicates present but last named constraint missing.
+        let missing_membership = r"
+            CONSTRAINT document_record_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
+            CONSTRAINT document_record_system_order CHECK (system_to IS NULL OR system_from <= system_to)
+            CONSTRAINT document_record_revision_positive CHECK (revision_number > 0)
+            CONSTRAINT event_instance_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
+            CONSTRAINT event_instance_system_order CHECK (system_to IS NULL OR system_from <= system_to)
+        ";
+        assert_eq!(
+            super::validate_temporal_interval_ordering(missing_membership),
+            Err(MigrationContractError::MissingTemporalIntervalConstraint)
+        );
+
+        let complete = r"
+            CONSTRAINT document_record_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
+            CONSTRAINT document_record_system_order CHECK (system_to IS NULL OR system_from <= system_to)
+            CONSTRAINT document_record_revision_positive CHECK (revision_number > 0)
+            CONSTRAINT event_instance_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
+            CONSTRAINT event_instance_system_order CHECK (system_to IS NULL OR system_from <= system_to)
+            CONSTRAINT membership_assignment_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
+        ";
+        assert_eq!(super::validate_temporal_interval_ordering(complete), Ok(()));
     }
 
     #[test]
