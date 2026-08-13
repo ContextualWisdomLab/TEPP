@@ -53,6 +53,16 @@ fn mismatched_transition_flag_and_unknown_type_fail_closed() {
 }
 
 #[test]
+fn provenance_self_loop_is_allowed() {
+    let mut record = base_record("references", false);
+    record.target_event_id = record.source_event_id;
+
+    let sql = insert_event_relation_sql(&record).expect("provenance self-loop must remain valid");
+    assert!(sql.contains("references"));
+    assert!(sql.contains("FALSE"));
+}
+
+#[test]
 fn transition_self_loop_fails_closed() {
     let mut record = base_record("produces", true);
     record.target_event_id = record.source_event_id;
