@@ -8,10 +8,10 @@
 
 use persistence_postgres::{
     AuditEvent, CorpusSplitManifestRecord, DocumentRecord, LiveDocumentRepository,
-    LiveSqlxPoolOptions, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
-    ReproducibilityManifestRecord, SqlSession, apply_sql_batch, assume_app_runtime_role_sql,
-    clear_session_tenant_sql, open_live_sqlx_pool, require_live_sqlx_config,
-    reset_app_runtime_role_sql, set_session_tenant_sql,
+    LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
+    ModelRunRecord, ReproducibilityManifestRecord, SqlSession, apply_sql_batch,
+    assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
+    require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
 };
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
@@ -176,6 +176,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
         .expect("select reproducibility_manifest by id");
 
     exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
+    exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
     prove_append_only_immutability(&mut repo, &manifest);
     prove_temporal_interval_ordering(&mut repo, tenant_record_id, source_artifact_id);
     prove_tenant_rls_isolation(&mut repo);
@@ -299,6 +300,271 @@ fn exercise_model_run_artifact_chain(
         .expect("select model_run by id");
     repo.submit_model_artifacts_by_run(model_run.model_run_id)
         .expect("select model_artifact by run");
+}
+
+fn live_membership(
+    ids: (Uuid, Uuid, Option<Uuid>, Option<Uuid>),
+    membership_type_code: &str,
+    membership_weight: f64,
+    clocks: (AvailableTime, SystemTime),
+) -> MembershipAssignmentRecord {
+    let (tenant_record_id, document_record_id, target_entity_id, target_project_id) = ids;
+    let (available, system) = clocks;
+    let valid = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("valid");
+    MembershipAssignmentRecord {
+        membership_assignment_id: Uuid::now_v7(),
+        tenant_record_id,
+        document_record_id: Some(document_record_id),
+        text_segment_id: None,
+        target_entity_id,
+        target_project_id,
+        membership_type_code: membership_type_code.into(),
+        membership_weight,
+        valid_from: valid,
+        valid_to: Some(valid),
+        valid_time_precision_code: "second".into(),
+        system_time: system,
+        available_time: available,
+    }
+}
+
+fn entity_insert_sql(
+    entity_id: Uuid,
+    tenant_record_id: Uuid,
+    entity_type: &str,
+    available: AvailableTime,
+    system: SystemTime,
+) -> String {
+    format!(
+        "INSERT INTO entity_record (\
+            entity_record_id, tenant_record_id, entity_type_code, \
+            system_time, available_time\
+         ) VALUES (\
+            '{entity_id}'::uuid, '{tenant_record_id}'::uuid, '{entity_type}', \
+            '{system}'::timestamptz, '{available}'::timestamptz\
+         )",
+        system = system.to_rfc3339(),
+        available = available.to_rfc3339(),
+    )
+}
+
+fn seed_membership_targets(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    entity_a: Uuid,
+    entity_b: Uuid,
+    project: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    repo.session_mut()
+        .execute(&assume_app_runtime_role_sql())
+        .expect("SET ROLE tepp_app_runtime for membership seed");
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(Uuid::nil()))
+        .expect("bind wrong tenant GUC");
+    assert!(
+        repo.session_mut()
+            .execute(&entity_insert_sql(
+                entity_a,
+                tenant_record_id,
+                "author",
+                available,
+                system,
+            ))
+            .is_err(),
+        "wrong tenant GUC must reject entity_record insert under FORCE RLS"
+    );
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_record_id))
+        .expect("bind membership tenant GUC");
+    for (entity_id, entity_type) in [(entity_a, "author"), (entity_b, "department")] {
+        repo.session_mut()
+            .execute(&entity_insert_sql(
+                entity_id,
+                tenant_record_id,
+                entity_type,
+                available,
+                system,
+            ))
+            .expect("insert entity_record");
+    }
+    repo.session_mut()
+        .execute(&format!(
+            "INSERT INTO project_record (\
+                project_record_id, tenant_record_id, project_status_code, \
+                system_time, available_time\
+             ) VALUES (\
+                '{project}'::uuid, '{tenant_record_id}'::uuid, 'active', \
+                '{system}'::timestamptz, '{available}'::timestamptz\
+             )",
+            system = system.to_rfc3339(),
+            available = available.to_rfc3339(),
+        ))
+        .expect("insert project_record");
+    repo.session_mut()
+        .execute(&reset_app_runtime_role_sql())
+        .expect("RESET ROLE after membership seed");
+    repo.session_mut()
+        .execute(&clear_session_tenant_sql())
+        .expect("clear tenant GUC after membership seed");
+}
+
+fn exercise_typed_membership_assignments(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    let entity_a = Uuid::now_v7();
+    let entity_b = Uuid::now_v7();
+    let project = Uuid::now_v7();
+    let document_record_id = Uuid::now_v7();
+    seed_membership_targets(
+        repo,
+        tenant_record_id,
+        entity_a,
+        entity_b,
+        project,
+        available,
+        system,
+    );
+    let clocks = (available, system);
+    repo.insert_membership_assignment(&live_membership(
+        (tenant_record_id, document_record_id, Some(entity_a), None),
+        "author",
+        1.0,
+        clocks,
+    ))
+    .expect("insert author membership");
+    repo.insert_membership_assignment(&live_membership(
+        (tenant_record_id, document_record_id, Some(entity_b), None),
+        "department",
+        0.5,
+        clocks,
+    ))
+    .expect("insert department membership");
+    repo.insert_membership_assignment(&live_membership(
+        (tenant_record_id, document_record_id, None, Some(project)),
+        "project",
+        1.0,
+        clocks,
+    ))
+    .expect("insert project membership");
+    repo.submit_membership_assignments_for_document(document_record_id)
+        .expect("select document memberships");
+    prove_persisted_membership_rows(repo, document_record_id, entity_a, entity_b, project);
+    prove_membership_exactly_one_rejections(
+        repo,
+        tenant_record_id,
+        document_record_id,
+        entity_a,
+        project,
+        available,
+        system,
+    );
+}
+
+fn prove_persisted_membership_rows(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    document_record_id: Uuid,
+    entity_a: Uuid,
+    entity_b: Uuid,
+    project: Uuid,
+) {
+    let count_proof = format!(
+        "DO $tepp$ BEGIN \
+           IF (SELECT COUNT(*) FROM membership_assignment \
+               WHERE document_record_id = '{document_record_id}'::uuid) <> 3 THEN \
+             RAISE EXCEPTION 'expected three membership rows for one document'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM membership_assignment \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND target_entity_id = '{entity_a}'::uuid) <> 1 THEN \
+             RAISE EXCEPTION 'missing entity_a membership'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM membership_assignment \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND target_entity_id = '{entity_b}'::uuid) <> 1 THEN \
+             RAISE EXCEPTION 'missing entity_b membership'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM membership_assignment \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND target_project_id = '{project}'::uuid) <> 1 THEN \
+             RAISE EXCEPTION 'missing project membership'; \
+           END IF; \
+         END $tepp$"
+    );
+    repo.session_mut()
+        .execute(&count_proof)
+        .expect("one document must persist two entity and one project membership");
+}
+
+fn prove_membership_exactly_one_rejections(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    document_record_id: Uuid,
+    entity_a: Uuid,
+    project: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    let dual_target = format!(
+        "INSERT INTO membership_assignment (\
+            membership_assignment_id, tenant_record_id, document_record_id, \
+            text_segment_id, target_entity_id, target_project_id, \
+            membership_type_code, membership_weight, valid_from_window, \
+            valid_to_window, valid_time_precision_code, system_time, available_time\
+         ) VALUES (\
+            '{id}'::uuid, '{tenant_record_id}'::uuid, '{document_record_id}'::uuid, \
+            NULL, '{entity_a}'::uuid, '{project}'::uuid, \
+            'invalid', 1, '[2026-01-01,2026-01-01]'::tstzrange, \
+            NULL, 'second', '{system}'::timestamptz, '{available}'::timestamptz\
+         )",
+        id = Uuid::now_v7(),
+        system = system.to_rfc3339(),
+        available = available.to_rfc3339(),
+    );
+    assert!(
+        repo.session_mut().execute(&dual_target).is_err(),
+        "exactly-one target check must reject dual entity+project keys"
+    );
+
+    let text_segment_id = Uuid::now_v7();
+    repo.session_mut()
+        .execute(&format!(
+            "INSERT INTO text_segment (\
+                text_segment_id, tenant_record_id, document_record_id, \
+                start_byte, end_byte, system_time, available_time\
+             ) VALUES (\
+                '{text_segment_id}'::uuid, '{tenant_record_id}'::uuid, \
+                '{document_record_id}'::uuid, 0, 8, \
+                '{system}'::timestamptz, '{available}'::timestamptz\
+             )",
+            system = system.to_rfc3339(),
+            available = available.to_rfc3339(),
+        ))
+        .expect("insert text_segment");
+    let dual_unit = format!(
+        "INSERT INTO membership_assignment (\
+            membership_assignment_id, tenant_record_id, document_record_id, \
+            text_segment_id, target_entity_id, target_project_id, \
+            membership_type_code, membership_weight, valid_from_window, \
+            valid_to_window, valid_time_precision_code, system_time, available_time\
+         ) VALUES (\
+            '{id}'::uuid, '{tenant_record_id}'::uuid, '{document_record_id}'::uuid, \
+            '{text_segment_id}'::uuid, '{entity_a}'::uuid, NULL, \
+            'invalid', 1, '[2026-01-01,2026-01-01]'::tstzrange, \
+            NULL, 'second', '{system}'::timestamptz, '{available}'::timestamptz\
+         )",
+        id = Uuid::now_v7(),
+        system = system.to_rfc3339(),
+        available = available.to_rfc3339(),
+    );
+    assert!(
+        repo.session_mut().execute(&dual_unit).is_err(),
+        "exactly-one observed-unit check must reject dual document+segment keys"
+    );
 }
 
 /// Superuser seeds two tenants; `tepp_app_runtime` must only see the bound tenant.

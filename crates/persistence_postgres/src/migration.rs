@@ -20,6 +20,10 @@ const TEMPORAL_ORDER_UP: &str =
     include_str!("../../../migrations/0005_temporal_interval_ordering.up.sql");
 const TEMPORAL_ORDER_DOWN: &str =
     include_str!("../../../migrations/0005_temporal_interval_ordering.down.sql");
+const MEMBERSHIP_UP: &str =
+    include_str!("../../../migrations/0006_typed_membership_assignment.up.sql");
+const MEMBERSHIP_DOWN: &str =
+    include_str!("../../../migrations/0006_typed_membership_assignment.down.sql");
 
 /// Forward and rollback SQL for one migration unit.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -37,10 +41,10 @@ impl MigrationCatalog {
     /// sources are unexpectedly empty.
     pub fn from_embedded() -> Result<Self, MigrationContractError> {
         let up_sql = format!(
-            "{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}\n{TEMPORAL_ORDER_UP}"
+            "{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}\n{TEMPORAL_ORDER_UP}\n{MEMBERSHIP_UP}"
         );
         let down_sql = format!(
-            "{TEMPORAL_ORDER_DOWN}\n{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}"
+            "{MEMBERSHIP_DOWN}\n{TEMPORAL_ORDER_DOWN}\n{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}"
         );
         Self::from_sources(&up_sql, &down_sql)
     }
