@@ -6,9 +6,9 @@ import io
 import json
 import os
 import unittest
+import unittest.mock
 import urllib.error
 from typing import Any
-from unittest import mock
 
 from scripts import actions_workflow_fleet as fleet
 
@@ -474,9 +474,9 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
             FakeTransport(self._happy_responses()), "ContextualWisdomLab", "TEPP"
         )
         stdout = io.StringIO()
-        with mock.patch.object(fleet, "build_transport") as builder:
+        with unittest.mock.patch.object(fleet, "build_transport") as builder:
             builder.return_value = FakeTransport(self._happy_responses())
-            with mock.patch.object(fleet, "audit_repository", return_value=audit):
+            with unittest.mock.patch.object(fleet, "audit_repository", return_value=audit):
                 code = fleet.main(
                     [
                         "audit",
@@ -494,10 +494,10 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
         self.assertEqual(payload["default_branch_sha"], "abc123def456")
 
         disable_out = io.StringIO()
-        with mock.patch.object(fleet, "build_transport") as builder:
+        with unittest.mock.patch.object(fleet, "build_transport") as builder:
             builder.return_value = FakeTransport(self._happy_responses())
-            with mock.patch.object(fleet, "audit_repository", return_value=audit):
-                with mock.patch.object(
+            with unittest.mock.patch.object(fleet, "audit_repository", return_value=audit):
+                with unittest.mock.patch.object(
                     fleet,
                     "disable_orphans",
                     return_value=[
@@ -524,10 +524,10 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
         self.assertFalse(disabler.call_args.kwargs["apply_changes"])
 
         apply_out = io.StringIO()
-        with mock.patch.object(fleet, "build_transport") as builder:
+        with unittest.mock.patch.object(fleet, "build_transport") as builder:
             builder.return_value = FakeTransport(self._happy_responses())
-            with mock.patch.object(fleet, "audit_repository", return_value=audit):
-                with mock.patch.object(
+            with unittest.mock.patch.object(fleet, "audit_repository", return_value=audit):
+                with unittest.mock.patch.object(
                     fleet,
                     "disable_orphans",
                     return_value=[],
@@ -556,10 +556,10 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
             FakeTransport(self._happy_responses()), "ContextualWisdomLab", "TEPP"
         )
         stdout = io.StringIO()
-        with mock.patch.dict(os.environ, {"GITHUB_TOKEN": "from-process"}, clear=False):
-            with mock.patch.object(fleet, "build_transport") as builder:
+        with unittest.mock.patch.dict(os.environ, {"GITHUB_TOKEN": "from-process"}, clear=False):
+            with unittest.mock.patch.object(fleet, "build_transport") as builder:
                 builder.return_value = FakeTransport(self._happy_responses())
-                with mock.patch.object(fleet, "audit_repository", return_value=audit):
+                with unittest.mock.patch.object(fleet, "audit_repository", return_value=audit):
                     code = fleet.main(
                         ["audit", "--owner", "ContextualWisdomLab", "--repo", "TEPP"],
                         stdout=stdout,
@@ -739,7 +739,7 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
                 ],
             }
         )
-        with mock.patch.object(fleet, "_utc_now", return_value="clock-stamp"):
+        with unittest.mock.patch.object(fleet, "_utc_now", return_value="clock-stamp"):
             audit = fleet.audit_repository(
                 FakeTransport(responses), "ContextualWisdomLab", "TEPP"
             )
@@ -765,7 +765,7 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
                 )
 
         transport = fleet.UrllibTransport("secret-token")
-        with mock.patch("urllib.request.urlopen", side_effect=_Error()):
+        with unittest.mock.patch("urllib.request.urlopen", side_effect=_Error()):
             response = transport.request("GET", "/repos/o/r")
         self.assertEqual(response.status, 403)
         self.assertEqual(response.headers["X-GitHub"], "yes")
@@ -788,7 +788,7 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
                 return None
 
         transport = fleet.UrllibTransport("secret-token")
-        with mock.patch("urllib.request.urlopen", return_value=_FakeHttp()):
+        with unittest.mock.patch("urllib.request.urlopen", return_value=_FakeHttp()):
             response = transport.request("GET", "/repos/o/r")
         self.assertEqual(response.status, 200)
         self.assertEqual(json.loads(response.body), {"ok": True})
