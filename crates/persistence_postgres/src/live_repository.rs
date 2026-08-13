@@ -322,9 +322,9 @@ mod tests {
     use super::{LiveDocumentRepository, LiveMigrationError};
     use crate::document_store::{AuditEvent, DocumentRecord};
     use crate::manifest_sql::ReproducibilityManifestRecord;
+    use crate::mention_sql::EventMentionRecord;
     use crate::migration::MigrationCatalog;
     use crate::model_run_sql::{CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord};
-    use crate::mention_sql::EventMentionRecord;
     use crate::relation_sql::EventRelationRecord;
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};

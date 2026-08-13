@@ -85,10 +85,10 @@ pub use membership_sql::MembershipAssignmentRecord;
 pub use membership_sql::insert_membership_assignment_sql;
 /// Render selection SQL for document-level membership assignments.
 pub use membership_sql::select_membership_assignments_for_document_sql;
-/// Render insert SQL for a validated event mention.
-pub use mention_sql::insert_event_mention_sql;
 /// Event-mention row that cannot collapse into an instance identity.
 pub use mention_sql::EventMentionRecord;
+/// Render insert SQL for a validated event mention.
+pub use mention_sql::insert_event_mention_sql;
 /// Embedded and ad-hoc migration catalogs.
 pub use migration::MigrationCatalog;
 /// Validate migration SQL against TEPP contracts.
