@@ -140,9 +140,9 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// # Errors
     ///
-    /// Returns transport failures.
+    /// Returns action-code validation or transport failures.
     pub fn append_audit(&mut self, event: &AuditEvent) -> Result<(), PersistenceError> {
-        let sql = append_audit_sql(event);
+        let sql = append_audit_sql(event)?;
         self.session.execute(&sql)
     }
 

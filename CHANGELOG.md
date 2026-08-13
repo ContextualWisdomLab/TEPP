@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `persistence_postgres` audit-event SQL contracts: append-only insert that refuses empty, oversized, or hostile `action_code` values before SQL is rendered.
 - `persistence_postgres` event-instance SQL contracts: bitemporal insert and as-known-at lookup that refuse inverted valid/system windows and hostile type/lifecycle labels before SQL is rendered.
 - `persistence_postgres` event-mention SQL contracts: mention identity cannot equal the instance it supports; confidence must be finite and in `(0, 1]`.
 - `persistence_postgres` event-relation SQL contracts: closed ERD transition/provenance vocabulary bound to `transition_edge`, fail-closed unknown types and transition self-loops, live insert of `causes`/`references`.
