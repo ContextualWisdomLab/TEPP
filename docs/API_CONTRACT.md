@@ -21,6 +21,7 @@ Current protected main exposes Rust library/domain contracts, not a production H
 | LLM interpretation provider port | TEPP interpretation gateway | contextual-orchestrator | accepted-target |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
 | analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
+| org-central `.github` reusable-workflow binding | `tepp_api` `bind_org_github_workflow` | organization control-plane workflows | active-PR |
 
 ## 3. Versioning
 

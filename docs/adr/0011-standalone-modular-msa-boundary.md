@@ -1,7 +1,7 @@
 # ADR 0011 — Standalone operation and modular CWL MSA boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — Rust crates are independently usable; production service/API/persistence integrations remain accepted-target  
+**Implementation maturity:** partial — Rust crates are independently usable; org-central `.github` reusable-workflow bindings are on the active PR; live reusable-workflow dispatch and remaining persistence integrations remain accepted-target  
 **Date:** 2026-08-10  
 **Supersedes:** The broad cross-service ownership wording in ADR 0001. ADR 0001 remains authoritative for Rust-first numerical architecture.
 
@@ -50,7 +50,7 @@ Every public API/artifact contract is versioned. A breaking consumer/provider ch
 
 ## Verification
 
-Required tests cover contract version negotiation, unauthorized cross-service access, idempotency, stale artifact/model identities, missing dependencies, standalone CPU operation, contextual-orchestrator optional integration, naruon consumer contracts, and absence of direct cross-service database coupling.
+Required tests cover contract version negotiation, unauthorized cross-service access, idempotency, stale artifact/model identities, missing dependencies, standalone CPU operation, contextual-orchestrator optional integration, naruon consumer contracts, org-central `.github` reusable-workflow identity and scientific-claim refusal, and absence of direct cross-service database coupling.
 
 ## Rollback and supersession
 
