@@ -54,7 +54,7 @@ Friedman, J., Hastie, T., & Tibshirani, R. (2008). Sparse inverse covariance est
 
 Traag, V. A., Waltman, L., & van Eck, N. J. (2019). From Louvain to Leiden: Guaranteeing well-connected communities. *Scientific Reports, 9*, Article 5233. https://doi.org/10.1038/s41598-019-41695-z
 
-Raw topic proportions are not ordinary Euclidean measurements. TEPP uses logistic-normal or orthonormal log-ratio coordinates and reports posterior and resampling uncertainty for every network edge and cluster.
+Raw topic proportions are not ordinary Euclidean measurements. TEPP uses logistic-normal or orthonormal log-ratio coordinates and reports posterior and resampling uncertainty for every network edge and cluster. `network_analysis` fail-closes Euclidean use of a raw simplex and scores recovered clusters with pair precision and recall.
 
 ## Time, events, and topic detection and tracking
 

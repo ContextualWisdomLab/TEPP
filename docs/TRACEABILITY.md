@@ -27,7 +27,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
 | report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
 | candidate K statistical/Pareto gates + blinded LLM review | ADR 0012; research | future `model_selection` | accepted-target |
-| compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
+| compositional topic correlation / stable clustering | ADR 0005/0012; research | `network_analysis` simplex refusal and pair precision/recall on the active PR; graphical lasso/Leiden remaining | active-PR |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
