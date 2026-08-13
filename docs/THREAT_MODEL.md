@@ -1,7 +1,7 @@
 # TEPP Threat Model
 
 **Status:** Accepted target security model; implementation maturity follows `docs/TRACEABILITY.md`.  
-**Last reviewed:** 2026-08-10
+**Last reviewed:** 2026-08-13
 
 ## 1. Scope and protected assets
 
@@ -44,7 +44,7 @@ No external document, model output, provider response, serialized payload, datab
 | Resource exhaustion | huge documents, relation graphs, VRAM allocations or LLM payloads cause denial of service | size/depth/count budgets, streaming, bounded closure/worker pools, adaptive VRAM, quotas |
 | Serialization bypass | hostile JSON reconstructs invalid private state | explicit versioned DTOs, unknown-field rejection, reconstruct through domain validators |
 | Formula/active-content injection | exported artifacts execute spreadsheet/formula/HTML payloads | export escaping/sanitization, no active document execution |
-| Supply-chain compromise | mutable Actions/installers/dependencies alter build or release | full-SHA Actions, lockfiles, advisories/licenses, SBOM, SLSA-style provenance, reproducible release |
+| Supply-chain compromise | mutable Actions/installers/dependencies alter build or release | full-SHA Actions, orphan registry-identity audit/disable, lockfiles, advisories/licenses, SBOM, SLSA-style provenance, reproducible release |
 | Credential exfiltration | model/test/doc obtains secrets | minimum-scope secret materialization, `NVIDIA_NIM_API_KEY` only where required, never log/prompt secrets |
 | Evidence over-retention | raw source/PII remains after purpose expires | lifecycle classification, configurable retention, deletion/tombstone evidence, immutable audit digest not raw copy |
 

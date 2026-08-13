@@ -122,7 +122,11 @@ World Wide Web Consortium. (2023). *Web content accessibility guidelines (WCAG) 
 
 OpenSSF. (2023). *Supply-chain Levels for Software Artifacts (SLSA) specification, version 1.0*. https://slsa.dev/spec/v1.0/
 
-TEPP treats documents and model output as untrusted, requires exact evidence and fail-closed validation, supplies accessible exact-value alternatives to graphics, and emits SBOM and provenance evidence for releases.
+GitHub. (n.d.). *REST API endpoints for workflows*. GitHub Docs. Retrieved August 13, 2026, from https://docs.github.com/en/rest/actions/workflows
+
+OWASP Foundation. (2023). *OWASP Top 10 CI/CD Security Risks*. https://owasp.org/www-project-top-10-ci-cd-security-risks/
+
+TEPP treats documents and model output as untrusted, requires exact evidence and fail-closed validation, supplies accessible exact-value alternatives to graphics, and emits SBOM and provenance evidence for releases. Actions registry identities are inventoried against the protected-main tree rather than trusted because a YAML path once existed (GitHub, n.d.; OpenSSF, 2023; OWASP Foundation, 2023).
 
 ## LLM orchestration and test-time compute
 
