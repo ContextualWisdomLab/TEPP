@@ -40,6 +40,9 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 - authorization deny → `authorization_denied` envelope without policy leakage;
 - `postgres` / `jdbc` / `/sql` / `/tables/` or non-`https` origins → reject;
 - review, Copilot, or bearer credential headers → reject;
+- redefinition of reserved headers (`content-type`, `tepp-consumer`,
+  `tepp-contract-version`, `idempotency-key`) via extra headers → reject;
+- export interchange without a nonempty per-export idempotency key → reject;
 - lexical method codes (`tfidf`, `bm25`, `keyword`) claiming TEPP inference → reject.
 
 ## Authority sources

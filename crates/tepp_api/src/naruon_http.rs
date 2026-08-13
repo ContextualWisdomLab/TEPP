@@ -71,27 +71,32 @@ pub fn naruon_analysis_run_exchange_with_headers(
 /// Build a naruon → TEPP export-authorization exchange.
 ///
 /// Only [`AnalyticalPurpose::ModularServiceConsumer`] is accepted. TEPP remains
-/// the purpose-bound disclosure authority.
+/// the purpose-bound disclosure authority. The `idempotency-key` header is the
+/// caller-supplied per-export operation key and is never derived from
+/// `principal_id` alone.
 ///
 /// # Errors
 ///
 /// Returns [`ApiError::AuthorizationDenied`] when the purpose is not modular
 /// consumption or [`authorize_export`] denies the request.
-/// Returns [`ApiError::InvalidWirePayload`] for a hostile origin.
+/// Returns [`ApiError::InvalidWirePayload`] for a hostile origin or empty
+/// idempotency key.
 pub fn naruon_export_exchange(
     origin: &str,
     request: &ExportAuthorizationRequest,
+    idempotency_key: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
     if request.purpose != AnalyticalPurpose::ModularServiceConsumer {
         return Err(ApiError::AuthorizationDenied);
     }
+    require_nonempty(idempotency_key)?;
     require_export_allowed(&authorize_export(request)?)?;
     let target_url = compose_https_target(origin, NARUON_EXPORT_PATH)?;
     let body = crate::wire::to_json(request)?;
     Ok(NaruonHttpExchange {
         method: "POST",
         target_url,
-        headers: standard_headers(&request.principal_id),
+        headers: standard_headers(idempotency_key),
         body,
     })
 }
@@ -143,6 +148,12 @@ fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
 fn refuse_credential_headers(extra_headers: &[(&str, &str)]) -> Result<(), ApiError> {
     for (name, _) in extra_headers {
         let lowered = name.to_ascii_lowercase();
+        if matches!(
+            lowered.as_str(),
+            "content-type" | "tepp-consumer" | "tepp-contract-version" | "idempotency-key"
+        ) {
+            return Err(ApiError::InvalidWirePayload);
+        }
         if lowered == "authorization"
             || lowered == "cookie"
             || lowered == "x-api-key"
@@ -246,6 +257,22 @@ mod tests {
         );
         assert!(refuse_credential_headers(&[("x-trace", "1")]).is_ok());
         assert!(refuse_credential_headers(&[]).is_ok());
+        assert_eq!(
+            refuse_credential_headers(&[("Content-Type", "text/plain")]),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("IDEMPOTENCY-KEY", "override")]),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("tepp-consumer", "hostile")]),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("tepp-contract-version", "0")]),
+            Err(ApiError::InvalidWirePayload)
+        );
         assert_eq!(
             refuse_credential_headers(&[("Authorization", "Bearer x")]),
             Err(ApiError::AuthorizationDenied)

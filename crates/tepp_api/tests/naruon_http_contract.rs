@@ -103,18 +103,85 @@ fn export_exchange_requires_modular_service_consumer() {
         artifact_id: "tepp-export-demo-001".into(),
         includes_source_text: false,
     };
-    let exchange = naruon_export_exchange("https://tepp.example.test", &allowed).expect("export");
+    let exchange = naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-001")
+        .expect("export");
     assert_eq!(exchange.method, "POST");
     assert!(exchange.target_url.ends_with("/v1/exports"));
+    assert!(
+        exchange
+            .headers
+            .iter()
+            .any(|(name, value)| name == "idempotency-key" && value == "export-idem-001")
+    );
 
     let denied = ExportAuthorizationRequest {
         purpose: AnalyticalPurpose::OperationalMonitoring,
         ..allowed
     };
     assert_eq!(
-        naruon_export_exchange("https://tepp.example.test", &denied),
+        naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-denied"),
         Err(ApiError::AuthorizationDenied)
     );
+}
+
+#[test]
+fn export_exchange_uses_per_export_idempotency_keys() {
+    let principal = "naruon-service";
+    let first = ExportAuthorizationRequest {
+        tenant_workspace_id: "naruon-tenant-workspace-demo".into(),
+        principal_id: principal.into(),
+        purpose: AnalyticalPurpose::ModularServiceConsumer,
+        artifact_id: "tepp-export-demo-001".into(),
+        includes_source_text: false,
+    };
+    let second = ExportAuthorizationRequest {
+        artifact_id: "tepp-export-demo-002".into(),
+        ..first.clone()
+    };
+    let a = naruon_export_exchange("https://tepp.example.test", &first, "export-op-a")
+        .expect("first export");
+    let b = naruon_export_exchange("https://tepp.example.test", &second, "export-op-b")
+        .expect("second export");
+    let key_a = a
+        .headers
+        .iter()
+        .find(|(name, _)| name == "idempotency-key")
+        .map(|(_, value)| value.as_str())
+        .expect("key a");
+    let key_b = b
+        .headers
+        .iter()
+        .find(|(name, _)| name == "idempotency-key")
+        .map(|(_, value)| value.as_str())
+        .expect("key b");
+    assert_ne!(key_a, key_b);
+    assert_ne!(key_a, principal);
+    assert_ne!(key_b, principal);
+    assert_eq!(
+        naruon_export_exchange("https://tepp.example.test", &first, ""),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn reserved_standard_headers_cannot_be_redefined() {
+    let run = sample_run();
+    for (name, value) in [
+        ("Content-Type", "text/plain"),
+        ("tepp-consumer", "hostile"),
+        ("tepp-contract-version", "0"),
+        ("Idempotency-Key", "override"),
+    ] {
+        assert_eq!(
+            naruon_analysis_run_exchange_with_headers(
+                "https://tepp.example.test",
+                &run,
+                &[(name, value)]
+            ),
+            Err(ApiError::InvalidWirePayload),
+            "header={name}"
+        );
+    }
 }
 
 #[test]
