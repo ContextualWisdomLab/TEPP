@@ -733,8 +733,8 @@ mod tests {
             Err(MigrationContractError::MissingTemporalIntervalConstraint)
         );
 
-        // All named constraints present but wrong predicates.
-        let wrong_predicates = r"
+        // Named constraints present; fail each predicate branch independently.
+        let names = r"
             CONSTRAINT document_record_valid_order CHECK (true)
             CONSTRAINT document_record_system_order CHECK (true)
             CONSTRAINT document_record_revision_positive CHECK (true)
@@ -743,7 +743,23 @@ mod tests {
             CONSTRAINT membership_assignment_valid_order CHECK (true)
         ";
         assert_eq!(
-            super::validate_temporal_interval_ordering(wrong_predicates),
+            super::validate_temporal_interval_ordering(names),
+            Err(MigrationContractError::MissingTemporalIntervalConstraint)
+        );
+        let missing_system_order = format!(
+            "{names}\nCHECK (valid_to IS NULL OR valid_from <= valid_to)\n\
+             CHECK (revision_number > 0)"
+        );
+        assert_eq!(
+            super::validate_temporal_interval_ordering(&missing_system_order),
+            Err(MigrationContractError::MissingTemporalIntervalConstraint)
+        );
+        let missing_revision = format!(
+            "{names}\nCHECK (valid_to IS NULL OR valid_from <= valid_to)\n\
+             CHECK (system_to IS NULL OR system_from <= system_to)"
+        );
+        assert_eq!(
+            super::validate_temporal_interval_ordering(&missing_revision),
             Err(MigrationContractError::MissingTemporalIntervalConstraint)
         );
 
