@@ -33,6 +33,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Hourly NIM product-development operations | [`docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md`](docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md) |
 | Actions workflow fleet audit | [`docs/operations/ACTIONS_WORKFLOW_FLEET.md`](docs/operations/ACTIONS_WORKFLOW_FLEET.md) |
 | Actions fleet research doctoring | [`docs/research/actions-workflow-fleet.md`](docs/research/actions-workflow-fleet.md) |
+| Posterior ESEM/DSEM input-gate doctoring | [`docs/research/posterior-esem-input-gates.md`](docs/research/posterior-esem-input-gates.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
