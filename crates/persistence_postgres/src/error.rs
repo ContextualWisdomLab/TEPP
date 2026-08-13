@@ -30,6 +30,8 @@ pub enum PersistenceError {
     InvalidEventRelation,
     /// An event mention reused an instance identity or had an invalid confidence.
     InvalidEventMention,
+    /// An event instance had inverted windows or a hostile label.
+    InvalidEventInstance,
 }
 
 impl fmt::Display for PersistenceError {
@@ -47,6 +49,7 @@ impl fmt::Display for PersistenceError {
             Self::InvalidMembershipAssignment => "invalid membership assignment",
             Self::InvalidEventRelation => "invalid event relation",
             Self::InvalidEventMention => "invalid event mention",
+            Self::InvalidEventInstance => "invalid event instance",
         };
         formatter.write_str(message)
     }
@@ -153,6 +156,10 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidEventMention.to_string(),
             "invalid event mention"
+        );
+        assert_eq!(
+            PersistenceError::InvalidEventInstance.to_string(),
+            "invalid event instance"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),

@@ -4,6 +4,9 @@ use crate::document_sql::{
     append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql, revise_document_sqls,
 };
 use crate::document_store::{AuditEvent, DocumentRecord};
+use crate::instance_sql::{
+    EventInstanceRecord, insert_event_instance_sql, select_event_instance_as_known_at_sql,
+};
 use crate::manifest_sql::{
     ReproducibilityManifestRecord, insert_reproducibility_manifest_sql,
     select_reproducibility_manifest_by_digests_sql, select_reproducibility_manifest_by_id_sql,
@@ -273,6 +276,33 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
+    /// Insert a bitemporal event-instance version.
+    ///
+    /// # Errors
+    ///
+    /// Returns inverted-window/label validation or transport failures.
+    pub fn insert_event_instance(
+        &mut self,
+        record: &EventInstanceRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_event_instance_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up the event-instance version visible as of a system-time instant.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_event_instance_as_known_at(
+        &mut self,
+        event_instance_id: Uuid,
+        known_at: &SystemTime,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_event_instance_as_known_at_sql(event_instance_id, &known_at.to_rfc3339());
+        self.session.execute(&sql)
+    }
+
     /// Look up a model run by primary key.
     ///
     /// # Errors
@@ -321,6 +351,7 @@ impl std::error::Error for LiveMigrationError {}
 mod tests {
     use super::{LiveDocumentRepository, LiveMigrationError};
     use crate::document_store::{AuditEvent, DocumentRecord};
+    use crate::instance_sql::EventInstanceRecord;
     use crate::manifest_sql::ReproducibilityManifestRecord;
     use crate::mention_sql::EventMentionRecord;
     use crate::migration::MigrationCatalog;
@@ -497,6 +528,37 @@ mod tests {
         );
     }
 
+    fn exercise_event_instance(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let instance = EventInstanceRecord {
+            event_instance_id: uuid::Uuid::from_u128(1),
+            tenant_record_id: uuid::Uuid::nil(),
+            event_type_code: "occurrence".into(),
+            valid_from: EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("v"),
+            valid_to: None,
+            system_from: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            system_to: None,
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+            lifecycle_status_code: "asserted".into(),
+        };
+        repo.insert_event_instance(&instance)
+            .expect("instance insert");
+        repo.submit_event_instance_as_known_at(instance.event_instance_id, &instance.system_from)
+            .expect("instance known-at");
+        let mut inverted = instance.clone();
+        inverted.valid_to =
+            Some(EventTime::parse_rfc3339("2025-12-31T00:00:00Z").expect("earlier"));
+        assert_eq!(
+            repo.insert_event_instance(&inverted),
+            Err(PersistenceError::InvalidEventInstance)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO event_instance"))
+        );
+    }
+
     #[test]
     fn live_repository_applies_migrations_and_document_sql() {
         let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
@@ -552,6 +614,7 @@ mod tests {
         exercise_membership_assignment(&mut repo);
         exercise_event_relation(&mut repo);
         exercise_event_mention(&mut repo);
+        exercise_event_instance(&mut repo);
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
