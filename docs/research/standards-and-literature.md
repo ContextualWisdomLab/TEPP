@@ -96,6 +96,18 @@ Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World 
 
 TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
 
+## Numerical backends, VRAM, and mixed precision
+
+IEEE. (2019). *IEEE standard for floating-point arithmetic* (IEEE Std 754-2019). https://doi.org/10.1109/IEEESTD.2019.8766229
+
+Micikevicius, P., Narang, S., Alben, J., Diamos, G., Elsen, E., Garcia, D., Ginsburg, B., Houston, M., Kuchaiev, O., Venkatesh, G., & Wu, H. (2018). Mixed precision training. In *International Conference on Learning Representations*. https://openreview.net/forum?id=r1gs9JgRZ
+
+NVIDIA Corporation. (2024). *CUDA C++ programming guide*. https://docs.nvidia.com/cuda/cuda-c-programming-guide/
+
+Rhu, M., Gimelshein, N., Clemons, J., Zulfiqar, A., & Keckler, S. W. (2016). vDNN: Virtualized deep neural networks for scalable, memory-efficient neural network design. In *2016 49th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO)* (pp. 1–13). IEEE. https://doi.org/10.1109/MICRO.2016.7783721
+
+TEPP keeps IEEE 754 binary64 as the numerical reference. GPU work is streamed under a VRAM budget with a reserved safety headroom, typed out-of-memory as an expected operating state, and CPU fallback. Mixed precision is not permitted for final diagnostic quantities. Full-corpus document-by-topic tensors are refused on device memory. Hardware acceleration is not claimed from software-fallback tests.
+
 ## AI risk, management systems, and assurance readiness
 
 International Organization for Standardization. (2023a). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html

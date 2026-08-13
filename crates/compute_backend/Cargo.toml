@@ -1,0 +1,19 @@
+[package]
+name = "compute_backend"
+description = "VRAM-budgeted GPU planning with a CPU f64 reference and fail-closed OOM fallback."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+
+[lints]
+workspace = true
