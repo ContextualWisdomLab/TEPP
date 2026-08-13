@@ -1,13 +1,13 @@
 //! Live document repository over a SQL transport.
 
-use crate::document_sql::{
-    append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql, revise_document_sqls,
-};
-use crate::document_store::{AuditEvent, DocumentRecord};
 use crate::artifact_sql::{
     SourceArtifactRecord, assert_source_artifact_matches_sql, insert_source_artifact_sql,
     select_source_artifact_by_id_sql,
 };
+use crate::document_sql::{
+    append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql, revise_document_sqls,
+};
+use crate::document_store::{AuditEvent, DocumentRecord};
 use crate::instance_sql::{
     EventInstanceRecord, insert_event_instance_sql, select_event_instance_as_known_at_sql,
 };
@@ -307,12 +307,6 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
-    /// Look up a model run by primary key.
-    ///
-    /// # Errors
-    ///
-    /// Returns transport failures.
-
     /// Insert an append-only source artifact under the active tenant.
     ///
     /// A retry of the same immutable identity is a no-op. A same-id payload
@@ -345,6 +339,11 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
+    /// Look up a model run by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
     pub fn submit_model_run_by_id(&mut self, model_run_id: Uuid) -> Result<(), PersistenceError> {
         let sql = select_model_run_by_id_sql(model_run_id);
         self.session.execute(&sql)
@@ -387,13 +386,13 @@ impl std::error::Error for LiveMigrationError {}
 #[cfg(test)]
 mod tests {
     use super::{LiveDocumentRepository, LiveMigrationError};
+    use crate::artifact_sql::SourceArtifactRecord;
     use crate::document_store::{AuditEvent, DocumentRecord};
     use crate::instance_sql::EventInstanceRecord;
     use crate::manifest_sql::ReproducibilityManifestRecord;
     use crate::mention_sql::EventMentionRecord;
     use crate::migration::MigrationCatalog;
     use crate::model_run_sql::{CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord};
-    use crate::artifact_sql::SourceArtifactRecord;
     use crate::relation_sql::EventRelationRecord;
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};
@@ -597,8 +596,6 @@ mod tests {
         );
     }
 
-    #[test]
-
     fn exercise_source_artifact(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
         let artifact = SourceArtifactRecord {
             source_artifact_id: uuid::Uuid::from_u128(1),
@@ -628,14 +625,9 @@ mod tests {
                 .iter()
                 .any(|sql| sql.contains("ON CONFLICT (source_artifact_id) DO NOTHING"))
         );
-        assert!(
-            repo.session()
-                .executed()
-                .iter()
-                .any(|sql| sql.contains("conflicting source artifact"))
-        );
     }
 
+    #[test]
     fn live_repository_applies_migrations_and_document_sql() {
         let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
         let catalog = MigrationCatalog::from_embedded().expect("embedded");

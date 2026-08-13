@@ -16,11 +16,11 @@
 //! membership-assignment SQL (migration `0006`) replaces the polymorphic 0001 stub so documents
 //! can belong to multiple entities and projects without atomistic collapse.
 
+mod artifact_sql;
 mod cutoff;
 mod document_sql;
 mod document_store;
 mod error;
-mod artifact_sql;
 mod instance_sql;
 mod live_pool;
 mod live_repository;
@@ -37,6 +37,16 @@ mod sqlx_gate;
 mod sqlx_live;
 mod tenant_session;
 
+/// Append-only source artifact row.
+pub use artifact_sql::SourceArtifactRecord;
+/// Render a fail-closed stored-row match assertion for a source artifact.
+pub use artifact_sql::assert_source_artifact_matches_sql;
+/// Render insert SQL for a validated source artifact.
+pub use artifact_sql::insert_source_artifact_sql;
+/// Render selection SQL for a source artifact by primary key.
+pub use artifact_sql::select_source_artifact_by_id_sql;
+/// Compare two source artifacts for idempotent-retry equality.
+pub use artifact_sql::source_artifacts_are_idempotent_matches;
 /// Knowledge-cutoff eligibility for historical analytical reads.
 pub use cutoff::is_cutoff_eligible;
 /// Render append-only audit insert SQL.
@@ -97,16 +107,6 @@ pub use membership_sql::select_membership_assignments_for_document_sql;
 pub use mention_sql::EventMentionRecord;
 /// Render insert SQL for a validated event mention.
 pub use mention_sql::insert_event_mention_sql;
-/// Compare two source artifacts for idempotent-retry equality.
-pub use artifact_sql::source_artifacts_are_idempotent_matches;
-/// Render selection SQL for a source artifact by primary key.
-pub use artifact_sql::select_source_artifact_by_id_sql;
-/// Render insert SQL for a validated source artifact.
-pub use artifact_sql::insert_source_artifact_sql;
-/// Render a fail-closed stored-row match assertion for a source artifact.
-pub use artifact_sql::assert_source_artifact_matches_sql;
-/// Append-only source artifact row.
-pub use artifact_sql::SourceArtifactRecord;
 /// Embedded and ad-hoc migration catalogs.
 pub use migration::MigrationCatalog;
 /// Validate migration SQL against TEPP contracts.
