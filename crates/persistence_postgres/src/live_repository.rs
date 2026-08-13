@@ -12,13 +12,13 @@ use crate::membership_sql::{
     MembershipAssignmentRecord, insert_membership_assignment_sql,
     select_membership_assignments_for_document_sql,
 };
-use crate::relation_sql::{EventRelationRecord, insert_event_relation_sql};
 use crate::migration::{MigrationCatalog, validate_migration_catalog};
 use crate::model_run_sql::{
     CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord,
     insert_corpus_split_manifest_sql, insert_model_artifact_sql, insert_model_run_sql,
     select_model_artifacts_by_run_sql, select_model_run_by_id_sql,
 };
+use crate::relation_sql::{EventRelationRecord, insert_event_relation_sql};
 use crate::sql_session::{SqlSession, apply_sql_batch};
 use crate::{MigrationContractError, PersistenceError};
 use temporal_core::{EventTime, SystemTime};
@@ -258,7 +258,6 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
-
     /// Look up a model run by primary key.
     ///
     /// # Errors
@@ -457,7 +456,6 @@ mod tests {
                 .any(|sql| sql.contains("INSERT INTO event_relation"))
         );
     }
-
 
     #[test]
     fn live_repository_applies_migrations_and_document_sql() {

@@ -24,10 +24,10 @@ mod live_pool;
 mod live_repository;
 mod manifest_sql;
 mod membership_sql;
-mod relation_sql;
 mod migration;
 mod model_run_sql;
 mod naming;
+mod relation_sql;
 mod sql_session;
 mod sqlx_gate;
 #[cfg(feature = "live-sqlx")]
@@ -84,9 +84,6 @@ pub use membership_sql::MembershipAssignmentRecord;
 pub use membership_sql::insert_membership_assignment_sql;
 /// Render selection SQL for document-level membership assignments.
 pub use membership_sql::select_membership_assignments_for_document_sql;
-pub use relation_sql::insert_event_relation_sql;
-/// Render insert SQL for a validated event relation.
-pub use relation_sql::EventRelationRecord;
 /// Typed event-relation row bound to the ERD transition vocabulary.
 /// Embedded and ad-hoc migration catalogs.
 pub use migration::MigrationCatalog;
@@ -110,6 +107,10 @@ pub use model_run_sql::select_model_artifacts_by_run_sql;
 pub use model_run_sql::select_model_run_by_id_sql;
 /// Multi-word `snake_case` database object naming.
 pub use naming::is_multi_word_snake_case;
+/// Typed event-relation row bound to the ERD transition vocabulary.
+pub use relation_sql::EventRelationRecord;
+/// Render insert SQL for a validated event relation.
+pub use relation_sql::insert_event_relation_sql;
 /// Recording SQL transport for offline contract tests.
 pub use sql_session::RecordingSqlSession;
 /// Live SQL transport contract.
