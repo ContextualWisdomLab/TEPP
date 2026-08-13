@@ -399,6 +399,7 @@ mod tests {
         assert!(validate_sha256_hex(&"09".repeat(32)).is_ok());
         assert!(validate_sha256_hex(&"ab".repeat(32)).is_ok());
         assert!(validate_sha256_hex("zz").is_err());
+        assert!(validate_sha256_hex(&"AB".repeat(32)).is_err());
         assert!(validate_nonempty_label("cpu_f64").is_ok());
         assert!(validate_nonempty_label("").is_err());
         assert!(validate_nonempty_label(&"x".repeat(129)).is_err());
