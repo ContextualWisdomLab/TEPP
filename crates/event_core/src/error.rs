@@ -20,6 +20,12 @@ pub enum EventError {
     UnsupportedWireVersion,
     /// An unknown event-role name was supplied.
     UnknownEventRole,
+    /// A TDT track assignment was treated as an event instance.
+    EventTrackIsNotEventInstance,
+    /// A TDT track assignment was treated as a state transition.
+    EventTrackIsNotStateTransition,
+    /// An unknown event-track label was supplied.
+    UnknownEventTrackLabel,
 }
 
 impl fmt::Display for EventError {
@@ -32,6 +38,9 @@ impl fmt::Display for EventError {
             Self::InvalidWirePayload => "invalid event wire payload",
             Self::UnsupportedWireVersion => "unsupported event wire version",
             Self::UnknownEventRole => "unknown event role",
+            Self::EventTrackIsNotEventInstance => "event track is not an event instance",
+            Self::EventTrackIsNotStateTransition => "event track is not a state transition",
+            Self::UnknownEventTrackLabel => "unknown event track label",
         };
         formatter.write_str(message)
     }
@@ -65,6 +74,18 @@ mod tests {
                 "unsupported event wire version",
             ),
             (EventError::UnknownEventRole, "unknown event role"),
+            (
+                EventError::EventTrackIsNotEventInstance,
+                "event track is not an event instance",
+            ),
+            (
+                EventError::EventTrackIsNotStateTransition,
+                "event track is not a state transition",
+            ),
+            (
+                EventError::UnknownEventTrackLabel,
+                "unknown event track label",
+            ),
         ] {
             assert_eq!(error.to_string(), message);
         }
