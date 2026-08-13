@@ -9,13 +9,9 @@
 use persistence_postgres::{
     AuditEvent, CorpusSplitManifestRecord, DocumentRecord, LiveDocumentRepository,
     LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
-    ModelRunRecord, ReproducibilityManifestRecord, SqlSession, apply_sql_batch,
+    ModelRunRecord, PersistenceError, ReproducibilityManifestRecord, SqlSession, apply_sql_batch,
     assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
     require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
-    LiveSqlxPoolOptions, MigrationCatalog, ModelArtifactRecord, ModelRunRecord, PersistenceError,
-    ReproducibilityManifestRecord, SqlSession, apply_sql_batch, assume_app_runtime_role_sql,
-    clear_session_tenant_sql, open_live_sqlx_pool, require_live_sqlx_config,
-    reset_app_runtime_role_sql, set_session_tenant_sql,
 };
 use std::sync::{Arc, Barrier};
 use std::thread;

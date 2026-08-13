@@ -161,6 +161,8 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidMembershipAssignment.to_string(),
             "invalid membership assignment"
+        );
+        assert_eq!(
             PersistenceError::ConcurrentWriteConflict.to_string(),
             "concurrent write conflict"
         );
