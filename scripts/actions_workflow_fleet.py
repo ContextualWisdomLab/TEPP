@@ -13,6 +13,7 @@ import http.client
 import json
 import os
 import re
+import ssl
 import sys
 import urllib.parse
 from dataclasses import asdict, dataclass
@@ -150,7 +151,14 @@ class GithubHttpsTransport:
             "User-Agent": "tepp-actions-workflow-fleet",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        connection = http.client.HTTPSConnection(_API_HOST, timeout=60)
+        # Fixed host only; path is absolute-root validated above. Explicit
+        # default SSL context requires certificate verification (Python 3.4.3+).
+        # nosemgrep: python.lang.security.audit.httpsconnection-detected.httpsconnection-detected
+        connection = http.client.HTTPSConnection(
+            _API_HOST,
+            timeout=60,
+            context=ssl.create_default_context(),
+        )
         try:
             connection.request(method, path, headers=headers)
             response = connection.getresponse()
