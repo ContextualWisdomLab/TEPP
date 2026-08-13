@@ -2,10 +2,9 @@
 
 use std::path::PathBuf;
 use tepp_api::{
-    AnalysisRunRequest, AnalyticalPurpose, ApiError, ExportAuthorizationRequest,
-    NARUON_ANALYSIS_RUN_PATH, naruon_analysis_run_exchange,
-    naruon_analysis_run_exchange_with_headers, naruon_export_exchange,
-    naruon_may_claim_tepp_inference,
+    naruon_analysis_run_exchange, naruon_analysis_run_exchange_with_headers,
+    naruon_export_exchange, naruon_may_claim_tepp_inference, AnalysisRunRequest, AnalyticalPurpose,
+    ApiError, ExportAuthorizationRequest, NARUON_ANALYSIS_RUN_PATH,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -28,26 +27,20 @@ fn analysis_run_exchange_posts_versioned_json_without_credentials() {
         exchange.target_url,
         format!("https://tepp.example.test{NARUON_ANALYSIS_RUN_PATH}")
     );
-    assert!(
-        exchange
-            .headers
-            .iter()
-            .any(|(name, value)| name == "content-type" && value == "application/json")
-    );
-    assert!(
-        exchange
-            .headers
-            .iter()
-            .any(|(name, value)| name == "tepp-consumer" && value == "naruon")
-    );
-    assert!(
-        !exchange
-            .headers
-            .iter()
-            .any(|(name, _)| name == "authorization"
-                || name.contains("token")
-                || name.contains("copilot"))
-    );
+    assert!(exchange
+        .headers
+        .iter()
+        .any(|(name, value)| name == "content-type" && value == "application/json"));
+    assert!(exchange
+        .headers
+        .iter()
+        .any(|(name, value)| name == "tepp-consumer" && value == "naruon"));
+    assert!(!exchange
+        .headers
+        .iter()
+        .any(|(name, _)| name == "authorization"
+            || name.contains("token")
+            || name.contains("copilot")));
     let decoded = AnalysisRunRequest::from_json(&exchange.body).expect("body");
     assert_eq!(decoded.tenant_workspace_id, "naruon-tenant-workspace-demo");
 }
@@ -144,21 +137,20 @@ fn allowed_extra_headers_are_forwarded_on_analysis_run_exchange() {
     let exchange = naruon_analysis_run_exchange_with_headers(
         "https://tepp.example.test",
         &run,
-        &[("x-request-id", "naruon-trace-001"), ("x-correlation-id", "corr-42")],
+        &[
+            ("x-request-id", "naruon-trace-001"),
+            ("x-correlation-id", "corr-42"),
+        ],
     )
     .expect("non-credential headers are allowed");
-    assert!(
-        exchange
-            .headers
-            .iter()
-            .any(|(name, value)| name == "x-request-id" && value == "naruon-trace-001")
-    );
-    assert!(
-        exchange
-            .headers
-            .iter()
-            .any(|(name, value)| name == "x-correlation-id" && value == "corr-42")
-    );
+    assert!(exchange
+        .headers
+        .iter()
+        .any(|(name, value)| name == "x-request-id" && value == "naruon-trace-001"));
+    assert!(exchange
+        .headers
+        .iter()
+        .any(|(name, value)| name == "x-correlation-id" && value == "corr-42"));
 }
 
 #[test]
@@ -174,4 +166,3 @@ fn host_names_that_imply_table_access_fail_closed() {
         );
     }
 }
-
