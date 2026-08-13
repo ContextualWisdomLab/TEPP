@@ -16,6 +16,8 @@ mod role;
 
 /// Finite confidence on the closed unit interval.
 pub use confidence::EventConfidence;
+/// Mean squared error of mention probabilities against binary truth.
+pub use confidence::mention_brier_score;
 /// Fail-closed event-ontology errors.
 pub use error::EventError;
 /// Opaque event-instance identifier.
