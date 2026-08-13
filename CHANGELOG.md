@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `corpus_split` inferential-weight gate: only group-normalized ESS and uniform observation weights may enter an estimator; TF-IDF, BM25, and default global stopword deletion fail closed, with computed RMSE showing the retrieval surrogate recovers known shares worse than the allowed masses.
 - `persistence_postgres` typed membership assignment (migration `0006`): `entity_record`, `project_record`, and `text_segment` plus exactly-one observed-unit and target constraints that replace the polymorphic `membership_target_id` stub, with SQL insert/lookup, fail-closed inverted-window and backslash-label refusal, and live proof that one document persists two entity memberships and one project membership.
 - Actions workflow fleet auditor (`scripts/actions_workflow_fleet.py`): paginated registry inventory bound to the exact default-branch SHA/tree, classification of present/orphan/disabled/GitHub-dynamic identities, and fail-closed orphan disable that confirms GitHub's official `disabled_manually` state.
 - `persistence_postgres` temporal interval ordering migration (`0005`): multi-word CHECK constraints on `document_record`, `event_instance`, and `membership_assignment` that reject inverted valid/system windows and non-positive document revisions while preserving open-ended NULL upper bounds and equal point bounds; catalog validation and live inverted-window proof.
