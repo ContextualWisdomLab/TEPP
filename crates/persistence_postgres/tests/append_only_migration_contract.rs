@@ -30,9 +30,15 @@ fn embedded_append_only_ddl_rejects_update_delete_and_truncate() {
     for table in APPEND_ONLY_TABLES {
         assert!(
             up_sql.contains(&format!(
-                "revoke update, delete, truncate on table {table} from tepp_app_runtime"
+                "revoke update, delete on table {table} from tepp_app_runtime"
             )),
-            "runtime role must not retain destructive privileges on {table}"
+            "runtime role must not retain UPDATE/DELETE on {table}"
+        );
+        assert!(
+            up_sql.contains(&format!(
+                "revoke truncate on table {table} from tepp_app_runtime"
+            )),
+            "runtime role must not retain TRUNCATE on {table}"
         );
         assert!(
             up_sql.contains(&format!(
@@ -51,9 +57,9 @@ fn rollback_removes_rejection_triggers_without_granting_truncate() {
     assert!(down_sql.contains("drop function if exists reject_append_only_mutation()"));
     for table in APPEND_ONLY_TABLES {
         assert!(
-            down_sql.contains(&format!(
+            down_sql.contains(
                 "drop trigger if exists %i on %i', trigger_table || '_reject_mutation', trigger_table"
-            )) || down_sql.contains(&format!("drop trigger if exists {table}_reject_mutation on {table}")),
+            ) || down_sql.contains(&format!("drop trigger if exists {table}_reject_mutation on {table}")),
             "rollback must remove the append-only trigger for {table}"
         );
         assert!(
@@ -64,7 +70,7 @@ fn rollback_removes_rejection_triggers_without_granting_truncate() {
         );
         assert!(
             !down_sql.contains(&format!(
-                "grant update, delete, truncate on table {table} to tepp_app_runtime"
+                "grant truncate on table {table} to tepp_app_runtime"
             )),
             "rollback must not introduce a new TRUNCATE privilege on {table}"
         );
