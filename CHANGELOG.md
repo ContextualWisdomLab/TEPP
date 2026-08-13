@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `event_core` ADR 0016 evidence-status gates: TDT detections and CHRONOS predictions cannot admit a forward state transition; first-story detection scores miss/false-alarm rates against a known story stream (Allan 2002 task).
 - `persistence_postgres` typed membership assignment (migration `0006`): `entity_record`, `project_record`, and `text_segment` plus exactly-one observed-unit and target constraints that replace the polymorphic `membership_target_id` stub, with SQL insert/lookup, fail-closed inverted-window and backslash-label refusal, and live proof that one document persists two entity memberships and one project membership.
 - Actions workflow fleet auditor (`scripts/actions_workflow_fleet.py`): paginated registry inventory bound to the exact default-branch SHA/tree, classification of present/orphan/disabled/GitHub-dynamic identities, and fail-closed orphan disable that confirms GitHub's official `disabled_manually` state.
 - `persistence_postgres` temporal interval ordering migration (`0005`): multi-word CHECK constraints on `document_record`, `event_instance`, and `membership_assignment` that reject inverted valid/system windows and non-positive document revisions while preserving open-ended NULL upper bounds and equal point bounds; catalog validation and live inverted-window proof.

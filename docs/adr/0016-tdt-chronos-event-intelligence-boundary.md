@@ -1,7 +1,7 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** partial — evidence-layer admission gates and first-story miss/false-alarm scoring are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; full TDT tracking/calibration and CHRONOS schema extraction remain accepted-target  
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 temporal semantics and ADR 0003 event ontology/membership.
 

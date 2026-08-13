@@ -13,7 +13,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |
 | Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
-| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; full intelligence stack remaining | partial |
+| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; ADR 0016 status gates on the active PR | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
@@ -30,7 +30,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
-| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
+| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` evidence-layer admission + first-story rates on the active PR; full TDT/CHRONOS stack remaining | partial |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | future `interpretation_gateway` | accepted-target |
 | adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | future contextual-orchestrator integration + ablation evidence | accepted-target |
 | purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | future authorization/persistence/export/provider adapters | accepted-target |
