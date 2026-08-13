@@ -1,7 +1,7 @@
 # ADR 0011 — Standalone operation and modular CWL MSA boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — Rust crates are independently usable; production service/API/persistence integrations remain accepted-target  
+**Implementation maturity:** partial — Rust crates are independently usable; contextual-orchestrator HTTPS interpretation interchange is on the active PR; live HTTP servers and remaining persistence integrations remain accepted-target  
 **Date:** 2026-08-10  
 **Supersedes:** The broad cross-service ownership wording in ADR 0001. ADR 0001 remains authoritative for Rust-first numerical architecture.
 

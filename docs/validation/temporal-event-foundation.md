@@ -24,6 +24,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | — | unknown-field/version/limit tests | Task 12 / PR #21; HTTP service remaining |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
+| contextual-orchestrator HTTPS interchange | `tepp_api` | active-PR | interpretation POST builder | table-access + secret refusal | ADR 0011; `docs/research/orchestrator-http-interchange.md` |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 
 

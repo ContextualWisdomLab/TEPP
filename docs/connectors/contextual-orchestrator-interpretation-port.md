@@ -1,7 +1,7 @@
 # contextual-orchestrator interpretation port for TEPP
 
 **Status:** Accepted-target modular integration contract  
-**Last reviewed:** 2026-08-12
+**Last reviewed:** 2026-08-13
 
 ## Boundary
 
@@ -28,6 +28,10 @@ These allocations are guided by Fugu, Conductor, and TRINITY research cited in `
 - Live LLM tests and product-dev loops use `NVIDIA_NIM_API_KEY` only.
 - `COPILOT_GITHUB_TOKEN` is prohibited.
 - Existing independent review-agent credentials must not be repurposed for product development or interpretation traffic.
+
+## Wire interchange
+
+`tepp_api::orchestrator_interpretation_exchange` builds a credential-free `POST https://<host>/v1/interpretation-runs`. The host must be a DNS name; `postgres`, `jdbc`, `sql`, and `tables` hosts are refused. `refuse_repository_write_secret` accepts only `NVIDIA_NIM_API_KEY` as a model-credential name. `refuse_orchestrator_as_scientific_acceptance` always denies treating orchestrator output as statistical truth.
 
 ## Failure modes
 
