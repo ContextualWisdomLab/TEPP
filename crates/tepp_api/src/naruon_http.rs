@@ -135,11 +135,8 @@ fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
         return Err(ApiError::InvalidWirePayload);
     }
     let lowered = origin.to_ascii_lowercase();
-    if lowered.contains("postgres")
-        || lowered.contains("jdbc")
-        || lowered.contains("/sql")
-        || lowered.contains("/tables/")
-    {
+    // Host-only origins cannot embed path segments; refuse DB-access host labels.
+    if lowered.contains("postgres") || lowered.contains("jdbc") {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(format!("{origin}{path}"))
@@ -185,7 +182,7 @@ mod tests {
     use crate::ApiError;
 
     #[test]
-    fn origin_and_header_helpers_cover_accept_and_reject_arms() {
+    fn compose_https_target_accepts_clean_origin_and_rejects_hostile_forms() {
         assert!(compose_https_target("https://tepp.example.test", "/v1/x").is_ok());
         assert_eq!(
             compose_https_target("", "/v1/x"),
@@ -255,6 +252,10 @@ mod tests {
             compose_https_target("https://api.example/tables/x", "/v1/x"),
             Err(ApiError::InvalidWirePayload)
         );
+    }
+
+    #[test]
+    fn refuse_credential_headers_covers_reserved_and_secret_names() {
         assert!(refuse_credential_headers(&[("x-trace", "1")]).is_ok());
         assert!(refuse_credential_headers(&[]).is_ok());
         assert_eq!(
@@ -290,9 +291,17 @@ mod tests {
             Err(ApiError::AuthorizationDenied)
         );
         assert_eq!(
+            refuse_credential_headers(&[("x-github-actor", "agent")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
             refuse_credential_headers(&[("x-copilot-session", "t")]),
             Err(ApiError::AuthorizationDenied)
         );
+    }
+
+    #[test]
+    fn naruon_may_claim_tepp_inference_covers_accept_and_reject_arms() {
         assert!(naruon_may_claim_tepp_inference(NARUON_TEPP_INFERENCE_METHOD).is_ok());
         assert_eq!(
             naruon_may_claim_tepp_inference(""),
