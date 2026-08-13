@@ -117,6 +117,7 @@ mod tests {
     use super::{MigrationContractError, PersistenceError};
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn error_messages_are_stable() {
         assert_eq!(
             PersistenceError::DuplicateDocumentRecord.to_string(),
