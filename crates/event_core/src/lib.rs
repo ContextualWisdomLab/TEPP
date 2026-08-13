@@ -4,7 +4,8 @@
 //!
 //! TEPP separates **fallible event mentions** grounded in evidence from
 //! **versioned event instances** used for temporal state, multilevel membership,
-//! and scientific estimation. Mentions never silently become instances.
+//! and scientific estimation. Mentions and CHRONOS schema-slot predictions
+//! never silently become instances.
 
 mod confidence;
 mod error;
@@ -13,6 +14,7 @@ mod instance;
 mod mention;
 mod registry;
 mod role;
+mod schema;
 
 /// Finite confidence on the closed unit interval.
 pub use confidence::EventConfidence;
@@ -34,3 +36,19 @@ pub use mention::EventMention;
 pub use registry::EventRegistry;
 /// Typed event role kind.
 pub use role::EventRoleKind;
+/// Opaque CHRONOS schema-prediction identity.
+pub use schema::SchemaPredictionId;
+/// Predicted or observed filler for one schema slot.
+pub use schema::SchemaSlotAssignment;
+/// Filled-versus-empty occupancy label.
+pub use schema::SchemaSlotLabel;
+/// Threshold a slot-occupancy probability into a fill label.
+pub use schema::decide_schema_slot;
+/// Explicit refusal to treat a schema prediction as an instance.
+pub use schema::refuse_schema_prediction_as_instance;
+/// Explicit refusal to treat a schema prediction as a state transition.
+pub use schema::refuse_schema_prediction_as_transition;
+/// Precision of recovered filled slots against known truth.
+pub use schema::schema_slot_precision;
+/// Recall of recovered filled slots against known truth.
+pub use schema::schema_slot_recall;
