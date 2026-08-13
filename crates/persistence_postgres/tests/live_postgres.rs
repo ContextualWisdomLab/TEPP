@@ -12,9 +12,17 @@ use persistence_postgres::{
     ModelRunRecord, ReproducibilityManifestRecord, SqlSession, apply_sql_batch,
     assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
     require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
+    LiveSqlxPoolOptions, MigrationCatalog, ModelArtifactRecord, ModelRunRecord, PersistenceError,
+    ReproducibilityManifestRecord, SqlSession, apply_sql_batch, assume_app_runtime_role_sql,
+    clear_session_tenant_sql, open_live_sqlx_pool, require_live_sqlx_config,
+    reset_app_runtime_role_sql, set_session_tenant_sql,
 };
+use std::sync::{Arc, Barrier};
+use std::thread;
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
+
+const CONCURRENT_WRITERS: usize = 4;
 
 const LIVE_GATE_ENV: &str = "TEPP_LIVE_POSTGRES";
 
@@ -39,7 +47,7 @@ fn seed_tenant_and_artifact(
     source_artifact_id: Uuid,
     content_digest: &str,
 ) {
-    let (available, _valid, system) = sample_times();
+    let (_available, _valid, system) = sample_times();
     let tenant_sql = format!(
         "INSERT INTO tenant_record (tenant_record_id, tenant_status_code, system_time) \
          VALUES ('{tenant_record_id}'::uuid, 'active', '{system}'::timestamptz)",
@@ -48,7 +56,16 @@ fn seed_tenant_and_artifact(
     repo.session_mut()
         .execute(&tenant_sql)
         .expect("insert tenant_record");
+    seed_source_artifact(repo, tenant_record_id, source_artifact_id, content_digest);
+}
 
+fn seed_source_artifact(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    source_artifact_id: Uuid,
+    content_digest: &str,
+) {
+    let (available, _valid, system) = sample_times();
     let artifact_sql = format!(
         "INSERT INTO source_artifact (\
             source_artifact_id, tenant_record_id, content_sha256, source_size_bytes, \
@@ -179,7 +196,210 @@ fn live_postgres_applies_migrations_and_document_sql() {
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
     prove_append_only_immutability(&mut repo, &manifest);
     prove_temporal_interval_ordering(&mut repo, tenant_record_id, source_artifact_id);
+    prove_concurrent_document_writes(&mut repo);
     prove_tenant_rls_isolation(&mut repo);
+}
+
+fn open_writer_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {
+    let config = require_live_sqlx_config().expect("DATABASE_URL");
+    let options = LiveSqlxPoolOptions::new(1, 5_000).expect("writer pool");
+    let pool = open_live_sqlx_pool(&config, options).expect("writer pool open");
+    LiveDocumentRepository::new(pool)
+}
+
+fn is_closed_write_failure(error: PersistenceError) -> bool {
+    matches!(
+        error,
+        PersistenceError::DuplicateDocumentRecord
+            | PersistenceError::ConcurrentWriteConflict
+            | PersistenceError::SqlExecutionFailed
+    )
+}
+
+fn assert_single_winner(results: Vec<Result<(), PersistenceError>>, context: &str) {
+    let successes = results.iter().filter(|result| result.is_ok()).count();
+    assert_eq!(successes, 1, "{context}: expected exactly one winner");
+    assert!(
+        results
+            .into_iter()
+            .filter_map(Result::err)
+            .all(is_closed_write_failure),
+        "{context}: losers must fail closed"
+    );
+}
+
+fn document_row_guard(document_record_id: Uuid, expected_rows: u64, expected_open: u64) -> String {
+    format!(
+        "DO $tepp$ BEGIN \
+           IF (SELECT COUNT(*) FROM document_record \
+               WHERE document_record_id = '{document_record_id}'::uuid) <> {expected_rows} THEN \
+             RAISE EXCEPTION 'unexpected document_record row count'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM document_record \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND system_to IS NULL) <> {expected_open} THEN \
+             RAISE EXCEPTION 'unexpected open document_record count'; \
+           END IF; \
+         END $tepp$"
+    )
+}
+
+fn sample_document(
+    document_record_id: Uuid,
+    tenant_record_id: Uuid,
+    content_digest: String,
+    revision_number: u64,
+    system: SystemTime,
+) -> DocumentRecord {
+    let (available, valid, _) = sample_times();
+    DocumentRecord {
+        document_record_id,
+        tenant_record_id,
+        content_digest,
+        available_time: available,
+        valid_from: valid,
+        valid_to: None,
+        system_from: system,
+        system_to: None,
+        revision_number,
+    }
+}
+
+fn race_identical_writes(
+    record: &DocumentRecord,
+    revise: bool,
+    context: &'static str,
+) -> Vec<Result<(), PersistenceError>> {
+    let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
+    (0..CONCURRENT_WRITERS)
+        .map(|_| {
+            let barrier = Arc::clone(&barrier);
+            let record = record.clone();
+            thread::spawn(move || {
+                let mut writer = open_writer_repo();
+                barrier.wait();
+                if revise {
+                    writer.revise(&record)
+                } else {
+                    writer.insert(&record)
+                }
+            })
+        })
+        .map(|handle| handle.join().expect(context))
+        .collect()
+}
+
+/// Concurrent first inserts and revises must leave exactly one open version.
+fn prove_concurrent_document_writes(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+) {
+    let tenant_record_id = Uuid::now_v7();
+    let first_document_id = Uuid::now_v7();
+    let first_digest = "a1".repeat(32);
+    seed_tenant_and_artifact(repo, tenant_record_id, first_document_id, &first_digest);
+    let (_, _, system) = sample_times();
+    let first = sample_document(first_document_id, tenant_record_id, first_digest, 1, system);
+    assert_single_winner(
+        race_identical_writes(&first, false, "insert thread"),
+        "concurrent first insert",
+    );
+    repo.session_mut()
+        .execute(&document_row_guard(first_document_id, 1, 1))
+        .expect("exactly one first insert row");
+
+    let revised = sample_document(
+        first_document_id,
+        tenant_record_id,
+        "b2".repeat(32),
+        2,
+        SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later"),
+    );
+    assert_single_winner(
+        race_identical_writes(&revised, true, "revise thread"),
+        "concurrent revise",
+    );
+    repo.session_mut()
+        .execute(&document_row_guard(first_document_id, 2, 1))
+        .expect("closed first version plus one open revision");
+
+    prove_missing_open_row_fails(repo, tenant_record_id);
+    prove_distinct_concurrent_inserts(repo, tenant_record_id, system);
+    prove_concurrent_append_only_reject(first_document_id);
+}
+
+fn prove_missing_open_row_fails(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+) {
+    let missing = sample_document(
+        Uuid::now_v7(),
+        tenant_record_id,
+        "c3".repeat(32),
+        2,
+        SystemTime::parse_rfc3339("2026-03-01T00:00:00Z").expect("missing"),
+    );
+    let missing_error = repo.revise(&missing).expect_err("missing open row");
+    assert!(
+        is_closed_write_failure(missing_error),
+        "revise without an open row must fail closed"
+    );
+}
+
+fn prove_distinct_concurrent_inserts(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    system: SystemTime,
+) {
+    let pairs: Vec<(Uuid, String)> = (0..CONCURRENT_WRITERS)
+        .map(|index| (Uuid::now_v7(), format!("{index:02x}") + &"e5".repeat(31)))
+        .collect();
+    for (document_record_id, digest) in &pairs {
+        seed_source_artifact(repo, tenant_record_id, *document_record_id, digest);
+    }
+    let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
+    let handles: Vec<_> = pairs
+        .into_iter()
+        .map(|(document_record_id, digest)| {
+            let barrier = Arc::clone(&barrier);
+            let record = sample_document(document_record_id, tenant_record_id, digest, 1, system);
+            thread::spawn(move || {
+                let mut writer = open_writer_repo();
+                barrier.wait();
+                writer.insert(&record)
+            })
+        })
+        .collect();
+    for handle in handles {
+        handle
+            .join()
+            .expect("distinct insert thread")
+            .expect("independent document inserts must all succeed");
+    }
+}
+
+fn prove_concurrent_append_only_reject(source_artifact_id: Uuid) {
+    let artifact_update = format!(
+        "UPDATE source_artifact SET media_type_code = 'text/hostile' \
+         WHERE source_artifact_id = '{source_artifact_id}'::uuid"
+    );
+    let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
+    let handles: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| {
+            let barrier = Arc::clone(&barrier);
+            let sql = artifact_update.clone();
+            thread::spawn(move || {
+                let mut writer = open_writer_repo();
+                barrier.wait();
+                writer.session_mut().execute(&sql)
+            })
+        })
+        .collect();
+    for handle in handles {
+        assert!(
+            handle.join().expect("mutation thread").is_err(),
+            "concurrent append-only UPDATE must fail"
+        );
+    }
 }
 
 /// Append-only triggers must reject UPDATE/DELETE on identity tables.

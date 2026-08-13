@@ -5,7 +5,8 @@ use crate::artifact_sql::{
     select_source_artifact_by_id_sql,
 };
 use crate::document_sql::{
-    append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql, revise_document_sqls,
+    append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql,
+    revise_document_atomic_sql,
 };
 use crate::document_store::{AuditEvent, DocumentRecord};
 use crate::instance_sql::{
@@ -89,15 +90,14 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
-    /// Close the open system-time row and insert a revision.
+    /// Close the open system-time row and insert a revision atomically.
     ///
     /// # Errors
     ///
-    /// Returns digest or transport failures.
+    /// Returns digest, concurrent-write, or transport failures.
     pub fn revise(&mut self, record: &DocumentRecord) -> Result<(), PersistenceError> {
-        let [close, insert] = revise_document_sqls(record)?;
-        self.session.execute(&close)?;
-        self.session.execute(&insert)
+        let sql = revise_document_atomic_sql(record)?;
+        self.session.execute(&sql)
     }
 
     /// Issue as-known-at SQL for a document identity.
@@ -641,6 +641,12 @@ mod tests {
         revised.system_from =
             SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later system");
         repo.revise(&revised).expect("revise");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("DO $tepp$") && sql.contains("GET DIAGNOSTICS"))
+        );
         repo.submit_as_known_at(
             uuid::Uuid::nil(),
             &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("k"),

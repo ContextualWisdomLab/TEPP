@@ -38,6 +38,8 @@ pub enum PersistenceError {
     InvalidSourceArtifact,
     /// An audit action code was empty, oversized, or hostile.
     InvalidAuditEvent,
+    /// A concurrent writer won the open-row lock or serialization contest.
+    ConcurrentWriteConflict,
 }
 
 impl fmt::Display for PersistenceError {
@@ -59,6 +61,7 @@ impl fmt::Display for PersistenceError {
             Self::ConflictingSourceArtifact => "conflicting source artifact",
             Self::InvalidSourceArtifact => "invalid source artifact",
             Self::InvalidAuditEvent => "invalid audit event",
+            Self::ConcurrentWriteConflict => "concurrent write conflict",
         };
         formatter.write_str(message)
     }
@@ -158,6 +161,8 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidMembershipAssignment.to_string(),
             "invalid membership assignment"
+            PersistenceError::ConcurrentWriteConflict.to_string(),
+            "concurrent write conflict"
         );
         assert_eq!(
             PersistenceError::InvalidEventRelation.to_string(),
