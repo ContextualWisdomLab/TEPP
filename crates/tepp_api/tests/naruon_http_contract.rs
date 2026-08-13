@@ -137,3 +137,41 @@ fn lexical_heuristics_cannot_claim_tepp_inference() {
         Err(ApiError::InvalidWirePayload)
     );
 }
+
+#[test]
+fn allowed_extra_headers_are_forwarded_on_analysis_run_exchange() {
+    let run = sample_run();
+    let exchange = naruon_analysis_run_exchange_with_headers(
+        "https://tepp.example.test",
+        &run,
+        &[("x-request-id", "naruon-trace-001"), ("x-correlation-id", "corr-42")],
+    )
+    .expect("non-credential headers are allowed");
+    assert!(
+        exchange
+            .headers
+            .iter()
+            .any(|(name, value)| name == "x-request-id" && value == "naruon-trace-001")
+    );
+    assert!(
+        exchange
+            .headers
+            .iter()
+            .any(|(name, value)| name == "x-correlation-id" && value == "corr-42")
+    );
+}
+
+#[test]
+fn host_names_that_imply_table_access_fail_closed() {
+    let run = sample_run();
+    // Path-bearing origins are refused by host-shape checks; these hosts pass
+    // shape validation and exercise the table-access token refusal arm.
+    for origin in ["https://postgres.example.test", "https://jdbc.example.test"] {
+        assert_eq!(
+            naruon_analysis_run_exchange(origin, &run),
+            Err(ApiError::InvalidWirePayload),
+            "origin={origin}"
+        );
+    }
+}
+
