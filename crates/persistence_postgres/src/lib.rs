@@ -20,6 +20,7 @@ mod cutoff;
 mod document_sql;
 mod document_store;
 mod error;
+mod instance_sql;
 mod live_pool;
 mod live_repository;
 mod manifest_sql;
@@ -57,6 +58,12 @@ pub use document_store::DocumentStore;
 pub use error::MigrationContractError;
 /// Fail-closed persistence domain errors.
 pub use error::PersistenceError;
+/// Bitemporal event-instance row.
+pub use instance_sql::EventInstanceRecord;
+/// Render insert SQL for a validated event instance.
+pub use instance_sql::insert_event_instance_sql;
+/// Render as-known-at selection for one event-instance identity.
+pub use instance_sql::select_event_instance_as_known_at_sql;
 /// Default pool acquire timeout in milliseconds.
 pub use live_pool::DEFAULT_ACQUIRE_TIMEOUT_MS;
 /// Default maximum pool connections.
