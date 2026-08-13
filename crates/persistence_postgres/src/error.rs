@@ -26,6 +26,8 @@ pub enum PersistenceError {
     LiveAdapterNotConfigured,
     /// A membership assignment violated exactly-one, weight, window, or label contracts.
     InvalidMembershipAssignment,
+    /// An event relation violated the closed ERD transition vocabulary.
+    InvalidEventRelation,
 }
 
 impl fmt::Display for PersistenceError {
@@ -41,6 +43,7 @@ impl fmt::Display for PersistenceError {
             Self::PoolOptionsInvalid => "pool options invalid",
             Self::LiveAdapterNotConfigured => "live adapter not configured",
             Self::InvalidMembershipAssignment => "invalid membership assignment",
+            Self::InvalidEventRelation => "invalid event relation",
         };
         formatter.write_str(message)
     }
@@ -139,6 +142,10 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidMembershipAssignment.to_string(),
             "invalid membership assignment"
+        );
+        assert_eq!(
+            PersistenceError::InvalidEventRelation.to_string(),
+            "invalid event relation"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),
