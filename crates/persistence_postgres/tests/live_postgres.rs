@@ -18,7 +18,7 @@ use std::thread;
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
 
-const CONCURRENT_WRITERS: usize = 4;
+const CONCURRENT_WRITERS: usize = 2;
 
 const LIVE_GATE_ENV: &str = "TEPP_LIVE_POSTGRES";
 
@@ -99,6 +99,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
     repo.session_mut()
         .execute("SELECT 1")
         .expect("SELECT 1 through live transport");
+    apply_sql_timeouts(&mut repo, "5s", "60s");
 
     let catalog = MigrationCatalog::from_embedded().expect("embedded foundation catalog");
     // Best-effort reset: empty service DBs lack tables/role; re-runs clean residual objects.

@@ -71,6 +71,9 @@ pub fn revise_document_atomic_sql(record: &DocumentRecord) -> Result<String, Per
         "DO $tepp$ \
          DECLARE closed_count integer; \
          BEGIN \
+           PERFORM 1 FROM document_record \
+            WHERE document_record_id = '{document_id}'::uuid AND system_to IS NULL \
+            FOR UPDATE NOWAIT; \
            UPDATE document_record SET system_to = '{system_from}'::timestamptz \
             WHERE document_record_id = '{document_id}'::uuid AND system_to IS NULL; \
            GET DIAGNOSTICS closed_count = ROW_COUNT; \
