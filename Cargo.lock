@@ -1267,6 +1267,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tenant_access"
+version = "0.1.0"
+dependencies = [
+ "temporal_core",
+ "uuid",
+]
+
+[[package]]
 name = "tepp_api"
 version = "0.1.0"
 dependencies = [

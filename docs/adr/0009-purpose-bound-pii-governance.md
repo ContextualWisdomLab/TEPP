@@ -1,7 +1,7 @@
 # ADR 0009 — Purpose-bound PII governance without blanket masking
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — `tenant_access` binds tenant, role, and system-time lifetime and refuses event-time authorization and blanket masking; remaining purpose-grant persistence/export adapters remain accepted-target  
 **Date:** 2026-08-10  
 **Supersedes:** None.
 

@@ -34,7 +34,7 @@ Every protected read, model submission, export, administrative action, and re-id
 - export/re-identification privilege;
 - auditable decision evidence.
 
-Future persistent authorization entities must use descriptive multiword `snake_case` names such as `access_grant`, `purpose_binding`, `identity_mapping`, `retention_policy`, and `export_approval`.
+The `tenant_access` crate evaluates tenant, role, and system-time lifetime in memory. Persistent authorization entities must use descriptive multiword `snake_case` names such as `access_grant`, `purpose_binding`, `identity_mapping`, `retention_policy`, and `export_approval`. Grant lifetime uses system or assertion time; event time cannot authorize access.
 
 ## 4. Identity separation
 
