@@ -6,6 +6,7 @@ use crate::authorization::{
 };
 use crate::wire::require_nonempty;
 use std::fmt;
+use temporal_core::TemporalInstant;
 
 /// Time-bounded purpose grant evaluated at a decision instant.
 ///
@@ -322,6 +323,7 @@ fn is_rfc3339_utc(value: &str) -> bool {
         && bytes[11..13].iter().all(u8::is_ascii_digit)
         && bytes[14..16].iter().all(u8::is_ascii_digit)
         && bytes[17..19].iter().all(u8::is_ascii_digit)
+        && TemporalInstant::parse_rfc3339(value).is_ok()
 }
 
 #[cfg(test)]
