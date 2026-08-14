@@ -76,6 +76,12 @@ pub use orchestration::ContextualOrchestratorBinding;
 pub use orchestration::DocumentControlAttempt;
 /// Bounded interpretation task kind.
 pub use orchestration::InterpretationTaskKind;
+/// Maximum access capabilities on one orchestration request.
+pub use orchestration::MAX_ORCHESTRATION_ACCESS_ENTRIES;
+/// Maximum UTF-8 bytes in one orchestration access token.
+pub use orchestration::MAX_ORCHESTRATION_ACCESS_TOKEN_BYTES;
+/// Maximum billable token budget on one orchestration request.
+pub use orchestration::MAX_ORCHESTRATION_TOKEN_BUDGET;
 /// Orchestration contract version for contextual-orchestrator bindings.
 pub use orchestration::ORCHESTRATION_CONTRACT_VERSION;
 /// Versioned TEPP orchestration policy identity.

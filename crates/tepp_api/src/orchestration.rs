@@ -10,6 +10,13 @@ pub const ORCHESTRATION_POLICY_VERSION: &str = "tepp.orchestration.v1";
 /// Contract version for a contextual-orchestrator binding.
 pub const ORCHESTRATION_CONTRACT_VERSION: u16 = 1;
 
+/// Maximum billable token budget accepted by one orchestration request.
+pub const MAX_ORCHESTRATION_TOKEN_BUDGET: u64 = 1_000_000;
+/// Maximum number of TEPP-owned access capabilities on one request.
+pub const MAX_ORCHESTRATION_ACCESS_ENTRIES: usize = 64;
+/// Maximum UTF-8 byte length of one access capability token.
+pub const MAX_ORCHESTRATION_ACCESS_TOKEN_BYTES: usize = 128;
+
 const EVIDENCE_FLOOR: f64 = 0.35;
 const LOW_COMPLEXITY: f64 = 0.35;
 const HIGH_COMPLEXITY: f64 = 0.50;
@@ -564,11 +571,22 @@ fn validate_request(request: &OrchestrationRequest) -> Result<(), ApiError> {
     if request.document_control != DocumentControlAttempt::None {
         return Err(ApiError::AuthorizationDenied);
     }
+    if request.compute_budget_tokens > MAX_ORCHESTRATION_TOKEN_BUDGET
+        || request.access_list.len() > MAX_ORCHESTRATION_ACCESS_ENTRIES
+    {
+        return Err(ApiError::LimitExceeded);
+    }
     require_unit_score(request.risk_score)?;
     require_unit_score(request.ambiguity_score)?;
     require_unit_score(request.evidence_sufficiency)?;
-    for token in &request.access_list {
+    for (index, token) in request.access_list.iter().enumerate() {
         require_nonempty(token)?;
+        if token.len() > MAX_ORCHESTRATION_ACCESS_TOKEN_BYTES {
+            return Err(ApiError::LimitExceeded);
+        }
+        if request.access_list[..index].contains(token) {
+            return Err(ApiError::InvalidWirePayload);
+        }
     }
     Ok(())
 }

@@ -36,3 +36,12 @@ TRINITY motivates lightweight model/role delegation rather than a fixed deep gra
 - non-unit scores and unknown policy versions fail closed;
 - ablation rejects a non-direct baseline or a comparison that changes task kind, policy version, or access list, and reports incomparable zero or wide-band budgets;
 - orchestrator bindings omit credentials, reject raw source and malformed evidence-manifest values, and refuse abstention.
+
+## Resource-authority boundary
+
+A request may allocate at most 1,000,000 tokens, 64 TEPP-owned access
+capabilities, and 128 UTF-8 bytes per capability token. Duplicate
+capabilities fail closed instead of amplifying or obscuring authority.
+These are admission limits, not a promise that the full budget will be
+consumed; downstream providers remain subject to stricter policy and cost
+controls.
