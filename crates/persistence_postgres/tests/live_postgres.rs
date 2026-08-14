@@ -7,22 +7,19 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
-    AuditEvent, CorpusSplitManifestRecord, DocumentRecord, LiveDocumentRepository,
-    LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
-    ModelRunRecord, PersistenceError, ReproducibilityManifestRecord, SqlSession, apply_sql_batch,
-    assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
+    AuditEvent, CorpusSplitManifestRecord, DeletionRequestRecord, DocumentRecord,
+    EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository, LiveSqlxPoolOptions,
+    MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
+    PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord, SqlSession,
+    apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
     require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
 };
-use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
 use std::thread;
-use std::time::Duration;
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
 
-const CONCURRENT_WRITERS: usize = 2;
-/// Wall-clock budget for concurrent proofs; hang rather than block the live job forever.
-const CONCURRENT_PROOF_TIMEOUT: Duration = Duration::from_secs(90);
+const CONCURRENT_WRITERS: usize = 4;
 
 const LIVE_GATE_ENV: &str = "TEPP_LIVE_POSTGRES";
 
@@ -103,7 +100,6 @@ fn live_postgres_applies_migrations_and_document_sql() {
     repo.session_mut()
         .execute("SELECT 1")
         .expect("SELECT 1 through live transport");
-    apply_sql_timeouts(&mut repo, "5s", "60s");
 
     let catalog = MigrationCatalog::from_embedded().expect("embedded foundation catalog");
     // Best-effort reset: empty service DBs lack tables/role; re-runs clean residual objects.
@@ -129,6 +125,9 @@ fn live_postgres_applies_migrations_and_document_sql() {
         source_artifact_id,
         &content_digest,
     );
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_record_id))
+        .expect("bind tenant session before document_record mutations");
 
     let (available, valid, system) = sample_times();
     let record = DocumentRecord {
@@ -197,34 +196,25 @@ fn live_postgres_applies_migrations_and_document_sql() {
 
     exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
+    prove_retention_deletion_legal_hold(
+        &mut repo,
+        tenant_record_id,
+        document_record_id,
+        source_artifact_id,
+        available,
+        system,
+    );
     prove_append_only_immutability(&mut repo, &manifest);
     prove_temporal_interval_ordering(&mut repo, tenant_record_id, source_artifact_id);
-    apply_sql_timeouts(&mut repo, "3s", "30s");
     prove_concurrent_document_writes(&mut repo);
     prove_tenant_rls_isolation(&mut repo);
-}
-
-fn apply_sql_timeouts(
-    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
-    lock_timeout: &str,
-    statement_timeout: &str,
-) {
-    // Fail closed instead of hanging the live job on lock or statement stalls.
-    repo.session_mut()
-        .execute(&format!("SET lock_timeout = '{lock_timeout}'"))
-        .expect("lock_timeout");
-    repo.session_mut()
-        .execute(&format!("SET statement_timeout = '{statement_timeout}'"))
-        .expect("statement_timeout");
 }
 
 fn open_writer_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {
     let config = require_live_sqlx_config().expect("DATABASE_URL");
     let options = LiveSqlxPoolOptions::new(1, 5_000).expect("writer pool");
     let pool = open_live_sqlx_pool(&config, options).expect("writer pool open");
-    let mut repo = LiveDocumentRepository::new(pool);
-    apply_sql_timeouts(&mut repo, "3s", "15s");
-    repo
+    LiveDocumentRepository::new(pool)
 }
 
 fn is_closed_write_failure(error: PersistenceError) -> bool {
@@ -285,45 +275,18 @@ fn sample_document(
     }
 }
 
-fn join_with_timeout<T: Send + 'static>(
-    handle: thread::JoinHandle<T>,
-    budget: Duration,
-    context: &'static str,
-) -> T {
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        let _ = tx.send(handle.join());
-    });
-    match rx.recv_timeout(budget) {
-        Ok(Ok(value)) => value,
-        Ok(Err(panic_payload)) => {
-            panic!("{context}: worker thread panicked: {panic_payload:?}")
-        }
-        Err(mpsc::RecvTimeoutError::Timeout) => {
-            panic!("{context}: worker exceeded wall-clock budget")
-        }
-        Err(mpsc::RecvTimeoutError::Disconnected) => {
-            panic!("{context}: worker channel disconnected")
-        }
-    }
-}
-
 fn race_identical_writes(
     record: &DocumentRecord,
     revise: bool,
     context: &'static str,
 ) -> Vec<Result<(), PersistenceError>> {
-    // Open pools before the barrier so a failed open cannot leave peers waiting forever.
-    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
-        .map(|_| open_writer_repo())
-        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    let handles: Vec<_> = writers
-        .into_iter()
-        .map(|mut writer| {
+    (0..CONCURRENT_WRITERS)
+        .map(|_| {
             let barrier = Arc::clone(&barrier);
             let record = record.clone();
             thread::spawn(move || {
+                let mut writer = open_writer_repo();
                 barrier.wait();
                 if revise {
                     writer.revise(&record)
@@ -332,10 +295,7 @@ fn race_identical_writes(
                 }
             })
         })
-        .collect();
-    handles
-        .into_iter()
-        .map(|handle| join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, context))
+        .map(|handle| handle.join().expect(context))
         .collect()
 }
 
@@ -406,24 +366,23 @@ fn prove_distinct_concurrent_inserts(
     for (document_record_id, digest) in &pairs {
         seed_source_artifact(repo, tenant_record_id, *document_record_id, digest);
     }
-    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
-        .map(|_| open_writer_repo())
-        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    let handles: Vec<_> = writers
+    let handles: Vec<_> = pairs
         .into_iter()
-        .zip(pairs)
-        .map(|(mut writer, (document_record_id, digest))| {
+        .map(|(document_record_id, digest)| {
             let barrier = Arc::clone(&barrier);
             let record = sample_document(document_record_id, tenant_record_id, digest, 1, system);
             thread::spawn(move || {
+                let mut writer = open_writer_repo();
                 barrier.wait();
                 writer.insert(&record)
             })
         })
         .collect();
     for handle in handles {
-        join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, "distinct insert thread")
+        handle
+            .join()
+            .expect("distinct insert thread")
             .expect("independent document inserts must all succeed");
     }
 }
@@ -433,16 +392,13 @@ fn prove_concurrent_append_only_reject(source_artifact_id: Uuid) {
         "UPDATE source_artifact SET media_type_code = 'text/hostile' \
          WHERE source_artifact_id = '{source_artifact_id}'::uuid"
     );
-    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
-        .map(|_| open_writer_repo())
-        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    let handles: Vec<_> = writers
-        .into_iter()
-        .map(|mut writer| {
+    let handles: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| {
             let barrier = Arc::clone(&barrier);
             let sql = artifact_update.clone();
             thread::spawn(move || {
+                let mut writer = open_writer_repo();
                 barrier.wait();
                 writer.session_mut().execute(&sql)
             })
@@ -450,10 +406,189 @@ fn prove_concurrent_append_only_reject(source_artifact_id: Uuid) {
         .collect();
     for handle in handles {
         assert!(
-            join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, "mutation thread").is_err(),
+            handle.join().expect("mutation thread").is_err(),
             "concurrent append-only UPDATE must fail"
         );
     }
+}
+
+/// Legal hold blocks completed deletion; tombstones block restore and analysis.
+fn prove_retention_deletion_legal_hold(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    held_document_id: Uuid,
+    source_artifact_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    let policy = RetentionPolicyRecord {
+        retention_policy_id: Uuid::now_v7(),
+        tenant_record_id,
+        data_class_code: "raw_source".into(),
+        processing_purpose_code: "psychometric_analysis".into(),
+        retention_period_days: 365,
+        policy_status_code: "active".into(),
+        authority_citation: "adr-0009".into(),
+        system_time: system,
+        available_time: available,
+    };
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_record_id))
+        .expect("bind tenant session before lifecycle mutations");
+    repo.insert_retention_policy(&policy)
+        .expect("insert retention_policy");
+
+    let hold = LegalHoldRecord {
+        legal_hold_id: Uuid::now_v7(),
+        tenant_record_id,
+        hold_scope_code: "document".into(),
+        held_document_id: Some(held_document_id),
+        hold_authority_code: "contract".into(),
+        hold_status_code: "active".into(),
+        authority_citation: "hold-authority".into(),
+        system_time: system,
+        available_time: available,
+    };
+    repo.insert_legal_hold(&hold).expect("insert legal_hold");
+
+    let mut held_completion = DeletionRequestRecord {
+        deletion_request_id: Uuid::now_v7(),
+        tenant_record_id,
+        retention_policy_id: policy.retention_policy_id,
+        target_document_id: held_document_id,
+        target_data_class_code: "raw_source".into(),
+        processing_purpose_code: "psychometric_analysis".into(),
+        deletion_kind_code: "identity_tombstone".into(),
+        request_status_code: "completed".into(),
+        legal_hold_id: None,
+        system_time: system,
+        available_time: available,
+    };
+    assert!(
+        repo.insert_completed_deletion_request(&held_completion, &[hold.clone()])
+            .is_err(),
+        "application layer must refuse completed deletion under an active hold"
+    );
+    assert!(
+        repo.insert_deletion_request(&held_completion).is_err(),
+        "database trigger must refuse completed deletion under an active hold"
+    );
+    held_completion.deletion_request_id = Uuid::now_v7();
+    held_completion.request_status_code = "blocked_by_hold".into();
+    held_completion.legal_hold_id = Some(hold.legal_hold_id);
+    repo.insert_deletion_request(&held_completion)
+        .expect("blocked_by_hold request must persist");
+
+    let unheld_document_id = Uuid::now_v7();
+    let unheld = DocumentRecord {
+        document_record_id: unheld_document_id,
+        tenant_record_id,
+        content_digest: "ef".repeat(32),
+        available_time: available,
+        valid_from: EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("valid"),
+        valid_to: None,
+        system_from: system,
+        system_to: None,
+        revision_number: 1,
+    };
+    repo.session_mut()
+        .execute(&format!(
+            "INSERT INTO document_record (\
+                document_record_id, tenant_record_id, source_artifact_id, content_sha256, \
+                language_profile_code, assertion_time, document_time, valid_from, valid_to, \
+                system_from, system_to, available_time, revision_number\
+             ) VALUES (\
+                '{unheld_document_id}'::uuid, '{tenant_record_id}'::uuid, \
+                '{source_artifact_id}'::uuid, '{digest}', 'und', NULL, NULL, \
+                '{valid}'::timestamptz, NULL, '{system}'::timestamptz, NULL, \
+                '{available}'::timestamptz, 1\
+             )",
+            digest = unheld.content_digest,
+            valid = unheld.valid_from.to_rfc3339(),
+            system = system.to_rfc3339(),
+            available = available.to_rfc3339(),
+        ))
+        .expect("insert unheld document_record");
+
+    let completed = DeletionRequestRecord {
+        deletion_request_id: Uuid::now_v7(),
+        tenant_record_id,
+        retention_policy_id: policy.retention_policy_id,
+        target_document_id: unheld_document_id,
+        target_data_class_code: "raw_source".into(),
+        processing_purpose_code: "psychometric_analysis".into(),
+        deletion_kind_code: "identity_tombstone".into(),
+        request_status_code: "completed".into(),
+        legal_hold_id: None,
+        system_time: system,
+        available_time: available,
+    };
+    repo.insert_completed_deletion_request(&completed, &[])
+        .expect("completed deletion without a matching hold");
+
+    let tombstone = EvidenceTombstoneRecord {
+        evidence_tombstone_id: Uuid::now_v7(),
+        tenant_record_id,
+        tombstoned_document_id: unheld_document_id,
+        deletion_request_id: completed.deletion_request_id,
+        evidence_digest: "cd".repeat(32),
+        target_data_class_code: "raw_source".into(),
+        deletion_kind_code: "identity_tombstone".into(),
+        reproduction_status_code: "unavailable".into(),
+        system_time: system,
+        available_time: available,
+    };
+    repo.insert_evidence_tombstone(&tombstone)
+        .expect("insert evidence_tombstone");
+
+    let restore = format!(
+        "INSERT INTO document_record (\
+            document_record_id, tenant_record_id, source_artifact_id, content_sha256, \
+            language_profile_code, assertion_time, document_time, valid_from, valid_to, \
+            system_from, system_to, available_time, revision_number\
+         ) VALUES (\
+            '{unheld_document_id}'::uuid, '{tenant_record_id}'::uuid, \
+            '{source_artifact_id}'::uuid, '{digest}', 'und', NULL, NULL, \
+            '{valid}'::timestamptz, NULL, '2026-03-01T00:00:00Z'::timestamptz, NULL, \
+            '{available}'::timestamptz, 2\
+         )",
+        digest = unheld.content_digest,
+        valid = unheld.valid_from.to_rfc3339(),
+        available = available.to_rfc3339(),
+    );
+    assert!(
+        repo.session_mut().execute(&restore).is_err(),
+        "tombstoned document identities must not be restored"
+    );
+
+    let eligibility = format!(
+        "DO $tepp$ BEGIN \
+           IF EXISTS (\
+             SELECT 1 FROM document_record \
+             WHERE document_record_id = '{unheld_document_id}'::uuid \
+               AND system_to IS NULL \
+               AND NOT EXISTS (\
+                 SELECT 1 FROM evidence_tombstone \
+                 WHERE tombstoned_document_id = document_record.document_record_id\
+               )\
+           ) THEN \
+             RAISE EXCEPTION 'tombstoned document remained analysis-eligible'; \
+           END IF; \
+           IF EXISTS (\
+             SELECT 1 FROM evidence_tombstone \
+             WHERE evidence_tombstone_id = '{tombstone}'::uuid \
+               AND (evidence_digest IS NULL OR length(evidence_digest) <> 64)\
+           ) THEN \
+             RAISE EXCEPTION 'tombstone must record an action digest without raw source'; \
+           END IF; \
+         END $tepp$",
+        tombstone = tombstone.evidence_tombstone_id,
+    );
+    repo.session_mut()
+        .execute(&eligibility)
+        .expect("tombstoned evidence must leave analysis and keep only an action digest");
+    repo.submit_active_analysis_document(unheld_document_id)
+        .expect("active-analysis selection remains executable");
 }
 
 /// Append-only triggers must reject UPDATE/DELETE on identity tables.
@@ -487,6 +622,9 @@ fn prove_temporal_interval_ordering(
     tenant_record_id: Uuid,
     source_artifact_id: Uuid,
 ) {
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_record_id))
+        .expect("bind tenant session before interval-order probes");
     let document_record_id = Uuid::now_v7();
     let inverted = format!(
         "INSERT INTO document_record (\

@@ -1,0 +1,356 @@
+-- TEPP retention, deletion, and legal hold (ADR 0009 / ADR 0013).
+-- Policy-driven lifecycle is append-only except for one controlled system-time
+-- succession transition. Completed deletion cannot override an active legal
+-- hold, and a tombstone blocks restore of the same document identity.
+-- Tombstones store action digests, never raw source text.
+
+CREATE TABLE retention_policy (
+    retention_policy_id uuid PRIMARY KEY,
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record (tenant_record_id),
+    data_class_code text NOT NULL,
+    processing_purpose_code text NOT NULL,
+    retention_period_days integer NOT NULL,
+    policy_status_code text NOT NULL,
+    authority_citation text NOT NULL,
+    system_time timestamptz NOT NULL,
+    system_to timestamptz,
+    available_time timestamptz NOT NULL,
+    supersedes_retention_policy_id uuid REFERENCES retention_policy (retention_policy_id),
+    CONSTRAINT retention_policy_period_positive CHECK (retention_period_days > 0),
+    CONSTRAINT retention_policy_status_known CHECK (
+        policy_status_code IN ('active', 'superseded')
+    ),
+    CONSTRAINT retention_policy_system_order CHECK (
+        system_to IS NULL OR system_time <= system_to
+    ),
+    CONSTRAINT retention_policy_status_window_consistent CHECK (
+        (policy_status_code = 'active' AND system_to IS NULL)
+        OR (policy_status_code = 'superseded' AND system_to IS NOT NULL)
+    )
+);
+
+CREATE TABLE legal_hold (
+    legal_hold_id uuid PRIMARY KEY,
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record (tenant_record_id),
+    hold_scope_code text NOT NULL,
+    held_document_id uuid,
+    hold_authority_code text NOT NULL,
+    hold_status_code text NOT NULL,
+    authority_citation text NOT NULL,
+    system_time timestamptz NOT NULL,
+    available_time timestamptz NOT NULL,
+    CONSTRAINT legal_hold_document_scope_consistent CHECK (
+        (hold_scope_code = 'document' AND held_document_id IS NOT NULL)
+        OR (hold_scope_code = 'tenant' AND held_document_id IS NULL)
+    )
+);
+
+CREATE TABLE deletion_request (
+    deletion_request_id uuid PRIMARY KEY,
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record (tenant_record_id),
+    retention_policy_id uuid NOT NULL REFERENCES retention_policy (retention_policy_id),
+    target_document_id uuid NOT NULL,
+    target_data_class_code text NOT NULL,
+    processing_purpose_code text NOT NULL,
+    deletion_kind_code text NOT NULL,
+    request_status_code text NOT NULL,
+    legal_hold_id uuid REFERENCES legal_hold (legal_hold_id),
+    system_time timestamptz NOT NULL,
+    available_time timestamptz NOT NULL
+);
+
+CREATE TABLE evidence_tombstone (
+    evidence_tombstone_id uuid PRIMARY KEY,
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record (tenant_record_id),
+    tombstoned_document_id uuid NOT NULL,
+    deletion_request_id uuid NOT NULL REFERENCES deletion_request (deletion_request_id),
+    evidence_digest text NOT NULL,
+    target_data_class_code text NOT NULL,
+    deletion_kind_code text NOT NULL,
+    reproduction_status_code text NOT NULL,
+    system_time timestamptz NOT NULL,
+    available_time timestamptz NOT NULL
+);
+
+CREATE UNIQUE INDEX retention_policy_active_purpose_unique
+    ON retention_policy (tenant_record_id, data_class_code, processing_purpose_code)
+    WHERE policy_status_code = 'active' AND system_to IS NULL;
+
+CREATE UNIQUE INDEX retention_policy_successor_unique
+    ON retention_policy (supersedes_retention_policy_id)
+    WHERE supersedes_retention_policy_id IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION enforce_retention_policy_succession()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'retention policy history is append-only'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+
+    IF OLD.policy_status_code <> 'active'
+        OR OLD.system_to IS NOT NULL
+        OR NEW.policy_status_code <> 'superseded'
+        OR NEW.system_to IS NULL
+        OR NEW.system_to < OLD.system_time
+        OR NEW.retention_policy_id IS DISTINCT FROM OLD.retention_policy_id
+        OR NEW.tenant_record_id IS DISTINCT FROM OLD.tenant_record_id
+        OR NEW.data_class_code IS DISTINCT FROM OLD.data_class_code
+        OR NEW.processing_purpose_code IS DISTINCT FROM OLD.processing_purpose_code
+        OR NEW.retention_period_days IS DISTINCT FROM OLD.retention_period_days
+        OR NEW.authority_citation IS DISTINCT FROM OLD.authority_citation
+        OR NEW.system_time IS DISTINCT FROM OLD.system_time
+        OR NEW.available_time IS DISTINCT FROM OLD.available_time
+        OR NEW.supersedes_retention_policy_id IS DISTINCT FROM OLD.supersedes_retention_policy_id
+    THEN
+        RAISE EXCEPTION 'retention policy mutation must be a controlled succession'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER retention_policy_enforce_succession
+    BEFORE UPDATE OR DELETE ON retention_policy
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_retention_policy_succession();
+
+CREATE TRIGGER retention_policy_reject_truncate
+    BEFORE TRUNCATE ON retention_policy
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION reject_append_only_mutation();
+
+CREATE OR REPLACE FUNCTION supersede_retention_policy(
+    current_retention_policy_id uuid,
+    replacement_retention_policy_id uuid,
+    replacement_retention_period_days integer,
+    replacement_authority_citation text,
+    replacement_system_time timestamptz,
+    replacement_available_time timestamptz
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    tenant_context text;
+    current_policy retention_policy%ROWTYPE;
+BEGIN
+    tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
+    IF tenant_context IS NULL THEN
+        RAISE EXCEPTION 'tenant session context is required for retention policy succession'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    IF current_retention_policy_id = replacement_retention_policy_id
+        OR replacement_retention_period_days <= 0
+        OR replacement_authority_citation IS NULL
+        OR btrim(replacement_authority_citation) = ''
+    THEN
+        RAISE EXCEPTION 'invalid retention policy successor'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+
+    SELECT *
+    INTO current_policy
+    FROM public.retention_policy
+    WHERE retention_policy_id = current_retention_policy_id
+    FOR UPDATE;
+
+    IF NOT FOUND
+        OR current_policy.tenant_record_id::text <> tenant_context
+        OR current_policy.policy_status_code <> 'active'
+        OR current_policy.system_to IS NOT NULL
+        OR replacement_system_time < current_policy.system_time
+        OR replacement_available_time < current_policy.available_time
+    THEN
+        RAISE EXCEPTION 'retention policy successor is not authorized for the active version'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+
+    UPDATE public.retention_policy
+    SET policy_status_code = 'superseded',
+        system_to = replacement_system_time
+    WHERE retention_policy_id = current_retention_policy_id;
+
+    INSERT INTO public.retention_policy (
+        retention_policy_id,
+        tenant_record_id,
+        data_class_code,
+        processing_purpose_code,
+        retention_period_days,
+        policy_status_code,
+        authority_citation,
+        system_time,
+        system_to,
+        available_time,
+        supersedes_retention_policy_id
+    ) VALUES (
+        replacement_retention_policy_id,
+        current_policy.tenant_record_id,
+        current_policy.data_class_code,
+        current_policy.processing_purpose_code,
+        replacement_retention_period_days,
+        'active',
+        replacement_authority_citation,
+        replacement_system_time,
+        NULL,
+        replacement_available_time,
+        current_retention_policy_id
+    );
+
+    RETURN replacement_retention_policy_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION reject_held_evidence_deletion()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    tenant_context text;
+BEGIN
+    tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
+    IF tenant_context IS NULL OR NEW.tenant_record_id::text <> tenant_context THEN
+        RAISE EXCEPTION 'tenant session context is required for lifecycle mutation'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    IF NEW.request_status_code = 'completed' AND EXISTS (
+        SELECT 1
+        FROM public.legal_hold
+        WHERE tenant_record_id = NEW.tenant_record_id
+          AND hold_status_code = 'active'
+          AND (
+              hold_scope_code = 'tenant'
+              OR (
+                  hold_scope_code = 'document'
+                  AND held_document_id = NEW.target_document_id
+              )
+          )
+    ) THEN
+        RAISE EXCEPTION 'legal hold blocks deletion'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER deletion_request_reject_held_deletion
+    BEFORE INSERT ON deletion_request
+    FOR EACH ROW
+    EXECUTE FUNCTION reject_held_evidence_deletion();
+
+CREATE OR REPLACE FUNCTION reject_tombstoned_evidence_restore()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    tenant_context text;
+BEGIN
+    tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
+    IF tenant_context IS NULL OR NEW.tenant_record_id::text <> tenant_context THEN
+        RAISE EXCEPTION 'tenant session context is required for lifecycle mutation'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    IF EXISTS (
+        SELECT 1
+        FROM public.evidence_tombstone
+        WHERE tenant_record_id = NEW.tenant_record_id
+          AND tombstoned_document_id = NEW.document_record_id
+    ) THEN
+        RAISE EXCEPTION 'tombstoned evidence cannot be restored'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER document_record_reject_tombstone_restore
+    BEFORE INSERT OR UPDATE ON document_record
+    FOR EACH ROW
+    EXECUTE FUNCTION reject_tombstoned_evidence_restore();
+
+GRANT SELECT, INSERT ON TABLE retention_policy TO tepp_app_runtime;
+GRANT SELECT, INSERT ON TABLE legal_hold TO tepp_app_runtime;
+GRANT SELECT, INSERT ON TABLE deletion_request TO tepp_app_runtime;
+GRANT SELECT, INSERT ON TABLE evidence_tombstone TO tepp_app_runtime;
+REVOKE UPDATE, DELETE ON TABLE retention_policy FROM tepp_app_runtime;
+REVOKE TRUNCATE ON TABLE retention_policy FROM tepp_app_runtime;
+REVOKE UPDATE, DELETE ON TABLE legal_hold FROM tepp_app_runtime;
+REVOKE TRUNCATE ON TABLE legal_hold FROM tepp_app_runtime;
+REVOKE UPDATE, DELETE ON TABLE deletion_request FROM tepp_app_runtime;
+REVOKE TRUNCATE ON TABLE deletion_request FROM tepp_app_runtime;
+REVOKE UPDATE, DELETE ON TABLE evidence_tombstone FROM tepp_app_runtime;
+REVOKE TRUNCATE ON TABLE evidence_tombstone FROM tepp_app_runtime;
+
+REVOKE ALL ON FUNCTION enforce_retention_policy_succession() FROM PUBLIC;
+REVOKE ALL ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION reject_held_evidence_deletion() FROM PUBLIC;
+REVOKE ALL ON FUNCTION reject_tombstoned_evidence_restore() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) TO tepp_app_runtime;
+
+CREATE TRIGGER legal_hold_reject_mutation
+    BEFORE UPDATE OR DELETE OR TRUNCATE ON legal_hold
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION reject_append_only_mutation();
+CREATE TRIGGER deletion_request_reject_mutation
+    BEFORE UPDATE OR DELETE OR TRUNCATE ON deletion_request
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION reject_append_only_mutation();
+CREATE TRIGGER evidence_tombstone_reject_mutation
+    BEFORE UPDATE OR DELETE OR TRUNCATE ON evidence_tombstone
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION reject_append_only_mutation();
+
+ALTER TABLE retention_policy ENABLE ROW LEVEL SECURITY;
+ALTER TABLE retention_policy FORCE ROW LEVEL SECURITY;
+CREATE POLICY retention_policy_tenant_isolation ON retention_policy
+    FOR ALL
+    USING (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    )
+    WITH CHECK (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    );
+
+ALTER TABLE legal_hold ENABLE ROW LEVEL SECURITY;
+ALTER TABLE legal_hold FORCE ROW LEVEL SECURITY;
+CREATE POLICY legal_hold_tenant_isolation ON legal_hold
+    FOR ALL
+    USING (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    )
+    WITH CHECK (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    );
+
+ALTER TABLE deletion_request ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deletion_request FORCE ROW LEVEL SECURITY;
+CREATE POLICY deletion_request_tenant_isolation ON deletion_request
+    FOR ALL
+    USING (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    )
+    WITH CHECK (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    );
+
+ALTER TABLE evidence_tombstone ENABLE ROW LEVEL SECURITY;
+ALTER TABLE evidence_tombstone FORCE ROW LEVEL SECURITY;
+CREATE POLICY evidence_tombstone_tenant_isolation ON evidence_tombstone
+    FOR ALL
+    USING (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    )
+    WITH CHECK (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    );
