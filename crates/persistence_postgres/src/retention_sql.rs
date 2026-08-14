@@ -584,6 +584,13 @@ mod tests {
             supersede_retention_policy_sql(predecessor, &same),
             Err(PersistenceError::InvalidRetentionLifecycle)
         );
+
+        let mut superseded = policy();
+        superseded.policy_status_code = "superseded".into();
+        assert_eq!(
+            supersede_retention_policy_sql(predecessor, &superseded),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
     }
 
     #[test]
@@ -743,6 +750,14 @@ mod tests {
             insert_evidence_tombstone_sql(&digest),
             Err(PersistenceError::InvalidRetentionLifecycle)
         );
+        // 64-char non-hex and digit-only paths exercise every SHA-256 arm.
+        digest.evidence_digest = format!("{}G", "a".repeat(63));
+        assert_eq!(
+            insert_evidence_tombstone_sql(&digest),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+        digest.evidence_digest = "0".repeat(64);
+        insert_evidence_tombstone_sql(&digest).expect("digit digest");
 
         let mut override_status = tombstone();
         override_status.reproduction_status_code = "unaffected".into();

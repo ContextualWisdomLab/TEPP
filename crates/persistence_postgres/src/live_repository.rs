@@ -869,10 +869,14 @@ mod tests {
             executed.len() >= 2,
             "tenant GUC must precede document insert so 0007 restore trigger can run"
         );
+        let tenant_bind = &executed[0];
         assert!(
-            executed[0].contains("tepp.current_tenant_record_id")
-                && executed[0].contains(&record.tenant_record_id.to_string()),
-            "insert must bind the document tenant before SQL reaches document_record"
+            tenant_bind.contains("tepp.current_tenant_record_id"),
+            "insert must set the tenant GUC before SQL reaches document_record"
+        );
+        assert!(
+            tenant_bind.contains(&record.tenant_record_id.to_string()),
+            "tenant GUC bind must include the document tenant identity"
         );
         assert!(
             executed[1].contains("INSERT INTO document_record"),
@@ -959,6 +963,14 @@ mod tests {
         exercise_event_instance(&mut repo);
         exercise_source_artifact(&mut repo);
         exercise_retention_legal_hold(&mut repo);
+        repo.assert_restore_integrity()
+            .expect("restore integrity probes render through the session");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("restore integrity failed") || sql.contains("tepp_restore"))
+        );
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
