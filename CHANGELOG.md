@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `tenant_access` tenant/role/lifetime adapters: a grant binds one principal to one tenant role for a system-time window, refuses event/document/availability/cutoff clocks as access time, cannot be replaced by blanket PII masking, and recovered tenant/role pairs match known truth at a higher computed rate than a collapsed single-role assignment (ADR 0009).
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
 - `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).

@@ -96,6 +96,18 @@ Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World 
 
 TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
 
+## Privacy, tenant isolation, and temporal access control
+
+Ferraiolo, D. F., Sandhu, R., Gavrila, S., Kuhn, D. R., & Chandramouli, R. (2001). Proposed NIST standard for role-based access control. *ACM Transactions on Information and System Security, 4*(3), 224–274. https://doi.org/10.1145/501978.501980
+
+Bertino, E., Bonatti, P. A., & Ferrari, E. (2001). TRBAC: A temporal role-based access control model. *ACM Transactions on Information and System Security, 4*(3), 191–233. https://doi.org/10.1145/501978.501979
+
+Hu, V. C., Ferraiolo, D., Kuhn, R., Schnitzer, A., Sandlin, K., Miller, R., & Scarfone, K. (2014). *Guide to attribute based access control (ABAC) definition and considerations* (NIST Special Publication 800-162). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-162
+
+National Institute of Standards and Technology. (2020). *NIST Privacy Framework: A tool for improving privacy through enterprise risk management* (Version 1.0). U.S. Department of Commerce. https://doi.org/10.6028/NIST.CSWP.01162020
+
+`tenant_access` applies these sources to tenant isolation, closed access-role assignment, and system-time grant windows. Event time cannot authorize access. The citations are readiness and design inputs, not a certification or legal-sufficiency claim.
+
 ## AI risk, management systems, and assurance readiness
 
 International Organization for Standardization. (2023a). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
