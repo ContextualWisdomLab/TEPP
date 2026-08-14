@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: repair-tepp-pr-49-scientific-claims
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair:
@@ -51,6 +51,21 @@ jobs:
       - name: Apply scientific claim repair
         run: |
           python3 scripts/repair_pr49_scientific_claims.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for path_string in (
+              "docs/adr/0005-posterior-esem-dsem.md",
+              "docs/research/posterior-esem-input.md",
+              "docs/validation/temporal-event-foundation.md",
+          ):
+              path = Path(path_string)
+              if not path.exists():
+                  continue
+              text = path.read_text(encoding="utf-8")
+              normalized = "\n".join(line.rstrip() for line in text.splitlines()) + "\n"
+              path.write_text(normalized, encoding="utf-8")
+          PY
           cargo +1.97.1 fmt --all
 
       - name: Verify focused and workspace contracts
