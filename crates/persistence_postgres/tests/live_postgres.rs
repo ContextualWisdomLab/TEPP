@@ -91,34 +91,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
         return;
     }
 
-    let config = require_live_sqlx_config().expect(
-        "DATABASE_URL must be set and valid when TEPP_LIVE_POSTGRES=1 (live Postgres CI gate)",
-    );
-    // Single connection so SET ROLE / tenant GUC session state survives between
-    // SqlSession::execute calls (pool acquire must reuse the same backend session).
-    let options = LiveSqlxPoolOptions::new(1, 5_000).expect("pool options");
-    let pool = open_live_sqlx_pool(&config, options)
-        .expect("live-sqlx pool must open against the CI PostgreSQL service");
-    assert!(pool.is_live());
-
-    let mut repo = LiveDocumentRepository::new(pool);
-    repo.session_mut()
-        .execute("SELECT 1")
-        .expect("SELECT 1 through live transport");
-    apply_sql_timeouts(&mut repo, "5s", "60s");
-
-    let catalog = MigrationCatalog::from_embedded().expect("embedded foundation catalog");
-    // Best-effort reset: empty service DBs lack tables/role; re-runs clean residual objects.
-    let _ = apply_sql_batch(repo.session_mut(), catalog.down_sql());
-    let _ = repo
-        .session_mut()
-        .execute("DROP ROLE IF EXISTS tepp_app_runtime");
-    let applied = repo
-        .apply_migrations(&catalog)
-        .expect("foundation+RLS migrations must apply on live PostgreSQL");
-    assert!(applied >= 1);
-    repo.assert_restore_integrity()
-        .expect("empty restored catalog must pass integrity probes");
+    let mut repo = open_migrated_live_repo();
 
     let tenant_record_id = Uuid::now_v7();
     let document_record_id = Uuid::now_v7();
@@ -132,46 +105,15 @@ fn live_postgres_applies_migrations_and_document_sql() {
         &content_digest,
     );
 
-    let (available, valid, system) = sample_times();
-    let record = DocumentRecord {
-        document_record_id,
+    let (available, _valid, system) = sample_times();
+    prove_document_insert_revise_and_audit(
+        &mut repo,
         tenant_record_id,
-        content_digest: content_digest.clone(),
-        available_time: available,
-        valid_from: valid,
-        valid_to: None,
-        system_from: system,
-        system_to: None,
-        revision_number: 1,
-    };
-    repo.insert(&record).expect("insert document_record");
-
-    let mut revised = record.clone();
-    revised.revision_number = 2;
-    revised.system_from = SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later system");
-    revised.content_digest = "cd".repeat(32);
-    repo.revise(&revised).expect("revise document_record");
-
-    repo.submit_as_known_at(
         document_record_id,
-        &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("known_at"),
-    )
-    .expect("as-known-at select");
-    repo.submit_as_valid_at(
-        document_record_id,
-        &EventTime::parse_rfc3339("2026-01-15T00:00:00Z").expect("valid_at"),
-        &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("known_at"),
-    )
-    .expect("as-valid-at select");
-
-    let audit = AuditEvent {
-        audit_event_id: Uuid::now_v7(),
-        tenant_record_id,
-        action_code: "live_postgres_ci".into(),
-        subject_record_id: document_record_id,
-        recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
-    };
-    repo.append_audit(&audit).expect("append audit_event");
+        &content_digest,
+        available,
+        system,
+    );
 
     // Owner inserts a reproducibility manifest for the same tenant, then proves
     // digest lookup SQL remains executable on the live transport.
@@ -212,6 +154,80 @@ fn live_postgres_applies_migrations_and_document_sql() {
     apply_sql_timeouts(&mut repo, "3s", "30s");
     prove_concurrent_document_writes(&mut repo);
     prove_tenant_rls_isolation(&mut repo);
+}
+
+fn prove_document_insert_revise_and_audit(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    document_record_id: Uuid,
+    content_digest: &str,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    let valid = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("valid");
+    let record = DocumentRecord {
+        document_record_id,
+        tenant_record_id,
+        content_digest: content_digest.to_owned(),
+        available_time: available,
+        valid_from: valid,
+        valid_to: None,
+        system_from: system,
+        system_to: None,
+        revision_number: 1,
+    };
+    repo.insert(&record).expect("insert document_record");
+    let mut revised = record.clone();
+    revised.revision_number = 2;
+    revised.system_from = SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later system");
+    revised.content_digest = "cd".repeat(32);
+    repo.revise(&revised).expect("revise document_record");
+    repo.submit_as_known_at(
+        document_record_id,
+        &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("known_at"),
+    )
+    .expect("as-known-at select");
+    repo.submit_as_valid_at(
+        document_record_id,
+        &EventTime::parse_rfc3339("2026-01-15T00:00:00Z").expect("valid_at"),
+        &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("known_at"),
+    )
+    .expect("as-valid-at select");
+    let audit = AuditEvent {
+        audit_event_id: Uuid::now_v7(),
+        tenant_record_id,
+        action_code: "live_postgres_ci".into(),
+        subject_record_id: document_record_id,
+        recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
+    };
+    repo.append_audit(&audit).expect("append audit_event");
+}
+
+fn open_migrated_live_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {
+    let config = require_live_sqlx_config().expect(
+        "DATABASE_URL must be set and valid when TEPP_LIVE_POSTGRES=1 (live Postgres CI gate)",
+    );
+    let options = LiveSqlxPoolOptions::new(1, 5_000).expect("pool options");
+    let pool = open_live_sqlx_pool(&config, options)
+        .expect("live-sqlx pool must open against the CI PostgreSQL service");
+    assert!(pool.is_live());
+    let mut repo = LiveDocumentRepository::new(pool);
+    repo.session_mut()
+        .execute("SELECT 1")
+        .expect("SELECT 1 through live transport");
+    apply_sql_timeouts(&mut repo, "5s", "60s");
+    let catalog = MigrationCatalog::from_embedded().expect("embedded foundation catalog");
+    let _ = apply_sql_batch(repo.session_mut(), catalog.down_sql());
+    let _ = repo
+        .session_mut()
+        .execute("DROP ROLE IF EXISTS tepp_app_runtime");
+    let applied = repo
+        .apply_migrations(&catalog)
+        .expect("foundation+RLS migrations must apply on live PostgreSQL");
+    assert!(applied >= 1);
+    repo.assert_restore_integrity()
+        .expect("empty restored catalog must pass integrity probes");
+    repo
 }
 
 fn apply_sql_timeouts(
@@ -477,7 +493,8 @@ fn prove_retention_deletion_legal_hold(
     system: SystemTime,
 ) {
     let policy = seed_retention_policy(repo, tenant_record_id, available, system);
-    let hold = seed_document_legal_hold(repo, tenant_record_id, held_document_id, available, system);
+    let hold =
+        seed_document_legal_hold(repo, tenant_record_id, held_document_id, available, system);
     prove_hold_blocks_completed_deletion(repo, &policy, &hold, held_document_id, available, system);
     prove_tombstone_blocks_restore_and_analysis(
         repo,
@@ -655,7 +672,6 @@ fn prove_tombstone_blocks_restore_and_analysis(
     repo.submit_active_analysis_document(unheld_document_id)
         .expect("active-analysis select must exclude tombstones");
 }
-
 
 /// Append-only triggers must reject UPDATE/DELETE on identity tables.
 fn prove_append_only_immutability(
