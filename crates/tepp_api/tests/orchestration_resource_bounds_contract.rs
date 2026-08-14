@@ -64,5 +64,5 @@ fn verify_mode_falls_back_to_direct_at_the_direct_budget_boundary() {
     budgeted.compute_budget_tokens = OrchestrationMode::Direct.minimum_token_budget();
 
     let plan = route_orchestration(&budgeted).expect("bounded request");
-    assert_eq!(plan.mode, OrchestrationMode::Direct);
+    assert_eq!(plan.mode(), OrchestrationMode::Direct);
 }
