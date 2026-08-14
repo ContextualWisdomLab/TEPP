@@ -98,6 +98,11 @@ fn invalid_compositions_and_lexical_weights_fail_closed() {
         from_additive_log_ratio(&[f64::INFINITY]),
         Err(TopicMeasurementError::InvalidLogRatioDimension)
     );
+    assert_eq!(
+        from_additive_log_ratio(&[-1.0e9]),
+        Err(TopicMeasurementError::InvalidLogRatioDimension),
+        "inverse must not return a zero simplex part after underflow"
+    );
 
     for method in ["tfidf", "bm25", "keyword", "TF-IDF", ""] {
         assert_eq!(
