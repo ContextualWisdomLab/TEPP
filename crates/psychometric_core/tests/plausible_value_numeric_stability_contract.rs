@@ -17,6 +17,14 @@ fn scaled_mean_preserves_an_extreme_constant_draw() {
 }
 
 #[test]
+fn all_zero_draws_have_an_exact_zero_mean() {
+    assert_eq!(
+        plausible_value_mean(&[0.0, 0.0, 0.0]).expect("zero draws"),
+        0.0
+    );
+}
+
+#[test]
 fn nonfinite_draws_remain_rejected() {
     assert_eq!(
         plausible_value_mean(&[1.0, f64::INFINITY]),
