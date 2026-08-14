@@ -19,7 +19,7 @@ fn compensated_sum_rejects_mass_hidden_by_naive_floating_point_addition() {
 fn compensated_sum_accepts_a_valid_many_part_composition() {
     let tiny_mass = 1.0e-16;
     let tiny_parts = 10_000_usize;
-    let dominant = 1.0 - tiny_mass * tiny_parts as f64;
+    let dominant = 1.0 - tiny_mass * 10_000.0;
     let mut composition = Vec::with_capacity(tiny_parts + 1);
     composition.push(dominant);
     composition.extend(std::iter::repeat_n(tiny_mass, tiny_parts));
