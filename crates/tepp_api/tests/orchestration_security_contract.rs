@@ -58,6 +58,10 @@ fn budget_ablation_requires_the_same_task_policy_and_access_context() {
         &["evidence_spans"],
     ))
     .expect("direct baseline");
+    assert_eq!(
+        baseline.task_kind(),
+        InterpretationTaskKind::SpanClassification
+    );
     let comparable = route_orchestration(&request(
         InterpretationTaskKind::SpanClassification,
         0.80,

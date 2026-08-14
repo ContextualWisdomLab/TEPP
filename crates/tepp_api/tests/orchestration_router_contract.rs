@@ -330,8 +330,8 @@ fn comparable_budget_ablation_requires_direct_baseline() {
     ))
     .expect("direct");
     let verify = route_orchestration(&request(
-        InterpretationTaskKind::AdversarialVerification,
-        0.20,
+        InterpretationTaskKind::SpanClassification,
+        0.80,
         0.20,
         0.80,
         16_000,
@@ -358,9 +358,9 @@ fn comparable_budget_ablation_requires_direct_baseline() {
     );
 
     let abstain = route_orchestration(&request(
-        InterpretationTaskKind::NarrativeSynthesis,
-        0.80,
-        0.80,
+        InterpretationTaskKind::SpanClassification,
+        0.10,
+        0.10,
         0.10,
         32_000,
     ))
@@ -379,12 +379,16 @@ fn contextual_orchestrator_binding_never_carries_credentials() {
         16_000,
     ))
     .expect("verify");
-    let binding = bind_contextual_orchestrator(&plan, "sha256:evidence-manifest-1").expect("bind");
+    let binding = bind_contextual_orchestrator(
+        &plan,
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )
+    .expect("bind");
     assert_eq!(binding.contract_version(), ORCHESTRATION_CONTRACT_VERSION);
     assert_eq!(binding.mode(), OrchestrationMode::Verify);
     assert_eq!(
         binding.evidence_manifest_hash(),
-        "sha256:evidence-manifest-1"
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     );
     assert!(!binding.includes_credentials());
     assert_eq!(binding.access_list(), plan.access_list());
@@ -399,7 +403,10 @@ fn contextual_orchestrator_binding_never_carries_credentials() {
     ))
     .expect("abstain");
     assert_eq!(
-        bind_contextual_orchestrator(&abstain, "sha256:evidence-manifest-1"),
+        bind_contextual_orchestrator(
+            &abstain,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ),
         Err(ApiError::AuthorizationDenied)
     );
     assert_eq!(

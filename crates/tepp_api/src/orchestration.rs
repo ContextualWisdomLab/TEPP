@@ -262,6 +262,7 @@ pub struct OrchestrationRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OrchestrationPlan {
     mode: OrchestrationMode,
+    task_kind: InterpretationTaskKind,
     stages: u8,
     recursion_depth: u8,
     decomposition_code: &'static str,
@@ -279,6 +280,12 @@ impl OrchestrationPlan {
     #[must_use]
     pub const fn mode(&self) -> OrchestrationMode {
         self.mode
+    }
+
+    /// Interpretation task whose context this plan represents.
+    #[must_use]
+    pub const fn task_kind(&self) -> InterpretationTaskKind {
+        self.task_kind
     }
 
     /// Recorded workflow stage count.
@@ -489,7 +496,11 @@ pub fn record_budget_ablation(
     baseline: &OrchestrationPlan,
     compared: &OrchestrationPlan,
 ) -> Result<BudgetAblationRecord, ApiError> {
-    if baseline.mode != OrchestrationMode::Direct {
+    if baseline.mode != OrchestrationMode::Direct
+        || baseline.task_kind != compared.task_kind
+        || baseline.policy_version != compared.policy_version
+        || baseline.access_list != compared.access_list
+    {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(BudgetAblationRecord {
@@ -509,13 +520,13 @@ pub fn record_budget_ablation(
 /// # Errors
 ///
 /// Returns [`ApiError::AuthorizationDenied`] for [`OrchestrationMode::Abstain`].
-/// Returns [`ApiError::InvalidWirePayload`] when the evidence manifest hash is
-/// empty.
+/// Returns [`ApiError::InvalidWirePayload`] unless the evidence manifest is a
+/// canonical lowercase `sha256:` digest rather than raw source text.
 pub fn bind_contextual_orchestrator(
     plan: &OrchestrationPlan,
     evidence_manifest_hash: &str,
 ) -> Result<ContextualOrchestratorBinding, ApiError> {
-    require_nonempty(evidence_manifest_hash)?;
+    require_sha256_digest(evidence_manifest_hash)?;
     if plan.mode == OrchestrationMode::Abstain {
         return Err(ApiError::AuthorizationDenied);
     }
@@ -529,6 +540,21 @@ pub fn bind_contextual_orchestrator(
         token_budget: plan.token_budget,
         includes_credentials: false,
     })
+}
+
+fn require_sha256_digest(value: &str) -> Result<(), ApiError> {
+    let Some(digest) = value.strip_prefix("sha256:") else {
+        return Err(ApiError::InvalidWirePayload);
+    };
+    if digest.len() == 64
+        && digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidWirePayload)
+    }
 }
 
 fn validate_request(request: &OrchestrationRequest) -> Result<(), ApiError> {
@@ -617,6 +643,7 @@ fn build_plan(request: &OrchestrationRequest, mode: OrchestrationMode) -> Orches
     };
     OrchestrationPlan {
         mode,
+        task_kind: request.task_kind,
         stages: mode.stage_count(),
         recursion_depth: mode.recursion_depth(),
         decomposition_code: mode.decomposition_code(),
@@ -780,17 +807,17 @@ mod tests {
         assert!(!budgets_are_comparable(0, 16_000));
 
         let direct = route_orchestration(&request(
-            InterpretationTaskKind::SchemaConversion,
-            1.0,
-            0.0,
+            InterpretationTaskKind::SpanClassification,
+            0.1,
+            0.1,
             1.0,
             8_000,
         ))
         .expect("direct");
         let verify = route_orchestration(&request(
-            InterpretationTaskKind::AdversarialVerification,
-            0.0,
-            0.0,
+            InterpretationTaskKind::SpanClassification,
+            0.8,
+            0.1,
             1.0,
             32_000,
         ))
@@ -802,7 +829,11 @@ mod tests {
         assert_eq!(record.baseline_budget(), 8_000);
         assert_eq!(record.compared_budget(), 32_000);
 
-        let binding = bind_contextual_orchestrator(&verify, "sha256:manifest").expect("bind");
+        let binding = bind_contextual_orchestrator(
+            &verify,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        )
+        .expect("bind");
         assert_eq!(binding.contract_version(), ORCHESTRATION_CONTRACT_VERSION);
         assert_eq!(binding.roles().len(), 2);
         assert_eq!(binding.token_budget(), 32_000);
