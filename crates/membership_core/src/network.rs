@@ -170,12 +170,16 @@ impl EstimationMembershipRow {
 
 /// Refuse an estimator input that dropped known multiple memberships.
 ///
+/// Rows must represent one member and must preserve at least the required
+/// number of distinct group identities. Multiple roles within one group cannot
+/// substitute for a missing group context.
+///
 /// # Errors
 ///
-/// Returns [`MembershipError::InvalidWirePayload`] for an empty row set or a
-/// zero required multiplicity. Returns
-/// [`MembershipError::AtomisticCollapseRefused`] when `rows` is shorter than
-/// the known group multiplicity.
+/// Returns [`MembershipError::InvalidWirePayload`] for an empty row set, a zero
+/// required multiplicity, or mixed member identities. Returns
+/// [`MembershipError::AtomisticCollapseRefused`] when fewer distinct groups than
+/// `required_group_multiplicity` remain.
 pub fn refuse_atomistic_collapse(
     rows: &[EstimationMembershipRow],
     required_group_multiplicity: usize,
@@ -183,7 +187,15 @@ pub fn refuse_atomistic_collapse(
     if rows.is_empty() || required_group_multiplicity == 0 {
         return Err(MembershipError::InvalidWirePayload);
     }
-    if rows.len() < required_group_multiplicity {
+    let expected_member = rows[0].member_id();
+    let mut distinct_groups = BTreeSet::new();
+    for row in rows {
+        if row.member_id() != expected_member {
+            return Err(MembershipError::InvalidWirePayload);
+        }
+        distinct_groups.insert(row.group_id());
+    }
+    if distinct_groups.len() < required_group_multiplicity {
         return Err(MembershipError::AtomisticCollapseRefused);
     }
     Ok(())
