@@ -101,6 +101,21 @@ jobs:
       - name: Enforce exact line and branch coverage
         run: |
           cargo +1.97.1 llvm-cov --workspace --all-features --lcov --output-path coverage.lcov --ignore-filename-regex 'sqlx_live\\.rs'
+          python3 - <<'PY'
+          from pathlib import Path
+
+          current_file = None
+          missing = []
+          for raw_line in Path("coverage.lcov").read_text(encoding="utf-8").splitlines():
+              if raw_line.startswith("SF:"):
+                  current_file = raw_line[3:]
+              elif raw_line.startswith("DA:") and current_file is not None:
+                  line_number, hit_count, *_ = raw_line[3:].split(",")
+                  if int(hit_count) == 0:
+                      missing.append(f"{current_file}:{line_number}")
+          print("Uncovered executable lines:")
+          print("\n".join(missing) if missing else "none")
+          PY
           python3 scripts/check_coverage.py coverage.lcov --kind lines --format lcov
           cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json --ignore-filename-regex 'sqlx_live\\.rs'
           python3 scripts/check_coverage.py coverage-branches.json --kind branches
