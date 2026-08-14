@@ -87,9 +87,7 @@ fn require_composition(proportions: &[f64]) -> Result<f64, TopicMeasurementError
         sum = next;
     }
     let compensated_sum = sum + compensation;
-    if !compensated_sum.is_finite()
-        || (compensated_sum - 1.0).abs() > UNIT_SUM_TOLERANCE
-    {
+    if !compensated_sum.is_finite() || (compensated_sum - 1.0).abs() > UNIT_SUM_TOLERANCE {
         return Err(TopicMeasurementError::InvalidComposition);
     }
     Ok(proportions[proportions.len() - 1])
