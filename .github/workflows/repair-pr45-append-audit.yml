@@ -1,0 +1,63 @@
+name: Repair PR 45 append-audit binding variable
+
+on:
+  pull_request:
+    types:
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-tepp-pr-45-append-audit
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.number == 45 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/persistence-retention-legal-hold'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+
+      - name: Align append-audit parameter with tenant repair
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/persistence_postgres/src/live_repository.rs")
+          text = path.read_text(encoding="utf-8")
+          old = '''    pub fn append_audit(&mut self, event: &AuditEvent) -> Result<(), PersistenceError> {
+              let sql = append_audit_sql(event)?;
+          '''.replace("              ", "")
+          new = '''    pub fn append_audit(&mut self, record: &AuditEvent) -> Result<(), PersistenceError> {
+              let sql = append_audit_sql(record)?;
+          '''.replace("              ", "")
+          if text.count(old) != 1:
+              raise SystemExit("append_audit parameter target mismatch")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+          cargo +1.97.1 fmt --all
+          cargo +1.97.1 test -p persistence_postgres --lib --tests
+
+      - name: Commit verified repair and remove this workflow
+        run: |
+          rm -f .github/workflows/repair-pr45-append-audit.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(persistence): align audit tenant binding input"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
