@@ -56,20 +56,10 @@ jobs:
 
           path = Path("crates/tepp_api/src/provider_payload.rs")
           text = path.read_text(encoding="utf-8")
-          old = '''        let disclosed = DisclosedIdentityMapping {
-              opaque_analytical_id: "entity-1".into(),
-              direct_identity: "Pat Lee".into(),
-          };
-          assert_eq!(disclosed.0.opaque_analytical_id(), "entity-1");
-          assert_eq!(disclosed.0.direct_identity(), "Pat Lee");
-          '''
-          new = '''        let disclosed = DisclosedIdentityMapping {
-              opaque_analytical_id: "entity-1".into(),
-              direct_identity: "Pat Lee".into(),
-          };
-          assert_eq!(disclosed.opaque_analytical_id(), "entity-1");
-          assert_eq!(disclosed.direct_identity(), "Pat Lee");
-          '''
+          old = '''        assert_eq!(disclosed.0.opaque_analytical_id(), "entity-1");
+          assert_eq!(disclosed.0.direct_identity(), "Pat Lee");'''
+          new = '''        assert_eq!(disclosed.opaque_analytical_id(), "entity-1");
+          assert_eq!(disclosed.direct_identity(), "Pat Lee");'''
           if text.count(old) != 1:
               raise SystemExit("constructed disclosure accessor repair target mismatch")
           text = text.replace(old, new, 1)
