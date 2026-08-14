@@ -25,6 +25,7 @@ For the first production line:
 - stopword deletion is not the default preprocessing rule;
 - TF-IDF and BM25 are not inferential weights for the statistical topic estimator;
 - topic proportions are compositional and downstream network/psychometric analysis uses logistic-normal coordinates or valid orthonormal log-ratio coordinates;
+- ALR is a reference-dependent full-rank logistic-normal map, not an Aitchison-distance isometry; distance-based Euclidean Aitchison geometry uses an orthonormal ILR basis;
 - model selection uses statistical/recovery/stability/alignment/fairness gates and a Pareto-style comparison before any blinded LLM review;
 - the LLM may recommend among statistically admissible candidates but never defines the numerical optimum or bypasses diagnostics.
 

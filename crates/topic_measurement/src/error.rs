@@ -9,7 +9,7 @@ pub enum TopicMeasurementError {
     /// Composition is empty, has fewer than two parts, is non-positive,
     /// non-finite, or does not sum to one.
     InvalidComposition,
-    /// Log-ratio vector is empty or non-finite.
+    /// Log-ratio vector is empty, non-finite, or not representable as a strictly positive `f64` simplex.
     InvalidLogRatioDimension,
     /// TF-IDF, BM25, or keyword scores were offered as inferential coordinates.
     LexicalWeightForbidden,

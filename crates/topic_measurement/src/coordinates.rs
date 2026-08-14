@@ -7,8 +7,10 @@ const UNIT_SUM_TOLERANCE: f64 = 1e-12;
 /// Map a strictly positive unit simplex vector to additive log-ratio coordinates.
 ///
 /// For a `K`-part composition `θ` the image is the `K-1` vector
-/// `y_k = ln(θ_k / θ_K)`. This is the logistic-normal coordinate system used
-/// by correlated topic models and required before Euclidean or ESEM/DSEM work.
+/// `y_k = ln(θ_k / θ_K)`. This reference-dependent, full-rank coordinate map
+/// supports logistic-normal regression and ESEM/DSEM interfaces. It is not an
+/// orthonormal isometry for Aitchison distance; use ILR coordinates when that
+/// Euclidean geometry is the estimand.
 ///
 /// # Errors
 ///
@@ -19,7 +21,7 @@ pub fn additive_log_ratio(proportions: &[f64]) -> Result<Vec<f64>, TopicMeasurem
     let last = require_composition(proportions)?;
     Ok(proportions[..proportions.len() - 1]
         .iter()
-        .map(|part| (part / last).ln())
+        .map(|part| part.ln() - last.ln())
         .collect())
 }
 
@@ -28,32 +30,40 @@ pub fn additive_log_ratio(proportions: &[f64]) -> Result<Vec<f64>, TopicMeasurem
 /// # Errors
 ///
 /// Returns [`TopicMeasurementError::InvalidLogRatioDimension`] when the
-/// coordinate vector is empty or contains a non-finite value.
+/// coordinate vector is empty, non-finite, or would underflow a part to zero
+/// in the strictly positive `f64` simplex representation.
 pub fn from_additive_log_ratio(coordinates: &[f64]) -> Result<Vec<f64>, TopicMeasurementError> {
     if coordinates.is_empty() {
         return Err(TopicMeasurementError::InvalidLogRatioDimension);
     }
-    let mut exponentiated = Vec::with_capacity(coordinates.len());
-    let mut denom = 1.0_f64;
+    let mut maximum = 0.0_f64;
     for &value in coordinates {
         if !value.is_finite() {
             return Err(TopicMeasurementError::InvalidLogRatioDimension);
         }
-        let exp = value.exp();
-        if !exp.is_finite() {
-            return Err(TopicMeasurementError::InvalidLogRatioDimension);
-        }
-        denom += exp;
-        exponentiated.push(exp);
+        maximum = maximum.max(value);
     }
-    if !denom.is_finite() || denom <= 0.0 {
+
+    let reference_weight = (-maximum).exp();
+    if reference_weight == 0.0 {
         return Err(TopicMeasurementError::InvalidLogRatioDimension);
     }
-    let mut simplex = Vec::with_capacity(coordinates.len() + 1);
-    for exp in exponentiated {
-        simplex.push(exp / denom);
+    let mut shifted_weights = Vec::with_capacity(coordinates.len());
+    let mut denominator = reference_weight;
+    for &value in coordinates {
+        let weight = (value - maximum).exp();
+        if weight == 0.0 {
+            return Err(TopicMeasurementError::InvalidLogRatioDimension);
+        }
+        denominator += weight;
+        shifted_weights.push(weight);
     }
-    simplex.push(1.0 / denom);
+
+    let mut simplex = Vec::with_capacity(coordinates.len() + 1);
+    for weight in shifted_weights {
+        simplex.push(weight / denominator);
+    }
+    simplex.push(reference_weight / denominator);
     Ok(simplex)
 }
 
@@ -80,7 +90,7 @@ mod tests {
     use crate::error::TopicMeasurementError;
 
     #[test]
-    fn two_part_equal_shares_are_zero_and_overflow_fails_closed() {
+    fn two_part_equal_shares_are_zero_and_unrepresentable_extremes_fail_closed() {
         let pair = additive_log_ratio(&[0.5, 0.5]).expect("pair");
         assert_eq!(pair.len(), 1);
         assert!(pair[0].abs() < 1e-15);

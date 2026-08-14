@@ -2,9 +2,11 @@
 #![deny(missing_docs)]
 //! Logistic-normal and log-ratio coordinates for compositional topic proportions.
 //!
-//! Raw topic proportions are not Euclidean indicators. Downstream network and
-//! psychometric analysis must use additive log-ratio (logistic-normal) maps
-//! rather than TF-IDF, BM25, or keyword scores as inferential coordinates.
+//! Raw topic proportions are compositional rather than unconstrained Euclidean
+//! indicators. ALR supplies a reference-dependent full-rank logistic-normal map
+//! for regression and psychometric interfaces; it is not an orthonormal
+//! Aitchison-distance isometry. Distance-based Aitchison geometry requires ILR.
+//! TF-IDF, BM25, and keyword scores remain forbidden inferential coordinates.
 
 mod coordinates;
 mod error;
