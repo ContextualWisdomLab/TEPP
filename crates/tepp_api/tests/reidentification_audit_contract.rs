@@ -68,6 +68,7 @@ fn successful_reidentification_appends_redacted_audit_evidence_before_disclosure
     assert_eq!(audit.opaque_analytical_id(), "opaque-person-42");
     assert_eq!(audit.decision_time(), "2026-06-15T12:00:00Z");
     assert_eq!(audit.outcome(), ReidentificationAuditOutcome::Allowed);
+    assert_eq!(audit.outcome().wire_name(), "allowed");
     assert_eq!(audit.decision_digest(), DECISION_DIGEST);
     assert!(!format!("{audit:?}").contains("Pat Lee"));
     assert!(!format!("{audit:?}").contains("pat.lee@example.test"));
@@ -100,6 +101,7 @@ fn denied_reidentification_is_appended_and_replay_preserves_decision_order() {
         sink.records[0].outcome(),
         ReidentificationAuditOutcome::Denied
     );
+    assert_eq!(sink.records[0].outcome().wire_name(), "denied");
     assert_eq!(sink.records[1], allowed);
     assert_eq!(
         sink.records[1].outcome(),
