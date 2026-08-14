@@ -1,0 +1,237 @@
+name: Repair PR 47 orchestration security contracts
+
+on:
+  pull_request:
+    types:
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-tepp-pr-47-orchestration-security
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.number == 47 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/api-adaptive-orchestration-router'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact PR branch
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: agent/api-adaptive-orchestration-router
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Prove provenance and ablation regressions are RED
+        run: |
+          set +e
+          output=$(cargo +1.97.1 test -p tepp_api --test orchestration_security_contract 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            echo "Expected old orchestration contracts to accept noncanonical digests or incomparable ablations" >&2
+            exit 1
+          fi
+          grep -E "contextual_orchestrator_binding_requires|budget_ablation_requires" <<<"$output"
+
+      - name: Enforce canonical evidence digests and comparable ablations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/tepp_api/src/orchestration.rs")
+          text = path.read_text(encoding="utf-8")
+
+          def replace_once(old: str, new: str, label: str) -> None:
+              global text
+              if text.count(old) != 1:
+                  raise SystemExit(f"orchestration.rs: {label} target mismatch")
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              """pub struct OrchestrationPlan {
+              mode: OrchestrationMode,
+          """.replace("              ", ""),
+              """pub struct OrchestrationPlan {
+              mode: OrchestrationMode,
+              task_kind: InterpretationTaskKind,
+          """.replace("              ", ""),
+              "plan task identity",
+          )
+          replace_once(
+              """    /// Recorded workflow stage count.
+              #[must_use]
+              pub const fn stage_count(&self) -> u8 {
+          """.replace("              ", ""),
+              """    /// Interpretation task whose context this plan represents.
+              #[must_use]
+              pub const fn task_kind(&self) -> InterpretationTaskKind {
+                  self.task_kind
+              }
+
+              /// Recorded workflow stage count.
+              #[must_use]
+              pub const fn stage_count(&self) -> u8 {
+          """.replace("              ", ""),
+              "plan task getter",
+          )
+          replace_once(
+              """    if baseline.mode != OrchestrationMode::Direct {
+                  return Err(ApiError::InvalidWirePayload);
+              }
+          """.replace("              ", ""),
+              """    if baseline.mode != OrchestrationMode::Direct
+                  || baseline.task_kind != compared.task_kind
+                  || baseline.policy_version != compared.policy_version
+                  || baseline.access_list != compared.access_list
+              {
+                  return Err(ApiError::InvalidWirePayload);
+              }
+          """.replace("              ", ""),
+              "ablation context",
+          )
+          replace_once(
+              """    require_nonempty(evidence_manifest_hash)?;
+              if plan.mode == OrchestrationMode::Abstain {
+          """.replace("              ", ""),
+              """    require_sha256_digest(evidence_manifest_hash)?;
+              if plan.mode == OrchestrationMode::Abstain {
+          """.replace("              ", ""),
+              "binding digest validation",
+          )
+          replace_once(
+              """fn validate_request(request: &OrchestrationRequest) -> Result<(), ApiError> {
+          """.replace("          ", ""),
+              """fn require_sha256_digest(value: &str) -> Result<(), ApiError> {
+              let Some(digest) = value.strip_prefix("sha256:") else {
+                  return Err(ApiError::InvalidWirePayload);
+              };
+              if digest.len() == 64
+                  && digest
+                      .bytes()
+                      .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+              {
+                  Ok(())
+              } else {
+                  Err(ApiError::InvalidWirePayload)
+              }
+          }
+
+          fn validate_request(request: &OrchestrationRequest) -> Result<(), ApiError> {
+          """.replace("          ", ""),
+              "digest helper",
+          )
+          replace_once(
+              """    OrchestrationPlan {
+                  mode,
+                  stages: mode.stage_count(),
+          """.replace("              ", ""),
+              """    OrchestrationPlan {
+                  mode,
+                  task_kind: request.task_kind,
+                  stages: mode.stage_count(),
+          """.replace("              ", ""),
+              "plan construction",
+          )
+          replace_once(
+              """        let direct = route_orchestration(&request(
+                      InterpretationTaskKind::SchemaConversion,
+                      1.0,
+                      0.0,
+                      1.0,
+                      8_000,
+                  ))
+          """.replace("              ", ""),
+              """        let direct = route_orchestration(&request(
+                      InterpretationTaskKind::SpanClassification,
+                      0.1,
+                      0.1,
+                      1.0,
+                      8_000,
+                  ))
+          """.replace("              ", ""),
+              "internal direct ablation",
+          )
+          replace_once(
+              """        let verify = route_orchestration(&request(
+                      InterpretationTaskKind::AdversarialVerification,
+                      0.0,
+                      0.0,
+                      1.0,
+                      32_000,
+                  ))
+          """.replace("              ", ""),
+              """        let verify = route_orchestration(&request(
+                      InterpretationTaskKind::SpanClassification,
+                      0.8,
+                      0.1,
+                      1.0,
+                      32_000,
+                  ))
+          """.replace("              ", ""),
+              "internal verify ablation",
+          )
+          text = text.replace(
+              'bind_contextual_orchestrator(&verify, "sha256:manifest")',
+              'bind_contextual_orchestrator(&verify, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")',
+          )
+          replace_once(
+              """        let forged_binding = ContextualOrchestratorBinding {
+                      contract_version: ORCHESTRATION_CONTRACT_VERSION,
+                      mode: OrchestrationMode::Direct,
+          """.replace("              ", ""),
+              """        let forged_binding = ContextualOrchestratorBinding {
+                      contract_version: ORCHESTRATION_CONTRACT_VERSION,
+                      mode: OrchestrationMode::Direct,
+          """.replace("              ", ""),
+              "forged binding anchor",
+          )
+          path.write_text(text, encoding="utf-8")
+
+          contract = Path("crates/tepp_api/tests/orchestration_router_contract.rs")
+          contract_text = contract.read_text(encoding="utf-8")
+          contract_text = contract_text.replace(
+              "InterpretationTaskKind::AdversarialVerification,\n        0.20,\n        0.20,\n        0.80,\n        16_000,",
+              "InterpretationTaskKind::SpanClassification,\n        0.80,\n        0.20,\n        0.80,\n        16_000,",
+              1,
+          )
+          contract_text = contract_text.replace(
+              '"sha256:evidence-manifest-1"',
+              '"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
+          )
+          contract.write_text(contract_text, encoding="utf-8")
+          PY
+          cargo +1.97.1 fmt --all
+
+      - name: Verify focused and workspace contracts
+        run: |
+          cargo +1.97.1 fmt --all --check
+          cargo +1.97.1 test -p tepp_api --all-features
+          cargo +1.97.1 clippy -p tepp_api --all-targets --all-features -- -D warnings
+          cargo +1.97.1 test --workspace --all-features
+          python3 scripts/check_docstrings.py
+          python3 scripts/validate_documentation.py
+
+      - name: Commit verified repair and remove one-shot workflow
+        run: |
+          rm -f .github/workflows/repair-pr47-orchestration-security.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(api): bind orchestration to verifiable evidence context"
+          git push origin HEAD:agent/api-adaptive-orchestration-router
