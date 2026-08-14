@@ -1,8 +1,7 @@
 //! Semantic RFC 3339 validation contracts for provider-purpose grants.
 
 use tepp_api::{
-    AnalyticalPurpose, ApiError, ProviderEvidenceOffer, PurposeGrant,
-    minimize_provider_payload,
+    AnalyticalPurpose, ApiError, ProviderEvidenceOffer, PurposeGrant, minimize_provider_payload,
 };
 
 fn grant() -> PurposeGrant {
