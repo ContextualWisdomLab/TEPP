@@ -857,6 +857,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "purpose_authorization"
+version = "0.1.0"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
