@@ -2,6 +2,10 @@ name: Documentation Quality
 
 on:
   pull_request:
+    types:
+      - synchronize
+      - reopened
+      - ready_for_review
     paths:
       - "**/*.md"
       - "**/*.json"
