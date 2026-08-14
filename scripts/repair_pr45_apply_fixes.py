@@ -1,4 +1,4 @@
-"""Apply PR 45 tenant, migration, advisory-lock, and lifecycle fixes."""
+"""Apply PR 45 tenant, migration-order, and lifecycle fixes."""
 
 from pathlib import Path
 
@@ -65,54 +65,6 @@ live_path.write_text(live, encoding="utf-8")
 
 up_path = Path("migrations/0007_retention_deletion_legal_hold.up.sql")
 up = up_path.read_text(encoding="utf-8")
-up = replace_once(
-    up,
-    """    PERFORM pg_advisory_xact_lock(
-        hashtextextended(NEW.tenant_record_id::text, 0),
-        hashtextextended(NEW.target_document_id::text, 0)
-    );
-""",
-    """    PERFORM pg_advisory_xact_lock(
-        hashtextextended(
-            NEW.tenant_record_id::text || ':' || NEW.target_document_id::text,
-            0
-        )
-    );
-""",
-    "0007 deletion advisory lock",
-)
-up = replace_once(
-    up,
-    """    PERFORM pg_advisory_xact_lock(
-        hashtextextended(NEW.tenant_record_id::text, 0),
-        hashtextextended(lock_document::text, 0)
-    );
-""",
-    """    PERFORM pg_advisory_xact_lock(
-        hashtextextended(
-            NEW.tenant_record_id::text || ':' || lock_document::text,
-            0
-        )
-    );
-""",
-    "0007 hold-insert advisory lock",
-)
-up = replace_once(
-    up,
-    """    PERFORM pg_advisory_xact_lock(
-        hashtextextended(current_hold.tenant_record_id::text, 0),
-        hashtextextended(lock_document::text, 0)
-    );
-""",
-    """    PERFORM pg_advisory_xact_lock(
-        hashtextextended(
-            current_hold.tenant_record_id::text || ':' || lock_document::text,
-            0
-        )
-    );
-""",
-    "0007 hold-release advisory lock",
-)
 routine_privileges = """REVOKE ALL ON FUNCTION enforce_retention_policy_succession() FROM PUBLIC;
 REVOKE ALL ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) FROM PUBLIC;
 REVOKE ALL ON FUNCTION reject_held_evidence_deletion() FROM PUBLIC;
