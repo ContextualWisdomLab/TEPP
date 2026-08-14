@@ -1,6 +1,6 @@
 //! Database-layer vocabulary and tombstone/request consistency contracts.
 //!
-//! Application validation is not a substitute for PostgreSQL constraints. The
+//! Application validation is not a substitute for `PostgreSQL` constraints. The
 //! lifecycle migration must fail closed when callers bypass Rust renderers or
 //! attempt to connect a tombstone to a different tenant, document, data class,
 //! deletion kind, or incomplete deletion request.
