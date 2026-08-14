@@ -79,7 +79,7 @@ retention_test = """    #[test]
         let past = SystemTime::parse_rfc3339("2025-12-31T00:00:00Z").expect("past");
 
         let mut active_policy_closed = policy();
-        active_policy_closed.system_to = Some(future.clone());
+        active_policy_closed.system_to = Some(future);
         assert_eq!(
             insert_retention_policy_sql(&active_policy_closed),
             Err(PersistenceError::InvalidRetentionLifecycle)
@@ -94,7 +94,7 @@ retention_test = """    #[test]
 
         let mut superseded_policy_inverted = policy();
         superseded_policy_inverted.policy_status_code = "superseded".into();
-        superseded_policy_inverted.system_to = Some(past.clone());
+        superseded_policy_inverted.system_to = Some(past);
         assert_eq!(
             insert_retention_policy_sql(&superseded_policy_inverted),
             Err(PersistenceError::InvalidRetentionLifecycle)
