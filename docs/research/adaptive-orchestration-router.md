@@ -2,7 +2,7 @@
 
 ## Scope
 
-This note doctors the `tepp_api` governed router that implements the first executable slice of ADR 0010 without a database migration and without live model I/O:
+This note documents the `tepp_api` governed router that implements the first executable slice of ADR 0010 without a database migration and without live model I/O:
 
 1. `route_orchestration` selects versioned modes `direct`, `verify`, `committee`, `conductor`, or `abstain` from CPU `f64` unit-interval risk, ambiguity, and evidence-sufficiency scores plus an explicit token budget;
 2. the plan records workflow stage count, recursion depth, decomposition, TEPP-owned access lists, and role-specific reasoning effort;
@@ -15,9 +15,9 @@ Live NVIDIA NIM HTTP, learned conductor calibration, and production-quality clai
 
 ## Authoritative sources
 
-Xu, J., Sun, Q., Schwendeman, P., Nielsen, S., Cetin, E., & Tang, Y. (2026). TRINITY: An evolved LLM coordinator. In *International Conference on Learning Representations (ICLR 2026)*. https://arxiv.org/abs/2512.04695
+Xu, J., Sun, Q., Schwendeman, P., Nielsen, S., Cetin, E., & Tang, Y. (2026). *TRINITY: An evolved LLM coordinator* [Preprint]. arXiv. https://arxiv.org/abs/2512.04695
 
-Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2026). Learning to orchestrate agents in natural language with the Conductor. In *International Conference on Learning Representations (ICLR 2026)*. https://arxiv.org/abs/2512.04388
+Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2026). *Learning to orchestrate agents in natural language with the Conductor* [Preprint]. arXiv. https://arxiv.org/abs/2512.04388
 
 Tang, Y., Cetin, E., Xu, J., Sun, Q., Nielsen, S., Richard, V., Goda, H., Tymchenko, I., Nguyen, N., Lee, H., Ashiga, M., Kotyan, S., Kuroki, S., & Clanuwat, T. (2026). *Sakana Fugu technical report* [Preprint]. arXiv. https://arxiv.org/abs/2606.21228
 
@@ -29,7 +29,7 @@ TRINITY motivates lightweight model/role delegation rather than a fixed deep gra
 
 - low-risk span classification and schema conversion route `direct`;
 - material risk, adversarial verification, and low-ambiguity concept/narrative work route `verify`;
-- high-ambiguity concept alignment and gated blinded review route `committee`;
+- high-ambiguity concept alignment routes `committee`; gated blinded review routes `committee` only with its full minimum budget and otherwise abstains;
 - high-complexity narrative synthesis routes `conductor` when the budget allows and steps down otherwise;
 - insufficient evidence, failed scientific gates, and sub-minimum budgets abstain;
 - document-controlled policy, access, or credentials are denied;

@@ -51,7 +51,7 @@ fn contextual_orchestrator_binding_requires_a_canonical_sha256_manifest_digest()
 }
 
 #[test]
-fn budget_ablation_requires_the_same_task_policy_and_access_context() {
+fn budget_ablation_requires_the_same_task_and_access_context() {
     let baseline = route_orchestration(&request(
         InterpretationTaskKind::SpanClassification,
         0.10,

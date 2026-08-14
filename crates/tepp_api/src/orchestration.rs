@@ -489,7 +489,8 @@ impl ContextualOrchestratorBinding {
 pub fn route_orchestration(request: &OrchestrationRequest) -> Result<OrchestrationPlan, ApiError> {
     validate_request(request)?;
     let preferred = preferred_mode(request);
-    let mode = fit_mode(preferred, request.compute_budget_tokens);
+    let minimum_mode = minimum_acceptable_mode(request.task_kind);
+    let mode = fit_mode(preferred, request.compute_budget_tokens, minimum_mode);
     Ok(build_plan(request, mode))
 }
 
@@ -498,7 +499,8 @@ pub fn route_orchestration(request: &OrchestrationRequest) -> Result<Orchestrati
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when the baseline is not
-/// [`OrchestrationMode::Direct`].
+/// [`OrchestrationMode::Direct`], or when the two plans disagree on task
+/// kind, policy version, or access list.
 pub fn record_budget_ablation(
     baseline: &OrchestrationPlan,
     compared: &OrchestrationPlan,
@@ -636,11 +638,29 @@ fn preferred_mode(request: &OrchestrationRequest) -> OrchestrationMode {
     }
 }
 
-fn fit_mode(preferred: OrchestrationMode, budget: u64) -> OrchestrationMode {
+const fn minimum_acceptable_mode(task_kind: InterpretationTaskKind) -> OrchestrationMode {
+    match task_kind {
+        InterpretationTaskKind::BlindedModelReview => OrchestrationMode::Committee,
+        InterpretationTaskKind::SpanClassification
+        | InterpretationTaskKind::ConceptAlignment
+        | InterpretationTaskKind::NarrativeSynthesis
+        | InterpretationTaskKind::AdversarialVerification
+        | InterpretationTaskKind::SchemaConversion => OrchestrationMode::Direct,
+    }
+}
+
+fn fit_mode(
+    preferred: OrchestrationMode,
+    budget: u64,
+    minimum_mode: OrchestrationMode,
+) -> OrchestrationMode {
     let mut mode = preferred;
     loop {
         if budget >= mode.minimum_token_budget() {
             return mode;
+        }
+        if mode == minimum_mode {
+            return OrchestrationMode::Abstain;
         }
         mode = match mode {
             OrchestrationMode::Conductor => OrchestrationMode::Committee,
@@ -807,15 +827,18 @@ mod tests {
         assert_eq!(committee_budget.fallback_mode(), OrchestrationMode::Verify);
         assert_eq!(committee_budget.roles().len(), 3);
 
-        let verify_fit = route_orchestration(&request(
+        let underfunded_blinded_review = route_orchestration(&request(
             InterpretationTaskKind::BlindedModelReview,
             0.40,
             0.40,
             0.80,
             8_000,
         ))
-        .expect("committee steps to verify");
-        assert_eq!(verify_fit.mode(), OrchestrationMode::Verify);
+        .expect("underfunded blinded review");
+        assert_eq!(
+            underfunded_blinded_review.mode(),
+            OrchestrationMode::Abstain
+        );
     }
 
     #[test]
