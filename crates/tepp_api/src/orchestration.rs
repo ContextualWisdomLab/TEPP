@@ -84,7 +84,11 @@ impl OrchestrationMode {
     }
 
     /// Cheaper bounded fallback when this mode cannot complete.
+    ///
+    /// Keeping this match at one function boundary prevents callers from
+    /// duplicating unreachable enum branches during coverage instrumentation.
     #[must_use]
+    #[inline(never)]
     pub const fn fallback_mode(self) -> Self {
         match self {
             Self::Conductor => Self::Committee,
