@@ -56,20 +56,28 @@ jobs:
 
           path = Path("crates/tepp_api/src/provider_payload.rs")
           text = path.read_text(encoding="utf-8")
-          old = '''        assert_eq!(disclosed.0.opaque_analytical_id(), "entity-1");
-          assert_eq!(disclosed.0.direct_identity(), "Pat Lee");'''
-          new = '''        assert_eq!(disclosed.opaque_analytical_id(), "entity-1");
-          assert_eq!(disclosed.direct_identity(), "Pat Lee");'''
-          if text.count(old) != 1:
-              raise SystemExit("constructed disclosure accessor repair target mismatch")
-          text = text.replace(old, new, 1)
+          replacements = (
+              (
+                  'assert_eq!(disclosed.0.opaque_analytical_id(), "entity-1");',
+                  'assert_eq!(disclosed.opaque_analytical_id(), "entity-1");',
+              ),
+              (
+                  'assert_eq!(disclosed.0.direct_identity(), "Pat Lee");',
+                  'assert_eq!(disclosed.direct_identity(), "Pat Lee");',
+              ),
+          )
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f"constructed disclosure accessor target mismatch: {old}")
+              text = text.replace(old, new, 1)
 
           marker = "fn validate_grant(grant: &PurposeGrant) -> Result<(), ApiError> {\n"
-          comment = '''// Lexicographic comparisons in `validate_grant` and `grant_covers` are valid
-          // only after fixed-width UTC RFC 3339 validation; `TemporalInstant` also
-          // rejects impossible calendar dates and leap seconds before comparison.
-          fn validate_grant(grant: &PurposeGrant) -> Result<(), ApiError> {
-          '''
+          comment = (
+              "// Lexicographic comparisons in `validate_grant` and `grant_covers` are valid\n"
+              "// only after fixed-width UTC RFC 3339 validation; `TemporalInstant` also\n"
+              "// rejects impossible calendar dates and leap seconds before comparison.\n"
+              "fn validate_grant(grant: &PurposeGrant) -> Result<(), ApiError> {\n"
+          )
           if text.count(marker) != 1:
               raise SystemExit("grant comparison invariant marker mismatch")
           path.write_text(text.replace(marker, comment, 1), encoding="utf-8")
