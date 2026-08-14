@@ -1,9 +1,17 @@
 //! Live document repository over a SQL transport.
 
+use crate::artifact_sql::{
+    SourceArtifactRecord, assert_source_artifact_matches_sql, insert_source_artifact_sql,
+    select_source_artifact_by_id_sql,
+};
 use crate::document_sql::{
-    append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql, revise_document_sqls,
+    append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql,
+    revise_document_atomic_sql,
 };
 use crate::document_store::{AuditEvent, DocumentRecord};
+use crate::instance_sql::{
+    EventInstanceRecord, insert_event_instance_sql, select_event_instance_as_known_at_sql,
+};
 use crate::manifest_sql::{
     ReproducibilityManifestRecord, insert_reproducibility_manifest_sql,
     select_reproducibility_manifest_by_digests_sql, select_reproducibility_manifest_by_id_sql,
@@ -12,12 +20,15 @@ use crate::membership_sql::{
     MembershipAssignmentRecord, insert_membership_assignment_sql,
     select_membership_assignments_for_document_sql,
 };
+use crate::mention_sql::{EventMentionRecord, insert_event_mention_sql};
 use crate::migration::{MigrationCatalog, validate_migration_catalog};
 use crate::model_run_sql::{
     CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord,
     insert_corpus_split_manifest_sql, insert_model_artifact_sql, insert_model_run_sql,
     select_model_artifacts_by_run_sql, select_model_run_by_id_sql,
 };
+use crate::relation_sql::{EventRelationRecord, insert_event_relation_sql};
+use crate::restore_integrity::restore_integrity_probe_sqls;
 use crate::sql_session::{SqlSession, apply_sql_batch};
 use crate::{MigrationContractError, PersistenceError};
 use temporal_core::{EventTime, SystemTime};
@@ -70,6 +81,18 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         apply_sql_batch(&mut self.session, catalog.up_sql()).map_err(LiveMigrationError::Transport)
     }
 
+    /// Revalidate restored physical rows before analytical state is usable.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures, including a mapped restore-integrity raise.
+    pub fn assert_restore_integrity(&mut self) -> Result<(), PersistenceError> {
+        for sql in restore_integrity_probe_sqls() {
+            self.session.execute(&sql)?;
+        }
+        Ok(())
+    }
+
     /// Insert the first system-time version of a document identity.
     ///
     /// # Errors
@@ -80,15 +103,14 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
-    /// Close the open system-time row and insert a revision.
+    /// Close the open system-time row and insert a revision atomically.
     ///
     /// # Errors
     ///
-    /// Returns digest or transport failures.
+    /// Returns digest, concurrent-write, or transport failures.
     pub fn revise(&mut self, record: &DocumentRecord) -> Result<(), PersistenceError> {
-        let [close, insert] = revise_document_sqls(record)?;
-        self.session.execute(&close)?;
-        self.session.execute(&insert)
+        let sql = revise_document_atomic_sql(record)?;
+        self.session.execute(&sql)
     }
 
     /// Issue as-known-at SQL for a document identity.
@@ -131,9 +153,9 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// # Errors
     ///
-    /// Returns transport failures.
+    /// Returns action-code validation or transport failures.
     pub fn append_audit(&mut self, event: &AuditEvent) -> Result<(), PersistenceError> {
-        let sql = append_audit_sql(event);
+        let sql = append_audit_sql(event)?;
         self.session.execute(&sql)
     }
 
@@ -244,6 +266,92 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
+    /// Insert a typed event relation under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns vocabulary/flag validation or transport failures.
+    pub fn insert_event_relation(
+        &mut self,
+        record: &EventRelationRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_event_relation_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert an event mention that is not an instance identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns mention/instance or confidence validation failures, or transport
+    /// failures.
+    pub fn insert_event_mention(
+        &mut self,
+        record: &EventMentionRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_event_mention_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert a bitemporal event-instance version.
+    ///
+    /// # Errors
+    ///
+    /// Returns inverted-window/label validation or transport failures.
+    pub fn insert_event_instance(
+        &mut self,
+        record: &EventInstanceRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_event_instance_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up the event-instance version visible as of a system-time instant.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_event_instance_as_known_at(
+        &mut self,
+        event_instance_id: Uuid,
+        known_at: &SystemTime,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_event_instance_as_known_at_sql(event_instance_id, &known_at.to_rfc3339());
+        self.session.execute(&sql)
+    }
+
+    /// Insert an append-only source artifact under the active tenant.
+    ///
+    /// A retry of the same immutable identity is a no-op. A same-id payload
+    /// change fails closed after `ON CONFLICT DO NOTHING`.
+    ///
+    /// # Errors
+    ///
+    /// Returns digest/size/label validation, identity-conflict, or transport
+    /// failures.
+    pub fn insert_source_artifact(
+        &mut self,
+        record: &SourceArtifactRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_source_artifact_sql(record)?;
+        self.session.execute(&sql)?;
+        let assertion = assert_source_artifact_matches_sql(record)?;
+        self.session.execute(&assertion)
+    }
+
+    /// Look up a source artifact by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures from the underlying session.
+    pub fn submit_source_artifact_by_id(
+        &mut self,
+        source_artifact_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_source_artifact_by_id_sql(source_artifact_id);
+        self.session.execute(&sql)
+    }
+
     /// Look up a model run by primary key.
     ///
     /// # Errors
@@ -291,10 +399,14 @@ impl std::error::Error for LiveMigrationError {}
 #[cfg(test)]
 mod tests {
     use super::{LiveDocumentRepository, LiveMigrationError};
+    use crate::artifact_sql::SourceArtifactRecord;
     use crate::document_store::{AuditEvent, DocumentRecord};
+    use crate::instance_sql::EventInstanceRecord;
     use crate::manifest_sql::ReproducibilityManifestRecord;
+    use crate::mention_sql::EventMentionRecord;
     use crate::migration::MigrationCatalog;
     use crate::model_run_sql::{CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord};
+    use crate::relation_sql::EventRelationRecord;
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};
     use temporal_core::{AvailableTime, EventTime, SystemTime};
@@ -411,6 +523,123 @@ mod tests {
         );
     }
 
+    fn exercise_event_relation(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let (available, system) = (
+            AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+            SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+        );
+        let relation = EventRelationRecord {
+            event_relation_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            source_event_id: uuid::Uuid::from_u128(1),
+            target_event_id: uuid::Uuid::from_u128(2),
+            relation_type_code: "causes".into(),
+            transition_edge: true,
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_event_relation(&relation)
+            .expect("relation insert");
+        let mut bad = relation;
+        bad.transition_edge = false;
+        assert_eq!(
+            repo.insert_event_relation(&bad),
+            Err(PersistenceError::InvalidEventRelation)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO event_relation"))
+        );
+    }
+
+    fn exercise_event_mention(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let mention = EventMentionRecord {
+            event_mention_id: uuid::Uuid::from_u128(2),
+            event_instance_id: uuid::Uuid::from_u128(1),
+            tenant_record_id: uuid::Uuid::nil(),
+            confidence_score: 0.75,
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        };
+        repo.insert_event_mention(&mention).expect("mention insert");
+        let mut collapsed = mention.clone();
+        collapsed.event_mention_id = collapsed.event_instance_id;
+        assert_eq!(
+            repo.insert_event_mention(&collapsed),
+            Err(PersistenceError::InvalidEventMention)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO event_mention"))
+        );
+    }
+
+    fn exercise_event_instance(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let instance = EventInstanceRecord {
+            event_instance_id: uuid::Uuid::from_u128(1),
+            tenant_record_id: uuid::Uuid::nil(),
+            event_type_code: "occurrence".into(),
+            valid_from: EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("v"),
+            valid_to: None,
+            system_from: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            system_to: None,
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+            lifecycle_status_code: "asserted".into(),
+        };
+        repo.insert_event_instance(&instance)
+            .expect("instance insert");
+        repo.submit_event_instance_as_known_at(instance.event_instance_id, &instance.system_from)
+            .expect("instance known-at");
+        let mut inverted = instance.clone();
+        inverted.valid_to =
+            Some(EventTime::parse_rfc3339("2025-12-31T00:00:00Z").expect("earlier"));
+        assert_eq!(
+            repo.insert_event_instance(&inverted),
+            Err(PersistenceError::InvalidEventInstance)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO event_instance"))
+        );
+    }
+
+    fn exercise_source_artifact(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let artifact = SourceArtifactRecord {
+            source_artifact_id: uuid::Uuid::from_u128(1),
+            tenant_record_id: uuid::Uuid::nil(),
+            content_sha256: "ab".repeat(32),
+            source_size_bytes: 4,
+            media_type_code: "text/plain".into(),
+            protected_object_ref: None,
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        };
+        repo.insert_source_artifact(&artifact)
+            .expect("artifact insert");
+        repo.insert_source_artifact(&artifact)
+            .expect("identical retry");
+        repo.submit_source_artifact_by_id(artifact.source_artifact_id)
+            .expect("artifact by id");
+        let mut invalid = artifact.clone();
+        invalid.source_size_bytes = -1;
+        assert_eq!(
+            repo.insert_source_artifact(&invalid),
+            Err(PersistenceError::InvalidSourceArtifact)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("ON CONFLICT (source_artifact_id) DO NOTHING"))
+        );
+    }
+
     #[test]
     fn live_repository_applies_migrations_and_document_sql() {
         let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
@@ -418,6 +647,14 @@ mod tests {
         let applied = repo.apply_migrations(&catalog).expect("migrate");
         assert!(applied >= 1);
         assert!(!repo.session().executed().is_empty());
+        repo.assert_restore_integrity()
+            .expect("restore integrity probes");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("restore integrity failed"))
+        );
 
         repo.insert(&sample_record()).expect("insert");
         let mut revised = sample_record();
@@ -425,6 +662,12 @@ mod tests {
         revised.system_from =
             SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later system");
         repo.revise(&revised).expect("revise");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("DO $tepp$") && sql.contains("GET DIAGNOSTICS"))
+        );
         repo.submit_as_known_at(
             uuid::Uuid::nil(),
             &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("k"),
@@ -464,6 +707,10 @@ mod tests {
         );
         exercise_model_run_chain(&mut repo, &manifest);
         exercise_membership_assignment(&mut repo);
+        exercise_event_relation(&mut repo);
+        exercise_event_mention(&mut repo);
+        exercise_event_instance(&mut repo);
+        exercise_source_artifact(&mut repo);
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
