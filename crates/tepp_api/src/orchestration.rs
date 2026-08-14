@@ -838,7 +838,7 @@ mod tests {
     }
 
     #[test]
-    fn ablation_and_binding_getters_cover_remaining_branches() {
+    fn ablation_getters_and_rejection_paths_are_observable() {
         assert!(!budgets_are_comparable(8_000, 32_000));
         assert!(budgets_are_comparable(16_000, 16_000));
         assert!(!budgets_are_comparable(0, 16_000));
@@ -900,6 +900,26 @@ mod tests {
             record_budget_ablation(&direct, &different_access),
             Err(ApiError::InvalidWirePayload),
         );
+    }
+
+    #[test]
+    fn binding_getters_and_rejection_paths_are_observable() {
+        let direct = route_orchestration(&request(
+            InterpretationTaskKind::SpanClassification,
+            0.1,
+            0.1,
+            1.0,
+            8_000,
+        ))
+        .expect("direct");
+        let verify = route_orchestration(&request(
+            InterpretationTaskKind::SpanClassification,
+            0.8,
+            0.1,
+            1.0,
+            32_000,
+        ))
+        .expect("verify");
 
         let binding = bind_contextual_orchestrator(
             &verify,
@@ -968,6 +988,48 @@ mod tests {
             direct.to_string(),
             "orchestration mode=direct stages=1 recursion=0 proposal=true"
         );
+    }
+
+    #[test]
+    fn preferred_modes_cover_concept_and_narrative_boundaries() {
+        let cases = [
+            (
+                InterpretationTaskKind::ConceptAlignment,
+                0.1,
+                0.50,
+                OrchestrationMode::Committee,
+            ),
+            (
+                InterpretationTaskKind::ConceptAlignment,
+                0.1,
+                0.49,
+                OrchestrationMode::Verify,
+            ),
+            (
+                InterpretationTaskKind::NarrativeSynthesis,
+                0.1,
+                0.50,
+                OrchestrationMode::Conductor,
+            ),
+            (
+                InterpretationTaskKind::NarrativeSynthesis,
+                0.1,
+                0.49,
+                OrchestrationMode::Verify,
+            ),
+        ];
+
+        for (task_kind, risk_score, ambiguity_score, expected_mode) in cases {
+            let plan = route_orchestration(&request(
+                task_kind,
+                risk_score,
+                ambiguity_score,
+                1.0,
+                32_000,
+            ))
+            .expect("boundary route");
+            assert_eq!(plan.mode(), expected_mode);
+        }
     }
 
     #[test]
