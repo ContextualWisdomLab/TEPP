@@ -1,0 +1,74 @@
+name: Repair PR 46 internal audit digest
+
+on:
+  pull_request:
+    types:
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-tepp-pr-46-internal-audit-digest
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.number == 46 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/api-provider-payload-minimization'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact PR branch
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: agent/api-provider-payload-minimization
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Prove caller-controlled digest regression is RED
+        run: |
+          set +e
+          output=$(cargo +1.97.1 test -p tepp_api --test reidentification_audit_contract 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            echo "Expected the trust-boundary digest regression to fail before implementation" >&2
+            exit 1
+          fi
+          grep -E "disclose_identity_mapping|argument|reidentification_audit_contract" <<<"$output"
+
+      - name: Build digest inside the TEPP trust boundary
+        run: |
+          python3 scripts/repair_pr46_internal_audit_digest.py
+          cargo +1.97.1 fmt --all
+
+      - name: Verify focused and workspace contracts
+        run: |
+          cargo +1.97.1 fmt --all --check
+          cargo +1.97.1 test -p tepp_api --all-features
+          cargo +1.97.1 clippy -p tepp_api --all-targets --all-features -- -D warnings
+          cargo +1.97.1 test --workspace --all-features
+          python3 scripts/check_docstrings.py
+          python3 scripts/validate_documentation.py
+
+      - name: Commit verified repair and remove one-shot files
+        run: |
+          rm -f .github/workflows/repair-pr46-internal-audit-digest.yml
+          rm -f scripts/repair_pr46_internal_audit_digest.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(api): bind reidentification audit digest internally"
+          git push origin HEAD:agent/api-provider-payload-minimization
