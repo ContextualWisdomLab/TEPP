@@ -50,7 +50,6 @@ pub enum PersistenceError {
     UngovernedEvidenceRestore,
 }
 
-
 impl fmt::Display for PersistenceError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
@@ -109,7 +108,6 @@ pub enum MigrationContractError {
     /// Retention/legal-hold migration declarations were incomplete.
     MissingRetentionLegalHold,
 }
-
 
 impl fmt::Display for MigrationContractError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
