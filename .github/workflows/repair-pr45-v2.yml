@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: repair-tepp-pr-45-v2
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   repair:
