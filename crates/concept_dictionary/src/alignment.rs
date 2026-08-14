@@ -55,24 +55,53 @@ pub const fn compare_cross_language_means(level: InvarianceLevel) -> Result<(), 
 
 /// Root-mean-square error between two concept-coordinate vectors on CPU `f64`.
 ///
+/// A scaled sum-of-squares accumulator avoids intermediate overflow when the
+/// final RMSE remains representable. A residual whose subtraction itself cannot
+/// be represented fails closed rather than returning a non-finite metric.
+///
 /// # Errors
 ///
 /// Returns [`ConceptError::InvalidNumericInput`] for empty, unequal-length, or
-/// non-finite vectors.
+/// non-finite vectors, an unrepresentable residual, or a non-finite result.
 #[allow(clippy::cast_precision_loss)]
 pub fn concept_coordinate_rmse(left: &[f64], right: &[f64]) -> Result<f64, ConceptError> {
     if left.is_empty() || left.len() != right.len() {
         return Err(ConceptError::InvalidNumericInput);
     }
-    let mut sum_sq = 0.0_f64;
+
+    let mut scale = 0.0_f64;
+    let mut scaled_sum_squares = 1.0_f64;
     for (left_value, right_value) in left.iter().zip(right) {
         if !left_value.is_finite() || !right_value.is_finite() {
             return Err(ConceptError::InvalidNumericInput);
         }
         let residual = left_value - right_value;
-        sum_sq += residual * residual;
+        if !residual.is_finite() {
+            return Err(ConceptError::InvalidNumericInput);
+        }
+        let magnitude = residual.abs();
+        if magnitude == 0.0 {
+            continue;
+        }
+        if scale < magnitude {
+            let ratio = scale / magnitude;
+            scaled_sum_squares = 1.0 + scaled_sum_squares * ratio * ratio;
+            scale = magnitude;
+        } else {
+            let ratio = magnitude / scale;
+            scaled_sum_squares += ratio * ratio;
+        }
     }
-    Ok((sum_sq / left.len() as f64).sqrt())
+
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let result = scale * (scaled_sum_squares / left.len() as f64).sqrt();
+    if result.is_finite() {
+        Ok(result)
+    } else {
+        Err(ConceptError::InvalidNumericInput)
+    }
 }
 
 #[cfg(test)]
