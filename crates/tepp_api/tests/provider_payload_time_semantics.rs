@@ -46,22 +46,27 @@ fn provider_payload_rejects_semantically_invalid_utc_instants() {
 }
 
 #[test]
-fn provider_payload_accepts_a_real_leap_day_and_rejects_a_false_one() {
-    let leap_grant = PurposeGrant {
-        valid_from: "2028-02-29T00:00:00Z".into(),
-        valid_to: Some("2028-02-29T23:59:59Z".into()),
-        ..grant()
-    };
-    minimize_provider_payload(&leap_grant, &offer(), "2028-02-29T12:00:00Z")
-        .expect("Gregorian leap day must be accepted");
+fn provider_payload_enforces_gregorian_leap_year_semantics() {
+    for valid_leap_day in ["2000-02-29T12:00:00Z", "2028-02-29T12:00:00Z"] {
+        let leap_grant = PurposeGrant {
+            valid_from: valid_leap_day.into(),
+            valid_to: Some(valid_leap_day.into()),
+            ..grant()
+        };
+        minimize_provider_payload(&leap_grant, &offer(), valid_leap_day)
+            .expect("Gregorian leap day must be accepted");
+    }
 
-    let false_leap_grant = PurposeGrant {
-        valid_from: "2027-02-29T00:00:00Z".into(),
-        valid_to: None,
-        ..grant()
-    };
-    assert_eq!(
-        minimize_provider_payload(&false_leap_grant, &offer(), "2027-03-01T00:00:00Z"),
-        Err(ApiError::InvalidWirePayload),
-    );
+    for invalid_leap_day in ["2027-02-29T00:00:00Z", "2100-02-29T00:00:00Z"] {
+        let false_leap_grant = PurposeGrant {
+            valid_from: invalid_leap_day.into(),
+            valid_to: None,
+            ..grant()
+        };
+        assert_eq!(
+            minimize_provider_payload(&false_leap_grant, &offer(), "2100-03-01T00:00:00Z"),
+            Err(ApiError::InvalidWirePayload),
+            "non-leap-century and ordinary non-leap years must fail closed: {invalid_leap_day}",
+        );
+    }
 }
