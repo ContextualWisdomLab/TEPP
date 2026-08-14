@@ -48,9 +48,10 @@ for method in tenant_methods:
             f"live_repository.rs: unexpected first statement for {method}: "
             f"{live[insert_at:insert_at + 80]!r}"
         )
+    parameter = "event" if method == "append_audit" else "record"
     live = (
         live[:insert_at]
-        + "        self.bind_session_tenant(record.tenant_record_id)?;\n"
+        + f"        self.bind_session_tenant({parameter}.tenant_record_id)?;\n"
         + live[insert_at:]
     )
 live_path.write_text(live, encoding="utf-8")
