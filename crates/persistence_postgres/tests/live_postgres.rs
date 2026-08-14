@@ -194,14 +194,23 @@ fn live_postgres_applies_migrations_and_document_sql() {
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
     prove_append_only_immutability(&mut repo, &manifest);
     prove_temporal_interval_ordering(&mut repo, tenant_record_id, source_artifact_id);
-    repo.session_mut()
-        .execute("SET lock_timeout = '3s'")
-        .expect("main lock_timeout");
-    repo.session_mut()
-        .execute("SET statement_timeout = '30s'")
-        .expect("main statement_timeout");
+    apply_sql_timeouts(&mut repo, "3s", "30s");
     prove_concurrent_document_writes(&mut repo);
     prove_tenant_rls_isolation(&mut repo);
+}
+
+fn apply_sql_timeouts(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    lock_timeout: &str,
+    statement_timeout: &str,
+) {
+    // Fail closed instead of hanging the live job on lock or statement stalls.
+    repo.session_mut()
+        .execute(&format!("SET lock_timeout = '{lock_timeout}'"))
+        .expect("lock_timeout");
+    repo.session_mut()
+        .execute(&format!("SET statement_timeout = '{statement_timeout}'"))
+        .expect("statement_timeout");
 }
 
 fn open_writer_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {
@@ -209,13 +218,7 @@ fn open_writer_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPo
     let options = LiveSqlxPoolOptions::new(1, 5_000).expect("writer pool");
     let pool = open_live_sqlx_pool(&config, options).expect("writer pool open");
     let mut repo = LiveDocumentRepository::new(pool);
-    // Fail closed instead of hanging the live job on lock or statement stalls.
-    repo.session_mut()
-        .execute("SET lock_timeout = '3s'")
-        .expect("lock_timeout");
-    repo.session_mut()
-        .execute("SET statement_timeout = '15s'")
-        .expect("statement_timeout");
+    apply_sql_timeouts(&mut repo, "3s", "15s");
     repo
 }
 
