@@ -662,14 +662,7 @@ fn fit_mode(
         if mode == minimum_mode {
             return OrchestrationMode::Abstain;
         }
-        mode = match mode {
-            OrchestrationMode::Conductor => OrchestrationMode::Committee,
-            OrchestrationMode::Committee => OrchestrationMode::Verify,
-            OrchestrationMode::Verify => OrchestrationMode::Direct,
-            OrchestrationMode::Direct | OrchestrationMode::Abstain => {
-                return OrchestrationMode::Abstain;
-            }
-        };
+        mode = mode.fallback_mode();
     }
 }
 
