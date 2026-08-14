@@ -52,3 +52,36 @@ fn empty_or_non_increasing_event_clocks_fail_closed() {
         Err(IrregularTimeError::NonIncreasingEventTime)
     );
 }
+
+#[test]
+fn matching_event_and_system_spacing_is_not_refused() {
+    let observations = [observation(0, 0), observation(2, 2), observation(4, 4)];
+    refuse_equal_system_spacing_as_event_spacing(&observations).expect("matching clocks");
+}
+
+#[test]
+fn non_constant_system_lags_are_not_treated_as_equal_system_spacing() {
+    let observations = [observation(0, 0), observation(10, 1), observation(13, 5)];
+    refuse_equal_system_spacing_as_event_spacing(&observations)
+        .expect("varying system lags are not equal system spacing");
+    assert_eq!(
+        event_lag_seconds(&observations).expect("event lags"),
+        vec![10, 3]
+    );
+}
+
+#[test]
+fn lag_rmse_rejects_empty_or_nonempty_mismatched_lengths() {
+    assert_eq!(
+        lag_root_mean_square_error(&[], &[]),
+        Err(IrregularTimeError::InvalidObservationPayload)
+    );
+    assert_eq!(
+        lag_root_mean_square_error(&[10, 3], &[]),
+        Err(IrregularTimeError::InvalidObservationPayload)
+    );
+    assert_eq!(
+        lag_root_mean_square_error(&[10, 3], &[10]),
+        Err(IrregularTimeError::InvalidObservationPayload)
+    );
+}

@@ -126,5 +126,27 @@ mod tests {
             lag_root_mean_square_error(&[], &[]),
             Err(IrregularTimeError::InvalidObservationPayload)
         );
+        assert_eq!(
+            lag_root_mean_square_error(&[2, 2], &[]),
+            Err(IrregularTimeError::InvalidObservationPayload)
+        );
+        let matched = lag_root_mean_square_error(&[2, 2], &[2, 2]).expect("rmse");
+        assert!(matched.abs() < f64::EPSILON);
+        let irregular_system = [
+            ClockedObservation::new(0, 0),
+            ClockedObservation::new(10, 1),
+            ClockedObservation::new(13, 5),
+        ];
+        refuse_equal_system_spacing_as_event_spacing(&irregular_system)
+            .expect("non-constant system lags are not equal system spacing");
+        let equal_system_irregular_event = [
+            ClockedObservation::new(0, 0),
+            ClockedObservation::new(10, 1),
+            ClockedObservation::new(13, 2),
+        ];
+        assert_eq!(
+            refuse_equal_system_spacing_as_event_spacing(&equal_system_irregular_event),
+            Err(IrregularTimeError::SystemSpacingIsNotEventSpacing)
+        );
     }
 }
