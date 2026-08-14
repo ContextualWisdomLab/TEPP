@@ -296,8 +296,15 @@ fn join_with_timeout<T: Send + 'static>(
     });
     match rx.recv_timeout(budget) {
         Ok(Ok(value)) => value,
-        Ok(Err(_)) => panic!("{context}: worker thread panicked"),
-        Err(_) => panic!("{context}: worker exceeded wall-clock budget"),
+        Ok(Err(panic_payload)) => {
+            panic!("{context}: worker thread panicked: {panic_payload:?}")
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            panic!("{context}: worker exceeded wall-clock budget")
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            panic!("{context}: worker channel disconnected")
+        }
     }
 }
 
