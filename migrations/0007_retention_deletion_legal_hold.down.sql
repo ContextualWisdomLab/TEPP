@@ -1,13 +1,5 @@
 -- Rollback for 0007_retention_deletion_legal_hold.
 
-DROP FUNCTION IF EXISTS release_legal_hold(uuid, timestamptz);
-DROP FUNCTION IF EXISTS supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz);
-DROP FUNCTION IF EXISTS enforce_retention_policy_succession();
-DROP FUNCTION IF EXISTS enforce_legal_hold_release();
-DROP FUNCTION IF EXISTS reject_tombstoned_evidence_restore();
-DROP FUNCTION IF EXISTS reject_held_evidence_deletion();
-DROP FUNCTION IF EXISTS guard_legal_hold_insert();
-
 DO $tepp$
 DECLARE
     table_name text;
@@ -59,3 +51,11 @@ BEGIN
     END LOOP;
 END
 $tepp$;
+
+DROP FUNCTION IF EXISTS release_legal_hold(uuid, timestamptz);
+DROP FUNCTION IF EXISTS supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz);
+DROP FUNCTION IF EXISTS enforce_retention_policy_succession();
+DROP FUNCTION IF EXISTS enforce_legal_hold_release();
+DROP FUNCTION IF EXISTS reject_tombstoned_evidence_restore();
+DROP FUNCTION IF EXISTS reject_held_evidence_deletion();
+DROP FUNCTION IF EXISTS guard_legal_hold_insert();
