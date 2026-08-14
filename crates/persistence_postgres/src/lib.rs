@@ -58,6 +58,8 @@ pub use artifact_sql::source_artifacts_are_idempotent_matches;
 pub use concurrent_write::DEADLOCK_DETECTED_SQLSTATE;
 /// `PostgreSQL` `exclusion_violation` SQLSTATE.
 pub use concurrent_write::EXCLUSION_VIOLATION_SQLSTATE;
+/// `PostgreSQL` `lock_not_available` SQLSTATE (`FOR UPDATE NOWAIT`).
+pub use concurrent_write::LOCK_NOT_AVAILABLE_SQLSTATE;
 /// `PostgreSQL` `serialization_failure` SQLSTATE.
 pub use concurrent_write::SERIALIZATION_FAILURE_SQLSTATE;
 /// `PostgreSQL` `unique_violation` SQLSTATE.
