@@ -734,12 +734,14 @@ fn assign_roles(mode: OrchestrationMode, task: InterpretationTaskKind) -> Vec<Ro
 }
 
 fn budgets_are_comparable(left: u64, right: u64) -> bool {
-    if left == 0 || right == 0 {
-        return false;
-    }
-    left.abs_diff(right)
-        .saturating_mul(COMPARABLE_BUDGET_NUMERATOR)
-        <= left.max(right)
+    // A saturated product is zero exactly when either budget is zero. Expressing
+    // the guard this way keeps the helper total without an unreachable arm in
+    // the public Direct-baseline call path.
+    left.saturating_mul(right) > 0
+        && left
+            .abs_diff(right)
+            .saturating_mul(COMPARABLE_BUDGET_NUMERATOR)
+            <= left.max(right)
 }
 
 #[cfg(test)]
@@ -842,6 +844,7 @@ mod tests {
         assert!(!budgets_are_comparable(8_000, 32_000));
         assert!(budgets_are_comparable(16_000, 16_000));
         assert!(!budgets_are_comparable(0, 16_000));
+        assert!(!budgets_are_comparable(16_000, 0));
 
         let direct = route_orchestration(&request(
             InterpretationTaskKind::SpanClassification,
