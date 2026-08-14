@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `irregular_time` event-time lags: consecutive lags are taken from event/valid time, equal system-time spacing cannot stand in for irregular event spacing, and recovered event lags match known truth with lower computed RMSE than an equal-spacing assumption.
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
 - `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).
 - `persistence_postgres` audit-event SQL contracts: append-only insert that refuses empty, oversized, or hostile `action_code` values before SQL is rendered.

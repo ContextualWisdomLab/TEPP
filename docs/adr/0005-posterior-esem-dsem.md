@@ -1,7 +1,7 @@
 # ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — `irregular_time` spaces lags on event time and refuses equal system-time spacing; remaining ESEM/DSEM fit remains accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs upstream topic measurement/network coordinates; this ADR governs higher-order psychometric structure and longitudinal interpretation.
 
