@@ -15,24 +15,57 @@
 //! contracts chain immutable run identities to those manifests. Typed
 //! membership-assignment SQL (migration `0006`) replaces the polymorphic 0001 stub so documents
 //! can belong to multiple entities and projects without atomistic collapse.
+//! Concurrent document revises use one transactional `DO` block that requires
+//! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
+//! typed conflict errors. Restore integrity probes refuse to mark analytical
+//! state usable until tenant, digest, cutoff, temporal windows, and append-only
+//! triggers revalidate.
 
+mod artifact_sql;
+mod concurrent_write;
 mod cutoff;
 mod document_sql;
 mod document_store;
 mod error;
+mod instance_sql;
 mod live_pool;
 mod live_repository;
 mod manifest_sql;
 mod membership_sql;
+mod mention_sql;
 mod migration;
 mod model_run_sql;
 mod naming;
+mod relation_sql;
+mod restore_integrity;
 mod sql_session;
 mod sqlx_gate;
 #[cfg(feature = "live-sqlx")]
 mod sqlx_live;
 mod tenant_session;
 
+/// Append-only source artifact row.
+pub use artifact_sql::SourceArtifactRecord;
+/// Render a fail-closed stored-row match assertion for a source artifact.
+pub use artifact_sql::assert_source_artifact_matches_sql;
+/// Render insert SQL for a validated source artifact.
+pub use artifact_sql::insert_source_artifact_sql;
+/// Render selection SQL for a source artifact by primary key.
+pub use artifact_sql::select_source_artifact_by_id_sql;
+/// Compare two source artifacts for idempotent-retry equality.
+pub use artifact_sql::source_artifacts_are_idempotent_matches;
+/// `PostgreSQL` `deadlock_detected` SQLSTATE.
+pub use concurrent_write::DEADLOCK_DETECTED_SQLSTATE;
+/// `PostgreSQL` `exclusion_violation` SQLSTATE.
+pub use concurrent_write::EXCLUSION_VIOLATION_SQLSTATE;
+/// `PostgreSQL` `lock_not_available` SQLSTATE (`FOR UPDATE NOWAIT`).
+pub use concurrent_write::LOCK_NOT_AVAILABLE_SQLSTATE;
+/// `PostgreSQL` `serialization_failure` SQLSTATE.
+pub use concurrent_write::SERIALIZATION_FAILURE_SQLSTATE;
+/// `PostgreSQL` `unique_violation` SQLSTATE.
+pub use concurrent_write::UNIQUE_VIOLATION_SQLSTATE;
+/// Map a racing-write SQLSTATE onto a domain persistence error.
+pub use concurrent_write::classify_write_conflict;
 /// Knowledge-cutoff eligibility for historical analytical reads.
 pub use cutoff::is_cutoff_eligible;
 /// Render append-only audit insert SQL.
@@ -43,6 +76,8 @@ pub use document_sql::as_known_at_sql;
 pub use document_sql::as_valid_at_sql;
 /// Render open-document insert SQL.
 pub use document_sql::insert_document_sql;
+/// Render one transactional revise that fails closed unless one open row closes.
+pub use document_sql::revise_document_atomic_sql;
 /// Render revise close+insert SQL pair.
 pub use document_sql::revise_document_sqls;
 /// Append-only audit event.
@@ -55,6 +90,12 @@ pub use document_store::DocumentStore;
 pub use error::MigrationContractError;
 /// Fail-closed persistence domain errors.
 pub use error::PersistenceError;
+/// Bitemporal event-instance row.
+pub use instance_sql::EventInstanceRecord;
+/// Render insert SQL for a validated event instance.
+pub use instance_sql::insert_event_instance_sql;
+/// Render as-known-at selection for one event-instance identity.
+pub use instance_sql::select_event_instance_as_known_at_sql;
 /// Default pool acquire timeout in milliseconds.
 pub use live_pool::DEFAULT_ACQUIRE_TIMEOUT_MS;
 /// Default maximum pool connections.
@@ -83,6 +124,10 @@ pub use membership_sql::MembershipAssignmentRecord;
 pub use membership_sql::insert_membership_assignment_sql;
 /// Render selection SQL for document-level membership assignments.
 pub use membership_sql::select_membership_assignments_for_document_sql;
+/// Event-mention row that cannot collapse into an instance identity.
+pub use mention_sql::EventMentionRecord;
+/// Render insert SQL for a validated event mention.
+pub use mention_sql::insert_event_mention_sql;
 /// Embedded and ad-hoc migration catalogs.
 pub use migration::MigrationCatalog;
 /// Validate migration SQL against TEPP contracts.
@@ -105,6 +150,20 @@ pub use model_run_sql::select_model_artifacts_by_run_sql;
 pub use model_run_sql::select_model_run_by_id_sql;
 /// Multi-word `snake_case` database object naming.
 pub use naming::is_multi_word_snake_case;
+/// Typed event-relation row bound to the ERD transition vocabulary.
+pub use relation_sql::EventRelationRecord;
+/// Render insert SQL for a validated event relation.
+pub use relation_sql::insert_event_relation_sql;
+/// Opaque usable-state token after restore integrity passes.
+pub use restore_integrity::RestoreUsableState;
+/// Restored snapshot values that must be revalidated before use.
+pub use restore_integrity::RestoredAnalyticalSnapshot;
+/// Physical tables a backup/restore pair must cover.
+pub use restore_integrity::backup_scope_tables;
+/// Mark restored analytical state usable only after integrity revalidation.
+pub use restore_integrity::mark_restored_state_usable;
+/// SQL probes that fail closed on unusable restored rows.
+pub use restore_integrity::restore_integrity_probe_sqls;
 /// Recording SQL transport for offline contract tests.
 pub use sql_session::RecordingSqlSession;
 /// Live SQL transport contract.

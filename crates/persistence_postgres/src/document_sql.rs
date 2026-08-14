@@ -53,6 +53,41 @@ pub fn revise_document_sqls(record: &DocumentRecord) -> Result<[String; 2], Pers
     Ok([close, insert])
 }
 
+/// Render one transactional revise that fails closed unless exactly one open row closes.
+///
+/// The `DO` block updates the current `system_to IS NULL` version, requires that
+/// close to affect exactly one row, then inserts the successor. Concurrent
+/// revisers serialize on the open-row lock; the loser raises
+/// `serialization_failure` instead of leaving two open versions or a silent
+/// no-op. Digest validation matches [`insert_document_sql`].
+///
+/// # Errors
+///
+/// Returns [`PersistenceError::InvalidContentDigest`] when the digest is not a
+/// 64-character hexadecimal `SHA-256` string.
+pub fn revise_document_atomic_sql(record: &DocumentRecord) -> Result<String, PersistenceError> {
+    let insert = insert_document_sql(record)?;
+    Ok(format!(
+        "DO $tepp$ \
+         DECLARE closed_count integer; \
+         BEGIN \
+           PERFORM 1 FROM document_record \
+            WHERE document_record_id = '{document_id}'::uuid AND system_to IS NULL \
+            FOR UPDATE NOWAIT; \
+           UPDATE document_record SET system_to = '{system_from}'::timestamptz \
+            WHERE document_record_id = '{document_id}'::uuid AND system_to IS NULL; \
+           GET DIAGNOSTICS closed_count = ROW_COUNT; \
+           IF closed_count <> 1 THEN \
+             RAISE EXCEPTION 'concurrent document revision conflict' \
+               USING ERRCODE = 'serialization_failure'; \
+           END IF; \
+           {insert}; \
+         END $tepp$",
+        system_from = record.system_from.to_rfc3339(),
+        document_id = record.document_record_id,
+    ))
+}
+
 /// Render as-known-at selection for one document identity.
 #[must_use]
 pub fn as_known_at_sql(document_record_id: uuid::Uuid, known_at_rfc3339: &str) -> String {
@@ -89,10 +124,15 @@ pub fn as_valid_at_sql(
     )
 }
 
-/// Render append-only audit insert.
-#[must_use]
-pub fn append_audit_sql(event: &AuditEvent) -> String {
-    format!(
+/// Render append-only audit insert for a validated action code.
+///
+/// # Errors
+///
+/// Returns [`PersistenceError::InvalidAuditEvent`] when `action_code` is empty,
+/// longer than 128 bytes, or contains a control character, `'`, `;`, or `\`.
+pub fn append_audit_sql(event: &AuditEvent) -> Result<String, PersistenceError> {
+    validate_audit_action(&event.action_code)?;
+    Ok(format!(
         "INSERT INTO audit_event (\
             audit_event_id, tenant_record_id, action_code, subject_record_id, recorded_system_time\
         ) VALUES (\
@@ -104,7 +144,7 @@ pub fn append_audit_sql(event: &AuditEvent) -> String {
         action = escape_literal(&event.action_code),
         subject = event.subject_record_id,
         recorded = event.recorded_system_time.to_rfc3339(),
-    )
+    ))
 }
 
 fn optional_timestamptz(value: Option<String>) -> String {
@@ -116,6 +156,18 @@ fn optional_timestamptz(value: Option<String>) -> String {
 
 fn escape_literal(value: &str) -> String {
     value.replace('\'', "''")
+}
+
+fn validate_audit_action(value: &str) -> Result<(), PersistenceError> {
+    if value.is_empty()
+        || value.len() > 128
+        || value
+            .chars()
+            .any(|ch| ch.is_control() || ch == '\'' || ch == ';' || ch == '\\')
+    {
+        return Err(PersistenceError::InvalidAuditEvent);
+    }
+    Ok(())
 }
 
 fn validate_digest(digest: &str) -> Result<(), PersistenceError> {
@@ -132,7 +184,8 @@ fn validate_digest(digest: &str) -> Result<(), PersistenceError> {
 mod tests {
     use super::{
         append_audit_sql, as_known_at_sql, as_valid_at_sql, escape_literal, insert_document_sql,
-        optional_timestamptz, revise_document_sqls, validate_digest,
+        optional_timestamptz, revise_document_atomic_sql, revise_document_sqls,
+        validate_audit_action, validate_digest,
     };
     use crate::PersistenceError;
     use crate::document_store::{AuditEvent, DocumentRecord};
@@ -169,6 +222,19 @@ mod tests {
         assert!(close.contains("system_to IS NULL"));
         assert!(reopen.contains("INSERT INTO document_record"));
 
+        let atomic = revise_document_atomic_sql(&record).expect("atomic");
+        assert!(atomic.contains("DO $tepp$"));
+        assert!(atomic.contains("GET DIAGNOSTICS closed_count = ROW_COUNT"));
+        assert!(atomic.contains("serialization_failure"));
+        assert!(atomic.contains("INSERT INTO document_record"));
+        assert_eq!(
+            revise_document_atomic_sql(&DocumentRecord {
+                content_digest: "nope".into(),
+                ..sample_record()
+            }),
+            Err(PersistenceError::InvalidContentDigest)
+        );
+
         let known = as_known_at_sql(uuid::Uuid::nil(), "2026-03-01T00:00:00Z");
         assert!(known.contains("system_from <="));
         let valid = as_valid_at_sql(
@@ -181,13 +247,26 @@ mod tests {
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
             tenant_record_id: uuid::Uuid::nil(),
-            action_code: "revise'attempt".into(),
+            action_code: "revise".into(),
             subject_record_id: uuid::Uuid::nil(),
             recorded_system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
         };
-        let audit_sql = append_audit_sql(&audit);
+        let audit_sql = append_audit_sql(&audit).expect("audit");
         assert!(audit_sql.contains("INSERT INTO audit_event"));
-        assert!(audit_sql.contains("revise''attempt"));
+        assert!(audit_sql.contains("revise"));
+        assert_eq!(
+            append_audit_sql(&AuditEvent {
+                action_code: "revise'attempt".into(),
+                ..audit.clone()
+            }),
+            Err(PersistenceError::InvalidAuditEvent)
+        );
+        assert!(validate_audit_action("revise").is_ok());
+        assert!(validate_audit_action("").is_err());
+        assert!(validate_audit_action("revise;x").is_err());
+        assert!(validate_audit_action("revise\\").is_err());
+        assert!(validate_audit_action("revise\n").is_err());
+        assert!(validate_audit_action(&"x".repeat(129)).is_err());
 
         assert_eq!(
             insert_document_sql(&DocumentRecord {
