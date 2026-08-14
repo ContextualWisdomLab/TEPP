@@ -19,9 +19,10 @@ const UNIT_SUM_TOLERANCE: f64 = 1e-12;
 /// entry, or does not sum to one within a tight absolute tolerance.
 pub fn additive_log_ratio(proportions: &[f64]) -> Result<Vec<f64>, TopicMeasurementError> {
     let last = require_composition(proportions)?;
+    let reference_log = last.ln();
     Ok(proportions[..proportions.len() - 1]
         .iter()
-        .map(|part| part.ln() - last.ln())
+        .map(|part| part.ln() - reference_log)
         .collect())
 }
 
@@ -72,13 +73,23 @@ fn require_composition(proportions: &[f64]) -> Result<f64, TopicMeasurementError
         return Err(TopicMeasurementError::InvalidComposition);
     }
     let mut sum = 0.0_f64;
+    let mut compensation = 0.0_f64;
     for &part in proportions {
         if !part.is_finite() || part <= 0.0 {
             return Err(TopicMeasurementError::InvalidComposition);
         }
-        sum += part;
+        let next = sum + part;
+        compensation += if sum.abs() >= part.abs() {
+            (sum - next) + part
+        } else {
+            (part - next) + sum
+        };
+        sum = next;
     }
-    if !sum.is_finite() || (sum - 1.0).abs() > UNIT_SUM_TOLERANCE {
+    let compensated_sum = sum + compensation;
+    if !compensated_sum.is_finite()
+        || (compensated_sum - 1.0).abs() > UNIT_SUM_TOLERANCE
+    {
         return Err(TopicMeasurementError::InvalidComposition);
     }
     Ok(proportions[proportions.len() - 1])
