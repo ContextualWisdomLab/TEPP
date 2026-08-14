@@ -16,6 +16,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Six-clock temporal | `temporal_core` | implemented-main | — | unit + wire | Task 3 / PR #8 |
 | Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
+| TDT topic detection | `event_core` | active-PR | this PR | computed new-topic FAR/miss + pair P/R + RMSE vs always-new | ADR 0016; `docs/research/topic-detection-calibration.md` |
 | Multiple membership | `membership_core` | partial | — | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | concurrent document-write stress | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event (#37–#41 implemented-main) + atomic revise / concurrent-write SQLSTATE mapping (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#42 + concurrent-write stress |

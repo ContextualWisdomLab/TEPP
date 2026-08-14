@@ -20,6 +20,10 @@ pub enum EventError {
     UnsupportedWireVersion,
     /// An unknown event-role name was supplied.
     UnknownEventRole,
+    /// A topic cluster was treated as an event instance.
+    TopicClusterIsNotEventInstance,
+    /// An unknown topic-detection label name was supplied.
+    UnknownTopicDetectionLabel,
 }
 
 impl fmt::Display for EventError {
@@ -32,6 +36,8 @@ impl fmt::Display for EventError {
             Self::InvalidWirePayload => "invalid event wire payload",
             Self::UnsupportedWireVersion => "unsupported event wire version",
             Self::UnknownEventRole => "unknown event role",
+            Self::TopicClusterIsNotEventInstance => "topic cluster is not an event instance",
+            Self::UnknownTopicDetectionLabel => "unknown topic-detection label",
         };
         formatter.write_str(message)
     }
@@ -65,6 +71,14 @@ mod tests {
                 "unsupported event wire version",
             ),
             (EventError::UnknownEventRole, "unknown event role"),
+            (
+                EventError::TopicClusterIsNotEventInstance,
+                "topic cluster is not an event instance",
+            ),
+            (
+                EventError::UnknownTopicDetectionLabel,
+                "unknown topic-detection label",
+            ),
         ] {
             assert_eq!(error.to_string(), message);
         }

@@ -4,7 +4,8 @@
 //!
 //! TEPP separates **fallible event mentions** grounded in evidence from
 //! **versioned event instances** used for temporal state, multilevel membership,
-//! and scientific estimation. Mentions never silently become instances.
+//! and scientific estimation. Mentions and TDT topic clusters never silently
+//! become instances.
 
 mod confidence;
 mod error;
@@ -13,6 +14,7 @@ mod instance;
 mod mention;
 mod registry;
 mod role;
+mod topic;
 
 /// Finite confidence on the closed unit interval.
 pub use confidence::EventConfidence;
@@ -34,3 +36,19 @@ pub use mention::EventMention;
 pub use registry::EventRegistry;
 /// Typed event role kind.
 pub use role::EventRoleKind;
+/// Opaque TDT topic-cluster identity.
+pub use topic::TopicClusterId;
+/// New-topic versus existing-topic detection label.
+pub use topic::TopicDetectionLabel;
+/// Threshold a new-topic probability into a detection label.
+pub use topic::decide_topic_detection;
+/// False-alarm rate for new-topic detections.
+pub use topic::new_topic_false_alarm_rate;
+/// Miss rate for new-topic detections.
+pub use topic::new_topic_miss_rate;
+/// Explicit refusal to treat a topic cluster as an instance.
+pub use topic::refuse_topic_cluster_as_event_instance;
+/// Pair precision of recovered topic clusters against known truth.
+pub use topic::topic_cluster_pair_precision;
+/// Pair recall of recovered topic clusters against known truth.
+pub use topic::topic_cluster_pair_recall;
