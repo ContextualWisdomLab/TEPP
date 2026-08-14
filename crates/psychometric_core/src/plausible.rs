@@ -4,7 +4,11 @@ use crate::error::PsychometricError;
 use crate::indicator::{IndicatorKind, require_finite, require_valid_indicator};
 use crate::loading::recover_reflective_loading;
 
-/// Arithmetic mean of finite plausible-value draws.
+/// Scale-normalized compensated mean of finite plausible-value draws.
+///
+/// Scaling by the largest absolute draw prevents valid finite posterior values
+/// from overflowing during aggregation. Compensated accumulation preserves
+/// cancellation when draws span very different magnitudes.
 ///
 /// # Errors
 ///
@@ -14,14 +18,26 @@ pub fn plausible_value_mean(draws: &[f64]) -> Result<f64, PsychometricError> {
     if draws.is_empty() {
         return Err(PsychometricError::InvalidNumericInput);
     }
-    let mut sum = 0.0_f64;
+    let mut scale = 0.0_f64;
     for &value in draws {
         if !value.is_finite() {
             return Err(PsychometricError::InvalidNumericInput);
         }
-        sum += value;
+        scale = scale.max(value.abs());
     }
-    require_finite(sum / draws.len() as f64)
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+
+    let mut normalized_sum = 0.0_f64;
+    let mut compensation = 0.0_f64;
+    for &value in draws {
+        let adjusted = value / scale - compensation;
+        let next = normalized_sum + adjusted;
+        compensation = (next - normalized_sum) - adjusted;
+        normalized_sum = next;
+    }
+    require_finite((normalized_sum / draws.len() as f64) * scale)
 }
 
 /// Recover a reflective loading by averaging OLS slopes across posterior
