@@ -1068,4 +1068,18 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
     }
+
+    #[test]
+    fn finite_out_of_range_score_fails_closed() {
+        assert_eq!(
+            route_orchestration(&request(
+                InterpretationTaskKind::SpanClassification,
+                1.01,
+                0.1,
+                0.9,
+                8_000,
+            )),
+            Err(ApiError::InvalidWirePayload)
+        );
+    }
 }
