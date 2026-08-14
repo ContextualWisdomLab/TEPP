@@ -7,7 +7,7 @@ on:
       - reopened
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: repair-tepp-pr-45-v2
@@ -21,6 +21,8 @@ jobs:
       github.event.pull_request.head.ref == 'agent/persistence-retention-legal-hold'
     runs-on: ubuntu-latest
     timeout-minutes: 50
+    permissions:
+      contents: write
     services:
       postgres:
         image: postgres:16.9-alpine
@@ -42,7 +44,7 @@ jobs:
       - name: Checkout exact PR head
         uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: agent/persistence-retention-legal-hold
           fetch-depth: 0
           persist-credentials: true
 
@@ -104,6 +106,7 @@ jobs:
           rm -f coverage.lcov coverage-branches.json
           rm -f .github/workflows/repair-pr45.yml
           rm -f .github/workflows/repair-pr45-v2.yml
+          rm -f .github/workflows/repair-pr45-append-audit.yml
           rm -f scripts/repair_pr45_add_tests.py
           rm -f scripts/repair_pr45_apply_fixes.py
           git config user.name "github-actions[bot]"
@@ -111,4 +114,4 @@ jobs:
           git add -A
           git diff --cached --check
           git commit -m "fix(persistence): close retention lifecycle review gaps"
-          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          git push origin HEAD:agent/persistence-retention-legal-hold
