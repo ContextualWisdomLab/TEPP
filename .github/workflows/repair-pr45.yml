@@ -1,0 +1,413 @@
+name: Repair PR 45 retention lifecycle
+
+on:
+  pull_request:
+    types:
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-tepp-pr-45
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.number == 45 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/persistence-retention-legal-hold'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    services:
+      postgres:
+        image: postgres:16.9-alpine
+        env:
+          POSTGRES_USER: tepp
+          POSTGRES_PASSWORD: tepp_ci
+          POSTGRES_DB: tepp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tepp -d tepp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://tepp:tepp_ci@localhost:5432/tepp
+      CARGO_LLVM_COV_VERSION: "0.8.6"
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust toolchains
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt --component llvm-tools-preview
+          rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
+
+      - name: Add regression tests before implementation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement target, found {count}")
+              file_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          live_repository_test_marker = '''    #[test]
+              fn insert_and_revise_bind_tenant_session_before_document_sql() {
+          '''.replace("              ", "")
+          live_repository_test = '''    #[test]
+              fn tenant_scoped_insert_binds_session_context() {
+                  let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
+                  let manifest = ReproducibilityManifestRecord {
+                      reproducibility_manifest_id: uuid::Uuid::from_u128(11),
+                      tenant_record_id: uuid::Uuid::from_u128(12),
+                      knowledge_cutoff: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z")
+                          .expect("knowledge cutoff"),
+                      evidence_digest: "ab".repeat(32),
+                      code_commit_sha: "c".repeat(40),
+                      dependency_lock_digest: "de".repeat(32),
+                      system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z")
+                          .expect("system"),
+                      available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z")
+                          .expect("available"),
+                  };
+
+                  repo.insert_reproducibility_manifest(&manifest)
+                      .expect("manifest insert");
+                  let executed = repo.session().executed();
+                  assert_eq!(
+                      executed.len(),
+                      2,
+                      "tenant-scoped insert must bind the session before the INSERT"
+                  );
+                  assert!(executed[0].contains("tepp.current_tenant_record_id"));
+                  assert!(executed[0].contains(&manifest.tenant_record_id.to_string()));
+                  assert!(executed[1].contains("INSERT INTO reproducibility_manifest"));
+              }
+
+              #[test]
+              fn insert_and_revise_bind_tenant_session_before_document_sql() {
+          '''.replace("              ", "")
+          replace_once(
+              "crates/persistence_postgres/src/live_repository.rs",
+              live_repository_test_marker,
+              live_repository_test,
+          )
+
+          artifact_old = '''        let referenced = insert_source_artifact_sql(&with_ref).expect("ref");
+                  assert!(referenced.contains("s3://tepp/object"));
+          '''.replace("          ", "")
+          artifact_new = '''        let referenced = insert_source_artifact_sql(&with_ref).expect("ref");
+                  assert!(referenced.contains("s3://tepp/object"));
+                  let referenced_assertion =
+                      assert_source_artifact_matches_sql(&with_ref).expect("referenced assertion");
+                  assert!(referenced_assertion.contains("s3://tepp/object"));
+          '''.replace("          ", "")
+          replace_once(
+              "crates/persistence_postgres/src/artifact_sql.rs",
+              artifact_old,
+              artifact_new,
+          )
+
+          retention_marker = '''    #[test]
+              fn hold_scope_mismatch_and_unknown_codes_fail_closed() {
+          '''.replace("              ", "")
+          retention_test = '''    #[test]
+              fn lifecycle_windows_fail_closed() {
+                  let future = SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("future");
+                  let past = SystemTime::parse_rfc3339("2025-12-31T00:00:00Z").expect("past");
+
+                  let mut active_policy_closed = policy();
+                  active_policy_closed.system_to = Some(future.clone());
+                  assert_eq!(
+                      insert_retention_policy_sql(&active_policy_closed),
+                      Err(PersistenceError::InvalidRetentionLifecycle)
+                  );
+
+                  let mut superseded_policy_open = policy();
+                  superseded_policy_open.policy_status_code = "superseded".into();
+                  assert_eq!(
+                      insert_retention_policy_sql(&superseded_policy_open),
+                      Err(PersistenceError::InvalidRetentionLifecycle)
+                  );
+
+                  let mut superseded_policy_inverted = policy();
+                  superseded_policy_inverted.policy_status_code = "superseded".into();
+                  superseded_policy_inverted.system_to = Some(past.clone());
+                  assert_eq!(
+                      insert_retention_policy_sql(&superseded_policy_inverted),
+                      Err(PersistenceError::InvalidRetentionLifecycle)
+                  );
+
+                  let mut active_hold_closed = hold();
+                  active_hold_closed.system_to = Some(future);
+                  assert_eq!(
+                      insert_legal_hold_sql(&active_hold_closed),
+                      Err(PersistenceError::InvalidRetentionLifecycle)
+                  );
+
+                  let mut released_hold_open = hold();
+                  released_hold_open.hold_status_code = "released".into();
+                  assert_eq!(
+                      insert_legal_hold_sql(&released_hold_open),
+                      Err(PersistenceError::InvalidRetentionLifecycle)
+                  );
+
+                  let mut released_hold_inverted = hold();
+                  released_hold_inverted.hold_status_code = "released".into();
+                  released_hold_inverted.system_to = Some(past);
+                  assert_eq!(
+                      insert_legal_hold_sql(&released_hold_inverted),
+                      Err(PersistenceError::InvalidRetentionLifecycle)
+                  );
+              }
+
+              #[test]
+              fn hold_scope_mismatch_and_unknown_codes_fail_closed() {
+          '''.replace("              ", "")
+          replace_once(
+              "crates/persistence_postgres/src/retention_sql.rs",
+              retention_marker,
+              retention_test,
+          )
+
+          migration_use_old = "    use super::{MigrationCatalog, validate_migration_catalog};"
+          migration_use_new = (
+              "    use super::{\n"
+              "        MigrationCatalog, RETENTION_DOWN, RETENTION_UP, validate_migration_catalog,\n"
+              "    };"
+          )
+          replace_once(
+              "crates/persistence_postgres/src/migration.rs",
+              migration_use_old,
+              migration_use_new,
+          )
+          migration_marker = '''    #[test]
+              fn helper_predicates_are_exhaustive() {
+          '''.replace("              ", "")
+          migration_test = '''    #[test]
+              fn retention_migration_orders_trigger_and_privilege_dependencies() {
+                  let release_definition = RETENTION_UP
+                      .rfind("CREATE OR REPLACE FUNCTION release_legal_hold")
+                      .expect("release function definition");
+                  let release_privilege = RETENTION_UP
+                      .rfind("GRANT EXECUTE ON FUNCTION release_legal_hold")
+                      .expect("release function privilege");
+                  assert!(
+                      release_definition < release_privilege,
+                      "routine privileges must be applied only after routine creation"
+                  );
+
+                  let trigger_drop = RETENTION_DOWN
+                      .find("DROP TRIGGER IF EXISTS legal_hold_enforce_release")
+                      .expect("trigger drop");
+                  let function_drop = RETENTION_DOWN
+                      .find("DROP FUNCTION IF EXISTS enforce_legal_hold_release")
+                      .expect("function drop");
+                  assert!(
+                      trigger_drop < function_drop,
+                      "rollback must remove trigger dependencies before their functions"
+                  );
+              }
+
+              #[test]
+              fn helper_predicates_are_exhaustive() {
+          '''.replace("              ", "")
+          replace_once(
+              "crates/persistence_postgres/src/migration.rs",
+              migration_marker,
+              migration_test,
+          )
+
+          live_test_path = Path("crates/persistence_postgres/tests/live_postgres.rs")
+          live_test = live_test_path.read_text(encoding="utf-8")
+          import_old = "reset_app_runtime_role_sql, set_session_tenant_sql,"
+          import_new = (
+              "reset_app_runtime_role_sql, select_active_analysis_document_sql, "
+              "set_session_tenant_sql,"
+          )
+          if live_test.count(import_old) != 1:
+              raise SystemExit("live_postgres.rs: import replacement target mismatch")
+          live_test = live_test.replace(import_old, import_new, 1)
+
+          start = live_test.index("    let eligibility = format!(", live_test.index("fn prove_retention"))
+          end_marker = '''    repo.submit_active_analysis_document(unheld_document_id)
+                  .expect("active-analysis select must exclude tombstones");
+          '''.replace("          ", "")
+          end = live_test.index(end_marker, start) + len(end_marker)
+          replacement = '''    let active_selection = select_active_analysis_document_sql(unheld_document_id);
+              let eligibility = format!(
+                  "DO $tepp$ BEGIN \\
+                     IF EXISTS ({active_selection}) THEN \\
+                       RAISE EXCEPTION 'tombstoned document remained analysis-eligible'; \\
+                     END IF; \\
+                     IF EXISTS ( \\
+                       SELECT 1 FROM evidence_tombstone \\
+                       WHERE evidence_tombstone_id = '{tombstone}'::uuid \\
+                         AND reproduction_status_code = 'available' \\
+                     ) THEN \\
+                       RAISE EXCEPTION 'deleted raw source claimed available reproduction'; \\
+                     END IF; \\
+                   END $tepp$",
+                  tombstone = tombstone.evidence_tombstone_id,
+              );
+              repo.session_mut()
+                  .execute(&eligibility)
+                  .expect("active-analysis SQL must return zero tombstoned rows");
+          '''.replace("              ", "")
+          live_test_path.write_text(live_test[:start] + replacement + live_test[end:], encoding="utf-8")
+          PY
+
+      - name: Prove the tenant-binding regression is RED
+        run: |
+          set +e
+          cargo +1.97.1 test -p persistence_postgres tenant_scoped_insert_binds_session_context -- --exact
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "Expected the tenant-binding regression to fail before implementation" >&2
+            exit 1
+          fi
+
+      - name: Apply tenant, migration, and lifecycle fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          live_path = Path("crates/persistence_postgres/src/live_repository.rs")
+          live = live_path.read_text(encoding="utf-8")
+          old_helper = '''    /// Bind the session tenant GUC required by FORCE RLS and the 0007
+              /// tombstone-restore trigger before mutating `document_record`.
+              fn bind_document_tenant(&mut self, tenant_record_id: Uuid) -> Result<(), PersistenceError> {
+          '''.replace("              ", "")
+          new_helper = '''    /// Bind the session tenant GUC before tenant-scoped persistence operations.
+              fn bind_session_tenant(&mut self, tenant_record_id: Uuid) -> Result<(), PersistenceError> {
+          '''.replace("              ", "")
+          if live.count(old_helper) != 1:
+              raise SystemExit("live_repository.rs: tenant helper target mismatch")
+          live = live.replace(old_helper, new_helper, 1)
+          live = live.replace("self.bind_document_tenant(", "self.bind_session_tenant(")
+
+          tenant_methods = [
+              "append_audit",
+              "insert_reproducibility_manifest",
+              "insert_corpus_split_manifest",
+              "insert_model_run",
+              "insert_model_artifact",
+              "insert_membership_assignment",
+              "insert_event_relation",
+              "insert_event_mention",
+              "insert_event_instance",
+              "insert_source_artifact",
+              "insert_retention_policy",
+              "insert_legal_hold",
+              "insert_deletion_request",
+              "insert_completed_deletion_request",
+              "insert_evidence_tombstone",
+          ]
+          for method in tenant_methods:
+              start = live.find(f"    pub fn {method}(")
+              if start < 0:
+                  raise SystemExit(f"live_repository.rs: method not found: {method}")
+              brace = live.find(" {\n", start)
+              if brace < 0:
+                  raise SystemExit(f"live_repository.rs: method brace not found: {method}")
+              insert_at = brace + len(" {\n")
+              expected = "        let sql ="
+              if not live.startswith(expected, insert_at):
+                  raise SystemExit(
+                      f"live_repository.rs: unexpected first statement for {method}: "
+                      f"{live[insert_at:insert_at + 80]!r}"
+                  )
+              live = (
+                  live[:insert_at]
+                  + "        self.bind_session_tenant(record.tenant_record_id)?;\n"
+                  + live[insert_at:]
+              )
+          live_path.write_text(live, encoding="utf-8")
+
+          up_path = Path("migrations/0007_retention_deletion_legal_hold.up.sql")
+          up = up_path.read_text(encoding="utf-8")
+          routine_privileges = '''REVOKE ALL ON FUNCTION enforce_retention_policy_succession() FROM PUBLIC;
+          REVOKE ALL ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) FROM PUBLIC;
+          REVOKE ALL ON FUNCTION reject_held_evidence_deletion() FROM PUBLIC;
+          REVOKE ALL ON FUNCTION reject_tombstoned_evidence_restore() FROM PUBLIC;
+          GRANT EXECUTE ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) TO tepp_app_runtime;
+          REVOKE ALL ON FUNCTION release_legal_hold(uuid, timestamptz) FROM PUBLIC;
+          REVOKE ALL ON FUNCTION enforce_legal_hold_release() FROM PUBLIC;
+          REVOKE ALL ON FUNCTION guard_legal_hold_insert() FROM PUBLIC;
+          GRANT EXECUTE ON FUNCTION release_legal_hold(uuid, timestamptz) TO tepp_app_runtime;
+          '''.replace("          ", "")
+          if up.count(routine_privileges) != 1:
+              raise SystemExit("0007 up: routine privilege block target mismatch")
+          up = up.replace(routine_privileges + "\n", "", 1)
+          up = up.rstrip() + "\n\n" + routine_privileges
+          up_path.write_text(up, encoding="utf-8")
+
+          down_path = Path("migrations/0007_retention_deletion_legal_hold.down.sql")
+          down = down_path.read_text(encoding="utf-8")
+          function_drops = '''DROP FUNCTION IF EXISTS release_legal_hold(uuid, timestamptz);
+          DROP FUNCTION IF EXISTS supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz);
+          DROP FUNCTION IF EXISTS enforce_retention_policy_succession();
+          DROP FUNCTION IF EXISTS enforce_legal_hold_release();
+          DROP FUNCTION IF EXISTS reject_tombstoned_evidence_restore();
+          DROP FUNCTION IF EXISTS reject_held_evidence_deletion();
+          DROP FUNCTION IF EXISTS guard_legal_hold_insert();
+          '''.replace("          ", "")
+          if down.count(function_drops) != 1:
+              raise SystemExit("0007 down: function drop block target mismatch")
+          down = down.replace(function_drops + "\n", "", 1)
+          down = down.rstrip() + "\n\n" + function_drops
+          down_path.write_text(down, encoding="utf-8")
+          PY
+
+      - name: Format and run persistence tests
+        run: |
+          cargo +1.97.1 fmt --all
+          cargo +1.97.1 test -p persistence_postgres --lib --tests
+          cargo +1.97.1 clippy -p persistence_postgres --all-targets --all-features -- -D warnings
+
+      - name: Run live PostgreSQL integration
+        env:
+          TEPP_LIVE_POSTGRES: "1"
+        run: cargo +1.97.1 test -p persistence_postgres --features live-sqlx --test live_postgres -- --nocapture
+
+      - name: Run full workspace verification
+        run: |
+          cargo +1.97.1 test --workspace --all-features
+          python3 scripts/check_docstrings.py
+          python3 scripts/check_workspace_contract.py
+          python3 scripts/validate_documentation.py
+
+      - name: Install pinned coverage tool
+        run: cargo +1.97.1 install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
+
+      - name: Enforce exact line and branch coverage
+        run: |
+          cargo +1.97.1 llvm-cov --workspace --all-features --lcov --output-path coverage.lcov --ignore-filename-regex 'sqlx_live\\.rs'
+          python3 scripts/check_coverage.py coverage.lcov --kind lines --format lcov
+          cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json --ignore-filename-regex 'sqlx_live\\.rs'
+          python3 scripts/check_coverage.py coverage-branches.json --kind branches
+
+      - name: Commit verified repair and remove one-shot workflow
+        run: |
+          rm -f coverage.lcov coverage-branches.json
+          rm -f .github/workflows/repair-pr45.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(persistence): close retention lifecycle review gaps"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
