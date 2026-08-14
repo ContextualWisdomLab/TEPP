@@ -13,12 +13,16 @@ use persistence_postgres::{
     assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
     require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
 };
+use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
 use std::thread;
+use std::time::Duration;
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
 
 const CONCURRENT_WRITERS: usize = 2;
+/// Wall-clock budget for concurrent proofs; hang rather than block the live job forever.
+const CONCURRENT_PROOF_TIMEOUT: Duration = Duration::from_secs(90);
 
 const LIVE_GATE_ENV: &str = "TEPP_LIVE_POSTGRES";
 
@@ -281,6 +285,22 @@ fn sample_document(
     }
 }
 
+fn join_with_timeout<T: Send + 'static>(
+    handle: thread::JoinHandle<T>,
+    budget: Duration,
+    context: &'static str,
+) -> T {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = tx.send(handle.join());
+    });
+    match rx.recv_timeout(budget) {
+        Ok(Ok(value)) => value,
+        Ok(Err(_)) => panic!("{context}: worker thread panicked"),
+        Err(_) => panic!("{context}: worker exceeded wall-clock budget"),
+    }
+}
+
 fn race_identical_writes(
     record: &DocumentRecord,
     revise: bool,
@@ -291,7 +311,7 @@ fn race_identical_writes(
         .map(|_| open_writer_repo())
         .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    writers
+    let handles: Vec<_> = writers
         .into_iter()
         .map(|mut writer| {
             let barrier = Arc::clone(&barrier);
@@ -305,7 +325,10 @@ fn race_identical_writes(
                 }
             })
         })
-        .map(|handle| handle.join().expect(context))
+        .collect();
+    handles
+        .into_iter()
+        .map(|handle| join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, context))
         .collect()
 }
 
@@ -393,9 +416,7 @@ fn prove_distinct_concurrent_inserts(
         })
         .collect();
     for handle in handles {
-        handle
-            .join()
-            .expect("distinct insert thread")
+        join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, "distinct insert thread")
             .expect("independent document inserts must all succeed");
     }
 }
@@ -422,7 +443,7 @@ fn prove_concurrent_append_only_reject(source_artifact_id: Uuid) {
         .collect();
     for handle in handles {
         assert!(
-            handle.join().expect("mutation thread").is_err(),
+            join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, "mutation thread").is_err(),
             "concurrent append-only UPDATE must fail"
         );
     }
