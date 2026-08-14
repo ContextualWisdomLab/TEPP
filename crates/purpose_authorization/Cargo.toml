@@ -1,0 +1,20 @@
+[package]
+name = "purpose_authorization"
+description = "Purpose-bound authorization grants that refuse blanket masking."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+uuid = { workspace = true }
+
+[lints]
+workspace = true
