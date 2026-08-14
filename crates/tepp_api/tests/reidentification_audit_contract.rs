@@ -1,9 +1,8 @@
 //! Elevated re-identification must append redacted audit evidence for every decision.
 
 use tepp_api::{
-    AnalyticalPurpose, ApiError, IdentityMappingRecord, PurposeGrant,
-    ReidentificationAuditOutcome, ReidentificationAuditRecord, ReidentificationAuditSink,
-    disclose_identity_mapping,
+    AnalyticalPurpose, ApiError, IdentityMappingRecord, PurposeGrant, ReidentificationAuditOutcome,
+    ReidentificationAuditRecord, ReidentificationAuditSink, disclose_identity_mapping,
 };
 
 const DECISION_DIGEST: &str =
@@ -59,7 +58,10 @@ fn successful_reidentification_appends_redacted_audit_evidence_before_disclosure
     )
     .expect("audited elevated disclosure");
 
-    assert_eq!(disclosed.direct_identity(), "Pat Lee <pat.lee@example.test>");
+    assert_eq!(
+        disclosed.direct_identity(),
+        "Pat Lee <pat.lee@example.test>"
+    );
     assert_eq!(sink.records, vec![audit.clone()]);
     assert_eq!(audit.tenant_workspace_id(), "tenant-workspace");
     assert_eq!(audit.principal_id(), "principal-analyst");

@@ -35,5 +35,5 @@ National Institute of Standards and Technology. (2020). *NIST Privacy Framework:
 
 ## Verification
 
-- unit tests for unknown fields, unsupported versions, empty identities, byte limits, GraphML escaping, example payload parsing, expired-purpose denial, provider mapping refusal, and elevated re-identification;
+- unit tests for unknown fields, unsupported versions, empty identities, byte limits, GraphML escaping, example payload parsing, expired, not-yet-valid, inverted, cross-tenant, and impossible-calendar grant denial; provider mapping refusal; and audited elevated re-identification replay;
 - workspace line and branch coverage gates must remain complete for production modules.
