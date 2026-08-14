@@ -2,9 +2,8 @@
 
 use tepp_api::{
     ApiError, DocumentControlAttempt, InterpretationTaskKind, MAX_ORCHESTRATION_ACCESS_ENTRIES,
-    MAX_ORCHESTRATION_ACCESS_TOKEN_BYTES,
-    MAX_ORCHESTRATION_TOKEN_BUDGET, ORCHESTRATION_POLICY_VERSION, OrchestrationRequest,
-    route_orchestration,
+    MAX_ORCHESTRATION_ACCESS_TOKEN_BYTES, MAX_ORCHESTRATION_TOKEN_BUDGET,
+    ORCHESTRATION_POLICY_VERSION, OrchestrationMode, OrchestrationRequest, route_orchestration,
 };
 
 fn request() -> OrchestrationRequest {
@@ -56,4 +55,14 @@ fn duplicate_access_tokens_fail_closed_instead_of_amplifying_authority() {
         route_orchestration(&duplicate),
         Err(ApiError::InvalidWirePayload)
     );
+}
+
+#[test]
+fn verify_mode_falls_back_to_direct_at_the_direct_budget_boundary() {
+    let mut budgeted = request();
+    budgeted.risk_score = 0.35;
+    budgeted.compute_budget_tokens = OrchestrationMode::Direct.minimum_token_budget();
+
+    let plan = route_orchestration(&budgeted).expect("bounded request");
+    assert_eq!(plan.mode, OrchestrationMode::Direct);
 }
