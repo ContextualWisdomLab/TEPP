@@ -87,6 +87,43 @@ jobs:
         run: |
           python3 scripts/repair_pr50_apply_known_identity.py
           cargo +1.97.1 fmt --all
+      - name: Rebase shared ledgers on protected main
+        run: |
+          git show origin/main:CHANGELOG.md > /tmp/main_changelog.md
+          git show origin/main:docs/TRACEABILITY.md > /tmp/main_traceability.md
+          git show origin/main:docs/validation/temporal-event-foundation.md > /tmp/main_validation.md
+          python3 - <<'PY'
+          from pathlib import Path
+
+          changelog = Path('/tmp/main_changelog.md').read_text(encoding='utf-8')
+          bullet = '- `event_core` ADR 0016 evidence-status gates: TDT detections and CHRONOS predictions cannot admit a forward state transition; generic first-story miss/false-alarm scoring is paired with an explicitly oracle-assisted known-identity baseline.\n'
+          if bullet not in changelog:
+              marker = '### Added\n\n'
+              if changelog.count(marker) != 1:
+                  raise SystemExit('protected-main CHANGELOG Added marker mismatch')
+              changelog = changelog.replace(marker, marker + bullet, 1)
+          Path('CHANGELOG.md').write_text(changelog, encoding='utf-8')
+
+          traceability = Path('/tmp/main_traceability.md').read_text(encoding='utf-8')
+          event_old = '| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |'
+          event_new = '| event ontology/evidence mentions | PRD; ADR 0003/0016 | `event_core` mention/instance separation on protected main; ADR 0016 admission gates and independent-truth rate scoring on the active PR; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; raw-text detection/tracking remains | partial |'
+          tdt_old = '| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |'
+          tdt_new = '| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` admission gates, generic rates, and an explicitly oracle-assisted known-identity baseline on the active PR; raw-text TDT/CHRONOS stack remaining | partial |'
+          for old, new in ((event_old, event_new), (tdt_old, tdt_new)):
+              if traceability.count(old) != 1:
+                  raise SystemExit(f'protected-main traceability target mismatch: {old}')
+              traceability = traceability.replace(old, new, 1)
+          Path('docs/TRACEABILITY.md').write_text(traceability, encoding='utf-8')
+
+          validation = Path('/tmp/main_validation.md').read_text(encoding='utf-8')
+          row = '| TDT/CHRONOS evidence-status gates | `event_core` | active-PR | admission + generic first-story rates | independent truth + known-identity baseline | ADR 0016; `docs/research/event-intelligence-status-gates.md` |\n'
+          if row not in validation:
+              marker = '| Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |\n'
+              if validation.count(marker) != 1:
+                  raise SystemExit('protected-main validation marker mismatch')
+              validation = validation.replace(marker, marker + row, 1)
+          Path('docs/validation/temporal-event-foundation.md').write_text(validation, encoding='utf-8')
+          PY
       - name: Verify focused and workspace contracts
         run: |
           cargo +1.97.1 fmt --all --check
