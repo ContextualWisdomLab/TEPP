@@ -39,6 +39,22 @@ fn known_simplex_recovers_through_alr_with_computed_rmse() {
 }
 
 #[test]
+fn large_finite_coordinates_round_trip_without_exponential_overflow() {
+    let truth = [710.0, 709.0];
+    let simplex = from_additive_log_ratio(&truth)
+        .expect("finite representable ALR coordinates must use a stable inverse");
+    assert!(simplex.iter().all(|part| part.is_finite() && *part > 0.0));
+    assert!((simplex.iter().sum::<f64>() - 1.0).abs() < 1e-15);
+
+    let recovered = additive_log_ratio(&simplex)
+        .expect("forward ALR must subtract logs instead of overflowing the ratio");
+    assert!(
+        rmse(&truth, &recovered) < 1e-10,
+        "large-coordinate round trip must retain the true parameters"
+    );
+}
+
+#[test]
 fn equal_shares_map_to_zero_alr_and_refuse_raw_euclidean_use() {
     let thirds = [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0];
     let coordinates = additive_log_ratio(&thirds).expect("equal");
