@@ -1,6 +1,14 @@
-"""Apply PR 45 tenant, migration, and lifecycle fixes."""
+"""Apply PR 45 tenant, migration, advisory-lock, and lifecycle fixes."""
 
 from pathlib import Path
+
+
+def replace_once(text: str, old: str, new: str, label: str) -> str:
+    """Replace exactly one fragment or fail closed."""
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected one target, found {count}")
+    return text.replace(old, new, 1)
 
 
 live_path = Path("crates/persistence_postgres/src/live_repository.rs")
@@ -12,9 +20,7 @@ old_helper = """    /// Bind the session tenant GUC required by FORCE RLS and th
 new_helper = """    /// Bind the session tenant GUC before tenant-scoped persistence operations.
     fn bind_session_tenant(&mut self, tenant_record_id: Uuid) -> Result<(), PersistenceError> {
 """
-if live.count(old_helper) != 1:
-    raise SystemExit("live_repository.rs: tenant helper target mismatch")
-live = live.replace(old_helper, new_helper, 1)
+live = replace_once(live, old_helper, new_helper, "live_repository tenant helper")
 live = live.replace("self.bind_document_tenant(", "self.bind_session_tenant(")
 
 tenant_methods = [
@@ -59,6 +65,54 @@ live_path.write_text(live, encoding="utf-8")
 
 up_path = Path("migrations/0007_retention_deletion_legal_hold.up.sql")
 up = up_path.read_text(encoding="utf-8")
+up = replace_once(
+    up,
+    """    PERFORM pg_advisory_xact_lock(
+        hashtextextended(NEW.tenant_record_id::text, 0),
+        hashtextextended(NEW.target_document_id::text, 0)
+    );
+""",
+    """    PERFORM pg_advisory_xact_lock(
+        hashtextextended(
+            NEW.tenant_record_id::text || ':' || NEW.target_document_id::text,
+            0
+        )
+    );
+""",
+    "0007 deletion advisory lock",
+)
+up = replace_once(
+    up,
+    """    PERFORM pg_advisory_xact_lock(
+        hashtextextended(NEW.tenant_record_id::text, 0),
+        hashtextextended(lock_document::text, 0)
+    );
+""",
+    """    PERFORM pg_advisory_xact_lock(
+        hashtextextended(
+            NEW.tenant_record_id::text || ':' || lock_document::text,
+            0
+        )
+    );
+""",
+    "0007 hold-insert advisory lock",
+)
+up = replace_once(
+    up,
+    """    PERFORM pg_advisory_xact_lock(
+        hashtextextended(current_hold.tenant_record_id::text, 0),
+        hashtextextended(lock_document::text, 0)
+    );
+""",
+    """    PERFORM pg_advisory_xact_lock(
+        hashtextextended(
+            current_hold.tenant_record_id::text || ':' || lock_document::text,
+            0
+        )
+    );
+""",
+    "0007 hold-release advisory lock",
+)
 routine_privileges = """REVOKE ALL ON FUNCTION enforce_retention_policy_succession() FROM PUBLIC;
 REVOKE ALL ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) FROM PUBLIC;
 REVOKE ALL ON FUNCTION reject_held_evidence_deletion() FROM PUBLIC;
@@ -69,9 +123,7 @@ REVOKE ALL ON FUNCTION enforce_legal_hold_release() FROM PUBLIC;
 REVOKE ALL ON FUNCTION guard_legal_hold_insert() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION release_legal_hold(uuid, timestamptz) TO tepp_app_runtime;
 """
-if up.count(routine_privileges) != 1:
-    raise SystemExit("0007 up: routine privilege block target mismatch")
-up = up.replace(routine_privileges + "\n", "", 1)
+up = replace_once(up, routine_privileges + "\n", "", "0007 routine privileges")
 up = up.rstrip() + "\n\n" + routine_privileges
 up_path.write_text(up, encoding="utf-8")
 
@@ -85,8 +137,6 @@ DROP FUNCTION IF EXISTS reject_tombstoned_evidence_restore();
 DROP FUNCTION IF EXISTS reject_held_evidence_deletion();
 DROP FUNCTION IF EXISTS guard_legal_hold_insert();
 """
-if down.count(function_drops) != 1:
-    raise SystemExit("0007 down: function drop block target mismatch")
-down = down.replace(function_drops + "\n", "", 1)
+down = replace_once(down, function_drops + "\n", "", "0007 function drops")
 down = down.rstrip() + "\n\n" + function_drops
 down_path.write_text(down, encoding="utf-8")
