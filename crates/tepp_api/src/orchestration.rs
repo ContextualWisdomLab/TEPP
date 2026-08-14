@@ -746,9 +746,9 @@ fn budgets_are_comparable(left: u64, right: u64) -> bool {
 mod tests {
     use super::{
         DocumentControlAttempt, InterpretationTaskKind, ORCHESTRATION_CONTRACT_VERSION,
-        ORCHESTRATION_POLICY_VERSION, OrchestrationMode, OrchestrationRequest,
-        OrchestrationRole, ReasoningEffort, bind_contextual_orchestrator,
-        budgets_are_comparable, record_budget_ablation, route_orchestration,
+        ORCHESTRATION_POLICY_VERSION, OrchestrationMode, OrchestrationRequest, OrchestrationRole,
+        ReasoningEffort, bind_contextual_orchestrator, budgets_are_comparable,
+        record_budget_ablation, route_orchestration,
     };
     use crate::ApiError;
 
@@ -895,8 +895,7 @@ mod tests {
             32_000,
         );
         different_access.access_list.push("evidence_spans".into());
-        let different_access =
-            route_orchestration(&different_access).expect("different access");
+        let different_access = route_orchestration(&different_access).expect("different access");
         assert_eq!(
             record_budget_ablation(&direct, &different_access),
             Err(ApiError::InvalidWirePayload),
@@ -917,6 +916,36 @@ mod tests {
         assert_eq!(
             binding.evidence_manifest_hash(),
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
+        assert_eq!(
+            bind_contextual_orchestrator(&verify, "raw evidence"),
+            Err(ApiError::InvalidWirePayload),
+        );
+        assert_eq!(
+            bind_contextual_orchestrator(&verify, "sha256:a"),
+            Err(ApiError::InvalidWirePayload),
+        );
+        assert_eq!(
+            bind_contextual_orchestrator(
+                &verify,
+                "sha256:gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+            ),
+            Err(ApiError::InvalidWirePayload),
+        );
+        let abstain = route_orchestration(&request(
+            InterpretationTaskKind::SpanClassification,
+            0.1,
+            0.1,
+            0.1,
+            8_000,
+        ))
+        .expect("abstain");
+        assert_eq!(
+            bind_contextual_orchestrator(
+                &abstain,
+                "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            ),
+            Err(ApiError::AuthorizationDenied),
         );
 
         let conductor = route_orchestration(&request(
