@@ -6,12 +6,14 @@ use tepp_api::{
     refuse_org_workflow_secret, refuse_org_workflow_table_access,
 };
 
+const PINNED_SHA: &str = "f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae";
+
 #[test]
 fn reusable_workflow_binds_as_ci_review_security_only() {
-    let binding = bind_org_github_workflow(
-        "ContextualWisdomLab/.github/.github/workflows/security-scan.yml@main",
-    )
-    .expect("org reusable workflow");
+    let identity = format!(
+        "ContextualWisdomLab/.github/.github/workflows/security-scan.yml@{PINNED_SHA}"
+    );
+    let binding = bind_org_github_workflow(&identity).expect("org reusable workflow");
     assert_eq!(
         binding.contract_version(),
         ORG_GITHUB_WORKFLOW_CONTRACT_VERSION
@@ -21,13 +23,14 @@ fn reusable_workflow_binds_as_ci_review_security_only() {
     assert!(
         binding
             .workflow_identity()
-            .contains(ORG_GITHUB_WORKFLOW_OWNER)
+            .starts_with(ORG_GITHUB_WORKFLOW_OWNER)
     );
     assert!(
         binding
             .workflow_identity()
             .contains("workflows/security-scan.yml")
     );
+    assert!(binding.workflow_identity().ends_with(PINNED_SHA));
     assert_eq!(binding.authority(), OrgWorkflowAuthority::CiReviewSecurity);
     assert_eq!(
         refuse_check_conclusion_as_scientific_claim("SUCCESS"),
