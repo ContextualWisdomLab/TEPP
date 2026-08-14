@@ -114,7 +114,7 @@ TEPP owns its application/API state, authorized evidence, model runs, and artifa
 
 ### Provider payload minimization
 
-Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers must build the payload through `tepp_api::minimize_provider_payload`. That function preserves opaque analytical identifiers and membership roles, applies purpose-bound source-text rules, refuses expired, impossible-calendar, or cross-tenant grants, and never copies a direct identity mapping into the provider body or ordinary log. Re-identification is a separate elevated scientific path (`disclose_identity_mapping`), not a provider header or prompt field.
+Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers must build the payload through `tepp_api::minimize_provider_payload`. That function preserves opaque analytical identifiers and membership roles, applies purpose-bound source-text rules, refuses expired, not-yet-valid, inverted, cross-tenant, or impossible-calendar grants, and never copies a direct identity mapping into the provider body or ordinary log. Re-identification is a separate elevated scientific path (`disclose_identity_mapping`), not a provider header or prompt field.
 
 ### contextual-orchestrator
 

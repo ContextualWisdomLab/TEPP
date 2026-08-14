@@ -169,6 +169,109 @@ impl DisclosedIdentityMapping {
     }
 }
 
+/// Redacted outcome of an elevated re-identification decision.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReidentificationAuditOutcome {
+    /// The protected mapping was released after audit append succeeded.
+    Allowed,
+    /// A well-formed request was denied by purpose, tenant, lifetime, or role policy.
+    Denied,
+}
+
+impl ReidentificationAuditOutcome {
+    /// Stable wire name for append-only audit persistence.
+    #[must_use]
+    pub const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Allowed => "allowed",
+            Self::Denied => "denied",
+        }
+    }
+}
+
+/// Redacted append-only evidence for an elevated re-identification decision.
+///
+/// Direct identity is deliberately absent. The digest identifies the governed
+/// decision input without copying protected source or mapping content.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReidentificationAuditRecord {
+    tenant_workspace_id: String,
+    principal_id: String,
+    purpose_wire_name: String,
+    action_code: &'static str,
+    opaque_analytical_id: String,
+    decision_time: String,
+    outcome: ReidentificationAuditOutcome,
+    decision_digest: String,
+}
+
+impl ReidentificationAuditRecord {
+    /// Tenant/workspace in which the decision occurred.
+    #[must_use]
+    pub fn tenant_workspace_id(&self) -> &str {
+        &self.tenant_workspace_id
+    }
+
+    /// Opaque principal that requested disclosure.
+    #[must_use]
+    pub fn principal_id(&self) -> &str {
+        &self.principal_id
+    }
+
+    /// Purpose wire name evaluated by policy.
+    #[must_use]
+    pub fn purpose_wire_name(&self) -> &str {
+        &self.purpose_wire_name
+    }
+
+    /// Stable elevated action code.
+    #[must_use]
+    pub const fn action_code(&self) -> &'static str {
+        self.action_code
+    }
+
+    /// Opaque analytical identity involved in the decision.
+    #[must_use]
+    pub fn opaque_analytical_id(&self) -> &str {
+        &self.opaque_analytical_id
+    }
+
+    /// Canonical UTC decision instant.
+    #[must_use]
+    pub fn decision_time(&self) -> &str {
+        &self.decision_time
+    }
+
+    /// Allowed or denied decision outcome.
+    #[must_use]
+    pub const fn outcome(&self) -> ReidentificationAuditOutcome {
+        self.outcome
+    }
+
+    /// Canonical SHA-256 digest of the governed decision input.
+    #[must_use]
+    pub fn decision_digest(&self) -> &str {
+        &self.decision_digest
+    }
+}
+
+/// Append-only persistence port for elevated re-identification audit evidence.
+///
+/// Implementations must append an immutable row or event and must never copy
+/// the disclosed direct identity into ordinary audit storage.
+pub trait ReidentificationAuditSink {
+    /// Append one redacted decision record before disclosure or denial returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns a redacted [`ApiError`] when append-only persistence fails. The
+    /// disclosure then fails closed and no direct identity is returned.
+    fn append_reidentification_audit(
+        &mut self,
+        record: &ReidentificationAuditRecord,
+    ) -> Result<(), ApiError>;
+}
+
 /// Minimize evidence for a model provider without blanket PII masking.
 ///
 /// Opaque analytical identifiers and membership roles are preserved. Source
@@ -241,33 +344,69 @@ pub fn minimize_provider_payload(
 /// [`ApiError::AuthorizationDenied`] when the grant is expired, not yet
 /// valid, cross-tenant, missing the elevated flag, or not
 /// [`AnalyticalPurpose::ScientificValidation`].
-pub fn disclose_identity_mapping(
+pub fn disclose_identity_mapping<S: ReidentificationAuditSink>(
     grant: &PurposeGrant,
     mapping: &IdentityMappingRecord,
     decision_time: &str,
-) -> Result<DisclosedIdentityMapping, ApiError> {
+    decision_digest: &str,
+    audit_sink: &mut S,
+) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
     validate_grant(grant)?;
     require_nonempty(&mapping.tenant_workspace_id)?;
     require_nonempty(&mapping.opaque_analytical_id)?;
     require_nonempty(&mapping.direct_identity)?;
     require_rfc3339_utc(decision_time)?;
-    if !grant_covers(grant, decision_time) {
-        return Err(ApiError::AuthorizationDenied);
-    }
-    if mapping.tenant_workspace_id != grant.tenant_workspace_id {
-        return Err(ApiError::AuthorizationDenied);
-    }
-    if !grant.reidentification_authorized
-        || grant.purpose != AnalyticalPurpose::ScientificValidation
-    {
-        return Err(ApiError::AuthorizationDenied);
-    }
-    Ok(DisclosedIdentityMapping {
+    require_sha256_digest(decision_digest)?;
+
+    let allowed = grant_covers(grant, decision_time)
+        && mapping.tenant_workspace_id == grant.tenant_workspace_id
+        && grant.reidentification_authorized
+        && grant.purpose == AnalyticalPurpose::ScientificValidation;
+    let audit_record = ReidentificationAuditRecord {
+        tenant_workspace_id: grant.tenant_workspace_id.clone(),
+        principal_id: grant.principal_id.clone(),
+        purpose_wire_name: grant.purpose.wire_name().into(),
+        action_code: "reidentify_identity_mapping",
         opaque_analytical_id: mapping.opaque_analytical_id.clone(),
-        direct_identity: mapping.direct_identity.clone(),
-    })
+        decision_time: decision_time.into(),
+        outcome: if allowed {
+            ReidentificationAuditOutcome::Allowed
+        } else {
+            ReidentificationAuditOutcome::Denied
+        },
+        decision_digest: decision_digest.into(),
+    };
+    audit_sink.append_reidentification_audit(&audit_record)?;
+    if !allowed {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    Ok((
+        DisclosedIdentityMapping {
+            opaque_analytical_id: mapping.opaque_analytical_id.clone(),
+            direct_identity: mapping.direct_identity.clone(),
+        },
+        audit_record,
+    ))
 }
 
+fn require_sha256_digest(value: &str) -> Result<(), ApiError> {
+    let Some(digest) = value.strip_prefix("sha256:") else {
+        return Err(ApiError::InvalidWirePayload);
+    };
+    if digest.len() == 64
+        && digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidWirePayload)
+    }
+}
+
+// Lexicographic comparisons in `validate_grant` and `grant_covers` are valid
+// only after fixed-width UTC RFC 3339 validation; `TemporalInstant` also
+// rejects impossible calendar dates and leap seconds before comparison.
 fn validate_grant(grant: &PurposeGrant) -> Result<(), ApiError> {
     require_nonempty(&grant.tenant_workspace_id)?;
     require_nonempty(&grant.principal_id)?;
@@ -330,8 +469,10 @@ fn is_rfc3339_utc(value: &str) -> bool {
 mod tests {
     use super::{
         DisclosedIdentityMapping, IdentityMappingRecord, MinimizedProviderPayload,
-        ProviderDisclosureLog, ProviderEvidenceOffer, PurposeGrant, disclose_identity_mapping,
-        is_rfc3339_utc, minimize_provider_payload,
+        ProviderDisclosureLog, ProviderEvidenceOffer, PurposeGrant, ReidentificationAuditRecord,
+        ReidentificationAuditSink,
+        disclose_identity_mapping as disclose_identity_mapping_with_audit, is_rfc3339_utc,
+        minimize_provider_payload,
     };
     use crate::ApiError;
     use crate::authorization::AnalyticalPurpose;
@@ -364,6 +505,36 @@ mod tests {
             opaque_analytical_id: "entity-1".into(),
             direct_identity: "Pat Lee".into(),
         }
+    }
+
+    #[derive(Default)]
+    struct RecordingAuditSink {
+        records: Vec<ReidentificationAuditRecord>,
+    }
+
+    impl ReidentificationAuditSink for RecordingAuditSink {
+        fn append_reidentification_audit(
+            &mut self,
+            record: &ReidentificationAuditRecord,
+        ) -> Result<(), ApiError> {
+            self.records.push(record.clone());
+            Ok(())
+        }
+    }
+
+    fn disclose(
+        grant: &PurposeGrant,
+        mapping: &IdentityMappingRecord,
+        decision_time: &str,
+    ) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
+        let mut audit_sink = RecordingAuditSink::default();
+        disclose_identity_mapping_with_audit(
+            grant,
+            mapping,
+            decision_time,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &mut audit_sink,
+        )
     }
 
     #[test]
@@ -488,7 +659,7 @@ mod tests {
     #[test]
     fn disclose_covers_remaining_fail_closed_branches() {
         assert_eq!(
-            disclose_identity_mapping(
+            disclose(
                 &grant(AnalyticalPurpose::PartnerDisclosure, true),
                 &mapping(),
                 "2026-06-15T12:00:00Z",
@@ -500,7 +671,7 @@ mod tests {
             ..grant(AnalyticalPurpose::ScientificValidation, true)
         };
         assert_eq!(
-            disclose_identity_mapping(&expired, &mapping(), "2026-06-15T12:00:00Z"),
+            disclose(&expired, &mapping(), "2026-06-15T12:00:00Z"),
             Err(ApiError::AuthorizationDenied)
         );
         let inverted = PurposeGrant {
@@ -509,7 +680,7 @@ mod tests {
             ..grant(AnalyticalPurpose::ScientificValidation, true)
         };
         assert_eq!(
-            disclose_identity_mapping(&inverted, &mapping(), "2026-06-15T12:00:00Z"),
+            disclose(&inverted, &mapping(), "2026-06-15T12:00:00Z"),
             Err(ApiError::InvalidWirePayload)
         );
         let foreign = IdentityMappingRecord {
@@ -517,7 +688,7 @@ mod tests {
             ..mapping()
         };
         assert_eq!(
-            disclose_identity_mapping(
+            disclose(
                 &grant(AnalyticalPurpose::ScientificValidation, true),
                 &foreign,
                 "2026-06-15T12:00:00Z",
@@ -527,7 +698,7 @@ mod tests {
         let mut empty = mapping();
         empty.direct_identity.clear();
         assert_eq!(
-            disclose_identity_mapping(
+            disclose(
                 &grant(AnalyticalPurpose::ScientificValidation, true),
                 &empty,
                 "2026-06-15T12:00:00Z",
@@ -535,7 +706,7 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            disclose_identity_mapping(
+            disclose(
                 &grant(AnalyticalPurpose::ScientificValidation, true),
                 &mapping(),
                 "bad",
@@ -545,7 +716,7 @@ mod tests {
         let mut empty_opaque = mapping();
         empty_opaque.opaque_analytical_id.clear();
         assert_eq!(
-            disclose_identity_mapping(
+            disclose(
                 &grant(AnalyticalPurpose::ScientificValidation, true),
                 &empty_opaque,
                 "2026-06-15T12:00:00Z",
@@ -555,7 +726,7 @@ mod tests {
         let mut empty_tenant = mapping();
         empty_tenant.tenant_workspace_id.clear();
         assert_eq!(
-            disclose_identity_mapping(
+            disclose(
                 &grant(AnalyticalPurpose::ScientificValidation, true),
                 &empty_tenant,
                 "2026-06-15T12:00:00Z",

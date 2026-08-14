@@ -1,8 +1,9 @@
 //! Purpose-bound provider payloads refuse identity mappings and expired grants.
 
 use tepp_api::{
-    AnalyticalPurpose, ApiError, IdentityMappingRecord, ProviderEvidenceOffer, PurposeGrant,
-    disclose_identity_mapping, minimize_provider_payload,
+    AnalyticalPurpose, ApiError, DisclosedIdentityMapping, IdentityMappingRecord,
+    ProviderEvidenceOffer, PurposeGrant, ReidentificationAuditRecord, ReidentificationAuditSink,
+    disclose_identity_mapping as disclose_identity_mapping_with_audit, minimize_provider_payload,
 };
 
 fn active_grant(purpose: AnalyticalPurpose, reidentification: bool) -> PurposeGrant {
@@ -25,6 +26,36 @@ fn scientific_offer() -> ProviderEvidenceOffer {
         identity_mapping: None,
         membership_role: Some("author".into()),
     }
+}
+
+#[derive(Default)]
+struct RecordingAuditSink {
+    records: Vec<ReidentificationAuditRecord>,
+}
+
+impl ReidentificationAuditSink for RecordingAuditSink {
+    fn append_reidentification_audit(
+        &mut self,
+        record: &ReidentificationAuditRecord,
+    ) -> Result<(), ApiError> {
+        self.records.push(record.clone());
+        Ok(())
+    }
+}
+
+fn disclose(
+    grant: &PurposeGrant,
+    mapping: &IdentityMappingRecord,
+    decision_time: &str,
+) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
+    let mut sink = RecordingAuditSink::default();
+    disclose_identity_mapping_with_audit(
+        grant,
+        mapping,
+        decision_time,
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        &mut sink,
+    )
 }
 
 #[test]
@@ -129,20 +160,20 @@ fn reidentification_is_a_separate_elevated_path() {
         direct_identity: "Jane Roe <jane.roe@acme.example>".into(),
     };
 
-    let disclosed = disclose_identity_mapping(
+    let disclosed = disclose(
         &active_grant(AnalyticalPurpose::ScientificValidation, true),
         &mapping,
         "2026-06-15T12:00:00Z",
     )
     .expect("elevated");
     assert_eq!(
-        disclosed.direct_identity(),
+        disclosed.0.direct_identity(),
         "Jane Roe <jane.roe@acme.example>"
     );
-    assert_eq!(disclosed.opaque_analytical_id(), "entity-opaque-42");
+    assert_eq!(disclosed.0.opaque_analytical_id(), "entity-opaque-42");
 
     assert_eq!(
-        disclose_identity_mapping(
+        disclose(
             &active_grant(AnalyticalPurpose::ScientificValidation, false),
             &mapping,
             "2026-06-15T12:00:00Z",
@@ -150,7 +181,7 @@ fn reidentification_is_a_separate_elevated_path() {
         Err(ApiError::AuthorizationDenied)
     );
     assert_eq!(
-        disclose_identity_mapping(
+        disclose(
             &active_grant(AnalyticalPurpose::OperationalMonitoring, true),
             &mapping,
             "2026-06-15T12:00:00Z",
@@ -158,7 +189,7 @@ fn reidentification_is_a_separate_elevated_path() {
         Err(ApiError::AuthorizationDenied)
     );
     assert_eq!(
-        disclose_identity_mapping(
+        disclose(
             &active_grant(AnalyticalPurpose::ModularServiceConsumer, true),
             &mapping,
             "2026-06-15T12:00:00Z",

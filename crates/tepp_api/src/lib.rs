@@ -79,6 +79,12 @@ pub use provider_payload::ProviderDisclosureLog;
 pub use provider_payload::ProviderEvidenceOffer;
 /// Time-bounded purpose grant.
 pub use provider_payload::PurposeGrant;
+/// Redacted re-identification decision outcome.
+pub use provider_payload::ReidentificationAuditOutcome;
+/// Redacted append-only re-identification audit record.
+pub use provider_payload::ReidentificationAuditRecord;
+/// Append-only persistence port for re-identification audit evidence.
+pub use provider_payload::ReidentificationAuditSink;
 /// Disclose a mapping on the elevated scientific path.
 pub use provider_payload::disclose_identity_mapping;
 /// Minimize evidence for a model provider.
