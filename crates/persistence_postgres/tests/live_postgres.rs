@@ -521,6 +521,7 @@ fn seed_retention_policy(
         policy_status_code: "active".into(),
         authority_citation: "adr-0009".into(),
         system_time: system,
+        system_to: None,
         available_time: available,
     };
     repo.session_mut()
@@ -547,6 +548,7 @@ fn seed_document_legal_hold(
         hold_status_code: "active".into(),
         authority_citation: "hold-authority".into(),
         system_time: system,
+        system_to: None,
         available_time: available,
     };
     repo.insert_legal_hold(&hold).expect("insert legal_hold");

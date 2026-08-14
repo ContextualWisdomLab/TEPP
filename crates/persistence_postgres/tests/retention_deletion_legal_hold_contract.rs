@@ -74,6 +74,18 @@ fn retention_policy_succession_is_atomic_and_single_active() {
         up_sql.contains("create trigger retention_policy_enforce_succession"),
         "ordinary policy mutation must remain fail closed"
     );
+    assert!(
+        up_sql.contains("create or replace function release_legal_hold"),
+        "legal holds must have a controlled release path"
+    );
+    assert!(
+        up_sql.contains("create index evidence_tombstone_document_lookup"),
+        "tombstone restore checks need an indexed lookup"
+    );
+    assert!(
+        up_sql.contains("pg_advisory_xact_lock"),
+        "hold and deletion races must be serialized"
+    );
 }
 
 #[test]
@@ -85,6 +97,8 @@ fn lifecycle_trigger_functions_are_tenant_bound_security_definers() {
         "reject_held_evidence_deletion",
         "reject_tombstoned_evidence_restore",
         "supersede_retention_policy",
+        "release_legal_hold",
+        "guard_legal_hold_insert",
     ] {
         let start = up_sql
             .find(&format!("create or replace function {function_name}"))
@@ -122,6 +136,14 @@ fn rollback_drops_retention_lifecycle_tables_and_functions() {
     assert!(
         down_sql.contains("drop function if exists enforce_retention_policy_succession"),
         "0007 rollback must remove the succession mutation guard"
+    );
+    assert!(
+        down_sql.contains("drop function if exists release_legal_hold"),
+        "0007 rollback must remove the legal-hold release API"
+    );
+    assert!(
+        down_sql.contains("to_regclass('public.legal_hold')"),
+        "trigger drops must guard missing tables during partial rollback"
     );
     for table in [
         "evidence_tombstone",

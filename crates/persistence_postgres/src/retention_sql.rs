@@ -53,17 +53,21 @@ pub struct RetentionPolicyRecord {
     pub authority_citation: String,
     /// System/record time when the policy was asserted.
     pub system_time: SystemTime,
+    /// Closed system-time upper bound; required when `policy_status_code` is
+    /// `superseded`, and must remain open (`None`) for `active` policies.
+    pub system_to: Option<SystemTime>,
     /// Availability time of the policy assertion.
     pub available_time: AvailableTime,
 }
 
 impl RetentionPolicyRecord {
-    /// Fail-closed vocabulary, period, and label validation.
+    /// Fail-closed vocabulary, period, window, and label validation.
     ///
     /// # Errors
     ///
     /// Returns [`PersistenceError::InvalidRetentionLifecycle`] when the period
-    /// is not positive or a label is empty, hostile, or outside the vocabulary.
+    /// is not positive, a label is empty/hostile/unknown, or the status/window
+    /// pair is inconsistent with migration `0007`.
     pub fn validate(&self) -> Result<(), PersistenceError> {
         if self.retention_period_days <= 0 {
             return Err(PersistenceError::InvalidRetentionLifecycle);
@@ -71,7 +75,18 @@ impl RetentionPolicyRecord {
         validate_vocab(&self.data_class_code, &DATA_CLASSES)?;
         validate_vocab(&self.processing_purpose_code, &PURPOSES)?;
         validate_vocab(&self.policy_status_code, &POLICY_STATUSES)?;
-        validate_lifecycle_label(&self.authority_citation)
+        validate_lifecycle_label(&self.authority_citation)?;
+        let open = self.system_to.is_none();
+        let active = self.policy_status_code == "active";
+        if active != open {
+            return Err(PersistenceError::InvalidRetentionLifecycle);
+        }
+        if let Some(until) = self.system_to.as_ref()
+            && until.instant() < self.system_time.instant()
+        {
+            return Err(PersistenceError::InvalidRetentionLifecycle);
+        }
+        Ok(())
     }
 }
 
@@ -94,18 +109,21 @@ pub struct LegalHoldRecord {
     pub authority_citation: String,
     /// System/record time when the hold was asserted.
     pub system_time: SystemTime,
+    /// Closed system-time upper bound; required when `hold_status_code` is
+    /// `released`, and must remain open (`None`) for `active` holds.
+    pub system_to: Option<SystemTime>,
     /// Availability time of the hold assertion.
     pub available_time: AvailableTime,
 }
 
 impl LegalHoldRecord {
-    /// Fail-closed scope, vocabulary, and label validation.
+    /// Fail-closed scope, vocabulary, window, and label validation.
     ///
     /// # Errors
     ///
     /// Returns [`PersistenceError::InvalidRetentionLifecycle`] when document
-    /// scope is missing an identity, tenant scope carries one, or a label is
-    /// hostile/unknown.
+    /// scope is missing an identity, tenant scope carries one, a label is
+    /// hostile/unknown, or the status/window pair is inconsistent.
     pub fn validate(&self) -> Result<(), PersistenceError> {
         validate_vocab(&self.hold_scope_code, &HOLD_SCOPES)?;
         validate_vocab(&self.hold_status_code, &HOLD_STATUSES)?;
@@ -115,6 +133,16 @@ impl LegalHoldRecord {
         if document_scope != self.held_document_id.is_some() {
             return Err(PersistenceError::InvalidRetentionLifecycle);
         }
+        let open = self.system_to.is_none();
+        let active = self.hold_status_code == "active";
+        if active != open {
+            return Err(PersistenceError::InvalidRetentionLifecycle);
+        }
+        if let Some(until) = self.system_to.as_ref()
+            && until.instant() < self.system_time.instant()
+        {
+            return Err(PersistenceError::InvalidRetentionLifecycle);
+        }
         Ok(())
     }
 
@@ -122,6 +150,7 @@ impl LegalHoldRecord {
     #[must_use]
     pub fn blocks_deletion(&self, tenant_record_id: Uuid, document_id: Uuid) -> bool {
         self.hold_status_code == "active"
+            && self.system_to.is_none()
             && self.tenant_record_id == tenant_record_id
             && (self.hold_scope_code == "tenant" || self.held_document_id == Some(document_id))
     }
@@ -231,11 +260,11 @@ pub fn insert_retention_policy_sql(
         "INSERT INTO retention_policy (\
             retention_policy_id, tenant_record_id, data_class_code, \
             processing_purpose_code, retention_period_days, policy_status_code, \
-            authority_citation, system_time, available_time\
+            authority_citation, system_time, system_to, available_time\
         ) VALUES (\
             '{policy}'::uuid, '{tenant}'::uuid, '{class}', \
             '{purpose}', {days}, '{status}', \
-            '{citation}', '{system}'::timestamptz, '{available}'::timestamptz\
+            '{citation}', '{system}'::timestamptz, {system_to}, '{available}'::timestamptz\
         )",
         policy = record.retention_policy_id,
         tenant = record.tenant_record_id,
@@ -245,6 +274,7 @@ pub fn insert_retention_policy_sql(
         status = record.policy_status_code,
         citation = record.authority_citation,
         system = record.system_time.to_rfc3339(),
+        system_to = optional_timestamptz(record.system_to.as_ref()),
         available = record.available_time.to_rfc3339(),
     ))
 }
@@ -296,11 +326,11 @@ pub fn insert_legal_hold_sql(record: &LegalHoldRecord) -> Result<String, Persist
         "INSERT INTO legal_hold (\
             legal_hold_id, tenant_record_id, hold_scope_code, held_document_id, \
             hold_authority_code, hold_status_code, authority_citation, \
-            system_time, available_time\
+            system_time, system_to, available_time\
         ) VALUES (\
             '{hold}'::uuid, '{tenant}'::uuid, '{scope}', {document}, \
             '{authority}', '{status}', '{citation}', \
-            '{system}'::timestamptz, '{available}'::timestamptz\
+            '{system}'::timestamptz, {system_to}, '{available}'::timestamptz\
         )",
         hold = record.legal_hold_id,
         tenant = record.tenant_record_id,
@@ -310,7 +340,28 @@ pub fn insert_legal_hold_sql(record: &LegalHoldRecord) -> Result<String, Persist
         status = record.hold_status_code,
         citation = record.authority_citation,
         system = record.system_time.to_rfc3339(),
+        system_to = optional_timestamptz(record.system_to.as_ref()),
         available = record.available_time.to_rfc3339(),
+    ))
+}
+
+/// Render SQL that releases one active legal hold under the session tenant.
+///
+/// # Errors
+///
+/// Returns [`PersistenceError::InvalidRetentionLifecycle`] when the hold
+/// identity is nil (caller must pass a real open hold id).
+pub fn release_legal_hold_sql(
+    legal_hold_id: Uuid,
+    release_system_time: &SystemTime,
+) -> Result<String, PersistenceError> {
+    if legal_hold_id.is_nil() {
+        return Err(PersistenceError::InvalidRetentionLifecycle);
+    }
+    Ok(format!(
+        "SELECT release_legal_hold('{hold}'::uuid, '{release}'::timestamptz)",
+        hold = legal_hold_id,
+        release = release_system_time.to_rfc3339(),
     ))
 }
 
@@ -428,6 +479,13 @@ fn render_deletion_request_sql(record: &DeletionRequestRecord) -> String {
     )
 }
 
+fn optional_timestamptz(value: Option<&SystemTime>) -> String {
+    match value {
+        Some(time) => format!("'{}'::timestamptz", time.to_rfc3339()),
+        None => "NULL".into(),
+    }
+}
+
 fn optional_uuid(value: Option<Uuid>) -> String {
     match value {
         Some(id) => format!("'{id}'::uuid"),
@@ -473,7 +531,8 @@ mod tests {
         DeletionRequestRecord, EvidenceTombstoneRecord, LegalHoldRecord, RetentionPolicyRecord,
         insert_completed_deletion_request_sql, insert_deletion_request_sql,
         insert_evidence_tombstone_sql, insert_legal_hold_sql, insert_retention_policy_sql,
-        select_active_analysis_document_sql, supersede_retention_policy_sql,
+        release_legal_hold_sql, select_active_analysis_document_sql,
+        supersede_retention_policy_sql,
     };
     use crate::PersistenceError;
     use temporal_core::{AvailableTime, SystemTime};
@@ -497,6 +556,7 @@ mod tests {
             policy_status_code: "active".into(),
             authority_citation: "adr-0009".into(),
             system_time: system,
+            system_to: None,
             available_time: available,
         }
     }
@@ -512,6 +572,7 @@ mod tests {
             hold_status_code: "active".into(),
             authority_citation: "hold-authority".into(),
             system_time: system,
+            system_to: None,
             available_time: available,
         }
     }
@@ -587,8 +648,30 @@ mod tests {
 
         let mut superseded = policy();
         superseded.policy_status_code = "superseded".into();
+        superseded.system_to =
+            Some(SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("closed"));
         assert_eq!(
             supersede_retention_policy_sql(predecessor, &superseded),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+        assert!(insert_retention_policy_sql(&superseded).is_ok());
+        assert!(
+            insert_retention_policy_sql(&superseded)
+                .expect("historical superseded")
+                .contains("system_to")
+        );
+
+        let release = release_legal_hold_sql(
+            Uuid::from_u128(2),
+            &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("release"),
+        )
+        .expect("release sql");
+        assert!(release.contains("SELECT release_legal_hold("));
+        assert_eq!(
+            release_legal_hold_sql(
+                Uuid::nil(),
+                &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("r")
+            ),
             Err(PersistenceError::InvalidRetentionLifecycle)
         );
     }

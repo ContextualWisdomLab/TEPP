@@ -38,7 +38,18 @@ CREATE TABLE legal_hold (
     hold_status_code text NOT NULL,
     authority_citation text NOT NULL,
     system_time timestamptz NOT NULL,
+    system_to timestamptz,
     available_time timestamptz NOT NULL,
+    CONSTRAINT legal_hold_status_known CHECK (
+        hold_status_code IN ('active', 'released')
+    ),
+    CONSTRAINT legal_hold_system_order CHECK (
+        system_to IS NULL OR system_time <= system_to
+    ),
+    CONSTRAINT legal_hold_status_window_consistent CHECK (
+        (hold_status_code = 'active' AND system_to IS NULL)
+        OR (hold_status_code = 'released' AND system_to IS NOT NULL)
+    ),
     CONSTRAINT legal_hold_document_scope_consistent CHECK (
         (hold_scope_code = 'document' AND held_document_id IS NOT NULL)
         OR (hold_scope_code = 'tenant' AND held_document_id IS NULL)
@@ -79,6 +90,36 @@ CREATE UNIQUE INDEX retention_policy_active_purpose_unique
 CREATE UNIQUE INDEX retention_policy_successor_unique
     ON retention_policy (supersedes_retention_policy_id)
     WHERE supersedes_retention_policy_id IS NOT NULL;
+
+CREATE UNIQUE INDEX legal_hold_active_document_unique
+    ON legal_hold (tenant_record_id, held_document_id)
+    WHERE hold_status_code = 'active'
+      AND system_to IS NULL
+      AND hold_scope_code = 'document'
+      AND held_document_id IS NOT NULL;
+
+CREATE UNIQUE INDEX legal_hold_active_tenant_unique
+    ON legal_hold (tenant_record_id)
+    WHERE hold_status_code = 'active'
+      AND system_to IS NULL
+      AND hold_scope_code = 'tenant';
+
+CREATE INDEX evidence_tombstone_document_lookup
+    ON evidence_tombstone (tenant_record_id, tombstoned_document_id);
+
+CREATE INDEX legal_hold_active_scope_lookup
+    ON legal_hold (tenant_record_id, hold_scope_code, held_document_id)
+    WHERE hold_status_code = 'active' AND system_to IS NULL;
+
+CREATE INDEX deletion_request_retention_policy_id_idx
+    ON deletion_request (retention_policy_id);
+
+CREATE INDEX deletion_request_legal_hold_id_idx
+    ON deletion_request (legal_hold_id)
+    WHERE legal_hold_id IS NOT NULL;
+
+CREATE INDEX evidence_tombstone_deletion_request_id_idx
+    ON evidence_tombstone (deletion_request_id);
 
 CREATE OR REPLACE FUNCTION enforce_retention_policy_succession()
 RETURNS trigger
@@ -222,11 +263,17 @@ BEGIN
         RAISE EXCEPTION 'tenant session context is required for lifecycle mutation'
             USING ERRCODE = 'integrity_constraint_violation';
     END IF;
+    -- Serialize hold/deletion races for the same tenant+document scope.
+    PERFORM pg_advisory_xact_lock(
+        hashtextextended(NEW.tenant_record_id::text, 0),
+        hashtextextended(NEW.target_document_id::text, 0)
+    );
     IF NEW.request_status_code = 'completed' AND EXISTS (
         SELECT 1
         FROM public.legal_hold
         WHERE tenant_record_id = NEW.tenant_record_id
           AND hold_status_code = 'active'
+          AND system_to IS NULL
           AND (
               hold_scope_code = 'tenant'
               OR (
@@ -297,9 +344,132 @@ REVOKE ALL ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, tim
 REVOKE ALL ON FUNCTION reject_held_evidence_deletion() FROM PUBLIC;
 REVOKE ALL ON FUNCTION reject_tombstoned_evidence_restore() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) TO tepp_app_runtime;
+REVOKE ALL ON FUNCTION release_legal_hold(uuid, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION enforce_legal_hold_release() FROM PUBLIC;
+REVOKE ALL ON FUNCTION guard_legal_hold_insert() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION release_legal_hold(uuid, timestamptz) TO tepp_app_runtime;
 
+CREATE OR REPLACE FUNCTION guard_legal_hold_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    tenant_context text;
+    lock_document uuid;
+BEGIN
+    tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
+    IF tenant_context IS NULL OR NEW.tenant_record_id::text <> tenant_context THEN
+        RAISE EXCEPTION 'tenant session context is required for lifecycle mutation'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    IF NEW.hold_status_code <> 'active' OR NEW.system_to IS NOT NULL THEN
+        RAISE EXCEPTION 'legal hold insert must be an open active hold'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    lock_document := COALESCE(NEW.held_document_id, '00000000-0000-0000-0000-000000000000'::uuid);
+    PERFORM pg_advisory_xact_lock(
+        hashtextextended(NEW.tenant_record_id::text, 0),
+        hashtextextended(lock_document::text, 0)
+    );
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION enforce_legal_hold_release()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'legal hold history is append-only'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    IF OLD.hold_status_code <> 'active'
+        OR OLD.system_to IS NOT NULL
+        OR NEW.hold_status_code <> 'released'
+        OR NEW.system_to IS NULL
+        OR NEW.system_to < OLD.system_time
+        OR NEW.legal_hold_id IS DISTINCT FROM OLD.legal_hold_id
+        OR NEW.tenant_record_id IS DISTINCT FROM OLD.tenant_record_id
+        OR NEW.hold_scope_code IS DISTINCT FROM OLD.hold_scope_code
+        OR NEW.held_document_id IS DISTINCT FROM OLD.held_document_id
+        OR NEW.hold_authority_code IS DISTINCT FROM OLD.hold_authority_code
+        OR NEW.authority_citation IS DISTINCT FROM OLD.authority_citation
+        OR NEW.system_time IS DISTINCT FROM OLD.system_time
+        OR NEW.available_time IS DISTINCT FROM OLD.available_time
+    THEN
+        RAISE EXCEPTION 'legal hold mutation must be a controlled release'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION release_legal_hold(
+    target_legal_hold_id uuid,
+    release_system_time timestamptz
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    tenant_context text;
+    current_hold legal_hold%ROWTYPE;
+    lock_document uuid;
+BEGIN
+    tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
+    IF tenant_context IS NULL THEN
+        RAISE EXCEPTION 'tenant session context is required for legal hold release'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+
+    SELECT *
+    INTO current_hold
+    FROM public.legal_hold
+    WHERE legal_hold_id = target_legal_hold_id
+    FOR UPDATE;
+
+    IF NOT FOUND
+        OR current_hold.tenant_record_id::text <> tenant_context
+        OR current_hold.hold_status_code <> 'active'
+        OR current_hold.system_to IS NOT NULL
+        OR release_system_time < current_hold.system_time
+    THEN
+        RAISE EXCEPTION 'legal hold release is not authorized for the active version'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+
+    lock_document := COALESCE(current_hold.held_document_id, '00000000-0000-0000-0000-000000000000'::uuid);
+    PERFORM pg_advisory_xact_lock(
+        hashtextextended(current_hold.tenant_record_id::text, 0),
+        hashtextextended(lock_document::text, 0)
+    );
+
+    UPDATE public.legal_hold
+    SET hold_status_code = 'released',
+        system_to = release_system_time
+    WHERE legal_hold_id = target_legal_hold_id;
+
+    RETURN target_legal_hold_id;
+END;
+$$;
+
+CREATE TRIGGER legal_hold_guard_insert
+    BEFORE INSERT ON legal_hold
+    FOR EACH ROW
+    EXECUTE FUNCTION guard_legal_hold_insert();
+CREATE TRIGGER legal_hold_enforce_release
+    BEFORE UPDATE OR DELETE ON legal_hold
+    FOR EACH ROW
+    EXECUTE FUNCTION enforce_legal_hold_release();
 CREATE TRIGGER legal_hold_reject_mutation
-    BEFORE UPDATE OR DELETE OR TRUNCATE ON legal_hold
+    BEFORE TRUNCATE ON legal_hold
     FOR EACH STATEMENT
     EXECUTE FUNCTION reject_append_only_mutation();
 CREATE TRIGGER deletion_request_reject_mutation

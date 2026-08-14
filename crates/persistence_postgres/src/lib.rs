@@ -185,6 +185,8 @@ pub use retention_sql::insert_evidence_tombstone_sql;
 pub use retention_sql::insert_legal_hold_sql;
 /// Render insert SQL for a validated retention policy.
 pub use retention_sql::insert_retention_policy_sql;
+/// Render SQL that releases one active legal hold.
+pub use retention_sql::release_legal_hold_sql;
 /// Render active-analysis selection that excludes revoked or tombstoned documents.
 pub use retention_sql::select_active_analysis_document_sql;
 /// Render supersede SQL for a successive retention policy.

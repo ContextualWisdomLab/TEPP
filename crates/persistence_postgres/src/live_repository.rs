@@ -747,6 +747,7 @@ mod tests {
             policy_status_code: "active".into(),
             authority_citation: "adr-0009".into(),
             system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            system_to: None,
             available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
         }
     }
@@ -761,6 +762,7 @@ mod tests {
             hold_status_code: "active".into(),
             authority_citation: "hold-authority".into(),
             system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            system_to: None,
             available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
         }
     }
