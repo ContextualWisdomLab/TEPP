@@ -1,0 +1,78 @@
+name: Repair PR 52 orchestrator interchange security
+
+on:
+  pull_request:
+    types:
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-tepp-pr-52-interchange-security
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.number == 52 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/orchestrator-http-interchange'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact PR branch
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: agent/orchestrator-http-interchange
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Prove the pre-implementation resource contract was RED
+        run: |
+          git worktree add "$RUNNER_TEMP/tepp-red" 5c365f917610e5b3bc0cfd1fae09785e63cbe3aa
+          set +e
+          output=$(cd "$RUNNER_TEMP/tepp-red" && cargo +1.97.1 test -p tepp_api --test orchestrator_http_security_contract 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          git worktree remove --force "$RUNNER_TEMP/tepp-red"
+          if [ "$status" -eq 0 ]; then
+            echo "Expected the pre-implementation orchestrator resource contract to fail" >&2
+            exit 1
+          fi
+          grep -E "MAX_ORCHESTRATOR|unresolved import" <<<"$output"
+
+      - name: Merge current protected main without discarding feature behavior
+        run: |
+          git fetch origin main
+          git merge --no-edit -X ours origin/main
+
+      - name: Verify focused and workspace contracts
+        run: |
+          cargo +1.97.1 fmt --all --check
+          cargo +1.97.1 test -p tepp_api --all-features
+          cargo +1.97.1 clippy -p tepp_api --all-targets --all-features -- -D warnings
+          cargo +1.97.1 test --workspace --all-features
+          python3 scripts/check_workspace_contract.py
+          python3 scripts/check_docstrings.py
+          python3 scripts/validate_documentation.py
+
+      - name: Commit verified merge and remove one-shot workflow
+        run: |
+          rm -f .github/workflows/repair-pr52-interchange-security.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(api): bound orchestrator interchange trust channels"
+          fi
+          git push origin HEAD:agent/orchestrator-http-interchange
