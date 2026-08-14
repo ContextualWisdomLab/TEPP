@@ -194,6 +194,12 @@ fn live_postgres_applies_migrations_and_document_sql() {
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
     prove_append_only_immutability(&mut repo, &manifest);
     prove_temporal_interval_ordering(&mut repo, tenant_record_id, source_artifact_id);
+    repo.session_mut()
+        .execute("SET lock_timeout = '3s'")
+        .expect("main lock_timeout");
+    repo.session_mut()
+        .execute("SET statement_timeout = '30s'")
+        .expect("main statement_timeout");
     prove_concurrent_document_writes(&mut repo);
     prove_tenant_rls_isolation(&mut repo);
 }
@@ -202,7 +208,15 @@ fn open_writer_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPo
     let config = require_live_sqlx_config().expect("DATABASE_URL");
     let options = LiveSqlxPoolOptions::new(1, 5_000).expect("writer pool");
     let pool = open_live_sqlx_pool(&config, options).expect("writer pool open");
-    LiveDocumentRepository::new(pool)
+    let mut repo = LiveDocumentRepository::new(pool);
+    // Fail closed instead of hanging the live job on lock or statement stalls.
+    repo.session_mut()
+        .execute("SET lock_timeout = '3s'")
+        .expect("lock_timeout");
+    repo.session_mut()
+        .execute("SET statement_timeout = '15s'")
+        .expect("statement_timeout");
+    repo
 }
 
 fn is_closed_write_failure(error: PersistenceError) -> bool {
@@ -268,13 +282,17 @@ fn race_identical_writes(
     revise: bool,
     context: &'static str,
 ) -> Vec<Result<(), PersistenceError>> {
+    // Open pools before the barrier so a failed open cannot leave peers waiting forever.
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    (0..CONCURRENT_WRITERS)
-        .map(|_| {
+    writers
+        .into_iter()
+        .map(|mut writer| {
             let barrier = Arc::clone(&barrier);
             let record = record.clone();
             thread::spawn(move || {
-                let mut writer = open_writer_repo();
                 barrier.wait();
                 if revise {
                     writer.revise(&record)
@@ -354,14 +372,17 @@ fn prove_distinct_concurrent_inserts(
     for (document_record_id, digest) in &pairs {
         seed_source_artifact(repo, tenant_record_id, *document_record_id, digest);
     }
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    let handles: Vec<_> = pairs
+    let handles: Vec<_> = writers
         .into_iter()
-        .map(|(document_record_id, digest)| {
+        .zip(pairs)
+        .map(|(mut writer, (document_record_id, digest))| {
             let barrier = Arc::clone(&barrier);
             let record = sample_document(document_record_id, tenant_record_id, digest, 1, system);
             thread::spawn(move || {
-                let mut writer = open_writer_repo();
                 barrier.wait();
                 writer.insert(&record)
             })
@@ -380,13 +401,16 @@ fn prove_concurrent_append_only_reject(source_artifact_id: Uuid) {
         "UPDATE source_artifact SET media_type_code = 'text/hostile' \
          WHERE source_artifact_id = '{source_artifact_id}'::uuid"
     );
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    let handles: Vec<_> = (0..CONCURRENT_WRITERS)
-        .map(|_| {
+    let handles: Vec<_> = writers
+        .into_iter()
+        .map(|mut writer| {
             let barrier = Arc::clone(&barrier);
             let sql = artifact_update.clone();
             thread::spawn(move || {
-                let mut writer = open_writer_repo();
                 barrier.wait();
                 writer.session_mut().execute(&sql)
             })
