@@ -6,8 +6,8 @@ from pathlib import Path
 CONTRACT = r'''//! Event-intelligence status gates and an explicitly oracle-assisted baseline.
 
 use event_core::{
-    EventError, EventEvidenceLayer, FirstStoryRates, KnownIdentityStoryDecision,
-    admit_state_transition, classify_known_identity_baseline, first_story_detection_rates,
+    EventError, EventEvidenceLayer, KnownIdentityStoryDecision, admit_state_transition,
+    classify_known_identity_baseline, first_story_detection_rates,
 };
 
 #[test]
@@ -103,9 +103,13 @@ fn baseline_and_rate_contracts_fail_closed_at_their_boundaries() {
         Err(EventError::InvalidWirePayload)
     );
 
-    let empty_classes = FirstStoryRates::empty_for_test();
-    assert!(empty_classes.miss_rate() < 1e-15);
-    assert!(empty_classes.false_alarm_rate() < 1e-15);
+    let all_continuations = first_story_detection_rates(&[false, false], &[false, false])
+        .expect("zero first-story denominator");
+    assert!(all_continuations.miss_rate() < 1e-15);
+    let all_first = first_story_detection_rates(&[true, true], &[true, false])
+        .expect("zero continuation denominator");
+    assert!((all_first.miss_rate() - 0.5).abs() < 1e-15);
+    assert!(all_first.false_alarm_rate() < 1e-15);
 }
 '''
 
