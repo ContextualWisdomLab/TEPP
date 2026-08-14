@@ -1,7 +1,7 @@
 # ADR 0004 — Shared multilingual latent semantic space
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — `measurement_invariance` records configural/metric/scalar status and refuses shared meaning from configural structure alone; remaining language-profile alignment remains accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs the complete topic-estimator/backend/global-topic contract built on this multilingual measurement decision.
 

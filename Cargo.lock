@@ -698,6 +698,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "measurement_invariance"
+version = "0.1.0"
+
+[[package]]
 name = "membership_core"
 version = "0.1.0"
 dependencies = [
