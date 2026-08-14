@@ -48,19 +48,25 @@ jobs:
           fi
           grep -F "provider_payload_rejects_semantically_invalid_utc_instants" <<<"$output"
 
-      - name: Use the shared temporal semantic parser
+      - name: Use the shared temporal semantic parser and restore merged documentation
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path("crates/tepp_api/src/provider_payload.rs")
-          text = path.read_text(encoding="utf-8")
+          def replace_once(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              if text.count(old) != 1:
+                  raise SystemExit(f"{path}: target mismatch for {old[:80]!r}")
+              file_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          provider_path = Path("crates/tepp_api/src/provider_payload.rs")
+          provider = provider_path.read_text(encoding="utf-8")
           old_import = "use std::fmt;\n"
           new_import = "use std::fmt;\nuse temporal_core::TemporalInstant;\n"
-          if text.count(old_import) != 1:
+          if provider.count(old_import) != 1:
               raise SystemExit("provider_payload.rs: import target mismatch")
-          text = text.replace(old_import, new_import, 1)
-
+          provider = provider.replace(old_import, new_import, 1)
           old_tail = """        && bytes[14..16].iter().all(u8::is_ascii_digit)
                   && bytes[17..19].iter().all(u8::is_ascii_digit)
           """.replace("          ", "")
@@ -68,9 +74,82 @@ jobs:
                   && bytes[17..19].iter().all(u8::is_ascii_digit)
                   && TemporalInstant::parse_rfc3339(value).is_ok()
           """.replace("          ", "")
-          if text.count(old_tail) != 1:
+          if provider.count(old_tail) != 1:
               raise SystemExit("provider_payload.rs: validator target mismatch")
-          path.write_text(text.replace(old_tail, new_tail, 1), encoding="utf-8")
+          provider_path.write_text(provider.replace(old_tail, new_tail, 1), encoding="utf-8")
+
+          changelog_item = (
+              "- `tepp_api` purpose-bound provider-payload minimization: time-bounded "
+              "`PurposeGrant` evaluation, fail-closed expired/not-yet-valid and cross-tenant "
+              "denial, semantic UTC calendar validation, refusal to copy identity mappings into "
+              "model-provider payloads or ordinary logs, preservation of opaque analytical "
+              "identifiers and membership roles (no blanket PII mask), and a separately "
+              "authorized scientific re-identification path.\n"
+          )
+          changelog = Path("CHANGELOG.md")
+          changelog_text = changelog.read_text(encoding="utf-8")
+          if changelog_item not in changelog_text:
+              marker = "### Added\n\n"
+              if changelog_text.count(marker) != 1:
+                  raise SystemExit("CHANGELOG.md: Added marker mismatch")
+              changelog.write_text(
+                  changelog_text.replace(marker, marker + changelog_item, 1),
+                  encoding="utf-8",
+              )
+
+          api_anchor = (
+              "`naruon` may submit evidence/analysis requests or consume versioned "
+              "topic/event/psychometric artifacts. It must not treat lexical heuristics as TEPP "
+              "topic inference and must not read TEPP database tables directly. HTTP interchange "
+              "is `tepp_api::naruon_analysis_run_exchange` / `naruon_export_exchange` "
+              "(`POST /v1/analysis-runs` and `/v1/exports` over `https` only). Detailed modular "
+              "surfaces and failure modes are recorded in "
+              "[`docs/connectors/naruon-artifact-consumer.md`](connectors/naruon-artifact-consumer.md).\n"
+          )
+          api_section = (
+              "\n### Provider payload minimization\n\n"
+              "Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers must "
+              "build the payload through `tepp_api::minimize_provider_payload`. That function "
+              "preserves opaque analytical identifiers and membership roles, applies purpose-bound "
+              "source-text rules, refuses expired, impossible-calendar, or cross-tenant grants, and "
+              "never copies a direct identity mapping into the provider body or ordinary log. "
+              "Re-identification is a separate elevated scientific path "
+              "(`disclose_identity_mapping`), not a provider header or prompt field.\n"
+          )
+          api_path = Path("docs/API_CONTRACT.md")
+          api_text = api_path.read_text(encoding="utf-8")
+          if "### Provider payload minimization" not in api_text:
+              if api_text.count(api_anchor) != 1:
+                  raise SystemExit("docs/API_CONTRACT.md: naruon anchor mismatch")
+              api_path.write_text(api_text.replace(api_anchor, api_anchor + api_section, 1), encoding="utf-8")
+
+          replace_once(
+              "docs/TRACEABILITY.md",
+              "| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | future authorization/persistence/export/provider adapters | accepted-target |",
+              "| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `tepp_api` export authorization plus provider-payload minimization / elevated re-identification on the active PR; persistence retention/deletion remaining | partial |",
+          )
+          replace_once(
+              "docs/TRACEABILITY.md",
+              "| tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | future service/persistence boundaries | accepted-target |",
+              "| tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | `tepp_api` time-bounded `PurposeGrant` + cross-tenant denial on the active PR; persistent `access_grant` storage remaining | partial |",
+          )
+
+          validation_path = Path("docs/validation/temporal-event-foundation.md")
+          validation = validation_path.read_text(encoding="utf-8")
+          validation_row = (
+              "| Purpose-bound provider payloads | `tepp_api` | active-PR | provider-payload "
+              "minimization | expired/impossible-calendar grant, mapping refusal, elevated re-id | "
+              "ADR 0009; `docs/research/provider-payload-minimization.md` |\n"
+          )
+          if validation_row not in validation:
+              marker = (
+                  "| Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP "
+                  "interchange | unknown-field/version/limit + naruon HTTPS interchange tests | "
+                  "Task 12 / PR #21; live HTTP service remaining |\n"
+              )
+              if validation.count(marker) != 1:
+                  raise SystemExit("validation ledger: API row mismatch")
+              validation_path.write_text(validation.replace(marker, marker + validation_row, 1), encoding="utf-8")
           PY
 
       - name: Verify focused and workspace contracts
