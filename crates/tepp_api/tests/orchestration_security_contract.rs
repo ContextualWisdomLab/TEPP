@@ -48,6 +48,14 @@ fn contextual_orchestrator_binding_requires_a_canonical_sha256_manifest_digest()
             "raw source or noncanonical digest must fail closed: {invalid_digest}",
         );
     }
+    for digest_length in [63, 65] {
+        let invalid_digest = format!("sha256:{}", "a".repeat(digest_length));
+        assert_eq!(
+            bind_contextual_orchestrator(&plan, &invalid_digest),
+            Err(ApiError::InvalidWirePayload),
+            "adjacent digest length must fail closed: {digest_length}",
+        );
+    }
 }
 
 #[test]

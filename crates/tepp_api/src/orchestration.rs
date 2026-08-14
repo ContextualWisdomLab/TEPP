@@ -745,11 +745,10 @@ fn budgets_are_comparable(left: u64, right: u64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        BudgetAblationRecord, ContextualOrchestratorBinding, DocumentControlAttempt,
-        InterpretationTaskKind, ORCHESTRATION_CONTRACT_VERSION, ORCHESTRATION_POLICY_VERSION,
-        OrchestrationMode, OrchestrationRequest, OrchestrationRole, ReasoningEffort,
-        RoleAssignment, bind_contextual_orchestrator, budgets_are_comparable,
-        record_budget_ablation, route_orchestration,
+        DocumentControlAttempt, InterpretationTaskKind, ORCHESTRATION_CONTRACT_VERSION,
+        ORCHESTRATION_POLICY_VERSION, OrchestrationMode, OrchestrationRequest,
+        OrchestrationRole, ReasoningEffort, bind_contextual_orchestrator,
+        budgets_are_comparable, record_budget_ablation, route_orchestration,
     };
     use crate::ApiError;
 
@@ -866,6 +865,11 @@ mod tests {
         assert_eq!(record.compared_mode(), OrchestrationMode::Verify);
         assert_eq!(record.baseline_budget(), 8_000);
         assert_eq!(record.compared_budget(), 32_000);
+        assert!(
+            record_budget_ablation(&direct, &direct)
+                .expect("same-budget direct comparison")
+                .comparable()
+        );
 
         let committee = route_orchestration(&request(
             InterpretationTaskKind::BlindedModelReview,
@@ -908,33 +912,29 @@ mod tests {
         assert_eq!(binding.token_budget(), 32_000);
         assert!(binding.access_list().is_empty());
         assert!(!binding.includes_credentials());
+        assert_eq!(binding.mode(), OrchestrationMode::Verify);
+        assert_eq!(binding.policy_version(), ORCHESTRATION_POLICY_VERSION);
+        assert_eq!(
+            binding.evidence_manifest_hash(),
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
 
-        let assignment = RoleAssignment {
-            role: OrchestrationRole::Thinker,
-            effort: ReasoningEffort::Medium,
-        };
-        assert_eq!(assignment.role().wire_name(), "thinker");
-        assert_eq!(assignment.effort().wire_name(), "medium");
-
-        let forged = BudgetAblationRecord {
-            baseline_mode: OrchestrationMode::Direct,
-            compared_mode: OrchestrationMode::Committee,
-            baseline_budget: 1,
-            compared_budget: 1,
-            comparable: true,
-        };
-        assert!(forged.comparable());
-        let forged_binding = ContextualOrchestratorBinding {
-            contract_version: ORCHESTRATION_CONTRACT_VERSION,
-            mode: OrchestrationMode::Direct,
-            policy_version: ORCHESTRATION_POLICY_VERSION.into(),
-            evidence_manifest_hash: "sha256:x".into(),
-            access_list: Vec::new(),
-            roles: Vec::new(),
-            token_budget: 0,
-            includes_credentials: false,
-        };
-        assert_eq!(forged_binding.mode(), OrchestrationMode::Direct);
+        let conductor = route_orchestration(&request(
+            InterpretationTaskKind::NarrativeSynthesis,
+            0.8,
+            0.8,
+            1.0,
+            32_000,
+        ))
+        .expect("conductor");
+        let thinker = conductor
+            .roles()
+            .iter()
+            .find(|assignment| assignment.role() == OrchestrationRole::Thinker)
+            .expect("routed thinker");
+        assert_eq!(thinker.role().wire_name(), "thinker");
+        assert_eq!(thinker.effort(), ReasoningEffort::Medium);
+        assert_eq!(thinker.effort().wire_name(), "medium");
         assert_eq!(
             direct.to_string(),
             "orchestration mode=direct stages=1 recursion=0 proposal=true"
