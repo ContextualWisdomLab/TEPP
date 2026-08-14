@@ -52,7 +52,7 @@ LLM-backed semantic/interpreter functions use strict bounded requests and cached
 
 ## Database target recovery
 
-Before PostgreSQL becomes production state, prove migrations and rollback, tenant isolation/RLS, temporal/lineage constraints, idempotency/concurrency, backup/restore, retention/deletion, and reconstruction from immutable artifacts. Concurrent document first-insert and revise stress is implemented on the active PR (atomic open-row close plus typed SQLSTATE mapping) and is not a protected-main claim until integration. Backup/restore and post-restore leakage/lineage revalidation remain accepted-target. A database recovery must re-run leakage/lineage validation before analytical state is marked usable.
+Before PostgreSQL becomes production state, prove migrations and rollback, tenant isolation/RLS, temporal/lineage constraints, idempotency/concurrency, backup/restore, retention/deletion, and reconstruction from immutable artifacts. Concurrent document first-insert and revise stress is implemented-main. `persistence_postgres::mark_restored_state_usable` and `assert_restore_integrity` are the current fail-closed restore gate (active PR): they revalidate tenant identity, canonical digests, same-tenant knowledge-cutoff eligibility, temporal window order, and enabled append-only triggers. They do not yet revalidate relation-aware splits or full lineage graphs; those remain separate post-restore scientific steps. The gate does not replace operator `pg_dump`/`pg_restore` runbooks.
 
 ## Model release/cutover
 

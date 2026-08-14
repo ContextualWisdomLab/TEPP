@@ -1,9 +1,9 @@
 //! Public concurrent-write classification and atomic revise contracts.
 
 use persistence_postgres::{
-    DEADLOCK_DETECTED_SQLSTATE, DocumentRecord, EXCLUSION_VIOLATION_SQLSTATE, PersistenceError,
-    SERIALIZATION_FAILURE_SQLSTATE, UNIQUE_VIOLATION_SQLSTATE, classify_write_conflict,
-    revise_document_atomic_sql,
+    DEADLOCK_DETECTED_SQLSTATE, DocumentRecord, EXCLUSION_VIOLATION_SQLSTATE,
+    LOCK_NOT_AVAILABLE_SQLSTATE, PersistenceError, SERIALIZATION_FAILURE_SQLSTATE,
+    UNIQUE_VIOLATION_SQLSTATE, classify_write_conflict, revise_document_atomic_sql,
 };
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 
@@ -27,6 +27,7 @@ fn public_conflict_classifier_and_atomic_revise_sql_are_stable() {
     assert_eq!(SERIALIZATION_FAILURE_SQLSTATE, "40001");
     assert_eq!(DEADLOCK_DETECTED_SQLSTATE, "40P01");
     assert_eq!(EXCLUSION_VIOLATION_SQLSTATE, "23P01");
+    assert_eq!(LOCK_NOT_AVAILABLE_SQLSTATE, "55P03");
     assert_eq!(
         classify_write_conflict(UNIQUE_VIOLATION_SQLSTATE),
         Some(PersistenceError::DuplicateDocumentRecord)
@@ -35,9 +36,14 @@ fn public_conflict_classifier_and_atomic_revise_sql_are_stable() {
         classify_write_conflict(SERIALIZATION_FAILURE_SQLSTATE),
         Some(PersistenceError::ConcurrentWriteConflict)
     );
+    assert_eq!(
+        classify_write_conflict(LOCK_NOT_AVAILABLE_SQLSTATE),
+        Some(PersistenceError::ConcurrentWriteConflict)
+    );
 
     let sql = revise_document_atomic_sql(&sample_record()).expect("atomic revise");
     assert!(sql.contains("DO $tepp$"));
+    assert!(sql.contains("FOR UPDATE NOWAIT"));
     assert!(sql.contains("GET DIAGNOSTICS closed_count = ROW_COUNT"));
     assert!(sql.contains("closed_count <> 1"));
     assert!(sql.contains("ERRCODE = 'serialization_failure'"));

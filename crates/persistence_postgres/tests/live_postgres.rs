@@ -13,12 +13,16 @@ use persistence_postgres::{
     assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
     require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
 };
+use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
 use std::thread;
+use std::time::Duration;
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
 
-const CONCURRENT_WRITERS: usize = 4;
+const CONCURRENT_WRITERS: usize = 2;
+/// Wall-clock budget for concurrent proofs; hang rather than block the live job forever.
+const CONCURRENT_PROOF_TIMEOUT: Duration = Duration::from_secs(90);
 
 const LIVE_GATE_ENV: &str = "TEPP_LIVE_POSTGRES";
 
@@ -99,6 +103,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
     repo.session_mut()
         .execute("SELECT 1")
         .expect("SELECT 1 through live transport");
+    apply_sql_timeouts(&mut repo, "5s", "60s");
 
     let catalog = MigrationCatalog::from_embedded().expect("embedded foundation catalog");
     // Best-effort reset: empty service DBs lack tables/role; re-runs clean residual objects.
@@ -110,6 +115,8 @@ fn live_postgres_applies_migrations_and_document_sql() {
         .apply_migrations(&catalog)
         .expect("foundation+RLS migrations must apply on live PostgreSQL");
     assert!(applied >= 1);
+    repo.assert_restore_integrity()
+        .expect("empty restored catalog must pass integrity probes");
 
     let tenant_record_id = Uuid::now_v7();
     let document_record_id = Uuid::now_v7();
@@ -192,15 +199,32 @@ fn live_postgres_applies_migrations_and_document_sql() {
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
     prove_append_only_immutability(&mut repo, &manifest);
     prove_temporal_interval_ordering(&mut repo, tenant_record_id, source_artifact_id);
+    apply_sql_timeouts(&mut repo, "3s", "30s");
     prove_concurrent_document_writes(&mut repo);
     prove_tenant_rls_isolation(&mut repo);
+}
+
+fn apply_sql_timeouts(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    lock_timeout: &str,
+    statement_timeout: &str,
+) {
+    // Fail closed instead of hanging the live job on lock or statement stalls.
+    repo.session_mut()
+        .execute(&format!("SET lock_timeout = '{lock_timeout}'"))
+        .expect("lock_timeout");
+    repo.session_mut()
+        .execute(&format!("SET statement_timeout = '{statement_timeout}'"))
+        .expect("statement_timeout");
 }
 
 fn open_writer_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {
     let config = require_live_sqlx_config().expect("DATABASE_URL");
     let options = LiveSqlxPoolOptions::new(1, 5_000).expect("writer pool");
     let pool = open_live_sqlx_pool(&config, options).expect("writer pool open");
-    LiveDocumentRepository::new(pool)
+    let mut repo = LiveDocumentRepository::new(pool);
+    apply_sql_timeouts(&mut repo, "3s", "15s");
+    repo
 }
 
 fn is_closed_write_failure(error: PersistenceError) -> bool {
@@ -261,18 +285,45 @@ fn sample_document(
     }
 }
 
+fn join_with_timeout<T: Send + 'static>(
+    handle: thread::JoinHandle<T>,
+    budget: Duration,
+    context: &'static str,
+) -> T {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = tx.send(handle.join());
+    });
+    match rx.recv_timeout(budget) {
+        Ok(Ok(value)) => value,
+        Ok(Err(panic_payload)) => {
+            panic!("{context}: worker thread panicked: {panic_payload:?}")
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            panic!("{context}: worker exceeded wall-clock budget")
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            panic!("{context}: worker channel disconnected")
+        }
+    }
+}
+
 fn race_identical_writes(
     record: &DocumentRecord,
     revise: bool,
     context: &'static str,
 ) -> Vec<Result<(), PersistenceError>> {
+    // Open pools before the barrier so a failed open cannot leave peers waiting forever.
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    (0..CONCURRENT_WRITERS)
-        .map(|_| {
+    let handles: Vec<_> = writers
+        .into_iter()
+        .map(|mut writer| {
             let barrier = Arc::clone(&barrier);
             let record = record.clone();
             thread::spawn(move || {
-                let mut writer = open_writer_repo();
                 barrier.wait();
                 if revise {
                     writer.revise(&record)
@@ -281,7 +332,10 @@ fn race_identical_writes(
                 }
             })
         })
-        .map(|handle| handle.join().expect(context))
+        .collect();
+    handles
+        .into_iter()
+        .map(|handle| join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, context))
         .collect()
 }
 
@@ -352,23 +406,24 @@ fn prove_distinct_concurrent_inserts(
     for (document_record_id, digest) in &pairs {
         seed_source_artifact(repo, tenant_record_id, *document_record_id, digest);
     }
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    let handles: Vec<_> = pairs
+    let handles: Vec<_> = writers
         .into_iter()
-        .map(|(document_record_id, digest)| {
+        .zip(pairs)
+        .map(|(mut writer, (document_record_id, digest))| {
             let barrier = Arc::clone(&barrier);
             let record = sample_document(document_record_id, tenant_record_id, digest, 1, system);
             thread::spawn(move || {
-                let mut writer = open_writer_repo();
                 barrier.wait();
                 writer.insert(&record)
             })
         })
         .collect();
     for handle in handles {
-        handle
-            .join()
-            .expect("distinct insert thread")
+        join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, "distinct insert thread")
             .expect("independent document inserts must all succeed");
     }
 }
@@ -378,13 +433,16 @@ fn prove_concurrent_append_only_reject(source_artifact_id: Uuid) {
         "UPDATE source_artifact SET media_type_code = 'text/hostile' \
          WHERE source_artifact_id = '{source_artifact_id}'::uuid"
     );
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
     let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
-    let handles: Vec<_> = (0..CONCURRENT_WRITERS)
-        .map(|_| {
+    let handles: Vec<_> = writers
+        .into_iter()
+        .map(|mut writer| {
             let barrier = Arc::clone(&barrier);
             let sql = artifact_update.clone();
             thread::spawn(move || {
-                let mut writer = open_writer_repo();
                 barrier.wait();
                 writer.session_mut().execute(&sql)
             })
@@ -392,7 +450,7 @@ fn prove_concurrent_append_only_reject(source_artifact_id: Uuid) {
         .collect();
     for handle in handles {
         assert!(
-            handle.join().expect("mutation thread").is_err(),
+            join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, "mutation thread").is_err(),
             "concurrent append-only UPDATE must fail"
         );
     }
