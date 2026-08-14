@@ -1,0 +1,459 @@
+name: Repair PR 46 reidentification audit evidence
+
+on:
+  pull_request:
+    types:
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-tepp-pr-46-reidentification-audit
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.number == 46 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/api-provider-payload-minimization'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact PR branch
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: agent/api-provider-payload-minimization
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Prove reidentification audit contract is RED
+        run: |
+          set +e
+          output=$(cargo +1.97.1 test -p tepp_api --test reidentification_audit_contract 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            echo "Expected elevated disclosure to lack append-only audit evidence before implementation" >&2
+            exit 1
+          fi
+          grep -E "ReidentificationAudit|disclose_identity_mapping" <<<"$output"
+
+      - name: Add redacted append-only audit port and consistent evidence matrix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          provider_path = Path("crates/tepp_api/src/provider_payload.rs")
+          provider = provider_path.read_text(encoding="utf-8")
+
+          def replace_provider(old: str, new: str, label: str) -> None:
+              global provider
+              if provider.count(old) != 1:
+                  raise SystemExit(f"provider_payload.rs: {label} target mismatch")
+              provider = provider.replace(old, new, 1)
+
+          disclosed_impl = """impl DisclosedIdentityMapping {
+              /// Opaque analytical identifier that was resolved.
+              #[must_use]
+              pub fn opaque_analytical_id(&self) -> &str {
+                  &self.opaque_analytical_id
+              }
+
+              /// Direct identity released on the elevated path only.
+              #[must_use]
+              pub fn direct_identity(&self) -> &str {
+                  &self.direct_identity
+              }
+          }
+          """.replace("          ", "")
+          audit_types = disclosed_impl + """
+/// Redacted outcome of an elevated re-identification decision.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ReidentificationAuditOutcome {
+    /// The protected mapping was released after audit append succeeded.
+    Allowed,
+    /// A well-formed request was denied by purpose, tenant, lifetime, or role policy.
+    Denied,
+}
+
+impl ReidentificationAuditOutcome {
+    /// Stable wire name for append-only audit persistence.
+    #[must_use]
+    pub const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Allowed => "allowed",
+            Self::Denied => "denied",
+        }
+    }
+}
+
+/// Redacted append-only evidence for an elevated re-identification decision.
+///
+/// Direct identity is deliberately absent. The digest identifies the governed
+/// decision input without copying protected source or mapping content.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReidentificationAuditRecord {
+    tenant_workspace_id: String,
+    principal_id: String,
+    purpose_wire_name: String,
+    action_code: &'static str,
+    opaque_analytical_id: String,
+    decision_time: String,
+    outcome: ReidentificationAuditOutcome,
+    decision_digest: String,
+}
+
+impl ReidentificationAuditRecord {
+    /// Tenant/workspace in which the decision occurred.
+    #[must_use]
+    pub fn tenant_workspace_id(&self) -> &str {
+        &self.tenant_workspace_id
+    }
+
+    /// Opaque principal that requested disclosure.
+    #[must_use]
+    pub fn principal_id(&self) -> &str {
+        &self.principal_id
+    }
+
+    /// Purpose wire name evaluated by policy.
+    #[must_use]
+    pub fn purpose_wire_name(&self) -> &str {
+        &self.purpose_wire_name
+    }
+
+    /// Stable elevated action code.
+    #[must_use]
+    pub const fn action_code(&self) -> &'static str {
+        self.action_code
+    }
+
+    /// Opaque analytical identity involved in the decision.
+    #[must_use]
+    pub fn opaque_analytical_id(&self) -> &str {
+        &self.opaque_analytical_id
+    }
+
+    /// Canonical UTC decision instant.
+    #[must_use]
+    pub fn decision_time(&self) -> &str {
+        &self.decision_time
+    }
+
+    /// Allowed or denied decision outcome.
+    #[must_use]
+    pub const fn outcome(&self) -> ReidentificationAuditOutcome {
+        self.outcome
+    }
+
+    /// Canonical SHA-256 digest of the governed decision input.
+    #[must_use]
+    pub fn decision_digest(&self) -> &str {
+        &self.decision_digest
+    }
+}
+
+/// Append-only persistence port for elevated re-identification audit evidence.
+///
+/// Implementations must append an immutable row/event and must never copy the
+/// disclosed direct identity into ordinary audit storage.
+pub trait ReidentificationAuditSink {
+    /// Append one redacted decision record before disclosure or denial returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns a redacted [`ApiError`] when append-only persistence fails. The
+    /// disclosure then fails closed and no direct identity is returned.
+    fn append_reidentification_audit(
+        &mut self,
+        record: &ReidentificationAuditRecord,
+    ) -> Result<(), ApiError>;
+}
+"""
+          replace_provider(disclosed_impl, audit_types, "audit type insertion")
+
+          old_function = """pub fn disclose_identity_mapping(
+    grant: &PurposeGrant,
+    mapping: &IdentityMappingRecord,
+    decision_time: &str,
+) -> Result<DisclosedIdentityMapping, ApiError> {
+    validate_grant(grant)?;
+    require_nonempty(&mapping.tenant_workspace_id)?;
+    require_nonempty(&mapping.opaque_analytical_id)?;
+    require_nonempty(&mapping.direct_identity)?;
+    require_rfc3339_utc(decision_time)?;
+    if !grant_covers(grant, decision_time) {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    if mapping.tenant_workspace_id != grant.tenant_workspace_id {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    if !grant.reidentification_authorized
+        || grant.purpose != AnalyticalPurpose::ScientificValidation
+    {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    Ok(DisclosedIdentityMapping {
+        opaque_analytical_id: mapping.opaque_analytical_id.clone(),
+        direct_identity: mapping.direct_identity.clone(),
+    })
+}
+"""
+          new_function = """pub fn disclose_identity_mapping<S: ReidentificationAuditSink>(
+    grant: &PurposeGrant,
+    mapping: &IdentityMappingRecord,
+    decision_time: &str,
+    decision_digest: &str,
+    audit_sink: &mut S,
+) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
+    validate_grant(grant)?;
+    require_nonempty(&mapping.tenant_workspace_id)?;
+    require_nonempty(&mapping.opaque_analytical_id)?;
+    require_nonempty(&mapping.direct_identity)?;
+    require_rfc3339_utc(decision_time)?;
+    require_sha256_digest(decision_digest)?;
+
+    let allowed = grant_covers(grant, decision_time)
+        && mapping.tenant_workspace_id == grant.tenant_workspace_id
+        && grant.reidentification_authorized
+        && grant.purpose == AnalyticalPurpose::ScientificValidation;
+    let audit_record = ReidentificationAuditRecord {
+        tenant_workspace_id: grant.tenant_workspace_id.clone(),
+        principal_id: grant.principal_id.clone(),
+        purpose_wire_name: grant.purpose.wire_name().into(),
+        action_code: "reidentify_identity_mapping",
+        opaque_analytical_id: mapping.opaque_analytical_id.clone(),
+        decision_time: decision_time.into(),
+        outcome: if allowed {
+            ReidentificationAuditOutcome::Allowed
+        } else {
+            ReidentificationAuditOutcome::Denied
+        },
+        decision_digest: decision_digest.into(),
+    };
+    audit_sink.append_reidentification_audit(&audit_record)?;
+    if !allowed {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    Ok((
+        DisclosedIdentityMapping {
+            opaque_analytical_id: mapping.opaque_analytical_id.clone(),
+            direct_identity: mapping.direct_identity.clone(),
+        },
+        audit_record,
+    ))
+}
+"""
+          replace_provider(old_function, new_function, "audited disclosure function")
+
+          replace_provider(
+              """fn validate_grant(grant: &PurposeGrant) -> Result<(), ApiError> {
+""",
+              """fn require_sha256_digest(value: &str) -> Result<(), ApiError> {
+    let Some(digest) = value.strip_prefix("sha256:") else {
+        return Err(ApiError::InvalidWirePayload);
+    };
+    if digest.len() == 64
+        && digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        Ok(())
+    } else {
+        Err(ApiError::InvalidWirePayload)
+    }
+}
+
+fn validate_grant(grant: &PurposeGrant) -> Result<(), ApiError> {
+""",
+              "digest helper",
+          )
+
+          test_marker = "#[cfg(test)]\nmod tests {"
+          if provider.count(test_marker) != 1:
+              raise SystemExit("provider_payload.rs: test module marker mismatch")
+          production, tests = provider.split(test_marker, 1)
+          tests = test_marker + tests
+          tests = tests.replace(
+              "DisclosedIdentityMapping, IdentityMappingRecord, MinimizedProviderPayload,\n        ProviderDisclosureLog, ProviderEvidenceOffer, PurposeGrant, disclose_identity_mapping,",
+              "DisclosedIdentityMapping, IdentityMappingRecord, MinimizedProviderPayload,\n        ProviderDisclosureLog, ProviderEvidenceOffer, PurposeGrant, ReidentificationAuditRecord,\n        ReidentificationAuditSink, disclose_identity_mapping,",
+              1,
+          )
+          mapping_helper = """    fn mapping() -> IdentityMappingRecord {
+        IdentityMappingRecord {
+            tenant_workspace_id: "tenant-ws-1".into(),
+            opaque_analytical_id: "entity-1".into(),
+            direct_identity: "Pat Lee".into(),
+        }
+    }
+"""
+          audit_helper = mapping_helper + """
+    #[derive(Default)]
+    struct RecordingAuditSink {
+        records: Vec<ReidentificationAuditRecord>,
+    }
+
+    impl ReidentificationAuditSink for RecordingAuditSink {
+        fn append_reidentification_audit(
+            &mut self,
+            record: &ReidentificationAuditRecord,
+        ) -> Result<(), ApiError> {
+            self.records.push(record.clone());
+            Ok(())
+        }
+    }
+
+    fn disclose(
+        grant: &PurposeGrant,
+        mapping: &IdentityMappingRecord,
+        decision_time: &str,
+    ) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
+        let mut audit_sink = RecordingAuditSink::default();
+        disclose_identity_mapping(
+            grant,
+            mapping,
+            decision_time,
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            &mut audit_sink,
+        )
+    }
+"""
+          if tests.count(mapping_helper) != 1:
+              raise SystemExit("provider_payload.rs: mapping helper mismatch")
+          tests = tests.replace(mapping_helper, audit_helper, 1)
+          tests = tests.replace("disclose_identity_mapping(", "disclose(")
+          tests = tests.replace(
+              "        disclose(\n            grant,\n            mapping,\n            decision_time,\n            \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n            &mut audit_sink,\n        )",
+              "        disclose_identity_mapping(\n            grant,\n            mapping,\n            decision_time,\n            \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n            &mut audit_sink,\n        )",
+              1,
+          )
+          provider_path.write_text(production + tests, encoding="utf-8")
+
+          lib_path = Path("crates/tepp_api/src/lib.rs")
+          lib = lib_path.read_text(encoding="utf-8")
+          export_anchor = """/// Elevated re-identification result.
+pub use provider_payload::DisclosedIdentityMapping;
+"""
+          export_replacement = export_anchor + """/// Redacted re-identification decision outcome.
+pub use provider_payload::ReidentificationAuditOutcome;
+/// Redacted append-only re-identification audit record.
+pub use provider_payload::ReidentificationAuditRecord;
+/// Append-only persistence port for re-identification audit evidence.
+pub use provider_payload::ReidentificationAuditSink;
+"""
+          if lib.count(export_anchor) != 1:
+              raise SystemExit("lib.rs: provider export anchor mismatch")
+          lib_path.write_text(lib.replace(export_anchor, export_replacement, 1), encoding="utf-8")
+
+          contract_path = Path("crates/tepp_api/tests/provider_payload_contract.rs")
+          contract = contract_path.read_text(encoding="utf-8")
+          contract = contract.replace(
+              "AnalyticalPurpose, ApiError, IdentityMappingRecord, ProviderEvidenceOffer, PurposeGrant,\n    disclose_identity_mapping, minimize_provider_payload,",
+              "AnalyticalPurpose, ApiError, DisclosedIdentityMapping, IdentityMappingRecord,\n    ProviderEvidenceOffer, PurposeGrant, ReidentificationAuditRecord, ReidentificationAuditSink,\n    disclose_identity_mapping as disclose_identity_mapping_with_audit, minimize_provider_payload,",
+              1,
+          )
+          offer_marker = """fn scientific_offer() -> ProviderEvidenceOffer {
+    ProviderEvidenceOffer {
+        tenant_workspace_id: "tenant-ws-1".into(),
+        artifact_id: "artifact-quarterly-review-1".into(),
+        opaque_analytical_id: "entity-opaque-42".into(),
+        source_text: Some("Q3 pipeline slipped after the Acme renewal stalled.".into()),
+        identity_mapping: None,
+        membership_role: Some("author".into()),
+    }
+}
+"""
+          contract_helper = offer_marker + """
+#[derive(Default)]
+struct RecordingAuditSink {
+    records: Vec<ReidentificationAuditRecord>,
+}
+
+impl ReidentificationAuditSink for RecordingAuditSink {
+    fn append_reidentification_audit(
+        &mut self,
+        record: &ReidentificationAuditRecord,
+    ) -> Result<(), ApiError> {
+        self.records.push(record.clone());
+        Ok(())
+    }
+}
+
+fn disclose(
+    grant: &PurposeGrant,
+    mapping: &IdentityMappingRecord,
+    decision_time: &str,
+) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
+    let mut sink = RecordingAuditSink::default();
+    disclose_identity_mapping_with_audit(
+        grant,
+        mapping,
+        decision_time,
+        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        &mut sink,
+    )
+}
+"""
+          if contract.count(offer_marker) != 1:
+              raise SystemExit("provider contract: offer helper mismatch")
+          contract = contract.replace(offer_marker, contract_helper, 1)
+          contract = contract.replace("disclose_identity_mapping(", "disclose(")
+          contract = contract.replace("disclosed.direct_identity()", "disclosed.0.direct_identity()")
+          contract = contract.replace(
+              "disclosed.opaque_analytical_id()", "disclosed.0.opaque_analytical_id()"
+          )
+          contract_path.write_text(contract, encoding="utf-8")
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file_path = Path(path)
+              text = file_path.read_text(encoding="utf-8")
+              if text.count(old) != 1:
+                  raise SystemExit(f"{path}: documentation target mismatch")
+              file_path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          replace_once(
+              "docs/API_CONTRACT.md",
+              "refuses expired, impossible-calendar, or cross-tenant grants",
+              "refuses expired, not-yet-valid, inverted, cross-tenant, or impossible-calendar grants",
+          )
+          replace_once(
+              "docs/research/task-12-versioned-api-contracts.md",
+              "expired-purpose denial, provider mapping refusal, and elevated re-identification;",
+              "expired, not-yet-valid, inverted, cross-tenant, and impossible-calendar grant denial; provider mapping refusal; and audited elevated re-identification replay;",
+          )
+          replace_once(
+              "docs/validation/temporal-event-foundation.md",
+              "expired/impossible-calendar grant, mapping refusal, elevated re-id",
+              "expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay",
+          )
+          PY
+          cargo +1.97.1 fmt --all
+
+      - name: Verify focused and workspace contracts
+        run: |
+          cargo +1.97.1 fmt --all --check
+          cargo +1.97.1 test -p tepp_api --all-features
+          cargo +1.97.1 clippy -p tepp_api --all-targets --all-features -- -D warnings
+          cargo +1.97.1 test --workspace --all-features
+          python3 scripts/check_docstrings.py
+          python3 scripts/validate_documentation.py
+
+      - name: Commit verified repair and remove one-shot workflow
+        run: |
+          rm -f .github/workflows/repair-pr46-reidentification-audit.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(api): audit elevated reidentification decisions"
+          git push origin HEAD:agent/api-provider-payload-minimization
