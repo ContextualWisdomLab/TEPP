@@ -54,7 +54,9 @@ jobs:
           rustup toolchain install nightly-2026-08-01 --profile minimal --component llvm-tools-preview
 
       - name: Add regression tests
-        run: python3 scripts/repair_pr45_add_tests.py
+        run: |
+          python3 scripts/repair_pr45_add_tests.py
+          python3 scripts/repair_pr45_add_lock_tests.py
 
       - name: Prove tenant binding is RED before implementation
         run: |
@@ -71,7 +73,9 @@ jobs:
           grep -F "tenant-scoped insert must bind the session before the INSERT" <<<"$output"
 
       - name: Apply implementation and migration fixes
-        run: python3 scripts/repair_pr45_apply_fixes.py
+        run: |
+          python3 scripts/repair_pr45_apply_fixes.py
+          python3 scripts/repair_pr45_apply_lock_fixes.py
 
       - name: Format and run persistence verification
         run: |
@@ -108,7 +112,9 @@ jobs:
           rm -f .github/workflows/repair-pr45-v2.yml
           rm -f .github/workflows/repair-pr45-append-audit.yml
           rm -f scripts/repair_pr45_add_tests.py
+          rm -f scripts/repair_pr45_add_lock_tests.py
           rm -f scripts/repair_pr45_apply_fixes.py
+          rm -f scripts/repair_pr45_apply_lock_fixes.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
