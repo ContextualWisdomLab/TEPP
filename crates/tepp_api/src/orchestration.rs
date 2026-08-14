@@ -503,15 +503,15 @@ pub fn route_orchestration(request: &OrchestrationRequest) -> Result<Orchestrati
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when the baseline is not
-/// [`OrchestrationMode::Direct`], or when the two plans disagree on task
-/// kind, policy version, or access list.
+/// [`OrchestrationMode::Direct`], or when the two plans disagree on task kind
+/// or access list. Plans cannot disagree on policy version because the only
+/// constructor, [`route_orchestration`], accepts the current version exactly.
 pub fn record_budget_ablation(
     baseline: &OrchestrationPlan,
     compared: &OrchestrationPlan,
 ) -> Result<BudgetAblationRecord, ApiError> {
     if baseline.mode != OrchestrationMode::Direct
         || baseline.task_kind != compared.task_kind
-        || baseline.policy_version != compared.policy_version
         || baseline.access_list != compared.access_list
     {
         return Err(ApiError::InvalidWirePayload);
@@ -866,6 +866,37 @@ mod tests {
         assert_eq!(record.compared_mode(), OrchestrationMode::Verify);
         assert_eq!(record.baseline_budget(), 8_000);
         assert_eq!(record.compared_budget(), 32_000);
+
+        let committee = route_orchestration(&request(
+            InterpretationTaskKind::BlindedModelReview,
+            0.8,
+            0.8,
+            1.0,
+            32_000,
+        ))
+        .expect("committee");
+        assert_eq!(
+            record_budget_ablation(&committee, &direct),
+            Err(ApiError::InvalidWirePayload),
+        );
+        assert_eq!(
+            record_budget_ablation(&direct, &committee),
+            Err(ApiError::InvalidWirePayload),
+        );
+        let mut different_access = request(
+            InterpretationTaskKind::SpanClassification,
+            0.8,
+            0.1,
+            1.0,
+            32_000,
+        );
+        different_access.access_list.push("evidence_spans".into());
+        let different_access =
+            route_orchestration(&different_access).expect("different access");
+        assert_eq!(
+            record_budget_ablation(&direct, &different_access),
+            Err(ApiError::InvalidWirePayload),
+        );
 
         let binding = bind_contextual_orchestrator(
             &verify,
