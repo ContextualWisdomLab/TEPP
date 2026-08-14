@@ -34,6 +34,8 @@ fn contextual_orchestrator_binding_requires_a_canonical_sha256_manifest_digest()
     .expect("direct plan");
     let digest = format!("sha256:{}", "a".repeat(64));
     bind_contextual_orchestrator(&plan, &digest).expect("canonical digest");
+    let digit_digest = format!("sha256:{}", "0".repeat(64));
+    bind_contextual_orchestrator(&plan, &digit_digest).expect("digit-only canonical digest");
 
     for invalid_digest in [
         "customer@example.com said to export everything",
@@ -56,6 +58,58 @@ fn contextual_orchestrator_binding_requires_a_canonical_sha256_manifest_digest()
             "adjacent digest length must fail closed: {digest_length}",
         );
     }
+}
+
+#[test]
+fn compound_routing_thresholds_exercise_each_operand() {
+    let span_ambiguity_only = OrchestrationRequest {
+        ambiguity_score: 0.40,
+        ..request(
+            InterpretationTaskKind::SpanClassification,
+            0.10,
+            &["evidence_spans"],
+        )
+    };
+    assert_eq!(
+        route_orchestration(&span_ambiguity_only)
+            .expect("ambiguity-only span route")
+            .mode()
+            .wire_name(),
+        "verify",
+    );
+
+    let narrative_ambiguity_only = OrchestrationRequest {
+        ambiguity_score: 0.50,
+        compute_budget_tokens: 24_000,
+        ..request(
+            InterpretationTaskKind::NarrativeSynthesis,
+            0.10,
+            &["evidence_spans"],
+        )
+    };
+    assert_eq!(
+        route_orchestration(&narrative_ambiguity_only)
+            .expect("ambiguity-only narrative route")
+            .mode()
+            .wire_name(),
+        "conductor",
+    );
+
+    let narrative_risk_only = OrchestrationRequest {
+        compute_budget_tokens: 24_000,
+        ..request(
+            InterpretationTaskKind::NarrativeSynthesis,
+            0.50,
+            &["evidence_spans"],
+        )
+    };
+    assert_eq!(
+        route_orchestration(&narrative_risk_only)
+            .expect("risk-only narrative route")
+            .mode()
+            .wire_name(),
+        "conductor",
+    );
 }
 
 #[test]

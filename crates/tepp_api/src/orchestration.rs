@@ -926,6 +926,11 @@ mod tests {
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         )
         .expect("bind");
+        bind_contextual_orchestrator(
+            &verify,
+            "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        )
+        .expect("digit-only canonical digest");
         assert_eq!(binding.contract_version(), ORCHESTRATION_CONTRACT_VERSION);
         assert_eq!(binding.roles().len(), 2);
         assert_eq!(binding.token_budget(), 32_000);
@@ -993,6 +998,12 @@ mod tests {
     #[test]
     fn preferred_modes_cover_concept_and_narrative_boundaries() {
         let cases = [
+            (
+                InterpretationTaskKind::SpanClassification,
+                0.10,
+                0.40,
+                OrchestrationMode::Verify,
+            ),
             (
                 InterpretationTaskKind::ConceptAlignment,
                 0.1,
