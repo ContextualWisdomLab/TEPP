@@ -47,6 +47,10 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
+/// Maximum orchestrator JSON body size.
+pub use orchestrator_http::MAX_ORCHESTRATOR_BODY_BYTES;
+/// Maximum orchestrator idempotency-key size.
+pub use orchestrator_http::MAX_ORCHESTRATOR_IDEMPOTENCY_KEY_BYTES;
 /// Versioned interpretation-run path.
 pub use orchestrator_http::ORCHESTRATOR_INTERPRETATION_PATH;
 /// Credential-free orchestrator HTTPS exchange.
