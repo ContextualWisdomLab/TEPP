@@ -5,13 +5,16 @@
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
 //! scientific crates; this crate only defines fail-closed interchange shapes.
+//! naruon HTTP interchange is a versioned `https` POST to analysis-run and
+//! export paths; table-access URLs, review/Copilot headers, and lexical
+//! inference claims fail closed (ADR 0011).
 
 mod analysis_run;
 mod authorization;
 mod envelope;
 mod error;
 mod export;
-mod provider_payload;
+mod naruon_http;
 mod wire;
 
 /// Analysis-run contract version constant.
@@ -47,19 +50,19 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
-/// Elevated re-identification result.
-pub use provider_payload::DisclosedIdentityMapping;
-/// Separately protected identity mapping.
-pub use provider_payload::IdentityMappingRecord;
-/// Minimized provider payload without direct identity.
-pub use provider_payload::MinimizedProviderPayload;
-/// Log-safe provider disclosure record.
-pub use provider_payload::ProviderDisclosureLog;
-/// Evidence offered to a model provider.
-pub use provider_payload::ProviderEvidenceOffer;
-/// Time-bounded purpose grant.
-pub use provider_payload::PurposeGrant;
-/// Disclose a mapping on the elevated scientific path.
-pub use provider_payload::disclose_identity_mapping;
-/// Minimize evidence for a model provider.
-pub use provider_payload::minimize_provider_payload;
+/// Versioned analysis-run path naruon may call.
+pub use naruon_http::NARUON_ANALYSIS_RUN_PATH;
+/// Versioned export path naruon may call.
+pub use naruon_http::NARUON_EXPORT_PATH;
+/// Allowed TEPP inference method code naruon may claim.
+pub use naruon_http::NARUON_TEPP_INFERENCE_METHOD;
+/// Fail-closed HTTP exchange naruon may send to TEPP.
+pub use naruon_http::NaruonHttpExchange;
+/// Build a naruon analysis-run create exchange.
+pub use naruon_http::naruon_analysis_run_exchange;
+/// Build an analysis-run exchange and refuse credential headers.
+pub use naruon_http::naruon_analysis_run_exchange_with_headers;
+/// Build a naruon export-authorization exchange.
+pub use naruon_http::naruon_export_exchange;
+/// Refuse lexical heuristics as TEPP inference claims.
+pub use naruon_http::naruon_may_claim_tepp_inference;

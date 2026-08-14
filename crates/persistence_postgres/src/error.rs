@@ -26,6 +26,22 @@ pub enum PersistenceError {
     LiveAdapterNotConfigured,
     /// A membership assignment violated exactly-one, weight, window, or label contracts.
     InvalidMembershipAssignment,
+    /// An event relation violated the closed ERD transition vocabulary.
+    InvalidEventRelation,
+    /// An event mention reused an instance identity or had an invalid confidence.
+    InvalidEventMention,
+    /// An event instance had inverted windows or a hostile label.
+    InvalidEventInstance,
+    /// A source-artifact identity already exists with different immutable fields.
+    ConflictingSourceArtifact,
+    /// A source artifact had a non-canonical digest, negative size, or hostile label.
+    InvalidSourceArtifact,
+    /// An audit action code was empty, oversized, or hostile.
+    InvalidAuditEvent,
+    /// A concurrent writer won the open-row lock or serialization contest.
+    ConcurrentWriteConflict,
+    /// A restored snapshot failed integrity revalidation and is not usable.
+    RestoreIntegrityFailed,
 }
 
 impl fmt::Display for PersistenceError {
@@ -41,6 +57,14 @@ impl fmt::Display for PersistenceError {
             Self::PoolOptionsInvalid => "pool options invalid",
             Self::LiveAdapterNotConfigured => "live adapter not configured",
             Self::InvalidMembershipAssignment => "invalid membership assignment",
+            Self::InvalidEventRelation => "invalid event relation",
+            Self::InvalidEventMention => "invalid event mention",
+            Self::InvalidEventInstance => "invalid event instance",
+            Self::ConflictingSourceArtifact => "conflicting source artifact",
+            Self::InvalidSourceArtifact => "invalid source artifact",
+            Self::InvalidAuditEvent => "invalid audit event",
+            Self::ConcurrentWriteConflict => "concurrent write conflict",
+            Self::RestoreIntegrityFailed => "restore integrity failed",
         };
         formatter.write_str(message)
     }
@@ -99,6 +123,7 @@ mod tests {
     use super::{MigrationContractError, PersistenceError};
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn error_messages_are_stable() {
         assert_eq!(
             PersistenceError::DuplicateDocumentRecord.to_string(),
@@ -139,6 +164,38 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidMembershipAssignment.to_string(),
             "invalid membership assignment"
+        );
+        assert_eq!(
+            PersistenceError::ConcurrentWriteConflict.to_string(),
+            "concurrent write conflict"
+        );
+        assert_eq!(
+            PersistenceError::InvalidEventRelation.to_string(),
+            "invalid event relation"
+        );
+        assert_eq!(
+            PersistenceError::InvalidEventMention.to_string(),
+            "invalid event mention"
+        );
+        assert_eq!(
+            PersistenceError::InvalidEventInstance.to_string(),
+            "invalid event instance"
+        );
+        assert_eq!(
+            PersistenceError::ConflictingSourceArtifact.to_string(),
+            "conflicting source artifact"
+        );
+        assert_eq!(
+            PersistenceError::InvalidSourceArtifact.to_string(),
+            "invalid source artifact"
+        );
+        assert_eq!(
+            PersistenceError::InvalidAuditEvent.to_string(),
+            "invalid audit event"
+        );
+        assert_eq!(
+            PersistenceError::RestoreIntegrityFailed.to_string(),
+            "restore integrity failed"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),

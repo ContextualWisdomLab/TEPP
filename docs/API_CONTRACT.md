@@ -110,11 +110,7 @@ TEPP owns its application/API state, authorized evidence, model runs, and artifa
 
 ### naruon
 
-`naruon` may submit evidence/analysis requests or consume versioned topic/event/psychometric artifacts. It must not treat lexical heuristics as TEPP topic inference and must not read TEPP database tables directly. Detailed modular surfaces and failure modes are recorded in [`docs/connectors/naruon-artifact-consumer.md`](connectors/naruon-artifact-consumer.md).
-
-### Provider payload minimization
-
-Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers must build the payload through `tepp_api::minimize_provider_payload`. That function preserves opaque analytical identifiers and membership roles, applies purpose-bound source-text rules, refuses expired or cross-tenant grants, and never copies a direct identity mapping into the provider body or the ordinary log. Re-identification is a separate elevated scientific path (`disclose_identity_mapping`), not a provider header or prompt field.
+`naruon` may submit evidence/analysis requests or consume versioned topic/event/psychometric artifacts. It must not treat lexical heuristics as TEPP topic inference and must not read TEPP database tables directly. HTTP interchange is `tepp_api::naruon_analysis_run_exchange` / `naruon_export_exchange` (`POST /v1/analysis-runs` and `/v1/exports` over `https` only). Detailed modular surfaces and failure modes are recorded in [`docs/connectors/naruon-artifact-consumer.md`](connectors/naruon-artifact-consumer.md).
 
 ### contextual-orchestrator
 
