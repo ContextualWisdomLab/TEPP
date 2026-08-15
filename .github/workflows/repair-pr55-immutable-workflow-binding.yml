@@ -2,10 +2,7 @@ name: Repair PR 55 immutable workflow binding
 
 on:
   pull_request:
-    types:
-      - synchronize
-      - reopened
-      - ready_for_review
+    types: [synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -54,6 +51,8 @@ jobs:
 
       - name: Merge current protected main without discarding feature behavior
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           git merge --no-edit -X ours origin/main
 
@@ -83,15 +82,10 @@ jobs:
 
       - name: Commit verified merge and remove one-shot workflow
         run: |
-          rm -f coverage-branches.json
-          rm -f .github/workflows/repair-pr55-immutable-workflow-binding.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f coverage-branches.json .github/workflows/repair-pr55-immutable-workflow-binding.yml
           git add -A
           git diff --cached --check
           if ! git diff --cached --quiet; then
             git commit -m "fix(api): pin org workflow identities to commits"
           fi
           git push origin HEAD:agent/org-github-control-plane
-
-# Synchronize exact-head repair after ready-for-review transition.
