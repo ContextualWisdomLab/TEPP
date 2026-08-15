@@ -195,4 +195,4 @@ Direct identity contributes to the digest but never appears in the redacted
 audit record or ordinary logs. This makes append-only replay evidence bind the
 actual governed decision rather than an arbitrary caller assertion.
 """
-research_path.write_text(research + "\n", encoding="utf-8")
+research_path.write_text(research.rstrip() + "\n", encoding="utf-8")
