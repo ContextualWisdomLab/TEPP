@@ -11,7 +11,7 @@ TEPP must turn documentary evidence into meaning-bearing embedding inputs withou
 
 The current draft PR #56 uses blank-line splitting as the semantic-unit implementation. That is a useful source-structure hint, but it is not the required architecture. Blank lines do not establish semantic coherence, do not protect the final rendered embedding payload from a model context overflow, do not represent headings, lists, tables, code, captions, dialogue turns, or DOM regions, and do not restore parent or neighboring context at retrieval time.
 
-The target OpenAI profile currently relevant to this decision, `text-embedding-3-large`, has a documented maximum input of 8,192 tokens, uses `cl100k_base` for third-generation embedding token estimation, and returns 3,072 dimensions by default with an optional `dimensions` parameter. These values are provider facts, not universal TEPP constants. They can change by model or revision and therefore belong in a versioned model profile.
+The target OpenAI profile currently relevant to this decision, `text-embedding-3-large`, has a provider-documented per-input ceiling of 8,192 tokens, maps to `cl100k_base` in OpenAI's current tokenizer registry, and emits a full vector of up to 3,072 dimensions with an optional `dimensions` parameter. These are mutable provider facts, not universal TEPP constants. TEPP therefore records both the provider-documented ceiling and its own operational hard limit, together with exact source, retrieval date, tokenizer artifact digest, and verification method.
 
 ## Decision
 
@@ -49,20 +49,29 @@ Every embedding request is governed by an immutable `embedding_model_profile` co
 - provider and endpoint family;
 - model identifier and observed revision;
 - tokenizer profile and tokenizer artifact digest;
-- maximum input tokens;
-- default and requested vector dimensions;
+- provider-documented maximum input tokens;
+- TEPP operational hard-limit tokens and explicit safety margin;
+- full/default and requested vector dimensions;
 - input role;
 - metadata-template version;
-- profile source and verification date.
+- profile source URL, retrieval date, source artifact digest, and verification method.
 
-For `text-embedding-3-large`, the initial profile records `max_input_tokens = 8192`, `tokenizer_profile = cl100k_base`, and `default_dimensions = 3072`. TEPP code does not scatter these values as literals.
+The following invariant is database- and domain-enforced:
+
+\[
+\operatorname{operational\_hard\_limit}
+\leq
+\operatorname{provider\_documented\_maximum}.
+\]
+
+For `text-embedding-3-large`, the initial profile records `provider_documented_max_input_tokens = 8192`, `operational_hard_limit_tokens <= 8192`, `tokenizer_profile = cl100k_base`, and `full_dimensions = 3072`. TEPP code does not scatter these values as literals. Reducing the operational limit or changing a provider/tokenizer fact creates a new profile revision rather than mutating an existing one.
 
 ### 4. Budget-aware semantic-span packing
 
 Micro-units are packed in document order. A candidate span may be merged only when all of the following hold:
 
 1. no mandatory structural boundary is crossed;
-2. the final rendered payload remains within the active model profile;
+2. the final rendered payload remains within the active profile's operational hard limit;
 3. the configurable target-size policy allows the merge;
 4. semantic evidence does not indicate a strong boundary.
 
@@ -73,7 +82,7 @@ Pre-packing may reserve tokens for headings and other metadata, but the authorit
 \[
 \operatorname{tokens}(\operatorname{rendered\_payload})
 >
-\operatorname{max\_input\_tokens}.
+\operatorname{operational\_hard\_limit\_tokens}.
 \]
 
 The hard overflow rate is therefore required to be zero.
@@ -119,6 +128,7 @@ This ADR does not:
 - claim that a blank line, sentence, or paragraph is always a complete semantic unit;
 - implement true late chunking for a closed embedding API that does not expose contextual token embeddings and pooling control;
 - let an LLM directly write authoritative spans without deterministic offset and budget validation;
+- treat one live provider probe as permanent evidence of an immutable external contract;
 - establish a stable public release.
 
 ## Alternatives considered
@@ -134,7 +144,7 @@ This ADR does not:
 
 - exact source spans remain the canonical evidence identity;
 - paragraph-only logic becomes one structural adapter rather than the product contract;
-- model limits are configuration data with source, revision, and digest;
+- provider limits and TEPP operational limits are distinct versioned profile facts;
 - the same algorithm works when language metadata is absent, mixed, wrong, or unresolved;
 - provider calls are impossible until the final payload is counted;
 - retrieval can use small precise leaves without abandoning larger context;
@@ -153,9 +163,12 @@ TEPP returns typed, content-redacting failures:
 - `unit_unsplittable_under_budget`;
 - `invalid_source_offset`;
 - `semantic_similarity_unavailable`;
-- `embedding_provider_unavailable`.
+- `embedding_provider_unavailable`;
+- `embedding_provider_contract_diverged`.
 
 `semantic_similarity_unavailable` may degrade to deterministic structure-only packing and records `boundary_mode = structure_only`. Tokenizer/profile/offset failures cannot degrade because they protect correctness. Provider retries and fallback are bounded and recorded; they never change span identity silently.
+
+If the provider rejects a payload that the verified profile permits, the adapter returns `embedding_provider_contract_diverged`, records the response class without source text, and fails closed. Operations may publish a new profile revision with a lower operational hard limit after verification; no existing profile, payload digest, span identity, or vector provenance is rewritten.
 
 ## Security, privacy, and governance impact
 
@@ -187,11 +200,12 @@ Acceptance requires falsifiable evidence.
 
 ### Correctness
 
-- final rendered-payload overflow rate is exactly zero;
+- final rendered-payload overflow rate is exactly zero relative to the profile's operational hard limit;
 - source reconstruction from every leaf span is exact;
 - byte and Unicode-scalar offsets remain valid under mixed scripts, combining marks, emoji ZWJ sequences, RTL text, and malformed-input rejection;
 - no control-flow branch depends on a language code;
-- unsplittable oversized inputs fail closed without truncation.
+- unsplittable oversized inputs fail closed without truncation;
+- every operational limit is less than or equal to its provider-documented ceiling and tied to source/retrieval/digest evidence.
 
 ### Retrieval quality
 
@@ -211,10 +225,12 @@ Tests include whitespace-delimited and non-whitespace-delimited scripts, Korean/
 
 ### Model profile
 
-The `text-embedding-3-large` profile is tested against 8,192-token acceptance and 8,193-token refusal using the pinned tokenizer profile. The final metadata-rendered payload, not raw content alone, is counted.
+Deterministic unit/property tests accept a final rendered payload exactly at the profile's operational hard limit and refuse or recursively split one token above it. The initial `text-embedding-3-large` profile additionally proves that its configured operational hard limit does not exceed the provider-documented 8,192-token ceiling, uses the pinned `cl100k_base` artifact, and binds the full 3,072-dimension output or an explicit requested dimension.
+
+A scheduled live provider contract probe may corroborate the external boundary using `NVIDIA_NIM_API_KEY` only when the tested provider is reached through the reviewed orchestration/gateway policy; direct OpenAI live verification uses an explicitly authorized provider credential and is not a required unit-test dependency. Live rejection at or below the operational limit is treated as contract divergence, not as permission to truncate.
 
 ## Rollback and supersession
 
 Rollback disables dense/LLM refinement and uses deterministic structure-only packing with the last validated model profile. It does not restore blank-line-only segmentation as an authoritative semantic algorithm.
 
-Supersession requires an ADR that preserves exact evidence offsets, versioned model limits, final-payload token enforcement, language-independent base correctness, explicit degradation, and retrieval-quality evidence. A later open-weight model may add true late chunking, but that capability must remain separate from the `text-embedding-3-large` API profile unless the provider exposes the necessary token-level contract.
+Supersession requires an ADR that preserves exact evidence offsets, versioned provider and operational model limits, final-payload token enforcement, language-independent base correctness, explicit degradation, provider-divergence handling, and retrieval-quality evidence. A later open-weight model may add true late chunking, but that capability must remain separate from the `text-embedding-3-large` API profile unless the provider exposes the necessary token-level contract.
