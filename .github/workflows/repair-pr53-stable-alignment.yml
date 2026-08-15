@@ -86,3 +86,5 @@ jobs:
             git commit -m "fix(concept): stabilize shared-space RMSE"
           fi
           git push origin HEAD:agent/concept-dictionary-language-profiles
+
+# Synchronize exact-head repair after ready-for-review transition.
