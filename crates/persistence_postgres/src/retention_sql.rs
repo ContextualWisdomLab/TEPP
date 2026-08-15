@@ -689,6 +689,67 @@ mod tests {
     }
 
     #[test]
+    fn status_window_pair_and_inverted_system_bounds_fail_closed() {
+        let closed =
+            SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("closed system bound");
+        let before =
+            SystemTime::parse_rfc3339("2025-01-01T00:00:00Z").expect("before system bound");
+
+        let mut active_closed = policy();
+        active_closed.system_to = Some(closed);
+        assert_eq!(
+            insert_retention_policy_sql(&active_closed),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut superseded_open = policy();
+        superseded_open.policy_status_code = "superseded".into();
+        assert_eq!(
+            insert_retention_policy_sql(&superseded_open),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut inverted = policy();
+        inverted.policy_status_code = "superseded".into();
+        inverted.system_to = Some(before);
+        assert_eq!(
+            insert_retention_policy_sql(&inverted),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut hold_active_closed = hold();
+        hold_active_closed.system_to = Some(closed);
+        assert_eq!(
+            insert_legal_hold_sql(&hold_active_closed),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut hold_released_open = hold();
+        hold_released_open.hold_status_code = "released".into();
+        assert_eq!(
+            insert_legal_hold_sql(&hold_released_open),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut hold_inverted = hold();
+        hold_inverted.hold_status_code = "released".into();
+        hold_inverted.system_to = Some(before);
+        assert_eq!(
+            insert_legal_hold_sql(&hold_inverted),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut released_closed = hold();
+        released_closed.hold_status_code = "released".into();
+        released_closed.system_to = Some(closed);
+        insert_legal_hold_sql(&released_closed).expect("historical released hold");
+        assert!(
+            !released_closed.blocks_deletion(Uuid::nil(), Uuid::from_u128(3)),
+            "released/closed holds must not block deletion"
+        );
+    }
+
+    #[test]
     fn non_positive_period_unknown_vocab_and_hostile_labels_fail_closed() {
         let mut zero = policy();
         zero.retention_period_days = 0;

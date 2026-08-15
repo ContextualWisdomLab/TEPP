@@ -222,6 +222,10 @@ mod tests {
         with_ref.source_size_bytes = 0;
         let referenced = insert_source_artifact_sql(&with_ref).expect("ref");
         assert!(referenced.contains("s3://tepp/object"));
+        let referenced_assertion =
+            assert_source_artifact_matches_sql(&with_ref).expect("referenced assertion");
+        assert!(referenced_assertion.contains("s3://tepp/object"));
+        assert!(referenced_assertion.contains("IS NOT DISTINCT FROM 's3://tepp/object'"));
 
         assert_eq!(
             insert_source_artifact_sql(&SourceArtifactRecord {
