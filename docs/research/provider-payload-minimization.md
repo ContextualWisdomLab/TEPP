@@ -32,3 +32,12 @@ ISO/IEC 27701:2025 is the current standalone Privacy Information Management Syst
 - attached identity mappings are refused on the provider path;
 - elevated scientific re-identification returns the mapping; other purposes and missing flags are denied;
 - disclosure logs never contain source text or mapping strings.
+
+## Re-identification audit digest authority
+
+The caller cannot provide or select the decision digest. TEPP computes a
+versioned, length-delimited SHA-256 digest inside the trust boundary from the
+purpose grant, protected mapping, decision instant, and allow/deny outcome.
+Direct identity contributes to the digest but never appears in the redacted
+audit record or ordinary logs. This makes append-only replay evidence bind the
+actual governed decision rather than an arbitrary caller assertion.

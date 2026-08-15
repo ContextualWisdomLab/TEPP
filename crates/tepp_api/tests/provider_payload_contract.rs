@@ -49,13 +49,7 @@ fn disclose(
     decision_time: &str,
 ) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
     let mut sink = RecordingAuditSink::default();
-    disclose_identity_mapping_with_audit(
-        grant,
-        mapping,
-        decision_time,
-        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        &mut sink,
-    )
+    disclose_identity_mapping_with_audit(grant, mapping, decision_time, &mut sink)
 }
 
 #[test]
