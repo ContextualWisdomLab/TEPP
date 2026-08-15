@@ -44,22 +44,31 @@ pub fn semantic_paragraph_units(
     Ok(units)
 }
 
-/// Refuse collapsing a multi-paragraph document into one bag-of-words unit.
+/// Require the canonical paragraph spans instead of one collapsed document bag.
+///
+/// The expected paragraph multiplicity is derived from `document`; callers
+/// cannot weaken the guard by supplying their own count. The supplied spans
+/// must also equal the canonical exact spans, preventing unrelated spans from
+/// satisfying the count alone.
 ///
 /// # Errors
 ///
-/// Returns [`EvidenceError::InvalidWirePayload`] for an empty unit set or a
-/// zero required count. Returns [`EvidenceError::SemanticUnitBagRefused`] when
-/// `units` is shorter than the known paragraph multiplicity.
+/// Returns [`EvidenceError::InvalidWirePayload`] for an empty or noncanonical
+/// span set. Returns [`EvidenceError::SemanticUnitBagRefused`] when `units`
+/// contains fewer spans than the document's canonical paragraph set.
 pub fn refuse_document_bag_of_words(
+    document: &DocumentRecord,
     units: &[SourceSpan],
-    required_paragraph_count: usize,
 ) -> Result<(), EvidenceError> {
-    if units.is_empty() || required_paragraph_count == 0 {
+    if units.is_empty() {
         return Err(EvidenceError::InvalidWirePayload);
     }
-    if units.len() < required_paragraph_count {
+    let expected = semantic_paragraph_units(document)?;
+    if units.len() < expected.len() {
         return Err(EvidenceError::SemanticUnitBagRefused);
+    }
+    if units != expected.as_slice() {
+        return Err(EvidenceError::InvalidWirePayload);
     }
     Ok(())
 }
@@ -70,14 +79,15 @@ mod tests {
     use crate::{DocumentRecord, EvidenceError, SourceArtifact};
 
     #[test]
-    fn trailing_blank_and_zero_required_count_fail_closed() {
+    fn trailing_blank_and_empty_unit_set_fail_closed() {
         let text = "Only one unit.\n\n   \n\n";
         let artifact = SourceArtifact::from_bytes(text.as_bytes()).expect("artifact");
         let document = DocumentRecord::from_text(artifact.id(), text).expect("document");
         let units = semantic_paragraph_units(&document).expect("trim empty");
         assert_eq!(units.len(), 1);
+        refuse_document_bag_of_words(&document, &units).expect("canonical unit");
         assert_eq!(
-            refuse_document_bag_of_words(&units, 0),
+            refuse_document_bag_of_words(&document, &[]),
             Err(EvidenceError::InvalidWirePayload)
         );
     }
