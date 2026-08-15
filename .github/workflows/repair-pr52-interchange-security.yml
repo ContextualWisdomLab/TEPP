@@ -76,3 +76,5 @@ jobs:
             git commit -m "fix(api): bound orchestrator interchange trust channels"
           fi
           git push origin HEAD:agent/orchestrator-http-interchange
+
+# Synchronize exact-head repair after ready-for-review transition.
