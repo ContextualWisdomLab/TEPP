@@ -9,7 +9,7 @@ use measurement_invariance::{
 fn configural_status_cannot_claim_shared_metric_meaning() {
     assert_eq!(
         require_shared_metric_meaning(InvarianceLevel::Configural),
-        Err(InvarianceError::InvarianceTooWeakForSharedMeaning)
+        Err(InvarianceError::InvarianceTooWeakForSharedMetricMeaning)
     );
     assert_eq!(
         require_shared_metric_meaning(InvarianceLevel::Metric),
