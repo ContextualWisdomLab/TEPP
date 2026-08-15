@@ -7,17 +7,19 @@ use std::fmt;
 #[non_exhaustive]
 pub enum InvarianceError {
     /// A weaker invariance status was treated as shared metric meaning.
-    InvarianceTooWeakForSharedMeaning,
+    InvarianceTooWeakForSharedMetricMeaning,
     /// An unknown invariance-status wire name was supplied.
     UnknownInvarianceLevel,
-    /// Loading slices were empty, length-mismatched, or non-finite.
+    /// Loading slices were empty, identity-mismatched, length-mismatched, or non-finite.
     InvalidLoadingPayload,
 }
 
 impl fmt::Display for InvarianceError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
-            Self::InvarianceTooWeakForSharedMeaning => "invariance is too weak for shared meaning",
+            Self::InvarianceTooWeakForSharedMetricMeaning => {
+                "invariance is too weak for shared metric meaning"
+            }
             Self::UnknownInvarianceLevel => "unknown invariance level",
             Self::InvalidLoadingPayload => "invalid invariance loading payload",
         };
@@ -35,8 +37,8 @@ mod tests {
     fn error_messages_are_stable() {
         for (error, message) in [
             (
-                InvarianceError::InvarianceTooWeakForSharedMeaning,
-                "invariance is too weak for shared meaning",
+                InvarianceError::InvarianceTooWeakForSharedMetricMeaning,
+                "invariance is too weak for shared metric meaning",
             ),
             (
                 InvarianceError::UnknownInvarianceLevel,
