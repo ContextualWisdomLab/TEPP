@@ -1,22 +1,22 @@
-//! Shared meaning requires an explicit invariance status and computed loading RMSE.
+//! Shared metric meaning requires an explicit invariance status and identified loading RMSE.
 
 use measurement_invariance::{
     GroupLoading, InvarianceError, InvarianceLevel, loading_root_mean_square_error,
-    refuse_noninvariant_as_shared_meaning,
+    require_shared_metric_meaning,
 };
 
 #[test]
 fn configural_status_cannot_claim_shared_metric_meaning() {
     assert_eq!(
-        refuse_noninvariant_as_shared_meaning(InvarianceLevel::Configural),
+        require_shared_metric_meaning(InvarianceLevel::Configural),
         Err(InvarianceError::InvarianceTooWeakForSharedMeaning)
     );
     assert_eq!(
-        refuse_noninvariant_as_shared_meaning(InvarianceLevel::Metric),
+        require_shared_metric_meaning(InvarianceLevel::Metric),
         Ok(())
     );
     assert_eq!(
-        refuse_noninvariant_as_shared_meaning(InvarianceLevel::Scalar),
+        require_shared_metric_meaning(InvarianceLevel::Scalar),
         Ok(())
     );
 }
