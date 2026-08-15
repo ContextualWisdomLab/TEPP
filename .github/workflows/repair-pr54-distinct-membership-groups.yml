@@ -76,3 +76,5 @@ jobs:
             git commit -m "fix(membership): preserve distinct estimator groups"
           fi
           git push origin HEAD:agent/membership-estimation-rows
+
+# Synchronize exact-head repair after ready-for-review transition.
