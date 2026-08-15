@@ -150,3 +150,50 @@ fn audit_digest_is_deterministic_and_binds_protected_mapping_content() {
     assert!(!first.decision_digest().contains("Pat"));
     assert!(!changed.decision_digest().contains("Different"));
 }
+
+#[test]
+fn audit_digest_binds_principal_grant_window_and_decision_time() {
+    let mut baseline_sink = RecordingAuditSink::default();
+    let (_, baseline) = disclose_identity_mapping(
+        &grant(true),
+        &mapping(),
+        "2026-06-15T12:00:00Z",
+        &mut baseline_sink,
+    )
+    .expect("baseline disclosure");
+
+    let mut changed_principal_grant = grant(true);
+    changed_principal_grant.principal_id = "principal-reviewer".into();
+    let mut changed_principal_sink = RecordingAuditSink::default();
+    let (_, changed_principal) = disclose_identity_mapping(
+        &changed_principal_grant,
+        &mapping(),
+        "2026-06-15T12:00:00Z",
+        &mut changed_principal_sink,
+    )
+    .expect("changed principal disclosure");
+
+    let mut changed_window_grant = grant(true);
+    changed_window_grant.valid_from = "2026-02-01T00:00:00Z".into();
+    let mut changed_window_sink = RecordingAuditSink::default();
+    let (_, changed_window) = disclose_identity_mapping(
+        &changed_window_grant,
+        &mapping(),
+        "2026-06-15T12:00:00Z",
+        &mut changed_window_sink,
+    )
+    .expect("changed grant window disclosure");
+
+    let mut changed_time_sink = RecordingAuditSink::default();
+    let (_, changed_time) = disclose_identity_mapping(
+        &grant(true),
+        &mapping(),
+        "2026-06-15T12:00:01Z",
+        &mut changed_time_sink,
+    )
+    .expect("changed decision time disclosure");
+
+    for changed in [&changed_principal, &changed_window, &changed_time] {
+        assert_ne!(baseline.decision_digest(), changed.decision_digest());
+    }
+}
