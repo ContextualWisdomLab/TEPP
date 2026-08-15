@@ -1,0 +1,75 @@
+name: Repair PR 54 distinct membership groups
+
+on:
+  pull_request:
+    types: [synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repair-tepp-pr-54-distinct-membership-groups
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: >-
+      github.event.pull_request.number == 54 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'agent/membership-estimation-rows'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout exact PR branch
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          ref: agent/membership-estimation-rows
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Prove the pre-implementation group contract was RED
+        run: |
+          git worktree add "$RUNNER_TEMP/tepp-red" 6d2c710e977bf087b2452a6785a6483e20bc9e68
+          set +e
+          output=$(cd "$RUNNER_TEMP/tepp-red" && cargo +1.97.1 test -p membership_core --test atomistic_collapse_structure_contract 2>&1)
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          git worktree remove --force "$RUNNER_TEMP/tepp-red"
+          if [ "$status" -eq 0 ]; then
+            echo "Expected duplicate-group rows to expose the old collapse guard" >&2
+            exit 1
+          fi
+          grep -E "duplicate_group_rows|AtomisticCollapseRefused" <<<"$output"
+
+      - name: Merge current protected main without discarding feature behavior
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge --no-edit -X ours origin/main
+
+      - name: Verify focused and workspace contracts
+        run: |
+          cargo +1.97.1 fmt --all --check
+          cargo +1.97.1 test -p membership_core --all-features
+          cargo +1.97.1 clippy -p membership_core --all-targets --all-features -- -D warnings
+          cargo +1.97.1 test --workspace --all-features
+          python3 scripts/check_workspace_contract.py
+          python3 scripts/check_docstrings.py
+          python3 scripts/validate_documentation.py
+
+      - name: Commit verified merge and remove one-shot workflow
+        run: |
+          rm -f .github/workflows/repair-pr54-distinct-membership-groups.yml
+          git add -A
+          git diff --cached --check
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(membership): preserve distinct estimator groups"
+          fi
+          git push origin HEAD:agent/membership-estimation-rows
