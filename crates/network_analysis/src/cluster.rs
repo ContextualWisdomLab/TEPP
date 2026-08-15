@@ -109,8 +109,16 @@ mod tests {
 
     #[test]
     fn pair_sizes_and_lengths_with_mixed_outcomes_cover_rate_branches() {
-        let truth = [ClusterLabel::new(1), ClusterLabel::new(1), ClusterLabel::new(2)];
-        let decided = [ClusterLabel::new(1), ClusterLabel::new(2), ClusterLabel::new(2)];
+        let truth = [
+            ClusterLabel::new(1),
+            ClusterLabel::new(1),
+            ClusterLabel::new(2),
+        ];
+        let decided = [
+            ClusterLabel::new(1),
+            ClusterLabel::new(2),
+            ClusterLabel::new(2),
+        ];
 
         let precision = cluster_pair_precision(&truth, &decided).expect("precision");
         let recall = cluster_pair_recall(&truth, &decided).expect("recall");
@@ -118,15 +126,28 @@ mod tests {
         assert!((precision - (0.0_f64 / 1.0_f64)).abs() < f64::EPSILON);
         assert!((recall - 0.0_f64).abs() < f64::EPSILON);
 
-        let true_aligned = [ClusterLabel::new(3), ClusterLabel::new(3), ClusterLabel::new(2)];
-        let aligned_precision = cluster_pair_precision(&truth, &true_aligned).expect("precision_aligned");
+        let true_aligned = [
+            ClusterLabel::new(3),
+            ClusterLabel::new(3),
+            ClusterLabel::new(2),
+        ];
+        let aligned_precision =
+            cluster_pair_precision(&truth, &true_aligned).expect("precision_aligned");
         assert!((aligned_precision - 1.0_f64).abs() < f64::EPSILON);
     }
 
     #[test]
     fn recall_with_no_truth_pairs_is_invalid() {
-        let truth = [ClusterLabel::new(1), ClusterLabel::new(2), ClusterLabel::new(3)];
-        let decided = [ClusterLabel::new(1), ClusterLabel::new(1), ClusterLabel::new(2)];
+        let truth = [
+            ClusterLabel::new(1),
+            ClusterLabel::new(2),
+            ClusterLabel::new(3),
+        ];
+        let decided = [
+            ClusterLabel::new(1),
+            ClusterLabel::new(1),
+            ClusterLabel::new(2),
+        ];
 
         assert_eq!(
             cluster_pair_recall(&truth, &decided),
@@ -136,7 +157,11 @@ mod tests {
 
     #[test]
     fn payloads_with_mismatched_lengths_are_invalid() {
-        let truth = [ClusterLabel::new(1), ClusterLabel::new(2), ClusterLabel::new(3)];
+        let truth = [
+            ClusterLabel::new(1),
+            ClusterLabel::new(2),
+            ClusterLabel::new(3),
+        ];
         let decided = [ClusterLabel::new(1), ClusterLabel::new(1)];
 
         assert_eq!(
