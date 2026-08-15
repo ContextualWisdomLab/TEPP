@@ -52,6 +52,8 @@ jobs:
 
       - name: Merge current protected main without discarding feature behavior
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           git merge --no-edit -X ours origin/main
 
@@ -68,8 +70,6 @@ jobs:
       - name: Commit verified merge and remove one-shot workflow
         run: |
           rm -f .github/workflows/repair-pr52-interchange-security.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --check
           if ! git diff --cached --quiet; then
