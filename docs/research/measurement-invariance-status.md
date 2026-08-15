@@ -4,10 +4,12 @@
 
 `measurement_invariance` records an explicit configural, metric, or scalar
 status. Configural structure alone cannot license shared metric meaning.
-Recovered group loadings are scored with computed RMSE against known truth.
+Recovered loadings are scored with computed RMSE against known truth only after
+each estimate is bound to the same group × indicator × factor coordinate as its
+truth parameter; sequence position alone is not parameter identity.
 
-This slice does not fit ESEM/DSEM, claim partial invariance, or treat a
-language profile as aligned from architecture alone.
+This slice does not fit ESEM/DSEM, solve rotational alignment, claim partial
+invariance, or treat a language profile as aligned from architecture alone.
 
 ## Authority
 
@@ -23,6 +25,10 @@ language profile as aligned from architecture alone.
 Meredith (1993) distinguishes configural, weak/metric, and strong/scalar
 invariance. Marsh et al. (2014) place those tests inside an ESEM program.
 They do **not** authorize treating configural similarity as shared scores.
+The explicit group × indicator × factor key in TEPP is an implementation
+safeguard: a recovery statistic is meaningful only when the estimated loading
+and known-truth loading refer to the same identified parameter. It does not
+resolve ESEM factor rotation or establish invariance by itself.
 
 Meredith, W. (1993). Measurement invariance, factor analysis and factorial
 invariance. *Psychometrika, 58*(4), 525–543.
