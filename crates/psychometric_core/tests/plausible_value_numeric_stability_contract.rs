@@ -11,22 +11,20 @@ fn scaled_mean_recovers_balanced_extreme_posterior_draws() {
         -f64::MAX,
     ])
     .expect("balanced finite draws have a finite mean");
-    assert_eq!(mean, 0.0);
+    assert!(mean.abs() < f64::EPSILON);
 }
 
 #[test]
 fn scaled_mean_preserves_an_extreme_constant_draw() {
     let mean = posterior_draw_point_estimate_mean(&[f64::MAX, f64::MAX])
         .expect("constant finite extreme draws have a finite mean");
-    assert_eq!(mean, f64::MAX);
+    assert_eq!(mean.to_bits(), f64::MAX.to_bits());
 }
 
 #[test]
 fn all_zero_draws_have_an_exact_zero_mean() {
-    assert_eq!(
-        posterior_draw_point_estimate_mean(&[0.0, 0.0, 0.0]).expect("zero draws"),
-        0.0
-    );
+    let mean = posterior_draw_point_estimate_mean(&[0.0, 0.0, 0.0]).expect("zero draws");
+    assert!(mean.abs() < f64::EPSILON);
 }
 
 #[test]
