@@ -723,6 +723,10 @@ mod tests {
             insert_legal_hold_sql(&hold_active_closed),
             Err(PersistenceError::InvalidRetentionLifecycle)
         );
+        assert!(
+            !hold_active_closed.blocks_deletion(Uuid::nil(), Uuid::from_u128(3)),
+            "active status with a closed system_to must not block deletion"
+        );
 
         let mut hold_released_open = hold();
         hold_released_open.hold_status_code = "released".into();
