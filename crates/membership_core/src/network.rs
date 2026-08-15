@@ -88,9 +88,7 @@ impl MembershipNetwork {
         self.assignments
             .iter()
             .copied()
-            .filter(|assignment| {
-                assignment.member_id() == member_id && assignment.is_active_at(instant)
-            })
+            .filter(|assignment| assignment.member_id() == member_id && assignment.is_active_at(instant))
             .collect()
     }
 
@@ -135,12 +133,7 @@ impl EstimationMembershipRow {
     /// Copy the scientifically relevant fields from one assignment.
     #[must_use]
     pub fn from_assignment(assignment: MembershipAssignment) -> Self {
-        Self {
-            member_id: assignment.member_id(),
-            group_id: assignment.group_id(),
-            role: assignment.role(),
-            weight: assignment.weight().value(),
-        }
+        Self { member_id: assignment.member_id(), group_id: assignment.group_id(), role: assignment.role(), weight: assignment.weight().value() }
     }
 
     /// Member identity on this row.
@@ -151,7 +144,7 @@ impl EstimationMembershipRow {
 
     /// Group identity on this row.
     #[must_use]
-    pub const fn group_id(self) -> GroupId {
+    pub fn group_id(self) -> GroupId {
         self.group_id
     }
 
