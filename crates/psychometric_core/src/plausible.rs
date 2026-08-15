@@ -4,7 +4,7 @@ use crate::error::PsychometricError;
 use crate::indicator::{IndicatorKind, require_finite, require_valid_indicator};
 use crate::loading::recover_reflective_loading;
 
-/// Scale-normalized compensated mean of finite plausible-value draws.
+/// Arithmetic mean of finite plausible-value draws.
 ///
 /// Scaling by the largest absolute draw prevents valid finite posterior values
 /// from overflowing during aggregation. Compensated accumulation preserves
