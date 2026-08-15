@@ -2,23 +2,36 @@
 
 use crate::error::ComputeBackendError;
 
-/// Stream a weighted sum on the CPU `f64` reference path.
+/// Stream a compensated weighted sum on the CPU `f64` reference path.
+///
+/// Neumaier-style compensation preserves low-order terms in cancellation-heavy
+/// inputs while keeping deterministic input order. This sequential function is
+/// the numerical reference for later fixed-pool CPU and GPU implementations.
 ///
 /// # Errors
 ///
 /// Returns [`ComputeBackendError::InvalidBudget`] when the slices are empty or
-/// unequal, and [`ComputeBackendError::NonFiniteOutput`] when any term is
-/// non-finite.
+/// unequal, and [`ComputeBackendError::NonFiniteOutput`] when any term or
+/// accumulator is non-finite.
 pub fn streamed_weighted_sum(weights: &[f64], values: &[f64]) -> Result<f64, ComputeBackendError> {
     if weights.is_empty() || weights.len() != values.len() {
         return Err(ComputeBackendError::InvalidBudget);
     }
     let mut total = 0.0_f64;
+    let mut compensation = 0.0_f64;
     for (weight, value) in weights.iter().zip(values) {
         let term = require_finite(*weight)? * require_finite(*value)?;
-        total = require_finite(total + term)?;
+        let term = require_finite(term)?;
+        let next = require_finite(total + term)?;
+        let correction = if total.abs() >= term.abs() {
+            (total - next) + term
+        } else {
+            (term - next) + total
+        };
+        compensation = require_finite(compensation + correction)?;
+        total = next;
     }
-    Ok(total)
+    require_finite(total + compensation)
 }
 
 /// Reject a non-finite diagnostic quantity.
@@ -39,9 +52,10 @@ pub fn require_finite(value: f64) -> Result<f64, ComputeBackendError> {
 ///
 /// # Errors
 ///
-/// Returns [`ComputeBackendError::NonFiniteOutput`] when either value is
-/// non-finite, and [`ComputeBackendError::ParityFailure`] when the absolute
-/// gap exceeds `tolerance`.
+/// Returns [`ComputeBackendError::NonFiniteOutput`] when either value or the
+/// tolerance is non-finite, [`ComputeBackendError::InvalidTolerance`] for a
+/// negative tolerance, and [`ComputeBackendError::ParityFailure`] when the
+/// absolute gap exceeds the non-negative tolerance.
 pub fn require_cpu_gpu_parity(
     cpu_reference: f64,
     candidate: f64,
@@ -50,6 +64,9 @@ pub fn require_cpu_gpu_parity(
     let left = require_finite(cpu_reference)?;
     let right = require_finite(candidate)?;
     let bound = require_finite(tolerance)?;
+    if bound < 0.0 {
+        return Err(ComputeBackendError::InvalidTolerance);
+    }
     if (left - right).abs() <= bound {
         Ok(())
     } else {
@@ -61,6 +78,16 @@ pub fn require_cpu_gpu_parity(
 mod tests {
     use super::{require_cpu_gpu_parity, require_finite, streamed_weighted_sum};
     use crate::error::ComputeBackendError;
+
+    #[test]
+    fn compensated_reference_recovers_low_order_cancellation_term() {
+        let result =
+            streamed_weighted_sum(&[1.0, 1.0, 1.0], &[1e16, 1.0, -1e16]).expect("compensated sum");
+        assert!((result - 1.0).abs() < 1e-15);
+        let reverse = streamed_weighted_sum(&[1.0, 1.0, 1.0], &[-1e16, 1.0, 1e16])
+            .expect("reverse compensation branch");
+        assert!((reverse - 1.0).abs() < 1e-15);
+    }
 
     #[test]
     fn reference_path_rejects_invalid_and_non_finite_input() {
@@ -94,6 +121,10 @@ mod tests {
         assert_eq!(
             require_cpu_gpu_parity(1.0, 2.0, 0.1),
             Err(ComputeBackendError::ParityFailure)
+        );
+        assert_eq!(
+            require_cpu_gpu_parity(1.0, 1.0, -0.1),
+            Err(ComputeBackendError::InvalidTolerance)
         );
         assert_eq!(
             require_cpu_gpu_parity(f64::NAN, 1.0, 0.1),

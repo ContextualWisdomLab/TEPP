@@ -58,25 +58,12 @@ impl VramController {
     /// forbidden memory adaptation, mixed-precision finals, or an overflowing
     /// peak prediction.
     pub fn plan(&self, request: &WorkloadRequest) -> Result<MicroBatchPlan, ComputeBackendError> {
-        if request.corpus_placement() == CorpusPlacement::FullCorpusOnDevice {
-            return Err(ComputeBackendError::FullCorpusTensorRefused);
-        }
-        if request.observation_retention() == ObservationRetention::DropToFit {
-            return Err(ComputeBackendError::ObservationDropForbidden);
-        }
-        if request.model_complexity() == ModelComplexity::ReduceToFit {
-            return Err(ComputeBackendError::ComplexityReductionForbidden);
-        }
-        if request.cutoff_policy() == CutoffPolicy::MoveToFit {
-            return Err(ComputeBackendError::CutoffMutationForbidden);
-        }
-        if request.final_quantity_precision() != PrecisionMode::ReferenceF64 {
-            return Err(ComputeBackendError::UnsupportedPrecision);
-        }
+        Self::validate_request(request)?;
 
         if !self.inventory.device_present() {
             return Ok(Self::cpu_plan(
                 request.requested_batch(),
+                0,
                 FallbackReason::DeviceUnavailable,
             ));
         }
@@ -85,6 +72,7 @@ impl VramController {
         if usable == 0 {
             return Ok(Self::cpu_plan(
                 request.requested_batch(),
+                0,
                 FallbackReason::InsufficientVram,
             ));
         }
@@ -102,12 +90,14 @@ impl VramController {
                     batch,
                     peak,
                     PrecisionMode::ReferenceF64,
+                    0,
                     None,
                 ));
             }
             if batch == 1 {
                 return Ok(Self::cpu_plan(
                     request.requested_batch(),
+                    0,
                     FallbackReason::InsufficientVram,
                 ));
             }
@@ -115,43 +105,84 @@ impl VramController {
         }
     }
 
-    /// Treat device OOM as an expected state and fall back after bounded retries.
+    /// Return the next executable plan after one observed device OOM.
     ///
-    /// The returned CPU plan keeps the original batch so observations are not
-    /// dropped. This slice does not claim a live accelerator retry lane.
+    /// Each accepted retry halves the current micro-batch and recomputes its
+    /// peak estimate from the original workload. Once the configured retry
+    /// budget is exhausted, or a unit batch fails, the plan switches to the CPU
+    /// `f64` reference without dropping any observation.
     ///
     /// # Errors
     ///
-    /// Returns [`ComputeBackendError::RetryBudgetExceeded`] when the plan is
-    /// already on the CPU reference path.
+    /// Returns [`ComputeBackendError::RetryBudgetExceeded`] when the supplied
+    /// plan is already on the CPU path, and validation/overflow errors for an
+    /// invalid workload or retry counter.
     pub fn recover_from_oom(
         &self,
+        request: &WorkloadRequest,
         plan: &MicroBatchPlan,
     ) -> Result<MicroBatchPlan, ComputeBackendError> {
+        Self::validate_request(request)?;
         if plan.backend() != ComputeBackendKind::GpuStreamed {
             return Err(ComputeBackendError::RetryBudgetExceeded);
         }
-        let mut remaining = self.max_retries;
-        let mut batch = plan.batch_size();
-        while remaining > 0 {
-            remaining -= 1;
-            if batch > 1 {
-                batch /= 2;
-            }
+        let next_retry = plan
+            .oom_retry_count()
+            .checked_add(1)
+            .ok_or(ComputeBackendError::InvalidBudget)?;
+        if next_retry <= self.max_retries && plan.batch_size() > 1 {
+            let batch = plan.batch_size() / 2;
+            let peak = predicted_peak_bytes(
+                batch,
+                request.bytes_per_observation(),
+                request.working_set_bytes(),
+            )?;
+            return Ok(MicroBatchPlan::new(
+                ComputeBackendKind::GpuStreamed,
+                batch,
+                peak,
+                PrecisionMode::ReferenceF64,
+                next_retry,
+                None,
+            ));
         }
-        let _ = batch;
         Ok(Self::cpu_plan(
-            plan.batch_size(),
+            request.requested_batch(),
+            next_retry,
             FallbackReason::OutOfMemoryRetryExhausted,
         ))
     }
 
-    const fn cpu_plan(batch_size: u32, reason: FallbackReason) -> MicroBatchPlan {
+    fn validate_request(request: &WorkloadRequest) -> Result<(), ComputeBackendError> {
+        if request.corpus_placement() == CorpusPlacement::FullCorpusOnDevice {
+            return Err(ComputeBackendError::FullCorpusTensorRefused);
+        }
+        if request.observation_retention() == ObservationRetention::DropToFit {
+            return Err(ComputeBackendError::ObservationDropForbidden);
+        }
+        if request.model_complexity() == ModelComplexity::ReduceToFit {
+            return Err(ComputeBackendError::ComplexityReductionForbidden);
+        }
+        if request.cutoff_policy() == CutoffPolicy::MoveToFit {
+            return Err(ComputeBackendError::CutoffMutationForbidden);
+        }
+        if request.final_quantity_precision() != PrecisionMode::ReferenceF64 {
+            return Err(ComputeBackendError::UnsupportedPrecision);
+        }
+        Ok(())
+    }
+
+    const fn cpu_plan(
+        batch_size: u32,
+        oom_retry_count: u32,
+        reason: FallbackReason,
+    ) -> MicroBatchPlan {
         MicroBatchPlan::new(
             ComputeBackendKind::CpuF64Reference,
             batch_size,
             0,
             PrecisionMode::ReferenceF64,
+            oom_retry_count,
             Some(reason),
         )
     }
@@ -162,7 +193,7 @@ mod tests {
     use super::VramController;
     use crate::error::ComputeBackendError;
     use crate::inventory::DeviceInventory;
-    use crate::plan::{ComputeBackendKind, FallbackReason};
+    use crate::plan::{ComputeBackendKind, FallbackReason, MicroBatchPlan};
     use crate::profile::VramProfile;
     use crate::request::{
         CorpusPlacement, CutoffPolicy, ModelComplexity, ObservationRetention, PrecisionMode,
@@ -199,7 +230,7 @@ mod tests {
         assert_eq!(planned.backend(), ComputeBackendKind::CpuF64Reference);
         assert_eq!(planned.fallback(), Some(FallbackReason::DeviceUnavailable));
         assert_eq!(
-            cpu.recover_from_oom(&planned),
+            cpu.recover_from_oom(&request(4, 8), &planned),
             Err(ComputeBackendError::RetryBudgetExceeded)
         );
 
@@ -221,6 +252,7 @@ mod tests {
         assert_eq!(planned.batch_size(), 8);
         assert_eq!(planned.precision(), PrecisionMode::ReferenceF64);
         assert_eq!(planned.predicted_peak_bytes(), 0);
+        assert_eq!(planned.oom_retry_count(), 0);
     }
 
     #[test]
@@ -248,23 +280,90 @@ mod tests {
     }
 
     #[test]
-    fn oom_recovery_covers_zero_retries_and_unit_batches() {
+    fn overflowing_oom_retry_peak_fails_closed() {
+        let inventory =
+            DeviceInventory::gpu(VramProfile::Gib24, VramProfile::Gib24.bytes()).expect("24");
+        let controller = VramController::new(inventory, 1).expect("controller");
+        let huge = WorkloadRequest::new(
+            1,
+            1,
+            u64::MAX,
+            u64::MAX,
+            2,
+            CorpusPlacement::StreamedMicroBatches,
+            ObservationRetention::KeepAll,
+            ModelComplexity::KeepSpecified,
+            CutoffPolicy::KeepCutoff,
+            PrecisionMode::ReferenceF64,
+        )
+        .expect("request");
+        let initial = MicroBatchPlan::new(
+            ComputeBackendKind::GpuStreamed,
+            2,
+            0,
+            PrecisionMode::ReferenceF64,
+            0,
+            None,
+        );
+        assert_eq!(
+            controller.recover_from_oom(&huge, &initial),
+            Err(ComputeBackendError::InvalidBudget)
+        );
+    }
+
+    #[test]
+    fn oom_recovery_emits_retries_then_falls_back() {
         let inventory =
             DeviceInventory::gpu(VramProfile::Gib12, VramProfile::Gib12.bytes()).expect("12");
-        let zero_retry = VramController::new(inventory, 0).expect("zero retry");
-        let planned = zero_retry.plan(&request(4, 8)).expect("gpu");
-        assert_eq!(planned.backend(), ComputeBackendKind::GpuStreamed);
-        let recovered = zero_retry.recover_from_oom(&planned).expect("fallback");
-        assert_eq!(
-            recovered.fallback(),
-            Some(FallbackReason::OutOfMemoryRetryExhausted)
-        );
+        let controller = VramController::new(inventory, 1).expect("controller");
+        let workload = request(4, 8);
+        let initial = controller.plan(&workload).expect("gpu");
+        let retry = controller
+            .recover_from_oom(&workload, &initial)
+            .expect("retry");
+        assert_eq!(retry.backend(), ComputeBackendKind::GpuStreamed);
+        assert_eq!(retry.batch_size(), 2);
+        assert_eq!(retry.oom_retry_count(), 1);
+        let fallback = controller
+            .recover_from_oom(&workload, &retry)
+            .expect("fallback");
+        assert_eq!(fallback.backend(), ComputeBackendKind::CpuF64Reference);
+        assert_eq!(fallback.batch_size(), 4);
+        assert_eq!(fallback.oom_retry_count(), 2);
 
-        let unit_retry = VramController::new(inventory, 3).expect("unit retry");
-        let unit_plan = unit_retry.plan(&request(1, 8)).expect("unit gpu");
-        assert_eq!(unit_plan.batch_size(), 1);
-        let recovered = unit_retry.recover_from_oom(&unit_plan).expect("unit oom");
-        assert_eq!(recovered.backend(), ComputeBackendKind::CpuF64Reference);
-        assert_eq!(recovered.batch_size(), 1);
+        let zero_retry = VramController::new(inventory, 0).expect("zero retry");
+        let immediate = zero_retry
+            .recover_from_oom(&workload, &initial)
+            .expect("immediate fallback");
+        assert_eq!(immediate.backend(), ComputeBackendKind::CpuF64Reference);
+        assert_eq!(immediate.oom_retry_count(), 1);
+
+        let unit_workload = request(1, 8);
+        let unit_plan = controller.plan(&unit_workload).expect("unit gpu");
+        let unit_fallback = controller
+            .recover_from_oom(&unit_workload, &unit_plan)
+            .expect("unit fallback");
+        assert_eq!(unit_fallback.backend(), ComputeBackendKind::CpuF64Reference);
+        assert_eq!(unit_fallback.batch_size(), 1);
+    }
+
+    #[test]
+    fn overflowing_retry_counter_fails_closed() {
+        let inventory =
+            DeviceInventory::gpu(VramProfile::Gib12, VramProfile::Gib12.bytes()).expect("12");
+        let controller = VramController::new(inventory, u32::MAX).expect("controller");
+        let workload = request(4, 8);
+        let invalid = MicroBatchPlan::new(
+            ComputeBackendKind::GpuStreamed,
+            4,
+            40,
+            PrecisionMode::ReferenceF64,
+            u32::MAX,
+            None,
+        );
+        assert_eq!(
+            controller.recover_from_oom(&workload, &invalid),
+            Err(ComputeBackendError::InvalidBudget)
+        );
     }
 }

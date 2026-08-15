@@ -14,6 +14,8 @@ pub enum ComputeBackendError {
     NonFiniteOutput,
     /// CPU `f64` and candidate outputs diverged beyond tolerance.
     ParityFailure,
+    /// A parity tolerance was negative.
+    InvalidTolerance,
     /// Mixed precision was requested for a final diagnostic quantity.
     UnsupportedPrecision,
     /// A claimed accelerator could not be initialized.
@@ -49,6 +51,7 @@ impl fmt::Display for ComputeBackendError {
             Self::DeviceLoss => "compute device lost",
             Self::NonFiniteOutput => "non-finite compute output",
             Self::ParityFailure => "cpu gpu parity failure",
+            Self::InvalidTolerance => "invalid parity tolerance",
             Self::UnsupportedPrecision => "mixed precision cannot finalize diagnostics",
             Self::BackendInitFailure => "compute backend initialization failed",
             Self::FullCorpusTensorRefused => "full-corpus device tensor is refused",
@@ -112,6 +115,11 @@ mod tests {
             (
                 ComputeBackendError::ParityFailure,
                 "cpu gpu parity failure",
+                false,
+            ),
+            (
+                ComputeBackendError::InvalidTolerance,
+                "invalid parity tolerance",
                 false,
             ),
             (

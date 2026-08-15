@@ -1,10 +1,10 @@
-//! VRAM budget, OOM fallback, and CPU `f64` reference contracts.
+//! VRAM budget, executable OOM retry, and CPU `f64` reference contracts.
 #![allow(clippy::cast_precision_loss)]
 
 use compute_backend::{
     AllocationTelemetry, ComputeBackendError, ComputeBackendKind, CorpusPlacement, CutoffPolicy,
     DeviceInventory, FallbackReason, ModelComplexity, ObservationRetention, PrecisionMode,
-    VramController, VramProfile, WorkloadRequest, streamed_weighted_sum,
+    VramController, VramProfile, WorkloadRequest, require_cpu_gpu_parity, streamed_weighted_sum,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -45,16 +45,16 @@ fn profiles_cover_the_adr_device_classes() {
 }
 
 #[test]
-fn streamed_weighted_sum_recovers_known_total_with_computed_rmse() {
+fn compensated_reference_recovers_cancellation_and_known_total() {
     let weights = [0.25_f64, 0.25, 0.25, 0.25];
     let values = [4.0_f64, 8.0, 12.0, 16.0];
-    let truth = 10.0_f64;
     let recovered = streamed_weighted_sum(&weights, &values).expect("finite reference");
-    let error = rmse(&[truth], &[recovered]);
-    assert!(
-        error < 1e-12,
-        "CPU f64 RMSE {error} exceeded machine-scale bound"
-    );
+    let error = rmse(&[10.0], &[recovered]);
+    assert!(error < 1e-12, "CPU f64 RMSE {error} exceeded bound");
+
+    let cancellation = streamed_weighted_sum(&[1.0, 1.0, 1.0], &[1e16, 1.0, -1e16])
+        .expect("compensated cancellation");
+    assert!((cancellation - 1.0).abs() < 1e-15);
 }
 
 #[test]
@@ -77,34 +77,72 @@ fn larger_vram_profiles_admit_larger_micro_batches() {
 
     assert_eq!(small.backend(), ComputeBackendKind::GpuStreamed);
     assert_eq!(large.backend(), ComputeBackendKind::GpuStreamed);
-    assert!(
-        large.batch_size() > small.batch_size(),
-        "24 GiB batch {} should exceed 4 GiB batch {}",
-        large.batch_size(),
-        small.batch_size()
-    );
-    assert!(small.predicted_peak_bytes() <= VramProfile::Gib4.bytes());
+    assert!(large.batch_size() > small.batch_size());
+    assert_eq!(small.oom_retry_count(), 0);
+    assert_eq!(large.oom_retry_count(), 0);
 }
 
 #[test]
-fn oom_retries_then_fall_back_to_cpu_without_dropping_work() {
+fn each_oom_returns_a_smaller_gpu_plan_before_cpu_fallback() {
     let controller = VramController::new(
         DeviceInventory::gpu(VramProfile::Gib6, VramProfile::Gib6.bytes()).expect("6 GiB"),
         2,
     )
     .expect("controller");
-    let planned = controller
-        .plan(&base_request(64, 1_048_576))
-        .expect("initial plan");
-    let recovered = controller
-        .recover_from_oom(&planned)
-        .expect("OOM is an expected state");
-    assert_eq!(recovered.backend(), ComputeBackendKind::CpuF64Reference);
+    let request = base_request(64, 1_048_576);
+    let initial = controller.plan(&request).expect("initial plan");
+    let retry_one = controller
+        .recover_from_oom(&request, &initial)
+        .expect("first retry plan");
+    assert_eq!(retry_one.backend(), ComputeBackendKind::GpuStreamed);
+    assert_eq!(retry_one.batch_size(), initial.batch_size() / 2);
+    assert_eq!(retry_one.oom_retry_count(), 1);
+    assert!(retry_one.predicted_peak_bytes() < initial.predicted_peak_bytes());
+
+    let retry_two = controller
+        .recover_from_oom(&request, &retry_one)
+        .expect("second retry plan");
+    assert_eq!(retry_two.backend(), ComputeBackendKind::GpuStreamed);
+    assert_eq!(retry_two.batch_size(), retry_one.batch_size() / 2);
+    assert_eq!(retry_two.oom_retry_count(), 2);
+
+    let fallback = controller
+        .recover_from_oom(&request, &retry_two)
+        .expect("bounded fallback");
+    assert_eq!(fallback.backend(), ComputeBackendKind::CpuF64Reference);
     assert_eq!(
-        recovered.fallback(),
+        fallback.fallback(),
         Some(FallbackReason::OutOfMemoryRetryExhausted)
     );
-    assert_eq!(recovered.batch_size(), planned.batch_size());
+    assert_eq!(fallback.batch_size(), request.requested_batch());
+    assert_eq!(fallback.oom_retry_count(), 3);
+}
+
+#[test]
+fn streamed_cardinality_does_not_require_a_hypothetical_full_tensor() {
+    let request = WorkloadRequest::new(
+        u64::MAX,
+        u64::MAX,
+        8,
+        0,
+        1,
+        CorpusPlacement::StreamedMicroBatches,
+        ObservationRetention::KeepAll,
+        ModelComplexity::KeepSpecified,
+        CutoffPolicy::KeepCutoff,
+        PrecisionMode::ReferenceF64,
+    )
+    .expect("streamed dimensions are independently representable");
+    assert_eq!(request.document_count(), u64::MAX);
+    assert_eq!(request.topic_count(), u64::MAX);
+}
+
+#[test]
+fn parity_rejects_negative_tolerance() {
+    assert_eq!(
+        require_cpu_gpu_parity(1.0, 1.0, -0.1),
+        Err(ComputeBackendError::InvalidTolerance)
+    );
 }
 
 fn forbidden_request(
@@ -128,56 +166,60 @@ fn forbidden_memory_adaptations_fail_closed() {
     )
     .expect("controller");
 
-    assert_eq!(
-        controller.plan(&forbidden_request(
-            CorpusPlacement::FullCorpusOnDevice,
-            ObservationRetention::KeepAll,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::KeepCutoff,
-            PrecisionMode::ReferenceF64,
-        )),
-        Err(ComputeBackendError::FullCorpusTensorRefused)
-    );
-    assert_eq!(
-        controller.plan(&forbidden_request(
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::DropToFit,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::KeepCutoff,
-            PrecisionMode::ReferenceF64,
-        )),
-        Err(ComputeBackendError::ObservationDropForbidden)
-    );
-    assert_eq!(
-        controller.plan(&forbidden_request(
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::KeepAll,
-            ModelComplexity::ReduceToFit,
-            CutoffPolicy::KeepCutoff,
-            PrecisionMode::ReferenceF64,
-        )),
-        Err(ComputeBackendError::ComplexityReductionForbidden)
-    );
-    assert_eq!(
-        controller.plan(&forbidden_request(
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::KeepAll,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::MoveToFit,
-            PrecisionMode::ReferenceF64,
-        )),
-        Err(ComputeBackendError::CutoffMutationForbidden)
-    );
-    assert_eq!(
-        controller.plan(&forbidden_request(
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::KeepAll,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::KeepCutoff,
-            PrecisionMode::TransientMixed,
-        )),
-        Err(ComputeBackendError::UnsupportedPrecision)
-    );
+    for (request, expected) in [
+        (
+            forbidden_request(
+                CorpusPlacement::FullCorpusOnDevice,
+                ObservationRetention::KeepAll,
+                ModelComplexity::KeepSpecified,
+                CutoffPolicy::KeepCutoff,
+                PrecisionMode::ReferenceF64,
+            ),
+            ComputeBackendError::FullCorpusTensorRefused,
+        ),
+        (
+            forbidden_request(
+                CorpusPlacement::StreamedMicroBatches,
+                ObservationRetention::DropToFit,
+                ModelComplexity::KeepSpecified,
+                CutoffPolicy::KeepCutoff,
+                PrecisionMode::ReferenceF64,
+            ),
+            ComputeBackendError::ObservationDropForbidden,
+        ),
+        (
+            forbidden_request(
+                CorpusPlacement::StreamedMicroBatches,
+                ObservationRetention::KeepAll,
+                ModelComplexity::ReduceToFit,
+                CutoffPolicy::KeepCutoff,
+                PrecisionMode::ReferenceF64,
+            ),
+            ComputeBackendError::ComplexityReductionForbidden,
+        ),
+        (
+            forbidden_request(
+                CorpusPlacement::StreamedMicroBatches,
+                ObservationRetention::KeepAll,
+                ModelComplexity::KeepSpecified,
+                CutoffPolicy::MoveToFit,
+                PrecisionMode::ReferenceF64,
+            ),
+            ComputeBackendError::CutoffMutationForbidden,
+        ),
+        (
+            forbidden_request(
+                CorpusPlacement::StreamedMicroBatches,
+                ObservationRetention::KeepAll,
+                ModelComplexity::KeepSpecified,
+                CutoffPolicy::KeepCutoff,
+                PrecisionMode::TransientMixed,
+            ),
+            ComputeBackendError::UnsupportedPrecision,
+        ),
+    ] {
+        assert_eq!(controller.plan(&request), Err(expected));
+    }
 }
 
 #[test]

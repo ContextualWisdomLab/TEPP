@@ -31,6 +31,7 @@ pub struct MicroBatchPlan {
     batch_size: u32,
     predicted_peak_bytes: u64,
     precision: PrecisionMode,
+    oom_retry_count: u32,
     fallback: Option<FallbackReason>,
 }
 
@@ -40,6 +41,7 @@ impl MicroBatchPlan {
         batch_size: u32,
         predicted_peak_bytes: u64,
         precision: PrecisionMode,
+        oom_retry_count: u32,
         fallback: Option<FallbackReason>,
     ) -> Self {
         Self {
@@ -47,6 +49,7 @@ impl MicroBatchPlan {
             batch_size,
             predicted_peak_bytes,
             precision,
+            oom_retry_count,
             fallback,
         }
     }
@@ -73,6 +76,12 @@ impl MicroBatchPlan {
     #[must_use]
     pub const fn precision(self) -> PrecisionMode {
         self.precision
+    }
+
+    /// Return how many observed OOMs led to this plan.
+    #[must_use]
+    pub const fn oom_retry_count(self) -> u32 {
+        self.oom_retry_count
     }
 
     /// Return the fallback reason, if the accelerator was not used.
@@ -123,12 +132,14 @@ mod tests {
             3,
             24,
             PrecisionMode::ReferenceF64,
+            2,
             Some(FallbackReason::NonFiniteGuard),
         );
         assert_eq!(plan.backend(), ComputeBackendKind::CpuF64Reference);
         assert_eq!(plan.batch_size(), 3);
         assert_eq!(plan.predicted_peak_bytes(), 24);
         assert_eq!(plan.precision(), PrecisionMode::ReferenceF64);
+        assert_eq!(plan.oom_retry_count(), 2);
         assert_eq!(plan.fallback(), Some(FallbackReason::NonFiniteGuard));
     }
 }

@@ -65,11 +65,14 @@ pub struct WorkloadRequest {
 impl WorkloadRequest {
     /// Construct a fail-closed workload request.
     ///
+    /// Streamed document and topic cardinalities are stored independently; the
+    /// constructor deliberately does not materialize or size a hypothetical
+    /// full-corpus tensor that the controller refuses to allocate.
+    ///
     /// # Errors
     ///
     /// Returns [`ComputeBackendError::InvalidBudget`] when counts, batch size,
-    /// or per-observation bytes are zero, or when the implied full-corpus
-    /// `f64` tensor size overflows.
+    /// or per-observation bytes are zero.
     #[allow(clippy::too_many_arguments)]
     pub const fn new(
         document_count: u64,
@@ -88,12 +91,6 @@ impl WorkloadRequest {
             || bytes_per_observation == 0
             || requested_batch == 0
         {
-            return Err(ComputeBackendError::InvalidBudget);
-        }
-        let Some(cells) = document_count.checked_mul(topic_count) else {
-            return Err(ComputeBackendError::InvalidBudget);
-        };
-        if cells.checked_mul(8).is_none() {
             return Err(ComputeBackendError::InvalidBudget);
         }
         Ok(Self {
@@ -179,7 +176,7 @@ mod tests {
     };
     use crate::error::ComputeBackendError;
 
-    fn invalid(
+    fn request(
         documents: u64,
         topics: u64,
         bytes_per_observation: u64,
@@ -201,22 +198,17 @@ mod tests {
 
     #[test]
     fn request_rejects_zero_counts() {
-        assert_eq!(invalid(0, 1, 8, 1), Err(ComputeBackendError::InvalidBudget));
-        assert_eq!(invalid(1, 0, 8, 1), Err(ComputeBackendError::InvalidBudget));
-        assert_eq!(invalid(1, 1, 0, 1), Err(ComputeBackendError::InvalidBudget));
-        assert_eq!(invalid(1, 1, 8, 0), Err(ComputeBackendError::InvalidBudget));
+        assert_eq!(request(0, 1, 8, 1), Err(ComputeBackendError::InvalidBudget));
+        assert_eq!(request(1, 0, 8, 1), Err(ComputeBackendError::InvalidBudget));
+        assert_eq!(request(1, 1, 0, 1), Err(ComputeBackendError::InvalidBudget));
+        assert_eq!(request(1, 1, 8, 0), Err(ComputeBackendError::InvalidBudget));
     }
 
     #[test]
-    fn request_rejects_overflowing_full_corpus_size() {
-        assert_eq!(
-            invalid(u64::MAX, 2, 8, 1),
-            Err(ComputeBackendError::InvalidBudget)
-        );
-        assert_eq!(
-            invalid((u64::MAX / 8) + 1, 1, 8, 1),
-            Err(ComputeBackendError::InvalidBudget)
-        );
+    fn streamed_dimensions_are_not_multiplied_into_a_full_tensor() {
+        let request = request(u64::MAX, u64::MAX, 8, 1).expect("streamed cardinality");
+        assert_eq!(request.document_count(), u64::MAX);
+        assert_eq!(request.topic_count(), u64::MAX);
     }
 
     #[test]
