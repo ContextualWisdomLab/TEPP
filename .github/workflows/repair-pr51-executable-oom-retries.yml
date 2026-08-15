@@ -77,7 +77,7 @@ jobs:
       - name: Enforce exact authored coverage
         run: |
           cargo +1.97.1 install cargo-llvm-cov --locked --version 0.8.6
-          cargo +1.97.1 llvm-cov -p compute_backend --all-features --fail-under-lines 100
+          cargo +1.97.1 llvm-cov -p compute_backend --all-features --show-missing-lines --fail-under-lines 100
           cargo +nightly-2026-08-01 llvm-cov --branch -p compute_backend --all-features --json --summary-only --output-path coverage-branches.json
           python3 scripts/check_coverage.py coverage-branches.json --kind branches
 
