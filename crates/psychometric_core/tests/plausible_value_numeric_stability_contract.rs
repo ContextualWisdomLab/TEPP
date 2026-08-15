@@ -4,13 +4,8 @@ use psychometric_core::{PsychometricError, posterior_draw_point_estimate_mean};
 
 #[test]
 fn scaled_mean_recovers_balanced_extreme_posterior_draws() {
-    let mean = posterior_draw_point_estimate_mean(&[
-        f64::MAX,
-        f64::MAX,
-        -f64::MAX,
-        -f64::MAX,
-    ])
-    .expect("balanced finite draws have a finite mean");
+    let mean = posterior_draw_point_estimate_mean(&[f64::MAX, f64::MAX, -f64::MAX, -f64::MAX])
+        .expect("balanced finite draws have a finite mean");
     assert!(mean.abs() < f64::EPSILON);
 }
 

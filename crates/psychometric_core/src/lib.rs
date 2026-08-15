@@ -3,10 +3,11 @@
 #![allow(clippy::cast_precision_loss)]
 //! Posterior-aware psychometric input gates for ESEM/DSEM.
 //!
-//! Raw topic proportions are not Euclidean indicators. This crate classifies
-//! constructs, admits only log-ratio or logistic-normal coordinates, aggregates
-//! plausible-value loadings on a CPU `f64` path, and refuses causal language
-//! from temporal precedence, document linkage, event tracking, or prediction.
+//! Raw topic proportions are not unconstrained structural indicators. This
+//! crate classifies constructs, admits mapped log-ratio/logistic-normal inputs,
+//! distinguishes ALR from orthonormal ILR geometry, averages loading point
+//! estimates across posterior draws on a CPU `f64` path without claiming Rubin
+//! uncertainty pooling, and refuses causal language from non-identifying cues.
 
 mod causality;
 mod construct;
@@ -37,7 +38,7 @@ pub use indicator::require_valid_indicator;
 pub use loading::ordinary_least_squares_slope;
 /// Recover one reflective loading.
 pub use loading::recover_reflective_loading;
-/// Arithmetic mean of plausible-value draws.
-pub use plausible::plausible_value_mean;
-/// Average OLS loadings across posterior indicator draws.
-pub use plausible::recover_loading_from_plausible_values;
+/// Arithmetic mean of posterior-draw point estimates.
+pub use plausible::posterior_draw_point_estimate_mean;
+/// Average OLS loading point estimates across posterior indicator draws.
+pub use plausible::recover_loading_point_estimate_mean;

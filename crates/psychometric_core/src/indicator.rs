@@ -1,4 +1,4 @@
-//! Valid psychometric indicator coordinates.
+//! Valid structural indicator coordinates and compositional-geometry claims.
 
 use crate::error::PsychometricError;
 
@@ -28,10 +28,20 @@ impl IndicatorKind {
         }
     }
 
-    /// Return whether the kind is a valid Euclidean psychometric input.
+    /// Return whether the kind is an admissible unconstrained structural input.
+    ///
+    /// This does not claim that the coordinates are orthonormal or preserve
+    /// Aitchison distance. ALR is reference-dependent; only ILR carries that
+    /// orthonormal compositional-geometry claim.
     #[must_use]
-    pub const fn is_valid_psychometric_input(self) -> bool {
+    pub const fn is_valid_structural_input(self) -> bool {
         !matches!(self, Self::RawProportion)
+    }
+
+    /// Return whether the coordinate kind is an orthonormal Aitchison isometry.
+    #[must_use]
+    pub const fn preserves_aitchison_distance(self) -> bool {
+        matches!(self, Self::IsometricLogRatio)
     }
 }
 
@@ -42,7 +52,7 @@ impl IndicatorKind {
 /// Returns [`PsychometricError::RawProportionForbidden`] for
 /// [`IndicatorKind::RawProportion`].
 pub fn require_valid_indicator(kind: IndicatorKind) -> Result<(), PsychometricError> {
-    if kind.is_valid_psychometric_input() {
+    if kind.is_valid_structural_input() {
         Ok(())
     } else {
         Err(PsychometricError::RawProportionForbidden)
@@ -50,6 +60,10 @@ pub fn require_valid_indicator(kind: IndicatorKind) -> Result<(), PsychometricEr
 }
 
 /// Pearson product-moment correlation on already-mapped coordinates.
+///
+/// For ALR this is a reference-dependent coordinate correlation, not an
+/// Aitchison-distance-preserving statistic. Use an ILR basis when orthonormal
+/// compositional geometry is part of the estimand.
 ///
 /// # Errors
 ///

@@ -61,7 +61,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
-| `psychometric_core` | posterior-aware ESEM/DSEM input gates and CPU `f64` loading recovery |
+| `psychometric_core` | posterior-aware structural input gates and CPU `f64` loading point-estimate recovery |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

@@ -1,8 +1,8 @@
 # ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
 
-**Decision status:** Accepted  
-**Implementation maturity:** partial — construct classification, valid log-ratio/logistic-normal indicator gates, CPU `f64` OLS and plausible-value loading recovery, invariance-gated mean comparison, and causal-heuristic refusal are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; full ESEM/set-ESEM, formative composites, DSEM, and continuous-time dynamics remain accepted-target  
-**Date:** 2026-08-05  
+**Decision status:** Accepted
+**Implementation maturity:** partial — construct classification, valid log-ratio/logistic-normal indicator gates, CPU `f64` OLS and posterior-draw loading point-estimate averaging (not Rubin variance pooling), invariance-gated mean comparison, and causal-heuristic refusal are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; full ESEM/set-ESEM, formative composites, DSEM, and continuous-time dynamics remain accepted-target
+**Date:** 2026-08-05
 **Supersedes:** None. ADR 0012 governs upstream topic measurement/network coordinates; this ADR governs higher-order psychometric structure and longitudinal interpretation.
 
 ## Context
@@ -14,6 +14,7 @@ TEPP also needs to distinguish stable between-unit differences from within-unit 
 ## Decision
 
 Topic proportions are not treated as error-free ordinary indicators. TEPP uses logistic-normal latent coordinates or valid orthonormal log-ratio coordinates and propagates topic posterior uncertainty through plausible values or a joint text-measurement/structural model.
+The current executable slice only averages loading point estimates across posterior draws. It does not yet pool within-draw and between-draw uncertainty and therefore does not satisfy the full posterior-propagation decision by itself.
 
 Before ESEM/SEM interpretation, each higher-order construct is classified as reflective, formative/composite, network, or unresolved. Reflective indicators may use ESEM/set-ESEM; formative structures use composite/formative models; interacting structures use network models. A good global fit statistic is not authority to reinterpret a formative/network structure as reflective.
 

@@ -4,7 +4,7 @@
 use psychometric_core::{
     CausalHeuristic, ConstructClass, IndicatorKind, PsychometricError, claim_causal_effect,
     compare_latent_means, interpret_as_reflective, ordinary_least_squares_slope,
-    pearson_correlation, plausible_value_mean, recover_loading_from_plausible_values,
+    pearson_correlation, posterior_draw_point_estimate_mean, recover_loading_point_estimate_mean,
     recover_reflective_loading, require_valid_indicator,
 };
 
@@ -46,7 +46,7 @@ fn known_loading_recovers_through_ols_with_computed_rmse() {
 }
 
 #[test]
-fn plausible_value_mean_recovers_true_loading_under_symmetric_draw_noise() {
+fn posterior_draw_point_estimate_mean_recovers_true_loading_under_symmetric_draw_noise() {
     let true_loading = 0.8_f64;
     let factor_scores = centered_scores(16);
     let mut indicator_draws = Vec::with_capacity(5);
@@ -60,16 +60,16 @@ fn plausible_value_mean_recovers_true_loading_under_symmetric_draw_noise() {
         );
     }
 
-    let pooled = recover_loading_from_plausible_values(
+    let pooled = recover_loading_point_estimate_mean(
         &factor_scores,
         &indicator_draws,
         IndicatorKind::LogisticNormal,
     )
-    .expect("plausible-value loading");
+    .expect("posterior-draw point-estimate loading");
     let pooled_error = rmse(&[true_loading], &[pooled]);
     assert!(
         pooled_error < 1e-12,
-        "symmetric plausible-value RMSE {pooled_error} should cancel"
+        "symmetric posterior-draw point-estimate RMSE {pooled_error} should cancel"
     );
 
     let single = recover_reflective_loading(
@@ -100,7 +100,7 @@ fn raw_proportions_and_invalid_numeric_inputs_fail_closed() {
         Err(PsychometricError::RawProportionForbidden)
     );
     assert_eq!(
-        recover_loading_from_plausible_values(
+        recover_loading_point_estimate_mean(
             &[1.0, 2.0],
             &[vec![0.5, 0.5]],
             IndicatorKind::RawProportion
@@ -133,19 +133,19 @@ fn raw_proportions_and_invalid_numeric_inputs_fail_closed() {
         Err(PsychometricError::SingularDesign)
     );
     assert_eq!(
-        plausible_value_mean(&[]),
+        posterior_draw_point_estimate_mean(&[]),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
-        plausible_value_mean(&[1.0, f64::INFINITY]),
+        posterior_draw_point_estimate_mean(&[1.0, f64::INFINITY]),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
-        recover_loading_from_plausible_values(&[1.0, 2.0], &[], IndicatorKind::AdditiveLogRatio),
+        recover_loading_point_estimate_mean(&[1.0, 2.0], &[], IndicatorKind::AdditiveLogRatio),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
-        recover_loading_from_plausible_values(
+        recover_loading_point_estimate_mean(
             &[1.0, 2.0],
             &[vec![1.0]],
             IndicatorKind::AdditiveLogRatio
@@ -213,10 +213,10 @@ fn construct_class_and_causal_heuristics_refuse_overclaim() {
         assert!(!heuristic.as_str().is_empty());
     }
 
-    assert!(IndicatorKind::AdditiveLogRatio.is_valid_psychometric_input());
-    assert!(IndicatorKind::IsometricLogRatio.is_valid_psychometric_input());
-    assert!(IndicatorKind::LogisticNormal.is_valid_psychometric_input());
-    assert!(!IndicatorKind::RawProportion.is_valid_psychometric_input());
+    assert!(IndicatorKind::AdditiveLogRatio.is_valid_structural_input());
+    assert!(IndicatorKind::IsometricLogRatio.is_valid_structural_input());
+    assert!(IndicatorKind::LogisticNormal.is_valid_structural_input());
+    assert!(!IndicatorKind::RawProportion.is_valid_structural_input());
     assert_eq!(IndicatorKind::AdditiveLogRatio.as_str(), "alr");
     assert_eq!(IndicatorKind::IsometricLogRatio.as_str(), "ilr");
     assert_eq!(IndicatorKind::LogisticNormal.as_str(), "logistic_normal");
@@ -233,7 +233,7 @@ fn finite_alr_correlation_and_error_messages_are_stable() {
 
     let slope = ordinary_least_squares_slope(&left, &right).expect("slope");
     assert!((slope - 2.0).abs() < 1e-12);
-    let mean = plausible_value_mean(&[0.7, 0.8, 0.9]).expect("mean");
+    let mean = posterior_draw_point_estimate_mean(&[0.7, 0.8, 0.9]).expect("mean");
     assert!((mean - 0.8).abs() < 1e-15);
 
     assert_eq!(

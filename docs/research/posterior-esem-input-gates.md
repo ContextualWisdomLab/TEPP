@@ -6,9 +6,9 @@ This slice delivers the first executable ADR 0005 contract in `psychometric_core
 
 1. classify each higher-order construct as reflective, formative, network, or unresolved before any ESEM/SEM interpretation;
 2. refuse raw topic-proportion Pearson correlations and OLS loadings as psychometric inputs;
-3. admit only additive log-ratio, isometric log-ratio, or logistic-normal coordinates;
-4. recover a reflective loading by ordinary least squares on a CPU `f64` path;
-5. average recovered loadings across posterior indicator draws (plausible values);
+3. admit ALR, ILR, or logistic-normal coordinates as unconstrained structural inputs while reserving orthonormal Aitchison-distance claims for ILR;
+4. recover a reflective loading point estimate by ordinary least squares on a CPU `f64` path;
+5. average recovered loading point estimates across posterior indicator draws without claiming Rubin within/between uncertainty pooling;
 6. refuse latent-mean comparison without invariance evidence;
 7. refuse causal language that rests only on temporal precedence, document linkage, event tracking, or model prediction.
 
@@ -31,12 +31,12 @@ Holland, P. W. (1986). Statistics and causal inference. *Journal of the American
 ## Formula notes
 
 - **OLS loading** \(\hat\lambda = \sum_i (f_i-\bar f)(y_i-\bar y) / \sum_i (f_i-\bar f)^2\) on already-mapped coordinates.
-- **Plausible-value loading** is the arithmetic mean of \(\hat\lambda_d\) across posterior indicator draws (Mislevy, 1991).
+- **Posterior-draw loading point estimate** is the arithmetic mean of \(\hat\lambda_d\) across draws. This narrow slice does not compute within-draw variance, between-draw variance, total variance, degrees of freedom, or Rubin-style pooled uncertainty; Mislevy (1991) motivates the future full posterior-propagation contract rather than validating this point-estimate shortcut.
 - **RMSE** is computed from recovered versus known true loadings; tests do not hard-code expected recovery numbers.
 - A good global fit statistic is not authority to reinterpret a formative or network construct as reflective (Bollen & Lennox, 1991; Asparouhov & Muthén, 2009).
 
 ## Verification
 
 - noiseless OLS recovers a known loading with machine-scale computed RMSE;
-- symmetric plausible-value draw noise cancels in the pooled loading and has smaller computed RMSE than a single draw;
+- symmetric posterior-draw point-estimate noise cancels in the arithmetic mean and has smaller computed RMSE than a single draw;
 - raw-proportion, empty, non-finite, singular, invariance-missing, formative-reinterpretation, and causal-heuristic paths fail closed.
