@@ -24,17 +24,17 @@ fn configural_status_cannot_claim_shared_metric_meaning() {
 #[test]
 fn aligned_loadings_have_lower_computed_rmse_than_a_crossed_collapse() {
     let truth = [
-        GroupLoading::new(0, 0.80),
-        GroupLoading::new(1, 0.80),
-        GroupLoading::new(0, 0.40),
-        GroupLoading::new(1, 0.40),
+        GroupLoading::new(0, 0, 0, 0.80),
+        GroupLoading::new(1, 0, 0, 0.80),
+        GroupLoading::new(0, 1, 0, 0.40),
+        GroupLoading::new(1, 1, 0, 0.40),
     ];
     let aligned = truth;
     let crossed = [
-        GroupLoading::new(0, 0.80),
-        GroupLoading::new(1, 0.40),
-        GroupLoading::new(0, 0.40),
-        GroupLoading::new(1, 0.80),
+        GroupLoading::new(0, 0, 0, 0.80),
+        GroupLoading::new(1, 0, 0, 0.40),
+        GroupLoading::new(0, 1, 0, 0.40),
+        GroupLoading::new(1, 1, 0, 0.80),
     ];
 
     let aligned_rmse = loading_root_mean_square_error(&truth, &aligned).expect("aligned");
@@ -49,6 +49,22 @@ fn aligned_loadings_have_lower_computed_rmse_than_a_crossed_collapse() {
     };
     assert!((aligned_rmse - expected).abs() < f64::EPSILON);
     assert!(aligned_rmse < crossed_rmse);
+}
+
+#[test]
+fn mismatched_loading_coordinates_fail_closed() {
+    let truth = [GroupLoading::new(0, 0, 0, 0.80)];
+    let wrong_indicator = [GroupLoading::new(0, 1, 0, 0.80)];
+    let wrong_factor = [GroupLoading::new(0, 0, 1, 0.80)];
+
+    assert_eq!(
+        loading_root_mean_square_error(&truth, &wrong_indicator),
+        Err(InvarianceError::InvalidLoadingPayload)
+    );
+    assert_eq!(
+        loading_root_mean_square_error(&truth, &wrong_factor),
+        Err(InvarianceError::InvalidLoadingPayload)
+    );
 }
 
 #[test]
