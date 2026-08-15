@@ -1,4 +1,4 @@
-//! Explicit invariance status that may or may not license shared meaning.
+//! Explicit invariance status for shared metric interpretation.
 
 use crate::InvarianceError;
 
@@ -40,24 +40,22 @@ impl InvarianceLevel {
 
     /// Return whether this status licenses shared metric meaning.
     #[must_use]
-    pub const fn licenses_shared_meaning(self) -> bool {
+    pub const fn licenses_shared_metric_meaning(self) -> bool {
         matches!(self, Self::Metric | Self::Scalar)
     }
 }
 
-/// Refuse to treat a weaker invariance status as shared meaning.
+/// Require an invariance status strong enough for shared metric meaning.
 ///
 /// # Errors
 ///
-/// Returns [`InvarianceError::InvarianceTooWeakForSharedMeaning`] when the
-/// status is only configural.
-pub fn refuse_noninvariant_as_shared_meaning(
-    level: InvarianceLevel,
-) -> Result<(), InvarianceError> {
-    if level.licenses_shared_meaning() {
+/// Returns [`InvarianceError::InvarianceTooWeakForSharedMetricMeaning`] when
+/// the status is only configural.
+pub fn require_shared_metric_meaning(level: InvarianceLevel) -> Result<(), InvarianceError> {
+    if level.licenses_shared_metric_meaning() {
         Ok(())
     } else {
-        Err(InvarianceError::InvarianceTooWeakForSharedMeaning)
+        Err(InvarianceError::InvarianceTooWeakForSharedMetricMeaning)
     }
 }
 
@@ -82,5 +80,12 @@ mod tests {
             InvarianceLevel::from_wire_name("partial"),
             Err(InvarianceError::UnknownInvarianceLevel)
         );
+    }
+
+    #[test]
+    fn only_metric_or_scalar_status_licenses_shared_metric_meaning() {
+        assert!(!InvarianceLevel::Configural.licenses_shared_metric_meaning());
+        assert!(InvarianceLevel::Metric.licenses_shared_metric_meaning());
+        assert!(InvarianceLevel::Scalar.licenses_shared_metric_meaning());
     }
 }
