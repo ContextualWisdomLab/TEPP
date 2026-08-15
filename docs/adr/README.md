@@ -22,6 +22,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0014](0014-scientific-claim-promotion-and-release-evidence.md) | Scientific claim promotion and release evidence authority | Accepted | partial | Separates design, implementation, scientific/product claim, and release authority; repository SBOM/provenance generator implemented, full release bundle remaining. |
 | [0015](0015-autonomous-development-review-and-merge-authority.md) | Autonomous development, review, and merge authority separation | Accepted | active-PR | Separates model proposal, deterministic verification, publication, independent review, and merge/release authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
+| [0017](0017-language-agnostic-semantic-span-budgeting.md) | Language-agnostic semantic spans, model profiles, and final-payload token budgets | Proposed | research-only | Narrows ADR 0004/0008 implementation, preserves ADR 0010/0011/0012 ownership, and supersedes paragraph-only draft PR #56 as the target design. |
 
 ## Decision ownership summary
 
@@ -42,7 +43,8 @@ Use the narrowest owning ADR when decisions overlap:
 - **persistence / manifests / leakage-safe split:** ADR 0013;
 - **claim maturity / release evidence:** ADR 0014;
 - **autonomous development/review/merge authority:** ADR 0015;
-- **TDT/CHRONOS event intelligence:** ADR 0016.
+- **TDT/CHRONOS event intelligence:** ADR 0016;
+- **semantic-unit identity / embedding-model profile / final-payload budget / hierarchy:** ADR 0017.
 
 ## Change and supersession rule
 

@@ -1,10 +1,14 @@
 # TEPP Documentation Map
 
-TEPP's approved PRD v0.4 and implementation plan are the primary product baseline. This index makes the technical, data, scientific, security/privacy, integration, quality, operating, and assurance contracts discoverable without duplicating that source material.
+TEPP's approved PRD v0.4 and implementation plan are the primary product baseline. This index makes the technical, data, scientific, security/privacy, integration, quality, operating, and assurance contracts discoverable without duplicating that source material. Proposed documents remain non-authoritative until their decision and product status are accepted through review.
 
 | Area | Canonical document |
 |---|---|
 | Approved product requirements | [`docs/product/prd-v0.4-approved.md`](docs/product/prd-v0.4-approved.md) |
+| Proposed semantic-span PRD delta | [`docs/product/prd-v0.5-proposed.md`](docs/product/prd-v0.5-proposed.md) |
+| Language-agnostic semantic-span design | [`docs/superpowers/specs/2026-08-15-language-agnostic-semantic-span-embedding-design.md`](docs/superpowers/specs/2026-08-15-language-agnostic-semantic-span-embedding-design.md) |
+| Language-agnostic semantic-span implementation plan | [`docs/superpowers/plans/2026-08-15-language-agnostic-semantic-span-embedding.md`](docs/superpowers/plans/2026-08-15-language-agnostic-semantic-span-embedding.md) |
+| Semantic-span research traceability | [`docs/research/language-agnostic-semantic-span-embedding.md`](docs/research/language-agnostic-semantic-span-embedding.md) |
 | Whole-conversation documentation fitness | [`docs/DOCUMENTATION_ASSESSMENT.md`](docs/DOCUMENTATION_ASSESSMENT.md) |
 | Technical requirements | [`docs/TRD.md`](docs/TRD.md) |
 | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
@@ -23,6 +27,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Requirement/research/evidence traceability | [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) |
 | Architecture decision index / ownership map | [`docs/adr/README.md`](docs/adr/README.md) |
 | ADR status, maturity, and supersession policy | [`docs/adr/ADR_POLICY.md`](docs/adr/ADR_POLICY.md) |
+| Proposed semantic-span authority | [`docs/adr/0017-language-agnostic-semantic-span-budgeting.md`](docs/adr/0017-language-agnostic-semantic-span-budgeting.md) |
 | Delivery roadmap | [`docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md`](docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md) |
 | Foundation implementation plan | [`docs/superpowers/plans/2026-08-05-temporal-event-foundation.md`](docs/superpowers/plans/2026-08-05-temporal-event-foundation.md) |
 | Foundation validation ledger | [`docs/validation/temporal-event-foundation.md`](docs/validation/temporal-event-foundation.md) |
@@ -56,4 +61,4 @@ The documentation graph is **design-sufficient** when a reviewer can reconstruct
 
 It is **protected-main-sufficient** only after the canonical documents are integrated on protected `main`, remain semantically current with live code, and their required exact-head documentation/security/review gates pass. An active documentation PR can therefore be design-sufficient while the protected branch remains documentation-insufficient.
 
-At the time of this review, immutable evidence records/exact spans, the Rust workspace quality foundation, and typed six-clock values/uncertain intervals (PR #8) are implemented-main. PR #9 is the active-PR that replays Task 4 Allen interval algebra and bounded path-consistency reasoner work onto that protected-main temporal foundation. Superseded PRs #5 and #6 remain historical lineage only. Event ontology, PostgreSQL persistence, shared-latent topic estimation, GPU kernels, TDT/CHRONOS intelligence, longitudinal ESEM/DSEM, visual analytics, production HTTP services, and deployment assurance remain later accepted-target or deployment-owned work.
+At the time of this proposal, immutable evidence records/exact spans and the Rust workspace quality foundation are implemented on protected main. The language-agnostic semantic-span pipeline, provider model-profile registry, final-payload budget gate, hierarchy, adapters, and retrieval benchmark described in ADR 0017 remain proposed research/design work until independently reviewed, accepted, implemented, and promoted under ADR 0014.
