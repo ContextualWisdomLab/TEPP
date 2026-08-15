@@ -12,8 +12,7 @@ fn system_time(value: &str) -> SystemTime {
 }
 
 fn available_time() -> AvailableTime {
-    AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z")
-        .expect("valid available time fixture")
+    AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("valid available time fixture")
 }
 
 fn active_policy() -> RetentionPolicyRecord {
@@ -86,7 +85,9 @@ fn legal_hold_requires_status_window_consistency_and_forward_closure() {
     assert!(
         !active_with_close.blocks_deletion(
             active_with_close.tenant_record_id,
-            active_with_close.held_document_id.expect("held document fixture")
+            active_with_close
+                .held_document_id
+                .expect("held document fixture")
         ),
         "a closed hold cannot block deletion even when its status is malformed as active"
     );
