@@ -93,3 +93,5 @@ jobs:
             git commit -m "fix(api): pin org workflow identities to commits"
           fi
           git push origin HEAD:agent/org-github-control-plane
+
+# Synchronize exact-head repair after ready-for-review transition.
