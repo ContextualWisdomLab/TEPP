@@ -5,6 +5,7 @@ use crate::authorization::{
     AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
 };
 use crate::wire::require_nonempty;
+use sha2::{Digest, Sha256};
 use std::fmt;
 use temporal_core::TemporalInstant;
 
@@ -348,7 +349,6 @@ pub fn disclose_identity_mapping<S: ReidentificationAuditSink>(
     grant: &PurposeGrant,
     mapping: &IdentityMappingRecord,
     decision_time: &str,
-    decision_digest: &str,
     audit_sink: &mut S,
 ) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
     validate_grant(grant)?;
@@ -356,12 +356,16 @@ pub fn disclose_identity_mapping<S: ReidentificationAuditSink>(
     require_nonempty(&mapping.opaque_analytical_id)?;
     require_nonempty(&mapping.direct_identity)?;
     require_rfc3339_utc(decision_time)?;
-    require_sha256_digest(decision_digest)?;
 
     let allowed = grant_covers(grant, decision_time)
         && mapping.tenant_workspace_id == grant.tenant_workspace_id
         && grant.reidentification_authorized
         && grant.purpose == AnalyticalPurpose::ScientificValidation;
+    let outcome = if allowed {
+        ReidentificationAuditOutcome::Allowed
+    } else {
+        ReidentificationAuditOutcome::Denied
+    };
     let audit_record = ReidentificationAuditRecord {
         tenant_workspace_id: grant.tenant_workspace_id.clone(),
         principal_id: grant.principal_id.clone(),
@@ -369,12 +373,8 @@ pub fn disclose_identity_mapping<S: ReidentificationAuditSink>(
         action_code: "reidentify_identity_mapping",
         opaque_analytical_id: mapping.opaque_analytical_id.clone(),
         decision_time: decision_time.into(),
-        outcome: if allowed {
-            ReidentificationAuditOutcome::Allowed
-        } else {
-            ReidentificationAuditOutcome::Denied
-        },
-        decision_digest: decision_digest.into(),
+        outcome,
+        decision_digest: reidentification_decision_digest(grant, mapping, decision_time, outcome)?,
     };
     audit_sink.append_reidentification_audit(&audit_record)?;
     if !allowed {
@@ -389,19 +389,45 @@ pub fn disclose_identity_mapping<S: ReidentificationAuditSink>(
     ))
 }
 
-fn require_sha256_digest(value: &str) -> Result<(), ApiError> {
-    let Some(digest) = value.strip_prefix("sha256:") else {
-        return Err(ApiError::InvalidWirePayload);
-    };
-    if digest.len() == 64
-        && digest
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        Ok(())
-    } else {
-        Err(ApiError::InvalidWirePayload)
+const REIDENTIFICATION_AUDIT_DIGEST_VERSION: &str = "tepp.reidentification.audit.v1";
+
+fn reidentification_decision_digest(
+    grant: &PurposeGrant,
+    mapping: &IdentityMappingRecord,
+    decision_time: &str,
+    outcome: ReidentificationAuditOutcome,
+) -> Result<String, ApiError> {
+    let mut hasher = Sha256::new();
+    for value in [
+        REIDENTIFICATION_AUDIT_DIGEST_VERSION,
+        "reidentify_identity_mapping",
+        &grant.tenant_workspace_id,
+        &grant.principal_id,
+        grant.purpose.wire_name(),
+        &grant.valid_from,
+        if grant.valid_to.is_some() { "1" } else { "0" },
+        grant.valid_to.as_deref().unwrap_or(""),
+        if grant.reidentification_authorized {
+            "1"
+        } else {
+            "0"
+        },
+        &mapping.tenant_workspace_id,
+        &mapping.opaque_analytical_id,
+        &mapping.direct_identity,
+        decision_time,
+        outcome.wire_name(),
+    ] {
+        update_audit_digest_field(&mut hasher, value)?;
     }
+    Ok(format!("sha256:{:x}", hasher.finalize()))
+}
+
+fn update_audit_digest_field(hasher: &mut Sha256, value: &str) -> Result<(), ApiError> {
+    let length = u64::try_from(value.len()).map_err(|_| ApiError::LimitExceeded)?;
+    hasher.update(length.to_be_bytes());
+    hasher.update(value.as_bytes());
+    Ok(())
 }
 
 // Lexicographic comparisons in `validate_grant` and `grant_covers` are valid
@@ -528,13 +554,7 @@ mod tests {
         decision_time: &str,
     ) -> Result<(DisclosedIdentityMapping, ReidentificationAuditRecord), ApiError> {
         let mut audit_sink = RecordingAuditSink::default();
-        disclose_identity_mapping_with_audit(
-            grant,
-            mapping,
-            decision_time,
-            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            &mut audit_sink,
-        )
+        disclose_identity_mapping_with_audit(grant, mapping, decision_time, &mut audit_sink)
     }
 
     #[test]

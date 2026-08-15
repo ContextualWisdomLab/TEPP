@@ -1,9 +1,8 @@
 //! Elevated re-identification must append redacted audit evidence for every decision.
 
 use tepp_api::{
-    AnalyticalPurpose, ApiError, IdentityMappingRecord, PurposeGrant,
-    ReidentificationAuditOutcome, ReidentificationAuditRecord, ReidentificationAuditSink,
-    disclose_identity_mapping,
+    AnalyticalPurpose, ApiError, IdentityMappingRecord, PurposeGrant, ReidentificationAuditOutcome,
+    ReidentificationAuditRecord, ReidentificationAuditSink, disclose_identity_mapping,
 };
 
 #[derive(Default)]
@@ -47,15 +46,14 @@ fn mapping() -> IdentityMappingRecord {
 #[test]
 fn successful_reidentification_appends_redacted_audit_evidence_before_disclosure() {
     let mut sink = RecordingAuditSink::default();
-    let (disclosed, audit) = disclose_identity_mapping(
-        &grant(true),
-        &mapping(),
-        "2026-06-15T12:00:00Z",
-        &mut sink,
-    )
-    .expect("audited elevated disclosure");
+    let (disclosed, audit) =
+        disclose_identity_mapping(&grant(true), &mapping(), "2026-06-15T12:00:00Z", &mut sink)
+            .expect("audited elevated disclosure");
 
-    assert_eq!(disclosed.direct_identity(), "Pat Lee <pat.lee@example.test>");
+    assert_eq!(
+        disclosed.direct_identity(),
+        "Pat Lee <pat.lee@example.test>"
+    );
     assert_eq!(sink.records, vec![audit.clone()]);
     assert_eq!(audit.tenant_workspace_id(), "tenant-workspace");
     assert_eq!(audit.principal_id(), "principal-analyst");
@@ -75,21 +73,12 @@ fn successful_reidentification_appends_redacted_audit_evidence_before_disclosure
 fn denied_reidentification_is_appended_and_replay_preserves_decision_order() {
     let mut sink = RecordingAuditSink::default();
     assert_eq!(
-        disclose_identity_mapping(
-            &grant(false),
-            &mapping(),
-            "2026-06-15T12:00:00Z",
-            &mut sink,
-        ),
+        disclose_identity_mapping(&grant(false), &mapping(), "2026-06-15T12:00:00Z", &mut sink,),
         Err(ApiError::AuthorizationDenied),
     );
-    let (_, allowed) = disclose_identity_mapping(
-        &grant(true),
-        &mapping(),
-        "2026-06-15T12:00:01Z",
-        &mut sink,
-    )
-    .expect("second audited decision");
+    let (_, allowed) =
+        disclose_identity_mapping(&grant(true), &mapping(), "2026-06-15T12:00:01Z", &mut sink)
+            .expect("second audited decision");
 
     assert_eq!(sink.records.len(), 2);
     assert_eq!(
