@@ -21,6 +21,7 @@ BEGIN
         DROP TRIGGER IF EXISTS deletion_request_reject_mutation ON public.deletion_request;
     END IF;
     IF to_regclass('public.evidence_tombstone') IS NOT NULL THEN
+        DROP TRIGGER IF EXISTS evidence_tombstone_guard_insert ON public.evidence_tombstone;
         DROP TRIGGER IF EXISTS evidence_tombstone_reject_mutation ON public.evidence_tombstone;
     END IF;
 
@@ -59,3 +60,4 @@ DROP FUNCTION IF EXISTS enforce_legal_hold_release();
 DROP FUNCTION IF EXISTS reject_tombstoned_evidence_restore();
 DROP FUNCTION IF EXISTS reject_held_evidence_deletion();
 DROP FUNCTION IF EXISTS guard_legal_hold_insert();
+DROP FUNCTION IF EXISTS guard_evidence_tombstone_insert();

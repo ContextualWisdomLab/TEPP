@@ -100,9 +100,8 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         Ok(())
     }
 
-    /// Bind the session tenant GUC required by FORCE RLS and the 0007
-    /// tombstone-restore trigger before mutating `document_record`.
-    fn bind_document_tenant(&mut self, tenant_record_id: Uuid) -> Result<(), PersistenceError> {
+    /// Bind the session tenant GUC before tenant-scoped persistence operations.
+    fn bind_session_tenant(&mut self, tenant_record_id: Uuid) -> Result<(), PersistenceError> {
         self.session
             .execute(&set_session_tenant_sql(tenant_record_id))
     }
@@ -117,7 +116,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// Returns digest or transport failures.
     pub fn insert(&mut self, record: &DocumentRecord) -> Result<(), PersistenceError> {
-        self.bind_document_tenant(record.tenant_record_id)?;
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_document_sql(record)?;
         self.session.execute(&sql)
     }
@@ -128,7 +127,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// Returns digest, concurrent-write, or transport failures.
     pub fn revise(&mut self, record: &DocumentRecord) -> Result<(), PersistenceError> {
-        self.bind_document_tenant(record.tenant_record_id)?;
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = revise_document_atomic_sql(record)?;
         self.session.execute(&sql)
     }
@@ -175,6 +174,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// Returns action-code validation or transport failures.
     pub fn append_audit(&mut self, event: &AuditEvent) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(event.tenant_record_id)?;
         let sql = append_audit_sql(event)?;
         self.session.execute(&sql)
     }
@@ -188,6 +188,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &ReproducibilityManifestRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_reproducibility_manifest_sql(record)?;
         self.session.execute(&sql)
     }
@@ -233,6 +234,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &CorpusSplitManifestRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_corpus_split_manifest_sql(record)?;
         self.session.execute(&sql)
     }
@@ -243,6 +245,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// Returns digest/label validation or transport failures.
     pub fn insert_model_run(&mut self, record: &ModelRunRecord) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_model_run_sql(record)?;
         self.session.execute(&sql)
     }
@@ -256,6 +259,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &ModelArtifactRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_model_artifact_sql(record)?;
         self.session.execute(&sql)
     }
@@ -269,6 +273,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &MembershipAssignmentRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_membership_assignment_sql(record)?;
         self.session.execute(&sql)
     }
@@ -295,6 +300,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &EventRelationRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_event_relation_sql(record)?;
         self.session.execute(&sql)
     }
@@ -309,6 +315,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &EventMentionRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_event_mention_sql(record)?;
         self.session.execute(&sql)
     }
@@ -322,6 +329,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &EventInstanceRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_event_instance_sql(record)?;
         self.session.execute(&sql)
     }
@@ -353,6 +361,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &SourceArtifactRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_source_artifact_sql(record)?;
         self.session.execute(&sql)?;
         let assertion = assert_source_artifact_matches_sql(record)?;
@@ -404,6 +413,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &RetentionPolicyRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_retention_policy_sql(record)?;
         self.session.execute(&sql)
     }
@@ -414,6 +424,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// Returns lifecycle validation or transport failures.
     pub fn insert_legal_hold(&mut self, record: &LegalHoldRecord) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_legal_hold_sql(record)?;
         self.session.execute(&sql)
     }
@@ -427,6 +438,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &DeletionRequestRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_deletion_request_sql(record)?;
         self.session.execute(&sql)
     }
@@ -442,6 +454,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         record: &DeletionRequestRecord,
         holds: &[LegalHoldRecord],
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_completed_deletion_request_sql(record, holds)?;
         self.session.execute(&sql)
     }
@@ -455,6 +468,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &EvidenceTombstoneRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_evidence_tombstone_sql(record)?;
         self.session.execute(&sql)
     }

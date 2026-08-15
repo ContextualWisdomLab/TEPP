@@ -1,6 +1,6 @@
 //! Execution-order contracts for lifecycle migration routines and rollback.
 //!
-//! PostgreSQL resolves routines and trigger dependencies statement by statement.
+//! `PostgreSQL` resolves routines and trigger dependencies statement by statement.
 //! These tests prevent privilege statements from preceding routine definitions
 //! and prevent rollback from dropping routines while dependent triggers exist.
 

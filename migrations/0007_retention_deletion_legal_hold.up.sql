@@ -67,7 +67,22 @@ CREATE TABLE deletion_request (
     request_status_code text NOT NULL,
     legal_hold_id uuid REFERENCES legal_hold (legal_hold_id),
     system_time timestamptz NOT NULL,
-    available_time timestamptz NOT NULL
+    available_time timestamptz NOT NULL,
+    CONSTRAINT deletion_request_kind_known CHECK (
+        deletion_kind_code IN (
+            'logical_revocation',
+            'cache_export_removal',
+            'identity_tombstone'
+        )
+    ),
+    CONSTRAINT deletion_request_status_known CHECK (
+        request_status_code IN (
+            'requested',
+            'completed',
+            'blocked_by_hold',
+            'reproduction_limited'
+        )
+    )
 );
 
 CREATE TABLE evidence_tombstone (
@@ -80,7 +95,17 @@ CREATE TABLE evidence_tombstone (
     deletion_kind_code text NOT NULL,
     reproduction_status_code text NOT NULL,
     system_time timestamptz NOT NULL,
-    available_time timestamptz NOT NULL
+    available_time timestamptz NOT NULL,
+    CONSTRAINT evidence_tombstone_kind_known CHECK (
+        deletion_kind_code IN (
+            'logical_revocation',
+            'cache_export_removal',
+            'identity_tombstone'
+        )
+    ),
+    CONSTRAINT evidence_tombstone_reproduction_status_known CHECK (
+        reproduction_status_code IN ('unavailable', 'limited', 'unaffected')
+    )
 );
 
 CREATE UNIQUE INDEX retention_policy_active_purpose_unique
@@ -120,6 +145,10 @@ CREATE INDEX deletion_request_legal_hold_id_idx
 
 CREATE INDEX evidence_tombstone_deletion_request_id_idx
     ON evidence_tombstone (deletion_request_id);
+
+CREATE INDEX deletion_request_completed_scope_lookup
+    ON deletion_request (tenant_record_id, system_time, target_document_id)
+    WHERE request_status_code = 'completed';
 
 CREATE OR REPLACE FUNCTION enforce_retention_policy_succession()
 RETURNS trigger
@@ -263,11 +292,26 @@ BEGIN
         RAISE EXCEPTION 'tenant session context is required for lifecycle mutation'
             USING ERRCODE = 'integrity_constraint_violation';
     END IF;
-    -- Serialize hold/deletion races for the same tenant+document scope.
-    PERFORM pg_advisory_xact_lock(
-        hashtextextended(NEW.tenant_record_id::text, 0),
-        hashtextextended(NEW.target_document_id::text, 0)
-    );
+    IF NEW.request_status_code = 'completed' THEN
+        -- Acquire the tenant lock first so tenant-wide and document holds share
+        -- one deadlock-free order. Each call uses PostgreSQL's single-bigint
+        -- advisory-lock overload.
+        PERFORM pg_advisory_xact_lock(
+            hashtextextended(
+                'tepp:lifecycle:tenant:' || NEW.tenant_record_id::text,
+                0
+            )
+        );
+        PERFORM pg_advisory_xact_lock(
+            hashtextextended(
+                'tepp:lifecycle:document:'
+                    || NEW.tenant_record_id::text
+                    || ':'
+                    || NEW.target_document_id::text,
+                0
+            )
+        );
+    END IF;
     IF NEW.request_status_code = 'completed' AND EXISTS (
         SELECT 1
         FROM public.legal_hold
@@ -326,6 +370,42 @@ CREATE TRIGGER document_record_reject_tombstone_restore
     FOR EACH ROW
     EXECUTE FUNCTION reject_tombstoned_evidence_restore();
 
+CREATE OR REPLACE FUNCTION guard_evidence_tombstone_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    tenant_context text;
+BEGIN
+    tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
+    IF tenant_context IS NULL OR NEW.tenant_record_id::text <> tenant_context THEN
+        RAISE EXCEPTION 'tenant session context is required for lifecycle mutation'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.deletion_request
+        WHERE deletion_request_id = NEW.deletion_request_id
+          AND tenant_record_id = NEW.tenant_record_id
+          AND target_document_id = NEW.tombstoned_document_id
+          AND target_data_class_code = NEW.target_data_class_code
+          AND deletion_kind_code = NEW.deletion_kind_code
+          AND request_status_code = 'completed'
+    ) THEN
+        RAISE EXCEPTION 'evidence tombstone must match one completed deletion request'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER evidence_tombstone_guard_insert
+    BEFORE INSERT ON evidence_tombstone
+    FOR EACH ROW
+    EXECUTE FUNCTION guard_evidence_tombstone_insert();
+
 GRANT SELECT, INSERT ON TABLE retention_policy TO tepp_app_runtime;
 GRANT SELECT, INSERT ON TABLE legal_hold TO tepp_app_runtime;
 GRANT SELECT, INSERT ON TABLE deletion_request TO tepp_app_runtime;
@@ -339,16 +419,6 @@ REVOKE TRUNCATE ON TABLE deletion_request FROM tepp_app_runtime;
 REVOKE UPDATE, DELETE ON TABLE evidence_tombstone FROM tepp_app_runtime;
 REVOKE TRUNCATE ON TABLE evidence_tombstone FROM tepp_app_runtime;
 
-REVOKE ALL ON FUNCTION enforce_retention_policy_succession() FROM PUBLIC;
-REVOKE ALL ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) FROM PUBLIC;
-REVOKE ALL ON FUNCTION reject_held_evidence_deletion() FROM PUBLIC;
-REVOKE ALL ON FUNCTION reject_tombstoned_evidence_restore() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) TO tepp_app_runtime;
-REVOKE ALL ON FUNCTION release_legal_hold(uuid, timestamptz) FROM PUBLIC;
-REVOKE ALL ON FUNCTION enforce_legal_hold_release() FROM PUBLIC;
-REVOKE ALL ON FUNCTION guard_legal_hold_insert() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION release_legal_hold(uuid, timestamptz) TO tepp_app_runtime;
-
 CREATE OR REPLACE FUNCTION guard_legal_hold_insert()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -357,7 +427,6 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
     tenant_context text;
-    lock_document uuid;
 BEGIN
     tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
     IF tenant_context IS NULL OR NEW.tenant_record_id::text <> tenant_context THEN
@@ -368,11 +437,54 @@ BEGIN
         RAISE EXCEPTION 'legal hold insert must be an open active hold'
             USING ERRCODE = 'integrity_constraint_violation';
     END IF;
-    lock_document := COALESCE(NEW.held_document_id, '00000000-0000-0000-0000-000000000000'::uuid);
+    IF NEW.hold_scope_code NOT IN ('document', 'tenant')
+        OR (NEW.hold_scope_code = 'document' AND NEW.held_document_id IS NULL)
+        OR (NEW.hold_scope_code = 'tenant' AND NEW.held_document_id IS NOT NULL)
+    THEN
+        RAISE EXCEPTION 'legal hold scope is inconsistent'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+
+    -- Completed deletions and legal holds always acquire the tenant lock first.
+    -- Document-scoped operations then acquire the document lock, eliminating
+    -- hold/deletion TOCTOU races without relying on a nonexistent two-bigint
+    -- advisory-lock overload.
     PERFORM pg_advisory_xact_lock(
-        hashtextextended(NEW.tenant_record_id::text, 0),
-        hashtextextended(lock_document::text, 0)
+        hashtextextended(
+            'tepp:lifecycle:tenant:' || NEW.tenant_record_id::text,
+            0
+        )
     );
+    IF NEW.hold_scope_code = 'document' THEN
+        PERFORM pg_advisory_xact_lock(
+            hashtextextended(
+                'tepp:lifecycle:document:'
+                    || NEW.tenant_record_id::text
+                    || ':'
+                    || NEW.held_document_id::text,
+                0
+            )
+        );
+    END IF;
+
+    -- The deletion trigger checks newly committed holds. This symmetric check
+    -- covers the opposite serialization order: a completed deletion that
+    -- committed first cannot coexist with a hold effective at or before it.
+    IF EXISTS (
+        SELECT 1
+        FROM public.deletion_request AS completed_deletion
+        WHERE completed_deletion.tenant_record_id = NEW.tenant_record_id
+          AND completed_deletion.request_status_code = 'completed'
+          AND completed_deletion.system_time >= NEW.system_time
+          AND (
+              NEW.hold_scope_code = 'tenant'
+              OR completed_deletion.target_document_id = NEW.held_document_id
+          )
+    ) THEN
+        RAISE EXCEPTION 'completed deletion blocks legal hold activation'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+
     RETURN NEW;
 END;
 $$;
@@ -421,7 +533,6 @@ AS $$
 DECLARE
     tenant_context text;
     current_hold legal_hold%ROWTYPE;
-    lock_document uuid;
 BEGIN
     tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
     IF tenant_context IS NULL THEN
@@ -445,11 +556,23 @@ BEGIN
             USING ERRCODE = 'integrity_constraint_violation';
     END IF;
 
-    lock_document := COALESCE(current_hold.held_document_id, '00000000-0000-0000-0000-000000000000'::uuid);
     PERFORM pg_advisory_xact_lock(
-        hashtextextended(current_hold.tenant_record_id::text, 0),
-        hashtextextended(lock_document::text, 0)
+        hashtextextended(
+            'tepp:lifecycle:tenant:' || current_hold.tenant_record_id::text,
+            0
+        )
     );
+    IF current_hold.hold_scope_code = 'document' THEN
+        PERFORM pg_advisory_xact_lock(
+            hashtextextended(
+                'tepp:lifecycle:document:'
+                    || current_hold.tenant_record_id::text
+                    || ':'
+                    || current_hold.held_document_id::text,
+                0
+            )
+        );
+    END IF;
 
     UPDATE public.legal_hold
     SET hold_status_code = 'released',
@@ -524,3 +647,14 @@ CREATE POLICY evidence_tombstone_tenant_isolation ON evidence_tombstone
     WITH CHECK (
         tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
     );
+
+REVOKE ALL ON FUNCTION enforce_retention_policy_succession() FROM PUBLIC;
+REVOKE ALL ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION reject_held_evidence_deletion() FROM PUBLIC;
+REVOKE ALL ON FUNCTION reject_tombstoned_evidence_restore() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION supersede_retention_policy(uuid, uuid, integer, text, timestamptz, timestamptz) TO tepp_app_runtime;
+REVOKE ALL ON FUNCTION release_legal_hold(uuid, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION enforce_legal_hold_release() FROM PUBLIC;
+REVOKE ALL ON FUNCTION guard_legal_hold_insert() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION release_legal_hold(uuid, timestamptz) TO tepp_app_runtime;
+REVOKE ALL ON FUNCTION guard_evidence_tombstone_insert() FROM PUBLIC;
