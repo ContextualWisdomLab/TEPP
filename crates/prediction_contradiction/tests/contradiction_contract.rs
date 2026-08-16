@@ -2,8 +2,8 @@
 
 use prediction_contradiction::{
     PredictionContradictionError, PromotionSupport, classify_promotion_support,
-    contradiction_agreement_rate, intervals_contradict, refuse_promotion,
-    require_observed_coverage,
+    contradiction_agreement_rate, intervals_contradict, refuse_contradiction_or_adjacency,
+    refuse_promotion, require_observed_coverage,
 };
 use temporal_core::{
     AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
@@ -48,6 +48,15 @@ fn before_and_after_cannot_become_observed_fact() {
 
     assert!(intervals_contradict(&predicted, &later_observed).expect("before"));
     assert_eq!(
+        refuse_contradiction_or_adjacency(
+            &predicted,
+            &later_observed,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionContradictsObservation)
+    );
+    assert_eq!(
         refuse_promotion(
             &predicted,
             &later_observed,
@@ -58,6 +67,15 @@ fn before_and_after_cannot_become_observed_fact() {
     );
 
     assert!(intervals_contradict(&earlier_observed, &predicted_later).expect("after"));
+    assert_eq!(
+        refuse_contradiction_or_adjacency(
+            &earlier_observed,
+            &predicted_later,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionContradictsObservation)
+    );
     assert_eq!(
         refuse_promotion(
             &earlier_observed,
@@ -79,10 +97,23 @@ fn meeting_intervals_are_adjacent_not_allen_contradiction() {
 
     assert!(!intervals_contradict(&predicted, &meeting).expect("meets"));
     assert_eq!(
+        refuse_contradiction_or_adjacency(
+            &predicted,
+            &meeting,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionLacksOverlappingSupport)
+    );
+    assert_eq!(
         refuse_promotion(&predicted, &meeting, observed_available, knowledge_cutoff),
         Err(PredictionContradictionError::PredictionLacksOverlappingSupport)
     );
     assert!(!intervals_contradict(&met_by, &earlier).expect("met_by"));
+    assert_eq!(
+        refuse_contradiction_or_adjacency(&met_by, &earlier, observed_available, knowledge_cutoff),
+        Err(PredictionContradictionError::PredictionLacksOverlappingSupport)
+    );
     assert_eq!(
         refuse_promotion(&met_by, &earlier, observed_available, knowledge_cutoff),
         Err(PredictionContradictionError::PredictionLacksOverlappingSupport)
@@ -95,7 +126,7 @@ fn overlapping_observation_is_not_contradiction_and_is_not_coverage() {
     let overlapping = closed_event_interval(5, 15);
     let (observed_available, knowledge_cutoff) = eligible_clocks();
     assert!(!intervals_contradict(&predicted, &overlapping).expect("overlaps"));
-    refuse_promotion(
+    refuse_contradiction_or_adjacency(
         &predicted,
         &overlapping,
         observed_available,
@@ -118,9 +149,44 @@ fn overlapping_observation_is_not_contradiction_and_is_not_coverage() {
 }
 
 #[test]
+fn refuse_promotion_refuses_unmatched_predicted_mass() {
+    let predicted = closed_event_interval(0, 10);
+    let overlapping = closed_event_interval(5, 15);
+    let contained = closed_event_interval(2, 8);
+    let (observed_available, knowledge_cutoff) = eligible_clocks();
+    assert_eq!(
+        refuse_promotion(
+            &predicted,
+            &overlapping,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionNotCoveredByObservation)
+    );
+    assert_eq!(
+        refuse_promotion(
+            &predicted,
+            &contained,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionNotCoveredByObservation)
+    );
+}
+
+#[test]
 fn evidence_available_after_cutoff_is_ineligible() {
     let predicted = closed_event_interval(0, 10);
     let overlapping = closed_event_interval(5, 15);
+    assert_eq!(
+        refuse_contradiction_or_adjacency(
+            &predicted,
+            &overlapping,
+            available("2026-01-04T00:00:00Z"),
+            cutoff("2026-01-03T00:00:00Z"),
+        ),
+        Err(PredictionContradictionError::EvidenceAfterCutoff)
+    );
     assert_eq!(
         refuse_promotion(
             &predicted,
@@ -192,7 +258,7 @@ fn availability_equal_to_cutoff_remains_eligible() {
     let covering = closed_event_interval(0, 10);
     let observed_available = available("2026-01-03T00:00:00Z");
     let knowledge_cutoff = cutoff("2026-01-03T00:00:00Z");
-    refuse_promotion(
+    refuse_contradiction_or_adjacency(
         &predicted,
         &overlapping,
         observed_available,
@@ -201,6 +267,8 @@ fn availability_equal_to_cutoff_remains_eligible() {
     .expect("available == cutoff is eligible for the contradiction filter");
     require_observed_coverage(&predicted, &covering, observed_available, knowledge_cutoff)
         .expect("available == cutoff is eligible for coverage");
+    refuse_promotion(&predicted, &covering, observed_available, knowledge_cutoff)
+        .expect("available == cutoff is eligible for promotion");
 }
 
 #[test]
@@ -212,6 +280,15 @@ fn after_and_overlapped_by_use_the_same_promotion_rules() {
     let (observed_available, knowledge_cutoff) = eligible_clocks();
 
     assert!(intervals_contradict(&predicted, &earlier_observed).expect("after"));
+    assert_eq!(
+        refuse_contradiction_or_adjacency(
+            &predicted,
+            &earlier_observed,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionContradictsObservation)
+    );
     assert_eq!(
         refuse_promotion(
             &predicted,
@@ -225,13 +302,22 @@ fn after_and_overlapped_by_use_the_same_promotion_rules() {
         classify_promotion_support(&later_predicted, &overlapped_by).expect("overlapped_by"),
         PromotionSupport::PartialOverlap
     );
-    refuse_promotion(
+    refuse_contradiction_or_adjacency(
         &later_predicted,
         &overlapped_by,
         observed_available,
         knowledge_cutoff,
     )
     .expect("overlapped_by is not Allen contradiction");
+    assert_eq!(
+        refuse_promotion(
+            &later_predicted,
+            &overlapped_by,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionNotCoveredByObservation)
+    );
     assert_eq!(
         require_observed_coverage(
             &later_predicted,
@@ -255,6 +341,15 @@ fn half_open_observed_interval_is_not_an_allen_input() {
     let (observed_available, knowledge_cutoff) = eligible_clocks();
     assert_eq!(
         intervals_contradict(&predicted, &observed),
+        Err(PredictionContradictionError::InvalidIntervalPayload)
+    );
+    assert_eq!(
+        refuse_contradiction_or_adjacency(
+            &predicted,
+            &observed,
+            observed_available,
+            knowledge_cutoff
+        ),
         Err(PredictionContradictionError::InvalidIntervalPayload)
     );
     assert_eq!(

@@ -23,8 +23,9 @@ owns the hour. The scheduler does not create a competing branch.
 Current executable queue while drafts remain open:
 
 1. Merge the predicted-versus-observed Allen coverage gate
-   (`prediction_contradiction` / PR #94). Keep PR #93 draft; its `Ok(())`
-   path is not promotion authority.
+   (`prediction_contradiction` / this repair of PR #94). `refuse_promotion`
+   now requires coverage. Keep PR #93 draft; its `Ok(())` path is not
+   promotion authority.
 2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #87),
    `text_segment` SQL contracts on existing migration `0006`, retention and
    legal-hold migration `0007` (PR #45), foundation known-truth recovery

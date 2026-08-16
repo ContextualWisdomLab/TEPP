@@ -8,8 +8,10 @@ event-time interval cannot become observed fact when the Allen relation is
 `before` or `after` (contradiction) or `meets` / `met_by` (adjacent, no
 interior overlap). Partial overlap (`overlaps`, `overlapped_by`, `contains`,
 `started_by`, `finished_by`) is not a network contradiction, but it leaves
-unmatched predicted mass. `require_observed_coverage` therefore succeeds only
-for `during`, `starts`, `finishes`, and `equals`. Observed evidence whose
+unmatched predicted mass. `refuse_promotion` and `require_observed_coverage`
+therefore succeed only for `during`, `starts`, `finishes`, and `equals`.
+`refuse_contradiction_or_adjacency` is the weaker contradiction/adjacency
+filter; do not call it to authorize promotion. Observed evidence whose
 availability time exceeds the analysis knowledge cutoff is ineligible.
 
 Label agreement on those flags is a helper for the gate. It is not RMSE,
@@ -26,7 +28,7 @@ flowchart TD
     contradict[Refuse: before / after]
     adjacent[Refuse: meets / met_by]
     partial[Refuse coverage: unmatched predicted mass]
-    cover[Coverage may authorize promotion]
+    cover[refuse_promotion: coverage may authorize promotion]
     cutoff -->|no| ineligible[Refuse: evidence after cutoff]
     cutoff -->|yes| allen
     allen --> contradict
@@ -35,8 +37,9 @@ flowchart TD
     allen --> cover
 ```
 
-Next action: call `require_observed_coverage` before promoting a forecast.
-`refuse_promotion` only answers whether the pair is contradictory or adjacent.
+Next action: call `refuse_promotion` (or `require_observed_coverage`) before
+promoting a forecast. `refuse_contradiction_or_adjacency` only answers whether
+the pair is contradictory or adjacent.
 
 ## Authority
 

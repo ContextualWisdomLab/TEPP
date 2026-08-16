@@ -20,6 +20,8 @@ TEPP separates three event-intelligence layers:
 
 Transition edges admitted to the state/input-process-outcome graph remain governed by ADR 0002/0003 and cannot be created merely because TDT/CHRONOS predicts or links two events. Retrospective evidence and schema predictions remain provenance/hypothesis edges until independently promoted.
 
+The bounded `prediction_contradiction` crate is the promotion-authority gate for a pairwise predicted-versus-observed closed proper interval. `refuse_promotion` and `require_observed_coverage` succeed only when later-available evidence covers every predicted instant (`during`, `starts`, `finishes`, or `equals`). `refuse_contradiction_or_adjacency` answers only whether the pair is Allen `before`/`after` or `meets`/`met_by`; its `Ok(())` is not authority to promote unmatched predicted mass.
+
 ## Alternatives considered
 
 1. **Single end-to-end event graph with no evidence-state distinction** — rejected because observation, inference, prediction, and transition authority become conflated.

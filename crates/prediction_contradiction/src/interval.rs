@@ -13,10 +13,11 @@ fn map_temporal(error: TemporalError) -> PredictionContradictionError {
 
 /// How later-observed evidence relates to a predicted event-time interval.
 ///
-/// `Ok(())` from [`refuse_promotion`] means the pair is not an Allen
-/// contradiction or adjacency refusal. It does not authorize promoting
-/// unmatched predicted mass. Only [`PromotionSupport::ObservedCoversPrediction`]
-/// means every predicted instant has observed support.
+/// `Ok(())` from [`refuse_promotion`] or [`require_observed_coverage`] means
+/// every predicted instant has observed support. `Ok(())` from
+/// [`refuse_contradiction_or_adjacency`] only means the pair is not an Allen
+/// contradiction or adjacency refusal. Only
+/// [`PromotionSupport::ObservedCoversPrediction`] authorizes promotion.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PromotionSupport {
     /// Observed interval covers every instant of the predicted interval.
@@ -84,12 +85,12 @@ pub fn intervals_contradict(
     }
 }
 
-/// Refuse promotion when evidence is ineligible, disjoint, or only adjacent.
+/// Refuse only Allen contradiction or adjacency; this is not promotion authority.
 ///
-/// Success means the pair is not an Allen `before` / `after` contradiction
-/// and is not merely adjacent. Callers must not treat success as authority
-/// to promote unmatched predicted shoulders. Use
-/// [`require_observed_coverage`] when the predicted interval must be covered.
+/// Success means the pair is not Allen `before` / `after` and is not merely
+/// adjacent. Partial overlap still leaves unmatched predicted mass. Call
+/// [`refuse_promotion`] or [`require_observed_coverage`] before recording a
+/// forecast as observed fact.
 ///
 /// This function classifies intervals with
 /// [`temporal_core::classify_interval_relation`]. It does not run the
@@ -105,7 +106,7 @@ pub fn intervals_contradict(
 /// `meets` / `met_by`. Returns
 /// [`PredictionContradictionError::InvalidIntervalPayload`] when either
 /// interval is not a closed proper Allen input.
-pub fn refuse_promotion(
+pub fn refuse_contradiction_or_adjacency(
     predicted: &TemporalInterval<EventTime>,
     observed: &TemporalInterval<EventTime>,
     observed_available: AvailableTime,
@@ -131,6 +132,23 @@ pub fn refuse_promotion(
         | AllenRelation::FinishedBy
         | AllenRelation::Equals => Ok(()),
     }
+}
+
+/// Refuse promotion unless later-observed evidence covers the prediction.
+///
+/// This is the promotion-authority entry point. It is identical to
+/// [`require_observed_coverage`]: unmatched predicted mass stays hypothetical.
+///
+/// # Errors
+///
+/// Returns the same errors as [`require_observed_coverage`].
+pub fn refuse_promotion(
+    predicted: &TemporalInterval<EventTime>,
+    observed: &TemporalInterval<EventTime>,
+    observed_available: AvailableTime,
+    cutoff: KnowledgeCutoff,
+) -> Result<(), PredictionContradictionError> {
+    require_observed_coverage(predicted, observed, observed_available, cutoff)
 }
 
 /// Refuse promotion unless later-observed evidence covers the prediction.
@@ -204,7 +222,8 @@ pub fn contradiction_agreement_rate(
 mod tests {
     use super::{
         PromotionSupport, classify_promotion_support, contradiction_agreement_rate,
-        intervals_contradict, refuse_promotion, require_observed_coverage,
+        intervals_contradict, refuse_contradiction_or_adjacency, refuse_promotion,
+        require_observed_coverage,
     };
     use crate::PredictionContradictionError;
     use temporal_core::{
@@ -251,28 +270,41 @@ mod tests {
     }
 
     #[test]
-    fn refuse_promotion_accepts_overlap_family_and_refuses_gaps() {
+    fn refuse_contradiction_or_adjacency_accepts_overlap_family_and_refuses_gaps() {
         let (available, cutoff) = clocks();
         let predicted = closed(0, 10);
-        refuse_promotion(&predicted, &closed(5, 15), available, cutoff).expect("overlap");
-        refuse_promotion(&closed(5, 15), &predicted, available, cutoff).expect("overlapped_by");
-        refuse_promotion(&predicted, &closed(0, 8), available, cutoff).expect("started_by");
-        refuse_promotion(&closed(0, 8), &predicted, available, cutoff).expect("starts");
-        refuse_promotion(&predicted, &closed(2, 8), available, cutoff).expect("contains");
-        refuse_promotion(&closed(2, 8), &predicted, available, cutoff).expect("during");
-        refuse_promotion(&predicted, &closed(2, 10), available, cutoff).expect("finished_by");
-        refuse_promotion(&closed(2, 10), &predicted, available, cutoff).expect("finishes");
-        refuse_promotion(&predicted, &closed(0, 10), available, cutoff).expect("equals");
+        refuse_contradiction_or_adjacency(&predicted, &closed(5, 15), available, cutoff)
+            .expect("overlap");
+        refuse_contradiction_or_adjacency(&closed(5, 15), &predicted, available, cutoff)
+            .expect("overlapped_by");
+        refuse_contradiction_or_adjacency(&predicted, &closed(0, 8), available, cutoff)
+            .expect("started_by");
+        refuse_contradiction_or_adjacency(&closed(0, 8), &predicted, available, cutoff)
+            .expect("starts");
+        refuse_contradiction_or_adjacency(&predicted, &closed(2, 8), available, cutoff)
+            .expect("contains");
+        refuse_contradiction_or_adjacency(&closed(2, 8), &predicted, available, cutoff)
+            .expect("during");
+        refuse_contradiction_or_adjacency(&predicted, &closed(2, 10), available, cutoff)
+            .expect("finished_by");
+        refuse_contradiction_or_adjacency(&closed(2, 10), &predicted, available, cutoff)
+            .expect("finishes");
+        refuse_contradiction_or_adjacency(&predicted, &closed(0, 10), available, cutoff)
+            .expect("equals");
         assert_eq!(
-            refuse_promotion(&predicted, &closed(20, 30), available, cutoff),
+            refuse_contradiction_or_adjacency(&predicted, &closed(20, 30), available, cutoff),
             Err(PredictionContradictionError::PredictionContradictsObservation)
         );
         assert_eq!(
-            refuse_promotion(&closed(40, 50), &predicted, available, cutoff),
+            refuse_contradiction_or_adjacency(&closed(40, 50), &predicted, available, cutoff),
             Err(PredictionContradictionError::PredictionContradictsObservation)
         );
         assert_eq!(
-            refuse_promotion(&predicted, &closed(10, 20), available, cutoff),
+            refuse_contradiction_or_adjacency(&predicted, &closed(10, 20), available, cutoff),
+            Err(PredictionContradictionError::PredictionLacksOverlappingSupport)
+        );
+        assert_eq!(
+            refuse_contradiction_or_adjacency(&closed(10, 20), &predicted, available, cutoff),
             Err(PredictionContradictionError::PredictionLacksOverlappingSupport)
         );
     }
@@ -335,6 +367,26 @@ mod tests {
     }
 
     #[test]
+    fn refuse_promotion_matches_require_observed_coverage() {
+        let (available, cutoff) = clocks();
+        let predicted = closed(0, 10);
+        refuse_promotion(&closed(0, 8), &predicted, available, cutoff).expect("starts");
+        refuse_promotion(&predicted, &closed(0, 10), available, cutoff).expect("equals");
+        assert_eq!(
+            refuse_promotion(&predicted, &closed(5, 15), available, cutoff),
+            Err(PredictionContradictionError::PredictionNotCoveredByObservation)
+        );
+        assert_eq!(
+            refuse_promotion(&predicted, &closed(20, 30), available, cutoff),
+            Err(PredictionContradictionError::PredictionContradictsObservation)
+        );
+        assert_eq!(
+            refuse_promotion(&predicted, &closed(10, 20), available, cutoff),
+            Err(PredictionContradictionError::PredictionLacksOverlappingSupport)
+        );
+    }
+
+    #[test]
     fn require_observed_coverage_accepts_only_full_coverage() {
         let (available, cutoff) = clocks();
         let predicted = closed(0, 10);
@@ -382,7 +434,13 @@ mod tests {
         );
         require_observed_coverage(&predicted, &closed(0, 10), on_cutoff.0, on_cutoff.1)
             .expect("available == cutoff");
+        refuse_promotion(&predicted, &closed(0, 10), on_cutoff.0, on_cutoff.1)
+            .expect("available == cutoff on promotion");
         let late = AvailableTime::parse_rfc3339("2026-01-04T00:00:00Z").expect("late");
+        assert_eq!(
+            refuse_contradiction_or_adjacency(&predicted, &closed(5, 15), late, cutoff),
+            Err(PredictionContradictionError::EvidenceAfterCutoff)
+        );
         assert_eq!(
             refuse_promotion(&predicted, &closed(5, 15), late, cutoff),
             Err(PredictionContradictionError::EvidenceAfterCutoff)
@@ -399,6 +457,10 @@ mod tests {
         .expect("half-open");
         assert_eq!(
             intervals_contradict(&half_open, &closed(20, 30)),
+            Err(PredictionContradictionError::InvalidIntervalPayload)
+        );
+        assert_eq!(
+            refuse_contradiction_or_adjacency(&half_open, &closed(20, 30), available, cutoff),
             Err(PredictionContradictionError::InvalidIntervalPayload)
         );
         assert_eq!(

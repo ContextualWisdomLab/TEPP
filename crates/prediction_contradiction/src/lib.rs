@@ -6,10 +6,11 @@
 //! [`temporal_core::classify_interval_relation`] returns Allen `before` or
 //! `after`, or when the pair only `meets` / is `met_by`. Partial overlap is
 //! not a contradiction, but it also does not cover unmatched predicted
-//! mass. [`require_observed_coverage`] is the promotion-authority gate.
-//! Evidence whose availability time exceeds the analysis knowledge cutoff
-//! is ineligible (ADR 0002, ADR 0016). This crate does not run the
-//! path-consistency reasoner.
+//! mass. [`refuse_promotion`] and [`require_observed_coverage`] are the
+//! promotion-authority gates. [`refuse_contradiction_or_adjacency`] only
+//! answers contradiction or adjacency. Evidence whose availability time
+//! exceeds the analysis knowledge cutoff is ineligible (ADR 0002, ADR 0016).
+//! This crate does not run the path-consistency reasoner.
 
 mod error;
 mod interval;
@@ -24,7 +25,9 @@ pub use interval::classify_promotion_support;
 pub use interval::contradiction_agreement_rate;
 /// Return whether two closed proper intervals are Allen `before` or `after`.
 pub use interval::intervals_contradict;
-/// Refuse promotion when evidence is ineligible, disjoint, or only adjacent.
+/// Refuse only Allen contradiction or adjacency; this is not promotion authority.
+pub use interval::refuse_contradiction_or_adjacency;
+/// Refuse promotion unless later-observed evidence covers the prediction.
 pub use interval::refuse_promotion;
 /// Refuse promotion unless later-observed evidence covers the prediction.
 pub use interval::require_observed_coverage;
