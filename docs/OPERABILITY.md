@@ -3,7 +3,7 @@
 **Status:** Accepted target operating baseline with current maturity explicit.  
 **Last reviewed:** 2026-08-13
 
-TEPP is still an implementation-stage research/product platform. Protected main currently contains the Rust workspace/evidence foundation; PR #5/#6 add temporal foundations. Database, model fitting, GPU, services, visual analytics, and production deployment are later targets. This guide defines the operating evidence those stages must satisfy rather than claiming they already exist.
+TEPP is still an implementation-stage research/product platform. Protected main currently contains the Rust workspace/evidence foundation plus implemented-main temporal primitives (merged PRs #8 and #9). Superseded PRs #5 and #6 are historical lineage only. Database adapters are partial; model fitting, GPU, services, visual analytics, and production deployment are later targets. This guide defines the operating evidence those stages must satisfy rather than claiming they already exist. Unmerged or draft PRs are not implemented-main claims.
 
 ## Operating principles
 

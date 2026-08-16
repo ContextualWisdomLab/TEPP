@@ -9,13 +9,15 @@
 
 TEPP uses event intelligence for segmentation, linking, first-story detection, event tracking, schema instantiation, prediction, and temporal-consistency reasoning. These functions have different epistemic meanings. If they are collapsed into one opaque “event model,” a predicted event can be confused with an observed event, a topic link with a causal edge, or path consistency with proof of a complete real-world chronology.
 
+The named intelligence-boundary sources already recorded in [`docs/research/standards-and-literature.md`](../research/standards-and-literature.md) are Topic Detection and Tracking (Allan, 2002) and CHRONOS qualitative temporal reasoning over OWL (Anagnostopoulos et al., 2013). This ADR remains **accepted-target**: naming those families is not a protected-main implementation claim.
+
 ## Decision
 
 TEPP separates three event-intelligence layers:
 
 1. **Event Ontology layer** owns versioned event instances, mentions, roles/arguments, subevents, evidence spans, places, products/outcomes, and provenance. Observed mentions are fallible evidence; event instances are modeled objects.
-2. **TDT-style detection/tracking layer** owns story/event segmentation, link detection, new/first-story detection, topic/event detection, and longitudinal tracking. Its outputs are probabilistic measurement/detection evidence and require calibration and false-positive/false-negative evaluation.
-3. **CHRONOS-style reasoning layer** has two explicit subcontracts: semantic/neural event-schema extraction/prediction and symbolic/qualitative temporal-consistency reasoning. A predicted event/schema completion remains hypothetical until supported by later evidence. Temporal reasoning validates consistency/partial order under its stated algebra and resource bounds; it does not prove unrestricted global satisfiability unless a later implementation explicitly does so.
+2. **TDT-style detection/tracking layer** owns story/event segmentation, link detection, new/first-story detection, topic/event detection, and longitudinal tracking as defined by the TDT task family (Allan, 2002). Its outputs are probabilistic measurement/detection evidence and require calibration and false-positive/false-negative evaluation.
+3. **CHRONOS-style reasoning layer** has two explicit subcontracts: semantic/neural event-schema extraction/prediction and symbolic/qualitative temporal-consistency reasoning in the sense of CHRONOS (Anagnostopoulos et al., 2013). A predicted event/schema completion remains hypothetical until supported by later evidence. Temporal reasoning validates consistency/partial order under its stated algebra and resource bounds; it does not prove unrestricted global satisfiability unless a later implementation explicitly does so.
 
 Transition edges admitted to the state/input-process-outcome graph remain governed by ADR 0002/0003 and cannot be created merely because TDT/CHRONOS predicts or links two events. Retrospective evidence and schema predictions remain provenance/hypothesis edges until independently promoted.
 
@@ -52,3 +54,9 @@ Required evidence includes segmentation accuracy, link precision/recall, first-s
 ## Rollback and supersession
 
 Rollback selects the last validated event-intelligence model/reasoner version and preserves previously issued artifacts with their version/status. Supersede only with an ADR that maintains explicit separation of observed evidence, inferred event identity/relation, prediction, temporal consistency, and transition authority.
+
+## References
+
+Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information organization*. Kluwer Academic Publishers.
+
+Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reasoning engine for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 70–77. https://doi.org/10.1016/j.procs.2013.09.082

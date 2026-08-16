@@ -14,8 +14,8 @@ Current protected main exposes Rust library/domain contracts, not a production H
 | Contract | Owner | Consumers | Maturity |
 |---|---|---|---|
 | evidence record/span wire v1 | TEPP `evidence_core` | future TEPP services/adapters | implemented-main |
-| temporal clock/interval wire | `temporal_core` | relation/event/persistence | active-PR #5 |
-| interval relation/reasoner API | `temporal_core` | event/relation validation | active-PR #6 |
+| temporal clock/interval wire | `temporal_core` | relation/event/persistence | implemented-main (merged PR #8) |
+| interval relation/reasoner API | `temporal_core` | event/relation validation | implemented-main (merged PR #9; Allen, 1983) |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | LLM interpretation provider port | TEPP interpretation gateway | contextual-orchestrator | accepted-target |

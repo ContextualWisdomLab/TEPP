@@ -13,7 +13,9 @@ Without a dedicated decision, implementations could silently drift toward indepe
 
 ## Decision
 
-TEPP adopts **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** as the model-family contract. The initial reference backend is a temporal/relational shared-latent STM-style estimator with logistic-normal document coordinates and posterior uncertainty. Alternative polylingual or neural/contextual backends are allowed only when they satisfy the same versioned evidence, temporal, relational, posterior, invariance, and interoperability contracts.
+TEPP adopts **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** as the product model-family contract. TRSL-TM is the accepted-target estimator identity; it is not a claim that a production topic backend is already shipped on protected `main`.
+
+The reference family is a temporal/relational shared-latent STM-style estimator with logistic-normal document coordinates and posterior uncertainty (Roberts et al., 2014, 2019). Temporal topic identity over a modeled period follows the dynamic topic-model family (Blei & Lafferty, 2006): one global topic identity set may change in prevalence without silently becoming a new topic merely because a time slice was fitted independently. Alternative polylingual or neural/contextual backends are allowed only when they satisfy the same versioned evidence, temporal, relational, posterior, invariance, and interoperability contracts.
 
 For the first production line:
 
@@ -66,3 +68,11 @@ Required evidence includes known-truth topic/covariate/covariance recovery, bias
 ## Rollback and supersession
 
 Rollback selects the last validated model/backend contract and immutable model artifact. Supersede only with evidence that the new model family preserves or explicitly and deliberately changes the estimand, with corresponding PRD/ADR and migration updates.
+
+## References
+
+Blei, D. M., & Lafferty, J. D. (2006). Dynamic topic models. In *Proceedings of the 23rd International Conference on Machine Learning* (pp. 113–120). ACM. https://doi.org/10.1145/1143844.1143859
+
+Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02
+
+Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082. https://doi.org/10.1111/ajps.12103
