@@ -18,6 +18,34 @@ fn request<'a>(
     TlsBindRequest::new(host, 8443, scheme, certificate_pem, private_key_pem).expect("request")
 }
 
+fn decided_production(
+    host: &str,
+    scheme: &str,
+    certificate_pem: &str,
+    private_key_pem: &str,
+) -> BindDecision {
+    match TlsBindRequest::new(host, 8443, scheme, certificate_pem, private_key_pem) {
+        Err(_) => BindDecision::Refused,
+        Ok(request) => authorize_production_tls(&request)
+            .map(|authorized| authorized.decision())
+            .unwrap_or(BindDecision::Refused),
+    }
+}
+
+fn decided_orchestrator(
+    host: &str,
+    scheme: &str,
+    certificate_pem: &str,
+    private_key_pem: &str,
+) -> BindDecision {
+    match TlsBindRequest::new(host, 8443, scheme, certificate_pem, private_key_pem) {
+        Err(_) => BindDecision::Refused,
+        Ok(request) => authorize_orchestrator_live_port(&request)
+            .map(|authorized| authorized.decision())
+            .unwrap_or(BindDecision::Refused),
+    }
+}
+
 #[test]
 fn plaintext_production_and_table_access_hosts_fail_closed() {
     assert_eq!(
@@ -160,60 +188,78 @@ fn bind_request_debug_redacts_certificate_and_private_key_pem() {
     let debug = format!("{request:?}");
     assert!(
         !debug.contains(CERTIFICATE_PEM),
-        "certificate PEM must not appear in Debug: {debug}"
+        "certificate PEM must not appear in Debug"
     );
     assert!(
         !debug.contains(PRIVATE_KEY_PEM),
-        "private key PEM must not appear in Debug: {debug}"
+        "private key PEM must not appear in Debug"
     );
     assert!(
         !debug.contains("BEGIN CERTIFICATE"),
-        "certificate PEM header must not appear in Debug: {debug}"
+        "certificate PEM header must not appear in Debug"
     );
     assert!(
         !debug.contains("BEGIN PRIVATE KEY") && !debug.contains("BEGIN RSA PRIVATE KEY"),
-        "private key PEM header must not appear in Debug: {debug}"
+        "private key PEM header must not appear in Debug"
     );
-    assert!(
-        debug.contains("<redacted>"),
-        "PEM fields must be masked: {debug}"
-    );
+    assert!(debug.contains("<redacted>"), "PEM fields must be masked");
     assert!(
         debug.contains("203.0.113.10") && debug.contains("8443") && debug.contains("https"),
-        "non-secret bind fields must remain visible: {debug}"
+        "non-secret bind fields must remain visible"
     );
 }
 
 #[test]
 fn recovered_tls_decisions_match_known_truth_better_than_a_collapsed_grant() {
-    let truth = [
-        BindDecision::ProductionTls,
-        BindDecision::DevelopmentOnly,
-        BindDecision::Refused,
+    let cases = [
+        (
+            "203.0.113.10",
+            "https",
+            CERTIFICATE_PEM,
+            PRIVATE_KEY_PEM,
+            BindDecision::ProductionTls,
+        ),
+        ("localhost", "http", "", "", BindDecision::DevelopmentOnly),
+        (
+            "0.0.0.0",
+            "http",
+            CERTIFICATE_PEM,
+            PRIVATE_KEY_PEM,
+            BindDecision::Refused,
+        ),
+        (
+            "postgres.example",
+            "https",
+            CERTIFICATE_PEM,
+            PRIVATE_KEY_PEM,
+            BindDecision::Refused,
+        ),
+        ("198.51.100.8", "https", "", "", BindDecision::Refused),
     ];
-    let recovered = [
-        BindDecision::ProductionTls,
-        BindDecision::DevelopmentOnly,
-        BindDecision::Refused,
-    ];
-    let collapsed = [
-        BindDecision::ProductionTls,
-        BindDecision::ProductionTls,
-        BindDecision::ProductionTls,
-    ];
+    let truth: Vec<BindDecision> = cases
+        .iter()
+        .map(|(_, _, _, _, expected)| *expected)
+        .collect();
+    let recovered: Vec<BindDecision> = cases
+        .iter()
+        .map(|(host, scheme, certificate_pem, private_key_pem, _)| {
+            decided_production(host, scheme, certificate_pem, private_key_pem)
+        })
+        .collect();
+    assert_eq!(recovered, truth);
+    let collapsed = vec![BindDecision::ProductionTls; truth.len()];
     let recovered_rate = tls_policy_recovery_rate(&truth, &recovered).expect("recovered");
     let collapsed_rate = tls_policy_recovery_rate(&truth, &collapsed).expect("collapsed");
-    let expected = {
-        let mut matches = 0_u32;
-        for (truth_decision, decided_decision) in truth.iter().zip(recovered.iter()) {
-            if truth_decision == decided_decision {
-                matches += 1;
-            }
-        }
-        f64::from(matches) / f64::from(u32::try_from(truth.len()).expect("len"))
-    };
-    assert!((recovered_rate - expected).abs() < f64::EPSILON);
+    assert!((recovered_rate - 1.0).abs() < f64::EPSILON);
     assert!(recovered_rate > collapsed_rate);
+    assert_eq!(
+        decided_orchestrator("localhost", "http", "", ""),
+        BindDecision::Refused
+    );
+    assert_eq!(
+        decided_orchestrator("203.0.113.10", "https", CERTIFICATE_PEM, PRIVATE_KEY_PEM),
+        BindDecision::ProductionTls
+    );
     assert_eq!(
         tls_policy_recovery_rate(&truth, &truth[..2]),
         Err(TlsError::InvalidBindPayload)

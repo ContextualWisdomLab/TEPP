@@ -6,7 +6,8 @@
 TLS. Non-loopback binds require `https` and rustls PEM material. Loopback
 HTTP is development-only. An orchestrator live production port cannot be
 loopback plaintext. Table-access host labels fail closed. Recovery is the
-computed share of bind decisions that match known truth.
+computed share of `authorize_production_tls` and
+`authorize_orchestrator_live_port` decisions that match known truth.
 
 This slice does not terminate a public listener, issue certificates, or
 claim TLS deployment, CSAP, SOC 2, or legal sufficiency.
