@@ -1,4 +1,4 @@
-//! Predicted intervals stay hypothetical unless later-available evidence overlaps.
+//! Predicted intervals stay hypothetical unless later-available evidence covers them.
 
 use prediction_contradiction::{
     PredictionContradictionError, PromotionSupport, classify_promotion_support,
@@ -153,6 +153,8 @@ fn refuse_promotion_refuses_unmatched_predicted_mass() {
     let predicted = closed_event_interval(0, 10);
     let overlapping = closed_event_interval(5, 15);
     let contained = closed_event_interval(2, 8);
+    let started_by = closed_event_interval(0, 8);
+    let finished_by = closed_event_interval(2, 10);
     let (observed_available, knowledge_cutoff) = eligible_clocks();
     assert_eq!(
         refuse_promotion(
@@ -167,6 +169,24 @@ fn refuse_promotion_refuses_unmatched_predicted_mass() {
         refuse_promotion(
             &predicted,
             &contained,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionNotCoveredByObservation)
+    );
+    assert_eq!(
+        refuse_promotion(
+            &predicted,
+            &started_by,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionNotCoveredByObservation)
+    );
+    assert_eq!(
+        refuse_promotion(
+            &predicted,
+            &finished_by,
             observed_available,
             knowledge_cutoff
         ),
@@ -367,7 +387,7 @@ fn half_open_observed_interval_is_not_an_allen_input() {
 }
 
 #[test]
-fn known_allen_pairs_recover_coverage_and_contradiction_labels() {
+fn known_allen_pairs_agree_on_coverage_and_contradiction_labels() {
     let cases = [
         (
             closed_event_interval(0, 10),
