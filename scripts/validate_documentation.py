@@ -76,6 +76,30 @@ ADR_REQUIRED_HEADINGS = (
     "## Consequences",
     "## Verification",
 )
+STALE_COVERAGE_GATE_PARENTHETICAL = re.compile(
+    r"prediction_contradiction`? \(PR #\d+\)"
+)
+STALE_ACTIVE_PR_COVERAGE_GATE = re.compile(r"\*\*active-PR:\*\*\s*PR #\d+\b")
+STALE_LANDABLE_COVERAGE_GATE = re.compile(
+    r"landable coverage gate is PR #\d+\b",
+    re.IGNORECASE,
+)
+STALE_REFUSE_PROMOTION_DRAFT_AUTHORITY = re.compile(
+    r"refuse_promotion`? in PR #\d+ is the coverage authority"
+)
+STALE_MERGE_WEAK_DRAFTS = re.compile(r"merging the existing drafts")
+AUTHORITY_POINTER_FILES = (
+    "DOCUMENTATION.md",
+    "docs/DOCUMENTATION_ASSESSMENT.md",
+    "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md",
+    "docs/TRACEABILITY.md",
+    "docs/UML.md",
+    "docs/adr/0016-tdt-chronos-event-intelligence-boundary.md",
+    "CHANGELOG.md",
+    "ARCHITECTURE.md",
+    "README.md",
+    "docs/adr/README.md",
+)
 
 CANONICAL_LINKS = (
     "docs/product/prd-v0.4-approved.md",
@@ -117,6 +141,92 @@ def validate_required_files() -> None:
     missing = [path for path in REQUIRED_FILES if not (ROOT / path).is_file()]
     if missing:
         raise AssertionError(f"missing required documentation: {missing}")
+
+
+def _document_has_stale_coverage_authority(text: str) -> bool:
+    """Return whether one document names a superseded draft as the coverage gate."""
+
+    return bool(
+        STALE_COVERAGE_GATE_PARENTHETICAL.search(text)
+        or STALE_LANDABLE_COVERAGE_GATE.search(text)
+        or STALE_REFUSE_PROMOTION_DRAFT_AUTHORITY.search(text)
+    )
+
+
+def promotion_authority_failures(
+    documentation: str,
+    assessment: str,
+    hourly: str = "",
+    extra_documents: dict[str, str] | None = None,
+) -> list[str]:
+    """Return stale pointers that name a superseded draft as the coverage gate.
+
+    A pull-request number is not landable coverage authority. Canonical docs
+    and the hourly queue must name the `prediction_contradiction` crate, not
+    a draft such as #93, #94, #97, #101, or #102.
+    """
+
+    failures: list[str] = []
+    if _document_has_stale_coverage_authority(documentation):
+        failures.append(
+            "DOCUMENTATION.md names a superseded draft as the coverage-gate authority"
+        )
+    if STALE_ACTIVE_PR_COVERAGE_GATE.search(assessment) or (
+        _document_has_stale_coverage_authority(assessment)
+    ):
+        failures.append(
+            "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
+            "active-PR coverage gate"
+        )
+    if STALE_MERGE_WEAK_DRAFTS.search(hourly) or (
+        _document_has_stale_coverage_authority(hourly)
+    ):
+        failures.append(
+            "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md tells the "
+            "queue to merge superseded coverage drafts"
+        )
+    for path, text in (extra_documents or {}).items():
+        if _document_has_stale_coverage_authority(text) or (
+            STALE_ACTIVE_PR_COVERAGE_GATE.search(text)
+        ):
+            failures.append(
+                f"{path} names a superseded draft as the coverage-gate authority"
+            )
+    return failures
+
+
+def validate_promotion_authority_pointers() -> None:
+    """Refuse canonical docs that still treat a pull request as landable authority."""
+
+    missing = [
+        relative
+        for relative in AUTHORITY_POINTER_FILES
+        if not (ROOT / relative).is_file()
+    ]
+    if missing:
+        raise AssertionError(f"missing promotion-authority documents: {missing}")
+    texts = {
+        relative: (ROOT / relative).read_text(encoding="utf-8")
+        for relative in AUTHORITY_POINTER_FILES
+    }
+    extra_documents = {
+        path: text
+        for path, text in texts.items()
+        if path
+        not in {
+            "DOCUMENTATION.md",
+            "docs/DOCUMENTATION_ASSESSMENT.md",
+            "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md",
+        }
+    }
+    failures = promotion_authority_failures(
+        texts["DOCUMENTATION.md"],
+        texts["docs/DOCUMENTATION_ASSESSMENT.md"],
+        hourly=texts["docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md"],
+        extra_documents=extra_documents,
+    )
+    if failures:
+        raise AssertionError("\n".join(failures))
 
 
 def validate_documentation_map() -> None:
@@ -234,6 +344,7 @@ def main() -> None:
     """Run all deterministic documentation validation groups."""
 
     validate_required_files()
+    validate_promotion_authority_pointers()
     validate_documentation_map()
     validate_adr_graph()
     validate_markdown()

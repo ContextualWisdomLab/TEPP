@@ -36,7 +36,7 @@ flowchart LR
     INT --> ART
 ```
 
-On current protected main the workspace/evidence foundation, six-clock temporal values, Allen algebra/path-consistency, event ontology/membership, and PostgreSQL persistence through restore-integrity probes are implemented. The active-PR `prediction_contradiction` crate is the promotion-authority gate: call `refuse_promotion` before recording a forecast as observed fact. Remaining TDT/CHRONOS, topic, psychometric, and service boxes stay accepted-target.
+On current protected main the workspace/evidence foundation, six-clock temporal values, Allen algebra/path-consistency, event ontology/membership, and PostgreSQL persistence through restore-integrity probes are implemented. The active-PR `prediction_contradiction` crate is the promotion-authority gate: call `refuse_promotion` before authorizing promotion of unmatched predicted mass. Remaining TDT/CHRONOS, topic, psychometric, and service boxes stay accepted-target.
 
 ## Evidence-to-analysis sequence
 
