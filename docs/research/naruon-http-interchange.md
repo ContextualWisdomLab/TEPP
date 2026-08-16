@@ -12,17 +12,33 @@ contract evidence), not an RFC inference rule.
 
 A loopback-only live HTTP/1.1 listener (`NaruonLiveService`) now serves the
 same POST paths for local and standalone proof. It is not TLS termination and
-does not bind non-loopback addresses. Persistence remains TEPP-owned; naruon
-never migrates or queries TEPP application tables. Purpose-bound export
-disclosure and privacy-management readiness map to published privacy guidance
+does not bind non-loopback addresses. Live requests require a loopback `Host`,
+refuse `Transfer-Encoding` (Fielding & Reschke, 2014a) and
+`Proxy-Authorization` / NIM / NVIDIA header names (Fielding & Reschke, 2014b),
+parse `knowledge_cutoff` as RFC 3339 (Klyne & Newman, 2002), refuse
+later-available evidence, install a read/write stream deadline, and replay
+idempotency by tenant plus key. Persistence remains TEPP-owned; naruon never
+migrates or queries TEPP application tables. Purpose-bound export disclosure
+and privacy-management readiness map to published privacy guidance
 (ISO/IEC, 2019; National Institute of Standards and Technology, 2020) without
 claiming certification.
 
 ## Authority
 
-### External standards (HTTP and privacy claims only)
+### External standards (HTTP, time, and privacy claims only)
 
-Fielding, R. T., & Reschke, J. (Eds.). (2014). *Hypertext Transfer Protocol
+Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps*
+(RFC 3339). IETF. https://doi.org/10.17487/RFC3339
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014a). *Hypertext Transfer Protocol
+(HTTP/1.1): Message syntax and routing* (RFC 7230). IETF.
+https://doi.org/10.17487/RFC7230
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014b). *Hypertext Transfer Protocol
+(HTTP/1.1): Authentication* (RFC 7235). IETF.
+https://doi.org/10.17487/RFC7235
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014c). *Hypertext Transfer Protocol
 (HTTP/1.1): Semantics and content* (RFC 7231). IETF.
 https://doi.org/10.17487/RFC7231
 
@@ -52,4 +68,6 @@ https://doi.org/10.6028/NIST.CSWP.01162020
   idempotency key distinct from `principal_id` alone;
 - `tfidf` / `bm25` / `keyword` cannot claim TEPP inference;
 - loopback `NaruonLiveService` accepts valid POSTs and refuses non-loopback
-  binds, table-access hosts, credential headers, and conflicting idempotency.
+  binds, non-loopback `Host`, `Transfer-Encoding`, NIM/NVIDIA/proxy-authorization
+  headers, non-RFC 3339 cutoffs, later-available evidence, and conflicting
+  tenant-plus-key idempotency; export is proven over a real `TcpStream`.

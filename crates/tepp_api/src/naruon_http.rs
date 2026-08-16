@@ -46,8 +46,8 @@ pub fn naruon_analysis_run_exchange(
 /// # Errors
 ///
 /// Returns [`ApiError::AuthorizationDenied`] when an extra header names a
-/// review, Copilot, or bearer credential. Other failures match
-/// [`naruon_analysis_run_exchange`].
+/// review, Copilot, NIM/NVIDIA, proxy-authorization, or bearer credential.
+/// Other failures match [`naruon_analysis_run_exchange`].
 pub fn naruon_analysis_run_exchange_with_headers(
     origin: &str,
     request: &AnalysisRunRequest,
@@ -150,15 +150,18 @@ pub(crate) fn header_is_reserved_standard(name: &str) -> bool {
     )
 }
 
-/// Return whether `name` is a review, Copilot, or bearer credential header.
+/// Return whether `name` is a review, Copilot, NIM, or bearer credential header.
 pub(crate) fn header_is_credential(name: &str) -> bool {
     let lowered = name.to_ascii_lowercase();
     lowered == "authorization"
+        || lowered == "proxy-authorization"
         || lowered == "cookie"
         || lowered == "x-api-key"
         || lowered.contains("token")
         || lowered.contains("copilot")
         || lowered.contains("github")
+        || lowered.contains("nim")
+        || lowered.contains("nvidia")
 }
 
 fn refuse_credential_headers(extra_headers: &[(&str, &str)]) -> Result<(), ApiError> {
@@ -305,6 +308,18 @@ mod tests {
         );
         assert_eq!(
             refuse_credential_headers(&[("x-copilot-session", "t")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("Proxy-Authorization", "Basic x")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("x-nim-api-key", "k")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("X-NVIDIA-API-KEY", "k")]),
             Err(ApiError::AuthorizationDenied)
         );
     }

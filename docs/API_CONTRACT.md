@@ -110,7 +110,7 @@ TEPP owns its application/API state, authorized evidence, model runs, and artifa
 
 ### naruon
 
-`naruon` may submit evidence/analysis requests or consume versioned topic/event/psychometric artifacts. It must not treat lexical heuristics as TEPP topic inference and must not read TEPP database tables directly. HTTP interchange is `tepp_api::naruon_analysis_run_exchange` / `naruon_export_exchange` (`POST /v1/analysis-runs` and `/v1/exports` over `https` only). `NaruonLiveService` serves those POSTs on loopback HTTP/1.1 for local/standalone proof; it is not TLS termination and refuses non-loopback binds, table-access hosts, and credential headers. Detailed modular surfaces and failure modes are recorded in [`docs/connectors/naruon-artifact-consumer.md`](connectors/naruon-artifact-consumer.md).
+`naruon` may submit evidence/analysis requests or consume versioned topic/event/psychometric artifacts. It must not treat lexical heuristics as TEPP topic inference and must not read TEPP database tables directly. HTTP interchange is `tepp_api::naruon_analysis_run_exchange` / `naruon_export_exchange` (`POST /v1/analysis-runs` and `/v1/exports` over `https` only). `NaruonLiveService` serves those POSTs on loopback HTTP/1.1 for local/standalone proof; it is not TLS termination. Callers must send a loopback `Host`, an RFC 3339 `knowledge_cutoff`, and a tenant-scoped idempotency key. The listener refuses non-loopback binds, non-loopback hosts, `Transfer-Encoding`, NIM/NVIDIA/proxy-authorization headers, and later-available evidence. Detailed modular surfaces and failure modes are recorded in [`docs/connectors/naruon-artifact-consumer.md`](connectors/naruon-artifact-consumer.md).
 
 ### contextual-orchestrator
 

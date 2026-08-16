@@ -20,6 +20,17 @@ run may print the task contract without either credential.
 When a PR exists, normal review → repair → exact-head Checks → merge governance
 owns the hour. The scheduler does not create a competing branch.
 
+Current executable queue while drafts remain open:
+
+1. Land the coverage-authority pointer lock on PR #104. Keep #93, #94,
+   #97, #101, and #102 unmerged.
+2. This PR is the naruon live HTTP gate repair. Keep PR #87 draft: it
+   still accepts non-loopback `Host`, `Transfer-Encoding`, NIM/NVIDIA
+   headers, nonempty-string cutoffs, and undocumented timeout→413.
+3. After this lands: `text_segment` SQL on migration `0006` (PR #99),
+   then TLS bind recovery (PR #100). Do not open a competing naruon
+   live-HTTP PR.
+
 ## Required repository configuration
 
 Configure these repository or organization values:

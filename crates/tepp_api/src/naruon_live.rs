@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
+use std::time::Duration;
+
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 
 use crate::authorization::{
     AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
@@ -19,6 +22,9 @@ pub const NARUON_LIVE_HEADER_BYTE_LIMIT: usize = 8 * 1024;
 
 /// Maximum number of HTTP header lines on one live request.
 pub const NARUON_LIVE_HEADER_COUNT_LIMIT: usize = 32;
+
+/// Read/write deadline installed on every accepted live stream.
+pub const NARUON_LIVE_STREAM_DEADLINE: Duration = Duration::from_secs(2);
 
 /// HTTP/1.1 response produced by the naruon live listener.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -43,6 +49,7 @@ pub struct NaruonLiveService {
     next_run_serial: u64,
     next_request_serial: u64,
     accepted_runs: HashMap<String, (AnalysisRunRequest, AnalysisRunAccepted)>,
+    accepted_exports: HashMap<String, (ExportAuthorizationRequest, String)>,
 }
 
 impl Default for NaruonLiveService {
@@ -61,6 +68,7 @@ impl NaruonLiveService {
             next_run_serial: 1,
             next_request_serial: 1,
             accepted_runs: HashMap::new(),
+            accepted_exports: HashMap::new(),
         }
     }
 
@@ -121,13 +129,16 @@ impl NaruonLiveService {
     /// # Errors
     ///
     /// Returns [`ApiError::InvalidWirePayload`] or [`ApiError::LimitExceeded`]
-    /// when accept or response writing fails. Request-protocol failures become
-    /// HTTP error responses and are returned as `Ok`.
+    /// when accept, deadline install, or response writing fails.
+    /// Request-protocol failures become HTTP error responses and are returned
+    /// as `Ok`. Timeouts map to [`ApiError::LimitExceeded`] because
+    /// [`NARUON_LIVE_STREAM_DEADLINE`] is installed on the accepted stream.
     pub fn serve_accepted(
         &mut self,
         accepted: Result<TcpStream, std::io::Error>,
     ) -> Result<NaruonLiveResponse, ApiError> {
         let mut stream = accepted.map_err(|error| map_io_error(&error))?;
+        install_stream_deadline(&stream)?;
         let response = match Self::read_http_request(&mut stream) {
             Ok(request) => self.handle_http_request(&request),
             Err(error) => self.response_from_error(error),
@@ -226,7 +237,7 @@ impl NaruonLiveService {
         if path == NARUON_ANALYSIS_RUN_PATH {
             self.accept_analysis_run(headers, body)
         } else {
-            Self::authorize_export(headers, body)
+            self.authorize_export(headers, body)
         }
     }
 
@@ -236,11 +247,13 @@ impl NaruonLiveService {
         body: &str,
     ) -> Result<NaruonLiveResponse, ApiError> {
         let request = AnalysisRunRequest::from_json(body)?;
+        require_live_cutoff(&request, headers)?;
         let idempotency_key = header_value(headers, "idempotency-key")?;
         if idempotency_key != request.idempotency_key {
             return Err(ApiError::InvalidWirePayload);
         }
-        if let Some((stored_request, stored_accepted)) = self.accepted_runs.get(idempotency_key) {
+        let replay = replay_key(&request.tenant_workspace_id, idempotency_key);
+        if let Some((stored_request, stored_accepted)) = self.accepted_runs.get(&replay) {
             if requests_are_idempotent_matches(stored_request, &request) {
                 return Ok(NaruonLiveResponse::json(
                     202,
@@ -255,12 +268,12 @@ impl NaruonLiveService {
         let accepted =
             AnalysisRunAccepted::new(run_id, "accepted", request.idempotency_key.clone())?;
         let body = accepted.to_json()?;
-        self.accepted_runs
-            .insert(idempotency_key.to_owned(), (request, accepted));
+        self.accepted_runs.insert(replay, (request, accepted));
         Ok(NaruonLiveResponse::json(202, "Accepted", body))
     }
 
     fn authorize_export(
+        &mut self,
         headers: &HashMap<String, String>,
         body: &str,
     ) -> Result<NaruonLiveResponse, ApiError> {
@@ -272,9 +285,19 @@ impl NaruonLiveService {
         if request.purpose != AnalyticalPurpose::ModularServiceConsumer {
             return Err(ApiError::AuthorizationDenied);
         }
+        let replay = replay_key(&request.tenant_workspace_id, idempotency_key);
+        if let Some((stored_request, stored_body)) = self.accepted_exports.get(&replay) {
+            if stored_request == &request {
+                return Ok(NaruonLiveResponse::json(200, "OK", stored_body.clone()));
+            }
+            return Err(ApiError::InvalidWirePayload);
+        }
         let decision = authorize_export(&request)?;
         require_export_allowed(&decision)?;
-        Ok(NaruonLiveResponse::json(200, "OK", to_json(&decision)?))
+        let body = to_json(&decision)?;
+        self.accepted_exports
+            .insert(replay, (request, body.clone()));
+        Ok(NaruonLiveResponse::json(200, "OK", body))
     }
 
     fn response_from_error(&mut self, error: ApiError) -> NaruonLiveResponse {
@@ -426,9 +449,12 @@ fn refuse_live_headers(headers: &HashMap<String, String>) -> Result<(), ApiError
         if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);
         }
+        if name == "transfer-encoding" {
+            return Err(ApiError::InvalidWirePayload);
+        }
     }
     let host = header_value(headers, "host")?;
-    if host_implies_table_access(host) {
+    if host_implies_table_access(host) || !host_is_loopback(host) {
         return Err(ApiError::InvalidWirePayload);
     }
     if header_value(headers, "content-type")? != "application/json" {
@@ -452,6 +478,58 @@ fn header_value<'a>(headers: &'a HashMap<String, String>, name: &str) -> Result<
     Ok(value.as_str())
 }
 
+fn install_stream_deadline(stream: &TcpStream) -> Result<(), ApiError> {
+    install_timeout(stream.set_read_timeout(Some(NARUON_LIVE_STREAM_DEADLINE)))?;
+    install_timeout(stream.set_write_timeout(Some(NARUON_LIVE_STREAM_DEADLINE)))
+}
+
+fn install_timeout(result: Result<(), std::io::Error>) -> Result<(), ApiError> {
+    result.map_err(|error| map_io_error(&error))
+}
+
+fn replay_key(tenant_workspace_id: &str, idempotency_key: &str) -> String {
+    format!("{tenant_workspace_id}\u{1f}{idempotency_key}")
+}
+
+fn require_live_cutoff(
+    request: &AnalysisRunRequest,
+    headers: &HashMap<String, String>,
+) -> Result<(), ApiError> {
+    let cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| ApiError::InvalidWirePayload)?;
+    match headers.get("tepp-available-time") {
+        None => Ok(()),
+        Some(available_raw) if available_raw.is_empty() => Err(ApiError::InvalidWirePayload),
+        Some(available_raw) => {
+            let available = AvailableTime::parse_rfc3339(available_raw)
+                .map_err(|_| ApiError::InvalidWirePayload)?;
+            if available.instant() > cutoff.instant() {
+                Err(ApiError::InvalidWirePayload)
+            } else {
+                Ok(())
+            }
+        }
+    }
+}
+
+fn host_is_loopback(host: &str) -> bool {
+    let hostname = hostname_without_port(host);
+    if hostname.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    hostname.parse::<IpAddr>().is_ok_and(|ip| ip.is_loopback())
+}
+
+fn hostname_without_port(host: &str) -> &str {
+    if let Some(rest) = host.strip_prefix('[') {
+        return rest.split_once(']').map_or(host, |(inside, _)| inside);
+    }
+    if host.bytes().filter(|byte| *byte == b':').count() == 1 {
+        return host.rsplit_once(':').map_or(host, |(name, _)| name);
+    }
+    host
+}
+
 fn host_implies_table_access(host: &str) -> bool {
     let lowered = host.to_ascii_lowercase();
     lowered.contains("postgres")
@@ -469,10 +547,14 @@ fn host_implies_table_access(host: &str) -> bool {
 mod tests {
     use super::{
         NaruonLiveService, declared_content_length, envelope_json, fallback_envelope_json,
-        host_implies_table_access, map_io_error, parse_request_line, split_header_line,
+        host_implies_table_access, host_is_loopback, hostname_without_port, install_timeout,
+        map_io_error, parse_request_line, replay_key, require_live_cutoff, split_header_line,
         split_request, status_for,
     };
+    use crate::AnalysisRunRequest;
     use crate::ApiError;
+    use crate::analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
+    use std::collections::HashMap;
     use std::io::ErrorKind;
 
     #[test]
@@ -515,6 +597,60 @@ mod tests {
         assert!(host_implies_table_access("bad\\host"));
         assert!(host_implies_table_access("bad\u{0001}host"));
         assert!(!host_implies_table_access("127.0.0.1:43789"));
+        assert!(host_is_loopback("127.0.0.1"));
+        assert!(host_is_loopback("127.0.0.1:43789"));
+        assert!(host_is_loopback("localhost"));
+        assert!(host_is_loopback("LOCALHOST:80"));
+        assert!(host_is_loopback("[::1]"));
+        assert!(host_is_loopback("[::1]:8080"));
+        assert!(host_is_loopback("::1"));
+        assert!(!host_is_loopback("example.com"));
+        assert!(!host_is_loopback("8.8.8.8"));
+        assert!(!host_is_loopback("0.0.0.0"));
+        assert!(!host_is_loopback("localhost.evil.test"));
+        assert_eq!(hostname_without_port("127.0.0.1:9"), "127.0.0.1");
+        assert_eq!(hostname_without_port("[::1]:9"), "::1");
+        assert_eq!(hostname_without_port("[::1"), "[::1");
+        assert_eq!(install_timeout(Ok(())), Ok(()));
+        assert_eq!(
+            install_timeout(Err(std::io::Error::other("timeout install"))),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            install_timeout(Err(std::io::Error::new(ErrorKind::TimedOut, "t"))),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(replay_key("tenant-a", "key"), replay_key("tenant-a", "key"));
+        assert_ne!(replay_key("tenant-a", "key"), replay_key("tenant-b", "key"));
+        let mut cutoff_headers = HashMap::new();
+        let valid_run = AnalysisRunRequest {
+            contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
+            idempotency_key: "idem".into(),
+            tenant_workspace_id: "tenant".into(),
+            snapshot_id: "snap".into(),
+            knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            model_contract_version: "m".into(),
+            output_profile: "o".into(),
+        };
+        require_live_cutoff(&valid_run, &cutoff_headers).expect("no available header");
+        cutoff_headers.insert("tepp-available-time".into(), String::new());
+        assert_eq!(
+            require_live_cutoff(&valid_run, &cutoff_headers),
+            Err(ApiError::InvalidWirePayload)
+        );
+        cutoff_headers.insert("tepp-available-time".into(), "not-rfc3339".into());
+        assert_eq!(
+            require_live_cutoff(&valid_run, &cutoff_headers),
+            Err(ApiError::InvalidWirePayload)
+        );
+        cutoff_headers.insert("tepp-available-time".into(), "2026-07-01T00:00:00Z".into());
+        require_live_cutoff(&valid_run, &cutoff_headers).expect("earlier available");
+        let mut bad_cutoff = valid_run.clone();
+        bad_cutoff.knowledge_cutoff = "k".into();
+        assert_eq!(
+            require_live_cutoff(&bad_cutoff, &HashMap::new()),
+            Err(ApiError::InvalidWirePayload)
+        );
     }
 
     #[test]

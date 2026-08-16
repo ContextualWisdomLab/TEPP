@@ -116,6 +116,20 @@ National Institute of Standards and Technology. (n.d.). *AI risk management fram
 
 TEPP uses these sources as management/risk/readiness inputs, not as self-certification authority. ISO/IEC 42001:2023 and ISO/IEC 23894:2023 are published international standards (International Organization for Standardization, 2023a, 2023b). NIST AI RMF 1.0 remains the published framework while NIST is preparing a revision (Tabassi, 2023; National Institute of Standards and Technology, n.d.); the repository tracks the revision but does not silently treat an unpublished successor as normative. AICPA Trust Services Criteria are readiness inputs rather than self-issued attestation (American Institute of Certified Public Accountants, 2023). KISA currently describes CSAP service types as IaaS, SaaS, and DaaS and grades as high, medium, and low, while noting that the high and medium grades await later implementation (한국인터넷진흥원, n.d.). CSAP and SOC 2 evidence depend on actual deployment/organization controls and independent assessment.
 
+## HTTP interchange and Internet timestamps
+
+Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). IETF. https://doi.org/10.17487/RFC3339
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014a). *Hypertext Transfer Protocol (HTTP/1.1): Message syntax and routing* (RFC 7230). IETF. https://doi.org/10.17487/RFC7230
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014b). *Hypertext Transfer Protocol (HTTP/1.1): Authentication* (RFC 7235). IETF. https://doi.org/10.17487/RFC7235
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014c). *Hypertext Transfer Protocol (HTTP/1.1): Semantics and content* (RFC 7231). IETF. https://doi.org/10.17487/RFC7231
+
+Nottingham, M. (2022). *HTTP Semantics* (RFC 9110). IETF. https://doi.org/10.17487/RFC9110
+
+TEPP live naruon interchange uses RFC 3339 for `knowledge_cutoff` / availability eligibility and HTTP/1.1 host, transfer-coding, and proxy-authentication refusal on the loopback listener (Klyne & Newman, 2002; Fielding & Reschke, 2014a, 2014b, 2014c). RFC 9110 remains the current HTTP semantics snapshot for later production TLS work (Nottingham, 2022).
+
 ## Security, accessibility, and software supply chain
 
 World Wide Web Consortium. (2023). *Web content accessibility guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/

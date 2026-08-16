@@ -37,10 +37,13 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 
 - unknown wire fields → reject;
 - unsupported contract version → reject;
-- knowledge cutoff / availability violations → reject in TEPP domain crates;
+- knowledge cutoff / availability violations → reject on the live listener
+  (RFC 3339 cutoff plus optional `tepp-available-time`) and in TEPP domain crates;
 - authorization deny → `authorization_denied` envelope without policy leakage;
 - `postgres` / `jdbc` / `/sql` / `/tables/` or non-`https` origins → reject;
-- review, Copilot, or bearer credential headers → reject;
+- non-loopback `Host` or `Transfer-Encoding` on the live listener → reject;
+- review, Copilot, NIM/NVIDIA, proxy-authorization, or bearer credential
+  headers → reject;
 - redefinition of reserved headers (`content-type`, `tepp-consumer`,
   `tepp-contract-version`, `idempotency-key`) via extra headers → reject;
 - export interchange without a nonempty per-export idempotency key → reject;

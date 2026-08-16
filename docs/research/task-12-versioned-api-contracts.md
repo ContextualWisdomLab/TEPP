@@ -16,7 +16,13 @@ Loopback live HTTP/1.1 routing for naruon analysis-run and export POSTs is imple
 
 ## Authoritative sources
 
-Fielding, R. T., & Reschke, J. (Eds.). (2014). *Hypertext Transfer Protocol (HTTP/1.1): Semantics and content* (RFC 7231). IETF. https://doi.org/10.17487/RFC7231
+Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). IETF. https://doi.org/10.17487/RFC3339
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014a). *Hypertext Transfer Protocol (HTTP/1.1): Message syntax and routing* (RFC 7230). IETF. https://doi.org/10.17487/RFC7230
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014b). *Hypertext Transfer Protocol (HTTP/1.1): Authentication* (RFC 7235). IETF. https://doi.org/10.17487/RFC7235
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014c). *Hypertext Transfer Protocol (HTTP/1.1): Semantics and content* (RFC 7231). IETF. https://doi.org/10.17487/RFC7231
 
 Nottingham, M. (2022). *HTTP Semantics* (RFC 9110). IETF. https://doi.org/10.17487/RFC9110
 

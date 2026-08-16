@@ -9,6 +9,9 @@
 //! export paths; table-access URLs, review/Copilot headers, and lexical
 //! inference claims fail closed (ADR 0011). A loopback-only live HTTP/1.1
 //! listener serves those POSTs without TLS termination or table access.
+//! Live requests require a loopback `Host`, refuse `Transfer-Encoding` and
+//! NIM/NVIDIA/proxy-authorization headers, parse `knowledge_cutoff` as
+//! RFC 3339, and install a read/write stream deadline.
 
 mod analysis_run;
 mod authorization;
@@ -72,6 +75,8 @@ pub use naruon_http::naruon_may_claim_tepp_inference;
 pub use naruon_live::NARUON_LIVE_HEADER_BYTE_LIMIT;
 /// Maximum live HTTP header count.
 pub use naruon_live::NARUON_LIVE_HEADER_COUNT_LIMIT;
+/// Read/write deadline installed on each accepted live stream.
+pub use naruon_live::NARUON_LIVE_STREAM_DEADLINE;
 /// Loopback live HTTP/1.1 response.
 pub use naruon_live::NaruonLiveResponse;
 /// Loopback live HTTP/1.1 naruon listener.
