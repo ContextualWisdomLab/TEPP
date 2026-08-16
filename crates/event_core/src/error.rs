@@ -20,6 +20,10 @@ pub enum EventError {
     UnsupportedWireVersion,
     /// An unknown event-role name was supplied.
     UnknownEventRole,
+    /// A CHRONOS occurrence prediction was treated as an event instance.
+    PredictionIsNotEventInstance,
+    /// An unknown occurrence-truth label was supplied.
+    UnknownOccurrenceTruth,
 }
 
 impl fmt::Display for EventError {
@@ -32,6 +36,8 @@ impl fmt::Display for EventError {
             Self::InvalidWirePayload => "invalid event wire payload",
             Self::UnsupportedWireVersion => "unsupported event wire version",
             Self::UnknownEventRole => "unknown event role",
+            Self::PredictionIsNotEventInstance => "CHRONOS prediction is not an event instance",
+            Self::UnknownOccurrenceTruth => "unknown occurrence truth label",
         };
         formatter.write_str(message)
     }
@@ -65,6 +71,14 @@ mod tests {
                 "unsupported event wire version",
             ),
             (EventError::UnknownEventRole, "unknown event role"),
+            (
+                EventError::PredictionIsNotEventInstance,
+                "CHRONOS prediction is not an event instance",
+            ),
+            (
+                EventError::UnknownOccurrenceTruth,
+                "unknown occurrence truth label",
+            ),
         ] {
             assert_eq!(error.to_string(), message);
         }
