@@ -6,7 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
-- `operational_log` source separation: operational lines record an action code, opaque analytical subject, and system time; raw source text, source identity, and blanket PII masking fail closed; replayed lines match known truth at a higher computed rate than a collapsed single-action log (ADR 0009).
+- `operational_log` source separation: operational lines record an action code, opaque analytical subject, and system time; raw source text, source identity, and blanket PII masking fail closed; replayed lines match known truth at a higher computed rate than a collapsed single-action log (ADR 0009). The live docstring crate-root count is bound to `EXPECTED_CRATES` so the eleventh crate cannot fail a hard-coded `10`.
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
 - `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).
