@@ -96,6 +96,8 @@ Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World 
 
 TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
 
+Jensen, C. S., & Snodgrass, R. T. (1996). Semantics of time-varying information. *Information Systems, 21*(4), 311–352. https://doi.org/10.1016/0306-4379(96)00017-8 Valid time versus transaction/system time informs `document_clocks`; assertion time and document time remain additional TEPP clocks and cannot be omitted or replaced by event or system time.
+
 ## AI risk, management systems, and assurance readiness
 
 International Organization for Standardization. (2023a). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
