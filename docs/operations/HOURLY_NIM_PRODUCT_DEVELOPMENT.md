@@ -29,8 +29,8 @@ Current executable queue while drafts remain open:
    PR #102 unmerged: #93/#94 still accept unmatched predicted mass from
    `refuse_promotion`, #97 still names PR #94 as a landable authority
    pointer, and #101/#102 still name a draft as the landable gate.
-2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #105;
-   keep PR #87 unmerged),
+2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #107;
+   keep PR #87 and PR #105 unmerged),
    `text_segment` SQL contracts on existing migration `0006`, retention and
    legal-hold migration `0007` (PR #45), foundation known-truth recovery
    study, then CHRONOS forecast Brier calibration (PR #85).
