@@ -63,8 +63,11 @@ fn successful_reidentification_appends_redacted_audit_evidence_before_disclosure
     assert_eq!(audit.decision_time(), "2026-06-15T12:00:00Z");
     assert_eq!(audit.outcome(), ReidentificationAuditOutcome::Allowed);
     assert_eq!(audit.outcome().wire_name(), "allowed");
-    assert!(audit.decision_digest().starts_with("sha256:"));
-    assert_eq!(audit.decision_digest().len(), 71);
+    assert_eq!(
+        audit.decision_digest(),
+        "sha256:1a3b774ae989b971cd6ba7f4a38697e94a532ce29cff7c0a8e0d8d2a73f45ded",
+        "published FIPS 180-4 SHA-256 test vector for the v1 length-delimited decision encoding"
+    );
     assert!(!format!("{audit:?}").contains("Pat Lee"));
     assert!(!format!("{audit:?}").contains("pat.lee@example.test"));
 }

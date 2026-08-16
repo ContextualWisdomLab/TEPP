@@ -495,10 +495,10 @@ fn is_rfc3339_utc(value: &str) -> bool {
 mod tests {
     use super::{
         DisclosedIdentityMapping, IdentityMappingRecord, MinimizedProviderPayload,
-        ProviderDisclosureLog, ProviderEvidenceOffer, PurposeGrant, ReidentificationAuditRecord,
-        ReidentificationAuditSink,
+        ProviderDisclosureLog, ProviderEvidenceOffer, PurposeGrant, ReidentificationAuditOutcome,
+        ReidentificationAuditRecord, ReidentificationAuditSink,
         disclose_identity_mapping as disclose_identity_mapping_with_audit, is_rfc3339_utc,
-        minimize_provider_payload,
+        minimize_provider_payload, reidentification_decision_digest,
     };
     use crate::ApiError;
     use crate::authorization::AnalyticalPurpose;
@@ -772,5 +772,27 @@ mod tests {
             included_identity_mapping: false,
         };
         assert!(!log.included_identity_mapping());
+    }
+
+    #[test]
+    fn audit_digest_binds_outcome_when_other_canonical_fields_are_held_fixed() {
+        let allowed = reidentification_decision_digest(
+            &grant(AnalyticalPurpose::ScientificValidation, true),
+            &mapping(),
+            "2026-06-15T12:00:00Z",
+            ReidentificationAuditOutcome::Allowed,
+        )
+        .expect("allowed digest");
+        let denied = reidentification_decision_digest(
+            &grant(AnalyticalPurpose::ScientificValidation, true),
+            &mapping(),
+            "2026-06-15T12:00:00Z",
+            ReidentificationAuditOutcome::Denied,
+        )
+        .expect("denied digest");
+        assert_ne!(
+            allowed, denied,
+            "outcome wire name must change the digest when grant, mapping, and time stay fixed"
+        );
     }
 }
