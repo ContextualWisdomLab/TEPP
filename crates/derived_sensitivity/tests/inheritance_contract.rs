@@ -58,6 +58,18 @@ fn inherited_classes_match_known_truth_better_than_a_public_collapse() {
 }
 
 #[test]
+fn unknown_derived_kind_codes_fail_closed() {
+    assert_eq!(
+        inherit_sensitivity(SensitivityClass::Restricted, 99),
+        Err(DerivedSensitivityError::InvalidSensitivityPayload)
+    );
+    assert_eq!(
+        inherit_sensitivity(SensitivityClass::Internal, 0),
+        Err(DerivedSensitivityError::InvalidSensitivityPayload)
+    );
+}
+
+#[test]
 fn empty_or_mismatched_sensitivity_payloads_fail_closed() {
     assert_eq!(
         sensitivity_recovery_rate(&[], &[]),

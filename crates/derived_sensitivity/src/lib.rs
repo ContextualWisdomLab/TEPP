@@ -4,14 +4,20 @@
 //! Derived outputs inherit source sensitivity.
 //!
 //! Topic, factor, and relation artifacts are not public merely because they
-//! are derived. They inherit the source sensitivity class, and blanket PII
-//! masking is not a declassification grant (ADR 0009).
+//! are derived. They inherit the source sensitivity class. Unknown kind codes
+//! fail closed. Blanket PII masking is not a declassification grant (ADR 0009).
 
 mod classification;
 mod error;
 
 /// One derived topic, factor, or relation artifact with inherited sensitivity.
 pub use classification::DerivedArtifact;
+/// Closed derived-artifact kind: factor score or loading.
+pub use classification::KIND_FACTOR;
+/// Closed derived-artifact kind: relation or graph edge.
+pub use classification::KIND_RELATION;
+/// Closed derived-artifact kind: topic proportion or topic identity.
+pub use classification::KIND_TOPIC;
 /// Closed sensitivity vocabulary for source and derived artifacts.
 pub use classification::SensitivityClass;
 /// Inherit the source sensitivity class onto a derived artifact.

@@ -2,6 +2,13 @@
 
 use crate::DerivedSensitivityError;
 
+/// Closed derived-artifact kind: topic proportion or topic identity.
+pub const KIND_TOPIC: u16 = 1;
+/// Closed derived-artifact kind: factor score or loading.
+pub const KIND_FACTOR: u16 = 2;
+/// Closed derived-artifact kind: relation or graph edge.
+pub const KIND_RELATION: u16 = 3;
+
 /// Closed sensitivity vocabulary for source and derived artifacts.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SensitivityClass {
@@ -47,16 +54,15 @@ impl DerivedArtifact {
 ///
 /// # Errors
 ///
-/// Returns [`DerivedSensitivityError::DerivationIsNotDeclassification`] when
-/// the source class is not public and a caller would treat derivation as a
-/// public default. This function never upgrades Restricted or Internal to
-/// Public.
+/// Returns [`DerivedSensitivityError::InvalidSensitivityPayload`] when
+/// `kind_code` is not topic, factor, or relation. This function never
+/// upgrades Restricted or Internal to Public.
 pub fn inherit_sensitivity(
     source_class: SensitivityClass,
     kind_code: u16,
 ) -> Result<DerivedArtifact, DerivedSensitivityError> {
-    if matches!(source_class, SensitivityClass::Public) {
-        return Ok(DerivedArtifact::new(kind_code, SensitivityClass::Public));
+    if !matches!(kind_code, KIND_TOPIC | KIND_FACTOR | KIND_RELATION) {
+        return Err(DerivedSensitivityError::InvalidSensitivityPayload);
     }
     Ok(DerivedArtifact::new(kind_code, source_class))
 }
@@ -110,19 +116,27 @@ pub fn sensitivity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        DerivedArtifact, SensitivityClass, inherit_sensitivity,
-        refuse_blanket_mask_as_declassification, refuse_derivation_as_public,
+        DerivedArtifact, KIND_FACTOR, KIND_RELATION, KIND_TOPIC, SensitivityClass,
+        inherit_sensitivity, refuse_blanket_mask_as_declassification, refuse_derivation_as_public,
         sensitivity_recovery_rate,
     };
     use crate::DerivedSensitivityError;
 
     #[test]
     fn local_branches_cover_inherit_and_fail_closed_paths() {
-        let restricted = inherit_sensitivity(SensitivityClass::Restricted, 1).expect("restricted");
-        assert_eq!(restricted.kind_code(), 1);
+        let restricted =
+            inherit_sensitivity(SensitivityClass::Restricted, KIND_TOPIC).expect("restricted");
+        assert_eq!(restricted.kind_code(), KIND_TOPIC);
         assert_eq!(restricted.source_class(), SensitivityClass::Restricted);
-        let public = inherit_sensitivity(SensitivityClass::Public, 2).expect("public");
+        let public = inherit_sensitivity(SensitivityClass::Public, KIND_FACTOR).expect("public");
         assert_eq!(public.source_class(), SensitivityClass::Public);
+        let internal =
+            inherit_sensitivity(SensitivityClass::Internal, KIND_RELATION).expect("internal");
+        assert_eq!(internal.source_class(), SensitivityClass::Internal);
+        assert_eq!(
+            inherit_sensitivity(SensitivityClass::Restricted, 99),
+            Err(DerivedSensitivityError::InvalidSensitivityPayload)
+        );
         refuse_derivation_as_public(SensitivityClass::Public).expect("already public");
         assert_eq!(
             refuse_derivation_as_public(SensitivityClass::Internal),

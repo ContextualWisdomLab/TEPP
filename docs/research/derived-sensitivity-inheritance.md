@@ -3,7 +3,8 @@
 ## Scope
 
 `derived_sensitivity` keeps topic, factor, and relation artifacts in the
-source sensitivity class. Derivation is not declassification to public.
+source sensitivity class. Unknown kind codes fail closed. Derivation is
+not declassification to public.
 Blanket PII masking is not a declassification grant. Recovery is the
 computed share of inherited classes that match known truth.
 
