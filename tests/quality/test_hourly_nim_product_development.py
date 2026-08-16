@@ -229,7 +229,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         self.assertIn("Do not configure `COPILOT_GITHUB_TOKEN`", runbook)
 
     def test_hourly_queue_keeps_weaker_coverage_locks_unmerged(self) -> None:
-        """A runner must not treat #104 or #108 as the landable coverage gate."""
+        """A runner must not treat #104, #108, #109, or #111 as the landable gate."""
 
         runbook = _text(RUNBOOK)
         unmerged_sentences = [
@@ -238,7 +238,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             if "unmerged" in sentence.casefold()
         ]
         joined = " ".join(unmerged_sentences)
-        for pull_request in (93, 94, 97, 101, 102, 104, 108):
+        for pull_request in (93, 94, 97, 101, 102, 104, 108, 109, 111):
             with self.subTest(pull_request=pull_request):
                 self.assertIn(f"PR #{pull_request}", joined)
         self.assertIn("PR #107", runbook)

@@ -26,11 +26,12 @@ Current executable queue while drafts remain open:
    (`prediction_contradiction` / the coverage-authority landing PR).
    `refuse_promotion` requires coverage. Canonical docs name the crate,
    not a superseded draft. Keep PR #93, PR #94, PR #97, PR #101,
-   PR #102, PR #104, and PR #108 unmerged: #93/#94 still accept unmatched
-   predicted mass from `refuse_promotion`, #97 still names PR #94 as a
-   landable authority pointer, #101/#102 still name a draft as the
-   landable gate, #104 omits later citation-repair drafts from the
-   unmerged set, and #108 still treats #104 as landable.
+   PR #102, PR #104, PR #108, PR #109, and PR #111 unmerged: #93/#94
+   still accept unmatched predicted mass from `refuse_promotion`, #97
+   still names PR #94 as a landable authority pointer, #101/#102 still
+   name a draft as the landable gate, #104 omits later citation-repair
+   drafts from the unmerged set, #108 still treats #104 as landable,
+   #109 still omits #108, and #111 still omits the naruon PR #107 lock.
 2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #107;
    keep PR #87 and PR #105 unmerged),
    `text_segment` SQL contracts on existing migration `0006`, retention and
@@ -39,7 +40,7 @@ Current executable queue while drafts remain open:
 3. Do not open a competing hourly proposal until the open-PR inventory is
    empty. Prefer reviewing, repairing, and merging the coverage-authority
    landing PR. Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104,
-   and PR #108 unmerged.
+   PR #108, PR #109, and PR #111 unmerged.
 
 ## Required repository configuration
 

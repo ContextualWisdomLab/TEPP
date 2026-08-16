@@ -89,7 +89,7 @@ STALE_REFUSE_PROMOTION_DRAFT_AUTHORITY = re.compile(
 )
 STALE_MERGE_WEAK_DRAFTS = re.compile(r"merging the existing drafts")
 UNMERGED_QUEUE_SENTENCE = re.compile(r"[^.]*unmerged[^.]*", re.IGNORECASE)
-REQUIRED_UNMERGED_COVERAGE_DRAFTS = (93, 94, 97, 101, 102, 104, 108)
+REQUIRED_UNMERGED_COVERAGE_DRAFTS = (93, 94, 97, 101, 102, 104, 108, 109, 111)
 AUTHORITY_POINTER_FILES = (
     "DOCUMENTATION.md",
     "docs/DOCUMENTATION_ASSESSMENT.md",
@@ -206,7 +206,7 @@ def promotion_authority_failures(
 
     A pull-request number is not landable coverage authority. Canonical docs
     and the hourly queue must name the `prediction_contradiction` crate, not
-    a draft such as #93, #94, #97, #101, #102, #104, or #108.
+    a draft such as #93, #94, #97, #101, #102, #104, #108, #109, or #111.
     """
 
     failures: list[str] = []

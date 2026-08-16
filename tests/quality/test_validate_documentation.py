@@ -233,15 +233,16 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
         )
 
     def test_hourly_unmerged_set_omitting_later_drafts_fails(self) -> None:
-        """#104 and #108 must appear in Keep-unmerged sentences, not only #101/#102."""
+        """#104, #108, #109, and #111 must appear in Keep-unmerged sentences."""
 
         self.assertEqual(
             documentation.promotion_authority_failures(
                 "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
                 "- **active-PR:** `prediction_contradiction` Allen coverage gate",
                 hourly=(
-                    "Keep PR #93, PR #94, PR #97, PR #101, and PR #102 unmerged. "
-                    "naruon live HTTP loopback (PR #107; keep PR #87 and PR #105 unmerged)"
+                    "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, and "
+                    "PR #108 unmerged. naruon live HTTP loopback (PR #107; "
+                    "keep PR #87 and PR #105 unmerged)"
                 ),
             ),
             [
@@ -258,9 +259,9 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
                 "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
                 "- **active-PR:** `prediction_contradiction` Allen coverage gate",
                 hourly=(
-                    "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, and "
-                    "PR #108 unmerged. naruon live HTTP loopback (PR #105; "
-                    "keep PR #87 unmerged)"
+                    "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, "
+                    "PR #108, PR #109, and PR #111 unmerged. naruon live HTTP "
+                    "loopback (PR #105; keep PR #87 unmerged)"
                 ),
             ),
             [
@@ -282,9 +283,10 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             "refuse_promotion requires observed coverage."
         )
         current_hourly = (
-            "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, and "
-            "PR #108 unmerged. Prefer merging the coverage-authority landing PR. "
-            "naruon live HTTP loopback (PR #107; keep PR #87 and PR #105 unmerged)"
+            "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, "
+            "PR #108, PR #109, and PR #111 unmerged. Prefer merging the "
+            "coverage-authority landing PR. naruon live HTTP loopback "
+            "(PR #107; keep PR #87 and PR #105 unmerged)"
         )
         self.assertEqual(
             documentation.promotion_authority_failures(
