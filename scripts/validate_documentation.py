@@ -77,6 +77,48 @@ ADR_REQUIRED_HEADINGS = (
     "## Verification",
 )
 
+STALE_COVERAGE_GATE_PARENTHETICAL = re.compile(
+    r"prediction_contradiction` \(PR #9[347]\)"
+)
+STALE_ACTIVE_PR_COVERAGE_GATE = re.compile(r"\*\*active-PR:\*\*\s*PR #9[347]\b")
+STALE_LANDABLE_COVERAGE_GATE = re.compile(
+    r"landable coverage gate is PR #9[347]\b"
+)
+
+
+def promotion_authority_failures(documentation: str, assessment: str) -> list[str]:
+    """Return stale pointers that name a superseded draft as the coverage gate.
+
+    PR #93 and PR #94 still expose a `refuse_promotion` path that accepts
+    unmatched predicted mass. PR #97 still names PR #94 as the landable
+    authority. Canonical docs must name the crate, not those drafts.
+    """
+
+    failures: list[str] = []
+    if STALE_COVERAGE_GATE_PARENTHETICAL.search(
+        documentation
+    ) or STALE_LANDABLE_COVERAGE_GATE.search(documentation):
+        failures.append(
+            "DOCUMENTATION.md names a superseded draft as the coverage-gate authority"
+        )
+    if STALE_ACTIVE_PR_COVERAGE_GATE.search(assessment):
+        failures.append(
+            "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
+            "active-PR coverage gate"
+        )
+    return failures
+
+
+def validate_promotion_authority_pointers() -> None:
+    """Refuse canonical docs that treat PR #93, #94, or #97 as landable authority."""
+
+    documentation = (ROOT / "DOCUMENTATION.md").read_text(encoding="utf-8")
+    assessment = (ROOT / "docs/DOCUMENTATION_ASSESSMENT.md").read_text(encoding="utf-8")
+    failures = promotion_authority_failures(documentation, assessment)
+    if failures:
+        raise AssertionError("\n".join(failures))
+
+
 CANONICAL_LINKS = (
     "docs/product/prd-v0.4-approved.md",
     "docs/DOCUMENTATION_ASSESSMENT.md",
@@ -234,6 +276,7 @@ def main() -> None:
     """Run all deterministic documentation validation groups."""
 
     validate_required_files()
+    validate_promotion_authority_pointers()
     validate_documentation_map()
     validate_adr_graph()
     validate_markdown()
