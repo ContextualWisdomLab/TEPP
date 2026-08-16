@@ -23,17 +23,18 @@ owns the hour. The scheduler does not create a competing branch.
 Current executable queue while drafts remain open:
 
 1. Merge the predicted-versus-observed Allen coverage gate
-   (`prediction_contradiction` / this PR). `refuse_promotion` requires
-   coverage. Canonical docs name the crate, not a superseded draft.
-   Keep PR #93, PR #94, and PR #97 draft: #93/#94 still accept unmatched
-   predicted mass from `refuse_promotion`, and #97 still names PR #94 as
-   the landable authority.
+   (`prediction_contradiction` / the coverage-authority landing PR).
+   `refuse_promotion` requires coverage. Canonical docs name the crate,
+   not a superseded draft. Keep PR #93, PR #94, and PR #97 unmerged:
+   #93/#94 still accept unmatched predicted mass from `refuse_promotion`,
+   and #97 still names PR #94 as a landable authority pointer.
 2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #87),
    `text_segment` SQL contracts on existing migration `0006`, retention and
    legal-hold migration `0007` (PR #45), foundation known-truth recovery
    study, then CHRONOS forecast Brier calibration (PR #85).
 3. Do not open a competing hourly proposal until the open-PR inventory is
-   empty. Prefer reviewing, repairing, and merging the existing drafts.
+   empty. Prefer reviewing, repairing, and merging the coverage-authority
+   landing PR. Keep PR #93, PR #94, and PR #97 unmerged.
 
 ## Required repository configuration
 

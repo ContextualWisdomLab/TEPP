@@ -78,6 +78,98 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             ],
         )
 
+    def test_stale_pr97_pointers_fail_closed(self) -> None:
+        """The #97 pointer-repair draft is also not landable authority."""
+
+        stale_documentation = (
+            "The active-PR coverage gate in `prediction_contradiction` (PR #97) "
+            "requires observed Allen coverage."
+        )
+        stale_assessment = (
+            "- **active-PR:** PR #97 `prediction_contradiction` Allen coverage gate"
+        )
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                stale_documentation, stale_assessment
+            ),
+            [
+                "DOCUMENTATION.md names a superseded draft as the coverage-gate authority",
+                "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
+                "active-PR coverage gate",
+            ],
+        )
+
+    def test_parenthetical_without_backtick_fails(self) -> None:
+        """A missing markdown fence must not hide a draft authority pointer."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The landable gate is prediction_contradiction (PR #94).",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+            ),
+            [
+                "DOCUMENTATION.md names a superseded draft as the coverage-gate authority"
+            ],
+        )
+
+    def test_landable_and_refuse_promotion_authority_sentences_fail(self) -> None:
+        """Plain-language authority sentences are rejected even without markdown."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The landable coverage gate is PR #94.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+            ),
+            [
+                "DOCUMENTATION.md names a superseded draft as the coverage-gate authority"
+            ],
+        )
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "`refuse_promotion` in PR #94 is the coverage authority.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+            ),
+            [
+                "DOCUMENTATION.md names a superseded draft as the coverage-gate authority"
+            ],
+        )
+
+    def test_hourly_merge_existing_drafts_fails(self) -> None:
+        """The queue must not treat #93/#94/#97 as mergeable drafts."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                hourly=(
+                    "Prefer reviewing, repairing, and merging the existing drafts."
+                ),
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md tells the "
+                "queue to merge superseded coverage drafts"
+            ],
+        )
+
+    def test_extra_canonical_files_are_scanned(self) -> None:
+        """ADR, TRACEABILITY, and UML cannot rename a draft as the gate."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                extra_documents={
+                    "docs/TRACEABILITY.md": (
+                        "The landable coverage gate is PR #94."
+                    )
+                },
+            ),
+            [
+                "docs/TRACEABILITY.md names a superseded draft as the "
+                "coverage-gate authority"
+            ],
+        )
+
     def test_crate_named_authority_and_draft_lineage_pass(self) -> None:
         """Naming the crate, and mentioning drafts as non-landable, is allowed."""
 
@@ -90,9 +182,15 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             "- **active-PR:** `prediction_contradiction` Allen coverage gate; "
             "refuse_promotion requires observed coverage."
         )
+        current_hourly = (
+            "Keep PR #93, PR #94, and PR #97 unmerged. Prefer merging the "
+            "coverage-authority landing PR."
+        )
         self.assertEqual(
             documentation.promotion_authority_failures(
-                current_documentation, current_assessment
+                current_documentation,
+                current_assessment,
+                hourly=current_hourly,
             ),
             [],
         )
@@ -101,6 +199,58 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
         """Current canonical files pass the coverage-authority pointer contract."""
 
         documentation.validate_promotion_authority_pointers()
+
+    def test_assessment_parenthetical_and_hourly_parenthetical_fail(self) -> None:
+        """Assessment and hourly files fail on parenthetical draft pointers too."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "gate in `prediction_contradiction` (PR #94) requires coverage",
+            ),
+            [
+                "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
+                "active-PR coverage gate"
+            ],
+        )
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                hourly="gate in `prediction_contradiction` (PR #93) requires coverage",
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md tells the "
+                "queue to merge superseded coverage drafts"
+            ],
+        )
+
+    def test_extra_file_active_pr_pointer_fails(self) -> None:
+        """An extra canonical file with an active-PR draft pointer is rejected."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                extra_documents={
+                    "docs/UML.md": "- **active-PR:** PR #97 `prediction_contradiction`"
+                },
+            ),
+            [
+                "docs/UML.md names a superseded draft as the coverage-gate authority"
+            ],
+        )
+
+    def test_validate_promotion_authority_pointers_raises_on_missing_files(
+        self,
+    ) -> None:
+        """File-backed validation fail-closes when an authority document is absent."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            with mock.patch.object(documentation, "ROOT", Path(temporary)):
+                with self.assertRaises(AssertionError) as raised:
+                    documentation.validate_promotion_authority_pointers()
+        self.assertIn("missing promotion-authority documents", str(raised.exception))
 
     def test_validate_promotion_authority_pointers_raises_on_stale_files(
         self,
@@ -113,12 +263,21 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
                 "gate in `prediction_contradiction` (PR #94) requires coverage\n",
                 encoding="utf-8",
             )
-            assessment = root / "docs" / "DOCUMENTATION_ASSESSMENT.md"
-            assessment.parent.mkdir(parents=True)
-            assessment.write_text(
-                "- **active-PR:** PR #94 `prediction_contradiction`\n",
-                encoding="utf-8",
-            )
+            for relative in (
+                "docs/DOCUMENTATION_ASSESSMENT.md",
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md",
+                "docs/TRACEABILITY.md",
+                "docs/UML.md",
+                "docs/adr/0016-tdt-chronos-event-intelligence-boundary.md",
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "- **active-PR:** PR #94 `prediction_contradiction`\n"
+                    if relative.endswith("DOCUMENTATION_ASSESSMENT.md")
+                    else "crate-named coverage gate\n",
+                    encoding="utf-8",
+                )
             with mock.patch.object(documentation, "ROOT", root):
                 with self.assertRaises(AssertionError) as raised:
                     documentation.validate_promotion_authority_pointers()

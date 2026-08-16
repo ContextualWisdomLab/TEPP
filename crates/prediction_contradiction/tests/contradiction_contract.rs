@@ -1,4 +1,5 @@
-//! Predicted intervals stay hypothetical unless later-available evidence overlaps.
+//! Predicted intervals stay hypothetical unless later-available evidence covers
+//! every predicted instant (Allen during, starts, finishes, or equals).
 
 use prediction_contradiction::{
     PredictionContradictionError, PromotionSupport, classify_promotion_support,

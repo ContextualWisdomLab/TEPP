@@ -89,8 +89,8 @@ pub fn intervals_contradict(
 ///
 /// Success means the pair is not Allen `before` / `after` and is not merely
 /// adjacent. Partial overlap still leaves unmatched predicted mass. Call
-/// [`refuse_promotion`] or [`require_observed_coverage`] before recording a
-/// forecast as observed fact.
+/// [`refuse_promotion`] or [`require_observed_coverage`] before authorizing
+/// promotion of unmatched predicted mass.
 ///
 /// This function classifies intervals with
 /// [`temporal_core::classify_interval_relation`]. It does not run the
