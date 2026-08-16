@@ -822,12 +822,64 @@ mod tests {
             membership_role: None,
         };
         assert_eq!(payload.artifact_id(), "a");
+        assert_eq!(payload.opaque_analytical_id(), "e");
+        assert!(payload.membership_role().is_none());
         let log = ProviderDisclosureLog {
             purpose: "scientific_validation".into(),
             included_source_text: false,
             included_identity_mapping: false,
         };
         assert!(!log.included_identity_mapping());
+
+        // Short-circuit false arm of `reidentification_authorized` when cover,
+        // tenant, and scientific purpose already hold.
+        assert_eq!(
+            disclose(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &mapping(),
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+
+        // Open-ended grant (`valid_to: None`) exercises `if let Some` false arms
+        // in both `validate_grant` and `grant_covers`.
+        let open_ended = PurposeGrant {
+            valid_to: None,
+            ..grant(AnalyticalPurpose::ScientificValidation, false)
+        };
+        let open_min = minimize_provider_payload(&open_ended, &offer(None), "2026-06-15T12:00:00Z")
+            .expect("open-ended minimize");
+        assert_eq!(open_min.0.artifact_id(), "artifact-1");
+        assert_eq!(open_min.0.opaque_analytical_id(), "entity-1");
+        assert!(open_min.0.membership_role().is_none());
+
+        // Deny-path audit with open-ended grant and elevated flag false still
+        // appends before AuthorizationDenied (RecordingAuditSink mono).
+        assert_eq!(
+            disclose(
+                &PurposeGrant {
+                    valid_to: None,
+                    ..grant(AnalyticalPurpose::ScientificValidation, false)
+                },
+                &mapping(),
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+
+        // FailingSink mono: exercise deny path so append runs with allowed=false
+        // (still fails at sink; keeps mono instantiations exercised).
+        let mut failing = FailingSink;
+        assert_eq!(
+            disclose_identity_mapping_with_audit(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &mapping(),
+                "2026-06-15T12:00:00Z",
+                &mut failing,
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
     }
 
     #[test]
