@@ -80,4 +80,4 @@ Ordinary logs contain identifiers/digests sufficient for diagnosis without copyi
 
 ## 10. Privacy validation
 
-Required tests include cross-tenant denial, expired-purpose denial, re-identification-boundary checks, export authorization, provider payload minimization, raw-source log absence, deletion/retention behavior, audit replay, and derived-sensitive-data classification. Privacy controls must be tested with realistic author/customer/project/multiple-membership cases rather than only anonymous fixtures.
+Required tests include cross-tenant denial, expired-purpose denial, re-identification-boundary checks, export authorization, provider payload minimization, raw-source log absence, deletion/retention behavior, audit replay, and derived-sensitive-data classification. Privacy controls must be tested with realistic author/customer/project/multiple-membership cases rather than only anonymous fixtures. The in-memory `privileged_access` crate is the current audit-replay gate; persistence and encryption of the log remain accepted-target.

@@ -96,6 +96,12 @@ Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World 
 
 TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
 
+## Privacy, privileged access, and audit replay
+
+International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011). Accountability informs `privileged_access` replay; it is not a certification claim.
+
+International Organization for Standardization and International Electrotechnical Commission. (2022). *Information security, cybersecurity and privacy protection—Information security controls* (ISO/IEC Standard No. 27002:2022). Privileged-access rights and logging are operational controls, not authorization to store source identity in the audit artifact.
+
 ## AI risk, management systems, and assurance readiness
 
 International Organization for Standardization. (2023a). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
