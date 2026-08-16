@@ -42,6 +42,8 @@ pub enum PersistenceError {
     ConcurrentWriteConflict,
     /// A restored snapshot failed integrity revalidation and is not usable.
     RestoreIntegrityFailed,
+    /// A text segment had a negative or inverted UTF-8 byte span.
+    InvalidTextSegment,
 }
 
 impl fmt::Display for PersistenceError {
@@ -65,6 +67,7 @@ impl fmt::Display for PersistenceError {
             Self::InvalidAuditEvent => "invalid audit event",
             Self::ConcurrentWriteConflict => "concurrent write conflict",
             Self::RestoreIntegrityFailed => "restore integrity failed",
+            Self::InvalidTextSegment => "invalid text segment",
         };
         formatter.write_str(message)
     }
@@ -196,6 +199,10 @@ mod tests {
         assert_eq!(
             PersistenceError::RestoreIntegrityFailed.to_string(),
             "restore integrity failed"
+        );
+        assert_eq!(
+            PersistenceError::InvalidTextSegment.to_string(),
+            "invalid text segment"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),

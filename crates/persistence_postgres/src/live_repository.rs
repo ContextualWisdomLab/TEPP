@@ -29,9 +29,13 @@ use crate::model_run_sql::{
 };
 use crate::relation_sql::{EventRelationRecord, insert_event_relation_sql};
 use crate::restore_integrity::restore_integrity_probe_sqls;
+use crate::segment_sql::{
+    TextSegmentRecord, insert_text_segment_sql, select_text_segment_by_id_sql,
+    select_text_segments_for_document_as_of_sql,
+};
 use crate::sql_session::{SqlSession, apply_sql_batch};
 use crate::{MigrationContractError, PersistenceError};
-use temporal_core::{EventTime, SystemTime};
+use temporal_core::{EventTime, KnowledgeCutoff, SystemTime};
 use uuid::Uuid;
 
 /// Fail-closed live document/audit repository backed by [`SqlSession`].
@@ -293,6 +297,46 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
+    /// Insert an exact-span text segment under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns inverted/negative span validation or transport failures.
+    pub fn insert_text_segment(
+        &mut self,
+        record: &TextSegmentRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_text_segment_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up one text segment by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_text_segment_by_id(
+        &mut self,
+        text_segment_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_text_segment_by_id_sql(text_segment_id);
+        self.session.execute(&sql)
+    }
+
+    /// Look up cutoff-eligible text segments for one document identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_text_segments_for_document_as_of(
+        &mut self,
+        document_record_id: Uuid,
+        knowledge_cutoff: &KnowledgeCutoff,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_text_segments_for_document_as_of_sql(document_record_id, knowledge_cutoff);
+        self.session.execute(&sql)
+    }
+
     /// Insert a bitemporal event-instance version.
     ///
     /// # Errors
@@ -407,9 +451,10 @@ mod tests {
     use crate::migration::MigrationCatalog;
     use crate::model_run_sql::{CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord};
     use crate::relation_sql::EventRelationRecord;
+    use crate::segment_sql::TextSegmentRecord;
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};
-    use temporal_core::{AvailableTime, EventTime, SystemTime};
+    use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff, SystemTime};
 
     fn sample_record() -> DocumentRecord {
         DocumentRecord {
@@ -551,6 +596,36 @@ mod tests {
                 .executed()
                 .iter()
                 .any(|sql| sql.contains("INSERT INTO event_relation"))
+        );
+    }
+
+    fn exercise_text_segment(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let segment = TextSegmentRecord {
+            text_segment_id: uuid::Uuid::from_u128(7),
+            tenant_record_id: uuid::Uuid::nil(),
+            document_record_id: uuid::Uuid::from_u128(11),
+            start_byte: 0,
+            end_byte: 5,
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        };
+        repo.insert_text_segment(&segment).expect("segment insert");
+        repo.submit_text_segment_by_id(segment.text_segment_id)
+            .expect("segment by id");
+        let cutoff = KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff");
+        repo.submit_text_segments_for_document_as_of(segment.document_record_id, &cutoff)
+            .expect("segments as of");
+        let mut inverted = segment.clone();
+        inverted.end_byte = 0;
+        assert_eq!(
+            repo.insert_text_segment(&inverted),
+            Err(PersistenceError::InvalidTextSegment)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO text_segment"))
         );
     }
 
@@ -709,6 +784,7 @@ mod tests {
         exercise_membership_assignment(&mut repo);
         exercise_event_relation(&mut repo);
         exercise_event_mention(&mut repo);
+        exercise_text_segment(&mut repo);
         exercise_event_instance(&mut repo);
         exercise_source_artifact(&mut repo);
 

@@ -20,6 +20,13 @@ run may print the task contract without either credential.
 When a PR exists, normal review → repair → exact-head Checks → merge governance
 owns the hour. The scheduler does not create a competing branch.
 
+Current preferred next gap after the open-PR queue drains: persist the
+accepted ERD `document_record` foreign key on `text_segment` once `#45`
+releases migration `0007`. Do not allocate that number from another lane.
+Until then, land `#90` (production TLS bind policy), `#97` (prediction
+coverage gate), and `#45` (retention/`0007`) rather than opening a fourth
+writer for the same tables.
+
 ## Required repository configuration
 
 Configure these repository or organization values:
