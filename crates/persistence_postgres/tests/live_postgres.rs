@@ -12,7 +12,8 @@ use persistence_postgres::{
     MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
     PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord, SqlSession,
     apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
-    require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
+    require_live_sqlx_config, reset_app_runtime_role_sql, select_active_analysis_document_sql,
+    set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -672,6 +673,17 @@ fn prove_tombstone_blocks_restore_and_analysis(
         .execute(&eligibility)
         .expect("tombstoned evidence must be analysis-ineligible");
     repo.submit_active_analysis_document(unheld_document_id)
+        .expect("active-analysis select must remain executable");
+    let exclusion = format!(
+        "DO $tepp$ BEGIN \
+           IF EXISTS ({select}) THEN \
+             RAISE EXCEPTION 'active-analysis select returned a tombstoned document'; \
+           END IF; \
+         END $tepp$",
+        select = select_active_analysis_document_sql(unheld_document_id),
+    );
+    repo.session_mut()
+        .execute(&exclusion)
         .expect("active-analysis select must exclude tombstones");
 }
 
