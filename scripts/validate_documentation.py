@@ -154,17 +154,15 @@ def _document_has_stale_coverage_authority(text: str) -> bool:
 
 
 def _hourly_omits_weaker_coverage_lock(hourly: str) -> bool:
-    """Return whether hourly lists superseded drafts but omits the weaker #104 lock."""
+    """Return whether hourly lists superseded drafts but omits a weaker lock."""
 
     if not hourly:
         return False
     lists_superseded_lineage = all(
         f"PR #{number}" in hourly for number in (93, 94, 97, 101, 102)
     )
-    return (
-        lists_superseded_lineage
-        and "unmerged" in hourly
-        and "PR #104" not in hourly
+    return lists_superseded_lineage and "unmerged" in hourly and any(
+        f"PR #{number}" not in hourly for number in (104, 108, 109)
     )
 
 
@@ -178,8 +176,9 @@ def promotion_authority_failures(
 
     A pull-request number is not landable coverage authority. Canonical docs
     and the hourly queue must name the `prediction_contradiction` crate, not
-    a draft such as #93, #94, #97, #101, #102, or the weaker file-set lock
-    on #104.
+    a draft such as #93, #94, #97, #101, #102, the weaker file-set lock on
+    #104, the citation-repair lock on #108 that still omits #104, or #109
+    that still omits #108.
     """
 
     failures: list[str] = []
