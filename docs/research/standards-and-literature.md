@@ -104,6 +104,10 @@ National Institute of Standards and Technology. (2020). *NIST privacy framework:
 
 TEPP uses these sources, together with the AICPA Trust Services Criteria cited below, as readiness inputs for purpose-bound retention, deletion, and legal hold. They are not self-certification authority. Persistence migration `0007` records policy, hold, deletion requests, and evidence tombstones; it does not assert that a deployment is lawful under GDPR Article 17 or attested under SOC 2.
 
+## Privacy and derived-data sensitivity
+
+International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011). Use limitation and data minimization apply to derived topic, factor, and relation artifacts in `derived_sensitivity`; they are not a certification claim.
+
 ## AI risk, management systems, and assurance readiness
 
 International Organization for Standardization. (2023a). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
