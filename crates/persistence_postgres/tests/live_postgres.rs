@@ -577,19 +577,24 @@ fn prove_hold_blocks_completed_deletion(
         system_time: system,
         available_time: available,
     };
-    assert!(
-        repo.insert_completed_deletion_request(&held_completion, std::slice::from_ref(hold))
-            .is_err(),
+    assert_eq!(
+        repo.insert_completed_deletion_request(
+            &held_completion,
+            policy,
+            std::slice::from_ref(hold)
+        ),
+        Err(PersistenceError::LegalHoldBlocksDeletion),
         "application layer must refuse completed deletion under an active hold"
     );
-    assert!(
-        repo.insert_deletion_request(&held_completion).is_err(),
+    assert_eq!(
+        repo.insert_deletion_request(&held_completion, policy),
+        Err(PersistenceError::LegalHoldBlocksDeletion),
         "database trigger must refuse completed deletion under an active hold"
     );
     held_completion.deletion_request_id = Uuid::now_v7();
     held_completion.request_status_code = "blocked_by_hold".into();
     held_completion.legal_hold_id = Some(hold.legal_hold_id);
-    repo.insert_deletion_request(&held_completion)
+    repo.insert_deletion_request(&held_completion, policy)
         .expect("blocked_by_hold request must persist");
 }
 
@@ -636,7 +641,7 @@ fn prove_tombstone_blocks_restore_and_analysis(
         system_time: system,
         available_time: available,
     };
-    repo.insert_completed_deletion_request(&completed, &[])
+    repo.insert_completed_deletion_request(&completed, policy, &[])
         .expect("completed deletion without a matching hold");
 
     let tombstone = EvidenceTombstoneRecord {
@@ -666,7 +671,7 @@ fn prove_tombstone_blocks_restore_and_analysis(
     );
 
     let eligibility = format!(
-        "DO $tepp$ BEGIN            IF EXISTS (             SELECT 1 FROM document_record              WHERE document_record_id = '{unheld_document_id}'::uuid                AND system_to IS NULL                AND NOT EXISTS (                 SELECT 1 FROM evidence_tombstone                  WHERE tombstoned_document_id = document_record.document_record_id               )           ) THEN              RAISE EXCEPTION 'tombstoned document remained analysis-eligible';            END IF;            IF EXISTS (             SELECT 1 FROM evidence_tombstone              WHERE evidence_tombstone_id = '{tombstone}'::uuid                AND reproduction_status_code = 'available'           ) THEN              RAISE EXCEPTION 'deleted raw source claimed available reproduction';            END IF;          END $tepp$",
+        "DO $tepp$ BEGIN            IF EXISTS (             SELECT 1 FROM document_record              WHERE document_record_id = '{unheld_document_id}'::uuid                AND system_to IS NULL                AND NOT EXISTS (                 SELECT 1 FROM evidence_tombstone                  WHERE tombstoned_document_id = document_record.document_record_id                    AND deletion_kind_code IN ('logical_revocation', 'identity_tombstone')               )           ) THEN              RAISE EXCEPTION 'tombstoned document remained analysis-eligible';            END IF;            IF EXISTS (             SELECT 1 FROM evidence_tombstone              WHERE evidence_tombstone_id = '{tombstone}'::uuid                AND reproduction_status_code <> 'unavailable'           ) THEN              RAISE EXCEPTION 'identity tombstone must record unavailable reproduction';            END IF;          END $tepp$",
         tombstone = tombstone.evidence_tombstone_id,
     );
     repo.session_mut()

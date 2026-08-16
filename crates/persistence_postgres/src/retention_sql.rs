@@ -196,6 +196,28 @@ impl DeletionRequestRecord {
         validate_vocab(&self.deletion_kind_code, &DELETION_KINDS)?;
         validate_vocab(&self.request_status_code, &REQUEST_STATUSES)
     }
+
+    /// Bind this request to the cited retention policy's tenant, class, and purpose.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PersistenceError::InvalidRetentionLifecycle`] when vocabulary
+    /// fails or the request tenant, policy identity, data class, or purpose
+    /// does not match the cited policy.
+    pub fn bind_cited_policy(
+        &self,
+        policy: &RetentionPolicyRecord,
+    ) -> Result<(), PersistenceError> {
+        self.validate()?;
+        if self.retention_policy_id != policy.retention_policy_id
+            || self.tenant_record_id != policy.tenant_record_id
+            || self.target_data_class_code != policy.data_class_code
+            || self.processing_purpose_code != policy.processing_purpose_code
+        {
+            return Err(PersistenceError::InvalidRetentionLifecycle);
+        }
+        Ok(())
+    }
 }
 
 /// Append-only tombstone that records deletion without raw source text.
@@ -432,7 +454,11 @@ pub fn insert_evidence_tombstone_sql(
     ))
 }
 
-/// Render selection SQL that excludes tombstoned or revoked documents.
+/// Render selection SQL that excludes revoked or identity-tombstoned documents.
+///
+/// A `cache_export_removal` tombstone or completed request does not drop the
+/// document from active analysis; only `logical_revocation` and
+/// `identity_tombstone` kinds remove analysis eligibility.
 #[must_use]
 pub fn select_active_analysis_document_sql(document_record_id: Uuid) -> String {
     format!(
@@ -441,7 +467,8 @@ pub fn select_active_analysis_document_sql(document_record_id: Uuid) -> String {
            AND system_to IS NULL \
            AND NOT EXISTS (\
                 SELECT 1 FROM evidence_tombstone \
-                WHERE tombstoned_document_id = document_record.document_record_id\
+                WHERE tombstoned_document_id = document_record.document_record_id \
+                  AND deletion_kind_code IN ('logical_revocation', 'identity_tombstone')\
            ) \
            AND NOT EXISTS (\
                 SELECT 1 FROM deletion_request \
@@ -450,6 +477,20 @@ pub fn select_active_analysis_document_sql(document_record_id: Uuid) -> String {
                   AND deletion_kind_code IN ('logical_revocation', 'identity_tombstone')\
            )"
     )
+}
+
+/// Map a lifecycle SQL failure message onto a typed persistence error.
+///
+/// Trigger text `legal hold blocks deletion` is
+/// [`PersistenceError::LegalHoldBlocksDeletion`]. Other messages stay
+/// unmapped so the transport can fail closed as a generic execution error.
+#[must_use]
+pub fn classify_lifecycle_sql_failure(message: &str) -> Option<PersistenceError> {
+    if message.contains("legal hold blocks deletion") {
+        Some(PersistenceError::LegalHoldBlocksDeletion)
+    } else {
+        None
+    }
 }
 
 fn render_deletion_request_sql(record: &DeletionRequestRecord) -> String {
@@ -529,9 +570,9 @@ fn validate_sha256_hex(value: &str) -> Result<(), PersistenceError> {
 mod tests {
     use super::{
         DeletionRequestRecord, EvidenceTombstoneRecord, LegalHoldRecord, RetentionPolicyRecord,
-        insert_completed_deletion_request_sql, insert_deletion_request_sql,
-        insert_evidence_tombstone_sql, insert_legal_hold_sql, insert_retention_policy_sql,
-        release_legal_hold_sql, select_active_analysis_document_sql,
+        classify_lifecycle_sql_failure, insert_completed_deletion_request_sql,
+        insert_deletion_request_sql, insert_evidence_tombstone_sql, insert_legal_hold_sql,
+        insert_retention_policy_sql, release_legal_hold_sql, select_active_analysis_document_sql,
         supersede_retention_policy_sql,
     };
     use crate::PersistenceError;
@@ -686,6 +727,57 @@ mod tests {
         let lookup = select_active_analysis_document_sql(Uuid::from_u128(3));
         assert!(lookup.contains("evidence_tombstone"));
         assert!(lookup.contains("logical_revocation"));
+        let tombstone_clause = lookup
+            .split("FROM evidence_tombstone")
+            .nth(1)
+            .expect("tombstone exclusion");
+        assert!(
+            tombstone_clause
+                .contains("deletion_kind_code IN ('logical_revocation', 'identity_tombstone')"),
+            "cache_export_removal tombstones must stay analysis-eligible"
+        );
+    }
+
+    #[test]
+    fn deletion_request_must_match_cited_retention_policy() {
+        assert_eq!(request().bind_cited_policy(&policy()), Ok(()));
+
+        let mut mismatched_purpose = request();
+        mismatched_purpose.processing_purpose_code = "export_fulfillment".into();
+        assert_eq!(
+            mismatched_purpose.bind_cited_policy(&policy()),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut mismatched_class = request();
+        mismatched_class.target_data_class_code = "export_cache".into();
+        assert_eq!(
+            mismatched_class.bind_cited_policy(&policy()),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut mismatched_tenant = request();
+        mismatched_tenant.tenant_record_id = Uuid::from_u128(9);
+        assert_eq!(
+            mismatched_tenant.bind_cited_policy(&policy()),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+
+        let mut mismatched_policy_id = request();
+        mismatched_policy_id.retention_policy_id = Uuid::from_u128(11);
+        assert_eq!(
+            mismatched_policy_id.bind_cited_policy(&policy()),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+    }
+
+    #[test]
+    fn lifecycle_sql_message_maps_legal_hold_block() {
+        assert_eq!(
+            classify_lifecycle_sql_failure("ERROR: legal hold blocks deletion"),
+            Some(PersistenceError::LegalHoldBlocksDeletion)
+        );
+        assert_eq!(classify_lifecycle_sql_failure("sql execution failed"), None);
     }
 
     #[test]

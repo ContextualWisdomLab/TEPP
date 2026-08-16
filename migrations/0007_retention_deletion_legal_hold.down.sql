@@ -18,6 +18,7 @@ BEGIN
     END IF;
     IF to_regclass('public.deletion_request') IS NOT NULL THEN
         DROP TRIGGER IF EXISTS deletion_request_reject_held_deletion ON public.deletion_request;
+        DROP TRIGGER IF EXISTS deletion_request_guard_policy ON public.deletion_request;
         DROP TRIGGER IF EXISTS deletion_request_reject_mutation ON public.deletion_request;
     END IF;
     IF to_regclass('public.evidence_tombstone') IS NOT NULL THEN
@@ -59,5 +60,6 @@ DROP FUNCTION IF EXISTS enforce_retention_policy_succession();
 DROP FUNCTION IF EXISTS enforce_legal_hold_release();
 DROP FUNCTION IF EXISTS reject_tombstoned_evidence_restore();
 DROP FUNCTION IF EXISTS reject_held_evidence_deletion();
+DROP FUNCTION IF EXISTS guard_deletion_request_policy();
 DROP FUNCTION IF EXISTS guard_legal_hold_insert();
 DROP FUNCTION IF EXISTS guard_evidence_tombstone_insert();

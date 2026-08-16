@@ -21,7 +21,8 @@
 //! state usable until tenant, digest, cutoff, temporal windows, and append-only
 //! triggers revalidate. Retention, deletion, and legal-hold SQL (migration
 //! `0007`) records policy-driven lifecycle without restoring tombstoned
-//! evidence or completing a deletion under an active hold.
+//! evidence or completing a deletion under an active hold. Analysis exclusion
+//! is kind-aligned, and deletion requests bind to the cited policy.
 
 mod artifact_sql;
 mod concurrent_write;
@@ -175,6 +176,8 @@ pub use retention_sql::EvidenceTombstoneRecord;
 pub use retention_sql::LegalHoldRecord;
 /// Tenant-scoped retention policy row.
 pub use retention_sql::RetentionPolicyRecord;
+/// Map a lifecycle SQL failure message onto a typed persistence error.
+pub use retention_sql::classify_lifecycle_sql_failure;
 /// Render insert SQL for a completed deletion after hold evaluation.
 pub use retention_sql::insert_completed_deletion_request_sql;
 /// Render insert SQL for a validated deletion request.

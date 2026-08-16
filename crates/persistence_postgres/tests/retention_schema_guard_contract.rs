@@ -67,6 +67,24 @@ fn tombstone_insert_is_bound_to_its_completed_deletion_request() {
 }
 
 #[test]
+fn deletion_request_insert_is_bound_to_cited_retention_policy() {
+    for required_sql in [
+        "CREATE OR REPLACE FUNCTION guard_deletion_request_policy",
+        "CREATE TRIGGER deletion_request_guard_policy",
+        "BEFORE INSERT ON deletion_request",
+        "retention_policy_id = NEW.retention_policy_id",
+        "data_class_code = NEW.target_data_class_code",
+        "processing_purpose_code = NEW.processing_purpose_code",
+        "deletion request must match cited retention policy",
+    ] {
+        assert!(
+            RETENTION_UP_SQL.contains(required_sql),
+            "missing fail-closed deletion-request/policy guard: {required_sql}"
+        );
+    }
+}
+
+#[test]
 fn rollback_removes_tombstone_guard_before_its_function() {
     let trigger = RETENTION_DOWN_SQL
         .find("DROP TRIGGER IF EXISTS evidence_tombstone_guard_insert")
@@ -77,5 +95,15 @@ fn rollback_removes_tombstone_guard_before_its_function() {
     assert!(
         trigger < function,
         "rollback must drop the dependent tombstone trigger before its function"
+    );
+    let policy_trigger = RETENTION_DOWN_SQL
+        .find("DROP TRIGGER IF EXISTS deletion_request_guard_policy")
+        .expect("deletion-request policy guard trigger cleanup");
+    let policy_function = RETENTION_DOWN_SQL
+        .find("DROP FUNCTION IF EXISTS guard_deletion_request_policy")
+        .expect("deletion-request policy guard function cleanup");
+    assert!(
+        policy_trigger < policy_function,
+        "rollback must drop the dependent policy-guard trigger before its function"
     );
 }

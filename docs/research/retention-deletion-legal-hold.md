@@ -31,7 +31,7 @@ GDPR Article 17 motivates erasure and restriction workflows, including the possi
 Defined deterministic verification includes:
 
 - catalog validation requiring the four lifecycle tables, hold/restore functions, triggers, period/scope constraints, policy-succession contract, fixed trigger search paths, and tenant-session guards;
-- unit/contract tests refusing hostile labels, non-positive periods, mismatched hold scope, completed deletion under an active hold, invalid tombstone digests, raw-source reproduction override, and invalid policy successors; and
-- an exact-head live PostgreSQL procedure that is intended to insert a hold, prove application/database completion refusal, persist a `blocked_by_hold` request, supersede one active retention policy atomically, complete deletion of an unheld document, write a tombstone, and prove restore and analysis eligibility fail closed.
+- unit/contract tests refusing hostile labels, non-positive periods, mismatched hold scope, completed deletion under an active hold, invalid tombstone digests, raw-source reproduction override, invalid policy successors, and deletion requests whose tenant/class/purpose do not match the cited retention policy; and
+- an exact-head live PostgreSQL procedure that is intended to insert a hold, prove application/database completion refusal as `LegalHoldBlocksDeletion`, persist a `blocked_by_hold` request, supersede one active retention policy atomically, complete deletion of an unheld document, write a tombstone with `unavailable` reproduction (never the forbidden `available` token), and prove restore and analysis eligibility fail closed for `logical_revocation`/`identity_tombstone` only.
 
 The live procedure is test code, not completed execution evidence. Its result remains pending until the unchanged PR head's live PostgreSQL job succeeds; queued, cancelled, predecessor-head, or local-only evidence does not promote this capability to implemented-main.

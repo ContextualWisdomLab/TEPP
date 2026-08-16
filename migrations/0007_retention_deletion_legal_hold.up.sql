@@ -338,6 +338,40 @@ CREATE TRIGGER deletion_request_reject_held_deletion
     FOR EACH ROW
     EXECUTE FUNCTION reject_held_evidence_deletion();
 
+CREATE OR REPLACE FUNCTION guard_deletion_request_policy()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    tenant_context text;
+BEGIN
+    tenant_context := nullif(current_setting('tepp.current_tenant_record_id', true), '');
+    IF tenant_context IS NULL OR NEW.tenant_record_id::text <> tenant_context THEN
+        RAISE EXCEPTION 'tenant session context is required for lifecycle mutation'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.retention_policy
+        WHERE retention_policy_id = NEW.retention_policy_id
+          AND tenant_record_id = NEW.tenant_record_id
+          AND data_class_code = NEW.target_data_class_code
+          AND processing_purpose_code = NEW.processing_purpose_code
+    ) THEN
+        RAISE EXCEPTION 'deletion request must match cited retention policy'
+            USING ERRCODE = 'integrity_constraint_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER deletion_request_guard_policy
+    BEFORE INSERT ON deletion_request
+    FOR EACH ROW
+    EXECUTE FUNCTION guard_deletion_request_policy();
+
 CREATE OR REPLACE FUNCTION reject_tombstoned_evidence_restore()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -658,3 +692,4 @@ REVOKE ALL ON FUNCTION enforce_legal_hold_release() FROM PUBLIC;
 REVOKE ALL ON FUNCTION guard_legal_hold_insert() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION release_legal_hold(uuid, timestamptz) TO tepp_app_runtime;
 REVOKE ALL ON FUNCTION guard_evidence_tombstone_insert() FROM PUBLIC;
+REVOKE ALL ON FUNCTION guard_deletion_request_policy() FROM PUBLIC;

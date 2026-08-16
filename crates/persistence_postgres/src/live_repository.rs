@@ -433,11 +433,14 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// # Errors
     ///
-    /// Returns lifecycle validation or transport failures.
+    /// Returns lifecycle validation, a cited-policy mismatch, or transport
+    /// failures.
     pub fn insert_deletion_request(
         &mut self,
         record: &DeletionRequestRecord,
+        policy: &RetentionPolicyRecord,
     ) -> Result<(), PersistenceError> {
+        record.bind_cited_policy(policy)?;
         self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_deletion_request_sql(record)?;
         self.session.execute(&sql)
@@ -447,13 +450,15 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// # Errors
     ///
-    /// Returns lifecycle validation, [`PersistenceError::LegalHoldBlocksDeletion`],
-    /// or transport failures.
+    /// Returns lifecycle validation, a cited-policy mismatch,
+    /// [`PersistenceError::LegalHoldBlocksDeletion`], or transport failures.
     pub fn insert_completed_deletion_request(
         &mut self,
         record: &DeletionRequestRecord,
+        policy: &RetentionPolicyRecord,
         holds: &[LegalHoldRecord],
     ) -> Result<(), PersistenceError> {
+        record.bind_cited_policy(policy)?;
         self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_completed_deletion_request_sql(record, holds)?;
         self.session.execute(&sql)
@@ -816,16 +821,16 @@ mod tests {
         repo.insert_retention_policy(&sample_policy())
             .expect("policy insert");
         repo.insert_legal_hold(&sample_hold()).expect("hold insert");
-        repo.insert_deletion_request(&sample_deletion())
+        repo.insert_deletion_request(&sample_deletion(), &sample_policy())
             .expect("blocked request");
         let mut completed = sample_deletion();
         completed.request_status_code = "completed".into();
         completed.legal_hold_id = None;
         assert_eq!(
-            repo.insert_completed_deletion_request(&completed, &[sample_hold()]),
+            repo.insert_completed_deletion_request(&completed, &sample_policy(), &[sample_hold()]),
             Err(PersistenceError::LegalHoldBlocksDeletion)
         );
-        repo.insert_completed_deletion_request(&completed, &[])
+        repo.insert_completed_deletion_request(&completed, &sample_policy(), &[])
             .expect("unheld completion");
         repo.insert_evidence_tombstone(&sample_tombstone())
             .expect("tombstone");
@@ -864,7 +869,13 @@ mod tests {
         let mut bad_request = sample_deletion();
         bad_request.deletion_kind_code = "hard_delete".into();
         assert_eq!(
-            repo.insert_deletion_request(&bad_request),
+            repo.insert_deletion_request(&bad_request, &sample_policy()),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+        let mut mismatched_purpose = sample_deletion();
+        mismatched_purpose.processing_purpose_code = "export_fulfillment".into();
+        assert_eq!(
+            repo.insert_deletion_request(&mismatched_purpose, &sample_policy()),
             Err(PersistenceError::InvalidRetentionLifecycle)
         );
         let mut restore = sample_tombstone();

@@ -58,7 +58,7 @@ LLM use is optional and bounded. The default provider payload is evidence-minimi
 
 Retention is policy-driven per data class and purpose. Raw evidence, derived models, caches, provider payloads, exports, and audit records may have different retention periods. Deletion workflows distinguish:
 
-- logical revocation from active analysis;
+- logical revocation and identity tombstones from active analysis (`cache_export_removal` does not drop a document from analysis);
 - removal of mutable caches and exports;
 - deletion/tombstone of identity mappings where legally permitted;
 - immutable audit evidence that records the deletion action without retaining unnecessary raw PII;

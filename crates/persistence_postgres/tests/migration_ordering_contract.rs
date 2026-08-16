@@ -42,6 +42,10 @@ fn lifecycle_routine_privileges_follow_routine_definitions() {
             "REVOKE ALL ON FUNCTION guard_legal_hold_insert",
         ),
         (
+            "CREATE OR REPLACE FUNCTION guard_deletion_request_policy",
+            "REVOKE ALL ON FUNCTION guard_deletion_request_policy",
+        ),
+        (
             "CREATE OR REPLACE FUNCTION enforce_legal_hold_release",
             "REVOKE ALL ON FUNCTION enforce_legal_hold_release",
         ),
@@ -75,6 +79,7 @@ fn rollback_drops_lifecycle_routines_after_trigger_cleanup() {
         "DROP FUNCTION IF EXISTS reject_tombstoned_evidence_restore",
         "DROP FUNCTION IF EXISTS reject_held_evidence_deletion",
         "DROP FUNCTION IF EXISTS guard_legal_hold_insert",
+        "DROP FUNCTION IF EXISTS guard_deletion_request_policy",
     ];
 
     for routine_drop in routine_drops {
