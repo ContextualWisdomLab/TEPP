@@ -153,6 +153,21 @@ def _document_has_stale_coverage_authority(text: str) -> bool:
     )
 
 
+def _hourly_omits_weaker_coverage_lock(hourly: str) -> bool:
+    """Return whether hourly lists superseded drafts but omits the weaker #104 lock."""
+
+    if not hourly:
+        return False
+    lists_superseded_lineage = all(
+        f"PR #{number}" in hourly for number in (93, 94, 97, 101, 102)
+    )
+    return (
+        lists_superseded_lineage
+        and "unmerged" in hourly
+        and "PR #104" not in hourly
+    )
+
+
 def promotion_authority_failures(
     documentation: str,
     assessment: str,
@@ -163,7 +178,8 @@ def promotion_authority_failures(
 
     A pull-request number is not landable coverage authority. Canonical docs
     and the hourly queue must name the `prediction_contradiction` crate, not
-    a draft such as #93, #94, #97, #101, or #102.
+    a draft such as #93, #94, #97, #101, #102, or the weaker file-set lock
+    on #104.
     """
 
     failures: list[str] = []
@@ -178,8 +194,10 @@ def promotion_authority_failures(
             "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
             "active-PR coverage gate"
         )
-    if STALE_MERGE_WEAK_DRAFTS.search(hourly) or (
-        _document_has_stale_coverage_authority(hourly)
+    if (
+        STALE_MERGE_WEAK_DRAFTS.search(hourly)
+        or _document_has_stale_coverage_authority(hourly)
+        or _hourly_omits_weaker_coverage_lock(hourly)
     ):
         failures.append(
             "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md tells the "

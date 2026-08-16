@@ -232,6 +232,24 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             ],
         )
 
+    def test_hourly_omitting_weaker_coverage_lock_fails(self) -> None:
+        """A queue that lists #93/#94/#97/#101/#102 but not #104 is not fail-closed."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                hourly=(
+                    "Keep PR #93, PR #94, PR #97, PR #101, and PR #102 unmerged. "
+                    "Prefer merging the coverage-authority landing PR."
+                ),
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md tells the "
+                "queue to merge superseded coverage drafts"
+            ],
+        )
+
     def test_crate_named_authority_and_draft_lineage_pass(self) -> None:
         """Naming the crate, and mentioning drafts as non-landable, is allowed."""
 
@@ -245,7 +263,7 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             "refuse_promotion requires observed coverage."
         )
         current_hourly = (
-            "Keep PR #93, PR #94, PR #97, PR #101, and PR #102 unmerged. "
+            "Keep PR #93, PR #94, PR #97, PR #101, PR #102, and PR #104 unmerged. "
             "Prefer merging the coverage-authority landing PR."
         )
         self.assertEqual(
