@@ -11,6 +11,7 @@
 
 mod analysis_run;
 mod authorization;
+mod corpus_split_manifest;
 mod envelope;
 mod error;
 mod export;
@@ -27,6 +28,12 @@ pub use analysis_run::AnalysisRunRequest;
 pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 /// Idempotent request equality helper.
 pub use analysis_run::requests_are_idempotent_matches;
+/// Corpus-split leakage-audit contract version.
+pub use corpus_split_manifest::CORPUS_SPLIT_MANIFEST_CONTRACT_VERSION;
+/// Versioned corpus-split leakage-audit manifest.
+pub use corpus_split_manifest::CorpusSplitManifest;
+/// Train/validation/test partition identities for a split manifest.
+pub use corpus_split_manifest::CorpusSplitPartitions;
 /// Content-redacting error envelope.
 pub use envelope::ErrorEnvelope;
 /// Fail-closed API errors.

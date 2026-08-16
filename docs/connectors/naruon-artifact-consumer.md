@@ -1,7 +1,7 @@
 # naruon modular consumer contract for TEPP artifacts
 
-**Status:** Partial — versioned DTO plus HTTP interchange on the active PR; live HTTP service remaining  
-**Last reviewed:** 2026-08-13
+**Status:** Partial — versioned DTO plus HTTP interchange; live HTTP service remaining  
+**Last reviewed:** 2026-08-16
 
 ## Boundary
 
@@ -20,13 +20,14 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 |---|---|---|
 | analysis-run create | `tepp_api` `AnalysisRunRequest` v1 | naruon → TEPP |
 | reproducibility binding | `tepp_api` `ReproducibilityManifest` v1 | TEPP → naruon |
+| corpus-split leakage audit | `tepp_api` `CorpusSplitManifest` v1 | TEPP → naruon |
 | JSON-LD export envelope | `tepp_api` `JsonLdExport` v1 | TEPP → naruon |
 | GraphML relation export | `tepp_api` `GraphMlExport` | TEPP → naruon |
 | purpose-bound export auth | `tepp_api` `authorize_export` with `ModularServiceConsumer` | TEPP gate |
 | HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 
-Committed examples live under `examples/`. Schema for analysis-run requests lives under `schemas/analysis_run_request_v1.json`.
+Committed examples live under `examples/`. Schemas for analysis-run requests and corpus-split manifests live under `schemas/`.
 
 ## Purpose-bound disclosure
 
