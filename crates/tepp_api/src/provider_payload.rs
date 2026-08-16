@@ -374,7 +374,7 @@ pub fn disclose_identity_mapping<S: ReidentificationAuditSink>(
         opaque_analytical_id: mapping.opaque_analytical_id.clone(),
         decision_time: decision_time.into(),
         outcome,
-        decision_digest: reidentification_decision_digest(grant, mapping, decision_time, outcome)?,
+        decision_digest: reidentification_decision_digest(grant, mapping, decision_time, outcome),
     };
     audit_sink.append_reidentification_audit(&audit_record)?;
     if !allowed {
@@ -396,8 +396,15 @@ fn reidentification_decision_digest(
     mapping: &IdentityMappingRecord,
     decision_time: &str,
     outcome: ReidentificationAuditOutcome,
-) -> Result<String, ApiError> {
+) -> String {
     let mut hasher = Sha256::new();
+    let has_until = if grant.valid_to.is_some() { "1" } else { "0" };
+    let until = grant.valid_to.as_deref().unwrap_or("");
+    let reidentify_flag = if grant.reidentification_authorized {
+        "1"
+    } else {
+        "0"
+    };
     for value in [
         REIDENTIFICATION_AUDIT_DIGEST_VERSION,
         "reidentify_identity_mapping",
@@ -405,29 +412,25 @@ fn reidentification_decision_digest(
         &grant.principal_id,
         grant.purpose.wire_name(),
         &grant.valid_from,
-        if grant.valid_to.is_some() { "1" } else { "0" },
-        grant.valid_to.as_deref().unwrap_or(""),
-        if grant.reidentification_authorized {
-            "1"
-        } else {
-            "0"
-        },
+        has_until,
+        until,
+        reidentify_flag,
         &mapping.tenant_workspace_id,
         &mapping.opaque_analytical_id,
         &mapping.direct_identity,
         decision_time,
         outcome.wire_name(),
     ] {
-        update_audit_digest_field(&mut hasher, value)?;
+        update_audit_digest_field(&mut hasher, value);
     }
-    Ok(format!("sha256:{:x}", hasher.finalize()))
+    format!("sha256:{:x}", hasher.finalize())
 }
 
-fn update_audit_digest_field(hasher: &mut Sha256, value: &str) -> Result<(), ApiError> {
-    let length = u64::try_from(value.len()).map_err(|_| ApiError::LimitExceeded)?;
+fn update_audit_digest_field(hasher: &mut Sha256, value: &str) {
+    // `usize` fits in `u64` on all TEPP targets; avoid a dead `try_from` Err arm.
+    let length = value.len() as u64;
     hasher.update(length.to_be_bytes());
     hasher.update(value.as_bytes());
-    Ok(())
 }
 
 // Lexicographic comparisons in `validate_grant` and `grant_covers` are valid
@@ -834,15 +837,13 @@ mod tests {
             &mapping(),
             "2026-06-15T12:00:00Z",
             ReidentificationAuditOutcome::Allowed,
-        )
-        .expect("allowed digest");
+        );
         let denied = reidentification_decision_digest(
             &grant(AnalyticalPurpose::ScientificValidation, true),
             &mapping(),
             "2026-06-15T12:00:00Z",
             ReidentificationAuditOutcome::Denied,
-        )
-        .expect("denied digest");
+        );
         assert_ne!(
             allowed, denied,
             "outcome wire name must change the digest when grant, mapping, and time stay fixed"
@@ -904,15 +905,13 @@ mod tests {
             &mapping(),
             "2026-06-15T12:00:00Z",
             ReidentificationAuditOutcome::Allowed,
-        )
-        .expect("open digest");
+        );
         let closed_digest = reidentification_decision_digest(
             &grant(AnalyticalPurpose::ScientificValidation, true),
             &mapping(),
             "2026-06-15T12:00:00Z",
             ReidentificationAuditOutcome::Allowed,
-        )
-        .expect("closed digest");
+        );
         assert_ne!(
             open_digest, closed_digest,
             "open-ended valid_to must change the canonical audit digest"
@@ -922,8 +921,7 @@ mod tests {
             &mapping(),
             "2026-06-15T12:00:00Z",
             ReidentificationAuditOutcome::Denied,
-        )
-        .expect("unauthorized digest");
+        );
         assert_ne!(closed_digest, unauthorized);
 
         let mut sink = FailingSink;
