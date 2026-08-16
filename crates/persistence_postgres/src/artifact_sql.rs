@@ -222,16 +222,11 @@ mod tests {
         with_ref.source_size_bytes = 0;
         let referenced = insert_source_artifact_sql(&with_ref).expect("ref");
         assert!(referenced.contains("s3://tepp/object"));
-<<<<<<< HEAD
         let referenced_assertion =
             assert_source_artifact_matches_sql(&with_ref).expect("referenced assertion");
         assert!(referenced_assertion.contains("s3://tepp/object"));
         assert!(referenced_assertion.contains("IS NOT DISTINCT FROM 's3://tepp/object'"));
-=======
-        let assert_ref = assert_source_artifact_matches_sql(&with_ref).expect("assert-ref");
-        assert!(assert_ref.contains("s3://tepp/object"));
-        assert!(assert_ref.contains("protected_object_ref IS NOT DISTINCT FROM"));
->>>>>>> 84e9421 (fix(api): pin temporal_core version and cover assert object-ref branch)
+        assert!(referenced_assertion.contains("protected_object_ref IS NOT DISTINCT FROM"));
 
         assert_eq!(
             insert_source_artifact_sql(&SourceArtifactRecord {
