@@ -548,6 +548,16 @@ mod tests {
         }
     }
 
+    struct FailingSink;
+    impl ReidentificationAuditSink for FailingSink {
+        fn append_reidentification_audit(
+            &mut self,
+            _record: &ReidentificationAuditRecord,
+        ) -> Result<(), ApiError> {
+            Err(ApiError::AuthorizationDenied)
+        }
+    }
+
     fn disclose(
         grant: &PurposeGrant,
         mapping: &IdentityMappingRecord,
@@ -569,6 +579,12 @@ mod tests {
         assert!(!is_rfc3339_utc("2026-01-01Txx:00:00Z"));
         assert!(!is_rfc3339_utc("2026-01-01T00:xx:00Z"));
         assert!(!is_rfc3339_utc("2026-01-01T00:00:xxZ"));
+        assert!(!is_rfc3339_utc("2026X01-01T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01X01T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01X00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00X00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:00X00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:00:00X"));
 
         let at_start = minimize_provider_payload(
             &grant(AnalyticalPurpose::ScientificValidation, false),
@@ -587,6 +603,48 @@ mod tests {
         assert_eq!(
             at_end.1.to_string(),
             "provider_disclosure purpose=scientific_validation source=false mapping=false"
+        );
+    }
+
+    #[test]
+    fn minimize_denies_expired_foreign_and_identity_mapping_offers() {
+        let expired = PurposeGrant {
+            valid_to: Some("2026-03-01T00:00:00Z".into()),
+            ..grant(AnalyticalPurpose::ScientificValidation, false)
+        };
+        assert_eq!(
+            minimize_provider_payload(&expired, &offer(None), "2026-06-15T12:00:00Z"),
+            Err(ApiError::AuthorizationDenied)
+        );
+        let not_yet = PurposeGrant {
+            valid_from: "2026-07-01T00:00:00Z".into(),
+            ..grant(AnalyticalPurpose::ScientificValidation, false)
+        };
+        assert_eq!(
+            minimize_provider_payload(&not_yet, &offer(None), "2026-06-15T12:00:00Z"),
+            Err(ApiError::AuthorizationDenied)
+        );
+        let foreign = ProviderEvidenceOffer {
+            tenant_workspace_id: "other-tenant".into(),
+            ..offer(None)
+        };
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &foreign,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+        let mut mapped = offer(None);
+        mapped.identity_mapping = Some("secret-name".into());
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &mapped,
+                "2026-06-15T12:00:00Z",
+            ),
+            Err(ApiError::AuthorizationDenied)
         );
     }
 
@@ -873,15 +931,6 @@ mod tests {
         .expect("unauthorized digest");
         assert_ne!(closed_digest, unauthorized);
 
-        struct FailingSink;
-        impl ReidentificationAuditSink for FailingSink {
-            fn append_reidentification_audit(
-                &mut self,
-                _record: &ReidentificationAuditRecord,
-            ) -> Result<(), ApiError> {
-                Err(ApiError::AuthorizationDenied)
-            }
-        }
         let mut sink = FailingSink;
         assert_eq!(
             disclose_identity_mapping_with_audit(
@@ -911,10 +960,7 @@ mod tests {
         assert_eq!(audit.outcome(), ReidentificationAuditOutcome::Allowed);
         assert!(audit.decision_digest().starts_with("sha256:"));
         assert_eq!(audit.outcome().wire_name(), "allowed");
-        assert_eq!(
-            ReidentificationAuditOutcome::Denied.wire_name(),
-            "denied"
-        );
+        assert_eq!(ReidentificationAuditOutcome::Denied.wire_name(), "denied");
         assert_eq!(sink.records.len(), 1);
         assert_eq!(sink.records[0].decision_digest(), audit.decision_digest());
     }
