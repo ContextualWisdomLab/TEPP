@@ -12,7 +12,7 @@ Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. 
 
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated.
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. `psychometric_fit` recovers those cross-loadings and event-time lagged paths on a CPU `f64` OLS path; see `docs/research/esem-dsem-fit.md`.
 
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 

@@ -1,7 +1,7 @@
 # ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — CPU `f64` ESEM loading recovery and event-time DSEM lag gates in `psychometric_fit` on the active PR; `psychometric_core` input gates remain #49; longitudinal invariance and multilevel estimators remain accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs upstream topic measurement/network coordinates; this ADR governs higher-order psychometric structure and longitudinal interpretation.
 
