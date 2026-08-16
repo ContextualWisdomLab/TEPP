@@ -3,11 +3,13 @@
 ## Scope
 
 `operational_log` records action codes, opaque analytical subjects, and
-system time. `try_record` inspects caller-supplied source text, source
-identity, and blanket-mask intent before a line is created. A source
-identity cannot be converted into an `AnalyticalSubject`. Blanket PII
+system time. `try_record` is the only recording API and inspects
+caller-supplied source text, source identity, and blanket-mask intent
+before a line is created. `OperationalLogRecord::new` is crate-private.
+A source-identity `&str` cannot be converted into an `AnalyticalSubject`;
+`from_opaque` still binds an already-separated `u128`. Blanket PII
 masking is not a log grant. Recovery is the computed share of replayed
-lines that match known truth.
+lines that match known truth, including a collapsed-subject baseline.
 
 This slice does not persist the log, ship it to a SIEM, or claim CSAP,
 SOC 2, or legal sufficiency.

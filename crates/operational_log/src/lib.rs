@@ -3,9 +3,10 @@
 //! Operational logs that refuse source text and source identity.
 //!
 //! Privileged and ordinary operations may be logged with an opaque analytical
-//! subject and an action code. Raw source text and source identity cannot
-//! enter the log, a source identity cannot become an analytical subject, and
-//! blanket PII masking is not a log grant (ADR 0009).
+//! subject and an action code. `try_record` is the only recording API. Raw
+//! source text and source identity cannot enter the log, a source-identity
+//! `&str` cannot become an analytical subject, and blanket PII masking is not
+//! a log grant (ADR 0009).
 
 mod error;
 mod record;

@@ -36,9 +36,9 @@ pub struct OperationalLogRecord {
 }
 
 impl OperationalLogRecord {
-    /// Record an action against an opaque analytical subject.
+    /// Bind fields after `try_record` has refused forbidden payloads.
     #[must_use]
-    pub const fn new(
+    pub(crate) const fn new(
         action_code: u16,
         analytical_subject: AnalyticalSubject,
         system_time_seconds: i64,

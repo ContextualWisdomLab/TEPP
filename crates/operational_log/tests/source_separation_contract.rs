@@ -16,7 +16,15 @@ const PROJECT_SUBJECT: u128 = 0xA11_CE03;
 const SYSTEM_TIME: i64 = 1_713_196_800;
 
 fn record(action: u16, subject: u128) -> OperationalLogRecord {
-    OperationalLogRecord::new(action, AnalyticalSubject::from_opaque(subject), SYSTEM_TIME)
+    try_record(
+        action,
+        AnalyticalSubject::from_opaque(subject),
+        SYSTEM_TIME,
+        None,
+        None,
+        false,
+    )
+    .expect("opaque membership line")
 }
 
 #[test]
@@ -72,6 +80,17 @@ fn source_identity_cannot_become_a_log_subject_or_log_field() {
         refuse_source_identity_as_subject(AUTHOR_SOURCE_IDENTITY),
         Err(OperationalLogError::SourceIdentityNotLoggable)
     );
+    assert_eq!(
+        try_record(
+            ACTION_IDENTITY_MAPPING_READ,
+            author,
+            SYSTEM_TIME,
+            None,
+            Some(""),
+            false,
+        ),
+        Err(OperationalLogError::SourceIdentityNotLoggable)
+    );
 }
 
 #[test]
@@ -106,6 +125,27 @@ fn blanket_mask_is_not_a_log_grant_and_clear_intent_records_opaque_fields_only()
     assert_eq!(recorded.analytical_subject(), author);
     assert_eq!(recorded.system_time_seconds(), SYSTEM_TIME);
     assert_eq!(author.as_u128(), AUTHOR_SUBJECT);
+    let mapping = try_record(
+        ACTION_IDENTITY_MAPPING_READ,
+        author,
+        SYSTEM_TIME,
+        None,
+        None,
+        false,
+    )
+    .expect("opaque mapping line");
+    assert_eq!(mapping.action_code(), ACTION_IDENTITY_MAPPING_READ);
+    assert_eq!(
+        try_record(
+            ACTION_PRIVILEGED_EXPORT,
+            author,
+            SYSTEM_TIME,
+            Some(RENEWAL_SOURCE_TEXT),
+            Some(AUTHOR_SOURCE_IDENTITY),
+            true,
+        ),
+        Err(OperationalLogError::SourceTextNotLoggable)
+    );
 }
 
 #[test]
@@ -134,6 +174,26 @@ fn replayed_membership_actions_match_known_truth_better_than_a_collapsed_action(
     };
     assert!((recovered_rate - expected).abs() < f64::EPSILON);
     assert!(recovered_rate > collapsed_rate);
+}
+
+#[test]
+fn replayed_membership_subjects_match_known_truth_better_than_a_collapsed_subject() {
+    let truth = [
+        record(ACTION_PRIVILEGED_EXPORT, AUTHOR_SUBJECT),
+        record(ACTION_IDENTITY_MAPPING_READ, CUSTOMER_SUBJECT),
+        record(ACTION_ORDINARY_DIAGNOSIS, PROJECT_SUBJECT),
+    ];
+    let replayed = replay_operational_log(&truth).expect("replay");
+    let collapsed_subject = [
+        record(ACTION_PRIVILEGED_EXPORT, AUTHOR_SUBJECT),
+        record(ACTION_IDENTITY_MAPPING_READ, AUTHOR_SUBJECT),
+        record(ACTION_ORDINARY_DIAGNOSIS, AUTHOR_SUBJECT),
+    ];
+    let recovered_rate = log_recovery_rate(&truth, &replayed).expect("recovered");
+    let collapsed_rate = log_recovery_rate(&truth, &collapsed_subject).expect("collapsed");
+    assert!((recovered_rate - 1.0).abs() < f64::EPSILON);
+    assert!(recovered_rate > collapsed_rate);
+    assert!(collapsed_rate < 1.0);
 }
 
 #[test]
