@@ -18,7 +18,7 @@ Current protected main exposes Rust library/domain contracts, not a production H
 | interval relation/reasoner API | `temporal_core` | event/relation validation | active-PR #6 |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
-| LLM interpretation provider port | TEPP interpretation gateway | contextual-orchestrator | accepted-target |
+| LLM interpretation provider port | `orchestrator_live` loopback `POST /v1/interpretation-runs` | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
 | analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
 
@@ -41,6 +41,7 @@ When the service layer is introduced, use resources such as:
 ```text
 POST   /v1/evidence-imports
 GET    /v1/evidence-imports/{import_id}
+POST   /v1/interpretation-runs
 POST   /v1/analysis-runs
 GET    /v1/analysis-runs/{run_id}
 POST   /v1/analysis-runs/{run_id}/cancel
@@ -114,7 +115,7 @@ TEPP owns its application/API state, authorized evidence, model runs, and artifa
 
 ### contextual-orchestrator
 
-TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
+TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. A loopback-only live HTTP/1.1 listener (`orchestrator_live::OrchestratorLiveService`) serves `POST /v1/interpretation-runs` for local and standalone proof. It is not TLS termination. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
 
 ### organization `.github`
 

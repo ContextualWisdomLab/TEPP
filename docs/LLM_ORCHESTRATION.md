@@ -114,6 +114,8 @@ For model-selection review, statistical predictive/recovery/stability/invariance
 
 `contextual-orchestrator` is the preferred CWL provider-neutral integration when available. TEPP owns the evidence bundle, statistical/model-selection policy, scientific acceptance, artifact provenance, and allowed role/access configuration. The orchestrator owns provider routing/orchestration execution within the supplied policy. Neither service reads the other's application database directly.
 
+`orchestrator_live` exposes a loopback-only `POST /v1/interpretation-runs` listener that records the selected mode and budget. Listener output is hypothetical and cannot become scientific authority. Production TLS and provider execution remain outside this crate.
+
 ## 9. Development and live-test credentials
 
 Live model tests use GitHub Secret `NVIDIA_NIM_API_KEY` with the minimum runtime mapping required by the selected adapter. `COPILOT_GITHUB_TOKEN` is prohibited. Existing independent review-agent credentials are separate and must not be renamed, copied, or repurposed for TEPP model execution.
