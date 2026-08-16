@@ -6,16 +6,37 @@
 `temporal_core::classify_interval_relation`. A predicted closed proper
 event-time interval cannot become observed fact when the Allen relation is
 `before` or `after` (contradiction) or `meets` / `met_by` (adjacent, no
-interior overlap). Observed evidence whose availability time exceeds the
-analysis knowledge cutoff is ineligible.
+interior overlap). Partial overlap (`overlaps`, `overlapped_by`, `contains`,
+`started_by`, `finished_by`) is not a network contradiction, but it leaves
+unmatched predicted mass. `require_observed_coverage` therefore succeeds only
+for `during`, `starts`, `finishes`, and `equals`. Observed evidence whose
+availability time exceeds the analysis knowledge cutoff is ineligible.
 
-Label agreement on those contradiction flags is a helper for the gate. It is
-not RMSE, bias, or interval-coverage recovery against a generative truth
-process.
+Label agreement on those flags is a helper for the gate. It is not RMSE,
+bias, or interval-coverage recovery against a generative truth process.
 
 This slice does not run the `temporal_core` path-consistency reasoner, fit
 CHRONOS schemas, extract TDT tracks, or claim that the full ADR 0016
 intelligence stack is implemented.
+
+```mermaid
+flowchart TD
+    cutoff{available <= cutoff?}
+    allen[classify_interval_relation]
+    contradict[Refuse: before / after]
+    adjacent[Refuse: meets / met_by]
+    partial[Refuse coverage: unmatched predicted mass]
+    cover[Coverage may authorize promotion]
+    cutoff -->|no| ineligible[Refuse: evidence after cutoff]
+    cutoff -->|yes| allen
+    allen --> contradict
+    allen --> adjacent
+    allen --> partial
+    allen --> cover
+```
+
+Next action: call `require_observed_coverage` before promoting a forecast.
+`refuse_promotion` only answers whether the pair is contradictory or adjacent.
 
 ## Authority
 

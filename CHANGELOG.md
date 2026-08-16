@@ -6,7 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
-- `prediction_contradiction` promotion gate: `temporal_core` Allen classification refuses `before`/`after` as contradiction and `meets`/`met_by` as unsupported adjacency; evidence available after the knowledge cutoff is ineligible. Label agreement is not RMSE recovery (ADR 0002, ADR 0016).
+- `prediction_contradiction` promotion gate: `temporal_core` Allen classification refuses `before`/`after` as contradiction and `meets`/`met_by` as unsupported adjacency; `require_observed_coverage` refuses partial overlap that leaves unmatched predicted mass; evidence available after the knowledge cutoff is ineligible. Label agreement is not RMSE recovery (ADR 0002, ADR 0016).
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
 - `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).

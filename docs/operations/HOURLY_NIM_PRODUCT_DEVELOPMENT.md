@@ -23,8 +23,8 @@ owns the hour. The scheduler does not create a competing branch.
 Current executable queue while drafts remain open:
 
 1. Repair and merge the predicted-versus-observed Allen promotion gate
-   (`prediction_contradiction` / PR #93) using `temporal_core` classification,
-   not a second interval algebra.
+   (`prediction_contradiction` / PR #93) using `temporal_core` classification
+   and coverage before unmatched predicted mass can become fact.
 2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #87),
    `text_segment` SQL contracts on existing migration `0006`, retention and
    legal-hold migration `0007` (PR #45), foundation known-truth recovery

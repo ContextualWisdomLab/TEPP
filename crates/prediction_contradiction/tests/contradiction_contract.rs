@@ -1,8 +1,9 @@
 //! Predicted intervals stay hypothetical unless later-available evidence overlaps.
 
 use prediction_contradiction::{
-    PredictionContradictionError, contradiction_agreement_rate, intervals_contradict,
-    refuse_promotion,
+    PredictionContradictionError, PromotionSupport, classify_promotion_support,
+    contradiction_agreement_rate, intervals_contradict, refuse_promotion,
+    require_observed_coverage,
 };
 use temporal_core::{
     AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
@@ -89,7 +90,7 @@ fn meeting_intervals_are_adjacent_not_allen_contradiction() {
 }
 
 #[test]
-fn overlapping_observation_may_support_promotion() {
+fn overlapping_observation_is_not_contradiction_and_is_not_coverage() {
     let predicted = closed_event_interval(0, 10);
     let overlapping = closed_event_interval(5, 15);
     let (observed_available, knowledge_cutoff) = eligible_clocks();
@@ -100,7 +101,20 @@ fn overlapping_observation_may_support_promotion() {
         observed_available,
         knowledge_cutoff,
     )
-    .expect("overlapping support");
+    .expect("overlap is not Allen contradiction");
+    assert_eq!(
+        classify_promotion_support(&predicted, &overlapping).expect("overlaps"),
+        PromotionSupport::PartialOverlap
+    );
+    assert_eq!(
+        require_observed_coverage(
+            &predicted,
+            &overlapping,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionNotCoveredByObservation)
+    );
 }
 
 #[test]
@@ -169,4 +183,175 @@ fn empty_or_mismatched_agreement_slices_fail_closed() {
         contradiction_agreement_rate(&[true, false], &[true]),
         Err(PredictionContradictionError::AgreementSliceMismatch)
     );
+}
+
+#[test]
+fn availability_equal_to_cutoff_remains_eligible() {
+    let predicted = closed_event_interval(0, 10);
+    let overlapping = closed_event_interval(5, 15);
+    let covering = closed_event_interval(0, 10);
+    let observed_available = available("2026-01-03T00:00:00Z");
+    let knowledge_cutoff = cutoff("2026-01-03T00:00:00Z");
+    refuse_promotion(
+        &predicted,
+        &overlapping,
+        observed_available,
+        knowledge_cutoff,
+    )
+    .expect("available == cutoff is eligible for the contradiction filter");
+    require_observed_coverage(&predicted, &covering, observed_available, knowledge_cutoff)
+        .expect("available == cutoff is eligible for coverage");
+}
+
+#[test]
+fn after_and_overlapped_by_use_the_same_promotion_rules() {
+    let predicted = closed_event_interval(20, 30);
+    let earlier_observed = closed_event_interval(0, 10);
+    let overlapped_by = closed_event_interval(5, 15);
+    let later_predicted = closed_event_interval(10, 20);
+    let (observed_available, knowledge_cutoff) = eligible_clocks();
+
+    assert!(intervals_contradict(&predicted, &earlier_observed).expect("after"));
+    assert_eq!(
+        refuse_promotion(
+            &predicted,
+            &earlier_observed,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionContradictsObservation)
+    );
+    assert_eq!(
+        classify_promotion_support(&later_predicted, &overlapped_by).expect("overlapped_by"),
+        PromotionSupport::PartialOverlap
+    );
+    refuse_promotion(
+        &later_predicted,
+        &overlapped_by,
+        observed_available,
+        knowledge_cutoff,
+    )
+    .expect("overlapped_by is not Allen contradiction");
+    assert_eq!(
+        require_observed_coverage(
+            &later_predicted,
+            &overlapped_by,
+            observed_available,
+            knowledge_cutoff
+        ),
+        Err(PredictionContradictionError::PredictionNotCoveredByObservation)
+    );
+}
+
+#[test]
+fn half_open_observed_interval_is_not_an_allen_input() {
+    let predicted = closed_event_interval(0, 10);
+    let observed = TemporalInterval::bounded(
+        TemporalBoundary::Included(event_at(5)),
+        TemporalBoundary::Excluded(event_at(15)),
+        TemporalPrecision::Second,
+    )
+    .expect("half-open observed interval is representable");
+    let (observed_available, knowledge_cutoff) = eligible_clocks();
+    assert_eq!(
+        intervals_contradict(&predicted, &observed),
+        Err(PredictionContradictionError::InvalidIntervalPayload)
+    );
+    assert_eq!(
+        refuse_promotion(&predicted, &observed, observed_available, knowledge_cutoff),
+        Err(PredictionContradictionError::InvalidIntervalPayload)
+    );
+    assert_eq!(
+        classify_promotion_support(&predicted, &observed),
+        Err(PredictionContradictionError::InvalidIntervalPayload)
+    );
+    assert_eq!(
+        require_observed_coverage(&predicted, &observed, observed_available, knowledge_cutoff),
+        Err(PredictionContradictionError::InvalidIntervalPayload)
+    );
+}
+
+#[test]
+fn known_allen_pairs_recover_coverage_and_contradiction_labels() {
+    let cases = [
+        (
+            closed_event_interval(0, 10),
+            closed_event_interval(20, 30),
+            PromotionSupport::ContradictoryDisjoint,
+        ),
+        (
+            closed_event_interval(20, 30),
+            closed_event_interval(0, 10),
+            PromotionSupport::ContradictoryDisjoint,
+        ),
+        (
+            closed_event_interval(0, 10),
+            closed_event_interval(10, 20),
+            PromotionSupport::AdjacentWithoutOverlap,
+        ),
+        (
+            closed_event_interval(10, 20),
+            closed_event_interval(0, 10),
+            PromotionSupport::AdjacentWithoutOverlap,
+        ),
+        (
+            closed_event_interval(0, 10),
+            closed_event_interval(5, 15),
+            PromotionSupport::PartialOverlap,
+        ),
+        (
+            closed_event_interval(10, 20),
+            closed_event_interval(5, 15),
+            PromotionSupport::PartialOverlap,
+        ),
+        (
+            closed_event_interval(0, 10),
+            closed_event_interval(0, 8),
+            PromotionSupport::PartialOverlap,
+        ),
+        (
+            closed_event_interval(0, 10),
+            closed_event_interval(2, 8),
+            PromotionSupport::PartialOverlap,
+        ),
+        (
+            closed_event_interval(0, 10),
+            closed_event_interval(2, 10),
+            PromotionSupport::PartialOverlap,
+        ),
+        (
+            closed_event_interval(0, 8),
+            closed_event_interval(0, 20),
+            PromotionSupport::ObservedCoversPrediction,
+        ),
+        (
+            closed_event_interval(2, 8),
+            closed_event_interval(0, 20),
+            PromotionSupport::ObservedCoversPrediction,
+        ),
+        (
+            closed_event_interval(2, 10),
+            closed_event_interval(0, 10),
+            PromotionSupport::ObservedCoversPrediction,
+        ),
+        (
+            closed_event_interval(0, 10),
+            closed_event_interval(0, 10),
+            PromotionSupport::ObservedCoversPrediction,
+        ),
+    ];
+    let (observed_available, knowledge_cutoff) = eligible_clocks();
+    let mut truth = Vec::new();
+    let mut decided = Vec::new();
+    for (predicted, observed, expected) in cases {
+        let support = classify_promotion_support(&predicted, &observed).expect("label");
+        assert_eq!(support, expected);
+        truth.push(expected == PromotionSupport::ObservedCoversPrediction);
+        decided.push(
+            require_observed_coverage(&predicted, &observed, observed_available, knowledge_cutoff)
+                .is_ok(),
+        );
+    }
+    let agreed = contradiction_agreement_rate(&truth, &decided).expect("coverage agreement");
+    assert!((agreed - 1.0).abs() < f64::EPSILON);
 }

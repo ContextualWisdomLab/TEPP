@@ -1,6 +1,6 @@
 [package]
 name = "prediction_contradiction"
-description = "Predicted intervals that contradict observations cannot become fact."
+description = "Predicted intervals stay hypothetical unless later evidence covers them."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

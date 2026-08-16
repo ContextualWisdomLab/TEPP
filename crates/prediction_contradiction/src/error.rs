@@ -8,8 +8,10 @@ use std::fmt;
 pub enum PredictionContradictionError {
     /// Predicted and observed event-time intervals are Allen `before` or `after`.
     PredictionContradictsObservation,
-    /// Predicted and observed intervals meet but do not overlap in their interiors.
+    /// Predicted and observed intervals are adjacent and do not overlap in their interiors.
     PredictionLacksOverlappingSupport,
+    /// Observed evidence overlaps the prediction but does not cover it.
+    PredictionNotCoveredByObservation,
     /// Observed evidence became available after the analysis knowledge cutoff.
     EvidenceAfterCutoff,
     /// An interval is not a closed proper Allen input.
@@ -25,7 +27,10 @@ impl fmt::Display for PredictionContradictionError {
                 "predicted interval contradicts observed evidence"
             }
             Self::PredictionLacksOverlappingSupport => {
-                "predicted interval meets observation without overlapping support"
+                "predicted interval is adjacent to observation without overlapping support"
+            }
+            Self::PredictionNotCoveredByObservation => {
+                "observed evidence does not cover the predicted interval"
             }
             Self::EvidenceAfterCutoff => {
                 "observed evidence is available after the knowledge cutoff"
@@ -52,7 +57,11 @@ mod tests {
             ),
             (
                 PredictionContradictionError::PredictionLacksOverlappingSupport,
-                "predicted interval meets observation without overlapping support",
+                "predicted interval is adjacent to observation without overlapping support",
+            ),
+            (
+                PredictionContradictionError::PredictionNotCoveredByObservation,
+                "observed evidence does not cover the predicted interval",
             ),
             (
                 PredictionContradictionError::EvidenceAfterCutoff,
