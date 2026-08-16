@@ -22,8 +22,8 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
-| Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
-| CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
+| Versioned API/export contracts | `tepp_api` | implemented-main | production TLS naruon listener | unknown-field/version/limit + naruon HTTPS interchange + loopback live HTTP/1.1 tests | Task 12 / PR #21; live loopback listener on this PR |
+| CWL modular connectors | `docs/connectors/*` | implemented-main | production TLS ports | contract docs + examples + loopback live HTTP | PR #22; production TLS remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 
 

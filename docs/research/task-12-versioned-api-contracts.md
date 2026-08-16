@@ -12,7 +12,7 @@ Task 12 introduces fail-closed versioned wire contracts in `tepp_api` for standa
 6. committed JSON Schema and example payloads under `schemas/` and `examples/`;
 7. purpose-bound export authorization that preserves scientific identity linkages and refuses blanket PII masking.
 
-HTTP service routing remains accepted-target. Domain estimation and persistence stay outside this crate.
+Loopback live HTTP/1.1 routing for naruon analysis-run and export POSTs is implemented on this PR. Production TLS termination remains accepted-target. Domain estimation and persistence stay outside this crate.
 
 ## Authoritative sources
 

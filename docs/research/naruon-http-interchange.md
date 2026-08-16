@@ -10,11 +10,13 @@ headers, reserved-header redefinition, principal-only idempotency keys, and
 lexical TEPP inference claims is repository contract authority (see Internal
 contract evidence), not an RFC inference rule.
 
-This is not a live HTTP server. Persistence remains TEPP-owned; naruon never
-migrates or queries TEPP application tables. Purpose-bound export disclosure
-and privacy-management readiness map to published privacy guidance (ISO/IEC,
-2019; National Institute of Standards and Technology, 2020) without claiming
-certification.
+A loopback-only live HTTP/1.1 listener (`NaruonLiveService`) now serves the
+same POST paths for local and standalone proof. It is not TLS termination and
+does not bind non-loopback addresses. Persistence remains TEPP-owned; naruon
+never migrates or queries TEPP application tables. Purpose-bound export
+disclosure and privacy-management readiness map to published privacy guidance
+(ISO/IEC, 2019; National Institute of Standards and Technology, 2020) without
+claiming certification.
 
 ## Authority
 
@@ -38,6 +40,7 @@ https://doi.org/10.6028/NIST.CSWP.01162020
 - `docs/API_CONTRACT.md` — versioned analysis-run and export surfaces
 - `docs/adr/0011-standalone-modular-msa-boundary.md` — no cross-service table access
 - `crates/tepp_api/tests/naruon_http_contract.rs` — fail-closed interchange proofs
+- `crates/tepp_api/tests/naruon_live_http_contract.rs` — loopback live HTTP/1.1 proofs
 
 ## Verification
 
@@ -47,4 +50,6 @@ https://doi.org/10.6028/NIST.CSWP.01162020
 - reserved standard headers cannot be redefined via extra headers;
 - export interchange requires `ModularServiceConsumer` and a per-export
   idempotency key distinct from `principal_id` alone;
-- `tfidf` / `bm25` / `keyword` cannot claim TEPP inference.
+- `tfidf` / `bm25` / `keyword` cannot claim TEPP inference;
+- loopback `NaruonLiveService` accepts valid POSTs and refuses non-loopback
+  binds, table-access hosts, credential headers, and conflicting idempotency.

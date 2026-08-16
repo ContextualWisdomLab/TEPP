@@ -1,6 +1,6 @@
 # naruon modular consumer contract for TEPP artifacts
 
-**Status:** Partial — versioned DTO plus HTTP interchange on the active PR; live HTTP service remaining  
+**Status:** Partial — versioned DTO and HTTPS interchange on protected main; loopback live HTTP/1.1 POST listener on this PR; production TLS remaining  
 **Last reviewed:** 2026-08-13
 
 ## Boundary
@@ -25,6 +25,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | purpose-bound export auth | `tepp_api` `authorize_export` with `ModularServiceConsumer` | TEPP gate |
 | HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
+| Live loopback HTTP/1.1 listener | `tepp_api` `NaruonLiveService` binds `127.0.0.1` only | naruon → TEPP |
 
 Committed examples live under `examples/`. Schema for analysis-run requests lives under `schemas/analysis_run_request_v1.json`.
 

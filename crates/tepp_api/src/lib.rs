@@ -7,7 +7,8 @@
 //! scientific crates; this crate only defines fail-closed interchange shapes.
 //! naruon HTTP interchange is a versioned `https` POST to analysis-run and
 //! export paths; table-access URLs, review/Copilot headers, and lexical
-//! inference claims fail closed (ADR 0011).
+//! inference claims fail closed (ADR 0011). A loopback-only live HTTP/1.1
+//! listener serves those POSTs without TLS termination or table access.
 
 mod analysis_run;
 mod authorization;
@@ -15,6 +16,7 @@ mod envelope;
 mod error;
 mod export;
 mod naruon_http;
+mod naruon_live;
 mod wire;
 
 /// Analysis-run contract version constant.
@@ -66,3 +68,11 @@ pub use naruon_http::naruon_analysis_run_exchange_with_headers;
 pub use naruon_http::naruon_export_exchange;
 /// Refuse lexical heuristics as TEPP inference claims.
 pub use naruon_http::naruon_may_claim_tepp_inference;
+/// Maximum live HTTP header-block size in bytes.
+pub use naruon_live::NARUON_LIVE_HEADER_BYTE_LIMIT;
+/// Maximum live HTTP header count.
+pub use naruon_live::NARUON_LIVE_HEADER_COUNT_LIMIT;
+/// Loopback live HTTP/1.1 response.
+pub use naruon_live::NaruonLiveResponse;
+/// Loopback live HTTP/1.1 naruon listener.
+pub use naruon_live::NaruonLiveService;
