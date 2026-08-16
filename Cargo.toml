@@ -11,6 +11,7 @@ members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
+    "crates/role_contradiction",
 ]
 default-members = [
     "crates/evidence_core",
@@ -23,6 +24,7 @@ default-members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
+    "crates/role_contradiction",
 ]
 
 [workspace.package]

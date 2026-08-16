@@ -68,6 +68,14 @@ Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reaso
 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers.
 
+## Roles, membership, and multilevel structure
+
+Biddle, B. J. (1986). Recent developments in role theory. *Annual Review of Sociology, 12*, 67–92. https://doi.org/10.1146/annurev.so.12.080186.000435
+
+Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100201
+
+Customer, partner, and competitor are contextual roles. TEPP refuses a customer/competitor pair in the same group and does not collapse those roles into one commercial class (Biddle, 1986; Browne et al., 2001).
+
 ## Unicode, language tags, and multilingual structure
 
 Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #15: Unicode normalization forms*. Unicode Consortium.
