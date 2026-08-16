@@ -135,9 +135,9 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
         )
 
     def test_citation_repair_drafts_are_not_landable_authority(self) -> None:
-        """#101, #102, #104, and #108 still name a draft as the gate."""
+        """#101, #102, #104, #108, #109, #111, and #112 still name a draft as the gate."""
 
-        for pull_request in (101, 102, 104, 108):
+        for pull_request in (101, 102, 104, 108, 109, 111, 112):
             with self.subTest(pull_request=pull_request):
                 self.assertEqual(
                     documentation.promotion_authority_failures(
@@ -232,8 +232,46 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             ],
         )
 
+    def test_inverted_and_paraphrased_landable_authority_sentences_fail(self) -> None:
+        """A PR number is not landable authority in any subject/object order."""
+
+        current_assessment = (
+            "- **active-PR:** `prediction_contradiction` Allen coverage gate"
+        )
+        for sentence in (
+            "PR #108 is the landable coverage gate.",
+            "The landable gate is PR #109.",
+            "The coverage-authority landing PR is PR #112.",
+            "Merge PR #111 as the coverage-authority landing PR.",
+        ):
+            with self.subTest(sentence=sentence):
+                self.assertEqual(
+                    documentation.promotion_authority_failures(
+                        sentence,
+                        current_assessment,
+                    ),
+                    [
+                        "DOCUMENTATION.md names a superseded draft as the "
+                        "coverage-gate authority"
+                    ],
+                )
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                current_assessment,
+                hourly=(
+                    "Prefer reviewing, repairing, and merging the "
+                    "coverage-authority landing PR #108."
+                ),
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md tells the "
+                "queue to merge superseded coverage drafts"
+            ],
+        )
+
     def test_hourly_unmerged_set_omitting_later_drafts_fails(self) -> None:
-        """#104, #108, #109, and #111 must appear in Keep-unmerged sentences."""
+        """#104, #108, #109, #111, and #112 must appear in Keep-unmerged sentences."""
 
         self.assertEqual(
             documentation.promotion_authority_failures(
@@ -251,6 +289,68 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             ],
         )
 
+    def test_naruon_live_http_subject_reads_subject_not_keep_clause(self) -> None:
+        """The naruon subject is the number after the live-HTTP phrase."""
+
+        self.assertEqual(
+            documentation.naruon_live_http_subject(
+                "naruon live HTTP loopback (PR #107; keep PR #87 and PR #105 unmerged)"
+            ),
+            "107",
+        )
+        self.assertEqual(
+            documentation.naruon_live_http_subject(
+                "naruon live HTTP is PR #107."
+            ),
+            "107",
+        )
+        self.assertEqual(
+            documentation.naruon_live_http_subject(
+                "naruon live HTTP loopback (PR #105; keep PR #87 and PR #107 unmerged)"
+            ),
+            "105",
+        )
+        self.assertIsNone(
+            documentation.naruon_live_http_subject("Keep PR #107 unmerged.")
+        )
+
+    def test_hourly_unmerged_without_naruon_subject_fails(self) -> None:
+        """A complete Keep-unmerged list still requires the naruon #107 subject."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                hourly=(
+                    "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, "
+                    "PR #108, PR #109, PR #111, and PR #112 unmerged."
+                ),
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md points naruon "
+                "live HTTP away from PR #107"
+            ],
+        )
+
+    def test_hourly_naruon_107_without_weaker_http_drafts_fails(self) -> None:
+        """PR #107 as subject is not enough if #87 and #105 leave the unmerged set."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                hourly=(
+                    "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, "
+                    "PR #108, PR #109, PR #111, and PR #112 unmerged. naruon "
+                    "live HTTP loopback (PR #107)."
+                ),
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md points naruon "
+                "live HTTP away from PR #107"
+            ],
+        )
+
     def test_hourly_naruon_pointer_away_from_107_fails(self) -> None:
         """The next buyer slice must stay on the live loopback listener, not #105."""
 
@@ -260,13 +360,68 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
                 "- **active-PR:** `prediction_contradiction` Allen coverage gate",
                 hourly=(
                     "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, "
-                    "PR #108, PR #109, and PR #111 unmerged. naruon live HTTP "
-                    "loopback (PR #105; keep PR #87 unmerged)"
+                    "PR #108, PR #109, PR #111, and PR #112 unmerged. naruon "
+                    "live HTTP loopback (PR #105; keep PR #87 unmerged)"
                 ),
             ),
             [
                 "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md points naruon "
                 "live HTTP away from PR #107"
+            ],
+        )
+
+    def test_hourly_naruon_subject_ignores_keep_unmerged_107_mention(self) -> None:
+        """PR #107 in a keep-unmerged clause is not the naruon live-HTTP subject."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                hourly=(
+                    "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, "
+                    "PR #108, PR #109, PR #111, and PR #112 unmerged. naruon "
+                    "live HTTP loopback (PR #105; keep PR #87 and PR #107 "
+                    "unmerged)"
+                ),
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md points naruon "
+                "live HTTP away from PR #107"
+            ],
+        )
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                hourly=(
+                    "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, "
+                    "PR #108, PR #109, PR #111, and PR #112 unmerged. Do not "
+                    "use PR #107. naruon live HTTP is PR #105."
+                ),
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md points naruon "
+                "live HTTP away from PR #107"
+            ],
+        )
+
+    def test_negated_keep_unmerged_coverage_lock_fails(self) -> None:
+        """A negated Keep-unmerged sentence is not a lock."""
+
+        self.assertEqual(
+            documentation.promotion_authority_failures(
+                "The active-PR coverage gate in `prediction_contradiction` requires coverage.",
+                "- **active-PR:** `prediction_contradiction` Allen coverage gate",
+                hourly=(
+                    "Do not keep PR #93, PR #94, PR #97, PR #101, PR #102, "
+                    "PR #104, PR #108, PR #109, PR #111, and PR #112 unmerged. "
+                    "naruon live HTTP loopback (PR #107; keep PR #87 and "
+                    "PR #105 unmerged)"
+                ),
+            ),
+            [
+                "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md negates the "
+                "Keep-unmerged coverage-authority lock"
             ],
         )
 
@@ -284,9 +439,10 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
         )
         current_hourly = (
             "Keep PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, "
-            "PR #108, PR #109, and PR #111 unmerged. Prefer merging the "
-            "coverage-authority landing PR. naruon live HTTP loopback "
-            "(PR #107; keep PR #87 and PR #105 unmerged)"
+            "PR #108, PR #109, PR #111, and PR #112 unmerged. Prefer "
+            "reviewing the `prediction_contradiction` coverage gate. "
+            "naruon live HTTP loopback (PR #107; keep PR #87 and "
+            "PR #105 unmerged)"
         )
         self.assertEqual(
             documentation.promotion_authority_failures(
