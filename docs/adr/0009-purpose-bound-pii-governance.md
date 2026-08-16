@@ -1,7 +1,7 @@
 # ADR 0009 — Purpose-bound PII governance without blanket masking
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — `encrypted_mapping` seals source identity with a keyed `SHA-256` HMAC envelope; persistence/KMS and remaining authorization adapters stay accepted-target  
 **Date:** 2026-08-10  
 **Supersedes:** None.
 
