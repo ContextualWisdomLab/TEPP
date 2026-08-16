@@ -76,6 +76,10 @@ ADR_REQUIRED_HEADINGS = (
     "## Consequences",
     "## Verification",
 )
+STALE_COVERAGE_GATE_PARENTHETICAL = re.compile(
+    r"prediction_contradiction` \(PR #9[34]\)"
+)
+STALE_ACTIVE_PR_COVERAGE_GATE = re.compile(r"\*\*active-PR:\*\*\s*PR #9[34]\b")
 
 CANONICAL_LINKS = (
     "docs/product/prd-v0.4-approved.md",
@@ -117,6 +121,37 @@ def validate_required_files() -> None:
     missing = [path for path in REQUIRED_FILES if not (ROOT / path).is_file()]
     if missing:
         raise AssertionError(f"missing required documentation: {missing}")
+
+
+def promotion_authority_failures(documentation: str, assessment: str) -> list[str]:
+    """Return stale pointers that name a superseded draft as the coverage gate.
+
+    PR #93 and PR #94 still expose a `refuse_promotion` path that accepts
+    unmatched predicted mass. Canonical docs must name the crate, not those
+    drafts, as the landable authority.
+    """
+
+    failures: list[str] = []
+    if STALE_COVERAGE_GATE_PARENTHETICAL.search(documentation):
+        failures.append(
+            "DOCUMENTATION.md names a superseded draft as the coverage-gate authority"
+        )
+    if STALE_ACTIVE_PR_COVERAGE_GATE.search(assessment):
+        failures.append(
+            "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
+            "active-PR coverage gate"
+        )
+    return failures
+
+
+def validate_promotion_authority_pointers() -> None:
+    """Refuse canonical docs that still treat PR #93 or #94 as landable authority."""
+
+    documentation = (ROOT / "DOCUMENTATION.md").read_text(encoding="utf-8")
+    assessment = (ROOT / "docs/DOCUMENTATION_ASSESSMENT.md").read_text(encoding="utf-8")
+    failures = promotion_authority_failures(documentation, assessment)
+    if failures:
+        raise AssertionError("\n".join(failures))
 
 
 def validate_documentation_map() -> None:
@@ -234,6 +269,7 @@ def main() -> None:
     """Run all deterministic documentation validation groups."""
 
     validate_required_files()
+    validate_promotion_authority_pointers()
     validate_documentation_map()
     validate_adr_graph()
     validate_markdown()
