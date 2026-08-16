@@ -9,6 +9,7 @@ use crate::document_sql::{
     revise_document_atomic_sql,
 };
 use crate::document_store::{AuditEvent, DocumentRecord};
+use crate::entity_sql::{EntityRecord, insert_entity_record_sql, select_entity_record_by_id_sql};
 use crate::instance_sql::{
     EventInstanceRecord, insert_event_instance_sql, select_event_instance_as_known_at_sql,
 };
@@ -26,6 +27,9 @@ use crate::model_run_sql::{
     CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord,
     insert_corpus_split_manifest_sql, insert_model_artifact_sql, insert_model_run_sql,
     select_model_artifacts_by_run_sql, select_model_run_by_id_sql,
+};
+use crate::project_sql::{
+    ProjectRecord, insert_project_record_sql, select_project_record_by_id_sql,
 };
 use crate::relation_sql::{EventRelationRecord, insert_event_relation_sql};
 use crate::restore_integrity::restore_integrity_probe_sqls;
@@ -237,6 +241,55 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         record: &ModelArtifactRecord,
     ) -> Result<(), PersistenceError> {
         let sql = insert_model_artifact_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert a typed entity membership target under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns label validation or transport failures.
+    pub fn insert_entity_record(&mut self, record: &EntityRecord) -> Result<(), PersistenceError> {
+        let sql = insert_entity_record_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up an entity membership target by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_entity_record_by_id(
+        &mut self,
+        entity_record_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_entity_record_by_id_sql(entity_record_id);
+        self.session.execute(&sql)
+    }
+
+    /// Insert a typed project membership target under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns label validation or transport failures.
+    pub fn insert_project_record(
+        &mut self,
+        record: &ProjectRecord,
+    ) -> Result<(), PersistenceError> {
+        let sql = insert_project_record_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up a project membership target by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_project_record_by_id(
+        &mut self,
+        project_record_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_project_record_by_id_sql(project_record_id);
         self.session.execute(&sql)
     }
 
@@ -503,6 +556,59 @@ mod tests {
         }
     }
 
+    fn exercise_entity_project_targets(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let (available, system) = (
+            AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+            SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+        );
+        let entity = crate::EntityRecord {
+            entity_record_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            entity_type_code: "author".into(),
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_entity_record(&entity).expect("entity insert");
+        repo.submit_entity_record_by_id(entity.entity_record_id)
+            .expect("entity lookup");
+        let mut bad_entity = entity;
+        bad_entity.entity_type_code.clear();
+        assert_eq!(
+            repo.insert_entity_record(&bad_entity),
+            Err(PersistenceError::InvalidEntityRecord)
+        );
+
+        let project = crate::ProjectRecord {
+            project_record_id: uuid::Uuid::from_u128(2),
+            tenant_record_id: uuid::Uuid::nil(),
+            project_status_code: "active".into(),
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_project_record(&project)
+            .expect("project insert");
+        repo.submit_project_record_by_id(project.project_record_id)
+            .expect("project lookup");
+        let mut bad_project = project;
+        bad_project.project_status_code = "active';x".into();
+        assert_eq!(
+            repo.insert_project_record(&bad_project),
+            Err(PersistenceError::InvalidProjectRecord)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO entity_record"))
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO project_record"))
+        );
+    }
+
     fn exercise_membership_assignment(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
         let membership = sample_membership();
         repo.insert_membership_assignment(&membership)
@@ -706,6 +812,7 @@ mod tests {
                 .any(|sql| sql.contains("INSERT INTO reproducibility_manifest"))
         );
         exercise_model_run_chain(&mut repo, &manifest);
+        exercise_entity_project_targets(&mut repo);
         exercise_membership_assignment(&mut repo);
         exercise_event_relation(&mut repo);
         exercise_event_mention(&mut repo);

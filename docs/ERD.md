@@ -3,7 +3,7 @@
 **Status:** Accepted logical target model with current implementation maturity explicitly marked.  
 **Last reviewed:** 2026-08-13
 
-Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`), tenant row-level security (`0002`), the model-run/artifact chain (`0003`), append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006`), event-relation/mention/instance SQL, source-artifact SQL, audit-event SQL, and naruon HTTP interchange contracts as executable migration/application contracts with live CI. Concurrent document-write stress (atomic revise + live multi-session proof) is on the active PR and is not implemented-main until exact-head checks, review, and protected-main integration complete. Broader planned ERD entities and backup/recovery gates remain accepted-target.
+Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`), tenant row-level security (`0002`), the model-run/artifact chain (`0003`), append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006`), event-relation/mention/instance SQL, source-artifact SQL, audit-event SQL, concurrent document-write stress, backup/restore integrity, and naruon HTTP interchange contracts as executable migration/application contracts with live CI. Entity/project target SQL contracts for `entity_record` and `project_record` are on this PR and are not implemented-main until exact-head checks, review, and protected-main integration complete. Broader planned ERD entities remain accepted-target.
 
 ## Current domain foundation
 

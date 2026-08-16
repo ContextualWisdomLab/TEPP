@@ -15,6 +15,9 @@
 //! contracts chain immutable run identities to those manifests. Typed
 //! membership-assignment SQL (migration `0006`) replaces the polymorphic 0001 stub so documents
 //! can belong to multiple entities and projects without atomistic collapse.
+//! Entity and project target SQL refuse empty, oversized, or hostile labels
+//! before `INSERT`, so membership foreign keys cannot be seeded from raw
+//! attacker-controlled type or status strings.
 //! Concurrent document revises use one transactional `DO` block that requires
 //! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
 //! typed conflict errors. Restore integrity probes refuse to mark analytical
@@ -26,6 +29,7 @@ mod concurrent_write;
 mod cutoff;
 mod document_sql;
 mod document_store;
+mod entity_sql;
 mod error;
 mod instance_sql;
 mod live_pool;
@@ -36,6 +40,7 @@ mod mention_sql;
 mod migration;
 mod model_run_sql;
 mod naming;
+mod project_sql;
 mod relation_sql;
 mod restore_integrity;
 mod sql_session;
@@ -86,6 +91,12 @@ pub use document_store::AuditEvent;
 pub use document_store::DocumentRecord;
 /// In-memory bitemporal document store.
 pub use document_store::DocumentStore;
+/// Typed entity membership-target row.
+pub use entity_sql::EntityRecord;
+/// Render insert SQL for a validated entity record.
+pub use entity_sql::insert_entity_record_sql;
+/// Render selection SQL for an entity record by primary key.
+pub use entity_sql::select_entity_record_by_id_sql;
 /// Migration SQL contract violations.
 pub use error::MigrationContractError;
 /// Fail-closed persistence domain errors.
@@ -150,6 +161,12 @@ pub use model_run_sql::select_model_artifacts_by_run_sql;
 pub use model_run_sql::select_model_run_by_id_sql;
 /// Multi-word `snake_case` database object naming.
 pub use naming::is_multi_word_snake_case;
+/// Typed project membership-target row.
+pub use project_sql::ProjectRecord;
+/// Render insert SQL for a validated project record.
+pub use project_sql::insert_project_record_sql;
+/// Render selection SQL for a project record by primary key.
+pub use project_sql::select_project_record_by_id_sql;
 /// Typed event-relation row bound to the ERD transition vocabulary.
 pub use relation_sql::EventRelationRecord;
 /// Render insert SQL for a validated event relation.

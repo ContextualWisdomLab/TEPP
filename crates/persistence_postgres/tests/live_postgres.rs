@@ -7,10 +7,10 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
-    AuditEvent, CorpusSplitManifestRecord, DocumentRecord, LiveDocumentRepository,
+    AuditEvent, CorpusSplitManifestRecord, DocumentRecord, EntityRecord, LiveDocumentRepository,
     LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
-    ModelRunRecord, PersistenceError, ReproducibilityManifestRecord, SqlSession, apply_sql_batch,
-    assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
+    ModelRunRecord, PersistenceError, ProjectRecord, ReproducibilityManifestRecord, SqlSession,
+    apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
     require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
@@ -602,24 +602,36 @@ fn live_membership(
     }
 }
 
-fn entity_insert_sql(
-    entity_id: Uuid,
+fn live_entity(
+    entity_record_id: Uuid,
     tenant_record_id: Uuid,
-    entity_type: &str,
+    entity_type_code: &str,
     available: AvailableTime,
     system: SystemTime,
-) -> String {
-    format!(
-        "INSERT INTO entity_record (\
-            entity_record_id, tenant_record_id, entity_type_code, \
-            system_time, available_time\
-         ) VALUES (\
-            '{entity_id}'::uuid, '{tenant_record_id}'::uuid, '{entity_type}', \
-            '{system}'::timestamptz, '{available}'::timestamptz\
-         )",
-        system = system.to_rfc3339(),
-        available = available.to_rfc3339(),
-    )
+) -> EntityRecord {
+    EntityRecord {
+        entity_record_id,
+        tenant_record_id,
+        entity_type_code: entity_type_code.into(),
+        system_time: system,
+        available_time: available,
+    }
+}
+
+fn live_project(
+    project_record_id: Uuid,
+    tenant_record_id: Uuid,
+    project_status_code: &str,
+    available: AvailableTime,
+    system: SystemTime,
+) -> ProjectRecord {
+    ProjectRecord {
+        project_record_id,
+        tenant_record_id,
+        project_status_code: project_status_code.into(),
+        system_time: system,
+        available_time: available,
+    }
 }
 
 fn seed_membership_targets(
@@ -638,44 +650,63 @@ fn seed_membership_targets(
         .execute(&set_session_tenant_sql(Uuid::nil()))
         .expect("bind wrong tenant GUC");
     assert!(
-        repo.session_mut()
-            .execute(&entity_insert_sql(
-                entity_a,
-                tenant_record_id,
-                "author",
-                available,
-                system,
-            ))
-            .is_err(),
+        repo.insert_entity_record(&live_entity(
+            entity_a,
+            tenant_record_id,
+            "author",
+            available,
+            system,
+        ))
+        .is_err(),
         "wrong tenant GUC must reject entity_record insert under FORCE RLS"
     );
     repo.session_mut()
         .execute(&set_session_tenant_sql(tenant_record_id))
         .expect("bind membership tenant GUC");
+    assert_eq!(
+        repo.insert_entity_record(&live_entity(
+            entity_a,
+            tenant_record_id,
+            "author'; DROP TABLE",
+            available,
+            system,
+        )),
+        Err(PersistenceError::InvalidEntityRecord),
+        "hostile entity_type_code must fail closed before SQL"
+    );
+    assert_eq!(
+        repo.insert_project_record(&live_project(
+            project,
+            tenant_record_id,
+            "active;closed",
+            available,
+            system,
+        )),
+        Err(PersistenceError::InvalidProjectRecord),
+        "hostile project_status_code must fail closed before SQL"
+    );
     for (entity_id, entity_type) in [(entity_a, "author"), (entity_b, "department")] {
-        repo.session_mut()
-            .execute(&entity_insert_sql(
-                entity_id,
-                tenant_record_id,
-                entity_type,
-                available,
-                system,
-            ))
-            .expect("insert entity_record");
-    }
-    repo.session_mut()
-        .execute(&format!(
-            "INSERT INTO project_record (\
-                project_record_id, tenant_record_id, project_status_code, \
-                system_time, available_time\
-             ) VALUES (\
-                '{project}'::uuid, '{tenant_record_id}'::uuid, 'active', \
-                '{system}'::timestamptz, '{available}'::timestamptz\
-             )",
-            system = system.to_rfc3339(),
-            available = available.to_rfc3339(),
+        repo.insert_entity_record(&live_entity(
+            entity_id,
+            tenant_record_id,
+            entity_type,
+            available,
+            system,
         ))
-        .expect("insert project_record");
+        .expect("insert entity_record");
+        repo.submit_entity_record_by_id(entity_id)
+            .expect("select entity_record");
+    }
+    repo.insert_project_record(&live_project(
+        project,
+        tenant_record_id,
+        "active",
+        available,
+        system,
+    ))
+    .expect("insert project_record");
+    repo.submit_project_record_by_id(project)
+        .expect("select project_record");
     repo.session_mut()
         .execute(&reset_app_runtime_role_sql())
         .expect("RESET ROLE after membership seed");
