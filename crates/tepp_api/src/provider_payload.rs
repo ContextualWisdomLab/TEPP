@@ -795,4 +795,127 @@ mod tests {
             "outcome wire name must change the digest when grant, mapping, and time stay fixed"
         );
     }
+
+    #[test]
+    fn rfc3339_rejects_impossible_calendar_and_malformed_separators() {
+        // Fixed-width UTC shape but impossible calendar → TemporalInstant fails closed.
+        assert!(!is_rfc3339_utc("2026-02-30T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-13-01T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-00-01T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-00T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-32T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T24:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:60:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:00:60Z"));
+        // Separator / terminator failures that still keep length 20.
+        assert!(!is_rfc3339_utc("2026/01/01T00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01 00:00:00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00-00-00Z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:00:00z"));
+        assert!(!is_rfc3339_utc("2026-01-01T00:00:0aZ"));
+        assert_eq!(
+            minimize_provider_payload(
+                &grant(AnalyticalPurpose::ScientificValidation, false),
+                &offer(None),
+                "2026-02-30T00:00:00Z",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let bad_from = PurposeGrant {
+            valid_from: "2026-02-30T00:00:00Z".into(),
+            ..grant(AnalyticalPurpose::ScientificValidation, false)
+        };
+        assert_eq!(
+            minimize_provider_payload(&bad_from, &offer(None), "2026-06-15T12:00:00Z"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let bad_to = PurposeGrant {
+            valid_to: Some("2026-13-01T00:00:00Z".into()),
+            ..grant(AnalyticalPurpose::ScientificValidation, false)
+        };
+        assert_eq!(
+            minimize_provider_payload(&bad_to, &offer(None), "2026-06-15T12:00:00Z"),
+            Err(ApiError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn digest_and_audit_cover_open_ended_grant_and_sink_failure() {
+        let open = PurposeGrant {
+            valid_to: None,
+            reidentification_authorized: true,
+            ..grant(AnalyticalPurpose::ScientificValidation, true)
+        };
+        let open_digest = reidentification_decision_digest(
+            &open,
+            &mapping(),
+            "2026-06-15T12:00:00Z",
+            ReidentificationAuditOutcome::Allowed,
+        )
+        .expect("open digest");
+        let closed_digest = reidentification_decision_digest(
+            &grant(AnalyticalPurpose::ScientificValidation, true),
+            &mapping(),
+            "2026-06-15T12:00:00Z",
+            ReidentificationAuditOutcome::Allowed,
+        )
+        .expect("closed digest");
+        assert_ne!(
+            open_digest, closed_digest,
+            "open-ended valid_to must change the canonical audit digest"
+        );
+        let unauthorized = reidentification_decision_digest(
+            &grant(AnalyticalPurpose::ScientificValidation, false),
+            &mapping(),
+            "2026-06-15T12:00:00Z",
+            ReidentificationAuditOutcome::Denied,
+        )
+        .expect("unauthorized digest");
+        assert_ne!(closed_digest, unauthorized);
+
+        struct FailingSink;
+        impl ReidentificationAuditSink for FailingSink {
+            fn append_reidentification_audit(
+                &mut self,
+                _record: &ReidentificationAuditRecord,
+            ) -> Result<(), ApiError> {
+                Err(ApiError::AuthorizationDenied)
+            }
+        }
+        let mut sink = FailingSink;
+        assert_eq!(
+            disclose_identity_mapping_with_audit(
+                &grant(AnalyticalPurpose::ScientificValidation, true),
+                &mapping(),
+                "2026-06-15T12:00:00Z",
+                &mut sink,
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+
+        let mut sink = RecordingAuditSink::default();
+        let (disclosed, audit) = disclose_identity_mapping_with_audit(
+            &grant(AnalyticalPurpose::ScientificValidation, true),
+            &mapping(),
+            "2026-06-15T12:00:00Z",
+            &mut sink,
+        )
+        .expect("allowed with audit");
+        assert_eq!(disclosed.direct_identity(), "Pat Lee");
+        assert_eq!(audit.tenant_workspace_id(), "tenant-ws-1");
+        assert_eq!(audit.principal_id(), "principal-analyst-1");
+        assert_eq!(audit.purpose_wire_name(), "scientific_validation");
+        assert_eq!(audit.action_code(), "reidentify_identity_mapping");
+        assert_eq!(audit.opaque_analytical_id(), "entity-1");
+        assert_eq!(audit.decision_time(), "2026-06-15T12:00:00Z");
+        assert_eq!(audit.outcome(), ReidentificationAuditOutcome::Allowed);
+        assert!(audit.decision_digest().starts_with("sha256:"));
+        assert_eq!(audit.outcome().wire_name(), "allowed");
+        assert_eq!(
+            ReidentificationAuditOutcome::Denied.wire_name(),
+            "denied"
+        );
+        assert_eq!(sink.records.len(), 1);
+        assert_eq!(sink.records[0].decision_digest(), audit.decision_digest());
+    }
 }
