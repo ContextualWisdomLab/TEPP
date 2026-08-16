@@ -23,6 +23,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Production TLS bind gates | `service_tls` | accepted-target | active PR | plaintext production, table-access host, mismatched PEM, and orchestrator loopback refusal plus computed recovery | ADR 0011; rustls config is not a deployed listener |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 

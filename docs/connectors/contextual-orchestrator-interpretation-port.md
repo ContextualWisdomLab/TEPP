@@ -1,7 +1,7 @@
 # contextual-orchestrator interpretation port for TEPP
 
 **Status:** Accepted-target modular integration contract  
-**Last reviewed:** 2026-08-12
+**Last reviewed:** 2026-08-16
 
 ## Boundary
 
@@ -12,7 +12,7 @@ TEPP may call a provider-neutral interpretation/orchestration port for semantic 
 - model registry / scientific acceptance gates;
 - merge, release, or independent review authority (ADR 0010; ADR 0015).
 
-LLM/provider settings are execution policy only. Deterministic scientific gates remain authoritative (AGENTS.md §11).
+LLM/provider settings are execution policy only. Deterministic scientific gates remain authoritative (AGENTS.md §11). A production live bind uses `service_tls::authorize_orchestrator_live_port` and cannot be loopback plaintext. This document does not claim a deployed TLS listener.
 
 ## Allowed orchestration modes
 

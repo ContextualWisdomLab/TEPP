@@ -1,7 +1,7 @@
 # TEPP Requirements, Research, and Evidence Traceability
 
 **Status:** Accepted cross-cutting traceability baseline  
-**Last reviewed:** 2026-08-13
+**Last reviewed:** 2026-08-16
 
 The full APA 7th standards/literature register remains `docs/research/standards-and-literature.md`. This matrix links durable requirements to their owning decisions and implementation/evidence maturity without duplicating the bibliography.
 
@@ -35,9 +35,9 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | future contextual-orchestrator integration + ablation evidence | accepted-target |
 | purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | future authorization/persistence/export/provider adapters | accepted-target |
 | tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | future service/persistence boundaries | accepted-target |
-| standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; future service ports | partial |
+| standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md`; `docs/research/production-tls-bind-gates.md` | current standalone crates; `service_tls` production bind gates on the active PR; remaining live listeners | partial |
 | naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract on protected main; `tepp_api` HTTP interchange (active PR); live HTTP service remaining | partial |
-| contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `docs/connectors/contextual-orchestrator-interpretation-port.md`; live port remaining | partial |
+| contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `docs/connectors/contextual-orchestrator-interpretation-port.md`; `service_tls` refuses loopback plaintext as a live production port (active PR); HTTP listener remaining | partial |
 | Actions registry identities bound to protected-main tree (orphan disable) | Operability; GitHub Actions REST | `scripts/actions_workflow_fleet.py` + issue #20 tests/doctoring; live disable remains operator-authorized | active-PR |
 | autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | future safe OpenCode/NVIDIA autonomous-development workflow | accepted-target |
 | contextual-orchestrator execution boundary | ADR 0010/0011 | provider-neutral orchestration port; TEPP retains scientific authority | accepted-target |

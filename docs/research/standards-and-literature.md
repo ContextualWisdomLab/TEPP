@@ -116,6 +116,14 @@ National Institute of Standards and Technology. (n.d.). *AI risk management fram
 
 TEPP uses these sources as management/risk/readiness inputs, not as self-certification authority. ISO/IEC 42001:2023 and ISO/IEC 23894:2023 are published international standards (International Organization for Standardization, 2023a, 2023b). NIST AI RMF 1.0 remains the published framework while NIST is preparing a revision (Tabassi, 2023; National Institute of Standards and Technology, n.d.); the repository tracks the revision but does not silently treat an unpublished successor as normative. AICPA Trust Services Criteria are readiness inputs rather than self-issued attestation (American Institute of Certified Public Accountants, 2023). KISA currently describes CSAP service types as IaaS, SaaS, and DaaS and grades as high, medium, and low, while noting that the high and medium grades await later implementation (한국인터넷진흥원, n.d.). CSAP and SOC 2 evidence depend on actual deployment/organization controls and independent assessment.
 
+## Transport Layer Security for production service binds
+
+Rescorla, E. (2018). *The transport layer security (TLS) protocol version 1.3* (RFC 8446). Internet Engineering Task Force. https://doi.org/10.17487/RFC8446
+
+McKay, K. A., & Cooper, D. A. (2019). *Guidelines for the selection, configuration, and use of Transport Layer Security (TLS) implementations* (NIST Special Publication 800-52 Revision 2). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-52r2
+
+TEPP uses these sources to require rustls material on non-loopback service binds and to refuse plaintext production ports. They are not deployment or certification evidence.
+
 ## Security, accessibility, and software supply chain
 
 World Wide Web Consortium. (2023). *Web content accessibility guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/

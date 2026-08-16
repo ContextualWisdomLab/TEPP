@@ -11,6 +11,7 @@ members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
+    "crates/service_tls",
 ]
 default-members = [
     "crates/evidence_core",
@@ -23,6 +24,7 @@ default-members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
+    "crates/service_tls",
 ]
 
 [workspace.package]
@@ -45,6 +47,8 @@ sha2 = { version = "=0.10.9", default-features = false }
 uuid = { version = "=1.24.0", features = ["serde", "v7"] }
 tokio = { version = "=1.47.1", default-features = false, features = ["rt-multi-thread", "macros", "time"] }
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "postgres", "tls-rustls-ring-webpki"] }
+rustls = { version = "=0.23.43", default-features = false, features = ["std", "tls12", "ring"] }
+rustls-pemfile = { version = "=2.2.0", default-features = false, features = ["std"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
