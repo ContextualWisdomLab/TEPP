@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `citation_edge` provenance gate: citation, translation, revision, and retrospective-report edges may point to the past but cannot become input-process-outcome transitions; recovered kinds match known truth at a higher computed rate than collapsing every edge to citation (ADR 0002/0003).
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
 - `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).
