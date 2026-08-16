@@ -1,14 +1,21 @@
-# Predicted-versus-observed temporal contradiction (doctoring)
+# Predicted-versus-observed temporal contradiction
 
 ## Scope
 
-`prediction_contradiction` compares half-open event-time intervals. A
-predicted interval that is disjoint from later-observed evidence cannot be
-promoted to fact. Recovery is the computed share of contradiction flags that
-match known truth.
+`prediction_contradiction` is a promotion policy over
+`temporal_core::classify_interval_relation`. A predicted closed proper
+event-time interval cannot become observed fact when the Allen relation is
+`before` or `after` (contradiction) or `meets` / `met_by` (adjacent, no
+interior overlap). Observed evidence whose availability time exceeds the
+analysis knowledge cutoff is ineligible.
+
+Label agreement on those contradiction flags is a helper for the gate. It is
+not RMSE, bias, or interval-coverage recovery against a generative truth
+process.
 
 This slice does not run the `temporal_core` path-consistency reasoner, fit
-CHRONOS schemas, or claim a unique interval algebra.
+CHRONOS schemas, extract TDT tracks, or claim that the full ADR 0016
+intelligence stack is implemented.
 
 ## Authority
 
@@ -18,13 +25,14 @@ CHRONOS schemas, or claim a unique interval algebra.
   remain hypothetical until supported by later evidence; temporal
   contradiction can reject a proposed promotion.
 - `docs/adr/0002-six-clock-temporal-semantics.md` — event/valid time is
-  the clock for occurrence intervals.
+  the clock for occurrence intervals; availability may not exceed cutoff.
 
 ### Supporting literature
 
-Allen (1983) defines thirteen interval relations, including disjoint
-`before`/`after`. Disjointness is sufficient to refuse promotion; this
-crate does not implement the full composition table.
+Allen (1983) defines thirteen interval relations. `before` and `after` are
+strictly disjoint with a gap. `meets` and `met_by` share an endpoint and are
+not network contradictions. This crate uses that distinction for promotion
+and does not implement the composition table or path consistency.
 
 Allen, J. F. (1983). Maintaining knowledge about temporal intervals.
 *Communications of the ACM, 26*(11), 832–843.

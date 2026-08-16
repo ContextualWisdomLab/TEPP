@@ -20,6 +20,18 @@ run may print the task contract without either credential.
 When a PR exists, normal review → repair → exact-head Checks → merge governance
 owns the hour. The scheduler does not create a competing branch.
 
+Current executable queue while drafts remain open:
+
+1. Repair and merge the predicted-versus-observed Allen promotion gate
+   (`prediction_contradiction` / PR #93) using `temporal_core` classification,
+   not a second interval algebra.
+2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #87),
+   `text_segment` SQL contracts on existing migration `0006`, retention and
+   legal-hold migration `0007` (PR #45), foundation known-truth recovery
+   study, then CHRONOS forecast Brier calibration (PR #85).
+3. Do not open a competing hourly proposal until the open-PR inventory is
+   empty. Prefer reviewing, repairing, and merging the existing drafts.
+
 ## Required repository configuration
 
 Configure these repository or organization values:

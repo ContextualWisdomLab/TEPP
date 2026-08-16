@@ -6,10 +6,16 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum PredictionContradictionError {
-    /// A predicted interval was disjoint from later-observed evidence.
+    /// Predicted and observed event-time intervals are Allen `before` or `after`.
     PredictionContradictsObservation,
-    /// An interval or recovery slice was empty, inverted, or length-mismatched.
+    /// Predicted and observed intervals meet but do not overlap in their interiors.
+    PredictionLacksOverlappingSupport,
+    /// Observed evidence became available after the analysis knowledge cutoff.
+    EvidenceAfterCutoff,
+    /// An interval is not a closed proper Allen input.
     InvalidIntervalPayload,
+    /// An agreement-rate comparison used empty or length-mismatched slices.
+    AgreementSliceMismatch,
 }
 
 impl fmt::Display for PredictionContradictionError {
@@ -18,7 +24,14 @@ impl fmt::Display for PredictionContradictionError {
             Self::PredictionContradictsObservation => {
                 "predicted interval contradicts observed evidence"
             }
+            Self::PredictionLacksOverlappingSupport => {
+                "predicted interval meets observation without overlapping support"
+            }
+            Self::EvidenceAfterCutoff => {
+                "observed evidence is available after the knowledge cutoff"
+            }
             Self::InvalidIntervalPayload => "invalid prediction-contradiction payload",
+            Self::AgreementSliceMismatch => "agreement slices are empty or length-mismatched",
         };
         formatter.write_str(message)
     }
@@ -38,8 +51,20 @@ mod tests {
                 "predicted interval contradicts observed evidence",
             ),
             (
+                PredictionContradictionError::PredictionLacksOverlappingSupport,
+                "predicted interval meets observation without overlapping support",
+            ),
+            (
+                PredictionContradictionError::EvidenceAfterCutoff,
+                "observed evidence is available after the knowledge cutoff",
+            ),
+            (
                 PredictionContradictionError::InvalidIntervalPayload,
                 "invalid prediction-contradiction payload",
+            ),
+            (
+                PredictionContradictionError::AgreementSliceMismatch,
+                "agreement slices are empty or length-mismatched",
             ),
         ] {
             assert_eq!(error.to_string(), message);

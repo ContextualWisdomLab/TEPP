@@ -1,7 +1,8 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR  
+**Implementation maturity:** active-PR — bounded predicted-vs-observed Allen promotion gate only; TDT detection/tracking, CHRONOS schema extraction, prediction calibration, and path-consistency laws remain accepted-target  
+
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 temporal semantics and ADR 0003 event ontology/membership.
 
