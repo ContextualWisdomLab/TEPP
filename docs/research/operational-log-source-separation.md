@@ -3,9 +3,11 @@
 ## Scope
 
 `operational_log` records action codes, opaque analytical subjects, and
-system time. Raw source text and source identity cannot enter the log.
-Blanket PII masking is not a log grant. Recovery is the computed share of
-replayed lines that match known truth.
+system time. `try_record` inspects caller-supplied source text, source
+identity, and blanket-mask intent before a line is created. A source
+identity cannot be converted into an `AnalyticalSubject`. Blanket PII
+masking is not a log grant. Recovery is the computed share of replayed
+lines that match known truth.
 
 This slice does not persist the log, ship it to a SIEM, or claim CSAP,
 SOC 2, or legal sufficiency.
@@ -30,8 +32,9 @@ does not certify TEPP.
 
 ISO/IEC 29100 treats data minimization as a privacy-engineering principle
 (International Organization for Standardization & International
-Electrotechnical Commission, 2011). TEPP uses it to keep source text out
-of the log, not as a certification claim.
+Electrotechnical Commission, 2024). TEPP uses it to keep source text out
+of the log, not as a certification claim. The 2011 edition and its 2018
+amendment are withdrawn.
 
 International Organization for Standardization and International
 Electrotechnical Commission. (2022). *Information security, cybersecurity
@@ -39,5 +42,6 @@ and privacy protection—Information security controls* (ISO/IEC Standard No.
 27002:2022).
 
 International Organization for Standardization and International
-Electrotechnical Commission. (2011). *Information technology—Security
-techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011).
+Electrotechnical Commission. (2024). *Information technology—Security
+techniques—Privacy framework* (ISO/IEC Standard No. 29100:2024).
+https://www.iso.org/standard/85938.html

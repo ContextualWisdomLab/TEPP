@@ -59,6 +59,8 @@ mod tests {
             ),
         ] {
             assert_eq!(error.to_string(), message);
+            let as_error: &dyn std::error::Error = &error;
+            assert!(as_error.source().is_none());
         }
     }
 }

@@ -98,7 +98,7 @@ TEPP separates stable record identity, content equality, exact text location, wi
 
 ## Privacy and operational log/source separation
 
-International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011). Data minimization informs `operational_log`; it is not a certification claim.
+International Organization for Standardization and International Electrotechnical Commission. (2024). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2024). https://www.iso.org/standard/85938.html Data minimization informs `operational_log`; it is not a certification claim. The 2011 edition and its 2018 amendment are withdrawn.
 
 International Organization for Standardization and International Electrotechnical Commission. (2022). *Information security, cybersecurity and privacy protection—Information security controls* (ISO/IEC Standard No. 27002:2022). Logging is an operational control, not authorization to copy source text or source identity into the log.
 

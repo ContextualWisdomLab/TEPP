@@ -33,8 +33,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | future `interpretation_gateway` | accepted-target |
 | adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | future contextual-orchestrator integration + ablation evidence | accepted-target |
-| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `operational_log` source-text/identity refusal on the active PR; persistence/live HTTP/provider adapters remaining | active-PR |
-| tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | `operational_log` opaque-subject log replay on the active PR; tenant/role persistence remaining | active-PR |
+| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `operational_log` `try_record` inspects source text, source identity, and blanket-mask intent on the active PR; persistence/live HTTP/provider adapters remaining | active-PR |
+| tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | `operational_log` opaque `AnalyticalSubject` replay on the active PR; tenant/role persistence remaining | active-PR |
 | standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; future service ports | partial |
 | naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract on protected main; `tepp_api` HTTP interchange (active PR); live HTTP service remaining | partial |
 | contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `docs/connectors/contextual-orchestrator-interpretation-port.md`; live port remaining | partial |
