@@ -67,6 +67,10 @@ fn unknown_derived_kind_codes_fail_closed() {
         inherit_sensitivity(SensitivityClass::Internal, 0),
         Err(DerivedSensitivityError::InvalidSensitivityPayload)
     );
+    assert_eq!(
+        inherit_sensitivity(SensitivityClass::Public, 99),
+        Err(DerivedSensitivityError::InvalidSensitivityPayload)
+    );
 }
 
 #[test]
