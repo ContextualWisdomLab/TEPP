@@ -94,7 +94,15 @@ fn all_well_formed_denial_paths_append_replayable_redacted_records() {
         &mut sink,
     );
 
-    assert_eq!(sink.records.len(), 5);
+    let mut operational = grant();
+    operational.purpose = AnalyticalPurpose::OperationalMonitoring;
+    assert_denied_and_audited(&operational, &mapping(), "2026-06-15T12:00:00Z", &mut sink);
+
+    let mut modular = grant();
+    modular.purpose = AnalyticalPurpose::ModularServiceConsumer;
+    assert_denied_and_audited(&modular, &mapping(), "2026-06-15T12:00:00Z", &mut sink);
+
+    assert_eq!(sink.records.len(), 7);
     assert!(
         sink.records
             .iter()

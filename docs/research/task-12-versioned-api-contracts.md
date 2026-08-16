@@ -33,6 +33,8 @@ ISO/IEC. (2019). *ISO/IEC 27701:2019 Security techniques — Extension to ISO/IE
 
 National Institute of Standards and Technology. (2020). *NIST Privacy Framework: A tool for improving privacy through enterprise risk management* (Version 1.0). U.S. Department of Commerce. https://doi.org/10.6028/NIST.CSWP.01162020
 
+National Institute of Standards and Technology. (2015). *Secure Hash Standard (SHS)* (FIPS PUB 180-4). https://doi.org/10.6028/NIST.FIPS.180-4
+
 ## Verification
 
 - unit tests for unknown fields, unsupported versions, empty identities, byte limits, GraphML escaping, example payload parsing, expired, not-yet-valid, inverted, cross-tenant, and impossible-calendar grant denial; provider mapping refusal; and audited elevated re-identification replay;
