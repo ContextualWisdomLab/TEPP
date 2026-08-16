@@ -1,5 +1,7 @@
 //! Production and loopback bind classification.
 
+use std::fmt;
+
 use crate::{TlsError, rustls_server_config};
 
 /// Whether a bind host is local development or a production TLS target.
@@ -23,13 +25,26 @@ pub enum BindDecision {
 }
 
 /// A requested service bind plus PEM material.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct TlsBindRequest<'a> {
     bind_host: &'a str,
     bind_port: u16,
     scheme: &'a str,
     certificate_pem: &'a str,
     private_key_pem: &'a str,
+}
+
+impl fmt::Debug for TlsBindRequest<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("TlsBindRequest")
+            .field("bind_host", &self.bind_host)
+            .field("bind_port", &self.bind_port)
+            .field("scheme", &self.scheme)
+            .field("certificate_pem", &"<redacted>")
+            .field("private_key_pem", &"<redacted>")
+            .finish()
+    }
 }
 
 /// A bind that passed production TLS or honest development classification.
@@ -264,5 +279,8 @@ mod tests {
         let cloned = authorized.clone();
         assert_eq!(cloned, authorized);
         let _ = format!("{authorized:?}");
+        let debug = format!("{request:?}");
+        assert!(debug.contains("<redacted>"));
+        assert!(!debug.contains("BEGIN "));
     }
 }

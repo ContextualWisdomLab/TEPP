@@ -23,10 +23,12 @@ claim TLS deployment, CSAP, SOC 2, or legal sufficiency.
 ### Supporting literature
 
 TLS 1.3 is the IETF transport-security protocol used here as the rustls
-configuration target. It does **not** certify TEPP deployment.
+configuration target (Rescorla, 2018). It does **not** certify TEPP
+deployment.
 
 NIST SP 800-52 Revision 2 recommends TLS for protecting network
-connections and does not authorize plaintext production service binds.
+connections (McKay & Cooper, 2019). TEPP policy, not that publication,
+refuses plaintext production service binds.
 
 Rescorla, E. (2018). *The transport layer security (TLS) protocol version
 1.3* (RFC 8446). Internet Engineering Task Force.

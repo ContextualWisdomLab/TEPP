@@ -155,6 +155,36 @@ fn missing_or_mismatched_certificate_material_fails_closed() {
 }
 
 #[test]
+fn bind_request_debug_redacts_certificate_and_private_key_pem() {
+    let request = request("203.0.113.10", "https", CERTIFICATE_PEM, PRIVATE_KEY_PEM);
+    let debug = format!("{request:?}");
+    assert!(
+        !debug.contains(CERTIFICATE_PEM),
+        "certificate PEM must not appear in Debug: {debug}"
+    );
+    assert!(
+        !debug.contains(PRIVATE_KEY_PEM),
+        "private key PEM must not appear in Debug: {debug}"
+    );
+    assert!(
+        !debug.contains("BEGIN CERTIFICATE"),
+        "certificate PEM header must not appear in Debug: {debug}"
+    );
+    assert!(
+        !debug.contains("BEGIN PRIVATE KEY") && !debug.contains("BEGIN RSA PRIVATE KEY"),
+        "private key PEM header must not appear in Debug: {debug}"
+    );
+    assert!(
+        debug.contains("<redacted>"),
+        "PEM fields must be masked: {debug}"
+    );
+    assert!(
+        debug.contains("203.0.113.10") && debug.contains("8443") && debug.contains("https"),
+        "non-secret bind fields must remain visible: {debug}"
+    );
+}
+
+#[test]
 fn recovered_tls_decisions_match_known_truth_better_than_a_collapsed_grant() {
     let truth = [
         BindDecision::ProductionTls,

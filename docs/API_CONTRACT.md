@@ -114,7 +114,7 @@ TEPP owns its application/API state, authorized evidence, model runs, and artifa
 
 ### contextual-orchestrator
 
-TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. A production live port must pass `service_tls::authorize_orchestrator_live_port` (rustls PEM on a non-loopback `https` bind). Loopback HTTP is not that production port. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
+TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. A production live port must pass `service_tls::authorize_orchestrator_live_port` (valid rustls PEM on an `https` bind). Loopback plaintext is refused; loopback `https` with valid PEM is authorized as production TLS, not as a development-only exception. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
 
 ### organization `.github`
 
