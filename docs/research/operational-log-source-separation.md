@@ -11,8 +11,9 @@ A source-identity `&str` cannot be converted into an `AnalyticalSubject`;
 masking is not a log grant. Recovery is the computed share of replayed
 lines that match known truth, including a collapsed-subject baseline.
 
-This slice does not persist the log, ship it to a SIEM, or claim CSAP,
-SOC 2, or legal sufficiency.
+`persistence_postgres` `audit_event` inserts call the same `try_record`
+gate before SQL is rendered. This slice does not ship the log to a SIEM
+or claim CSAP, SOC 2, or legal sufficiency.
 
 ## Authority
 

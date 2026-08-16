@@ -19,7 +19,8 @@
 //! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
 //! typed conflict errors. Restore integrity probes refuse to mark analytical
 //! state usable until tenant, digest, cutoff, temporal windows, and append-only
-//! triggers revalidate.
+//! triggers revalidate. `audit_event` inserts call `operational_log::try_record`
+//! so source text, source identity, and blanket-mask grants cannot become SQL.
 
 mod artifact_sql;
 mod concurrent_write;
@@ -80,8 +81,12 @@ pub use document_sql::insert_document_sql;
 pub use document_sql::revise_document_atomic_sql;
 /// Render revise close+insert SQL pair.
 pub use document_sql::revise_document_sqls;
+/// Closed operational-log action for an inspected `audit_event` append.
+pub use document_store::ACTION_AUDIT_EVENT_APPEND;
 /// Append-only audit event.
 pub use document_store::AuditEvent;
+/// Source payloads inspected before an `audit_event` insert.
+pub use document_store::AuditSourceInspection;
 /// Bitemporal document version.
 pub use document_store::DocumentRecord;
 /// In-memory bitemporal document store.

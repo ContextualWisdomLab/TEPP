@@ -7,11 +7,12 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
-    AuditEvent, CorpusSplitManifestRecord, DocumentRecord, LiveDocumentRepository,
-    LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
-    ModelRunRecord, PersistenceError, ReproducibilityManifestRecord, SqlSession, apply_sql_batch,
-    assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
-    require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
+    AuditEvent, AuditSourceInspection, CorpusSplitManifestRecord, DocumentRecord,
+    LiveDocumentRepository, LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog,
+    ModelArtifactRecord, ModelRunRecord, PersistenceError, ReproducibilityManifestRecord,
+    SqlSession, apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql,
+    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
+    set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -169,7 +170,8 @@ fn live_postgres_applies_migrations_and_document_sql() {
         subject_record_id: document_record_id,
         recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
     };
-    repo.append_audit(&audit).expect("append audit_event");
+    repo.append_audit(&audit, AuditSourceInspection::CLEAR)
+        .expect("append audit_event");
 
     // Owner inserts a reproducibility manifest for the same tenant, then proves
     // digest lookup SQL remains executable on the live transport.

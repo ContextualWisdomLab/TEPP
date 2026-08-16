@@ -1,7 +1,10 @@
 //! Parameterized SQL contracts for bitemporal document rows.
 
 use crate::PersistenceError;
-use crate::document_store::{AuditEvent, DocumentRecord};
+use crate::document_store::{
+    ACTION_AUDIT_EVENT_APPEND, AuditEvent, AuditSourceInspection, DocumentRecord,
+};
+use operational_log::{AnalyticalSubject, try_record};
 
 /// Validate digest and render an insert for an open document version.
 ///
@@ -124,14 +127,20 @@ pub fn as_valid_at_sql(
     )
 }
 
-/// Render append-only audit insert for a validated action code.
+/// Render append-only audit insert after `try_record` refuses forbidden payloads.
 ///
 /// # Errors
 ///
 /// Returns [`PersistenceError::InvalidAuditEvent`] when `action_code` is empty,
 /// longer than 128 bytes, or contains a control character, `'`, `;`, or `\`.
-pub fn append_audit_sql(event: &AuditEvent) -> Result<String, PersistenceError> {
+/// Returns source-payload errors when `inspection` supplies source text, source
+/// identity, or a blanket-mask grant.
+pub fn append_audit_sql(
+    event: &AuditEvent,
+    inspection: AuditSourceInspection<'_>,
+) -> Result<String, PersistenceError> {
     validate_audit_action(&event.action_code)?;
+    inspect_audit_source(event, inspection)?;
     Ok(format!(
         "INSERT INTO audit_event (\
             audit_event_id, tenant_record_id, action_code, subject_record_id, recorded_system_time\
@@ -156,6 +165,26 @@ fn optional_timestamptz(value: Option<String>) -> String {
 
 fn escape_literal(value: &str) -> String {
     value.replace('\'', "''")
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn unix_seconds(recorded: temporal_core::SystemTime) -> i64 {
+    recorded.instant().as_nanosecond().div_euclid(1_000_000_000) as i64
+}
+
+fn inspect_audit_source(
+    event: &AuditEvent,
+    inspection: AuditSourceInspection<'_>,
+) -> Result<(), PersistenceError> {
+    try_record(
+        ACTION_AUDIT_EVENT_APPEND,
+        AnalyticalSubject::from_opaque(event.subject_record_id.as_u128()),
+        unix_seconds(event.recorded_system_time),
+        inspection.source_text,
+        inspection.source_identity,
+        inspection.blanket_mask,
+    )?;
+    Ok(())
 }
 
 fn validate_audit_action(value: &str) -> Result<(), PersistenceError> {
@@ -188,7 +217,7 @@ mod tests {
         validate_audit_action, validate_digest,
     };
     use crate::PersistenceError;
-    use crate::document_store::{AuditEvent, DocumentRecord};
+    use crate::document_store::{AuditEvent, AuditSourceInspection, DocumentRecord};
     use temporal_core::{AvailableTime, EventTime, SystemTime};
 
     fn sample_record() -> DocumentRecord {
@@ -251,15 +280,29 @@ mod tests {
             subject_record_id: uuid::Uuid::nil(),
             recorded_system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
         };
-        let audit_sql = append_audit_sql(&audit).expect("audit");
+        let audit_sql = append_audit_sql(&audit, AuditSourceInspection::CLEAR).expect("audit");
         assert!(audit_sql.contains("INSERT INTO audit_event"));
         assert!(audit_sql.contains("revise"));
         assert_eq!(
-            append_audit_sql(&AuditEvent {
-                action_code: "revise'attempt".into(),
-                ..audit.clone()
-            }),
+            append_audit_sql(
+                &AuditEvent {
+                    action_code: "revise'attempt".into(),
+                    ..audit.clone()
+                },
+                AuditSourceInspection::CLEAR,
+            ),
             Err(PersistenceError::InvalidAuditEvent)
+        );
+        assert_eq!(
+            append_audit_sql(
+                &audit,
+                AuditSourceInspection {
+                    source_text: Some("source"),
+                    source_identity: None,
+                    blanket_mask: false,
+                },
+            ),
+            Err(PersistenceError::SourceTextNotAuditable)
         );
         assert!(validate_audit_action("revise").is_ok());
         assert!(validate_audit_action("").is_err());
