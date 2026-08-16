@@ -142,22 +142,34 @@ fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
     Ok(format!("{origin}{path}"))
 }
 
+/// Return whether `name` is a reserved naruon interchange header.
+pub(crate) fn header_is_reserved_standard(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "content-type" | "tepp-consumer" | "tepp-contract-version" | "idempotency-key"
+    )
+}
+
+/// Return whether `name` is a review, model, proxy, or bearer credential header.
+pub(crate) fn header_is_credential(name: &str) -> bool {
+    let lowered = name.to_ascii_lowercase();
+    lowered == "authorization"
+        || lowered == "proxy-authorization"
+        || lowered == "cookie"
+        || lowered == "x-api-key"
+        || lowered.contains("token")
+        || lowered.contains("copilot")
+        || lowered.contains("github")
+        || lowered.contains("nim")
+        || lowered.contains("nvidia")
+}
+
 fn refuse_credential_headers(extra_headers: &[(&str, &str)]) -> Result<(), ApiError> {
     for (name, _) in extra_headers {
-        let lowered = name.to_ascii_lowercase();
-        if matches!(
-            lowered.as_str(),
-            "content-type" | "tepp-consumer" | "tepp-contract-version" | "idempotency-key"
-        ) {
+        if header_is_reserved_standard(name) {
             return Err(ApiError::InvalidWirePayload);
         }
-        if lowered == "authorization"
-            || lowered == "cookie"
-            || lowered == "x-api-key"
-            || lowered.contains("token")
-            || lowered.contains("copilot")
-            || lowered.contains("github")
-        {
+        if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);
         }
     }
@@ -296,6 +308,14 @@ mod tests {
         );
         assert_eq!(
             refuse_credential_headers(&[("x-copilot-session", "t")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("Proxy-Authorization", "Basic x")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("x-nvidia-nim-key", "nvapi-x")]),
             Err(ApiError::AuthorizationDenied)
         );
     }

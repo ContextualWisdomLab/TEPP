@@ -1270,8 +1270,10 @@ dependencies = [
 name = "tepp_api"
 version = "0.1.0"
 dependencies = [
+ "jiff",
  "serde",
  "serde_json",
+ "temporal_core",
 ]
 
 [[package]]

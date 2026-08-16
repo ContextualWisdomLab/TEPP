@@ -92,6 +92,22 @@ fn review_and_copilot_headers_are_authorization_denied() {
         ),
         Err(ApiError::AuthorizationDenied)
     );
+    assert_eq!(
+        naruon_analysis_run_exchange_with_headers(
+            "https://tepp.example.test",
+            &run,
+            &[("Proxy-Authorization", "Basic review-agent")]
+        ),
+        Err(ApiError::AuthorizationDenied)
+    );
+    assert_eq!(
+        naruon_analysis_run_exchange_with_headers(
+            "https://tepp.example.test",
+            &run,
+            &[("x-nvidia-nim-key", "nvapi-example")]
+        ),
+        Err(ApiError::AuthorizationDenied)
+    );
 }
 
 #[test]

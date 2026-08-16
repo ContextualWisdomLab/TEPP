@@ -1,6 +1,6 @@
 [package]
 name = "tepp_api"
-description = "Versioned service DTOs, schemas, and export contracts."
+description = "Versioned service DTOs, schemas, export contracts, and loopback naruon HTTP."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,8 +14,10 @@ categories.workspace = true
 publish = false
 
 [dependencies]
+jiff = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+temporal_core = { path = "../temporal_core" }
 
 [lints]
 workspace = true
