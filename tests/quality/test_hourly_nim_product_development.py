@@ -228,6 +228,23 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         self.assertIn("APA", doctoring)
         self.assertIn("Do not configure `COPILOT_GITHUB_TOKEN`", runbook)
 
+    def test_hourly_queue_keeps_weaker_coverage_locks_unmerged(self) -> None:
+        """A runner must not treat #104 or #108 as the landable coverage gate."""
+
+        runbook = _text(RUNBOOK)
+        unmerged_sentences = [
+            sentence
+            for sentence in runbook.replace("\n", " ").split(".")
+            if "unmerged" in sentence.casefold()
+        ]
+        joined = " ".join(unmerged_sentences)
+        for pull_request in (93, 94, 97, 101, 102, 104, 108):
+            with self.subTest(pull_request=pull_request):
+                self.assertIn(f"PR #{pull_request}", joined)
+        self.assertIn("PR #107", runbook)
+        self.assertIn("PR #105", joined)
+        self.assertIn("PR #87", joined)
+
 
 if __name__ == "__main__":
     unittest.main()

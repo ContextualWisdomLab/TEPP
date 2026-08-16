@@ -88,6 +88,8 @@ STALE_REFUSE_PROMOTION_DRAFT_AUTHORITY = re.compile(
     r"refuse_promotion`? in PR #\d+ is the coverage authority"
 )
 STALE_MERGE_WEAK_DRAFTS = re.compile(r"merging the existing drafts")
+UNMERGED_QUEUE_SENTENCE = re.compile(r"[^.]*unmerged[^.]*", re.IGNORECASE)
+REQUIRED_UNMERGED_COVERAGE_DRAFTS = (93, 94, 97, 101, 102, 104, 108)
 AUTHORITY_POINTER_FILES = (
     "DOCUMENTATION.md",
     "docs/DOCUMENTATION_ASSESSMENT.md",
@@ -153,6 +155,47 @@ def _document_has_stale_coverage_authority(text: str) -> bool:
     )
 
 
+def _hourly_unmerged_text(hourly: str) -> str:
+    """Return Keep-unmerged sentences so later drafts cannot hide outside the lock."""
+
+    collapsed = hourly.replace("\n", " ")
+    return " ".join(UNMERGED_QUEUE_SENTENCE.findall(collapsed))
+
+
+def _hourly_queue_lock_failures(hourly: str) -> list[str]:
+    """Return queue-lock failures when hourly names a coverage or naruon pointer.
+
+    The phrase lock already rejects `landable coverage gate is PR #N`. This
+    queue lock refuses an unmerged list that stops at #101/#102, and refuses a
+    naruon pointer that is not PR #107 with #87 and #105 kept unmerged.
+    """
+
+    if not hourly:
+        return []
+    looks_like_queue = "unmerged" in hourly.casefold() or "naruon" in hourly.casefold()
+    if not looks_like_queue:
+        return []
+    failures: list[str] = []
+    joined = _hourly_unmerged_text(hourly)
+    if any(
+        f"PR #{number}" not in joined for number in REQUIRED_UNMERGED_COVERAGE_DRAFTS
+    ):
+        failures.append(
+            "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md omits later "
+            "coverage-authority drafts from the unmerged set"
+        )
+    if (
+        "PR #107" not in hourly
+        or "PR #105" not in joined
+        or "PR #87" not in joined
+    ):
+        failures.append(
+            "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md points naruon "
+            "live HTTP away from PR #107"
+        )
+    return failures
+
+
 def promotion_authority_failures(
     documentation: str,
     assessment: str,
@@ -163,7 +206,7 @@ def promotion_authority_failures(
 
     A pull-request number is not landable coverage authority. Canonical docs
     and the hourly queue must name the `prediction_contradiction` crate, not
-    a draft such as #93, #94, #97, #101, or #102.
+    a draft such as #93, #94, #97, #101, #102, #104, or #108.
     """
 
     failures: list[str] = []
@@ -185,6 +228,7 @@ def promotion_authority_failures(
             "docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md tells the "
             "queue to merge superseded coverage drafts"
         )
+    failures.extend(_hourly_queue_lock_failures(hourly))
     for path, text in (extra_documents or {}).items():
         if _document_has_stale_coverage_authority(text) or (
             STALE_ACTIVE_PR_COVERAGE_GATE.search(text)
