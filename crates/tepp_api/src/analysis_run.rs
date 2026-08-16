@@ -5,6 +5,7 @@ use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
 use serde::{Deserialize, Serialize};
+use temporal_core::KnowledgeCutoff;
 
 /// Supported analysis-run contract version.
 pub const ANALYSIS_RUN_CONTRACT_VERSION: u16 = 1;
@@ -84,6 +85,8 @@ impl AnalysisRunRequest {
         require_nonempty(&self.tenant_workspace_id)?;
         require_nonempty(&self.snapshot_id)?;
         require_nonempty(&self.knowledge_cutoff)?;
+        KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff)
+            .map_err(|_| ApiError::InvalidWirePayload)?;
         require_nonempty(&self.model_contract_version)?;
         require_nonempty(&self.output_profile)?;
         Ok(())
@@ -215,6 +218,9 @@ mod tests {
         assert_eq!(bad.to_json(), Err(ApiError::InvalidWirePayload));
         bad = request.clone();
         bad.knowledge_cutoff.clear();
+        assert_eq!(bad.to_json(), Err(ApiError::InvalidWirePayload));
+        bad = request.clone();
+        bad.knowledge_cutoff = "k".into();
         assert_eq!(bad.to_json(), Err(ApiError::InvalidWirePayload));
         bad = request.clone();
         bad.model_contract_version.clear();

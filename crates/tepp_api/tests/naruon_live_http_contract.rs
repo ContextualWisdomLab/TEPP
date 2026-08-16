@@ -11,6 +11,7 @@ use tepp_api::{
     ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, ExportAuthorizationRequest,
     NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH, NARUON_LIVE_HEADER_BYTE_LIMIT,
     NARUON_LIVE_HEADER_COUNT_LIMIT, NaruonLiveService, naruon_analysis_run_exchange,
+    naruon_analysis_run_exchange_with_headers, naruon_export_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -513,6 +514,184 @@ fn serve_one_accepts_committed_naruon_exchange_over_loopback_tcp() {
     drop(TcpStream::connect(idle_addr).expect("connect2"));
     let idle_response = idle_worker.join().expect("join2").expect("served closed");
     assert_eq!(idle_response.status_code, 400);
+}
+
+#[test]
+fn handle_http_requires_loopback_host_and_refuses_transfer_encoding() {
+    let mut service = NaruonLiveService::new();
+    let run = sample_run();
+    let body = run.to_json().expect("json");
+    for host in ["attacker.example.com", "8.8.8.8", "mysql.internal"] {
+        let mut headers = naruon_headers(&run.idempotency_key);
+        headers[0] = ("Host".into(), host.into());
+        let response = service.handle_http_request(&http_request(
+            "POST",
+            NARUON_ANALYSIS_RUN_PATH,
+            &headers,
+            &body,
+        ));
+        assert_eq!(response.status_code, 400, "host={host}");
+        assert_eq!(
+            envelope(&response.body).error_code(),
+            "invalid_wire_payload"
+        );
+    }
+
+    let mut encoded = naruon_headers(&run.idempotency_key);
+    encoded.push(("Transfer-Encoding".into(), "chunked".into()));
+    let transfer = service.handle_http_request(&http_request(
+        "POST",
+        NARUON_ANALYSIS_RUN_PATH,
+        &encoded,
+        &body,
+    ));
+    assert_eq!(transfer.status_code, 400);
+    assert_eq!(
+        envelope(&transfer.body).error_code(),
+        "invalid_wire_payload"
+    );
+}
+
+#[test]
+fn handle_http_refuses_proxy_authorization_and_nim_headers() {
+    let mut service = NaruonLiveService::new();
+    let run = sample_run();
+    let body = run.to_json().expect("json");
+    for name in ["Proxy-Authorization", "x-nim-key", "x-nvidia-session"] {
+        let mut headers = naruon_headers(&run.idempotency_key);
+        headers.push((name.into(), "secret".into()));
+        let response = service.handle_http_request(&http_request(
+            "POST",
+            NARUON_ANALYSIS_RUN_PATH,
+            &headers,
+            &body,
+        ));
+        assert_eq!(response.status_code, 403, "header={name}");
+        assert_eq!(
+            envelope(&response.body).error_code(),
+            "authorization_denied",
+            "header={name}"
+        );
+        assert!(!response.body.contains("secret"));
+    }
+}
+
+#[test]
+fn handle_http_parses_cutoff_and_refuses_later_availability() {
+    let mut service = NaruonLiveService::new();
+    let invalid_body = r#"{"contract_version":1,"idempotency_key":"naruon-live-idem-001","tenant_workspace_id":"naruon-tenant-workspace-demo","snapshot_id":"tepp-snapshot-demo-001","knowledge_cutoff":"k","model_contract_version":"topic-measurement-v1","output_profile":"naruon-consumer-validation-report"}"#;
+    let invalid = service.handle_http_request(&http_request(
+        "POST",
+        NARUON_ANALYSIS_RUN_PATH,
+        &naruon_headers("naruon-live-idem-001"),
+        invalid_body,
+    ));
+    assert_eq!(invalid.status_code, 400);
+    assert_eq!(envelope(&invalid.body).error_code(), "invalid_wire_payload");
+
+    let run = sample_run();
+    let mut headers = naruon_headers(&run.idempotency_key);
+    headers.push((
+        "tepp-availability-time".into(),
+        "2026-08-02T00:00:00Z".into(),
+    ));
+    let late = service.handle_http_request(&http_request(
+        "POST",
+        NARUON_ANALYSIS_RUN_PATH,
+        &headers,
+        &run.to_json().expect("json"),
+    ));
+    assert_eq!(late.status_code, 403);
+    assert_eq!(envelope(&late.body).error_code(), "authorization_denied");
+
+    let mut eligible = naruon_headers(&run.idempotency_key);
+    eligible.push((
+        "tepp-availability-time".into(),
+        "2026-08-01T00:00:00Z".into(),
+    ));
+    let ok = service.handle_http_request(&http_request(
+        "POST",
+        NARUON_ANALYSIS_RUN_PATH,
+        &eligible,
+        &run.to_json().expect("json"),
+    ));
+    assert_eq!(ok.status_code, 202);
+}
+
+#[test]
+fn analysis_run_idempotency_is_keyed_by_tenant_and_key() {
+    let mut service = NaruonLiveService::new();
+    let first = sample_run();
+    let first_response = service.handle_http_request(&analysis_http(&first));
+    assert_eq!(first_response.status_code, 202);
+    let first_accepted =
+        AnalysisRunAccepted::from_json(&first_response.body).expect("first accepted");
+
+    let mut other_tenant = first.clone();
+    other_tenant.tenant_workspace_id = "other-tenant-workspace".into();
+    let second = service.handle_http_request(&analysis_http(&other_tenant));
+    assert_eq!(second.status_code, 202);
+    let second_accepted = AnalysisRunAccepted::from_json(&second.body).expect("second accepted");
+    assert_ne!(first_accepted.run_id, second_accepted.run_id);
+}
+
+#[test]
+fn serve_one_authorizes_export_over_loopback_tcp() {
+    let request = sample_export();
+    let exchange = naruon_export_exchange("https://tepp.example.test", &request, "export-tcp-001")
+        .expect("export exchange");
+    let mut service = NaruonLiveService::bind_loopback().expect("bind");
+    let addr = service.local_addr().expect("addr");
+    let worker = thread::spawn(move || service.serve_one());
+
+    let mut stream = TcpStream::connect(addr).expect("connect");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .expect("rt");
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .expect("wt");
+    let mut headers = naruon_headers("export-tcp-001");
+    headers[0] = ("Host".into(), format!("{addr}"));
+    let payload = http_request("POST", NARUON_EXPORT_PATH, &headers, &exchange.body);
+    stream.write_all(payload.as_bytes()).expect("write");
+    let mut received = String::new();
+    stream.read_to_string(&mut received).expect("read");
+    assert!(received.starts_with("HTTP/1.1 200 OK"));
+    assert!(received.contains("purpose_bound_export_allowed"));
+    let served = worker.join().expect("join").expect("serve");
+    assert_eq!(served.status_code, 200);
+}
+
+#[test]
+fn serve_one_maps_partial_request_timeout_to_limit_exceeded() {
+    let mut service = NaruonLiveService::bind_loopback().expect("bind");
+    service.set_io_timeout(Duration::from_millis(80));
+    let addr = service.local_addr().expect("addr");
+    let worker = thread::spawn(move || service.serve_one());
+
+    let mut stream = TcpStream::connect(addr).expect("connect");
+    stream.write_all(b"P").expect("partial");
+    thread::sleep(Duration::from_millis(160));
+    let served = worker.join().expect("join").expect("timed out request");
+    assert_eq!(served.status_code, 413);
+    assert_eq!(envelope(&served.body).error_code(), "limit_exceeded");
+}
+
+#[test]
+fn client_extra_headers_refuse_proxy_authorization_and_nim_names() {
+    let run = sample_run();
+    for name in ["Proxy-Authorization", "x-nim-key", "x-nvidia-session"] {
+        assert_eq!(
+            naruon_analysis_run_exchange_with_headers(
+                "https://tepp.example.test",
+                &run,
+                &[(name, "secret")]
+            ),
+            Err(ApiError::AuthorizationDenied),
+            "header={name}"
+        );
+    }
 }
 
 struct TimeoutRead;

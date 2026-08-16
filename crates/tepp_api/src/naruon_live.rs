@@ -2,23 +2,28 @@
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
+use std::time::Duration;
 
 use crate::authorization::{
     AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
 };
 use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH, header_is_credential};
-use crate::wire::{from_json, to_json};
+use crate::wire::{from_json, require_nonempty, to_json};
 use crate::{
     AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
     ErrorEnvelope, requests_are_idempotent_matches,
 };
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 
 /// Maximum request-line plus header bytes accepted before the body.
 pub const NARUON_LIVE_HEADER_BYTE_LIMIT: usize = 8 * 1024;
 
 /// Maximum number of HTTP header lines on one live request.
 pub const NARUON_LIVE_HEADER_COUNT_LIMIT: usize = 32;
+
+/// Read/write deadline applied to each accepted live stream.
+pub const NARUON_LIVE_IO_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// HTTP/1.1 response produced by the naruon live listener.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,9 +45,10 @@ pub struct NaruonLiveResponse {
 pub struct NaruonLiveService {
     listener: Option<TcpListener>,
     bound_addr: Option<SocketAddr>,
+    io_timeout: Duration,
     next_run_serial: u64,
     next_request_serial: u64,
-    accepted_runs: HashMap<String, (AnalysisRunRequest, AnalysisRunAccepted)>,
+    accepted_runs: HashMap<(String, String), (AnalysisRunRequest, AnalysisRunAccepted)>,
 }
 
 impl Default for NaruonLiveService {
@@ -58,6 +64,7 @@ impl NaruonLiveService {
         Self {
             listener: None,
             bound_addr: None,
+            io_timeout: NARUON_LIVE_IO_TIMEOUT,
             next_run_serial: 1,
             next_request_serial: 1,
             accepted_runs: HashMap::new(),
@@ -104,13 +111,19 @@ impl NaruonLiveService {
         self.bound_addr.ok_or(ApiError::InvalidWirePayload)
     }
 
+    /// Install the read/write deadline applied to each accepted stream.
+    pub fn set_io_timeout(&mut self, timeout: Duration) {
+        self.io_timeout = timeout;
+    }
+
     /// Accept one TCP connection and serve one HTTP/1.1 request.
     ///
     /// # Errors
     ///
     /// Returns [`ApiError::InvalidWirePayload`] when no socket is bound or
-    /// the accept/write path fails for a non-timeout reason. Timeouts map to
-    /// [`ApiError::LimitExceeded`].
+    /// the accept/write path fails for a non-timeout reason. A stream that
+    /// exceeds [`NARUON_LIVE_IO_TIMEOUT`] (or the value set by
+    /// [`Self::set_io_timeout`]) maps to [`ApiError::LimitExceeded`].
     pub fn serve_one(&mut self) -> Result<NaruonLiveResponse, ApiError> {
         let listener = self.listener.as_ref().ok_or(ApiError::InvalidWirePayload)?;
         self.serve_accepted(listener.accept().map(|(stream, _)| stream))
@@ -128,6 +141,12 @@ impl NaruonLiveService {
         accepted: Result<TcpStream, std::io::Error>,
     ) -> Result<NaruonLiveResponse, ApiError> {
         let mut stream = accepted.map_err(|error| map_io_error(&error))?;
+        stream
+            .set_read_timeout(Some(self.io_timeout))
+            .map_err(|error| map_io_error(&error))?;
+        stream
+            .set_write_timeout(Some(self.io_timeout))
+            .map_err(|error| map_io_error(&error))?;
         let response = match Self::read_http_request(&mut stream) {
             Ok(request) => self.handle_http_request(&request),
             Err(error) => self.response_from_error(error),
@@ -213,7 +232,7 @@ impl NaruonLiveService {
             return Err(ApiError::InvalidWirePayload);
         }
         let headers = parse_headers(lines)?;
-        refuse_live_headers(&headers)?;
+        refuse_live_headers(&headers, self.bound_addr)?;
         self.dispatch_path(path, &headers, body)
     }
 
@@ -240,7 +259,12 @@ impl NaruonLiveService {
         if idempotency_key != request.idempotency_key {
             return Err(ApiError::InvalidWirePayload);
         }
-        if let Some((stored_request, stored_accepted)) = self.accepted_runs.get(idempotency_key) {
+        refuse_availability_after_cutoff(headers, &request.knowledge_cutoff)?;
+        let replay_key = (
+            request.tenant_workspace_id.clone(),
+            idempotency_key.to_owned(),
+        );
+        if let Some((stored_request, stored_accepted)) = self.accepted_runs.get(&replay_key) {
             if requests_are_idempotent_matches(stored_request, &request) {
                 return Ok(NaruonLiveResponse::json(
                     202,
@@ -255,8 +279,7 @@ impl NaruonLiveService {
         let accepted =
             AnalysisRunAccepted::new(run_id, "accepted", request.idempotency_key.clone())?;
         let body = accepted.to_json()?;
-        self.accepted_runs
-            .insert(idempotency_key.to_owned(), (request, accepted));
+        self.accepted_runs.insert(replay_key, (request, accepted));
         Ok(NaruonLiveResponse::json(202, "Accepted", body))
     }
 
@@ -421,14 +444,20 @@ fn split_header_line(line: &str) -> Result<(&str, &str), ApiError> {
     Ok((name, value.trim()))
 }
 
-fn refuse_live_headers(headers: &HashMap<String, String>) -> Result<(), ApiError> {
+fn refuse_live_headers(
+    headers: &HashMap<String, String>,
+    bound: Option<SocketAddr>,
+) -> Result<(), ApiError> {
     for name in headers.keys() {
         if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);
         }
+        if name == "transfer-encoding" {
+            return Err(ApiError::InvalidWirePayload);
+        }
     }
     let host = header_value(headers, "host")?;
-    if host_implies_table_access(host) {
+    if host_implies_table_access(host) || !host_is_loopback(host, bound) {
         return Err(ApiError::InvalidWirePayload);
     }
     if header_value(headers, "content-type")? != "application/json" {
@@ -452,6 +481,46 @@ fn header_value<'a>(headers: &'a HashMap<String, String>, name: &str) -> Result<
     Ok(value.as_str())
 }
 
+fn refuse_availability_after_cutoff(
+    headers: &HashMap<String, String>,
+    knowledge_cutoff: &str,
+) -> Result<(), ApiError> {
+    let Some(available) = headers.get("tepp-availability-time") else {
+        return Ok(());
+    };
+    require_nonempty(available)?;
+    let available =
+        AvailableTime::parse_rfc3339(available).map_err(|_| ApiError::InvalidWirePayload)?;
+    let cutoff = KnowledgeCutoff::parse_rfc3339(knowledge_cutoff)
+        .map_err(|_| ApiError::InvalidWirePayload)?;
+    if available.instant() > cutoff.instant() {
+        return Err(ApiError::AuthorizationDenied);
+    }
+    Ok(())
+}
+
+fn host_is_loopback(host: &str, bound: Option<SocketAddr>) -> bool {
+    if let Some(bound) = bound
+        && host.eq_ignore_ascii_case(&bound.to_string())
+    {
+        return true;
+    }
+    let lowered = host.to_ascii_lowercase();
+    if lowered == "localhost" || lowered.starts_with("localhost:") {
+        return true;
+    }
+    if lowered == "[::1]" {
+        return true;
+    }
+    if let Ok(addr) = host.parse::<SocketAddr>() {
+        return addr.ip().is_loopback();
+    }
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        return ip.is_loopback();
+    }
+    false
+}
+
 fn host_implies_table_access(host: &str) -> bool {
     let lowered = host.to_ascii_lowercase();
     lowered.contains("postgres")
@@ -469,8 +538,8 @@ fn host_implies_table_access(host: &str) -> bool {
 mod tests {
     use super::{
         NaruonLiveService, declared_content_length, envelope_json, fallback_envelope_json,
-        host_implies_table_access, map_io_error, parse_request_line, split_header_line,
-        split_request, status_for,
+        host_implies_table_access, host_is_loopback, map_io_error, parse_request_line,
+        refuse_availability_after_cutoff, split_header_line, split_request, status_for,
     };
     use crate::ApiError;
     use std::io::ErrorKind;
@@ -515,6 +584,41 @@ mod tests {
         assert!(host_implies_table_access("bad\\host"));
         assert!(host_implies_table_access("bad\u{0001}host"));
         assert!(!host_implies_table_access("127.0.0.1:43789"));
+        assert!(host_is_loopback("127.0.0.1", None));
+        assert!(host_is_loopback("localhost:8080", None));
+        assert!(host_is_loopback("[::1]", None));
+        assert!(host_is_loopback(
+            "127.0.0.1:43789",
+            Some("127.0.0.1:43789".parse().expect("bound"))
+        ));
+        assert!(!host_is_loopback("8.8.8.8", None));
+        assert!(!host_is_loopback("attacker.example.com", None));
+        assert!(!host_is_loopback("mysql.internal", None));
+        let mut headers = std::collections::HashMap::new();
+        assert!(refuse_availability_after_cutoff(&headers, "2026-08-01T00:00:00Z").is_ok());
+        headers.insert(
+            "tepp-availability-time".into(),
+            "2026-08-01T00:00:00Z".into(),
+        );
+        assert!(refuse_availability_after_cutoff(&headers, "2026-08-01T00:00:00Z").is_ok());
+        headers.insert(
+            "tepp-availability-time".into(),
+            "2026-08-02T00:00:00Z".into(),
+        );
+        assert_eq!(
+            refuse_availability_after_cutoff(&headers, "2026-08-01T00:00:00Z"),
+            Err(ApiError::AuthorizationDenied)
+        );
+        headers.insert("tepp-availability-time".into(), "not-a-time".into());
+        assert_eq!(
+            refuse_availability_after_cutoff(&headers, "2026-08-01T00:00:00Z"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        headers.insert("tepp-availability-time".into(), String::new());
+        assert_eq!(
+            refuse_availability_after_cutoff(&headers, "2026-08-01T00:00:00Z"),
+            Err(ApiError::InvalidWirePayload)
+        );
     }
 
     #[test]

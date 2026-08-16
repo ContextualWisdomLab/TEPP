@@ -6,7 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
-- `tepp_api` naruon live HTTP/1.1 listener: loopback-only `NaruonLiveService` serves `POST /v1/analysis-runs` and `/v1/exports`, replays matching idempotency keys, and refuses non-loopback binds, table-access hosts, credential headers, and principal-only export keys. Not TLS termination (ADR 0011).
+- `tepp_api` naruon live HTTP/1.1 listener: loopback-only `NaruonLiveService` serves `POST /v1/analysis-runs` and `/v1/exports` with a read/write deadline, loopback `Host` enforcement, RFC 3339 knowledge-cutoff plus availability eligibility, tenant-plus-key idempotency replay, and refusal of `Transfer-Encoding`, `Proxy-Authorization`, and NIM/NVIDIA credential headers. Not TLS termination (ADR 0011).
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
 - `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).

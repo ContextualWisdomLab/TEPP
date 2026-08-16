@@ -92,6 +92,17 @@ fn review_and_copilot_headers_are_authorization_denied() {
         ),
         Err(ApiError::AuthorizationDenied)
     );
+    for name in ["Proxy-Authorization", "x-nim-key", "x-nvidia-session"] {
+        assert_eq!(
+            naruon_analysis_run_exchange_with_headers(
+                "https://tepp.example.test",
+                &run,
+                &[(name, "secret")]
+            ),
+            Err(ApiError::AuthorizationDenied),
+            "header={name}"
+        );
+    }
 }
 
 #[test]

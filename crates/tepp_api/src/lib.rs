@@ -6,7 +6,7 @@
 //! component without sharing application tables. Domain estimation remains in
 //! scientific crates; this crate only defines fail-closed interchange shapes.
 //! naruon HTTP interchange is a versioned `https` POST to analysis-run and
-//! export paths; table-access URLs, review/Copilot headers, and lexical
+//! export paths; table-access URLs, review/Copilot/NIM headers, and lexical
 //! inference claims fail closed (ADR 0011). A loopback-only live HTTP/1.1
 //! listener serves those POSTs without TLS termination or table access.
 
@@ -72,6 +72,8 @@ pub use naruon_http::naruon_may_claim_tepp_inference;
 pub use naruon_live::NARUON_LIVE_HEADER_BYTE_LIMIT;
 /// Maximum live HTTP header count.
 pub use naruon_live::NARUON_LIVE_HEADER_COUNT_LIMIT;
+/// Read/write deadline applied to each accepted live stream.
+pub use naruon_live::NARUON_LIVE_IO_TIMEOUT;
 /// Loopback live HTTP/1.1 response.
 pub use naruon_live::NaruonLiveResponse;
 /// Loopback live HTTP/1.1 naruon listener.

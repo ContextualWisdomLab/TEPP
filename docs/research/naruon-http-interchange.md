@@ -46,10 +46,12 @@ https://doi.org/10.6028/NIST.CSWP.01162020
 
 - committed naruon example builds `POST /v1/analysis-runs` without credentials;
 - `postgres` / `jdbc` / `/sql` / `/tables/` and non-`https` origins fail closed;
-- review, Copilot, and bearer headers are `AuthorizationDenied`;
+- review, Copilot, NIM/NVIDIA, `Proxy-Authorization`, and bearer headers are `AuthorizationDenied`;
 - reserved standard headers cannot be redefined via extra headers;
 - export interchange requires `ModularServiceConsumer` and a per-export
   idempotency key distinct from `principal_id` alone;
 - `tfidf` / `bm25` / `keyword` cannot claim TEPP inference;
-- loopback `NaruonLiveService` accepts valid POSTs and refuses non-loopback
-  binds, table-access hosts, credential headers, and conflicting idempotency.
+- loopback `NaruonLiveService` accepts valid POSTs over real `TcpStream`s,
+  applies a read/write deadline, requires a loopback `Host`, refuses
+  `Transfer-Encoding`, parses RFC 3339 cutoffs, denies later availability,
+  and replays idempotency by tenant plus key.
