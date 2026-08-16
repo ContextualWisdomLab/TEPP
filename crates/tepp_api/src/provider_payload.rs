@@ -474,21 +474,16 @@ fn require_rfc3339_utc(value: &str) -> Result<(), ApiError> {
 }
 
 fn is_rfc3339_utc(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    bytes.len() == 20
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes[10] == b'T'
-        && bytes[13] == b':'
-        && bytes[16] == b':'
-        && bytes[19] == b'Z'
-        && bytes[0..4].iter().all(u8::is_ascii_digit)
-        && bytes[5..7].iter().all(u8::is_ascii_digit)
-        && bytes[8..10].iter().all(u8::is_ascii_digit)
-        && bytes[11..13].iter().all(u8::is_ascii_digit)
-        && bytes[14..16].iter().all(u8::is_ascii_digit)
-        && bytes[17..19].iter().all(u8::is_ascii_digit)
-        && TemporalInstant::parse_rfc3339(value).is_ok()
+    // Exact second-resolution UTC (`YYYY-MM-DDTHH:MM:SSZ`). Calendar/syntax is
+    // owned by `TemporalInstant`; keep length + trailing `Z` only so offsets and
+    // fractional seconds stay out of grants without long `&&` branch chains.
+    if value.len() != 20 {
+        return false;
+    }
+    if value.as_bytes()[19] != b'Z' {
+        return false;
+    }
+    TemporalInstant::parse_rfc3339(value).is_ok()
 }
 
 #[cfg(test)]
