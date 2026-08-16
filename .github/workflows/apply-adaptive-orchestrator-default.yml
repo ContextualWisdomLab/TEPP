@@ -1,0 +1,123 @@
+name: Apply adaptive contextual-orchestrator default
+
+on:
+  push:
+    branches:
+      - agent/adaptive-orchestrator-default
+    paths:
+      - scripts/stage_adaptive_orchestrator_default_test.py
+      - scripts/apply_adaptive_orchestrator_default.py
+      - .github/workflows/apply-adaptive-orchestrator-default.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-adaptive-orchestrator-default-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  red-green-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js when present
+        if: hashFiles('package-lock.json') != ''
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Rust when present
+        if: hashFiles('Cargo.toml') != ''
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          if [ -f requirements/ci.txt ]; then
+            python -m pip install -r requirements/ci.txt
+          elif [ -f requirements-dev.txt ]; then
+            python -m pip install -r requirements-dev.txt
+          elif [ -f pyproject.toml ]; then
+            python -m pip install -e '.[dev]' || python -m pip install -e .
+          else
+            python -m pip install pytest
+          fi
+
+      - name: Install Node dependencies when present
+        if: hashFiles('package-lock.json') != ''
+        run: npm ci
+
+      - name: Stage the repository contract
+        run: python scripts/stage_adaptive_orchestrator_default_test.py
+
+      - name: Establish red state or recognize an already-applied source change
+        id: red
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python tests/test_contextual_orchestrator_default_policy.py > /tmp/tepp-adaptive-red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/tepp-adaptive-red.log
+          if [ "$status" -eq 0 ]; then
+            echo "already_applied=true" >> "$GITHUB_OUTPUT"
+          else
+            grep -Eq "FAILED|AssertionError|no production" /tmp/tepp-adaptive-red.log
+            echo "already_applied=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Apply production request and documentation changes
+        run: python scripts/apply_adaptive_orchestrator_default.py
+
+      - name: Prove the focused contract is green
+        run: python tests/test_contextual_orchestrator_default_policy.py
+
+      - name: Run Python tests when configured
+        if: hashFiles('pyproject.toml', 'pytest.ini', 'setup.cfg') != ''
+        run: python -m pytest -q
+
+      - name: Run Node tests when configured
+        if: hashFiles('package-lock.json') != ''
+        run: npm test
+
+      - name: Run Rust tests when configured
+        if: hashFiles('Cargo.toml') != ''
+        run: cargo test --workspace
+
+      - name: Verify syntax and patch integrity
+        shell: bash
+        run: |
+          python -m compileall -q scripts tests
+          git diff --check
+
+      - name: Publish the verified source commit
+        env:
+          TARGET_BRANCH: agent/adaptive-orchestrator-default
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm scripts/stage_adaptive_orchestrator_default_test.py
+          rm scripts/apply_adaptive_orchestrator_default.py
+          rm .github/workflows/apply-adaptive-orchestrator-default.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          git diff --cached --check
+          git commit -m "feat(ai): delegate interpretation to adaptive orchestration"
+          git push origin "HEAD:${TARGET_BRANCH}"
