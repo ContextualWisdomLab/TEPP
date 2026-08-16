@@ -27,8 +27,7 @@ fn decided_production(
     match TlsBindRequest::new(host, 8443, scheme, certificate_pem, private_key_pem) {
         Err(_) => BindDecision::Refused,
         Ok(request) => authorize_production_tls(&request)
-            .map(|authorized| authorized.decision())
-            .unwrap_or(BindDecision::Refused),
+            .map_or(BindDecision::Refused, |authorized| authorized.decision()),
     }
 }
 
@@ -41,8 +40,7 @@ fn decided_orchestrator(
     match TlsBindRequest::new(host, 8443, scheme, certificate_pem, private_key_pem) {
         Err(_) => BindDecision::Refused,
         Ok(request) => authorize_orchestrator_live_port(&request)
-            .map(|authorized| authorized.decision())
-            .unwrap_or(BindDecision::Refused),
+            .map_or(BindDecision::Refused, |authorized| authorized.decision()),
     }
 }
 
