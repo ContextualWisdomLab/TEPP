@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `psychometric_core` multilevel/event-time recovery on the stacked psychometric PR: cluster-mean CWC within/between OLS, Kish ESS weighted slopes, event-time-only discrete lag-1 and exact scalar local log-rate, CWC-then-event-time residual lag, Rubin `T_m = Ū_m + (1+1/m) B_m` on draw-level OLS loadings, and two-group OLS strong/strict-gated latent-mean difference. Metric/weak is not a mean license. Not DSEM, not RI-CLPM, not MGCFA, not Mislevy PVs (ADR 0005; no new migration).
 - `psychometric_core` posterior-aware structural input gates: construct classification, refusal of raw-proportion Pearson/OLS, explicit ALR-versus-ILR geometry boundaries, CPU `f64` OLS recovery, posterior-draw loading point-estimate averaging without Rubin uncertainty claims, invariance-gated latent-mean comparison, and causal-heuristic refusal (ADR 0005 first production slice; no new migration).
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.

@@ -34,6 +34,9 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Actions workflow fleet audit | [`docs/operations/ACTIONS_WORKFLOW_FLEET.md`](docs/operations/ACTIONS_WORKFLOW_FLEET.md) |
 | Actions fleet research doctoring | [`docs/research/actions-workflow-fleet.md`](docs/research/actions-workflow-fleet.md) |
 | Posterior ESEM/DSEM input-gate doctoring | [`docs/research/posterior-esem-input-gates.md`](docs/research/posterior-esem-input-gates.md) |
+| Multilevel/event-time recovery doctoring | [`docs/research/multilevel-event-time-recovery.md`](docs/research/multilevel-event-time-recovery.md) |
+| Rubin total-variance doctoring | [`docs/research/rubin-total-variance.md`](docs/research/rubin-total-variance.md) |
+| Strong-invariance latent-mean doctoring | [`docs/research/strong-invariance-latent-means.md`](docs/research/strong-invariance-latent-means.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 

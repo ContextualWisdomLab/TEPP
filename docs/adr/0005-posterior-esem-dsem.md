@@ -1,7 +1,7 @@
 # ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
 
 **Decision status:** Accepted
-**Implementation maturity:** partial — construct classification, valid log-ratio/logistic-normal indicator gates, CPU `f64` OLS and posterior-draw loading point-estimate averaging (not Rubin variance pooling), invariance-gated mean comparison, and causal-heuristic refusal are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; full ESEM/set-ESEM, formative composites, DSEM, and continuous-time dynamics remain accepted-target
+**Implementation maturity:** partial — construct classification, valid log-ratio/logistic-normal indicator gates, CPU `f64` OLS and posterior-draw loading point-estimate averaging, Rubin `T_m = Ū_m + (1+1/m) B_m` on draw-level OLS loadings, cluster-mean within/between OLS with Kish ESS WLS, event-time discrete lag-1 and exact scalar local log-rate, CWC-then-event-time residual lag, and strong/strict-gated two-group OLS latent-mean difference are implemented on the stacked psychometric PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target
 **Date:** 2026-08-05
 **Supersedes:** None. ADR 0012 governs upstream topic measurement/network coordinates; this ADR governs higher-order psychometric structure and longitudinal interpretation.
 
@@ -14,11 +14,13 @@ TEPP also needs to distinguish stable between-unit differences from within-unit 
 ## Decision
 
 Topic proportions are not treated as error-free ordinary indicators. TEPP uses logistic-normal latent coordinates or valid orthonormal log-ratio coordinates and propagates topic posterior uncertainty through plausible values or a joint text-measurement/structural model.
-The current executable slice only averages loading point estimates across posterior draws. It does not yet pool within-draw and between-draw uncertainty and therefore does not satisfy the full posterior-propagation decision by itself.
+The current executable slice averages loading point estimates across posterior draws and, separately, combines those complete-data OLS loadings with Rubin total variance. The point-estimate helper still does not by itself satisfy the full posterior-propagation decision. The Rubin helper uses complete-data OLS sampling variances; it does not treat the draws as Mislevy person-level plausible values.
 
 Before ESEM/SEM interpretation, each higher-order construct is classified as reflective, formative/composite, network, or unresolved. Reflective indicators may use ESEM/set-ESEM; formative structures use composite/formative models; interacting structures use network models. A good global fit statistic is not authority to reinterpret a formative/network structure as reflective.
 
 Longitudinal analysis evaluates measurement invariance at the level needed for the claimed comparison, supports partial/approximate or time-varying loadings where scientifically justified, separates stable between-unit components from within-unit temporal change, and handles irregular intervals through appropriate discrete- or continuous-time dynamics.
+
+The executable multilevel slice is cluster-mean centering (CWC) plus within/between OLS and Kish-weighted slopes. It is not DSEM and not RI-CLPM. The executable temporal slice maps a discrete lag through the exact scalar exponential `a = ln(φ) / Δt` on event time only (Voelkle, Oud, Davidov, & Schmidt, 2012, Eq. 7; Driver, Oud, & Voelkle, 2017, Eq. 3) and refuses the difference quotient. Metric/weak invariance licenses shared metric meaning only. Latent-mean comparison requires strong (equal loading and intercept) or strict invariance. This two-group OLS gate is not MGCFA.
 
 Input/process/intervention/outcome paths obey event-time order. Temporal precedence, document linkage, event tracking, or model prediction alone do not justify causal language.
 

@@ -264,4 +264,32 @@ fn finite_alr_correlation_and_error_messages_are_stable() {
         PsychometricError::InvarianceRequired.to_string(),
         "latent-mean comparison requires invariance evidence"
     );
+    assert_eq!(
+        PsychometricError::EventTimeRequired.to_string(),
+        "discrete lag and local log-rate require event time, not another clock"
+    );
+    assert_eq!(
+        PsychometricError::DifferenceQuotientForbidden.to_string(),
+        "the difference quotient is not the local continuous-time rate"
+    );
+    assert_eq!(
+        PsychometricError::InsufficientClusters.to_string(),
+        "within/between recovery requires at least two clusters"
+    );
+    assert_eq!(
+        PsychometricError::InvalidWeight.to_string(),
+        "invalid non-negative finite psychometric weight"
+    );
+    assert_eq!(
+        PsychometricError::NonPositiveInterval.to_string(),
+        "event-time interval must be strictly positive"
+    );
+    assert_eq!(
+        PsychometricError::InsufficientDraws.to_string(),
+        "Rubin total variance requires at least two complete-data draws"
+    );
+    assert_eq!(
+        PsychometricError::StrongInvarianceRequired.to_string(),
+        "latent-mean comparison requires strong or strict invariance; metric/weak is not enough"
+    );
 }

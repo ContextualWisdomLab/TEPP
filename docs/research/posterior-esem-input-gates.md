@@ -8,11 +8,11 @@ This slice delivers the first executable ADR 0005 contract in `psychometric_core
 2. refuse raw topic-proportion Pearson correlations and OLS loadings as psychometric inputs;
 3. admit ALR, ILR, or logistic-normal coordinates as unconstrained structural inputs while reserving orthonormal Aitchison-distance claims for ILR;
 4. recover a reflective loading point estimate by ordinary least squares on a CPU `f64` path;
-5. average recovered loading point estimates across posterior indicator draws without claiming Rubin within/between uncertainty pooling;
-6. refuse latent-mean comparison without invariance evidence;
+5. average recovered loading point estimates across posterior indicator draws without claiming Rubin within/between uncertainty pooling (the Rubin `T` helper is a separate API; see `docs/research/rubin-total-variance.md`);
+6. refuse latent-mean comparison without invariance evidence, and recover a mean difference only under strong or strict two-group OLS status;
 7. refuse causal language that rests only on temporal precedence, document linkage, event tracking, or model prediction.
 
-Full ESEM/set-ESEM, formative composites, DSEM, and continuous-time dynamics remain accepted-target.
+Cluster-mean CWC, Kish WLS, event-time log-rate, and CWC-then-lag live in the same crate and are doctored in `docs/research/multilevel-event-time-recovery.md`. Full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target.
 
 ## Authoritative sources
 

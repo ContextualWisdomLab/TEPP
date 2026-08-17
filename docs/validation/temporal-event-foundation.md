@@ -23,7 +23,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
-| Psychometric structural input gates | `psychometric_core` | accepted-target | active PR | construct-class refusal + ALR/ILR boundary + true-loading RMSE + posterior-draw point-estimate mean; full ESEM/DSEM/Rubin uncertainty remaining | ADR 0005; `docs/research/posterior-esem-input-gates.md` |
+| Psychometric structural input gates | `psychometric_core` | accepted-target | stacked psychometric PR | construct-class refusal + ALR/ILR boundary + true-loading RMSE + posterior-draw point-estimate mean + Rubin `T` + CWC within/between + event-time log-rate + strong-gated latent means; full ESEM/DSEM remaining | ADR 0005; `docs/research/posterior-esem-input-gates.md`; `docs/research/multilevel-event-time-recovery.md`; `docs/research/rubin-total-variance.md`; `docs/research/strong-invariance-latent-means.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 

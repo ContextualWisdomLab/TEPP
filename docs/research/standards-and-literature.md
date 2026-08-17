@@ -14,11 +14,23 @@ Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory str
 
 Bollen, K., & Lennox, R. (1991). Conventional wisdom on measurement: A structural equation perspective. *Psychological Bulletin, 110*(2), 305–314. https://doi.org/10.1037/0033-2909.110.2.305
 
+Driver, C. C., Oud, J. H. L., & Voelkle, M. C. (2017). Continuous time structural equation modeling with R package ctsem. *Journal of Statistical Software, 77*(5), 1–35. https://doi.org/10.18637/jss.v077.i05
+
+Enders, C. K., & Tofighi, D. (2007). Centering predictor variables in cross-sectional multilevel models: A new look at an old issue. *Psychological Methods, 12*(2), 121–138. https://doi.org/10.1037/1082-989X.12.2.121
+
+Curran, P. J., & Bauer, D. J. (2011). The disaggregation of within-person and between-person effects in longitudinal models of change. *Annual Review of Psychology, 62*, 583–619. https://doi.org/10.1146/annurev.psych.093008.100356
+
+Hamaker, E. L., Kuiper, R. M., & Grasman, R. P. P. P. (2015). A critique of the cross-lagged panel model. *Psychological Methods, 20*(1), 102–116. https://doi.org/10.1037/a0038889
+
+Voelkle, M. C., Oud, J. H. L., Davidov, E., & Schmidt, P. (2012). An SEM approach to continuous time modeling of panel data: Relating authoritarianism and anomia. *Psychological Methods, 17*(2), 176–192. https://doi.org/10.1037/a0027543
+
+Rubin, D. B. (1996). Multiple imputation after 18+ years. *Journal of the American Statistical Association, 91*(434), 473–489. https://doi.org/10.1080/01621459.1996.10476908
+
 Mislevy, R. J. (1991). Randomization-based inference about latent variables from complex samples. *Psychometrika, 56*(2), 177–196. https://doi.org/10.1007/BF02294457
 
 Holland, P. W. (1986). Statistics and causal inference. *Journal of the American Statistical Association, 81*(396), 945–960. https://doi.org/10.1080/01621459.1986.10478354
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Reflective, formative, and network classes remain distinct (Bollen & Lennox, 1991). Posterior uncertainty is propagated by averaging structural estimates across plausible values (Mislevy, 1991). Temporal precedence is not causal identification (Holland, 1986).
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Reflective, formative, and network classes remain distinct (Bollen & Lennox, 1991). Complete-data OLS loadings across posterior indicator draws are combined with Rubin (1996) \(T_m\); the arithmetic-mean helper remains a point estimate. Mislevy (1991) is listed as a future plausible-value source and was not opened in this cycle. Temporal precedence is not causal identification (Holland, 1986). Within/between OLS follows Enders and Tofighi (2007), Curran and Bauer (2011), and Hamaker et al. (2015). The scalar continuous-time map is Voelkle et al. (2012, Eq. 7) / Driver et al. (2017, Eq. 3). Metric/weak invariance does not license latent-mean comparison.
 
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 
