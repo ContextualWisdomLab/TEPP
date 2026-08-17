@@ -2,6 +2,11 @@
 //!
 //! This is a two-level OLS decomposition after centering within cluster (CWC).
 //! It is not DSEM, not RI-CLPM, and not a random-effects sampler.
+//!
+//! Enders and Tofighi (2007, Table 2, pp. 124–127) separate the
+//! **within-cluster** slope, the **between-cluster** slope, and the
+//! **contextual** effect. The CWC cluster-mean coefficient is the contextual
+//! effect (`between − within`), not the between-cluster effect.
 
 use std::collections::BTreeMap;
 
@@ -20,13 +25,15 @@ pub struct ClusteredScore {
     pub outcome: f64,
 }
 
-/// Recovered within-cluster and between-cluster OLS slopes.
+/// Recovered within-cluster, between-cluster, and contextual OLS slopes.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WithinBetweenSlopes {
     /// OLS slope of cluster-mean-centered outcomes on centered predictors.
     pub within_slope: f64,
     /// OLS slope of cluster-mean outcomes on cluster-mean predictors.
     pub between_slope: f64,
+    /// CWC cluster-mean coefficient: `between_slope - within_slope`.
+    pub contextual_effect: f64,
 }
 
 /// Recover within-cluster and between-cluster OLS slopes after CWC.
@@ -35,6 +42,14 @@ pub struct WithinBetweenSlopes {
 /// stacked cluster-mean-centered residuals. A grand-mean pooled slope is not
 /// returned because it confounds the two (Enders & Tofighi, 2007; Curran &
 /// Bauer, 2011; Hamaker, Kuiper, & Grasman, 2015).
+///
+/// `contextual_effect` is `between_slope − within_slope`. Enders and Tofighi
+/// (2007, Table 2, pp. 124–127) show that this is the cluster-mean coefficient
+/// under CWC (`γ01` in their Equations 4–5), **not** the between-cluster
+/// effect. The between-cluster effect is the cluster-mean-only slope (CGM
+/// `γ01` in their Equations 7–8). Adding the CWC contextual coefficient to the
+/// within slope recovers the between-cluster effect. This is two-level OLS, not
+/// the multilevel maximum-likelihood model they estimate.
 ///
 /// # Errors
 ///
@@ -86,10 +101,23 @@ pub fn recover_cluster_mean_within_between_slopes(
 
     let within_slope = ordinary_least_squares_slope(&within_predictors, &within_outcomes)?;
     let between_slope = ordinary_least_squares_slope(&between_predictors, &between_outcomes)?;
+    let contextual_effect = contextual_effect_from_slopes(within_slope, between_slope)?;
     Ok(WithinBetweenSlopes {
         within_slope,
         between_slope,
+        contextual_effect,
     })
+}
+
+/// Enders and Tofighi (2007, p. 127) identity: CWC `γ01 = β_between − β_within`.
+///
+/// This helper is crate-visible so overflow of the subtraction can be recovered
+/// in unit tests. It is not a random-effects estimator.
+pub(crate) fn contextual_effect_from_slopes(
+    within_slope: f64,
+    between_slope: f64,
+) -> Result<f64, PsychometricError> {
+    require_finite(between_slope - within_slope)
 }
 
 /// Kish effective sample size `ESS = (Σ w)² / Σ w²` for non-negative weights.
@@ -174,13 +202,13 @@ pub fn recover_kish_weighted_slope(
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredScore, kish_effective_sample_size, recover_cluster_mean_within_between_slopes,
-        recover_kish_weighted_slope,
+        ClusteredScore, contextual_effect_from_slopes, kish_effective_sample_size,
+        recover_cluster_mean_within_between_slopes, recover_kish_weighted_slope,
     };
     use crate::error::PsychometricError;
 
     #[test]
-    fn noiseless_cwc_recovers_distinct_within_and_between_slopes() {
+    fn noiseless_cwc_recovers_distinct_within_between_and_contextual() {
         let rows = [
             ClusteredScore {
                 cluster_key: 1,
@@ -205,9 +233,27 @@ mod tests {
         ];
         // cluster 1 mean x=1 y=2.5; cluster 2 mean x=5 y=10.5 → between = 2
         // within: (-1,-0.5),(1,0.5) and (-1,-0.5),(1,0.5) → within = 0.5
+        // contextual = 2 − 0.5 = 1.5 (CWC γ01; not the between slope)
         let recovered = recover_cluster_mean_within_between_slopes(&rows).expect("cwc");
         assert!((recovered.within_slope - 0.5).abs() < 1e-12);
         assert!((recovered.between_slope - 2.0).abs() < 1e-12);
+        assert!((recovered.contextual_effect - 1.5).abs() < 1e-12);
+        assert!((recovered.contextual_effect - recovered.between_slope).abs() > 1e-9);
+        assert!(
+            ((recovered.contextual_effect + recovered.within_slope) - recovered.between_slope)
+                .abs()
+                < 1e-15
+        );
+    }
+
+    #[test]
+    fn overflowing_contextual_subtraction_fails_closed() {
+        assert_eq!(
+            contextual_effect_from_slopes(-f64::MAX, f64::MAX),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let ok = contextual_effect_from_slopes(0.5, 2.0).expect("finite");
+        assert!((ok - 1.5).abs() < 1e-15);
     }
 
     #[test]

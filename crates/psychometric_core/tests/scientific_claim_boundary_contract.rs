@@ -1,8 +1,9 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, IndicatorKind, LagClock, LaggedWithinResidual,
-    posterior_draw_point_estimate_mean, recover_irregular_centered_residual_log_rate,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
+    ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
+    recover_cluster_mean_within_between_slopes, recover_irregular_centered_residual_log_rate,
     recover_loading_point_estimate_mean, recover_within_residual_event_time_log_rate,
 };
 
@@ -85,5 +86,48 @@ fn person_mean_subtraction_on_raw_ar_is_not_the_lagged_within_effect() {
     assert!(
         (cwc - drift).abs() > 1e-6,
         "Curran & Bauer (2011, pp. 607–608): CWC of raw AR recovered {cwc}, which must not equal drift {drift}"
+    );
+}
+
+#[test]
+fn cwc_cluster_mean_coefficient_is_not_the_between_cluster_effect() {
+    let rows = [
+        ClusteredScore {
+            cluster_key: 1,
+            predictor: 0.0,
+            outcome: 2.0,
+        },
+        ClusteredScore {
+            cluster_key: 1,
+            predictor: 2.0,
+            outcome: 3.0,
+        },
+        ClusteredScore {
+            cluster_key: 2,
+            predictor: 4.0,
+            outcome: 10.0,
+        },
+        ClusteredScore {
+            cluster_key: 2,
+            predictor: 6.0,
+            outcome: 11.0,
+        },
+    ];
+    let recovered = recover_cluster_mean_within_between_slopes(&rows).expect("cwc");
+    let predictors: Vec<f64> = rows.iter().map(|row| row.predictor).collect();
+    let outcomes: Vec<f64> = rows.iter().map(|row| row.outcome).collect();
+    let pooled = ordinary_least_squares_slope(&predictors, &outcomes).expect("pooled");
+    assert!(
+        (recovered.contextual_effect - recovered.between_slope).abs() > 1e-9,
+        "Enders & Tofighi (2007, Table 2, pp. 124–127): CWC γ01 is contextual, not between"
+    );
+    assert!(
+        (recovered.contextual_effect - pooled).abs() > 1e-9,
+        "pooled OLS must not be treated as the CWC contextual effect"
+    );
+    assert!(
+        ((recovered.contextual_effect + recovered.within_slope) - recovered.between_slope).abs()
+            < 1e-15,
+        "adding CWC γ01 to γ10 must recover the between-cluster slope"
     );
 }

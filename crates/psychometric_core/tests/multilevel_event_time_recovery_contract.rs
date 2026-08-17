@@ -24,9 +24,10 @@ fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
 }
 
 #[test]
-fn cluster_mean_cwc_recovers_known_within_and_between_better_than_pooled() {
+fn cluster_mean_cwc_recovers_known_within_between_and_contextual() {
     let true_within = 0.5_f64;
     let true_between = 2.0_f64;
+    let true_contextual = true_between - true_within;
     let mut rows = Vec::new();
     for cluster in 0..6_u64 {
         let cluster_mean = f64::from(u32::try_from(cluster).expect("tiny")) * 2.0;
@@ -44,14 +45,20 @@ fn cluster_mean_cwc_recovers_known_within_and_between_better_than_pooled() {
     let recovered = recover_cluster_mean_within_between_slopes(&rows).expect("cwc");
     let within_error = rmse(&[true_within], &[recovered.within_slope]);
     let between_error = rmse(&[true_between], &[recovered.between_slope]);
+    let contextual_error = rmse(&[true_contextual], &[recovered.contextual_effect]);
     assert!(within_error < 1e-12, "within RMSE {within_error}");
     assert!(between_error < 1e-12, "between RMSE {between_error}");
+    assert!(
+        contextual_error < 1e-12,
+        "contextual RMSE {contextual_error}"
+    );
 
     let predictors: Vec<f64> = rows.iter().map(|row| row.predictor).collect();
     let outcomes: Vec<f64> = rows.iter().map(|row| row.outcome).collect();
     let pooled = ordinary_least_squares_slope(&predictors, &outcomes).expect("pooled");
     let pooled_within_error = rmse(&[true_within], &[pooled]);
     let pooled_between_error = rmse(&[true_between], &[pooled]);
+    let pooled_contextual_error = rmse(&[true_contextual], &[pooled]);
     assert!(
         pooled_within_error > within_error,
         "pooled RMSE {pooled_within_error} should exceed CWC within {within_error}"
@@ -59,6 +66,14 @@ fn cluster_mean_cwc_recovers_known_within_and_between_better_than_pooled() {
     assert!(
         pooled_between_error > between_error,
         "pooled RMSE {pooled_between_error} should exceed CWC between {between_error}"
+    );
+    assert!(
+        pooled_contextual_error > contextual_error,
+        "pooled RMSE {pooled_contextual_error} should exceed CWC contextual {contextual_error}"
+    );
+    assert!(
+        (recovered.contextual_effect - recovered.between_slope).abs() > 1e-9,
+        "Enders & Tofighi (2007, Table 2): CWC contextual must not equal the between-cluster slope"
     );
 }
 

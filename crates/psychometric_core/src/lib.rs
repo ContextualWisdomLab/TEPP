@@ -8,10 +8,10 @@
 //! distinguishes ALR from orthonormal ILR geometry, averages loading point
 //! estimates across posterior draws on a CPU `f64` path without claiming Rubin
 //! uncertainty pooling, combines draw-level OLS loadings with Rubin `T`,
-//! decomposes cluster-mean within/between OLS, maps event-time discrete lags
-//! through the exact scalar exponential, maps already-centered irregular
-//! residuals without re-centering, and refuses latent-mean comparison
-//! below strong invariance.
+//! decomposes cluster-mean within/between OLS and the CWC contextual effect,
+//! maps event-time discrete lags through the exact scalar exponential, maps
+//! already-centered irregular residuals without re-centering, and refuses
+//! latent-mean comparison below strong invariance.
 
 mod causality;
 mod cluster_mean;
@@ -30,11 +30,11 @@ pub use causality::CausalHeuristic;
 pub use causality::claim_causal_effect;
 /// One clustered predictor–outcome pair.
 pub use cluster_mean::ClusteredScore;
-/// Recovered within-cluster and between-cluster OLS slopes.
+/// Recovered within-cluster, between-cluster, and contextual OLS slopes.
 pub use cluster_mean::WithinBetweenSlopes;
 /// Kish effective sample size on psychometric weights.
 pub use cluster_mean::kish_effective_sample_size;
-/// Cluster-mean within/between OLS after CWC.
+/// Cluster-mean within/between OLS after CWC, plus the contextual effect.
 pub use cluster_mean::recover_cluster_mean_within_between_slopes;
 /// Kish-weighted least-squares slope.
 pub use cluster_mean::recover_kish_weighted_slope;

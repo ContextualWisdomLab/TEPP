@@ -12,7 +12,7 @@ TEPP documents and events may simultaneously belong to authors, departments, cus
 
 ## Estimator target (future)
 
-Production multilevel estimators (cross-classified / multiple-membership ESEM/DSEM) remain accepted-target in `psychometric_core`. The current executable slice recovers two-level CWC OLS and Kish-weighted slopes only. Recovery studies must use realistic synthetic truth with known multilevel structure and report RMSE, bias, and coverage via `validation_core`; those metrics are a non-exhaustive subset of the acceptance contract. ADR 0005 additionally requires posterior-uncertainty propagation, construct-specific model classification, measurement invariance, within/between separation, irregular-time handling, and event-time ordering.
+Production multilevel estimators (cross-classified / multiple-membership ESEM/DSEM) remain accepted-target in `psychometric_core`. The current executable slice recovers two-level CWC OLS, the CWC contextual effect, and Kish-weighted slopes only. Recovery studies must use realistic synthetic truth with known multilevel structure and report RMSE, bias, and coverage via `validation_core`; those metrics are a non-exhaustive subset of the acceptance contract. ADR 0005 additionally requires posterior-uncertainty propagation, construct-specific model classification, measurement invariance, within/between separation, irregular-time handling, and event-time ordering.
 
 ## Authority sources
 

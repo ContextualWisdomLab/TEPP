@@ -1,6 +1,6 @@
 [package]
 name = "psychometric_core"
-description = "Posterior-aware ESEM/DSEM input gates, multilevel/event-time recovery, Rubin T, and strong-invariance latent means."
+description = "Posterior-aware ESEM/DSEM input gates, multilevel/event-time recovery, CWC contextual effect, Rubin T, and strong-invariance latent means."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
