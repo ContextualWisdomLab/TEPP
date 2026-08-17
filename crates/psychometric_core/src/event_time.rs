@@ -150,7 +150,9 @@ pub fn recover_local_log_rate(
 /// Returns [`PsychometricError::EventTimeRequired`] for any non-event clock,
 /// [`PsychometricError::NonPositiveInterval`] when `event_delta` is not
 /// strictly positive, and [`PsychometricError::InvalidNumericInput`] when the
-/// log-rate is non-finite or the exponential overflows.
+/// log-rate is non-finite or the exponential overflows or underflows to zero.
+/// Binary64 `exp` of a large negative argument is `+0`, which is not a
+/// discrete lag: the inverse `a = ln(φ) / Δt` requires `φ > 0`.
 pub fn recover_discrete_lag_from_log_rate(
     log_rate: f64,
     event_delta: f64,
@@ -165,7 +167,11 @@ pub fn recover_discrete_lag_from_log_rate(
     if !log_rate.is_finite() {
         return Err(PsychometricError::InvalidNumericInput);
     }
-    require_finite((log_rate * event_delta).exp())
+    let discrete_lag = (log_rate * event_delta).exp();
+    if !discrete_lag.is_finite() || discrete_lag <= 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    Ok(discrete_lag)
 }
 
 /// Recover the exact scalar pair `(φ, a)` on event time.
@@ -428,7 +434,7 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
         let mut derivative = 0.0_f64;
         for &(earlier, later, delta) in pairs {
             let mapped = (log_rate * delta).exp();
-            if !mapped.is_finite() {
+            if !mapped.is_finite() || mapped <= 0.0 {
                 return Err(PsychometricError::InvalidNumericInput);
             }
             let weight = delta * earlier;
@@ -455,13 +461,13 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_discrete_lag_from_log_rate,
-        recover_discrete_lag_one, recover_event_series_mean_log_rate,
-        recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
-        recover_local_log_rate, recover_within_residual_event_time_log_rate,
-        refuse_difference_quotient_as_local_rate,
-        refuse_pooled_discrete_lag_across_unequal_intervals,
+        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
+        recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
+        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+        recover_irregular_centered_residual_log_rate, recover_local_log_rate,
+        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+        refuse_pooled_discrete_lag_across_unequal_intervals, ClusteredEventScore, EventOccasion,
+        LagClock, LaggedWithinResidual,
     };
     use crate::error::PsychometricError;
 
@@ -544,6 +550,21 @@ mod tests {
         );
         assert_eq!(
             recover_discrete_lag_from_log_rate(800.0, 10.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(-800.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(-1.0, 800.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let source_lag =
+            recover_discrete_lag_from_log_rate(-0.7, 1.0, LagClock::EventTime).expect("source φ");
+        assert!(source_lag > 0.0);
+        assert_eq!(
+            map_discrete_lag_across_event_intervals(source_lag, 1.0, 2000.0, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
@@ -971,6 +992,10 @@ mod tests {
         assert!(skipped_start.is_finite());
         assert_eq!(
             fit_scalar_log_rate(&[(1e154, 1e154, 1.0)]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            fit_scalar_log_rate(&[(1.0, 1e-300, 1.0), (1.0, 1e-300, 2.0)]),
             Err(PsychometricError::InvalidNumericInput)
         );
     }

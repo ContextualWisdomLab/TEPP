@@ -2,13 +2,13 @@
 #![allow(clippy::cast_precision_loss)]
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
-    LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
-    ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
-    recover_discrete_lag_from_log_rate, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
-    recover_kish_weighted_slope, recover_within_residual_event_time_log_rate,
-    refuse_difference_quotient_as_local_rate, refuse_pooled_discrete_lag_across_unequal_intervals,
+    map_discrete_lag_across_event_intervals, ordinary_least_squares_slope,
+    recover_cluster_mean_within_between_slopes, recover_discrete_lag_from_log_rate,
+    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+    recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
+    recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+    refuse_pooled_discrete_lag_across_unequal_intervals, ClusteredEventScore, ClusteredScore,
+    EventOccasion, IndicatorKind, LagClock, LaggedWithinResidual, PsychometricError,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -131,6 +131,21 @@ fn discrete_lag_remaps_across_unequal_event_intervals() {
     assert_eq!(
         refuse_pooled_discrete_lag_across_unequal_intervals(month, two_months),
         Err(PsychometricError::UnequalIntervalPoolingForbidden)
+    );
+}
+
+#[test]
+fn forward_map_underflow_to_zero_fails_closed() {
+    assert_eq!(
+        recover_discrete_lag_from_log_rate(-800.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    let source_lag =
+        recover_discrete_lag_from_log_rate(-0.7, 1.0, LagClock::EventTime).expect("source φ");
+    assert!(source_lag > 0.0);
+    assert_eq!(
+        map_discrete_lag_across_event_intervals(source_lag, 1.0, 2000.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }
 

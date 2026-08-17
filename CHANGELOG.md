@@ -76,6 +76,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- `psychometric_core` scalar forward map `φ(Δt) = exp(a Δt)` now refuses binary64 underflow to `+0`. Voelkle et al. (2012, Eq. 7; ZORA accepted manuscript p. 16) write discrete auto-effects as `e^{a Δt}`, which are strictly positive; `a = ln(φ) / Δt` requires `φ > 0`. Direct overflow already failed closed. The Newton residual path refuses a mapped `+0` the same way.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
