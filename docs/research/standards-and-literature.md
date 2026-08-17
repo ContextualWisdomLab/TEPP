@@ -106,7 +106,15 @@ TEPP uses these sources, together with the AICPA Trust Services Criteria cited b
 
 ## Privacy and derived-data sensitivity
 
-International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011). Use limitation and data minimization apply to derived topic, factor, and relation artifacts in `derived_sensitivity`; they are not a certification claim.
+European Union. (2016). *Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data (General Data Protection Regulation)*. Official Journal of the European Union, L 119, 1–88. https://eur-lex.europa.eu/eli/reg/2016/679/oj
+
+Article 29 Data Protection Working Party. (2007). *Opinion 4/2007 on the concept of personal data* (WP 136). European Commission. https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2007/wp136_en.pdf
+
+International Organization for Standardization and International Electrotechnical Commission. (2024). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2024). https://www.iso.org/standard/85938.html
+
+International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011) (withdrawn; superseded by ISO/IEC 29100:2024).
+
+GDPR Article 4(1) and Recital 26 keep information personal when it relates to an identified or identifiable person, including after pseudonymisation if attribution remains possible. WP 136 treats content, purpose, and result as alternative “relating to” tests and gives derived medical-analysis and taxi-location examples. ISO/IEC 29100:2024 is the current published privacy-framework edition; TEPP does not quote unread 2024 clause text and does not treat the 2011 edition as current authority for use-limitation of derived artifacts. See `docs/research/derived-sensitivity-inheritance.md` and ADR 0009. Blanket masking is not declassification. These citations are readiness inputs, not certification.
 
 ## AI risk, management systems, and assurance readiness
 
