@@ -12,7 +12,9 @@
 //! maps event-time discrete lags through the exact scalar exponential, maps
 //! already-centered irregular residuals without re-centering, remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
-//! exact scalar discrete effect of a constant predictor, and refuses
+//! exact scalar discrete effect of a constant predictor, recovers the
+//! first-order discrete effect of a time-varying predictor with matched
+//! sampling and constancy intervals, and refuses
 //! latent-mean comparison below strong invariance.
 
 mod causality;
@@ -66,6 +68,8 @@ pub use event_time::recover_discrete_constant_predictor_effect;
 pub use event_time::recover_discrete_lag_from_log_rate;
 /// Noiseless scalar discrete lag `later / earlier`.
 pub use event_time::recover_discrete_lag_one;
+/// First-order discrete effect of a time-varying event-time predictor.
+pub use event_time::recover_discrete_time_varying_predictor_effect;
 /// Mean local log-rate on a sorted event-time series.
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
@@ -80,6 +84,8 @@ pub use event_time::recover_within_residual_event_time_log_rate;
 pub use event_time::refuse_difference_quotient_as_local_rate;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
+/// Refuse a time-varying predictor whose sampling and constancy intervals differ.
+pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.

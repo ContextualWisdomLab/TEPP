@@ -8,7 +8,9 @@
 //! `φ(Δt) = exp(a Δt)`. Discrete lags from unequal event intervals are
 //! not one coefficient; they map through `a` first. The exact scalar
 //! discrete effect of a constant predictor is Voelkle et al. (2012,
-//! Eq. 12). The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
+//! Eq. 12). The discrete effect of a time-varying predictor whose
+//! sampling interval equals its constancy interval is their Eq. 14.
+//! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
 
 use std::collections::BTreeMap;
@@ -288,17 +290,20 @@ pub fn recover_discrete_constant_predictor_effect(
     }
     // Finite z, overflowed expm1. (a_yx/a_xx)(exp(z) − 1) =
     // sign(a_yx/a_xx) exp(ln|a_yx| + z − ln|a_xx|) − a_yx/a_xx.
+    // The subtracted scale must itself be finite: if a_yx/a_xx overflows,
+    // the rewrite term is not a binary64 number. That path is dead if
+    // dominant is required first (dominant is then also infinite), so
+    // refuse the scale before forming the exponential.
+    let scale = outcome_on_predictor / predictor_log_rate;
+    if !scale.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
     let log_abs_dominant =
         outcome_on_predictor.abs().ln() + increment_argument - predictor_log_rate.abs().ln();
     let dominant = require_finite(
         outcome_on_predictor.signum() * predictor_log_rate.signum() * log_abs_dominant.exp(),
     )?;
-    let scale = outcome_on_predictor / predictor_log_rate;
-    if scale.is_finite() {
-        require_finite(dominant - scale)
-    } else {
-        Ok(dominant)
-    }
+    require_finite(dominant - scale)
 }
 
 /// Refuse treating discrete lags from unequal event intervals as one coefficient.
@@ -315,6 +320,74 @@ pub fn refuse_pooled_discrete_lag_across_unequal_intervals(
 ) -> Result<f64, PsychometricError> {
     let _ = (first_delta, second_delta);
     Err(PsychometricError::UnequalIntervalPoolingForbidden)
+}
+
+/// Exact scalar discrete effect of a time-varying event-time predictor.
+///
+/// Voelkle et al. (2012, Eq. 14; ZORA accepted manuscript, Introducing
+/// Intercepts, manuscript p. 21): when the predictor can take a new value
+/// at each occasion **and** the sampling interval equals the interval
+/// during which that predictor is assumed constant, the discrete effect
+/// is `b*_y.x(Δt) = a_yx Δt`. It does not depend on the predictor
+/// auto-effect. The manuscript calls this a first-order approximation
+/// that deteriorates as `Δt` grows. It is not Eq. 12. The general case
+/// (sampling interval ≠ constancy interval) cites Oud and Jansen (2000),
+/// which is unread, and fails closed. This is not DSEM.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event clock,
+/// [`PsychometricError::NonPositiveInterval`] when any interval is not
+/// strictly positive, [`PsychometricError::UnmatchedTimeVaryingInterval`]
+/// when the event, sampling, and constancy intervals are not the same
+/// finite value, and [`PsychometricError::InvalidNumericInput`] when the
+/// continuous effect is non-finite or the product overflows.
+pub fn recover_discrete_time_varying_predictor_effect(
+    outcome_on_predictor: f64,
+    event_delta: f64,
+    sampling_interval: f64,
+    constancy_interval: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite()
+        || event_delta <= 0.0
+        || !sampling_interval.is_finite()
+        || sampling_interval <= 0.0
+        || !constancy_interval.is_finite()
+        || constancy_interval <= 0.0
+    {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if event_delta.to_bits() != sampling_interval.to_bits()
+        || sampling_interval.to_bits() != constancy_interval.to_bits()
+    {
+        return Err(PsychometricError::UnmatchedTimeVaryingInterval);
+    }
+    if !outcome_on_predictor.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    require_finite(outcome_on_predictor * event_delta)
+}
+
+/// Refuse mapping a time-varying predictor when sampling ≠ constancy.
+///
+/// Always fails closed. Oud and Jansen (2000) is unread. Use
+/// [`recover_discrete_time_varying_predictor_effect`] only when the
+/// intervals already match, or [`recover_discrete_constant_predictor_effect`]
+/// for a constant predictor (Eq. 12).
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::UnmatchedTimeVaryingInterval`].
+pub fn refuse_unmatched_time_varying_predictor_interval(
+    sampling_interval: f64,
+    constancy_interval: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (sampling_interval, constancy_interval);
+    Err(PsychometricError::UnmatchedTimeVaryingInterval)
 }
 
 /// Refuse the difference quotient as a continuous-time rate.
@@ -549,10 +622,12 @@ mod tests {
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, recover_discrete_constant_predictor_effect,
         recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
-        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
-        recover_irregular_centered_residual_log_rate, recover_local_log_rate,
-        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+        recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
+        recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
+        recover_local_log_rate, recover_within_residual_event_time_log_rate,
+        refuse_difference_quotient_as_local_rate,
         refuse_pooled_discrete_lag_across_unequal_intervals,
+        refuse_unmatched_time_varying_predictor_interval,
     };
     use crate::error::PsychometricError;
 
@@ -820,6 +895,151 @@ mod tests {
         assert_eq!(
             recover_discrete_constant_predictor_effect(1.0, 1e308, 2.0, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
+        );
+        // a_yx/a_xx overflows; the Eq. 12 rewrite term is not a binary64 number.
+        assert!(!800.0_f64.exp_m1().is_finite());
+        assert!(!(1e308_f64 / 1e-10).is_finite());
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(1e308, 1e-10, 8e12, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn time_varying_predictor_discrete_effect_recovers_equation_fourteen() {
+        let outcome_on_predictor = 0.2_f64;
+        let delta = 2.0_f64;
+        let recovered = recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            delta,
+            delta,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq 14");
+        assert!((recovered - outcome_on_predictor * delta).abs() < 1e-15);
+        let constant = recover_discrete_constant_predictor_effect(
+            outcome_on_predictor,
+            -0.5,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq 12");
+        // Voelkle 2012, p. 21: Eq. 14 is not Eq. 12.
+        assert!((recovered - constant).abs() > 1e-3);
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                0.0,
+                delta,
+                delta,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn time_varying_predictor_unmatched_and_invalid_inputs_fail_closed() {
+        let outcome_on_predictor = 0.2_f64;
+        let delta = 2.0_f64;
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                outcome_on_predictor,
+                delta,
+                delta,
+                delta,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                outcome_on_predictor,
+                0.0,
+                0.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                outcome_on_predictor,
+                -1.0,
+                1.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                outcome_on_predictor,
+                1.0,
+                f64::NAN,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                outcome_on_predictor,
+                1.0,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                outcome_on_predictor,
+                1.0,
+                2.0,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::UnmatchedTimeVaryingInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                outcome_on_predictor,
+                2.0,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::UnmatchedTimeVaryingInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                f64::NAN,
+                delta,
+                delta,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_time_varying_predictor_effect(
+                1e308,
+                10.0,
+                10.0,
+                10.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            refuse_unmatched_time_varying_predictor_interval(1.0, 2.0),
+            Err(PsychometricError::UnmatchedTimeVaryingInterval)
+        );
+        assert_eq!(
+            refuse_unmatched_time_varying_predictor_interval(1.0, 1.0),
+            Err(PsychometricError::UnmatchedTimeVaryingInterval)
         );
     }
 

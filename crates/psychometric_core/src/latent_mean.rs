@@ -221,6 +221,8 @@ mod tests {
         assert!(MeanInvarianceStatus::Metric.licenses_shared_metric_meaning());
         assert!(!MeanInvarianceStatus::Metric.licenses_latent_mean_comparison());
         assert_eq!(MeanInvarianceStatus::Metric.as_str(), "metric");
+        assert_eq!(MeanInvarianceStatus::Configural.as_str(), "configural");
+        assert_eq!(MeanInvarianceStatus::Strict.as_str(), "strict");
     }
 
     #[test]

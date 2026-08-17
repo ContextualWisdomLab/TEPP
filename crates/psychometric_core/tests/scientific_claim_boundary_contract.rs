@@ -3,7 +3,8 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
-    recover_cluster_mean_within_between_slopes, recover_irregular_centered_residual_log_rate,
+    recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
+    recover_discrete_time_varying_predictor_effect, recover_irregular_centered_residual_log_rate,
     recover_loading_point_estimate_mean, recover_within_residual_event_time_log_rate,
 };
 
@@ -130,4 +131,30 @@ fn cwc_cluster_mean_coefficient_is_not_the_between_cluster_effect() {
             < 1e-15,
         "adding CWC γ01 to γ10 must recover the between-cluster slope"
     );
+}
+
+#[test]
+fn time_varying_equation_fourteen_is_not_constant_equation_twelve() {
+    let outcome_on_predictor = 0.35_f64;
+    let delta = 1.5_f64;
+    let time_varying = recover_discrete_time_varying_predictor_effect(
+        outcome_on_predictor,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq 14");
+    let constant = recover_discrete_constant_predictor_effect(
+        outcome_on_predictor,
+        -0.4,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq 12");
+    assert!(
+        (time_varying - constant).abs() > 1e-3,
+        "Voelkle et al. (2012, manuscript p. 21): Eq. 14 a_yx Δt must not equal Eq. 12"
+    );
+    assert!((time_varying - outcome_on_predictor * delta).abs() < 1e-15);
 }

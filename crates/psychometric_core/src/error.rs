@@ -31,6 +31,9 @@ pub enum PsychometricError {
     DifferenceQuotientForbidden,
     /// Discrete lags from unequal event intervals were treated as one coefficient.
     UnequalIntervalPoolingForbidden,
+    /// A time-varying predictor was mapped with unmatched sampling and
+    /// constancy intervals. Oud and Jansen (2000) is unread.
+    UnmatchedTimeVaryingInterval,
     /// Fewer than two clusters were supplied for a within/between decomposition.
     InsufficientClusters,
     /// A membership or survey weight is empty, negative, or non-finite.
@@ -65,6 +68,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::UnequalIntervalPoolingForbidden => {
                 "discrete lags from unequal event intervals are not one coefficient"
+            }
+            Self::UnmatchedTimeVaryingInterval => {
+                "time-varying predictor discrete effect requires matching sampling and constancy intervals"
             }
             Self::InsufficientClusters => "within/between recovery requires at least two clusters",
             Self::InvalidWeight => "invalid non-negative finite psychometric weight",
@@ -127,6 +133,10 @@ mod tests {
         assert_eq!(
             PsychometricError::UnequalIntervalPoolingForbidden.to_string(),
             "discrete lags from unequal event intervals are not one coefficient"
+        );
+        assert_eq!(
+            PsychometricError::UnmatchedTimeVaryingInterval.to_string(),
+            "time-varying predictor discrete effect requires matching sampling and constancy intervals"
         );
         assert_eq!(
             PsychometricError::InsufficientClusters.to_string(),
