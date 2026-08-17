@@ -189,6 +189,17 @@ fn constant_predictor_discrete_effect_recovers_equation_twelve() {
         underflow_error < 1e-15,
         "Eq. 12 binary64 underflow limit RMSE {underflow_error}"
     );
+    // a_yx Δt overflows; Eq. 12 remains finite.
+    let product_overflow =
+        recover_discrete_constant_predictor_effect(1e308, -100.0, 10.0, LagClock::EventTime)
+            .expect("eq 12 finite after a_yx Δt overflow");
+    let product_overflow_truth = (1e308 / -100.0) * (-100.0_f64 * 10.0).exp_m1();
+    let product_overflow_error = rmse(&[product_overflow_truth], &[product_overflow]);
+    assert!(
+        product_overflow_error / 1e306 < 1e-12,
+        "Eq. 12 a_yx Δt overflow RMSE {product_overflow_error}"
+    );
+    assert!(!(1e308_f64 * 10.0).is_finite());
 }
 
 #[test]

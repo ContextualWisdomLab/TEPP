@@ -223,8 +223,9 @@ pub fn map_discrete_lag_across_event_intervals(
 /// `b*_y.x(Δt) = (a_yx / a_xx) (exp(a_xx Δt) − 1)` for `a_xx ≠ 0`.
 /// Driver, Oud, and Voelkle (2017, p. 4, after Eq. 3) restate the same
 /// discrete intercept as a function of `A` and `Δt`. The algebraically
-/// identical evaluation is `a_yx Δt (expm1(z) / z)` with `z = a_xx Δt`.
-/// That order is Eq. 12, not the first-order product. When binary64 `z`
+/// identical evaluation is `a_yx (expm1(z) / z * Δt)` with `z = a_xx Δt`.
+/// The unitless scale multiplies `Δt` before `a_yx` so a finite Eq. 12
+/// result is not lost when `a_yx Δt` overflows. When binary64 `z`
 /// underflows to `+0`, the mathematical limit of Eq. 12 is `a_yx Δt`.
 /// Using that limit only at underflow is IEEE-754 evaluation of Eq. 12.
 /// The first-order product is not the general discrete effect. This is
@@ -260,9 +261,10 @@ pub fn recover_discrete_constant_predictor_effect(
         // Binary64 underflow of a_xx Δt. lim z→0 of Eq. 12 is a_yx Δt.
         return require_finite(outcome_on_predictor * event_delta);
     }
-    require_finite(
-        outcome_on_predictor * event_delta * (increment_argument.exp_m1() / increment_argument),
-    )
+    // Multiply expm1(z)/z by Δt first. a_yx * Δt can overflow a finite
+    // Eq. 12 result (a_yx = 1e308, a_xx = -100, Δt = 10 → ≈ 1e306).
+    let scaled_interval = increment_argument.exp_m1() / increment_argument * event_delta;
+    require_finite(outcome_on_predictor * scaled_interval)
 }
 
 /// Refuse treating discrete lags from unequal event intervals as one coefficient.
@@ -727,6 +729,14 @@ mod tests {
                 .expect("eq 12 scaled");
         assert!(tiny_nonzero.is_finite());
         assert!((tiny_nonzero - 1e154).abs() / 1e154 < 1e-12);
+        // a_yx Δt overflows; Eq. 12 remains finite (Voelkle 2012, Eq. 12).
+        let product_overflow =
+            recover_discrete_constant_predictor_effect(1e308, -100.0, 10.0, LagClock::EventTime)
+                .expect("eq 12 finite after a_yx Δt overflow");
+        let product_overflow_expected = (1e308 / -100.0) * (-100.0_f64 * 10.0).exp_m1();
+        assert!((product_overflow - product_overflow_expected).abs() / 1e306 < 1e-12);
+        assert!(product_overflow.is_finite());
+        assert!(!(1e308_f64 * 10.0).is_finite());
     }
 
     #[test]
