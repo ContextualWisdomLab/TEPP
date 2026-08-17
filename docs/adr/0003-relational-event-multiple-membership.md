@@ -1,7 +1,7 @@
 # ADR 0003 — Relational event ontology and time-varying multiple membership
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; typed relation graph with forward-only transitions active-PR; multilevel estimators and persistence remain accepted-target  
+**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; typed relation graph with forward-only transitions implemented-main; translation/copy/revision identity in `translation_edge` on the active PR; multilevel estimators and persistence remain accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0016 owns TDT/CHRONOS event-intelligence task semantics; this ADR remains authoritative for ontology, relation, role, and membership structure.
 
@@ -17,7 +17,7 @@ TEPP represents document, passage, event, entity, revision, translation, evidenc
 
 Authors, departments, organizations, customers, partners, competitors, projects, opportunity pools, templates, languages, locations, and episodes form cross-classified, time-varying, multiple-membership assignments. Memberships carry explicit weights where scientifically justified and governed validity intervals. Customer/partner/competitor are role assignments, not immutable entity classes.
 
-Observed relation evidence, inferred relations, and promoted transition edges remain distinct. Relation absence is not silently interpreted as evidence of no relationship.
+Observed relation evidence, inferred relations, and promoted transition edges remain distinct. Relation absence is not silently interpreted as evidence of no relationship. Translation, same-language copy, and revision remain provenance and never become reverse state transitions.
 
 ## Non-goals
 
