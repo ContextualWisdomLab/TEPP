@@ -200,6 +200,23 @@ fn constant_predictor_discrete_effect_recovers_equation_twelve() {
         "Eq. 12 a_yx Δt overflow RMSE {product_overflow_error}"
     );
     assert!(!(1e308_f64 * 10.0).is_finite());
+    // z → -∞: expm1(z)/z * Δt is +0; Eq. 12 → -a_yx/a_xx.
+    let increment_argument = -1e308_f64 * 2.0;
+    assert!(increment_argument.is_infinite() && increment_argument.is_sign_negative());
+    assert_eq!(
+        (increment_argument.exp_m1() / increment_argument * 2.0).to_bits(),
+        0.0_f64.to_bits()
+    );
+    let negative_overflow =
+        recover_discrete_constant_predictor_effect(1.0, -1e308, 2.0, LagClock::EventTime)
+            .expect("eq 12 equilibrium increment");
+    let negative_overflow_truth = -(1.0 / -1e308);
+    let negative_overflow_error = rmse(&[negative_overflow_truth], &[negative_overflow]);
+    assert!(
+        negative_overflow_error / 1e-308 < 1e-12,
+        "Eq. 12 z→-∞ equilibrium RMSE {negative_overflow_error}"
+    );
+    assert!(negative_overflow > 0.0);
 }
 
 #[test]

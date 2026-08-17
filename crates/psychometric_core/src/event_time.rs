@@ -219,17 +219,18 @@ pub fn map_discrete_lag_across_event_intervals(
 
 /// Exact scalar discrete effect of a constant event-time predictor.
 ///
-/// Voelkle et al. (2012, Eq. 12; ZORA accepted manuscript p. 16):
-/// `b*_y.x(Δt) = (a_yx / a_xx) (exp(a_xx Δt) − 1)` for `a_xx ≠ 0`.
-/// Driver, Oud, and Voelkle (2017, p. 4, after Eq. 3) restate the same
-/// discrete intercept as a function of `A` and `Δt`. The algebraically
-/// identical evaluation is `a_yx (expm1(z) / z * Δt)` with `z = a_xx Δt`.
-/// The unitless scale multiplies `Δt` before `a_yx` so a finite Eq. 12
-/// result is not lost when `a_yx Δt` overflows. When binary64 `z`
-/// underflows to `+0`, the mathematical limit of Eq. 12 is `a_yx Δt`.
-/// Using that limit only at underflow is IEEE-754 evaluation of Eq. 12.
-/// The first-order product is not the general discrete effect. This is
-/// not DSEM and not a matrix `expm`.
+/// Voelkle et al. (2012, Eq. 12; ZORA accepted manuscript, Introducing
+/// Intercepts): `b*_y.x(Δt) = (a_yx / a_xx) (exp(a_xx Δt) − 1)` for
+/// `a_xx ≠ 0`. Driver, Oud, and Voelkle (2017, p. 4, after Eq. 3)
+/// restate the same discrete intercept as a function of `A` and `Δt`.
+/// The algebraically identical evaluation is `a_yx (expm1(z) / a_xx)`
+/// with `z = a_xx Δt`. Dividing the increment by the finite auto-effect
+/// keeps a finite Eq. 12 result when `z` overflows to `-∞`
+/// (`exp(z) → 0`, so Eq. 12 → `-a_yx / a_xx`) and when `a_yx Δt`
+/// overflows. When binary64 `z` underflows to `+0`, the mathematical
+/// limit of Eq. 12 is `a_yx Δt`. Using that limit only at underflow is
+/// IEEE-754 evaluation of Eq. 12. The first-order product is not the
+/// general discrete effect. This is not DSEM and not a matrix `expm`.
 ///
 /// # Errors
 ///
@@ -261,10 +262,10 @@ pub fn recover_discrete_constant_predictor_effect(
         // Binary64 underflow of a_xx Δt. lim z→0 of Eq. 12 is a_yx Δt.
         return require_finite(outcome_on_predictor * event_delta);
     }
-    // Multiply expm1(z)/z by Δt first. a_yx * Δt can overflow a finite
-    // Eq. 12 result (a_yx = 1e308, a_xx = -100, Δt = 10 → ≈ 1e306).
-    let scaled_interval = increment_argument.exp_m1() / increment_argument * event_delta;
-    require_finite(outcome_on_predictor * scaled_interval)
+    // Divide expm1(z) by the finite a_xx, not by z. expm1(-∞)/-∞ is +0
+    // and loses the equilibrium increment -a_yx/a_xx (Voelkle 2012,
+    // Introducing Intercepts: the exponential vanishes as Δt grows).
+    require_finite(outcome_on_predictor * (increment_argument.exp_m1() / predictor_log_rate))
 }
 
 /// Refuse treating discrete lags from unequal event intervals as one coefficient.
@@ -737,6 +738,23 @@ mod tests {
         assert!((product_overflow - product_overflow_expected).abs() / 1e306 < 1e-12);
         assert!(product_overflow.is_finite());
         assert!(!(1e308_f64 * 10.0).is_finite());
+    }
+
+    #[test]
+    fn constant_predictor_negative_overflow_recovers_equilibrium_increment() {
+        // z → -∞: expm1(z)/z * Δt is +0; Eq. 12 → -a_yx/a_xx (Voelkle
+        // 2012, Introducing Intercepts equilibrium increment).
+        let increment_argument = -1e308_f64 * 2.0;
+        assert!(increment_argument.is_infinite() && increment_argument.is_sign_negative());
+        let lost_scale = increment_argument.exp_m1() / increment_argument * 2.0;
+        assert_eq!(lost_scale.to_bits(), 0.0_f64.to_bits());
+        let negative_overflow =
+            recover_discrete_constant_predictor_effect(1.0, -1e308, 2.0, LagClock::EventTime)
+                .expect("eq 12 equilibrium increment");
+        let negative_overflow_expected = -(1.0 / -1e308);
+        assert!((negative_overflow - negative_overflow_expected).abs() / 1e-308 < 1e-12);
+        assert!(negative_overflow > 0.0);
+        assert!(negative_overflow.is_finite());
     }
 
     #[test]
