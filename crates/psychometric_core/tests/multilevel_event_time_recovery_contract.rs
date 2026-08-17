@@ -317,6 +317,14 @@ fn discrete_process_noise_recovers_driver_equation_three() {
         recover_discrete_process_noise(0.0, 800.0, 1.0, LagClock::EventTime),
         Ok(0.0)
     );
+    let twice_rate_overflow =
+        recover_discrete_process_noise(1.0, 1e308, 1e-308, LagClock::EventTime)
+            .expect("2a overflow");
+    let expected_twice_rate = 0.5 * 2.0_f64.exp_m1() / 1e308;
+    assert!(rmse(&[expected_twice_rate], &[twice_rate_overflow]) / expected_twice_rate < 1e-12);
+    let overflowed_equilibrium =
+        recover_discrete_process_noise(1e308, -1e308, 2.0, LagClock::EventTime).expect("2a eq var");
+    assert!(rmse(&[0.5], &[overflowed_equilibrium]) < 1e-15);
     assert_eq!(
         recover_discrete_process_noise(1.0, 800.0, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)

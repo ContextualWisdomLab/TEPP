@@ -393,21 +393,24 @@ pub fn refuse_unmatched_time_varying_predictor_interval(
 
 /// Exact scalar discrete process noise on event time.
 ///
-/// Driver, Oud, and Voelkle (2017, Eq. 3; JSS PDF opened 2026-08-17T17:19Z,
+/// Driver, Oud, and Voelkle (2017, Eq. 3; JSS PDF re-opened 2026-08-17T21:03Z,
 /// p. 4) write the discrete process-noise covariance
 /// `Q_Δt = ∫_0^{Δt} expm(A(Δt−τ)) G G⊤ expm(A(Δt−τ))⊤ dτ`.
 /// The noiseless scalar closed form with continuous diffusion
 /// `q = G G⊤ ≥ 0` is `q (exp(2 a Δt) − 1) / (2 a)` for `a ≠ 0` and
 /// `q Δt` for `a = 0`. The algebraically identical finite-`expm1`
-/// evaluation is `q (expm1(z) / (2 a))` with `z = 2 a Δt`. When
-/// binary64 `z` underflows to `+0`, the mathematical limit is `q Δt`.
-/// When `z → −∞` the exponential vanishes and the result is the
-/// equilibrium variance `−q / (2 a)` for stable `a < 0`. When
-/// `expm1(z)` overflows to `+∞` at a finite `z`, rewrite as
-/// `sign(q / (2 a)) exp(ln|q| + z − ln|2 a|) − q / (2 a)`. `z → +∞`
-/// is an unstable process and fails closed unless `q = 0`. A zero
-/// diffusion is exactly zero even if `expm1` overflows. This is not a
-/// Kalman filter, not DSEM, and not a matrix `expm`.
+/// evaluation is `0.5 q (expm1(z) / a)` with `z = 2 (a Δt)`. Form
+/// `z` as twice the already-finite product `a Δt`. Forming `2 a`
+/// first overflows when `|a|` is at the binary64 extreme even if
+/// `a Δt` and `Q_Δt` are finite (`a = ±1e308`, `Δt = 1e-308`).
+/// When binary64 `z` underflows to `+0`, the mathematical limit is
+/// `q Δt`. When `z → −∞` the exponential vanishes and the result is
+/// the equilibrium variance `−q / (2 a) = −0.5 q / a` for stable
+/// `a < 0`. When `expm1(z)` overflows to `+∞` at a finite `z`,
+/// rewrite as `sign(q / a) exp(ln|q| + z − ln|a| − ln 2) − 0.5 q / a`.
+/// `z → +∞` is an unstable process and fails closed unless `q = 0`.
+/// A zero diffusion is exactly zero even if `expm1` overflows. This
+/// is not a Kalman filter, not DSEM, and not a matrix `expm`.
 ///
 /// # Errors
 ///
@@ -439,37 +442,38 @@ pub fn recover_discrete_process_noise(
     if log_rate == 0.0 {
         return require_finite(continuous_diffusion * event_delta);
     }
-    let twice_log_rate = 2.0 * log_rate;
-    if !twice_log_rate.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
-    let increment_argument = twice_log_rate * event_delta;
+    // z = 2 (a Δt), not (2 a) Δt. 2 a overflows at |a| = 1e308 even
+    // when a Δt is finite (Driver Eq. 3 scalar closed form).
+    let drift_interval = log_rate * event_delta;
+    let increment_argument = 2.0 * drift_interval;
     if increment_argument == 0.0 {
         // Binary64 underflow of 2 a Δt. lim z→0 of Eq. 3 Q_Δt is q Δt.
         return require_finite(continuous_diffusion * event_delta);
     }
     let increment = increment_argument.exp_m1();
     if increment.is_finite() {
-        // Divide expm1(z) by the finite 2 a, not by z. expm1(−∞)/−∞
-        // is +0 and loses the equilibrium variance −q / (2 a).
-        return require_finite(continuous_diffusion * (increment / twice_log_rate));
+        // Q = q expm1(z) / (2 a) = 0.5 q (expm1(z) / a). Divide by
+        // the finite a, not by 2 a: 2 a overflows when |a| = 1e308.
+        // expm1(−∞) is −1, so this path also keeps −0.5 q / a.
+        return require_finite(0.5 * continuous_diffusion * (increment / log_rate));
     }
     // expm1 overflowed. z → +∞ diverges (unstable auto-effect).
+    // z → −∞ is already handled above because expm1(−∞) is finite.
     if !increment_argument.is_finite() {
         return Err(PsychometricError::InvalidNumericInput);
     }
     // Finite z, overflowed expm1. (q / (2 a))(exp(z) − 1) =
-    // sign(q / (2 a)) exp(ln|q| + z − ln|2 a|) − q / (2 a).
-    let scale = continuous_diffusion / twice_log_rate;
-    if !scale.is_finite() {
+    // sign(q / a) exp(ln|q| + z − ln|a| − ln 2) − 0.5 q / a.
+    let half_scale = 0.5 * continuous_diffusion / log_rate;
+    if !half_scale.is_finite() {
         return Err(PsychometricError::InvalidNumericInput);
     }
-    let log_abs_dominant =
-        continuous_diffusion.abs().ln() + increment_argument - twice_log_rate.abs().ln();
-    let dominant = require_finite(
-        continuous_diffusion.signum() * twice_log_rate.signum() * log_abs_dominant.exp(),
-    )?;
-    require_finite(dominant - scale)
+    let log_abs_dominant = continuous_diffusion.abs().ln() + increment_argument
+        - log_rate.abs().ln()
+        - std::f64::consts::LN_2;
+    let dominant =
+        require_finite(continuous_diffusion.signum() * log_rate.signum() * log_abs_dominant.exp())?;
+    require_finite(dominant - half_scale)
 }
 
 /// Refuse the difference quotient as a continuous-time rate.
@@ -1163,6 +1167,17 @@ mod tests {
             recover_discrete_process_noise(0.0, 1e308, 2.0, LagClock::EventTime),
             Ok(0.0)
         );
+        // Forming 2 a first overflows; z = 2 (a Δt) stays finite.
+        let twice_rate_overflow =
+            recover_discrete_process_noise(1.0, 1e308, 1e-308, LagClock::EventTime)
+                .expect("2a overflow");
+        let expected_twice_rate = 0.5 * 2.0_f64.exp_m1() / 1e308;
+        assert!((twice_rate_overflow - expected_twice_rate).abs() / expected_twice_rate < 1e-12);
+        // 2 a overflows to −∞; expm1(−∞) = −1 keeps −0.5 q / a.
+        let overflowed_equilibrium =
+            recover_discrete_process_noise(1e308, -1e308, 2.0, LagClock::EventTime)
+                .expect("2a eq var");
+        assert!((overflowed_equilibrium - 0.5).abs() < 1e-15);
     }
 
     #[test]
@@ -1201,10 +1216,6 @@ mod tests {
         );
         assert_eq!(
             recover_discrete_process_noise(1.0, 1e308, 2.0, LagClock::EventTime),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_discrete_process_noise(1.0, 1e308, 1e-308, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }

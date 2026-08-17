@@ -173,6 +173,14 @@ fn discrete_process_noise_is_not_the_continuous_diffusion() {
     );
     let expected = diffusion * ((2.0 * drift * delta).exp() - 1.0) / (2.0 * drift);
     assert!((discrete - expected).abs() < 1e-15);
+    let twice_rate_overflow =
+        recover_discrete_process_noise(1.0, 1e308, 1e-308, LagClock::EventTime)
+            .expect("2a overflow");
+    let expected_twice_rate = 0.5 * 2.0_f64.exp_m1() / 1e308;
+    assert!((twice_rate_overflow - expected_twice_rate).abs() / expected_twice_rate < 1e-12);
+    let overflowed_equilibrium =
+        recover_discrete_process_noise(1e308, -1e308, 2.0, LagClock::EventTime).expect("2a eq var");
+    assert!((overflowed_equilibrium - 0.5).abs() < 1e-15);
     let constant =
         recover_discrete_constant_predictor_effect(diffusion, drift, delta, LagClock::EventTime)
             .expect("eq 12");
