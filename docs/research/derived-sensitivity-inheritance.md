@@ -72,18 +72,22 @@ Local Zotero was not reachable in this environment (`127.0.0.1:23119`).
 
 ## Application
 
-`inherit_sensitivity` copies the source class onto a closed kind
-(`topic`/`factor`/`relation`) and fails closed on unknown kinds.
-`refuse_derivation_as_public` and `refuse_blanket_mask_as_declassification`
-encode the WP 136 / GDPR reading that computation and masking are not
-independent declassification decisions (Article 29 Data Protection Working
-Party, 2007; European Union, 2016). Recovery is a computed match rate against
-known inherited classes, not an LLM judgment.
+`inherit_sensitivity` and `DerivedArtifact::try_new` copy the source class
+onto a closed kind (`topic`/`factor`/`relation`) and fail closed on unknown
+kinds. `refuse_derivation_as_public` and
+`refuse_blanket_mask_as_declassification` encode the WP 136 / GDPR reading
+that computation and masking are not independent declassification decisions
+(Article 29 Data Protection Working Party, 2007; European Union, 2016).
+Recovery is a computed match rate of paired kind **and** class against known
+truth, not an LLM judgment and not a class-only score that would treat a
+factor as a recovered topic.
 
 ## Verification
 
 - restricted/internal sources stay restricted/internal after inheritance;
-- unknown kind codes fail closed;
-- public collapse of restricted/internal truth has a lower match rate than
-  inherited classes;
+- unknown kind codes fail closed on inheritance and on `try_new`;
+- every topic/factor/relation × Restricted/Internal/Public pair recovers at
+  rate 1.0; public collapse recovers only the three Public sources (1/3);
+- reordering paired records preserves the recovery rate;
+- a matching class on the wrong kind is not recovery;
 - empty or length-mismatched recovery payloads fail closed.

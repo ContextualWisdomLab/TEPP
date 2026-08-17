@@ -28,13 +28,23 @@ pub struct DerivedArtifact {
 }
 
 impl DerivedArtifact {
-    /// Bind a derived-artifact kind to the source sensitivity class.
-    #[must_use]
-    pub const fn new(kind_code: u16, source_class: SensitivityClass) -> Self {
-        Self {
+    /// Bind a closed derived-artifact kind to the source sensitivity class.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DerivedSensitivityError::InvalidSensitivityPayload`] when
+    /// `kind_code` is not topic, factor, or relation.
+    pub const fn try_new(
+        kind_code: u16,
+        source_class: SensitivityClass,
+    ) -> Result<Self, DerivedSensitivityError> {
+        if !matches!(kind_code, KIND_TOPIC | KIND_FACTOR | KIND_RELATION) {
+            return Err(DerivedSensitivityError::InvalidSensitivityPayload);
+        }
+        Ok(Self {
             kind_code,
             source_class,
-        }
+        })
     }
 
     /// Closed kind code (topic, factor, or relation), never a public default.
@@ -61,10 +71,7 @@ pub fn inherit_sensitivity(
     source_class: SensitivityClass,
     kind_code: u16,
 ) -> Result<DerivedArtifact, DerivedSensitivityError> {
-    if !matches!(kind_code, KIND_TOPIC | KIND_FACTOR | KIND_RELATION) {
-        return Err(DerivedSensitivityError::InvalidSensitivityPayload);
-    }
-    Ok(DerivedArtifact::new(kind_code, source_class))
+    DerivedArtifact::try_new(kind_code, source_class)
 }
 
 /// Refuse to treat derivation as declassification to public.
@@ -91,7 +98,8 @@ pub fn refuse_blanket_mask_as_declassification() -> Result<(), DerivedSensitivit
     Err(DerivedSensitivityError::BlanketMaskIsNotAuthorization)
 }
 
-/// Fraction of inherited classes that match known truth.
+/// Fraction of paired records whose kind and inherited class both match
+/// known truth. A matching class on the wrong kind is not recovery.
 ///
 /// # Errors
 ///
@@ -146,7 +154,7 @@ mod tests {
             refuse_blanket_mask_as_declassification(),
             Err(DerivedSensitivityError::BlanketMaskIsNotAuthorization)
         );
-        let truth = [DerivedArtifact::new(1, SensitivityClass::Restricted)];
+        let truth = [DerivedArtifact::try_new(1, SensitivityClass::Restricted).expect("topic")];
         let matched = sensitivity_recovery_rate(&truth, &truth).expect("rate");
         assert!((matched - 1.0).abs() < f64::EPSILON);
         assert_eq!(

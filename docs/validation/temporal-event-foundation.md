@@ -25,7 +25,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
 | Purpose-bound provider payloads | `tepp_api` | implemented-main | provider-payload minimization | expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay | ADR 0009; `docs/research/provider-payload-minimization.md` |
 | Adaptive orchestration router | `tepp_api` | accepted-target | active PR | mode selection, document-control denial, ablation, credential-free bind | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
-| Derived sensitivity inheritance | `derived_sensitivity` | active-PR | this PR | inherited class recovery vs public collapse | ADR 0009 |
+| Derived sensitivity inheritance | `derived_sensitivity` | active-PR | this PR | kind+class recovery vs public collapse; 3×3 kind×class synthetic truth and reorder invariance; fail-closed unknown kinds, unvalidated constructors, derivation-as-public, blanket mask, empty/mismatched payloads | ADR 0009; GDPR Art. 4(1)/Recital 26; WP 136 |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 
