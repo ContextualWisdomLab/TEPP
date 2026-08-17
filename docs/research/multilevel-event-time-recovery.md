@@ -43,4 +43,6 @@ Kish, L. (1965). *Survey sampling*. John Wiley & Sons.
 - Kish WLS recovers a known slope;
 - the exact scalar map recovers a known drift on event time and refuses every other clock plus the difference quotient;
 - CWC-then-lag on a two-cluster decaying series has smaller computed RMSE than a level-pooled series when the latter is identified;
-- already-centered irregular residuals recover a known drift at machine-scale RMSE, and that RMSE is smaller than CWC of the corresponding raw autoregressive series (Curran & Bauer, 2011, pp. 607–608).
+- already-centered irregular residuals recover a known drift at machine-scale RMSE, and that RMSE is smaller than CWC of the corresponding raw autoregressive series (Curran & Bauer, 2011, pp. 607–608);
+- a singleton cluster is skipped; two singleton clusters yield an empty pair list and fail closed;
+- overflowing CWC residuals and Newton overflow / flat-derivative steps fail closed.

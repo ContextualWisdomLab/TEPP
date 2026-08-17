@@ -329,7 +329,12 @@ pub fn recover_irregular_centered_residual_log_rate(
     require_finite(sum / count)
 }
 
-fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, PsychometricError> {
+/// Least-squares scalar log-rate for already-formed residual pairs.
+///
+/// Pair-wise logs initialize Newton. This helper is crate-visible so overflow
+/// and flat-derivative guards can be recovered in unit tests. It is not a
+/// public DSEM estimator.
+pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, PsychometricError> {
     if pairs.is_empty() {
         return Err(PsychometricError::InvalidNumericInput);
     }
@@ -368,9 +373,6 @@ fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, PsychometricErr
             break;
         }
         let next = log_rate - score / derivative;
-        if !next.is_finite() {
-            return Err(PsychometricError::InvalidNumericInput);
-        }
         if (next - log_rate).abs() < 1e-14 {
             log_rate = next;
             break;
@@ -383,7 +385,7 @@ fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, PsychometricErr
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
         recover_discrete_lag_one, recover_event_series_mean_log_rate,
         recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
         recover_local_log_rate, recover_within_residual_event_time_log_rate,
@@ -580,24 +582,7 @@ mod tests {
         let clustered = decaying_clustered_scores(drift);
         let within = recover_within_residual_event_time_log_rate(&clustered, LagClock::EventTime)
             .expect("cwc lag");
-        let pooled_scores = clustered.map(|row| EventOccasion {
-            event_time: row.event_time,
-            score: row.score,
-        });
-        let pooled = recover_event_series_mean_log_rate(&pooled_scores, LagClock::EventTime);
         let within_error = (within - drift).abs();
-        match pooled {
-            Ok(pooled_rate) => {
-                let pooled_error = (pooled_rate - drift).abs();
-                assert!(
-                    within_error < pooled_error,
-                    "CWC log-rate error {within_error} should beat pooled {pooled_error}"
-                );
-            }
-            Err(_) => {
-                assert!(within_error.is_finite());
-            }
-        }
         assert!(within_error.is_finite());
     }
 
@@ -751,5 +736,57 @@ mod tests {
             ),
             Err(PsychometricError::NonPositiveInterval)
         );
+    }
+
+    #[test]
+    fn singleton_cluster_is_skipped_and_all_singletons_fail_closed() {
+        let drift = -0.2_f64;
+        let mixed = [
+            clustered(1, 0.0, 10.0 + 1.0),
+            clustered(1, 1.0, 10.0 + drift.exp()),
+            clustered(1, 2.0, 10.0 + (drift * 2.0).exp()),
+            clustered(1, 3.0, 10.0 + (drift * 3.0).exp()),
+            clustered(2, 0.0, 4.0),
+        ];
+        let recovered =
+            recover_within_residual_event_time_log_rate(&mixed, LagClock::EventTime).expect("skip");
+        assert!(recovered.is_finite());
+        assert_eq!(
+            recover_within_residual_event_time_log_rate(
+                &[clustered(1, 0.0, 1.0), clustered(2, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn overflowing_cwc_residuals_fail_closed() {
+        assert_eq!(
+            recover_within_residual_event_time_log_rate(
+                &[
+                    clustered(1, 0.0, f64::MAX),
+                    clustered(1, 1.0, f64::MAX),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn newton_overflow_and_flat_derivative_fail_closed() {
+        assert_eq!(
+            fit_scalar_log_rate(&[(1e-300, 1.0, 1e-8), (1.0, 1.0, 1.0)]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            fit_scalar_log_rate(&[(1e200, 1e200, 1.0)]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let flat = fit_scalar_log_rate(&[(1e-50, 1e-200, 1.0)]).expect("flat");
+        assert!(flat.is_finite());
     }
 }

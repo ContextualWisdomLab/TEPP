@@ -145,5 +145,13 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+        assert_eq!(
+            pearson_correlation(
+                &[1.0, 2.0],
+                &[1.0, f64::NAN],
+                IndicatorKind::IsometricLogRatio
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 }

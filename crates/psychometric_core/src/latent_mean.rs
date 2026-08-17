@@ -173,10 +173,10 @@ pub fn recover_strong_gated_latent_mean_difference(
     if !measurement.status.licenses_latent_mean_comparison() {
         return Err(PsychometricError::StrongInvarianceRequired);
     }
-    let loading = require_finite(f64::midpoint(
+    let loading = f64::midpoint(
         measurement.reference_loading,
         measurement.comparison_loading,
-    ))?;
+    );
     if loading == 0.0 {
         return Err(PsychometricError::SingularDesign);
     }

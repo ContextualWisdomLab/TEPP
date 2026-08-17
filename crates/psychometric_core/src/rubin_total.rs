@@ -50,9 +50,6 @@ pub fn combine_draw_level_ols_loadings(
     let mut within = Vec::with_capacity(draw_count);
     for draw in indicator_draws {
         let fit = ordinary_least_squares_fit(factor_scores, draw)?;
-        if fit.predictor_sum_of_squares <= 0.0 {
-            return Err(PsychometricError::SingularDesign);
-        }
         let sampling_variance =
             require_finite(fit.residual_variance / fit.predictor_sum_of_squares)?;
         loadings.push(fit.slope);
