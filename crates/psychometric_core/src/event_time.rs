@@ -220,17 +220,24 @@ pub fn map_discrete_lag_across_event_intervals(
 /// Exact scalar discrete effect of a constant event-time predictor.
 ///
 /// Voelkle et al. (2012, Eq. 12; ZORA accepted manuscript, Introducing
-/// Intercepts): `b*_y.x(Δt) = (a_yx / a_xx) (exp(a_xx Δt) − 1)` for
-/// `a_xx ≠ 0`. Driver, Oud, and Voelkle (2017, p. 4, after Eq. 3)
-/// restate the same discrete intercept as a function of `A` and `Δt`.
-/// The algebraically identical evaluation is `a_yx (expm1(z) / a_xx)`
-/// with `z = a_xx Δt`. Dividing the increment by the finite auto-effect
-/// keeps a finite Eq. 12 result when `z` overflows to `-∞`
-/// (`exp(z) → 0`, so Eq. 12 → `-a_yx / a_xx`) and when `a_yx Δt`
-/// overflows. When binary64 `z` underflows to `+0`, the mathematical
-/// limit of Eq. 12 is `a_yx Δt`. Using that limit only at underflow is
-/// IEEE-754 evaluation of Eq. 12. The first-order product is not the
-/// general discrete effect. This is not DSEM and not a matrix `expm`.
+/// Intercepts, manuscript p. 20): adding a continuous-time intercept
+/// `b` yields the discrete increment `A^{-1}(exp(A Δt) − I) b`. Driver,
+/// Oud, and Voelkle (2017, Eq. 3) write the same term as
+/// `A^{-1}[e^{A Δt} − I] ξ`. The scalar case is
+/// `b*_y.x(Δt) = (a_yx / a_xx) (exp(a_xx Δt) − 1)` for `a_xx ≠ 0`.
+/// The algebraically identical finite-`expm1` evaluation is
+/// `a_yx (expm1(z) / a_xx)` with `z = a_xx Δt`. Dividing the increment
+/// by the finite auto-effect keeps a finite Eq. 12 result when `z`
+/// overflows to `-∞` (`exp(z) → 0`, so Eq. 12 → `-a_yx / a_xx`) and
+/// when `a_yx Δt` overflows. When binary64 `z` underflows to `+0`, the
+/// mathematical limit of Eq. 12 is `a_yx Δt`. When `a_yx = 0`, Eq. 12
+/// is exactly `0` even if `expm1(z)` overflows (`0 * +∞` is `NaN`).
+/// When `expm1(z)` overflows to `+∞` at a finite `z`, rewrite as
+/// `sign(a_yx / a_xx) exp(ln|a_yx| + z − ln|a_xx|) − a_yx / a_xx` so a
+/// finite Eq. 12 result is not lost. `z → +∞` is an unstable process
+/// and fails closed unless `a_yx = 0`. The first-order product is not
+/// the general discrete effect. This is not DSEM and not a matrix
+/// `expm`.
 ///
 /// # Errors
 ///
@@ -257,15 +264,41 @@ pub fn recover_discrete_constant_predictor_effect(
     {
         return Err(PsychometricError::InvalidNumericInput);
     }
+    // Voelkle Eq. 12 / Driver Eq. 3: (0 / a)(exp(a Δt) − 1) = 0.
+    // Direct 0 * (expm1(z) / a) is NaN when expm1 overflows.
+    if outcome_on_predictor == 0.0 {
+        return Ok(0.0);
+    }
     let increment_argument = predictor_log_rate * event_delta;
     if increment_argument == 0.0 {
         // Binary64 underflow of a_xx Δt. lim z→0 of Eq. 12 is a_yx Δt.
         return require_finite(outcome_on_predictor * event_delta);
     }
-    // Divide expm1(z) by the finite a_xx, not by z. expm1(-∞)/-∞ is +0
-    // and loses the equilibrium increment -a_yx/a_xx (Voelkle 2012,
-    // Introducing Intercepts: the exponential vanishes as Δt grows).
-    require_finite(outcome_on_predictor * (increment_argument.exp_m1() / predictor_log_rate))
+    let increment = increment_argument.exp_m1();
+    if increment.is_finite() {
+        // Divide expm1(z) by the finite a_xx, not by z. expm1(-∞)/-∞
+        // is +0 and loses the equilibrium increment -a_yx/a_xx (Voelkle
+        // 2012, Introducing Intercepts: the exponential vanishes as Δt
+        // grows).
+        return require_finite(outcome_on_predictor * (increment / predictor_log_rate));
+    }
+    // expm1 overflowed. z → +∞ diverges (unstable auto-effect).
+    if !increment_argument.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // Finite z, overflowed expm1. (a_yx/a_xx)(exp(z) − 1) =
+    // sign(a_yx/a_xx) exp(ln|a_yx| + z − ln|a_xx|) − a_yx/a_xx.
+    let log_abs_dominant =
+        outcome_on_predictor.abs().ln() + increment_argument - predictor_log_rate.abs().ln();
+    let dominant = require_finite(
+        outcome_on_predictor.signum() * predictor_log_rate.signum() * log_abs_dominant.exp(),
+    )?;
+    let scale = outcome_on_predictor / predictor_log_rate;
+    if scale.is_finite() {
+        require_finite(dominant - scale)
+    } else {
+        Ok(dominant)
+    }
 }
 
 /// Refuse treating discrete lags from unequal event intervals as one coefficient.
@@ -755,6 +788,39 @@ mod tests {
         assert!((negative_overflow - negative_overflow_expected).abs() / 1e-308 < 1e-12);
         assert!(negative_overflow > 0.0);
         assert!(negative_overflow.is_finite());
+    }
+
+    #[test]
+    fn constant_predictor_expm1_overflow_recovers_finite_equation_twelve() {
+        // expm1(800) is +∞; (1e-308/800)(exp(800)−1) is finite.
+        assert!(!800.0_f64.exp_m1().is_finite());
+        assert!(!(1e-308_f64 * (800.0_f64.exp_m1() / 800.0)).is_finite());
+        let recovered =
+            recover_discrete_constant_predictor_effect(1e-308, 800.0, 1.0, LagClock::EventTime)
+                .expect("eq 12 log-space");
+        let expected = (1e-308_f64.ln() + 800.0 - 800.0_f64.ln()).exp() - 1e-308 / 800.0;
+        assert!((recovered - expected).abs() / expected < 1e-12);
+        assert!(recovered.is_finite() && recovered > 0.0);
+        let negative =
+            recover_discrete_constant_predictor_effect(-1e-308, 800.0, 1.0, LagClock::EventTime)
+                .expect("eq 12 signed log-space");
+        assert!((negative + expected).abs() / expected < 1e-12);
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(0.0, 800.0, 1.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(0.0, 1e308, 2.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(1.0, 800.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(1.0, 1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]

@@ -217,6 +217,25 @@ fn constant_predictor_discrete_effect_recovers_equation_twelve() {
         "Eq. 12 z→-∞ equilibrium RMSE {negative_overflow_error}"
     );
     assert!(negative_overflow > 0.0);
+    // expm1(800) is +∞; (1e-308/800)(exp(800)−1) remains finite.
+    assert!(!800.0_f64.exp_m1().is_finite());
+    let overflowed =
+        recover_discrete_constant_predictor_effect(1e-308, 800.0, 1.0, LagClock::EventTime)
+            .expect("eq 12 expm1 overflow");
+    let overflowed_truth = (1e-308_f64.ln() + 800.0 - 800.0_f64.ln()).exp() - 1e-308 / 800.0;
+    let overflowed_error = rmse(&[overflowed_truth], &[overflowed]);
+    assert!(
+        overflowed_error / overflowed_truth < 1e-12,
+        "Eq. 12 expm1-overflow RMSE {overflowed_error}"
+    );
+    assert_eq!(
+        recover_discrete_constant_predictor_effect(0.0, 800.0, 1.0, LagClock::EventTime),
+        Ok(0.0)
+    );
+    assert_eq!(
+        recover_discrete_constant_predictor_effect(0.0, 1e308, 2.0, LagClock::EventTime),
+        Ok(0.0)
+    );
 }
 
 #[test]
