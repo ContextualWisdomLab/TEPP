@@ -14,7 +14,8 @@
 //! lags across unequal event intervals through that log-rate, recovers the
 //! exact scalar discrete effect of a constant predictor, recovers the
 //! first-order discrete effect of a time-varying predictor with matched
-//! sampling and constancy intervals, and refuses
+//! sampling and constancy intervals, recovers the exact scalar discrete
+//! process noise of Driver et al. (2017, Eq. 3), and refuses
 //! latent-mean comparison below strong invariance.
 
 mod causality;
@@ -68,6 +69,8 @@ pub use event_time::recover_discrete_constant_predictor_effect;
 pub use event_time::recover_discrete_lag_from_log_rate;
 /// Noiseless scalar discrete lag `later / earlier`.
 pub use event_time::recover_discrete_lag_one;
+/// Exact scalar discrete process noise `Q_Δt` on event time.
+pub use event_time::recover_discrete_process_noise;
 /// First-order discrete effect of a time-varying event-time predictor.
 pub use event_time::recover_discrete_time_varying_predictor_effect;
 /// Mean local log-rate on a sorted event-time series.

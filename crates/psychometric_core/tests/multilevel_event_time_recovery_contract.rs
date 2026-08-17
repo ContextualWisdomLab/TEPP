@@ -6,10 +6,11 @@ use psychometric_core::{
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
     ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
     recover_discrete_constant_predictor_effect, recover_discrete_lag_from_log_rate,
-    recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
-    recover_kish_weighted_slope, recover_within_residual_event_time_log_rate,
-    refuse_difference_quotient_as_local_rate, refuse_pooled_discrete_lag_across_unequal_intervals,
+    recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
+    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+    recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
+    recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+    refuse_pooled_discrete_lag_across_unequal_intervals,
     refuse_unmatched_time_varying_predictor_interval,
 };
 
@@ -279,6 +280,50 @@ fn time_varying_predictor_discrete_effect_recovers_equation_fourteen() {
     assert_eq!(
         refuse_unmatched_time_varying_predictor_interval(1.0, 2.0),
         Err(PsychometricError::UnmatchedTimeVaryingInterval)
+    );
+}
+
+#[test]
+fn discrete_process_noise_recovers_driver_equation_three() {
+    let diffusion = 0.4_f64;
+    let drift = -0.5_f64;
+    let delta = 1.0_f64;
+    let recovered =
+        recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime).expect("q_dt");
+    let expected = diffusion * ((2.0 * drift * delta).exp() - 1.0) / (2.0 * drift);
+    let error = rmse(&[expected], &[recovered]);
+    assert!(error < 1e-15, "Driver Eq. 3 Q_Δt RMSE {error}");
+    let collapsed = rmse(&[expected], &[diffusion]);
+    assert!(
+        collapsed > error,
+        "continuous diffusion is not discrete process noise: collapsed RMSE {collapsed} must exceed {error}"
+    );
+    assert_eq!(
+        recover_discrete_process_noise(diffusion, 0.0, 2.5, LagClock::EventTime),
+        Ok(diffusion * 2.5)
+    );
+    let underflowed = recover_discrete_process_noise(1.0, 1e-308, 1e-308, LagClock::EventTime)
+        .expect("z underflow");
+    assert!(rmse(&[1e-308], &[underflowed]) < 1e-320);
+    let equilibrium =
+        recover_discrete_process_noise(0.4, -1e300, 2.0, LagClock::EventTime).expect("eq var");
+    assert!(rmse(&[0.4 / (2.0 * 1e300)], &[equilibrium]) < 1e-315);
+    let overflowed =
+        recover_discrete_process_noise(1e-308, 400.0, 1.0, LagClock::EventTime).expect("rewrite");
+    let rewrite_scale = 1e-308 / 800.0;
+    let rewrite = ((1e-308_f64).ln() + 800.0 - 800.0_f64.ln()).exp() - rewrite_scale;
+    assert!(rmse(&[rewrite], &[overflowed]) / rewrite.abs() < 1e-12);
+    assert_eq!(
+        recover_discrete_process_noise(0.0, 800.0, 1.0, LagClock::EventTime),
+        Ok(0.0)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(1.0, 800.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(0.4, -0.5, 1.0, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
     );
 }
 

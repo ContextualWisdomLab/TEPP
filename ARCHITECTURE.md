@@ -61,7 +61,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
-| `psychometric_core` | posterior-aware structural input gates, CWC within/between OLS plus the contextual effect, event-time log-rate, unequal-interval discrete-lag remapping, constant-predictor discrete effect, time-varying-predictor discrete effect (Eq. 14), irregular already-centered residual lag, Rubin `T` on OLS loadings, and strong-gated latent means |
+| `psychometric_core` | posterior-aware structural input gates, CWC within/between OLS plus the contextual effect, event-time log-rate, unequal-interval discrete-lag remapping, constant-predictor discrete effect, time-varying-predictor discrete effect (Eq. 14), exact scalar discrete process noise (Driver et al., 2017, Eq. 3), irregular already-centered residual lag, Rubin `T` on OLS loadings, and strong-gated latent means |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

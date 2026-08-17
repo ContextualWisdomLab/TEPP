@@ -10,7 +10,8 @@
 //! discrete effect of a constant predictor is Voelkle et al. (2012,
 //! Eq. 12). The discrete effect of a time-varying predictor whose
 //! sampling interval equals its constancy interval is their Eq. 14.
-//! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
+//! The exact scalar discrete process noise is the closed form of
+//! Driver, Oud, and Voelkle (2017, Eq. 3) `Q_Δt`. The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
 
 use std::collections::BTreeMap;
@@ -390,6 +391,87 @@ pub fn refuse_unmatched_time_varying_predictor_interval(
     Err(PsychometricError::UnmatchedTimeVaryingInterval)
 }
 
+/// Exact scalar discrete process noise on event time.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3; JSS PDF opened 2026-08-17T17:19Z,
+/// p. 4) write the discrete process-noise covariance
+/// `Q_Δt = ∫_0^{Δt} expm(A(Δt−τ)) G G⊤ expm(A(Δt−τ))⊤ dτ`.
+/// The noiseless scalar closed form with continuous diffusion
+/// `q = G G⊤ ≥ 0` is `q (exp(2 a Δt) − 1) / (2 a)` for `a ≠ 0` and
+/// `q Δt` for `a = 0`. The algebraically identical finite-`expm1`
+/// evaluation is `q (expm1(z) / (2 a))` with `z = 2 a Δt`. When
+/// binary64 `z` underflows to `+0`, the mathematical limit is `q Δt`.
+/// When `z → −∞` the exponential vanishes and the result is the
+/// equilibrium variance `−q / (2 a)` for stable `a < 0`. When
+/// `expm1(z)` overflows to `+∞` at a finite `z`, rewrite as
+/// `sign(q / (2 a)) exp(ln|q| + z − ln|2 a|) − q / (2 a)`. `z → +∞`
+/// is an unstable process and fails closed unless `q = 0`. A zero
+/// diffusion is exactly zero even if `expm1` overflows. This is not a
+/// Kalman filter, not DSEM, and not a matrix `expm`.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event clock,
+/// [`PsychometricError::NonPositiveInterval`] when `event_delta` is not
+/// strictly positive, and [`PsychometricError::InvalidNumericInput`] when
+/// the diffusion is negative or non-finite, the log-rate is non-finite, or
+/// the mapped variance is non-finite.
+pub fn recover_discrete_process_noise(
+    continuous_diffusion: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !continuous_diffusion.is_finite() || continuous_diffusion < 0.0 || !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // Driver Eq. 3: the integral of a zero diffusion is zero.
+    // Direct 0 * (expm1(z) / (2 a)) is NaN when expm1 overflows.
+    if continuous_diffusion == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate == 0.0 {
+        return require_finite(continuous_diffusion * event_delta);
+    }
+    let twice_log_rate = 2.0 * log_rate;
+    if !twice_log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let increment_argument = twice_log_rate * event_delta;
+    if increment_argument == 0.0 {
+        // Binary64 underflow of 2 a Δt. lim z→0 of Eq. 3 Q_Δt is q Δt.
+        return require_finite(continuous_diffusion * event_delta);
+    }
+    let increment = increment_argument.exp_m1();
+    if increment.is_finite() {
+        // Divide expm1(z) by the finite 2 a, not by z. expm1(−∞)/−∞
+        // is +0 and loses the equilibrium variance −q / (2 a).
+        return require_finite(continuous_diffusion * (increment / twice_log_rate));
+    }
+    // expm1 overflowed. z → +∞ diverges (unstable auto-effect).
+    if !increment_argument.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // Finite z, overflowed expm1. (q / (2 a))(exp(z) − 1) =
+    // sign(q / (2 a)) exp(ln|q| + z − ln|2 a|) − q / (2 a).
+    let scale = continuous_diffusion / twice_log_rate;
+    if !scale.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let log_abs_dominant =
+        continuous_diffusion.abs().ln() + increment_argument - twice_log_rate.abs().ln();
+    let dominant = require_finite(
+        continuous_diffusion.signum() * twice_log_rate.signum() * log_abs_dominant.exp(),
+    )?;
+    require_finite(dominant - scale)
+}
+
 /// Refuse the difference quotient as a continuous-time rate.
 ///
 /// Voelkle et al. (2012) discourage `(x(t+Δt) − x(t)) / Δt` as the drift.
@@ -622,10 +704,10 @@ mod tests {
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, recover_discrete_constant_predictor_effect,
         recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
-        recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-        recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
-        recover_local_log_rate, recover_within_residual_event_time_log_rate,
-        refuse_difference_quotient_as_local_rate,
+        recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
+        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+        recover_irregular_centered_residual_log_rate, recover_local_log_rate,
+        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_unmatched_time_varying_predictor_interval,
     };
@@ -1040,6 +1122,90 @@ mod tests {
         assert_eq!(
             refuse_unmatched_time_varying_predictor_interval(1.0, 1.0),
             Err(PsychometricError::UnmatchedTimeVaryingInterval)
+        );
+    }
+
+    #[test]
+    fn discrete_process_noise_recovers_driver_equation_three() {
+        let diffusion = 0.4_f64;
+        let drift = -0.5_f64;
+        let delta = 1.0_f64;
+        let recovered =
+            recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime)
+                .expect("q_dt");
+        let expected = diffusion * ((2.0 * drift * delta).exp() - 1.0) / (2.0 * drift);
+        assert!((recovered - expected).abs() < 1e-15);
+        // a = 0 is the integral of a constant diffusion: q Δt.
+        assert_eq!(
+            recover_discrete_process_noise(diffusion, 0.0, 2.5, LagClock::EventTime),
+            Ok(diffusion * 2.5)
+        );
+        // Binary64 underflow of 2 a Δt recovers the same limit.
+        let underflowed = recover_discrete_process_noise(1.0, 1e-308, 1e-308, LagClock::EventTime)
+            .expect("z underflow");
+        assert!((underflowed - 1e-308).abs() < 1e-320);
+        // z → −∞ keeps the equilibrium variance −q / (2 a).
+        let equilibrium =
+            recover_discrete_process_noise(0.4, -1e300, 2.0, LagClock::EventTime).expect("eq var");
+        assert!((equilibrium - (0.4 / (2.0 * 1e300))).abs() < 1e-315);
+        // Finite z, overflowed expm1: log-space rewrite stays finite.
+        let overflowed = recover_discrete_process_noise(1e-308, 400.0, 1.0, LagClock::EventTime)
+            .expect("expm1 overflow");
+        let rewrite_scale = 1e-308 / 800.0;
+        let rewrite_log = (1e-308_f64).ln() + 800.0 - 800.0_f64.ln();
+        let rewrite = rewrite_log.exp() - rewrite_scale;
+        assert!((overflowed - rewrite).abs() / rewrite.abs() < 1e-12);
+        assert_eq!(
+            recover_discrete_process_noise(0.0, 800.0, 1.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(0.0, 1e308, 2.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn discrete_process_noise_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_discrete_process_noise(0.4, -0.5, 1.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(0.4, -0.5, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(0.4, -0.5, -1.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(0.4, -0.5, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(-0.1, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(f64::NAN, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(0.4, f64::NAN, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(1.0, 800.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(1.0, 1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_process_noise(1.0, 1e308, 1e-308, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 
