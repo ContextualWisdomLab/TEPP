@@ -7,7 +7,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 
 | Requirement / decision | Canonical basis | Source/evidence boundary | Maturity |
 |---|---|---|---|
-| immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring; `persistence_postgres` source-artifact SQL insert/lookup plus idempotent retry (#40 implemented-main) | implemented-main |
+| immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring; `persistence_postgres` source-artifact SQL insert/lookup plus idempotent retry (#40 implemented-main); `payload_bound` inbound identity/provenance/size/depth on the active PR | partial |
 | Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |
