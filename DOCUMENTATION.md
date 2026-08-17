@@ -34,6 +34,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Actions workflow fleet audit | [`docs/operations/ACTIONS_WORKFLOW_FLEET.md`](docs/operations/ACTIONS_WORKFLOW_FLEET.md) |
 | Actions fleet research doctoring | [`docs/research/actions-workflow-fleet.md`](docs/research/actions-workflow-fleet.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
+| Relation absence is not negative evidence | [`docs/research/relation-absence-not-negative.md`](docs/research/relation-absence-not-negative.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
