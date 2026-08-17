@@ -10,7 +10,8 @@
 //! uncertainty pooling, combines draw-level OLS loadings with Rubin `T`,
 //! decomposes cluster-mean within/between OLS and the CWC contextual effect,
 //! maps event-time discrete lags through the exact scalar exponential, maps
-//! already-centered irregular residuals without re-centering, and refuses
+//! already-centered irregular residuals without re-centering, remaps discrete
+//! lags across unequal event intervals through that log-rate, and refuses
 //! latent-mean comparison below strong invariance.
 
 mod causality;
@@ -56,6 +57,10 @@ pub use event_time::EventOccasion;
 pub use event_time::LagClock;
 /// Already-centered lagged residual pair with an irregular event interval.
 pub use event_time::LaggedWithinResidual;
+/// Map a discrete lag onto another event interval through the exact log-rate.
+pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar forward map `φ = exp(a Δt)`.
+pub use event_time::recover_discrete_lag_from_log_rate;
 /// Noiseless scalar discrete lag `later / earlier`.
 pub use event_time::recover_discrete_lag_one;
 /// Mean local log-rate on a sorted event-time series.
@@ -70,6 +75,8 @@ pub use event_time::recover_local_log_rate;
 pub use event_time::recover_within_residual_event_time_log_rate;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse pooling discrete lags from unequal event intervals.
+pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.

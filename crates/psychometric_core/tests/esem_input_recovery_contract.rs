@@ -273,6 +273,10 @@ fn finite_alr_correlation_and_error_messages_are_stable() {
         "the difference quotient is not the local continuous-time rate"
     );
     assert_eq!(
+        PsychometricError::UnequalIntervalPoolingForbidden.to_string(),
+        "discrete lags from unequal event intervals are not one coefficient"
+    );
+    assert_eq!(
         PsychometricError::InsufficientClusters.to_string(),
         "within/between recovery requires at least two clusters"
     );

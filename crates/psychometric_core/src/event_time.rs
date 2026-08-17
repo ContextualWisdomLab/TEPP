@@ -1,10 +1,14 @@
 //! Event-time discrete lag-1 and exact scalar local log-rate.
 //!
-//! Voelkle, Oud, Davidov, and Schmidt (2012, Eq. 7) and Driver, Oud, and
-//! Voelkle (2017, Eq. 3) map the continuous-time drift by
+//! Voelkle, Oud, Davidov, and Schmidt (2012, Eq. 7; ZORA accepted
+//! manuscript, Continuous Time Modeling p. 16 and Appendix B) and Driver,
+//! Oud, and Voelkle (2017, Eq. 3) map the continuous-time drift by
 //! `A*(Δt) = exp(A Δt)`. The noiseless scalar inverse is
-//! `a = ln(φ) / Δt` with `φ = A*(Δt)`. The difference quotient
-//! `(x(t+Δt) − x(t)) / Δt` (their Eqs. 3–4) is refused. This is not DSEM.
+//! `a = ln(φ) / Δt` with `φ = A*(Δt)`. The forward map is
+//! `φ(Δt) = exp(a Δt)`. Discrete lags from unequal event intervals are
+//! not one coefficient; they map through `a` first. The difference
+//! quotient `(x(t+Δt) − x(t)) / Δt` (their Eqs. 3–4) is refused. This is
+//! not DSEM and not a matrix `expm`.
 
 use std::collections::BTreeMap;
 
@@ -136,6 +140,34 @@ pub fn recover_local_log_rate(
     require_finite(discrete_lag.ln() / event_delta)
 }
 
+/// Exact scalar forward map `φ(Δt) = exp(a Δt)` (Voelkle et al., 2012, Eq. 7).
+///
+/// This is the inverse of [`recover_local_log_rate`]. It is the scalar case of
+/// `A*(Δt) = exp(A Δt)`, not a matrix `expm`.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event clock,
+/// [`PsychometricError::NonPositiveInterval`] when `event_delta` is not
+/// strictly positive, and [`PsychometricError::InvalidNumericInput`] when the
+/// log-rate is non-finite or the exponential overflows.
+pub fn recover_discrete_lag_from_log_rate(
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    require_finite((log_rate * event_delta).exp())
+}
+
 /// Recover the exact scalar pair `(φ, a)` on event time.
 ///
 /// # Errors
@@ -154,6 +186,44 @@ pub fn recover_event_time_discrete_lag_and_log_rate(
         log_rate,
         event_delta,
     })
+}
+
+/// Map a discrete lag from one event interval onto another through `a`.
+///
+/// Voelkle et al. (2012, ZORA accepted manuscript pp. 2, 16, 33) show that
+/// discrete-time autoregressive coefficients from different intervals are
+/// not comparable. The licensed path is `a = ln(φ_src) / Δt_src` then
+/// `φ_ref = exp(a Δt_ref)`. Equal source and reference intervals still go
+/// through that map. This is not DSEM.
+///
+/// # Errors
+///
+/// Propagates [`recover_local_log_rate`] and
+/// [`recover_discrete_lag_from_log_rate`].
+pub fn map_discrete_lag_across_event_intervals(
+    discrete_lag: f64,
+    source_delta: f64,
+    reference_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let log_rate = recover_local_log_rate(discrete_lag, source_delta, clock)?;
+    recover_discrete_lag_from_log_rate(log_rate, reference_delta, clock)
+}
+
+/// Refuse treating discrete lags from unequal event intervals as one coefficient.
+///
+/// Always fails closed. Map each lag through
+/// [`map_discrete_lag_across_event_intervals`] instead.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::UnequalIntervalPoolingForbidden`].
+pub fn refuse_pooled_discrete_lag_across_unequal_intervals(
+    first_delta: f64,
+    second_delta: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (first_delta, second_delta);
+    Err(PsychometricError::UnequalIntervalPoolingForbidden)
 }
 
 /// Refuse the difference quotient as a continuous-time rate.
@@ -386,10 +456,12 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 mod tests {
     use super::{
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
+        map_discrete_lag_across_event_intervals, recover_discrete_lag_from_log_rate,
         recover_discrete_lag_one, recover_event_series_mean_log_rate,
         recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
         recover_local_log_rate, recover_within_residual_event_time_log_rate,
         refuse_difference_quotient_as_local_rate,
+        refuse_pooled_discrete_lag_across_unequal_intervals,
     };
     use crate::error::PsychometricError;
 
@@ -409,6 +481,87 @@ mod tests {
         assert!((recovered.log_rate - drift).abs() < 1e-12);
         assert!((recovered.discrete_lag - (drift * delta).exp()).abs() < 1e-12);
         assert!((recovered.event_delta - delta).abs() < 1e-15);
+    }
+
+    #[test]
+    fn forward_map_inverts_log_rate_and_remaps_unequal_intervals() {
+        let drift = -0.4_f64;
+        let source_delta = 1.0_f64;
+        let reference_delta = 2.0_f64;
+        let source_lag =
+            recover_discrete_lag_from_log_rate(drift, source_delta, LagClock::EventTime)
+                .expect("forward");
+        assert!((source_lag - (drift * source_delta).exp()).abs() < 1e-12);
+        let same = map_discrete_lag_across_event_intervals(
+            source_lag,
+            source_delta,
+            source_delta,
+            LagClock::EventTime,
+        )
+        .expect("same interval");
+        assert!((same - source_lag).abs() < 1e-12);
+        let remapped = map_discrete_lag_across_event_intervals(
+            source_lag,
+            source_delta,
+            reference_delta,
+            LagClock::EventTime,
+        )
+        .expect("remap");
+        assert!((remapped - (drift * reference_delta).exp()).abs() < 1e-12);
+        // Voelkle manuscript p. 2, 33: φ(1) ≠ φ(2) even for one process.
+        assert!((source_lag - remapped).abs() > 1e-9);
+        assert_eq!(
+            refuse_pooled_discrete_lag_across_unequal_intervals(source_delta, reference_delta),
+            Err(PsychometricError::UnequalIntervalPoolingForbidden)
+        );
+        assert_eq!(
+            refuse_pooled_discrete_lag_across_unequal_intervals(source_delta, source_delta),
+            Err(PsychometricError::UnequalIntervalPoolingForbidden)
+        );
+    }
+
+    #[test]
+    fn forward_map_and_interval_remap_fail_closed() {
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(-0.2, 1.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(-0.2, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(-0.2, -1.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(-0.2, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(f64::NAN, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(800.0, 10.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            map_discrete_lag_across_event_intervals(0.5, 1.0, 2.0, LagClock::AssertionTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            map_discrete_lag_across_event_intervals(0.5, 0.0, 2.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            map_discrete_lag_across_event_intervals(0.5, 1.0, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            map_discrete_lag_across_event_intervals(-0.2, 1.0, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]

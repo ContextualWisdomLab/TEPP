@@ -29,6 +29,8 @@ pub enum PsychometricError {
     /// The Voelkle–Oud difference quotient was offered as a continuous-time
     /// rate.
     DifferenceQuotientForbidden,
+    /// Discrete lags from unequal event intervals were treated as one coefficient.
+    UnequalIntervalPoolingForbidden,
     /// Fewer than two clusters were supplied for a within/between decomposition.
     InsufficientClusters,
     /// A membership or survey weight is empty, negative, or non-finite.
@@ -60,6 +62,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::DifferenceQuotientForbidden => {
                 "the difference quotient is not the local continuous-time rate"
+            }
+            Self::UnequalIntervalPoolingForbidden => {
+                "discrete lags from unequal event intervals are not one coefficient"
             }
             Self::InsufficientClusters => "within/between recovery requires at least two clusters",
             Self::InvalidWeight => "invalid non-negative finite psychometric weight",
@@ -118,6 +123,10 @@ mod tests {
         assert_eq!(
             PsychometricError::DifferenceQuotientForbidden.to_string(),
             "the difference quotient is not the local continuous-time rate"
+        );
+        assert_eq!(
+            PsychometricError::UnequalIntervalPoolingForbidden.to_string(),
+            "discrete lags from unequal event intervals are not one coefficient"
         );
         assert_eq!(
             PsychometricError::InsufficientClusters.to_string(),

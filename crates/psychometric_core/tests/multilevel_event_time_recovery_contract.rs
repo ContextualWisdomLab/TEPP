@@ -3,11 +3,12 @@
 
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
-    LaggedWithinResidual, PsychometricError, ordinary_least_squares_slope,
-    recover_cluster_mean_within_between_slopes, recover_event_series_mean_log_rate,
+    LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
+    ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
+    recover_discrete_lag_from_log_rate, recover_event_series_mean_log_rate,
     recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
     recover_kish_weighted_slope, recover_within_residual_event_time_log_rate,
-    refuse_difference_quotient_as_local_rate,
+    refuse_difference_quotient_as_local_rate, refuse_pooled_discrete_lag_across_unequal_intervals,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -106,6 +107,30 @@ fn event_time_log_rate_recovers_known_drift_and_refuses_quotient() {
     assert_eq!(
         recover_event_time_discrete_lag_and_log_rate(earlier, later, delta, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn discrete_lag_remaps_across_unequal_event_intervals() {
+    let true_drift = -0.35_f64;
+    let month = 1.0_f64;
+    let two_months = 2.0_f64;
+    let month_lag =
+        recover_discrete_lag_from_log_rate(true_drift, month, LagClock::EventTime).expect("φ(1)");
+    let two_month_truth = (true_drift * two_months).exp();
+    let remapped =
+        map_discrete_lag_across_event_intervals(month_lag, month, two_months, LagClock::EventTime)
+            .expect("φ(2)");
+    let error = rmse(&[two_month_truth], &[remapped]);
+    assert!(error < 1e-12, "interval-remap RMSE {error}");
+    let pooled_error = rmse(&[two_month_truth], &[month_lag]);
+    assert!(
+        pooled_error > error,
+        "Voelkle: pooling φ(1) as φ(2) RMSE {pooled_error} must exceed remap {error}"
+    );
+    assert_eq!(
+        refuse_pooled_discrete_lag_across_unequal_intervals(month, two_months),
+        Err(PsychometricError::UnequalIntervalPoolingForbidden)
     );
 }
 
