@@ -12,7 +12,7 @@ This slice delivers the first executable ADR 0005 contract in `psychometric_core
 6. refuse latent-mean comparison without invariance evidence, and recover a mean difference only under strong or strict two-group OLS status;
 7. refuse causal language that rests only on temporal precedence, document linkage, event tracking, or model prediction.
 
-Cluster-mean CWC, Kish WLS, event-time log-rate, and CWC-then-lag live in the same crate and are doctored in `docs/research/multilevel-event-time-recovery.md`. Full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target.
+Cluster-mean CWC, Kish WLS, event-time log-rate, CWC-then-lag, and irregular already-centered residual log-rate live in the same crate and are doctored in `docs/research/multilevel-event-time-recovery.md`. Full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target.
 
 ## Authoritative sources
 

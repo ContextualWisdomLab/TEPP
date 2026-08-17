@@ -9,7 +9,8 @@
 //! estimates across posterior draws on a CPU `f64` path without claiming Rubin
 //! uncertainty pooling, combines draw-level OLS loadings with Rubin `T`,
 //! decomposes cluster-mean within/between OLS, maps event-time discrete lags
-//! through the exact scalar exponential, and refuses latent-mean comparison
+//! through the exact scalar exponential, maps already-centered irregular
+//! residuals without re-centering, and refuses latent-mean comparison
 //! below strong invariance.
 
 mod causality;
@@ -53,15 +54,19 @@ pub use event_time::DiscreteLagAndLogRate;
 pub use event_time::EventOccasion;
 /// Clock on which a structural lag may be computed.
 pub use event_time::LagClock;
+/// Already-centered lagged residual pair with an irregular event interval.
+pub use event_time::LaggedWithinResidual;
 /// Noiseless scalar discrete lag `later / earlier`.
 pub use event_time::recover_discrete_lag_one;
 /// Mean local log-rate on a sorted event-time series.
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
 pub use event_time::recover_event_time_discrete_lag_and_log_rate;
+/// Mean exact log-rate on already-centered irregular residuals.
+pub use event_time::recover_irregular_centered_residual_log_rate;
 /// Exact scalar inverse `a = ln(φ) / Δt`.
 pub use event_time::recover_local_log_rate;
-/// CWC-then-event-time local log-rate (not DSEM).
+/// CWC-then-event-time local log-rate (not DSEM; not raw-process AR drift).
 pub use event_time::recover_within_residual_event_time_log_rate;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;

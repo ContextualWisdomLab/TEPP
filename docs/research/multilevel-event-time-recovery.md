@@ -8,7 +8,8 @@ This slice stays inside `psychometric_core`. It does not add a second invariance
 2. recover a Kish-weighted least-squares slope and report Kish ESS as the information diagnostic;
 3. map a discrete lag-1 coefficient through the exact scalar exponential on **event time only**;
 4. refuse the difference quotient as a continuous-time rate;
-5. apply the same event-time map to CWC residuals (still not DSEM).
+5. apply the same event-time map to CWC residuals (still not DSEM);
+6. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608).
 
 ## Claim boundary
 
@@ -33,11 +34,13 @@ Kish, L. (1965). *Survey sampling*. John Wiley & Sons.
 - **CWC.** For cluster \(i\) and occasion \(t\), \(x_{it}^{w} = x_{it}-\bar x_{i}\) and \(y_{it}^{w} = y_{it}-\bar y_{i}\). The within slope is OLS of \(y^{w}\) on \(x^{w}\). The between slope is OLS of the cluster means. A grand-mean pooled slope confounds the two.
 - **Kish ESS.** \(\mathrm{ESS}=(\sum w)^{2}/\sum w^{2}\) on non-negative finite weights. WLS uses the weights in the slope; ESS is not a second slope.
 - **Exact scalar map.** Voelkle et al. (2012, Eq. 7) and Driver et al. (2017, Eq. 3): \(\varphi = A^{*}(\Delta t)=\exp(a\,\Delta t)\). The inverse is \(a=\ln\varphi/\Delta t\). The difference quotient \((x(t+\Delta t)-x(t))/\Delta t\) is refused.
-- **CWC-then-lag.** Sample cluster means are removed first. Consecutive within residuals are then fitted by least squares to \(r_{t+\Delta t}\approx\exp(a\Delta t)\,r_{t}\) on event time. Same-sign pair-wise logs initialize the scalar Newton step. Sign-flipping \(T=2\) CWC pairs have no real logarithm and fail closed.
+- **CWC-then-lag.** Sample cluster means are removed first. Consecutive within residuals are then fitted by least squares to \(r_{t+\Delta t}\approx\exp(a\Delta t)\,r_{t}\) on event time. Same-sign pair-wise logs initialize the scalar Newton step. Sign-flipping \(T=2\) CWC pairs have no real logarithm and fail closed. Curran and Bauer (2011, pp. 607–608) show that this person-mean subtraction on a raw autoregressive series does **not** isolate the lagged within-person effect; the helper therefore does not claim to recover the raw-process drift.
+- **Already-centered irregular residual.** The caller supplies lagged within residuals. The mean of \(a=\ln(r_{t+\Delta t}/r_t)/\Delta t\) is the exact scalar map. Intervals may be irregular. The helper does not center again. This is not DSEM.
 
 ## Verification
 
 - noiseless CWC recovers known within and between slopes with smaller computed RMSE than a pooled OLS collapse;
 - Kish WLS recovers a known slope;
 - the exact scalar map recovers a known drift on event time and refuses every other clock plus the difference quotient;
-- CWC-then-lag on a two-cluster decaying series has smaller computed RMSE than a level-pooled series when the latter is identified.
+- CWC-then-lag on a two-cluster decaying series has smaller computed RMSE than a level-pooled series when the latter is identified;
+- already-centered irregular residuals recover a known drift at machine-scale RMSE, and that RMSE is smaller than CWC of the corresponding raw autoregressive series (Curran & Bauer, 2011, pp. 607–608).

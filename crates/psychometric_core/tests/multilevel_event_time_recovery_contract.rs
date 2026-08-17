@@ -2,9 +2,10 @@
 #![allow(clippy::cast_precision_loss)]
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock, PsychometricError,
-    ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
-    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+    ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
+    LaggedWithinResidual, PsychometricError, ordinary_least_squares_slope,
+    recover_cluster_mean_within_between_slopes, recover_event_series_mean_log_rate,
+    recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
     recover_kish_weighted_slope, recover_within_residual_event_time_log_rate,
     refuse_difference_quotient_as_local_rate,
 };
@@ -132,6 +133,54 @@ fn within_residual_event_time_log_rate_beats_pooled_levels() {
         Err(other) => panic!("unexpected pooled error {other}"),
     }
     assert!(within_error < 0.25, "CWC lag RMSE {within_error} too large");
+}
+
+#[test]
+fn irregular_centered_residuals_recover_known_drift_better_than_cwc_of_raw_ar() {
+    let true_drift = -0.35_f64;
+    let pairs = [
+        LaggedWithinResidual {
+            earlier_residual: 1.4,
+            later_residual: 1.4 * (true_drift * 0.4).exp(),
+            event_delta: 0.4,
+        },
+        LaggedWithinResidual {
+            earlier_residual: 0.9,
+            later_residual: 0.9 * (true_drift * 1.6).exp(),
+            event_delta: 1.6,
+        },
+        LaggedWithinResidual {
+            earlier_residual: -0.7,
+            later_residual: -0.7 * (true_drift * 2.2).exp(),
+            event_delta: 2.2,
+        },
+    ];
+    let centered = recover_irregular_centered_residual_log_rate(&pairs, LagClock::EventTime)
+        .expect("centered residual");
+    let centered_error = rmse(&[true_drift], &[centered]);
+    assert!(
+        centered_error < 1e-12,
+        "already-centered irregular RMSE {centered_error}"
+    );
+
+    let mut raw_ar = Vec::new();
+    for (cluster, person_mean, start) in [(1_u64, 7.5_f64, 1.1_f64), (2, -4.0, 0.8)] {
+        for step in 0..6 {
+            let time = f64::from(step);
+            raw_ar.push(ClusteredEventScore {
+                cluster_key: cluster,
+                event_time: time,
+                score: person_mean + start * (true_drift * time).exp(),
+            });
+        }
+    }
+    let cwc =
+        recover_within_residual_event_time_log_rate(&raw_ar, LagClock::EventTime).expect("cwc ar");
+    let cwc_error = rmse(&[true_drift], &[cwc]);
+    assert!(
+        cwc_error > centered_error,
+        "Curran & Bauer: CWC of raw AR RMSE {cwc_error} must exceed already-centered {centered_error}"
+    );
 }
 
 #[test]

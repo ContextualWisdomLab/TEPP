@@ -70,6 +70,20 @@ pub struct ClusteredEventScore {
     pub score: f64,
 }
 
+/// One already-centered lagged residual pair on event time.
+///
+/// `earlier_residual` and `later_residual` are within residuals the caller
+/// already formed. This type is not a raw score and is not re-centered.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LaggedWithinResidual {
+    /// Earlier within residual.
+    pub earlier_residual: f64,
+    /// Later within residual.
+    pub later_residual: f64,
+    /// Strictly positive event-time interval. Intervals may be irregular.
+    pub event_delta: f64,
+}
+
 /// Discrete lag-1 coefficient and its exact local log-rate.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DiscreteLagAndLogRate {
@@ -210,6 +224,13 @@ pub fn recover_event_series_mean_log_rate(
 /// Stable between-cluster means are removed first (CWC). Consecutive
 /// within-cluster residuals then use the exact scalar map. This is not DSEM.
 ///
+/// Curran and Bauer (2011, pp. 607–608) show that subtracting the observed
+/// person-specific mean from a raw autoregressive series does **not** isolate
+/// the lagged within-person effect. This helper therefore does not claim to
+/// recover the raw-process drift `a` from CWC of a raw AR path. For that
+/// estimand, supply already-centered lagged residuals to
+/// [`recover_irregular_centered_residual_log_rate`].
+///
 /// # Errors
 ///
 /// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock,
@@ -262,6 +283,50 @@ pub fn recover_within_residual_event_time_log_rate(
         }
     }
     fit_scalar_log_rate(&pairs)
+}
+
+/// Mean exact scalar log-rate on already-centered residuals with irregular intervals.
+///
+/// Each pair is `a = ln(later / earlier) / Δt` (Voelkle et al., 2012, Eq. 7).
+/// The function does **not** center again. Curran and Bauer (2011, pp. 607–608)
+/// reject person-mean subtraction on a raw autoregressive series as the
+/// lagged within-person residual. Intervals may be irregular. This is not DSEM.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock,
+/// [`PsychometricError::InvalidNumericInput`] for an empty series or a
+/// non-finite / non-positive residual ratio, and
+/// [`PsychometricError::NonPositiveInterval`] when any interval is not
+/// strictly positive.
+pub fn recover_irregular_centered_residual_log_rate(
+    pairs: &[LaggedWithinResidual],
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if pairs.is_empty() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let mut sum = 0.0_f64;
+    for pair in pairs {
+        if !pair.earlier_residual.is_finite()
+            || !pair.later_residual.is_finite()
+            || !pair.event_delta.is_finite()
+        {
+            return Err(PsychometricError::InvalidNumericInput);
+        }
+        let recovered = recover_event_time_discrete_lag_and_log_rate(
+            pair.earlier_residual,
+            pair.later_residual,
+            pair.event_delta,
+            clock,
+        )?;
+        sum += recovered.log_rate;
+    }
+    let count = pairs.len() as f64;
+    require_finite(sum / count)
 }
 
 fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, PsychometricError> {
@@ -318,8 +383,9 @@ fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, PsychometricErr
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, recover_discrete_lag_one,
-        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
+        recover_discrete_lag_one, recover_event_series_mean_log_rate,
+        recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
         recover_local_log_rate, recover_within_residual_event_time_log_rate,
         refuse_difference_quotient_as_local_rate,
     };
@@ -594,6 +660,93 @@ mod tests {
                     clustered(2, 0.0, 2.0),
                     clustered(2, 1.0, 1.5),
                 ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+    }
+
+    fn lagged(
+        earlier_residual: f64,
+        later_residual: f64,
+        event_delta: f64,
+    ) -> LaggedWithinResidual {
+        LaggedWithinResidual {
+            earlier_residual,
+            later_residual,
+            event_delta,
+        }
+    }
+
+    #[test]
+    fn irregular_centered_residuals_recover_exact_drift() {
+        let drift = -0.4_f64;
+        let pairs = [
+            lagged(1.2, 1.2 * (drift * 0.5).exp(), 0.5),
+            lagged(0.8, 0.8 * (drift * 1.75).exp(), 1.75),
+            lagged(-1.1, -1.1 * (drift * 2.25).exp(), 2.25),
+        ];
+        let recovered = recover_irregular_centered_residual_log_rate(&pairs, LagClock::EventTime)
+            .expect("irregular");
+        assert!((recovered - drift).abs() < 1e-12);
+    }
+
+    #[test]
+    fn irregular_centered_residuals_fail_closed() {
+        let ok = lagged(1.0, 0.8, 1.0);
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(&[ok], LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(&[], LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(
+                &[lagged(f64::NAN, 0.8, 1.0)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(
+                &[lagged(1.0, f64::INFINITY, 1.0)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(
+                &[lagged(1.0, 0.8, f64::NAN)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(
+                &[lagged(0.0, 0.8, 1.0)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(
+                &[lagged(1.0, -0.8, 1.0)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(
+                &[lagged(1.0, 0.8, 0.0)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_irregular_centered_residual_log_rate(
+                &[lagged(1.0, 0.8, -0.5)],
                 LagClock::EventTime
             ),
             Err(PsychometricError::NonPositiveInterval)

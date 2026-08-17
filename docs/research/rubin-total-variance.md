@@ -6,7 +6,7 @@ Adds Rubin combining for complete-data OLS loadings across posterior indicator d
 
 ## Claim boundary
 
-`T_m = \bar U_m + (1+1/m)B_m` is the complete-data combining rule. This slice does **not** implement Mislevy plausible values. The 1991 *Psychometrika* paper was not opened in this cycle (Cambridge/Springer/ETS copies were HTML stubs or paywalled). Do not cite that paper as having been read.
+`T_m = \bar U_m + (1+1/m)B_m` is the complete-data combining rule. This slice does **not** implement Mislevy plausible values. The 1991 *Psychometrika* paper was not opened in this cycle (Unpaywall 2026-08-17: closed; Cambridge/Springer/ETS copies were HTML stubs or paywalled). Do not cite that paper as having been read.
 
 ## Authoritative sources
 
