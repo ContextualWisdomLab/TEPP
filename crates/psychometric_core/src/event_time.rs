@@ -276,7 +276,7 @@ pub fn recover_within_residual_event_time_log_rate(
             if !delta.is_finite() || delta <= 0.0 {
                 return Err(PsychometricError::NonPositiveInterval);
             }
-            if !earlier_resid.is_finite() || !later_resid.is_finite() {
+            if !(earlier_resid.is_finite() & later_resid.is_finite()) {
                 return Err(PsychometricError::InvalidNumericInput);
             }
             pairs.push((earlier_resid, later_resid, delta));
@@ -525,6 +525,27 @@ mod tests {
                         score: 0.5,
                     },
                 ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_event_series_mean_log_rate(
+                &[occasion(0.0, 1.0), occasion(f64::NAN, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_event_series_mean_log_rate(
+                &[occasion(0.0, f64::NAN), occasion(1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_event_series_mean_log_rate(
+                &[occasion(0.0, 1.0), occasion(1.0, f64::NAN)],
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
@@ -788,5 +809,46 @@ mod tests {
         );
         let flat = fit_scalar_log_rate(&[(1e-50, 1e-200, 1.0)]).expect("flat");
         assert!(flat.is_finite());
+        assert_eq!(
+            fit_scalar_log_rate(&[(0.0, 1.0, 1.0), (1.0, -1.0, 1.0)]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let skipped_start =
+            fit_scalar_log_rate(&[(1e-320, 1.0, 1.0), (1.0, 0.5, 1.0)]).expect("skip inf ratio");
+        assert!(skipped_start.is_finite());
+        assert_eq!(
+            fit_scalar_log_rate(&[(1e154, 1e154, 1.0)]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn one_sided_residual_overflow_and_nonfinite_interval_fail_closed() {
+        assert_eq!(
+            recover_within_residual_event_time_log_rate(
+                &[
+                    clustered(1, 0.0, -f64::MAX),
+                    clustered(1, 1.0, -f64::MAX),
+                    clustered(1, 2.0, -f64::MAX),
+                    clustered(1, 3.0, f64::MAX),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.8),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_within_residual_event_time_log_rate(
+                &[
+                    clustered(1, f64::MAX, 1.0),
+                    clustered(1, -f64::MAX, 0.5),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
     }
 }

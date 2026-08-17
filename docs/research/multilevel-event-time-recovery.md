@@ -48,4 +48,4 @@ Kish, L. (1965). *Survey sampling*. John Wiley & Sons.
 - CWC-then-lag on a two-cluster decaying series has smaller computed RMSE than a level-pooled series when the latter is identified;
 - already-centered irregular residuals recover a known drift at machine-scale RMSE, and that RMSE is smaller than CWC of the corresponding raw autoregressive series (Curran & Bauer, 2011, pp. 607–608);
 - a singleton cluster is skipped; two singleton clusters yield an empty pair list and fail closed;
-- overflowing CWC residuals, overflowing contextual subtraction, and Newton overflow / flat-derivative steps fail closed.
+- overflowing CWC residuals, overflowing contextual subtraction, later-only residual overflow, non-finite intervals, Newton overflow / start-skip / deriv-INF, and Pearson empty/mismatch paths fail closed.
