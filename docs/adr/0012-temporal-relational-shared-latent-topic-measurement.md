@@ -1,7 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** partial — section-boilerplate method source is `section_source` on the active PR; topic estimator, global topic identity, remaining method-effect model, and TF-IDF/BM25 inferential-weight refusal remain accepted-target  
 **Date:** 2026-08-12  
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 

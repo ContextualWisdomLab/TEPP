@@ -32,7 +32,9 @@ Bianchi, F., Terragni, S., Hovy, D., Nozza, D., & Fersini, E. (2021). Cross-ling
 
 Nguyen, T. P., Minh, N. V., Nguyen, T., Van, L. N., Nguyen, D. A., Sang, D. V., & Le, T. (2025). XTRA: Cross-lingual topic modeling with topic and representation alignments. In *Findings of the Association for Computational Linguistics: EMNLP 2025*. Association for Computational Linguistics.
 
-TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts.
+Chemudugunta, C., Smyth, P., & Steyvers, M. (2007). Modeling general and specific aspects of documents with a probabilistic topic model. In B. Schölkopf, J. C. Platt, & T. Hoffman (Eds.), *Advances in neural information processing systems 19* (pp. 241–248). MIT Press. https://papers.nips.cc/paper/3048-modeling-general-and-specific-aspects-of-documents-with-a-probabilistic-topic-model
+
+TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Report section headings and other general/boilerplate wording stay explicit method/background structure; `section_source` refuses to treat them as unique latent content or as stopword deletion (Chemudugunta, Smyth, & Steyvers, 2007).
 
 ## Topic-model evaluation and LLM judges
 
