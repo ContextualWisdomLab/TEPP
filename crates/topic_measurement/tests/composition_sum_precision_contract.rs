@@ -16,6 +16,15 @@ fn compensated_sum_rejects_mass_hidden_by_naive_floating_point_addition() {
 }
 
 #[test]
+fn overflowing_finite_parts_fail_closed_as_non_finite_mass() {
+    assert_eq!(
+        additive_log_ratio(&[f64::MAX, f64::MAX]),
+        Err(TopicMeasurementError::InvalidComposition),
+        "Kahan-compensated MAX+MAX is non-finite; NaN cannot pass a unit-sum tolerance comparison"
+    );
+}
+
+#[test]
 fn compensated_sum_accepts_a_valid_many_part_composition() {
     let tiny_mass = 1.0e-16;
     let tiny_parts = 10_000_usize;

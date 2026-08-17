@@ -103,9 +103,17 @@ mod tests {
         let pair = additive_log_ratio(&[0.5, 0.5]).expect("pair");
         assert_eq!(pair.len(), 1);
         assert!(pair[0].abs() < 1e-15);
+        let recovered = from_additive_log_ratio(&pair).expect("inverse");
+        assert!((recovered[0] - 0.5).abs() < 1e-15);
+        assert!((recovered[1] - 0.5).abs() < 1e-15);
         assert_eq!(
             from_additive_log_ratio(&[1.0e9]),
             Err(TopicMeasurementError::InvalidLogRatioDimension)
+        );
+        assert_eq!(
+            additive_log_ratio(&[f64::MAX, f64::MAX]),
+            Err(TopicMeasurementError::InvalidComposition),
+            "overflowing finite parts must fail closed because compensated mass is non-finite"
         );
     }
 }

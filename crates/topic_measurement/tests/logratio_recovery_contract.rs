@@ -24,15 +24,19 @@ fn known_simplex_recovers_through_alr_with_computed_rmse() {
     // Closed-form simplex: (2, 3, 1) / 6. ALR is (ln 2, ln 3).
     let truth = [2.0 / 6.0, 3.0 / 6.0, 1.0 / 6.0];
     let coordinates = additive_log_ratio(&truth).expect("alr");
+    let true_parameters = [2.0_f64.ln(), 3.0_f64.ln()];
     assert_eq!(coordinates.len(), 2);
-    assert!((coordinates[0] - 2.0_f64.ln()).abs() < 1e-15);
-    assert!((coordinates[1] - 3.0_f64.ln()).abs() < 1e-15);
+    let parameter_rmse = rmse(&true_parameters, &coordinates);
+    assert!(
+        parameter_rmse < 1e-15,
+        "true-parameter ALR RMSE {parameter_rmse} exceeded machine-scale bound"
+    );
 
     let recovered = from_additive_log_ratio(&coordinates).expect("inverse");
-    let error = rmse(&truth, &recovered);
+    let simplex_rmse = rmse(&truth, &recovered);
     assert!(
-        error < 1e-15,
-        "ALR round-trip RMSE {error} exceeded machine-scale bound"
+        simplex_rmse < 1e-15,
+        "ALR round-trip RMSE {simplex_rmse} exceeded machine-scale bound"
     );
     let sum: f64 = recovered.iter().sum();
     assert!((sum - 1.0).abs() < 1e-15);
@@ -99,9 +103,19 @@ fn invalid_compositions_and_lexical_weights_fail_closed() {
         Err(TopicMeasurementError::InvalidLogRatioDimension)
     );
     assert_eq!(
+        from_additive_log_ratio(&[1.0e9]),
+        Err(TopicMeasurementError::InvalidLogRatioDimension),
+        "max-shifted reference weight must fail closed when it underflows to zero"
+    );
+    assert_eq!(
         from_additive_log_ratio(&[-1.0e9]),
         Err(TopicMeasurementError::InvalidLogRatioDimension),
         "inverse must not return a zero simplex part after underflow"
+    );
+    assert_eq!(
+        additive_log_ratio(&[f64::MAX, f64::MAX]),
+        Err(TopicMeasurementError::InvalidComposition),
+        "overflowing finite parts must fail closed because compensated mass is non-finite"
     );
 
     for method in ["tfidf", "bm25", "keyword", "TF-IDF", ""] {
