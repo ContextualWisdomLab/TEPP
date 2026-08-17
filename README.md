@@ -87,9 +87,11 @@ crates/prompt_source
 crates/provider_receipt
 crates/psychometric_core
 crates/psychometric_fit
+crates/relation_absence
 crates/relation_graph
 crates/retrospective_edge
 crates/revision_order
+crates/role_contradiction
 crates/semantic_core
 crates/service_tls
 crates/stopword_deletion
