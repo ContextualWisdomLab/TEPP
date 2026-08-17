@@ -1,7 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; estimator-side method model remains accepted-target  
 **Date:** 2026-08-12  
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
