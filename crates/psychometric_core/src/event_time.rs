@@ -221,7 +221,13 @@ pub fn map_discrete_lag_across_event_intervals(
 ///
 /// Voelkle et al. (2012, Eq. 12; ZORA accepted manuscript p. 16):
 /// `b*_y.x(Δt) = (a_yx / a_xx) (exp(a_xx Δt) − 1)` for `a_xx ≠ 0`.
-/// The increment uses `expm1` so `exp(z) − 1` does not cancel. This is
+/// Driver, Oud, and Voelkle (2017, p. 4, after Eq. 3) restate the same
+/// discrete intercept as a function of `A` and `Δt`. The algebraically
+/// identical evaluation is `a_yx Δt (expm1(z) / z)` with `z = a_xx Δt`.
+/// That order is Eq. 12, not the first-order product. When binary64 `z`
+/// underflows to `+0`, the mathematical limit of Eq. 12 is `a_yx Δt`.
+/// Using that limit only at underflow is IEEE-754 evaluation of Eq. 12.
+/// The first-order product is not the general discrete effect. This is
 /// not DSEM and not a matrix `expm`.
 ///
 /// # Errors
@@ -249,8 +255,14 @@ pub fn recover_discrete_constant_predictor_effect(
     {
         return Err(PsychometricError::InvalidNumericInput);
     }
-    let increment = (predictor_log_rate * event_delta).exp_m1();
-    require_finite((outcome_on_predictor / predictor_log_rate) * increment)
+    let increment_argument = predictor_log_rate * event_delta;
+    if increment_argument == 0.0 {
+        // Binary64 underflow of a_xx Δt. lim z→0 of Eq. 12 is a_yx Δt.
+        return require_finite(outcome_on_predictor * event_delta);
+    }
+    require_finite(
+        outcome_on_predictor * event_delta * (increment_argument.exp_m1() / increment_argument),
+    )
 }
 
 /// Refuse treating discrete lags from unequal event intervals as one coefficient.
@@ -498,14 +510,13 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
-        recover_discrete_constant_predictor_effect, recover_discrete_lag_from_log_rate,
-        recover_discrete_lag_one, recover_event_series_mean_log_rate,
-        recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
-        recover_local_log_rate, recover_within_residual_event_time_log_rate,
-        refuse_difference_quotient_as_local_rate,
-        refuse_pooled_discrete_lag_across_unequal_intervals, ClusteredEventScore, EventOccasion,
-        LagClock, LaggedWithinResidual,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
+        map_discrete_lag_across_event_intervals, recover_discrete_constant_predictor_effect,
+        recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
+        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+        recover_irregular_centered_residual_log_rate, recover_local_log_rate,
+        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+        refuse_pooled_discrete_lag_across_unequal_intervals,
     };
     use crate::error::PsychometricError;
 
@@ -707,6 +718,15 @@ mod tests {
             recover_discrete_constant_predictor_effect(1e300, 1e-300, 1e300, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
+        let underflowed_argument =
+            recover_discrete_constant_predictor_effect(1e308, 1e-308, 1e-308, LagClock::EventTime)
+                .expect("eq 12 limit");
+        assert!((underflowed_argument - 1.0).abs() < 1e-15);
+        let tiny_nonzero =
+            recover_discrete_constant_predictor_effect(1e308, 1e-154, 1e-154, LagClock::EventTime)
+                .expect("eq 12 scaled");
+        assert!(tiny_nonzero.is_finite());
+        assert!((tiny_nonzero - 1e154).abs() / 1e154 < 1e-12);
     }
 
     #[test]

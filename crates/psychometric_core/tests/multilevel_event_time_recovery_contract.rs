@@ -2,14 +2,14 @@
 #![allow(clippy::cast_precision_loss)]
 
 use psychometric_core::{
-    map_discrete_lag_across_event_intervals, ordinary_least_squares_slope,
-    recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
-    recover_discrete_lag_from_log_rate, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
-    recover_kish_weighted_slope, recover_within_residual_event_time_log_rate,
-    refuse_difference_quotient_as_local_rate, refuse_pooled_discrete_lag_across_unequal_intervals,
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
-    LaggedWithinResidual, PsychometricError,
+    LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
+    ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
+    recover_discrete_constant_predictor_effect, recover_discrete_lag_from_log_rate,
+    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+    recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
+    recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+    refuse_pooled_discrete_lag_across_unequal_intervals,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -180,6 +180,14 @@ fn constant_predictor_discrete_effect_recovers_equation_twelve() {
             LagClock::EventTime
         ),
         Err(PsychometricError::InvalidNumericInput)
+    );
+    let underflowed =
+        recover_discrete_constant_predictor_effect(1e308, 1e-308, 1e-308, LagClock::EventTime)
+            .expect("eq 12 underflow limit");
+    let underflow_error = rmse(&[1.0], &[underflowed]);
+    assert!(
+        underflow_error < 1e-15,
+        "Eq. 12 binary64 underflow limit RMSE {underflow_error}"
     );
 }
 
