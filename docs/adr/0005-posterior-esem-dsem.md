@@ -1,7 +1,7 @@
 # ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** accepted-target — ESEM/DSEM estimators remain accepted-target; unidentified-is-not-causal identity in `causal_language` on the active PR  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs upstream topic measurement/network coordinates; this ADR governs higher-order psychometric structure and longitudinal interpretation.
 
