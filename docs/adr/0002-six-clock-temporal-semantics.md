@@ -1,7 +1,7 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — unmerged PR #8 is the canonical replacement implementing typed clocks/intervals against the current protected-main lineage; superseded/conflicted PR #5 is historical lineage only; downstream transition/split enforcement remains accepted-target  
+**Implementation maturity:** partial — typed clocks/intervals are implemented-main (PR #8); input-process-outcome event-time order is `outcome_order` on the active PR; remaining clock-identity and split enforcement stay accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0013 owns persistence/split representation; ADR 0016 owns event-intelligence reasoning above these temporal primitives.
 

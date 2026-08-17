@@ -12,7 +12,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |
 | Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
-| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
+| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `outcome_order` IPO event-time order on the active PR | partial |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
