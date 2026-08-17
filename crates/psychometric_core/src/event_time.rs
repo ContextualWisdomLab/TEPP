@@ -6,9 +6,10 @@
 //! `A*(Δt) = exp(A Δt)`. The noiseless scalar inverse is
 //! `a = ln(φ) / Δt` with `φ = A*(Δt)`. The forward map is
 //! `φ(Δt) = exp(a Δt)`. Discrete lags from unequal event intervals are
-//! not one coefficient; they map through `a` first. The difference
-//! quotient `(x(t+Δt) − x(t)) / Δt` (their Eqs. 3–4) is refused. This is
-//! not DSEM and not a matrix `expm`.
+//! not one coefficient; they map through `a` first. The exact scalar
+//! discrete effect of a constant predictor is Voelkle et al. (2012,
+//! Eq. 12). The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
+//! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
 
 use std::collections::BTreeMap;
 
@@ -214,6 +215,42 @@ pub fn map_discrete_lag_across_event_intervals(
 ) -> Result<f64, PsychometricError> {
     let log_rate = recover_local_log_rate(discrete_lag, source_delta, clock)?;
     recover_discrete_lag_from_log_rate(log_rate, reference_delta, clock)
+}
+
+/// Exact scalar discrete effect of a constant event-time predictor.
+///
+/// Voelkle et al. (2012, Eq. 12; ZORA accepted manuscript p. 16):
+/// `b*_y.x(Δt) = (a_yx / a_xx) (exp(a_xx Δt) − 1)` for `a_xx ≠ 0`.
+/// The increment uses `expm1` so `exp(z) − 1` does not cancel. This is
+/// not DSEM and not a matrix `expm`.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event clock,
+/// [`PsychometricError::NonPositiveInterval`] when `event_delta` is not
+/// strictly positive, and [`PsychometricError::InvalidNumericInput`] when
+/// either rate is non-finite, the predictor auto-effect is zero, or the
+/// mapped effect is non-finite.
+pub fn recover_discrete_constant_predictor_effect(
+    outcome_on_predictor: f64,
+    predictor_log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !outcome_on_predictor.is_finite()
+        || !predictor_log_rate.is_finite()
+        || predictor_log_rate == 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let increment = (predictor_log_rate * event_delta).exp_m1();
+    require_finite((outcome_on_predictor / predictor_log_rate) * increment)
 }
 
 /// Refuse treating discrete lags from unequal event intervals as one coefficient.
@@ -462,10 +499,11 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 mod tests {
     use super::{
         fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
-        recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
-        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
-        recover_irregular_centered_residual_log_rate, recover_local_log_rate,
-        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+        recover_discrete_constant_predictor_effect, recover_discrete_lag_from_log_rate,
+        recover_discrete_lag_one, recover_event_series_mean_log_rate,
+        recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
+        recover_local_log_rate, recover_within_residual_event_time_log_rate,
+        refuse_difference_quotient_as_local_rate,
         refuse_pooled_discrete_lag_across_unequal_intervals, ClusteredEventScore, EventOccasion,
         LagClock, LaggedWithinResidual,
     };
@@ -581,6 +619,92 @@ mod tests {
         );
         assert_eq!(
             map_discrete_lag_across_event_intervals(-0.2, 1.0, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn constant_predictor_discrete_effect_recovers_equation_twelve() {
+        let outcome_on_predictor = 0.2_f64;
+        let predictor_log_rate = -0.5_f64;
+        let delta = 2.0_f64;
+        let recovered = recover_discrete_constant_predictor_effect(
+            outcome_on_predictor,
+            predictor_log_rate,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq 12");
+        let expected =
+            (outcome_on_predictor / predictor_log_rate) * (predictor_log_rate * delta).exp_m1();
+        assert!((recovered - expected).abs() < 1e-15);
+        let first_order = outcome_on_predictor * delta;
+        assert!((recovered - first_order).abs() > 1e-3);
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(
+                outcome_on_predictor,
+                predictor_log_rate,
+                delta,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(
+                outcome_on_predictor,
+                predictor_log_rate,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(
+                outcome_on_predictor,
+                predictor_log_rate,
+                -1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(
+                outcome_on_predictor,
+                predictor_log_rate,
+                f64::NAN,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(
+                f64::NAN,
+                predictor_log_rate,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(
+                outcome_on_predictor,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(
+                outcome_on_predictor,
+                f64::NAN,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_constant_predictor_effect(1e300, 1e-300, 1e300, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }

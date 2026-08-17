@@ -10,10 +10,11 @@ This slice stays inside `psychometric_core`. It does not add a second invariance
 4. map a discrete lag-1 coefficient through the exact scalar exponential on **event time only**;
 5. recover the exact scalar forward map `φ(Δt) = exp(a Δt)` and remap a discrete lag onto another event interval through that log-rate;
 6. refuse a binary64 underflow of that forward map to `+0` (not a discrete lag);
-7. refuse pooling discrete lags from unequal event intervals as one coefficient;
-8. refuse the difference quotient as a continuous-time rate;
-9. apply the same event-time map to CWC residuals (still not DSEM);
-10. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608).
+7. recover the exact scalar discrete effect of a constant predictor (Voelkle et al., 2012, Eq. 12);
+8. refuse pooling discrete lags from unequal event intervals as one coefficient;
+9. refuse the difference quotient as a continuous-time rate;
+10. apply the same event-time map to CWC residuals (still not DSEM);
+11. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608).
 
 ## Claim boundary
 
@@ -42,6 +43,7 @@ The Voelkle et al. (2012) ZORA accepted manuscript was opened 2026-08-17 and re-
 - **Kish ESS.** \(\mathrm{ESS}=(\sum w)^{2}/\sum w^{2}\) on non-negative finite weights. WLS uses the weights in the slope; ESS is not a second slope.
 - **Exact scalar map.** Voelkle et al. (2012, Eq. 7) and Driver et al. (2017, Eq. 3): \(\varphi = A^{*}(\Delta t)=\exp(a\,\Delta t)\). The inverse is \(a=\ln\varphi/\Delta t\). The forward map is the same equation. The real exponential is strictly positive; a binary64 underflow to `+0` is refused because the inverse logarithm does not exist at zero. The difference quotient \((x(t+\Delta t)-x(t))/\Delta t\) is refused.
 - **Unequal-interval remap.** Discrete \(\varphi(\Delta t_1)\) and \(\varphi(\Delta t_2)\) are not comparable when \(\Delta t_1\neq\Delta t_2\) (Voelkle et al., 2012, ZORA manuscript pp. 2, 16, 33). The licensed path is \(a=\ln\varphi_{\mathrm{src}}/\Delta t_{\mathrm{src}}\) then \(\varphi_{\mathrm{ref}}=\exp(a\,\Delta t_{\mathrm{ref}})\). Pooling those discrete lags fails closed.
+- **Constant-predictor discrete effect.** Voelkle et al. (2012, Eq. 12; ZORA accepted manuscript p. 16): for a constant predictor with \(a_{xx}\neq 0\), \(b^{*}_{y.x}(\Delta t)=(a_{yx}/a_{xx})(\exp(a_{xx}\Delta t)-1)\). The increment uses `expm1`. \(a_{xx}=0\) fails closed. The first-order product \(a_{yx}\Delta t\) is not that discrete effect. This is not DSEM.
 - **CWC-then-lag.** Sample cluster means are removed first. Consecutive within residuals are then fitted by least squares to \(r_{t+\Delta t}\approx\exp(a\Delta t)\,r_{t}\) on event time. Same-sign pair-wise logs initialize the scalar Newton step. Sign-flipping \(T=2\) CWC pairs have no real logarithm and fail closed. Curran and Bauer (2011, pp. 607–608) show that this person-mean subtraction on a raw autoregressive series does **not** isolate the lagged within-person effect; the helper therefore does not claim to recover the raw-process drift.
 - **Already-centered irregular residual.** The caller supplies lagged within residuals. The mean of \(a=\ln(r_{t+\Delta t}/r_t)/\Delta t\) is the exact scalar map. Intervals may be irregular. The helper does not center again. This is not DSEM.
 
@@ -53,6 +55,7 @@ The Voelkle et al. (2012) ZORA accepted manuscript was opened 2026-08-17 and re-
 - the exact scalar map recovers a known drift on event time and refuses every other clock plus the difference quotient;
 - the forward map inverts the log-rate, remaps \(\varphi(1)\) onto \(\varphi(2)\) at machine-scale RMSE, and that RMSE is smaller than treating \(\varphi(1)\) as \(\varphi(2)\);
 - a binary64 underflow of \(\exp(a\Delta t)\) to `+0` (direct forward map and large-interval remap) fails closed;
+- Voelkle et al. (2012, Eq. 12) recovers a known discrete constant-predictor effect at machine-scale RMSE, and that RMSE is smaller than the first-order product \(a_{yx}\Delta t\); \(a_{xx}=0\) fails closed;
 - pooling discrete lags from unequal intervals fails closed;
 - CWC-then-lag on a two-cluster decaying series has smaller computed RMSE than a level-pooled series when the latter is identified;
 - already-centered irregular residuals recover a known drift at machine-scale RMSE, and that RMSE is smaller than CWC of the corresponding raw autoregressive series (Curran & Bauer, 2011, pp. 607–608);

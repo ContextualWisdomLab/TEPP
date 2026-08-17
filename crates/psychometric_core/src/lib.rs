@@ -11,7 +11,8 @@
 //! decomposes cluster-mean within/between OLS and the CWC contextual effect,
 //! maps event-time discrete lags through the exact scalar exponential, maps
 //! already-centered irregular residuals without re-centering, remaps discrete
-//! lags across unequal event intervals through that log-rate, and refuses
+//! lags across unequal event intervals through that log-rate, recovers the
+//! exact scalar discrete effect of a constant predictor, and refuses
 //! latent-mean comparison below strong invariance.
 
 mod causality;
@@ -59,6 +60,8 @@ pub use event_time::LagClock;
 pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar discrete effect of a constant event-time predictor.
+pub use event_time::recover_discrete_constant_predictor_effect;
 /// Exact scalar forward map `φ = exp(a Δt)`.
 pub use event_time::recover_discrete_lag_from_log_rate;
 /// Noiseless scalar discrete lag `later / earlier`.
