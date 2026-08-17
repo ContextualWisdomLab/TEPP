@@ -68,6 +68,14 @@ Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reaso
 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers.
 
+## Translation versus transition
+
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434
+
+Phillips, A., & Davis, M. (2009). *Tags for identifying languages* (RFC 5646). Internet Engineering Task Force. https://doi.org/10.17487/RFC5646
+
+Allen (1983) classifies interval relations; it does **not** authorize treating a translation, same-language copy, or revision as a `causes` or `transitions_to` edge. RFC 5646 primary language subtags distinguish translation from same-language variants.
+
 ## Unicode, language tags, and multilingual structure
 
 Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #15: Unicode normalization forms*. Unicode Consortium.
