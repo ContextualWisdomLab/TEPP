@@ -210,7 +210,7 @@ mod tests {
             Err(TopicMeasurementError::InvalidLogRatioDimension)
         );
         assert_eq!(
-            from_isometric_log_ratio(&[f64::MAX]),
+            from_isometric_log_ratio(&[-f64::MAX, f64::MAX]),
             Err(TopicMeasurementError::InvalidLogRatioDimension)
         );
     }
