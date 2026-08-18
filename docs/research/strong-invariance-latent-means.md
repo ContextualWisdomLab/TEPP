@@ -12,7 +12,7 @@ This slice does **not** import the unpublished `measurement_invariance` crate on
 - `#84` `scalar` is the strong/scalar status (equal loading and intercept). That status licenses latent means.
 - Strict (also equal residual variance) also licenses latent means.
 - This is two-group OLS, not MGCFA, not partial invariance, and not alignment optimization.
-- Meredith (1993) names weak/strong/strict are used only as conventional labels. That PDF was not opened (Unpaywall/OpenAlex/Semantic Scholar/archive.org/ERIC 2026-08-17T21:03Z: closed; Springer remains an HTML stub). Do not cite Meredith equations as having been read.
+- Meredith (1993) names weak/strong/strict are used only as conventional labels. That PDF was not opened (Unpaywall/OpenAlex/Semantic Scholar/CORE/OpenAIRE/archive.org 2026-08-18T03:07Z: closed; Springer remains an HTML stub). Do not cite Meredith equations as having been read.
 
 ## Authoritative sources used for the mean gate
 

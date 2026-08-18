@@ -408,6 +408,8 @@ pub fn refuse_unmatched_time_varying_predictor_interval(
 /// the equilibrium variance `−q / (2 a) = −0.5 q / a` for stable
 /// `a < 0`. When `expm1(z)` overflows to `+∞` at a finite `z`,
 /// rewrite as `sign(q / a) exp(ln|q| + z − ln|a| − ln 2) − 0.5 q / a`.
+/// An overflowing rewrite scale `0.5 q / a` is not a finite `Q_Δt`
+/// (`q = 1e308`, `a = 0.1`, `Δt = 4000` → `z = 800`, `0.5 q / a = +∞`).
 /// `z → +∞` is an unstable process and fails closed unless `q = 0`.
 /// A zero diffusion is exactly zero even if `expm1` overflows. This
 /// is not a Kalman filter, not DSEM, and not a matrix `expm`.
@@ -464,6 +466,9 @@ pub fn recover_discrete_process_noise(
     }
     // Finite z, overflowed expm1. (q / (2 a))(exp(z) − 1) =
     // sign(q / a) exp(ln|q| + z − ln|a| − ln 2) − 0.5 q / a.
+    // Driver Eq. 3 (JSS PDF re-opened 2026-08-18T03:07Z, p. 4):
+    // Q_Δt is that integral. If 0.5 q / a overflows, the rewrite
+    // scale is not finite and Q_Δt is not finite.
     let half_scale = 0.5 * continuous_diffusion / log_rate;
     if !half_scale.is_finite() {
         return Err(PsychometricError::InvalidNumericInput);
@@ -1216,6 +1221,12 @@ mod tests {
         );
         assert_eq!(
             recover_discrete_process_noise(1.0, 1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        // Finite z, overflowed expm1, overflowing 0.5 q / a.
+        // q (e^{2 a Δt} − 1) / (2 a) is then non-finite (Driver Eq. 3).
+        assert_eq!(
+            recover_discrete_process_noise(1e308, 0.1, 4000.0, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }

@@ -330,6 +330,10 @@ fn discrete_process_noise_recovers_driver_equation_three() {
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
+        recover_discrete_process_noise(1e308, 0.1, 4000.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
         recover_discrete_process_noise(0.4, -0.5, 1.0, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
     );
