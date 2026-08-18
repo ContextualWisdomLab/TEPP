@@ -44,6 +44,9 @@ pub enum PsychometricError {
     InsufficientDraws,
     /// Latent-mean comparison was requested at metric/weak invariance.
     StrongInvarianceRequired,
+    /// Driver Eq. 3 process noise was treated as the unconditional latent
+    /// variance. `Q_Δt` is `cov(η_ti | η_{t-1,i})`.
+    ProcessNoiseIsConditionalVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -80,6 +83,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::StrongInvarianceRequired => {
                 "latent-mean comparison requires strong or strict invariance; metric/weak is not enough"
+            }
+            Self::ProcessNoiseIsConditionalVariance => {
+                "discrete process noise is the conditional residual variance, not the unconditional latent variance"
             }
         };
         formatter.write_str(message)
@@ -157,6 +163,10 @@ mod tests {
         assert_eq!(
             PsychometricError::StrongInvarianceRequired.to_string(),
             "latent-mean comparison requires strong or strict invariance; metric/weak is not enough"
+        );
+        assert_eq!(
+            PsychometricError::ProcessNoiseIsConditionalVariance.to_string(),
+            "discrete process noise is the conditional residual variance, not the unconditional latent variance"
         );
     }
 }

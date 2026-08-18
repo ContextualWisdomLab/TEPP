@@ -11,7 +11,16 @@
 //! Eq. 12). The discrete effect of a time-varying predictor whose
 //! sampling interval equals its constancy interval is their Eq. 14.
 //! The exact scalar discrete process noise is the closed form of
-//! Driver, Oud, and Voelkle (2017, Eq. 3) `Q_Δt`. The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
+//! Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5) `Q_Δt`.
+//! Equation 3 writes `η(t) = exp(A Δt) η(t0) + … +` the stochastic
+//! integral. Equation 4 writes that the integral exhibits covariance
+//! `Q_Δt`. The homogeneous-process consequence (`ξ`, `z` given) is
+//! `Q_Δt = cov(η_ti | η_{t-1,i})` and
+//! `cov(η_ti, η_{t-1,i}) = A_Δt cov(η_{t-1,i})`. The law of total
+//! variance on that pair is
+//! `Var(η_ti) = A_Δt Var(η_{t-1,i}) A_Δt⊤ + Q_Δt`. The JSS article
+//! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
+//! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
 
 use std::collections::BTreeMap;
@@ -482,6 +491,132 @@ pub fn recover_discrete_process_noise(
     require_finite(dominant - half_scale)
 }
 
+/// Exact scalar lagged latent covariance on event time.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5; JSS PDF
+/// re-opened 2026-08-18T11:20Z) write `η(t) = exp(A Δt) η(t0) + … +`
+/// the stochastic integral (Eq. 3) and that the integral exhibits
+/// covariance `Q_Δt` (Eq. 4). The homogeneous-process consequence is
+/// `cov(η_ti, η_{t-1,i}) = A_Δt cov(η_{t-1,i})`. The scalar map is
+/// `exp(a Δt) p` with prior variance `p ≥ 0`. This is not `Q_Δt`.
+/// Binary64 underflow of `exp(a Δt)` to `+0` is a vanishing
+/// covariance and is kept. A zero prior variance is exactly zero even
+/// if the exponential overflows. When `exp(a Δt)` overflows at a
+/// finite `a Δt`, rewrite as `exp(ln p + a Δt)`. An overflowing
+/// rewrite fails closed. A finite `exp(a Δt)` whose product with `p`
+/// overflows also fails closed. The JSS article has no numbered §2.2.
+/// This is not a Kalman filter, not DSEM, and not a matrix `expm`.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event clock,
+/// [`PsychometricError::NonPositiveInterval`] when `event_delta` is not
+/// strictly positive, and [`PsychometricError::InvalidNumericInput`] when
+/// the prior variance is negative or non-finite, the log-rate is
+/// non-finite, or the mapped covariance is non-finite.
+pub fn recover_discrete_lagged_latent_covariance(
+    prior_variance: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !prior_variance.is_finite() || prior_variance < 0.0 || !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // 0 * +∞ is NaN. Driver Eq. 3: A_Δt * 0 = 0.
+    if prior_variance == 0.0 {
+        return Ok(0.0);
+    }
+    let drift_interval = log_rate * event_delta;
+    let auto_effect = drift_interval.exp();
+    if auto_effect.is_finite() {
+        // +0 underflow is a vanishing lagged covariance.
+        return require_finite(auto_effect * prior_variance);
+    }
+    if !drift_interval.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // Finite a Δt, overflowed exp. exp(a Δt) p = exp(ln p + a Δt).
+    require_finite((prior_variance.ln() + drift_interval).exp())
+}
+
+/// Exact scalar discrete latent variance on event time.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5; JSS PDF
+/// re-opened 2026-08-18T11:20Z) write `Q_Δt` as the covariance of the
+/// stochastic integral (Eq. 4) after the homogeneous map
+/// `η(t) = exp(A Δt) η(t0) + …` (Eq. 3). That pair is
+/// `Q_Δt = cov(η_ti | η_{t-1,i})` and
+/// `cov(η_ti, η_{t-1,i}) = A_Δt cov(η_{t-1,i})` when `ξ` and `z` are
+/// given. The law of total variance on that pair is
+/// `Var(η_ti) = A_Δt Var(η_{t-1,i}) A_Δt⊤ + Q_Δt`. The scalar map is
+/// `exp(2 a Δt) p + Q_Δt`. This is not `Q_Δt` alone and not a Kalman
+/// measurement update. A zero prior variance is exactly `Q_Δt`.
+/// Binary64 underflow of `exp(2 a Δt)` keeps `Q_Δt`. When `exp(z)`
+/// overflows at a finite `z = 2 (a Δt)`, rewrite as
+/// `exp(ln p + z) + Q_Δt`. An overflowing rewrite fails closed.
+/// A finite `exp(z) p` whose sum with `Q_Δt` overflows fails closed.
+/// The JSS article has no numbered §2.2.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_process_noise`]. Returns
+/// [`PsychometricError::InvalidNumericInput`] when the prior variance is
+/// negative or non-finite or the mapped variance is non-finite.
+pub fn recover_discrete_latent_variance(
+    prior_variance: f64,
+    continuous_diffusion: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let process_noise =
+        recover_discrete_process_noise(continuous_diffusion, log_rate, event_delta, clock)?;
+    if !prior_variance.is_finite() || prior_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if prior_variance == 0.0 {
+        return Ok(process_noise);
+    }
+    let increment_argument = 2.0 * (log_rate * event_delta);
+    if increment_argument == 0.0 {
+        return require_finite(prior_variance + process_noise);
+    }
+    let auto_effect_square = increment_argument.exp();
+    if auto_effect_square.is_finite() {
+        return require_finite(auto_effect_square * prior_variance + process_noise);
+    }
+    if !increment_argument.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let carried = require_finite((prior_variance.ln() + increment_argument).exp())?;
+    require_finite(carried + process_noise)
+}
+
+/// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5):
+/// `Q_Δt = cov(η_ti | η_{t-1,i})` for the homogeneous process. That
+/// residual variance is not `Var(η_ti)` when the previous state is
+/// random. The JSS article has no numbered §2.2.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::ProcessNoiseIsConditionalVariance`].
+pub fn refuse_process_noise_as_unconditional_variance(
+    process_noise: f64,
+    prior_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (process_noise, prior_variance);
+    Err(PsychometricError::ProcessNoiseIsConditionalVariance)
+}
+
 /// Refuse the difference quotient as a continuous-time rate.
 ///
 /// Voelkle et al. (2012) discourage `(x(t+Δt) − x(t)) / Δt` as the drift.
@@ -714,11 +849,13 @@ mod tests {
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, recover_discrete_constant_predictor_effect,
         recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
+        recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
         recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
         recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_irregular_centered_residual_log_rate, recover_local_log_rate,
         recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
         refuse_pooled_discrete_lag_across_unequal_intervals,
+        refuse_process_noise_as_unconditional_variance,
         refuse_unmatched_time_varying_predictor_interval,
     };
     use crate::error::PsychometricError;
@@ -1231,6 +1368,150 @@ mod tests {
         assert_eq!(
             recover_discrete_process_noise(1e308, 0.1, 4000.0, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn lagged_covariance_and_latent_variance_follow_driver_equations_three_and_four() {
+        let prior = 2.0_f64;
+        let diffusion = 0.4_f64;
+        let drift = -0.5_f64;
+        let delta = 1.0_f64;
+        let lagged =
+            recover_discrete_lagged_latent_covariance(prior, drift, delta, LagClock::EventTime)
+                .expect("lagged cov");
+        let expected_lagged = (drift * delta).exp() * prior;
+        assert!((lagged - expected_lagged).abs() < 1e-15);
+        let process_noise =
+            recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime)
+                .expect("q_dt");
+        let latent =
+            recover_discrete_latent_variance(prior, diffusion, drift, delta, LagClock::EventTime)
+                .expect("var");
+        let expected_var = (2.0 * drift * delta).exp() * prior + process_noise;
+        assert!((latent - expected_var).abs() < 1e-15);
+        assert!((latent - process_noise).abs() > 1e-3);
+        assert_eq!(
+            refuse_process_noise_as_unconditional_variance(process_noise, prior),
+            Err(PsychometricError::ProcessNoiseIsConditionalVariance)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(0.0, 800.0, 1.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+        let underflowed_lagged =
+            recover_discrete_lagged_latent_covariance(2.0, -1e308, 2.0, LagClock::EventTime)
+                .expect("underflow lagged");
+        assert_eq!(underflowed_lagged.to_bits(), 0.0_f64.to_bits());
+        let rewritten =
+            recover_discrete_lagged_latent_covariance(1e-308, 800.0, 1.0, LagClock::EventTime)
+                .expect("rewrite lagged");
+        let expected_rewrite = (1e-308_f64.ln() + 800.0).exp();
+        assert!((rewritten - expected_rewrite).abs() / expected_rewrite < 1e-12);
+        let zero_prior =
+            recover_discrete_latent_variance(0.0, diffusion, drift, delta, LagClock::EventTime)
+                .expect("zero prior");
+        assert!((zero_prior - process_noise).abs() < 1e-15);
+        let drifted_zero =
+            recover_discrete_latent_variance(2.0, diffusion, 0.0, 2.5, LagClock::EventTime)
+                .expect("a=0");
+        assert!((drifted_zero - (2.0 + diffusion * 2.5)).abs() < 1e-15);
+        let underflowed_var =
+            recover_discrete_latent_variance(2.0, 1.0, 1e-308, 1e-308, LagClock::EventTime)
+                .expect("z underflow");
+        assert!((underflowed_var - (2.0 + 1.0 * 1e-308)).abs() < 1e-15);
+        let vanished =
+            recover_discrete_latent_variance(2.0, 1e308, -1e308, 2.0, LagClock::EventTime)
+                .expect("phi_sq underflow");
+        assert!((vanished - 0.5).abs() < 1e-15);
+        let rewritten_var =
+            recover_discrete_latent_variance(1e-308, 1e-308, 400.0, 1.0, LagClock::EventTime)
+                .expect("rewrite var");
+        assert!(rewritten_var.is_finite());
+        assert!(rewritten_var > 0.0);
+    }
+
+    #[test]
+    fn lagged_covariance_and_latent_variance_overflow_paths_fail_closed() {
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(1e308, 800.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(2.0, 1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_variance(1e308, 1e-308, 400.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_variance(2.0, 1.0, 1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(1e308, 700.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_variance(1e308, 1e-308, 350.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_variance(1e308, 1e308, 0.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let carried = (-90.622_f64).exp();
+        let diffusion_sum = (-83.938_f64).exp();
+        assert_eq!(
+            recover_discrete_latent_variance(
+                carried,
+                diffusion_sum,
+                400.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(-0.1, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(f64::NAN, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(2.0, f64::NAN, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(2.0, -0.5, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(2.0, -0.5, -1.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(2.0, -0.5, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_lagged_latent_covariance(2.0, -0.5, 1.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_latent_variance(-0.1, 0.4, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_variance(f64::NAN, 0.4, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_variance(2.0, 0.4, -0.5, 1.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
         );
     }
 

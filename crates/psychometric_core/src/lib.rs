@@ -15,7 +15,10 @@
 //! exact scalar discrete effect of a constant predictor, recovers the
 //! first-order discrete effect of a time-varying predictor with matched
 //! sampling and constancy intervals, recovers the exact scalar discrete
-//! process noise of Driver et al. (2017, Eq. 3), and refuses
+//! process noise of Driver et al. (2017, Eq. 3), recovers the lagged
+//! latent covariance and unconditional latent variance licensed by
+//! their Eq. 3–4,
+//! and refuses
 //! latent-mean comparison below strong invariance.
 
 mod causality;
@@ -69,6 +72,10 @@ pub use event_time::recover_discrete_constant_predictor_effect;
 pub use event_time::recover_discrete_lag_from_log_rate;
 /// Noiseless scalar discrete lag `later / earlier`.
 pub use event_time::recover_discrete_lag_one;
+/// Exact scalar lagged latent covariance `A_Δt cov(η_{t-1})`.
+pub use event_time::recover_discrete_lagged_latent_covariance;
+/// Exact scalar discrete latent variance `A_Δt P A_Δt⊤ + Q_Δt`.
+pub use event_time::recover_discrete_latent_variance;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
 pub use event_time::recover_discrete_process_noise;
 /// First-order discrete effect of a time-varying event-time predictor.
@@ -87,6 +94,8 @@ pub use event_time::recover_within_residual_event_time_log_rate;
 pub use event_time::refuse_difference_quotient_as_local_rate;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
+/// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
+pub use event_time::refuse_process_noise_as_unconditional_variance;
 /// Refuse a time-varying predictor whose sampling and constancy intervals differ.
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 /// Indicator coordinate kind.

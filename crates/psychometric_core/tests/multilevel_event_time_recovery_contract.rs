@@ -6,11 +6,13 @@ use psychometric_core::{
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
     ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
     recover_discrete_constant_predictor_effect, recover_discrete_lag_from_log_rate,
+    recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
     recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
     refuse_pooled_discrete_lag_across_unequal_intervals,
+    refuse_process_noise_as_unconditional_variance,
     refuse_unmatched_time_varying_predictor_interval,
 };
 
@@ -562,6 +564,76 @@ fn irregular_centered_residuals_recover_known_drift_better_than_cwc_of_raw_ar() 
     assert!(
         cwc_error > centered_error,
         "Curran & Bauer: CWC of raw AR RMSE {cwc_error} must exceed already-centered {centered_error}"
+    );
+}
+
+#[test]
+fn discrete_latent_variance_recovers_driver_equations_three_and_four() {
+    let prior = 2.0_f64;
+    let diffusion = 0.4_f64;
+    let drift = -0.5_f64;
+    let delta = 1.0_f64;
+    let process_noise =
+        recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime).expect("q_dt");
+    let lagged =
+        recover_discrete_lagged_latent_covariance(prior, drift, delta, LagClock::EventTime)
+            .expect("lagged");
+    let latent =
+        recover_discrete_latent_variance(prior, diffusion, drift, delta, LagClock::EventTime)
+            .expect("var");
+    let expected_lagged = (drift * delta).exp() * prior;
+    let expected_var = (2.0 * drift * delta).exp() * prior + process_noise;
+    let lagged_error = rmse(&[expected_lagged], &[lagged]);
+    let var_error = rmse(&[expected_var], &[latent]);
+    assert!(
+        lagged_error < 1e-15,
+        "Driver Eq. 3-4 lagged RMSE {lagged_error}"
+    );
+    assert!(
+        var_error < 1e-15,
+        "Driver Eq. 3-4 variance RMSE {var_error}"
+    );
+    let collapsed = rmse(&[expected_var], &[process_noise]);
+    assert!(
+        collapsed > var_error,
+        "Q_Δt is not Var(η_t): collapsed RMSE {collapsed} must exceed {var_error}"
+    );
+    assert_eq!(
+        refuse_process_noise_as_unconditional_variance(process_noise, prior),
+        Err(PsychometricError::ProcessNoiseIsConditionalVariance)
+    );
+    assert_eq!(
+        recover_discrete_lagged_latent_covariance(0.0, 800.0, 1.0, LagClock::EventTime),
+        Ok(0.0)
+    );
+    let rewritten =
+        recover_discrete_lagged_latent_covariance(1e-308, 800.0, 1.0, LagClock::EventTime)
+            .expect("rewrite");
+    assert!(rewritten.is_finite());
+    assert!(rewritten > 0.0);
+    assert_eq!(
+        recover_discrete_lagged_latent_covariance(2.0, 1e308, 2.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_latent_variance(-1.0, diffusion, drift, delta, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_lagged_latent_covariance(2.0, drift, 0.0, LagClock::EventTime),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_lagged_latent_covariance(2.0, drift, 1.0, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_lagged_latent_covariance(1e308, 700.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_latent_variance(1e308, 1e308, 0.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }
 

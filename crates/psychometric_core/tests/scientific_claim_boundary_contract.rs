@@ -4,9 +4,10 @@ use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
+    recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
-    recover_within_residual_event_time_log_rate,
+    recover_within_residual_event_time_log_rate, refuse_process_noise_as_unconditional_variance,
 };
 
 #[test]
@@ -211,5 +212,31 @@ fn discrete_process_noise_is_not_the_continuous_diffusion() {
     assert!(
         (discrete - constant).abs() > 1e-3,
         "Driver Eq. 3 Q_Δt is not Voelkle Eq. 12"
+    );
+}
+
+#[test]
+fn process_noise_is_not_the_unconditional_latent_variance() {
+    let prior = 2.0_f64;
+    let diffusion = 0.4_f64;
+    let drift = -0.5_f64;
+    let delta = 1.0_f64;
+    let process_noise =
+        recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime).expect("q_dt");
+    let lagged =
+        recover_discrete_lagged_latent_covariance(prior, drift, delta, LagClock::EventTime)
+            .expect("lagged");
+    let latent =
+        recover_discrete_latent_variance(prior, diffusion, drift, delta, LagClock::EventTime)
+            .expect("var");
+    assert!(
+        (process_noise - latent).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3-4, pp. 4-5): Q_Δt is cov(η_t | η_{{t-1}}), not Var(η_t)"
+    );
+    assert!((lagged - (drift * delta).exp() * prior).abs() < 1e-15);
+    assert!((latent - ((2.0 * drift * delta).exp() * prior + process_noise)).abs() < 1e-15);
+    assert_eq!(
+        refuse_process_noise_as_unconditional_variance(process_noise, prior),
+        Err(psychometric_core::PsychometricError::ProcessNoiseIsConditionalVariance)
     );
 }

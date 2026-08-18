@@ -296,4 +296,8 @@ fn finite_alr_correlation_and_error_messages_are_stable() {
         PsychometricError::StrongInvarianceRequired.to_string(),
         "latent-mean comparison requires strong or strict invariance; metric/weak is not enough"
     );
+    assert_eq!(
+        PsychometricError::ProcessNoiseIsConditionalVariance.to_string(),
+        "discrete process noise is the conditional residual variance, not the unconditional latent variance"
+    );
 }
