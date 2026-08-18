@@ -213,5 +213,9 @@ mod tests {
             from_isometric_log_ratio(&[-f64::MAX, f64::MAX]),
             Err(TopicMeasurementError::InvalidLogRatioDimension)
         );
+        let three = isometric_log_ratio(&[2.0 / 6.0, 3.0 / 6.0, 1.0 / 6.0]).expect("ilr three");
+        assert!((three[1] - (0.5_f64).sqrt() * 3.0_f64.ln()).abs() < 1e-15);
+        let recovered_three = from_isometric_log_ratio(&three).expect("ilr three inverse");
+        assert!((recovered_three.iter().sum::<f64>() - 1.0).abs() < 1e-15);
     }
 }
