@@ -284,6 +284,115 @@ fn time_varying_predictor_discrete_effect_recovers_equation_fourteen() {
 }
 
 #[test]
+fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
+    let outcome_on_predictor = 0.2_f64;
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            1.0,
+            1.0,
+            1.0,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            f64::NAN,
+            1.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            0.0,
+            1.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            1.0,
+            f64::NAN,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            1.0,
+            0.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            1.0,
+            1.0,
+            f64::NAN,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            1.0,
+            1.0,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            outcome_on_predictor,
+            2.0,
+            2.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::UnmatchedTimeVaryingInterval)
+    );
+}
+
+#[test]
+fn time_varying_predictor_equation_fourteen_numeric_inputs_fail_closed() {
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            f64::NAN,
+            1.0,
+            1.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_time_varying_predictor_effect(
+            1e308,
+            10.0,
+            10.0,
+            10.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
 fn discrete_process_noise_recovers_driver_equation_three() {
     let diffusion = 0.4_f64;
     let drift = -0.5_f64;
@@ -331,6 +440,34 @@ fn discrete_process_noise_recovers_driver_equation_three() {
     );
     assert_eq!(
         recover_discrete_process_noise(1e308, 0.1, 4000.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(1.0, 1e308, 2.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(0.4, -0.5, 0.0, LagClock::EventTime),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(0.4, -0.5, -1.0, LagClock::EventTime),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(0.4, -0.5, f64::NAN, LagClock::EventTime),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(-0.1, -0.5, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(f64::NAN, -0.5, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(0.4, f64::NAN, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(

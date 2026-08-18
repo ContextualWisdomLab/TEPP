@@ -185,6 +185,26 @@ fn discrete_process_noise_is_not_the_continuous_diffusion() {
         recover_discrete_process_noise(1e308, 0.1, 4000.0, LagClock::EventTime),
         Err(psychometric_core::PsychometricError::InvalidNumericInput)
     );
+    assert_eq!(
+        recover_discrete_process_noise(1.0, 1e308, 2.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(0.4, -0.5, f64::NAN, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(-0.1, -0.5, 1.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(f64::NAN, -0.5, 1.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_process_noise(0.4, f64::NAN, 1.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
     let constant =
         recover_discrete_constant_predictor_effect(diffusion, drift, delta, LagClock::EventTime)
             .expect("eq 12");

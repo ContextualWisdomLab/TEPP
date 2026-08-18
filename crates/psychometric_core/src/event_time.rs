@@ -395,7 +395,8 @@ pub fn refuse_unmatched_time_varying_predictor_interval(
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3; JSS PDF re-opened 2026-08-17T21:03Z,
 /// p. 4) write the discrete process-noise covariance
-/// `Q_Δt = ∫_0^{Δt} expm(A(Δt−τ)) G G⊤ expm(A(Δt−τ))⊤ dτ`.
+/// `Q_Δt = ∫_0^{Δt} expm(A(Δt−τ)) L G G⊤ L⊤ expm(A(Δt−τ))⊤ dτ`.
+/// This slice takes scalar `L = 1` (every latent subject to system noise).
 /// The noiseless scalar closed form with continuous diffusion
 /// `q = G G⊤ ≥ 0` is `q (exp(2 a Δt) − 1) / (2 a)` for `a ≠ 0` and
 /// `q Δt` for `a = 0`. The algebraically identical finite-`expm1`
@@ -944,7 +945,8 @@ mod tests {
         // z → -∞: expm1(z)/z * Δt is +0; Eq. 12 → -a_yx/a_xx (Voelkle
         // 2012, Introducing Intercepts equilibrium increment).
         let increment_argument = -1e308_f64 * 2.0;
-        assert!(increment_argument.is_infinite() && increment_argument.is_sign_negative());
+        assert!(increment_argument.is_infinite());
+        assert!(increment_argument.is_sign_negative());
         let lost_scale = increment_argument.exp_m1() / increment_argument * 2.0;
         assert_eq!(lost_scale.to_bits(), 0.0_f64.to_bits());
         let negative_overflow =
@@ -966,7 +968,8 @@ mod tests {
                 .expect("eq 12 log-space");
         let expected = (1e-308_f64.ln() + 800.0 - 800.0_f64.ln()).exp() - 1e-308 / 800.0;
         assert!((recovered - expected).abs() / expected < 1e-12);
-        assert!(recovered.is_finite() && recovered > 0.0);
+        assert!(recovered.is_finite());
+        assert!(recovered > 0.0);
         let negative =
             recover_discrete_constant_predictor_effect(-1e-308, 800.0, 1.0, LagClock::EventTime)
                 .expect("eq 12 signed log-space");
