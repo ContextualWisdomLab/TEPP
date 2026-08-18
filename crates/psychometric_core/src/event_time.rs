@@ -18,7 +18,10 @@
 //! `Q_Δt = cov(η_ti | η_{t-1,i})` and
 //! `cov(η_ti, η_{t-1,i}) = A_Δt cov(η_{t-1,i})`. The law of total
 //! variance on that pair is
-//! `Var(η_ti) = A_Δt Var(η_{t-1,i}) A_Δt⊤ + Q_Δt`. The JSS article
+//! `Var(η_ti) = A_Δt Var(η_{t-1,i}) A_Δt⊤ + Q_Δt`. As `Δt → ∞` with
+//! stable `a < 0`, Eq. 4 and the JSS `asymDIFFUSION` summary (p. 16;
+//! §4.3 T0VAR stationarity) give the scalar Lyapunov solution
+//! `-q / (2 a)`. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -602,6 +605,75 @@ pub fn recover_discrete_latent_variance(
     require_finite(carried + process_noise)
 }
 
+/// Exact scalar stationary within-subject variance on event time.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 4, p. 5; JSS PDF re-opened
+/// 2026-08-18T18:03Z) write `Q_Δt` as
+/// `irow(A#^{-1}[e^{A# Δt} − I] row(Q))` with `A# = A ⊗ I + I ⊗ A`.
+/// The scalar Kronecker sum is `2 a`. As `Δt → ∞` with stable
+/// `a < 0`, `e^{2 a Δt} → 0` and Eq. 4 becomes `-q / (2 a)`. The
+/// JSS summary names that limit `asymDIFFUSION` and takes it as the
+/// total within-subject variance (p. 16). Section 4.3 (pp. 9–10)
+/// constrains a stationary `T0VAR` to that same model-predicted
+/// variance. Form `-0.5 q / a`. Do not form `2 a` first: at
+/// `a = -1e308`, `q = 1e308`, `2 a` overflows and `-q / (2 a)`
+/// collapses to `+0`, but `-0.5 q / a = 0.5`. A zero diffusion is
+/// exactly zero. `a ≥ 0` has no finite stationary variance
+/// (including Brownian `a = 0`, whose variance grows as `q Δt`).
+/// An overflowing `-0.5 q / a` fails closed. This is not a Kalman
+/// filter, not DSEM, not a matrix `expm`, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::StationaryVarianceRequiresStableDrift`]
+/// when the log-rate is not strictly negative, and
+/// [`PsychometricError::InvalidNumericInput`] when the diffusion is
+/// negative or non-finite, the log-rate is non-finite, or the mapped
+/// variance is non-finite.
+pub fn recover_stationary_latent_variance(
+    continuous_diffusion: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !continuous_diffusion.is_finite() || continuous_diffusion < 0.0 || !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::StationaryVarianceRequiresStableDrift);
+    }
+    // Driver Eq. 4 as Δt → ∞: (0 − 1) q / (2 a) = −q / (2 a).
+    // Direct 0 * (1 / (2 a)) is not needed; a zero diffusion is zero.
+    if continuous_diffusion == 0.0 {
+        return Ok(0.0);
+    }
+    // −q / (2 a) = −0.5 q / a. Do not form 2 a first.
+    require_finite(-0.5 * continuous_diffusion / log_rate)
+}
+
+/// Refuse treating finite-interval process noise as `asymDIFFUSION`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 4 and p. 16): `Q_Δt` at a
+/// finite event interval is the covariance of the stochastic integral
+/// over that interval. The asymptotic within-subject variance is the
+/// `Δt → ∞` limit. Section 4.3 distinguishes that stationary
+/// constraint from a predetermined `T0VAR`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::FiniteIntervalProcessNoiseIsNotStationary`].
+pub fn refuse_finite_interval_process_noise_as_stationary_variance(
+    process_noise: f64,
+    event_delta: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (process_noise, event_delta);
+    Err(PsychometricError::FiniteIntervalProcessNoiseIsNotStationary)
+}
+
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5):
@@ -856,7 +928,9 @@ mod tests {
         recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
         recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_irregular_centered_residual_log_rate, recover_local_log_rate,
-        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+        recover_stationary_latent_variance, recover_within_residual_event_time_log_rate,
+        refuse_difference_quotient_as_local_rate,
+        refuse_finite_interval_process_noise_as_stationary_variance,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance,
         refuse_unmatched_time_varying_predictor_interval,
@@ -1521,6 +1595,94 @@ mod tests {
         assert_eq!(
             recover_discrete_latent_variance(2.0, 0.4, -0.5, 1.0, LagClock::SystemTime),
             Err(PsychometricError::EventTimeRequired)
+        );
+    }
+
+    #[test]
+    fn stationary_variance_recovers_driver_equation_four_asymptote() {
+        let diffusion = 0.4_f64;
+        let drift = -0.5_f64;
+        let recovered = recover_stationary_latent_variance(diffusion, drift, LagClock::EventTime)
+            .expect("asym");
+        let expected = -0.5 * diffusion / drift;
+        assert!((recovered - expected).abs() < 1e-15);
+        assert!((recovered - 0.4).abs() < 1e-15);
+        // Starting from p_∞, Var(η_t) is invariant across finite Δt.
+        for delta in [0.5_f64, 1.0, 2.0, 10.0] {
+            let evolved = recover_discrete_latent_variance(
+                recovered,
+                diffusion,
+                drift,
+                delta,
+                LagClock::EventTime,
+            )
+            .expect("invariant");
+            assert!(
+                (evolved - recovered).abs() < 1e-12,
+                "stationary variance must be invariant at Δt={delta}"
+            );
+        }
+        let finite_noise =
+            recover_discrete_process_noise(diffusion, drift, 1.0, LagClock::EventTime)
+                .expect("finite q_dt");
+        assert!((finite_noise - recovered).abs() > 1e-3);
+        assert_eq!(
+            refuse_finite_interval_process_noise_as_stationary_variance(finite_noise, 1.0),
+            Err(PsychometricError::FiniteIntervalProcessNoiseIsNotStationary)
+        );
+        assert_eq!(
+            refuse_finite_interval_process_noise_as_stationary_variance(recovered, 1.0),
+            Err(PsychometricError::FiniteIntervalProcessNoiseIsNotStationary)
+        );
+        assert_eq!(
+            recover_stationary_latent_variance(0.0, drift, LagClock::EventTime),
+            Ok(0.0)
+        );
+        // Do not form 2 a first: 2*(-1e308) overflows; -0.5 q / a is 0.5.
+        let twice_rate_overflow =
+            recover_stationary_latent_variance(1e308, -1e308, LagClock::EventTime)
+                .expect("2a overflow");
+        assert!((twice_rate_overflow - 0.5).abs() < 1e-15);
+        assert!(!(2.0 * -1e308_f64).is_finite());
+        let lost = -1e308_f64 / (2.0 * -1e308_f64);
+        assert!(lost.abs() < 1e-15);
+    }
+
+    #[test]
+    fn stationary_variance_unstable_and_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_stationary_latent_variance(0.4, -0.5, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_stationary_latent_variance(0.4, 0.0, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_stationary_latent_variance(0.4, 0.5, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_stationary_latent_variance(0.0, 0.0, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_stationary_latent_variance(-0.1, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_stationary_latent_variance(f64::NAN, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_stationary_latent_variance(0.4, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        // −0.5 q / a overflows when q is huge relative to |a|.
+        assert!(!(-0.5 * 1e308_f64 / -1e-10_f64).is_finite());
+        assert_eq!(
+            recover_stationary_latent_variance(1e308, -1e-10, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 

@@ -300,4 +300,12 @@ fn finite_alr_correlation_and_error_messages_are_stable() {
         PsychometricError::ProcessNoiseIsConditionalVariance.to_string(),
         "discrete process noise is the conditional residual variance, not the unconditional latent variance"
     );
+    assert_eq!(
+        PsychometricError::StationaryVarianceRequiresStableDrift.to_string(),
+        "stationary within-subject variance requires a stable negative drift"
+    );
+    assert_eq!(
+        PsychometricError::FiniteIntervalProcessNoiseIsNotStationary.to_string(),
+        "finite-interval process noise is not the asymptotic within-subject variance"
+    );
 }

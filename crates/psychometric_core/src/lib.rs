@@ -17,7 +17,9 @@
 //! sampling and constancy intervals, recovers the exact scalar discrete
 //! process noise of Driver et al. (2017, Eq. 3), recovers the lagged
 //! latent covariance and unconditional latent variance licensed by
-//! their Eq. 3–4,
+//! their Eq. 3–4, recovers the scalar stationary within-subject
+//! variance (Driver et al., 2017, Eq. 4 as `Δt → ∞`; §4.3; p. 16
+//! `asymDIFFUSION`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -88,10 +90,14 @@ pub use event_time::recover_event_time_discrete_lag_and_log_rate;
 pub use event_time::recover_irregular_centered_residual_log_rate;
 /// Exact scalar inverse `a = ln(φ) / Δt`.
 pub use event_time::recover_local_log_rate;
+/// Exact scalar stationary within-subject variance `-q / (2 a)`.
+pub use event_time::recover_stationary_latent_variance;
 /// CWC-then-event-time local log-rate (not DSEM; not raw-process AR drift).
 pub use event_time::recover_within_residual_event_time_log_rate;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
+pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.

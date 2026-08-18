@@ -47,6 +47,14 @@ pub enum PsychometricError {
     /// Driver Eq. 3 process noise was treated as the unconditional latent
     /// variance. `Q_Δt` is `cov(η_ti | η_{t-1,i})`.
     ProcessNoiseIsConditionalVariance,
+    /// Stationary within-subject variance was requested for a non-stable
+    /// drift. Driver et al. (2017, Eq. 4 as `Δt → ∞`; §4.3; p. 16
+    /// `asymDIFFUSION`) require `a < 0`.
+    StationaryVarianceRequiresStableDrift,
+    /// Finite-interval Driver Eq. 3 process noise was treated as the
+    /// asymptotic within-subject variance. `Q_Δt` at a finite `Δt` is not
+    /// `asymDIFFUSION`.
+    FiniteIntervalProcessNoiseIsNotStationary,
 }
 
 impl fmt::Display for PsychometricError {
@@ -86,6 +94,12 @@ impl fmt::Display for PsychometricError {
             }
             Self::ProcessNoiseIsConditionalVariance => {
                 "discrete process noise is the conditional residual variance, not the unconditional latent variance"
+            }
+            Self::StationaryVarianceRequiresStableDrift => {
+                "stationary within-subject variance requires a stable negative drift"
+            }
+            Self::FiniteIntervalProcessNoiseIsNotStationary => {
+                "finite-interval process noise is not the asymptotic within-subject variance"
             }
         };
         formatter.write_str(message)
@@ -167,6 +181,14 @@ mod tests {
         assert_eq!(
             PsychometricError::ProcessNoiseIsConditionalVariance.to_string(),
             "discrete process noise is the conditional residual variance, not the unconditional latent variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryVarianceRequiresStableDrift.to_string(),
+            "stationary within-subject variance requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::FiniteIntervalProcessNoiseIsNotStationary.to_string(),
+            "finite-interval process noise is not the asymptotic within-subject variance"
         );
     }
 }

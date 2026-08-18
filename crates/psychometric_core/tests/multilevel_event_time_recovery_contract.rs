@@ -10,7 +10,9 @@ use psychometric_core::{
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
-    recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+    recover_stationary_latent_variance, recover_within_residual_event_time_log_rate,
+    refuse_difference_quotient_as_local_rate,
+    refuse_finite_interval_process_noise_as_stationary_variance,
     refuse_pooled_discrete_lag_across_unequal_intervals,
     refuse_process_noise_as_unconditional_variance,
     refuse_unmatched_time_varying_predictor_interval,
@@ -639,6 +641,63 @@ fn discrete_latent_variance_recovers_driver_equations_three_and_four() {
     // non-finite (Driver Eq. 3–4).
     assert_eq!(
         recover_discrete_latent_variance(2.0, 0.0, 1e308, 2.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn stationary_variance_recovers_driver_equation_four_asymptote() {
+    let diffusion = 0.4_f64;
+    let drift = -0.5_f64;
+    let stationary =
+        recover_stationary_latent_variance(diffusion, drift, LagClock::EventTime).expect("asym");
+    let expected = -0.5 * diffusion / drift;
+    let error = rmse(&[expected], &[stationary]);
+    assert!(error < 1e-15, "Driver Eq. 4 asymDIFFUSION RMSE {error}");
+    for delta in [0.5_f64, 1.0, 2.0, 10.0] {
+        let evolved = recover_discrete_latent_variance(
+            stationary,
+            diffusion,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("invariant");
+        let evolved_error = rmse(&[stationary], &[evolved]);
+        assert!(
+            evolved_error < 1e-12,
+            "stationary variance must be invariant at Δt={delta}: RMSE {evolved_error}"
+        );
+    }
+    let finite_noise =
+        recover_discrete_process_noise(diffusion, drift, 1.0, LagClock::EventTime).expect("q_dt");
+    let collapsed = rmse(&[stationary], &[finite_noise]);
+    assert!(
+        collapsed > error,
+        "finite-Δt Q_Δt is not asymDIFFUSION: collapsed RMSE {collapsed} must exceed {error}"
+    );
+    assert_eq!(
+        refuse_finite_interval_process_noise_as_stationary_variance(finite_noise, 1.0),
+        Err(PsychometricError::FiniteIntervalProcessNoiseIsNotStationary)
+    );
+    assert_eq!(
+        recover_stationary_latent_variance(diffusion, 0.0, LagClock::EventTime),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_stationary_latent_variance(diffusion, 0.5, LagClock::EventTime),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_stationary_latent_variance(1e308, -1e308, LagClock::EventTime),
+        Ok(0.5)
+    );
+    assert_eq!(
+        recover_stationary_latent_variance(diffusion, drift, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_stationary_latent_variance(1e308, -1e-10, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }

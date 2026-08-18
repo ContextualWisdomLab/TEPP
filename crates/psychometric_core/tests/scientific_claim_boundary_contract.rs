@@ -7,7 +7,9 @@ use psychometric_core::{
     recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
-    recover_within_residual_event_time_log_rate, refuse_process_noise_as_unconditional_variance,
+    recover_stationary_latent_variance, recover_within_residual_event_time_log_rate,
+    refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_process_noise_as_unconditional_variance,
 };
 
 #[test]
@@ -238,5 +240,32 @@ fn process_noise_is_not_the_unconditional_latent_variance() {
     assert_eq!(
         refuse_process_noise_as_unconditional_variance(process_noise, prior),
         Err(psychometric_core::PsychometricError::ProcessNoiseIsConditionalVariance)
+    );
+}
+
+#[test]
+fn finite_interval_process_noise_is_not_the_stationary_variance() {
+    let diffusion = 0.4_f64;
+    let drift = -0.5_f64;
+    let delta = 1.0_f64;
+    let process_noise =
+        recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime).expect("q_dt");
+    let stationary =
+        recover_stationary_latent_variance(diffusion, drift, LagClock::EventTime).expect("asym");
+    assert!(
+        (process_noise - stationary).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 4 / p. 16): finite-Δt Q_Δt is not asymDIFFUSION"
+    );
+    let evolved =
+        recover_discrete_latent_variance(stationary, diffusion, drift, delta, LagClock::EventTime)
+            .expect("invariant");
+    assert!((evolved - stationary).abs() < 1e-12);
+    assert_eq!(
+        refuse_finite_interval_process_noise_as_stationary_variance(process_noise, delta),
+        Err(psychometric_core::PsychometricError::FiniteIntervalProcessNoiseIsNotStationary)
+    );
+    assert_eq!(
+        recover_stationary_latent_variance(diffusion, 0.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
     );
 }
