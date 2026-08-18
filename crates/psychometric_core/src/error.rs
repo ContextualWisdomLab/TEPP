@@ -55,6 +55,13 @@ pub enum PsychometricError {
     /// asymptotic within-subject variance. `Q_Δt` at a finite `Δt` is not
     /// `asymDIFFUSION`.
     FiniteIntervalProcessNoiseIsNotStationary,
+    /// Driver §4.3 trait variance was treated as process noise or diffusion.
+    /// A stable trait has `DRIFT` and `DIFFUSION` fixed to zero.
+    TraitVarianceIsNotProcessNoise,
+    /// Driver §4.3 trait variance was treated as the stationary
+    /// within-subject variance. `TRAITVAR` is between-subject and
+    /// time-invariant; `asymDIFFUSION` is the `Δt → ∞` state variance.
+    TraitVarianceIsNotStationaryWithinSubject,
 }
 
 impl fmt::Display for PsychometricError {
@@ -100,6 +107,12 @@ impl fmt::Display for PsychometricError {
             }
             Self::FiniteIntervalProcessNoiseIsNotStationary => {
                 "finite-interval process noise is not the asymptotic within-subject variance"
+            }
+            Self::TraitVarianceIsNotProcessNoise => {
+                "trait variance is not process noise and is not a diffusion"
+            }
+            Self::TraitVarianceIsNotStationaryWithinSubject => {
+                "trait variance is not the stationary within-subject variance"
             }
         };
         formatter.write_str(message)
@@ -189,6 +202,14 @@ mod tests {
         assert_eq!(
             PsychometricError::FiniteIntervalProcessNoiseIsNotStationary.to_string(),
             "finite-interval process noise is not the asymptotic within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::TraitVarianceIsNotProcessNoise.to_string(),
+            "trait variance is not process noise and is not a diffusion"
+        );
+        assert_eq!(
+            PsychometricError::TraitVarianceIsNotStationaryWithinSubject.to_string(),
+            "trait variance is not the stationary within-subject variance"
         );
     }
 }

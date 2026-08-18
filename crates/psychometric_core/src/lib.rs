@@ -19,7 +19,9 @@
 //! latent covariance and unconditional latent variance licensed by
 //! their Eq. 3–4, recovers the scalar stationary within-subject
 //! variance (Driver et al., 2017, Eq. 4 as `Δt → ∞`; §4.3; p. 16
-//! `asymDIFFUSION`),
+//! `asymDIFFUSION`), recovers the Driver §4.3 trait-plus-state
+//! variance and lagged covariance (`TRAITVAR` is not process noise
+//! and not `asymDIFFUSION`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -92,6 +94,10 @@ pub use event_time::recover_irregular_centered_residual_log_rate;
 pub use event_time::recover_local_log_rate;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
+/// Exact scalar trait-plus-state lagged covariance.
+pub use event_time::recover_trait_plus_state_lagged_covariance;
+/// Exact scalar trait-plus-state latent variance.
+pub use event_time::recover_trait_plus_state_latent_variance;
 /// CWC-then-event-time local log-rate (not DSEM; not raw-process AR drift).
 pub use event_time::recover_within_residual_event_time_log_rate;
 /// Refuse the difference quotient as a continuous-time rate.
@@ -102,6 +108,10 @@ pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
+/// Refuse treating Driver §4.3 trait variance as process noise.
+pub use event_time::refuse_trait_variance_as_process_noise;
+/// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.
+pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 /// Refuse a time-varying predictor whose sampling and constancy intervals differ.
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 /// Indicator coordinate kind.

@@ -7,9 +7,11 @@ use psychometric_core::{
     recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
-    recover_stationary_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_stationary_latent_variance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_finite_interval_process_noise_as_stationary_variance,
-    refuse_process_noise_as_unconditional_variance,
+    refuse_process_noise_as_unconditional_variance, refuse_trait_variance_as_process_noise,
+    refuse_trait_variance_as_stationary_within_subject,
 };
 
 #[test]
@@ -267,5 +269,41 @@ fn finite_interval_process_noise_is_not_the_stationary_variance() {
     assert_eq!(
         recover_stationary_latent_variance(diffusion, 0.0, LagClock::EventTime),
         Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+}
+
+#[test]
+fn trait_variance_is_not_process_noise_or_stationary_within_subject() {
+    let trait_variance = 1.5_f64;
+    let diffusion = 0.4_f64;
+    let drift = -0.5_f64;
+    let delta = 1.0_f64;
+    let state =
+        recover_stationary_latent_variance(diffusion, drift, LagClock::EventTime).expect("state");
+    let total = recover_trait_plus_state_latent_variance(trait_variance, state).expect("sum");
+    let process_noise =
+        recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime).expect("q_dt");
+    assert!(
+        (trait_variance - process_noise).abs() > 1e-3,
+        "Driver et al. (2017, §4.3, p. 9): TRAITVAR is not Q_Δt"
+    );
+    assert!(
+        (trait_variance - state).abs() > 1e-3,
+        "Driver et al. (2017, §4.3, p. 9): TRAITVAR is not asymDIFFUSION"
+    );
+    let evolved_as_state =
+        recover_discrete_latent_variance(total, diffusion, drift, delta, LagClock::EventTime)
+            .expect("wrong");
+    assert!(
+        (evolved_as_state - total).abs() > 1e-3,
+        "Driver et al. (2017, §4.3): evolving trait+state as all-state is not the trait map"
+    );
+    assert_eq!(
+        refuse_trait_variance_as_process_noise(trait_variance, process_noise),
+        Err(psychometric_core::PsychometricError::TraitVarianceIsNotProcessNoise)
+    );
+    assert_eq!(
+        refuse_trait_variance_as_stationary_within_subject(trait_variance, state),
+        Err(psychometric_core::PsychometricError::TraitVarianceIsNotStationaryWithinSubject)
     );
 }

@@ -21,7 +21,10 @@
 //! `Var(η_ti) = A_Δt Var(η_{t-1,i}) A_Δt⊤ + Q_Δt`. As `Δt → ∞` with
 //! stable `a < 0`, Eq. 4 and the JSS `asymDIFFUSION` summary (p. 16;
 //! §4.3 T0VAR stationarity) give the scalar Lyapunov solution
-//! `-q / (2 a)`. The JSS article
+//! `-q / (2 a)`. Section 4.3 (p. 9) then adds a stable trait process
+//! with `DRIFT` and `DIFFUSION` fixed to zero. That `TRAITVAR` is
+//! time-invariant between-subject variance; it is not process noise
+//! and not `asymDIFFUSION`. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -674,6 +677,108 @@ pub fn refuse_finite_interval_process_noise_as_stationary_variance(
     Err(PsychometricError::FiniteIntervalProcessNoiseIsNotStationary)
 }
 
+/// Exact scalar trait-plus-state latent variance.
+///
+/// Driver, Oud, and Voelkle (2017, §4.3, p. 9; JSS PDF re-opened
+/// 2026-08-18T21:07Z) add a stable trait process with `DRIFT` and
+/// `DIFFUSION` fixed to zero. The scalar sum is `trait + state`. The
+/// ctsem `TRAITVAR` parameterization that adds the trait to the
+/// `DIFFUSION` matrix is a software rewrite; it does not license
+/// treating trait variance as process noise. This is not RI-CLPM, not
+/// a Kalman filter, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::InvalidNumericInput`] when either
+/// variance is negative or non-finite, or the sum overflows.
+pub fn recover_trait_plus_state_latent_variance(
+    trait_variance: f64,
+    state_variance: f64,
+) -> Result<f64, PsychometricError> {
+    if !trait_variance.is_finite() || trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !state_variance.is_finite() || state_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if trait_variance == 0.0 {
+        return Ok(state_variance);
+    }
+    if state_variance == 0.0 {
+        return Ok(trait_variance);
+    }
+    require_finite(trait_variance + state_variance)
+}
+
+/// Exact scalar trait-plus-state lagged latent covariance.
+///
+/// Driver, Oud, and Voelkle (2017, §4.3, p. 9): a stable trait has no
+/// temporal dynamics, so `cov(trait_t, trait_{t-1}) = trait`. The
+/// state lagged covariance remains `exp(a Δt) p` (Eq. 3–4). The
+/// scalar sum is `trait + exp(a Δt) p`. Evolving the summed variance
+/// as if it were all state is not this map. This is not RI-CLPM.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_lagged_latent_covariance`]. Returns
+/// [`PsychometricError::InvalidNumericInput`] when the trait variance
+/// is negative or non-finite or the sum overflows.
+pub fn recover_trait_plus_state_lagged_covariance(
+    trait_variance: f64,
+    state_prior_variance: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !trait_variance.is_finite() || trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let state_lagged = recover_discrete_lagged_latent_covariance(
+        state_prior_variance,
+        log_rate,
+        event_delta,
+        clock,
+    )?;
+    if trait_variance == 0.0 {
+        return Ok(state_lagged);
+    }
+    require_finite(trait_variance + state_lagged)
+}
+
+/// Refuse treating Driver §4.3 trait variance as process noise.
+///
+/// A stable trait has `DIFFUSION` fixed to zero. The ctsem
+/// `TRAITVAR` rewrite that adds the trait to `DIFFUSION` is not a
+/// license to treat trait variance as `Q_Δt`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::TraitVarianceIsNotProcessNoise`].
+pub fn refuse_trait_variance_as_process_noise(
+    trait_variance: f64,
+    process_noise: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (trait_variance, process_noise);
+    Err(PsychometricError::TraitVarianceIsNotProcessNoise)
+}
+
+/// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.
+///
+/// Trait variance is time-invariant between-subject variance. The
+/// stationary within-subject variance is the `Δt → ∞` limit of Eq. 4.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TraitVarianceIsNotStationaryWithinSubject`].
+pub fn refuse_trait_variance_as_stationary_within_subject(
+    trait_variance: f64,
+    stationary_state_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (trait_variance, stationary_state_variance);
+    Err(PsychometricError::TraitVarianceIsNotStationaryWithinSubject)
+}
+
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5):
@@ -928,11 +1033,13 @@ mod tests {
         recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
         recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_irregular_centered_residual_log_rate, recover_local_log_rate,
-        recover_stationary_latent_variance, recover_within_residual_event_time_log_rate,
+        recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_difference_quotient_as_local_rate,
         refuse_finite_interval_process_noise_as_stationary_variance,
         refuse_pooled_discrete_lag_across_unequal_intervals,
-        refuse_process_noise_as_unconditional_variance,
+        refuse_process_noise_as_unconditional_variance, refuse_trait_variance_as_process_noise,
+        refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
     };
     use crate::error::PsychometricError;
@@ -1682,6 +1789,127 @@ mod tests {
         assert!(!(-0.5 * 1e308_f64 / -1e-10_f64).is_finite());
         assert_eq!(
             recover_stationary_latent_variance(1e308, -1e-10, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn trait_plus_state_recovers_driver_section_four_point_three() {
+        let trait_variance = 1.5_f64;
+        let diffusion = 0.4_f64;
+        let drift = -0.5_f64;
+        let delta = 1.0_f64;
+        let state = recover_stationary_latent_variance(diffusion, drift, LagClock::EventTime)
+            .expect("state");
+        let total = recover_trait_plus_state_latent_variance(trait_variance, state).expect("sum");
+        assert!((total - (trait_variance + state)).abs() < 1e-15);
+        let lagged = recover_trait_plus_state_lagged_covariance(
+            trait_variance,
+            state,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("lagged");
+        let state_lagged =
+            recover_discrete_lagged_latent_covariance(state, drift, delta, LagClock::EventTime)
+                .expect("state lagged");
+        assert!((lagged - (trait_variance + state_lagged)).abs() < 1e-15);
+        // Evolving the summed variance as if it were all state is not
+        // the trait-plus-state map (Driver §4.3; Hamaker et al., 2015).
+        let evolved_as_state =
+            recover_discrete_latent_variance(total, diffusion, drift, delta, LagClock::EventTime)
+                .expect("wrong");
+        let evolved_state =
+            recover_discrete_latent_variance(state, diffusion, drift, delta, LagClock::EventTime)
+                .expect("state evolved");
+        let evolved_right =
+            recover_trait_plus_state_latent_variance(trait_variance, evolved_state).expect("right");
+        assert!((evolved_right - total).abs() < 1e-12);
+        assert!((evolved_as_state - evolved_right).abs() > 1e-3);
+        assert_eq!(
+            recover_trait_plus_state_latent_variance(0.0, state),
+            Ok(state)
+        );
+        assert_eq!(
+            recover_trait_plus_state_latent_variance(trait_variance, 0.0),
+            Ok(trait_variance)
+        );
+        assert_eq!(
+            recover_trait_plus_state_lagged_covariance(
+                0.0,
+                state,
+                drift,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(state_lagged)
+        );
+        assert_eq!(
+            recover_trait_plus_state_lagged_covariance(
+                trait_variance,
+                0.0,
+                drift,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(trait_variance)
+        );
+        let process_noise =
+            recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime)
+                .expect("q_dt");
+        assert_eq!(
+            refuse_trait_variance_as_process_noise(trait_variance, process_noise),
+            Err(PsychometricError::TraitVarianceIsNotProcessNoise)
+        );
+        assert_eq!(
+            refuse_trait_variance_as_stationary_within_subject(trait_variance, state),
+            Err(PsychometricError::TraitVarianceIsNotStationaryWithinSubject)
+        );
+    }
+
+    #[test]
+    fn trait_plus_state_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_trait_plus_state_latent_variance(-0.1, 0.4),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_trait_plus_state_latent_variance(0.4, -0.1),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_trait_plus_state_latent_variance(f64::NAN, 0.4),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_trait_plus_state_latent_variance(0.4, f64::NAN),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_trait_plus_state_latent_variance(1e308, 1e308),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_trait_plus_state_lagged_covariance(-0.1, 0.4, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_trait_plus_state_lagged_covariance(
+                f64::NAN,
+                0.4,
+                -0.5,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_trait_plus_state_lagged_covariance(0.4, 0.4, -0.5, 1.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_trait_plus_state_lagged_covariance(1e308, 1e308, 0.0, 1.0, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }

@@ -10,11 +10,13 @@ use psychometric_core::{
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
-    recover_stationary_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_difference_quotient_as_local_rate,
     refuse_finite_interval_process_noise_as_stationary_variance,
     refuse_pooled_discrete_lag_across_unequal_intervals,
-    refuse_process_noise_as_unconditional_variance,
+    refuse_process_noise_as_unconditional_variance, refuse_trait_variance_as_process_noise,
+    refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
 };
 
@@ -699,6 +701,80 @@ fn stationary_variance_recovers_driver_equation_four_asymptote() {
     assert_eq!(
         recover_stationary_latent_variance(1e308, -1e-10, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn trait_plus_state_recovers_driver_section_four_point_three() {
+    let trait_variance = 1.5_f64;
+    let diffusion = 0.4_f64;
+    let drift = -0.5_f64;
+    let delta = 1.0_f64;
+    let state =
+        recover_stationary_latent_variance(diffusion, drift, LagClock::EventTime).expect("state");
+    let total = recover_trait_plus_state_latent_variance(trait_variance, state).expect("sum");
+    let expected_total = trait_variance + state;
+    let error = rmse(&[expected_total], &[total]);
+    assert!(error < 1e-15, "Driver §4.3 trait+state RMSE {error}");
+    let lagged = recover_trait_plus_state_lagged_covariance(
+        trait_variance,
+        state,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("lagged");
+    let state_lagged =
+        recover_discrete_lagged_latent_covariance(state, drift, delta, LagClock::EventTime)
+            .expect("state lagged");
+    let lagged_error = rmse(&[trait_variance + state_lagged], &[lagged]);
+    assert!(
+        lagged_error < 1e-15,
+        "Driver §4.3 trait+state lagged RMSE {lagged_error}"
+    );
+    let evolved_as_state =
+        recover_discrete_latent_variance(total, diffusion, drift, delta, LagClock::EventTime)
+            .expect("wrong");
+    let evolved_state =
+        recover_discrete_latent_variance(state, diffusion, drift, delta, LagClock::EventTime)
+            .expect("state evolved");
+    let evolved_right =
+        recover_trait_plus_state_latent_variance(trait_variance, evolved_state).expect("right");
+    let right_error = rmse(&[total], &[evolved_right]);
+    assert!(
+        right_error < 1e-12,
+        "trait + stationary state must stay invariant: RMSE {right_error}"
+    );
+    let collapsed = rmse(&[evolved_right], &[evolved_as_state]);
+    assert!(
+        collapsed > error,
+        "evolving trait+state as all-state is not Driver §4.3: collapsed RMSE {collapsed} must exceed {error}"
+    );
+    let process_noise =
+        recover_discrete_process_noise(diffusion, drift, delta, LagClock::EventTime).expect("q_dt");
+    assert_eq!(
+        refuse_trait_variance_as_process_noise(trait_variance, process_noise),
+        Err(PsychometricError::TraitVarianceIsNotProcessNoise)
+    );
+    assert_eq!(
+        refuse_trait_variance_as_stationary_within_subject(trait_variance, state),
+        Err(PsychometricError::TraitVarianceIsNotStationaryWithinSubject)
+    );
+    assert_eq!(
+        recover_trait_plus_state_latent_variance(0.0, state),
+        Ok(state)
+    );
+    assert_eq!(
+        recover_trait_plus_state_latent_variance(trait_variance, 0.0),
+        Ok(trait_variance)
+    );
+    assert_eq!(
+        recover_trait_plus_state_lagged_covariance(1e308, 1e308, 0.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_trait_plus_state_lagged_covariance(0.4, 0.4, -0.5, 1.0, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
     );
 }
 
