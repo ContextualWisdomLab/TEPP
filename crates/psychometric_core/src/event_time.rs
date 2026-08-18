@@ -562,7 +562,10 @@ pub fn recover_discrete_lagged_latent_covariance(
 /// overflows at a finite `z = 2 (a Δt)`, rewrite as
 /// `exp(ln p + z) + Q_Δt`. An overflowing rewrite fails closed.
 /// A finite `exp(z) p` whose sum with `Q_Δt` overflows fails closed.
-/// The JSS article has no numbered §2.2.
+/// A zero diffusion skips the process-noise `z → +∞` refusal; the
+/// carried term `exp(2 a Δt) p` is then still non-finite when
+/// `2 (a Δt)` overflows to `+∞` (`p = 2`, `q = 0`, `a = 1e308`,
+/// `Δt = 2`) and fails closed. The JSS article has no numbered §2.2.
 ///
 /// # Errors
 ///
@@ -1447,6 +1450,12 @@ mod tests {
         );
         assert_eq!(
             recover_discrete_latent_variance(2.0, 1.0, 1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        // Zero diffusion is exactly Q_Δt = 0 (Driver Eq. 3). That skip
+        // does not license exp(2 a Δt) p when 2 (a Δt) overflows to +∞.
+        assert_eq!(
+            recover_discrete_latent_variance(2.0, 0.0, 1e308, 2.0, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(

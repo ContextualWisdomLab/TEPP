@@ -635,6 +635,12 @@ fn discrete_latent_variance_recovers_driver_equations_three_and_four() {
         recover_discrete_latent_variance(1e308, 1e308, 0.0, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
+    // Zero diffusion skips process-noise z→+∞. exp(2 a Δt) p is then
+    // non-finite (Driver Eq. 3–4).
+    assert_eq!(
+        recover_discrete_latent_variance(2.0, 0.0, 1e308, 2.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
 }
 
 #[test]
