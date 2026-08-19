@@ -5,16 +5,17 @@
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
 //! scientific crates; this crate only defines fail-closed interchange shapes.
-//! naruon HTTP interchange is a versioned `https` POST to analysis-run and
-//! export paths; table-access URLs, review/Copilot/NIM/proxy headers, and
-//! lexical inference claims fail closed. A loopback live listener proves
-//! those POSTs over TCP without claiming production TLS (ADR 0011).
+//! Naruon and LineageWeave use the versioned analysis-run contract; Naruon also
+//! owns the current purpose-bound export adapter. Loopback listeners prove the
+//! HTTP boundary without claiming production TLS or completed model results.
 
 mod analysis_run;
+mod analysis_run_live;
 mod authorization;
 mod envelope;
 mod error;
 mod export;
+mod lineageweave_http;
 mod naruon_http;
 mod naruon_live;
 mod wire;
@@ -29,6 +30,8 @@ pub use analysis_run::AnalysisRunRequest;
 pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 /// Idempotent request equality helper.
 pub use analysis_run::requests_are_idempotent_matches;
+/// Consumer-neutral loopback analysis-run service.
+pub use analysis_run_live::AnalysisRunLiveService;
 /// Content-redacting error envelope.
 pub use envelope::ErrorEnvelope;
 /// Fail-closed API errors.
@@ -52,19 +55,25 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
-/// Versioned analysis-run path naruon may call.
+/// Published LineageWeave modular-consumer identity.
+pub use lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
+/// Published Naruon modular-consumer identity.
+pub use lineageweave_http::NARUON_CONSUMER_CODE;
+/// Build a credential-free LineageWeave analysis-run exchange.
+pub use lineageweave_http::lineageweave_analysis_run_exchange;
+/// Versioned analysis-run path modular consumers may call.
 pub use naruon_http::NARUON_ANALYSIS_RUN_PATH;
-/// Versioned export path naruon may call.
+/// Versioned export path Naruon may call.
 pub use naruon_http::NARUON_EXPORT_PATH;
-/// Allowed TEPP inference method code naruon may claim.
+/// Allowed TEPP inference method code Naruon may claim.
 pub use naruon_http::NARUON_TEPP_INFERENCE_METHOD;
-/// Fail-closed HTTP exchange naruon may send to TEPP.
+/// Fail-closed HTTP exchange a modular consumer may send to TEPP.
 pub use naruon_http::NaruonHttpExchange;
-/// Build a naruon analysis-run create exchange.
+/// Build a Naruon analysis-run create exchange.
 pub use naruon_http::naruon_analysis_run_exchange;
-/// Build an analysis-run exchange and refuse credential headers.
+/// Build a Naruon analysis-run exchange and refuse credential headers.
 pub use naruon_http::naruon_analysis_run_exchange_with_headers;
-/// Build a naruon export-authorization exchange.
+/// Build a Naruon export-authorization exchange.
 pub use naruon_http::naruon_export_exchange;
 /// Refuse lexical heuristics as TEPP inference claims.
 pub use naruon_http::naruon_may_claim_tepp_inference;
@@ -74,7 +83,7 @@ pub use naruon_live::NARUON_LIVE_HEADER_BYTE_LIMIT;
 pub use naruon_live::NARUON_LIVE_HEADER_COUNT_LIMIT;
 /// Accepted-stream read/write deadline.
 pub use naruon_live::NARUON_LIVE_IO_TIMEOUT;
-/// HTTP/1.1 response from the naruon live listener.
+/// HTTP/1.1 response from the loopback listener.
 pub use naruon_live::NaruonLiveResponse;
-/// Loopback live HTTP/1.1 service for naruon POSTs.
+/// Backward-compatible Naruon loopback HTTP/1.1 service.
 pub use naruon_live::NaruonLiveService;

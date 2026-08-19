@@ -3,8 +3,8 @@
 use std::fmt::Write as _;
 
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunRequest,
-    LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NaruonLiveService,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService,
+    AnalysisRunRequest, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH,
     lineageweave_analysis_run_exchange,
 };
 
@@ -65,7 +65,7 @@ fn lineageweave_exchange_uses_the_published_consumer_header_without_credentials(
 #[test]
 fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     let run = sample_run();
-    let mut service = NaruonLiveService::new();
+    let mut service = AnalysisRunLiveService::new();
 
     let naruon = service.handle_http_request(&http_request("naruon", &run));
     let lineageweave = service.handle_http_request(&http_request(
@@ -92,7 +92,7 @@ fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
 
 #[test]
 fn live_listener_refuses_an_unpublished_consumer() {
-    let mut service = NaruonLiveService::new();
+    let mut service = AnalysisRunLiveService::new();
     let response = service.handle_http_request(&http_request("unpublished-consumer", &sample_run()));
     assert_eq!(response.status_code, 400);
 }
