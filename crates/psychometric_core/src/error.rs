@@ -80,6 +80,15 @@ pub enum PsychometricError {
     /// lagged observed-indicator covariance. Independent `ε` does
     /// not enter `cov(y_t, y_{t-1})`.
     MeasurementErrorIsNotLaggedObservedCovariance,
+    /// Driver Eq. 5 `MANIFESTMEANS` was treated as `E(y)`. Table 2
+    /// (p. 12) names `τ` the expected intercept `Γ`, not `τ + λ μ`.
+    ManifestMeansIsNotObservedMean,
+    /// Driver Eq. 5 latent mean was treated as `E(y)`. `E(η)` is
+    /// not `τ + λ E(η)`.
+    LatentMeanIsNotObservedMean,
+    /// Driver Table 2 `CINT` was treated as `MANIFESTMEANS`. `κ` is
+    /// the latent continuous intercept, not the expected `Γ`.
+    ContinuousInterceptIsNotManifestMeans,
 }
 
 impl fmt::Display for PsychometricError {
@@ -146,6 +155,13 @@ impl fmt::Display for PsychometricError {
             }
             Self::MeasurementErrorIsNotLaggedObservedCovariance => {
                 "measurement-error variance is not the lagged observed-indicator covariance"
+            }
+            Self::ManifestMeansIsNotObservedMean => {
+                "manifest means are not the observed-indicator mean"
+            }
+            Self::LatentMeanIsNotObservedMean => "latent mean is not the observed-indicator mean",
+            Self::ContinuousInterceptIsNotManifestMeans => {
+                "continuous intercept is not the manifest mean"
             }
         };
         formatter.write_str(message)
@@ -267,6 +283,18 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotLaggedObservedCovariance.to_string(),
             "measurement-error variance is not the lagged observed-indicator covariance"
+        );
+        assert_eq!(
+            PsychometricError::ManifestMeansIsNotObservedMean.to_string(),
+            "manifest means are not the observed-indicator mean"
+        );
+        assert_eq!(
+            PsychometricError::LatentMeanIsNotObservedMean.to_string(),
+            "latent mean is not the observed-indicator mean"
+        );
+        assert_eq!(
+            PsychometricError::ContinuousInterceptIsNotManifestMeans.to_string(),
+            "continuous intercept is not the manifest mean"
         );
     }
 }

@@ -10,13 +10,14 @@ use psychometric_core::{
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_variance,
-    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
     refuse_finite_interval_process_noise_as_stationary_variance,
-    refuse_latent_lagged_covariance_as_observed_covariance,
-    refuse_latent_variance_as_observed_variance,
+    refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
+    refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
     refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
@@ -939,6 +940,61 @@ fn manifest_lagged_observed_covariance_recovers_driver_equation_five() {
     );
     assert_eq!(
         recover_manifest_lagged_observed_covariance(1e308, 1.0, 0.0),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn manifest_observed_mean_recovers_driver_equation_five() {
+    let loading = 2.0_f64;
+    let latent_mean = 0.4_f64;
+    let manifest_mean = 0.5_f64;
+    let observed =
+        recover_manifest_observed_mean(loading, latent_mean, manifest_mean).expect("eq5-mean");
+    let expected = loading * latent_mean + manifest_mean;
+    let error = rmse(&[expected], &[observed]);
+    assert!(error < 1e-15, "Driver Eq. 5 observed mean RMSE {error}");
+    let intercept_error = rmse(&[expected], &[manifest_mean]);
+    assert!(
+        intercept_error > error,
+        "MANIFESTMEANS is not E(y): RMSE {intercept_error} must exceed {error}"
+    );
+    let latent_error = rmse(&[expected], &[latent_mean]);
+    assert!(
+        latent_error > error,
+        "E(η) is not E(y): RMSE {latent_error} must exceed {error}"
+    );
+    let without_loading =
+        recover_manifest_observed_mean(0.0, latent_mean, manifest_mean).expect("lambda0");
+    let dropped_error = rmse(&[expected], &[without_loading]);
+    assert!(
+        dropped_error > error,
+        "zero loading is τ, not τ + λμ: RMSE {dropped_error} must exceed {error}"
+    );
+    assert_eq!(
+        refuse_manifest_means_as_observed_mean(manifest_mean, observed),
+        Err(PsychometricError::ManifestMeansIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_latent_mean_as_observed_mean(latent_mean, observed),
+        Err(PsychometricError::LatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_continuous_intercept_as_manifest_means(0.3, manifest_mean),
+        Err(PsychometricError::ContinuousInterceptIsNotManifestMeans)
+    );
+    let scaled = recover_manifest_observed_mean(1e308, 1e-308, 0.0).expect("scale");
+    assert!(
+        (scaled - 1.0).abs() < 1e-15,
+        "Driver Eq. 5 λμ must keep λ=1e308, μ=1e-308: got {scaled}"
+    );
+    let finite_loaded = recover_manifest_observed_mean(1e308, 1.0, 0.0).expect("lambda-mu");
+    assert!(
+        (finite_loaded - 1e308).abs() / 1e308 < 1e-15,
+        "Driver Eq. 5 mean is λμ, not λ²: got {finite_loaded}"
+    );
+    assert_eq!(
+        recover_manifest_observed_mean(1e308, 2.0, 0.0),
         Err(PsychometricError::InvalidNumericInput)
     );
 }

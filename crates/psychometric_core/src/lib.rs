@@ -26,7 +26,9 @@
 //! `MANIFESTTRAITVAR` is zero, else `λ² Var(η) + θ + ψ`; Table 2,
 //! p. 12: `MANIFESTVAR` is `Θ`, not `Var(y)`; `MANIFESTTRAITVAR` is
 //! not `MANIFESTVAR`; lagged observed covariance is
-//! `λ² cov(η_t, η_{t-1}) + ψ` and does not include `Θ`; Equation 1
+//! `λ² cov(η_t, η_{t-1}) + ψ` and does not include `Θ`; the
+//! observed-indicator mean is `τ + λ μ` (`MANIFESTMEANS` is `τ`,
+//! not `E(y)`; `CINT` is not `MANIFESTMEANS`; Equation 1
 //! is the SDE),
 //! and refuses
 //! latent-mean comparison below strong invariance.
@@ -100,6 +102,8 @@ pub use event_time::recover_irregular_centered_residual_log_rate;
 pub use event_time::recover_local_log_rate;
 /// Exact scalar lagged observed-indicator covariance `λ² cov(η) + ψ`.
 pub use event_time::recover_manifest_lagged_observed_covariance;
+/// Exact scalar observed-indicator mean `τ + λ μ`.
+pub use event_time::recover_manifest_observed_mean;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ`.
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
@@ -112,14 +116,20 @@ pub use event_time::recover_trait_plus_state_lagged_covariance;
 pub use event_time::recover_trait_plus_state_latent_variance;
 /// CWC-then-event-time local log-rate (not DSEM; not raw-process AR drift).
 pub use event_time::recover_within_residual_event_time_log_rate;
+/// Refuse treating Driver Table 2 `CINT` as `MANIFESTMEANS`.
+pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
+/// Refuse treating Driver Eq. 5 latent mean as `E(y)`.
+pub use event_time::refuse_latent_mean_as_observed_mean;
 /// Refuse treating Driver Eq. 5 latent variance as `Var(y)`.
 pub use event_time::refuse_latent_variance_as_observed_variance;
+/// Refuse treating Driver Eq. 5 `MANIFESTMEANS` as `E(y)`.
+pub use event_time::refuse_manifest_means_as_observed_mean;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.
 pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
 /// Refuse treating Driver Eq. 5 measurement error as lagged observed covariance.

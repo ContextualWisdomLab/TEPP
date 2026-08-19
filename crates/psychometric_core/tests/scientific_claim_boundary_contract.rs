@@ -7,12 +7,13 @@ use psychometric_core::{
     recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_variance,
-    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_stationary_latent_variance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate, refuse_continuous_intercept_as_manifest_means,
     refuse_finite_interval_process_noise_as_stationary_variance,
-    refuse_latent_lagged_covariance_as_observed_covariance,
-    refuse_latent_variance_as_observed_variance,
+    refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
+    refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
     refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance, refuse_process_noise_as_unconditional_variance,
@@ -409,5 +410,39 @@ fn lagged_latent_covariance_and_measurement_error_are_not_lagged_observed_covari
     assert_eq!(
         refuse_measurement_error_as_lagged_observed_covariance(measurement_error, observed),
         Err(psychometric_core::PsychometricError::MeasurementErrorIsNotLaggedObservedCovariance)
+    );
+}
+
+#[test]
+fn manifest_means_and_latent_mean_are_not_observed_mean() {
+    let loading = 2.0_f64;
+    let latent_mean = 0.4_f64;
+    let manifest_mean = 0.5_f64;
+    let continuous_intercept = 0.3_f64;
+    let observed =
+        recover_manifest_observed_mean(loading, latent_mean, manifest_mean).expect("eq5-mean");
+    assert!(
+        (manifest_mean - observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 / Table 2 p. 12): MANIFESTMEANS is not E(y)"
+    );
+    assert!(
+        (latent_mean - observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): E(η) is not E(y)"
+    );
+    assert!(
+        (continuous_intercept - manifest_mean).abs() > 1e-3,
+        "Driver et al. (2017, Table 2 p. 12): CINT is not MANIFESTMEANS"
+    );
+    assert_eq!(
+        refuse_manifest_means_as_observed_mean(manifest_mean, observed),
+        Err(psychometric_core::PsychometricError::ManifestMeansIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_latent_mean_as_observed_mean(latent_mean, observed),
+        Err(psychometric_core::PsychometricError::LatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_continuous_intercept_as_manifest_means(continuous_intercept, manifest_mean),
+        Err(psychometric_core::PsychometricError::ContinuousInterceptIsNotManifestMeans)
     );
 }

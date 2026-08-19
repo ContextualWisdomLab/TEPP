@@ -34,7 +34,9 @@
 //! `MANIFESTTRAITVAR` is not `MANIFESTVAR`, `TRAITVAR` is latent
 //! (scaled by `λ²`), and `Var(η)` is not `Var(y)`. The lagged
 //! observed covariance is `λ² cov(η_t, η_{t-1}) + ψ`; `Θ` does not
-//! enter. The JSS article
+//! enter. The scalar observed mean is `τ + λ μ` (Table 2, p. 12:
+//! `MANIFESTMEANS` is `τ`, not `E(y)`; `CINT` is `κ`, not `τ`;
+//! `T0MEANS` is the initial latent mean, not `E(y)`). The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -1023,6 +1025,93 @@ pub fn refuse_measurement_error_as_lagged_observed_covariance(
     Err(PsychometricError::MeasurementErrorIsNotLaggedObservedCovariance)
 }
 
+/// Exact scalar observed-indicator mean from Driver Equation 5.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Table 2, p. 12; JSS
+/// PDF re-opened 2026-08-19T14:08Z) write `y_i(t) = Γ + Λ η_i(t) +
+/// ζ_i(t)` with `ζ ~ N(0, Θ)` and `Γ ~ N(τ, Ψ)`. The expected
+/// intercept is `τ`. Table 2 names `τ` `MANIFESTMEANS`. The scalar
+/// map is `E(y) = τ + λ μ`. Form `λ μ` then add `τ`. A zero loading
+/// or zero latent mean is exactly `τ`. A zero intercept is exactly
+/// `λ μ`. `MANIFESTMEANS` is not `E(y)`. `E(η)` is not `E(y)`.
+/// `CINT` `κ` is the latent continuous intercept from Equation 1,
+/// not `τ`. `T0MEANS` is the initial latent mean, not `E(y)`. An
+/// overflowing product or sum fails closed. This is not a Kalman
+/// filter and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::InvalidNumericInput`] when the loading,
+/// latent mean, or intercept is non-finite, or the mapped mean is
+/// non-finite.
+pub fn recover_manifest_observed_mean(
+    loading: f64,
+    latent_mean: f64,
+    manifest_mean: f64,
+) -> Result<f64, PsychometricError> {
+    if !loading.is_finite() || !latent_mean.is_finite() || !manifest_mean.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if loading == 0.0 || latent_mean == 0.0 {
+        return Ok(manifest_mean);
+    }
+    let explained = require_finite(loading * latent_mean)?;
+    if manifest_mean == 0.0 {
+        return Ok(explained);
+    }
+    require_finite(explained + manifest_mean)
+}
+
+/// Refuse treating Driver Eq. 5 `MANIFESTMEANS` as `E(y)`.
+///
+/// Table 2 (p. 12) names `τ` the expected intercept `Γ`. Equation 5
+/// maps `E(y) = τ + λ μ`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::ManifestMeansIsNotObservedMean`].
+pub fn refuse_manifest_means_as_observed_mean(
+    manifest_mean: f64,
+    observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (manifest_mean, observed_mean);
+    Err(PsychometricError::ManifestMeansIsNotObservedMean)
+}
+
+/// Refuse treating Driver Eq. 5 latent mean as `E(y)`.
+///
+/// `E(η)` is the latent process mean. Equation 5 maps `E(y) = τ + λ μ`.
+/// `T0MEANS` is that latent mean at the first occasion, not `E(y)`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::LatentMeanIsNotObservedMean`].
+pub fn refuse_latent_mean_as_observed_mean(
+    latent_mean: f64,
+    observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (latent_mean, observed_mean);
+    Err(PsychometricError::LatentMeanIsNotObservedMean)
+}
+
+/// Refuse treating Driver Table 2 `CINT` as `MANIFESTMEANS`.
+///
+/// Table 2 (p. 12) names `κ` `CINT`, the latent continuous intercept
+/// from Equation 1, and `τ` `MANIFESTMEANS`, the expected `Γ` from
+/// Equation 5. `κ` is not `τ`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ContinuousInterceptIsNotManifestMeans`].
+pub fn refuse_continuous_intercept_as_manifest_means(
+    continuous_intercept: f64,
+    manifest_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (continuous_intercept, manifest_mean);
+    Err(PsychometricError::ContinuousInterceptIsNotManifestMeans)
+}
+
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5):
@@ -1277,13 +1366,15 @@ mod tests {
         recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
         recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_irregular_centered_residual_log_rate, recover_local_log_rate,
-        recover_manifest_lagged_observed_covariance, recover_manifest_observed_variance,
-        recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+        recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+        recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+        recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+        refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
         refuse_finite_interval_process_noise_as_stationary_variance,
         refuse_latent_lagged_covariance_as_observed_covariance,
-        refuse_latent_variance_as_observed_variance,
+        refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
+        refuse_manifest_means_as_observed_mean,
         refuse_manifest_trait_variance_as_measurement_error,
         refuse_measurement_error_as_lagged_observed_covariance,
         refuse_measurement_error_as_observed_variance,
@@ -2833,5 +2924,73 @@ mod tests {
             recover_manifest_lagged_observed_covariance(1e308, 1e-308, 1e308),
             Err(PsychometricError::InvalidNumericInput)
         );
+    }
+
+    #[test]
+    fn manifest_observed_mean_recovers_driver_equation_five() {
+        let loading = 2.0_f64;
+        let latent_mean = 0.4_f64;
+        let manifest_mean = 0.5_f64;
+        let recovered =
+            recover_manifest_observed_mean(loading, latent_mean, manifest_mean).expect("eq5-mean");
+        let expected = loading * latent_mean + manifest_mean;
+        assert!((recovered - expected).abs() < 1e-15);
+        assert!((recovered - 1.3).abs() < 1e-15);
+        assert_eq!(
+            recover_manifest_observed_mean(loading, latent_mean, 0.0),
+            Ok(0.8)
+        );
+        assert_eq!(
+            recover_manifest_observed_mean(0.0, latent_mean, manifest_mean),
+            Ok(manifest_mean)
+        );
+        assert_eq!(
+            recover_manifest_observed_mean(loading, 0.0, manifest_mean),
+            Ok(manifest_mean)
+        );
+        assert_eq!(recover_manifest_observed_mean(-2.0, 0.5, 1.0), Ok(0.0));
+        assert_eq!(
+            refuse_manifest_means_as_observed_mean(manifest_mean, recovered),
+            Err(PsychometricError::ManifestMeansIsNotObservedMean)
+        );
+        assert_eq!(
+            refuse_latent_mean_as_observed_mean(latent_mean, recovered),
+            Err(PsychometricError::LatentMeanIsNotObservedMean)
+        );
+        assert_eq!(
+            refuse_continuous_intercept_as_manifest_means(0.3, manifest_mean),
+            Err(PsychometricError::ContinuousInterceptIsNotManifestMeans)
+        );
+        let scaled = recover_manifest_observed_mean(1e308, 1e-308, 0.0).expect("scale");
+        assert!((scaled - 1.0).abs() < 1e-15);
+        let finite_loaded = recover_manifest_observed_mean(1e308, 1.0, 0.0).expect("lambda-mu");
+        assert!((finite_loaded - 1e308).abs() / 1e308 < 1e-15);
+        assert!(!(1e308_f64 * 1e308_f64).is_finite());
+    }
+
+    #[test]
+    fn manifest_observed_mean_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_manifest_observed_mean(f64::NAN, 0.4, 0.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_mean(2.0, f64::NAN, 0.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_mean(2.0, 0.4, f64::NAN),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_mean(1e308, 2.0, 0.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_mean(1.0, 1e308, 1e308),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(recover_manifest_observed_mean(0.0, 1e308, 0.5), Ok(0.5));
+        assert_eq!(recover_manifest_observed_mean(1e308, 0.0, 0.5), Ok(0.5));
     }
 }
