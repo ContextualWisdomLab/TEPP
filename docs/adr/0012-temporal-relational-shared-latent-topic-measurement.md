@@ -1,7 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — logistic-normal additive log-ratio coordinates, sequential Egozcue isometric log-ratio coordinates, and lexical-weight refusal are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; temporal topic identity, backend STM estimator, method-effect model, and K-selection remain accepted-target  
+**Implementation maturity:** partial — logistic-normal additive log-ratio coordinates, sequential Egozcue isometric log-ratio coordinates, and lexical-weight refusal are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; temporal topic identity, backend STM estimator, method-effect model, and K-selection remain accepted-target
 **Date:** 2026-08-12  
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
