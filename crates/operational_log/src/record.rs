@@ -1,35 +1,86 @@
 //! Operational-log records bound to opaque analytical subjects.
 
 use crate::OperationalLogError;
+use uuid::Uuid;
+
+/// Closed action vocabulary for operational-log records.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u16)]
+pub enum ActionCode {
+    /// Read an analytical artifact through an authorized path.
+    AnalyticalRead = 1,
+    /// Write an analytical artifact through an authorized path.
+    AnalyticalWrite = 2,
+    /// Refuse an unauthorized analytical operation.
+    AnalyticalReject = 3,
+}
+
+/// Opaque analytical subject generated independently from source identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AnalyticalSubject(Uuid);
+
+impl AnalyticalSubject {
+    /// Generate a fresh opaque subject identifier.
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Uuid::now_v7())
+    }
+}
+
+/// Source identity that must never become an operational-log subject.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SourceIdentity(Uuid);
+
+impl SourceIdentity {
+    /// Construct a source-identity token for a refusal-path test or boundary.
+    #[must_use]
+    pub fn new() -> Self {
+        Self(Uuid::now_v7())
+    }
+}
 
 /// One operational-log line without source text or source identity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OperationalLogRecord {
-    action_code: u16,
-    analytical_subject: u128,
+    action_code: ActionCode,
+    analytical_subject: AnalyticalSubject,
     system_time_seconds: i64,
 }
 
 impl OperationalLogRecord {
-    /// Record an action against an opaque analytical subject.
-    #[must_use]
-    pub const fn new(action_code: u16, analytical_subject: u128, system_time_seconds: i64) -> Self {
-        Self {
+    /// Construct a record only after source-separation authorization checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-separation or blanket-mask error when prohibited
+    /// payloads or authorization intent are supplied.
+    pub fn try_record(
+        action_code: ActionCode,
+        analytical_subject: AnalyticalSubject,
+        system_time_seconds: i64,
+        source_text: Option<&str>,
+        source_identity: Option<SourceIdentity>,
+        blanket_mask_requested: bool,
+    ) -> Result<Self, OperationalLogError> {
+        refuse_source_text_in_log(source_text)?;
+        refuse_source_identity_in_log(source_identity)?;
+        refuse_blanket_mask_as_log_grant(blanket_mask_requested)?;
+        Ok(Self {
             action_code,
             analytical_subject,
             system_time_seconds,
-        }
+        })
     }
 
     /// Closed action code, never source text.
     #[must_use]
-    pub const fn action_code(self) -> u16 {
+    pub const fn action_code(self) -> ActionCode {
         self.action_code
     }
 
     /// Opaque analytical subject, never a source identity.
     #[must_use]
-    pub const fn analytical_subject(self) -> u128 {
+    pub const fn analytical_subject(self) -> AnalyticalSubject {
         self.analytical_subject
     }
 
@@ -45,11 +96,17 @@ impl OperationalLogRecord {
 /// # Errors
 ///
 /// Returns [`OperationalLogError::InvalidLogPayload`] when no records are
-/// supplied.
+/// supplied or system time decreases between adjacent records.
 pub fn replay_operational_log(
     records: &[OperationalLogRecord],
 ) -> Result<Vec<OperationalLogRecord>, OperationalLogError> {
     if records.is_empty() {
+        return Err(OperationalLogError::InvalidLogPayload);
+    }
+    if records
+        .windows(2)
+        .any(|pair| pair[1].system_time_seconds < pair[0].system_time_seconds)
+    {
         return Err(OperationalLogError::InvalidLogPayload);
     }
     Ok(records.to_vec())
@@ -60,8 +117,12 @@ pub fn replay_operational_log(
 /// # Errors
 ///
 /// Always returns [`OperationalLogError::SourceTextNotLoggable`].
-pub fn refuse_source_text_in_log() -> Result<(), OperationalLogError> {
-    Err(OperationalLogError::SourceTextNotLoggable)
+pub fn refuse_source_text_in_log(source_text: Option<&str>) -> Result<(), OperationalLogError> {
+    if source_text.is_some() {
+        Err(OperationalLogError::SourceTextNotLoggable)
+    } else {
+        Ok(())
+    }
 }
 
 /// Refuse to place source identity in the operational log.
@@ -69,7 +130,24 @@ pub fn refuse_source_text_in_log() -> Result<(), OperationalLogError> {
 /// # Errors
 ///
 /// Always returns [`OperationalLogError::SourceIdentityNotLoggable`].
-pub fn refuse_source_identity_in_log() -> Result<(), OperationalLogError> {
+pub fn refuse_source_identity_in_log(
+    source_identity: Option<SourceIdentity>,
+) -> Result<(), OperationalLogError> {
+    if source_identity.is_some() {
+        Err(OperationalLogError::SourceIdentityNotLoggable)
+    } else {
+        Ok(())
+    }
+}
+
+/// Refuse to reinterpret a source identity as an analytical subject.
+///
+/// # Errors
+///
+/// Always returns [`OperationalLogError::SourceIdentityNotLoggable`].
+pub fn refuse_source_identity_as_subject(
+    _source_identity: SourceIdentity,
+) -> Result<(), OperationalLogError> {
     Err(OperationalLogError::SourceIdentityNotLoggable)
 }
 
@@ -78,8 +156,14 @@ pub fn refuse_source_identity_in_log() -> Result<(), OperationalLogError> {
 /// # Errors
 ///
 /// Always returns [`OperationalLogError::BlanketMaskIsNotAuthorization`].
-pub fn refuse_blanket_mask_as_log_grant() -> Result<(), OperationalLogError> {
-    Err(OperationalLogError::BlanketMaskIsNotAuthorization)
+pub fn refuse_blanket_mask_as_log_grant(
+    blanket_mask_requested: bool,
+) -> Result<(), OperationalLogError> {
+    if blanket_mask_requested {
+        Err(OperationalLogError::BlanketMaskIsNotAuthorization)
+    } else {
+        Ok(())
+    }
 }
 
 /// Fraction of replayed log records that match known truth.
@@ -107,7 +191,8 @@ pub fn log_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        OperationalLogRecord, log_recovery_rate, refuse_blanket_mask_as_log_grant,
+        ActionCode, AnalyticalSubject, OperationalLogRecord, SourceIdentity, log_recovery_rate,
+        refuse_blanket_mask_as_log_grant, refuse_source_identity_as_subject,
         refuse_source_identity_in_log, refuse_source_text_in_log, replay_operational_log,
     };
     use crate::OperationalLogError;
@@ -115,30 +200,79 @@ mod tests {
     #[test]
     fn local_branches_cover_replay_and_fail_closed_paths() {
         let truth = [
-            OperationalLogRecord::new(1, 11, 10),
-            OperationalLogRecord::new(2, 22, 11),
+            OperationalLogRecord::try_record(
+                ActionCode::AnalyticalRead,
+                AnalyticalSubject::new(),
+                10,
+                None,
+                None,
+                false,
+            )
+            .expect("first record"),
+            OperationalLogRecord::try_record(
+                ActionCode::AnalyticalWrite,
+                AnalyticalSubject::new(),
+                11,
+                None,
+                None,
+                false,
+            )
+            .expect("second record"),
         ];
-        assert_eq!(truth[0].action_code(), 1);
-        assert_eq!(truth[0].analytical_subject(), 11);
+        assert_eq!(truth[0].action_code(), ActionCode::AnalyticalRead);
         assert_eq!(truth[0].system_time_seconds(), 10);
         let replayed = replay_operational_log(&truth).expect("replay");
         let matched = log_recovery_rate(&truth, &replayed).expect("rate");
         assert!((matched - 1.0).abs() < f64::EPSILON);
         assert_eq!(
-            refuse_source_text_in_log(),
+            refuse_source_text_in_log(Some("source")),
             Err(OperationalLogError::SourceTextNotLoggable)
         );
         assert_eq!(
-            refuse_source_identity_in_log(),
+            refuse_source_identity_in_log(Some(SourceIdentity::new())),
             Err(OperationalLogError::SourceIdentityNotLoggable)
         );
         assert_eq!(
-            refuse_blanket_mask_as_log_grant(),
+            refuse_blanket_mask_as_log_grant(true),
             Err(OperationalLogError::BlanketMaskIsNotAuthorization)
         );
         assert_eq!(
+            refuse_source_identity_as_subject(SourceIdentity::new()),
+            Err(OperationalLogError::SourceIdentityNotLoggable)
+        );
+        assert!(refuse_source_text_in_log(None).is_ok());
+        assert!(refuse_source_identity_in_log(None).is_ok());
+        assert!(refuse_blanket_mask_as_log_grant(false).is_ok());
+        assert_eq!(
             replay_operational_log(&[]),
             Err(OperationalLogError::InvalidLogPayload)
+        );
+        let reverse = [
+            truth[1],
+            OperationalLogRecord::try_record(
+                ActionCode::AnalyticalRead,
+                AnalyticalSubject::new(),
+                9,
+                None,
+                None,
+                false,
+            )
+            .expect("reverse record"),
+        ];
+        assert_eq!(
+            replay_operational_log(&reverse),
+            Err(OperationalLogError::InvalidLogPayload)
+        );
+        assert_eq!(
+            OperationalLogRecord::try_record(
+                ActionCode::AnalyticalRead,
+                AnalyticalSubject::new(),
+                10,
+                Some("source"),
+                None,
+                false,
+            ),
+            Err(OperationalLogError::SourceTextNotLoggable)
         );
         assert_eq!(
             log_recovery_rate(&[], &[]),

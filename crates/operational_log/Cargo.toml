@@ -13,5 +13,8 @@ keywords.workspace = true
 categories.workspace = true
 publish = false
 
+[dependencies]
+uuid = { workspace = true }
+
 [lints]
 workspace = true

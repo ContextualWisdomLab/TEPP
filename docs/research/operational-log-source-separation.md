@@ -28,10 +28,10 @@ Standardization & International Electrotechnical Commission, 2022). It
 does **not** authorize writing source text into operational logs, and it
 does not certify TEPP.
 
-ISO/IEC 29100 treats data minimization as a privacy-engineering principle
-(International Organization for Standardization & International
-Electrotechnical Commission, 2011). TEPP uses it to keep source text out
-of the log, not as a certification claim.
+ISO/IEC 29100:2024 provides the current privacy framework and treats data
+minimization as a privacy-engineering principle (International Organization
+for Standardization & International Electrotechnical Commission, 2024). TEPP
+uses it to keep source text out of the log, not as a certification claim.
 
 International Organization for Standardization and International
 Electrotechnical Commission. (2022). *Information security, cybersecurity
@@ -39,5 +39,6 @@ and privacy protection—Information security controls* (ISO/IEC Standard No.
 27002:2022).
 
 International Organization for Standardization and International
-Electrotechnical Commission. (2011). *Information technology—Security
-techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011).
+Electrotechnical Commission. (2024). *Information technology—Security
+techniques—Privacy framework* (ISO/IEC Standard No. 29100:2024).
+https://www.iso.org/standard/85938.html
