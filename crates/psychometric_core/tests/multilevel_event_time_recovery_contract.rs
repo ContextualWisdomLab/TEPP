@@ -10,11 +10,14 @@ use psychometric_core::{
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
-    recover_manifest_observed_variance, recover_stationary_latent_variance,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
+    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    refuse_difference_quotient_as_local_rate,
     refuse_finite_interval_process_noise_as_stationary_variance,
-    refuse_latent_variance_as_observed_variance, refuse_measurement_error_as_observed_variance,
+    refuse_latent_variance_as_observed_variance,
+    refuse_manifest_trait_variance_as_measurement_error,
+    refuse_measurement_error_as_observed_variance,
     refuse_pooled_discrete_lag_across_unequal_intervals,
     refuse_process_noise_as_unconditional_variance, refuse_trait_variance_as_process_noise,
     refuse_trait_variance_as_stationary_within_subject,
@@ -792,15 +795,15 @@ fn trait_plus_state_recovers_driver_section_four_point_three() {
 }
 
 #[test]
-fn manifest_observed_variance_recovers_driver_equation_one() {
+fn manifest_observed_variance_recovers_driver_equation_five() {
     let loading = 2.0_f64;
     let latent = 0.4_f64;
     let measurement_error = 0.1_f64;
     let observed =
-        recover_manifest_observed_variance(loading, latent, measurement_error).expect("eq1");
+        recover_manifest_observed_variance(loading, latent, measurement_error).expect("eq5");
     let expected = (loading * latent) * loading + measurement_error;
     let error = rmse(&[expected], &[observed]);
-    assert!(error < 1e-15, "Driver Eq. 1 Var(y) RMSE {error}");
+    assert!(error < 1e-15, "Driver Eq. 5 Var(y) RMSE {error}");
     let collapsed_error = rmse(&[expected], &[measurement_error]);
     let latent_error = rmse(&[expected], &[latent]);
     assert!(
@@ -826,10 +829,73 @@ fn manifest_observed_variance_recovers_driver_equation_one() {
     let scaled = recover_manifest_observed_variance(1e308, 1e-308, 0.0).expect("scale");
     assert!(
         (scaled - 1e308).abs() / 1e308 < 1e-15,
-        "Driver Eq. 1 (λ p)λ must keep λ=1e308, p=1e-308: got {scaled}"
+        "Driver Eq. 5 (λ p)λ must keep λ=1e308, p=1e-308: got {scaled}"
     );
     assert_eq!(
         recover_manifest_observed_variance(1e308, 1.0, 0.0),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn manifest_trait_plus_state_observed_variance_recovers_driver_equation_five() {
+    let loading = 2.0_f64;
+    let latent = 0.4_f64;
+    let measurement_error = 0.1_f64;
+    let manifest_trait = 0.5_f64;
+    let observed = recover_manifest_trait_plus_state_observed_variance(
+        loading,
+        latent,
+        measurement_error,
+        manifest_trait,
+    )
+    .expect("eq5-trait");
+    let expected = (loading * latent) * loading + measurement_error + manifest_trait;
+    let error = rmse(&[expected], &[observed]);
+    assert!(error < 1e-15, "Driver Eq. 5 λ²p+θ+ψ RMSE {error}");
+    let dropped_trait =
+        recover_manifest_observed_variance(loading, latent, measurement_error).expect("psi0");
+    let dropped_error = rmse(&[expected], &[dropped_trait]);
+    assert!(
+        dropped_error > error,
+        "MANIFESTTRAITVAR is not dropped: RMSE {dropped_error} must exceed {error}"
+    );
+    let stuffed =
+        recover_manifest_observed_variance(loading, latent, manifest_trait).expect("psi-as-theta");
+    let stuffed_error = rmse(&[expected], &[stuffed]);
+    assert!(
+        stuffed_error > error,
+        "MANIFESTTRAITVAR is not MANIFESTVAR: stuffed RMSE {stuffed_error} must exceed {error}"
+    );
+    let latent_trait =
+        recover_manifest_observed_variance(loading, latent + manifest_trait, measurement_error)
+            .expect("traitvar");
+    let latent_trait_error = rmse(&[expected], &[latent_trait]);
+    assert!(
+        latent_trait_error > error,
+        "TRAITVAR is not MANIFESTTRAITVAR: scaled RMSE {latent_trait_error} must exceed {error}"
+    );
+    assert_eq!(
+        refuse_manifest_trait_variance_as_measurement_error(manifest_trait, measurement_error),
+        Err(PsychometricError::ManifestTraitVarianceIsNotMeasurementError)
+    );
+    assert_eq!(
+        recover_manifest_trait_plus_state_observed_variance(
+            0.0,
+            latent,
+            measurement_error,
+            manifest_trait
+        ),
+        Ok(measurement_error + manifest_trait)
+    );
+    let scaled = recover_manifest_trait_plus_state_observed_variance(1e308, 1e-308, 0.0, 1.0)
+        .expect("scale");
+    assert!(
+        (scaled - 1e308).abs() / 1e308 < 1e-15,
+        "Driver Eq. 5 (λ p)λ + ψ must keep λ=1e308, p=1e-308: got {scaled}"
+    );
+    assert_eq!(
+        recover_manifest_trait_plus_state_observed_variance(1e308, 1e-308, 1e308, 1e308),
         Err(PsychometricError::InvalidNumericInput)
     );
 }

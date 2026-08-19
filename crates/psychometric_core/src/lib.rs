@@ -21,9 +21,11 @@
 //! variance (Driver et al., 2017, Eq. 4 as `Δt → ∞`; §4.3; p. 16
 //! `asymDIFFUSION`), recovers the Driver §4.3 trait-plus-state
 //! variance and lagged covariance (`TRAITVAR` is not process noise
-//! and not `asymDIFFUSION`), recovers the Driver Eq. 1 scalar
-//! observed-indicator variance (`λ² Var(η) + θ`; `MANIFESTVAR` is
-//! not `Var(y)`),
+//! and not `asymDIFFUSION`), recovers the Driver Eq. 5 scalar
+//! observed-indicator variance (`λ² Var(η) + θ` when
+//! `MANIFESTTRAITVAR` is zero, else `λ² Var(η) + θ + ψ`; Table 2,
+//! p. 12: `MANIFESTVAR` is `Θ`, not `Var(y)`; `MANIFESTTRAITVAR` is
+//! not `MANIFESTVAR`; Equation 1 is the SDE),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -96,6 +98,8 @@ pub use event_time::recover_irregular_centered_residual_log_rate;
 pub use event_time::recover_local_log_rate;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ`.
 pub use event_time::recover_manifest_observed_variance;
+/// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
+pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
 /// Exact scalar trait-plus-state lagged covariance.
@@ -108,9 +112,11 @@ pub use event_time::recover_within_residual_event_time_log_rate;
 pub use event_time::refuse_difference_quotient_as_local_rate;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
-/// Refuse treating Driver Eq. 1 latent variance as `Var(y)`.
+/// Refuse treating Driver Eq. 5 latent variance as `Var(y)`.
 pub use event_time::refuse_latent_variance_as_observed_variance;
-/// Refuse treating Driver Eq. 1 measurement error as `Var(y)`.
+/// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.
+pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
+/// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
 pub use event_time::refuse_measurement_error_as_observed_variance;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
