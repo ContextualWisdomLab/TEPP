@@ -72,10 +72,11 @@ mod tests {
         let run = sample_run();
         let exchange = lineageweave_analysis_run_exchange("https://tepp.example.test", &run)
             .expect("exchange");
-        assert!(exchange.headers.contains(&(
-            "tepp-consumer".into(),
-            LINEAGEWEAVE_CONSUMER_CODE.into()
-        )));
+        assert!(
+            exchange
+                .headers
+                .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+        );
         assert_eq!(
             lineageweave_analysis_run_exchange("http://tepp.example.test", &run),
             Err(ApiError::InvalidWirePayload)

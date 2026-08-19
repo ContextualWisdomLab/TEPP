@@ -3,9 +3,8 @@
 use std::fmt::Write as _;
 
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService,
-    AnalysisRunRequest, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH,
-    lineageweave_analysis_run_exchange,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
+    LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, lineageweave_analysis_run_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -46,14 +45,16 @@ fn lineageweave_exchange_uses_the_published_consumer_header_without_credentials(
         exchange.target_url,
         "https://tepp.example.test/v1/analysis-runs"
     );
-    assert!(exchange.headers.contains(&(
-        "tepp-consumer".into(),
-        LINEAGEWEAVE_CONSUMER_CODE.into()
-    )));
-    assert!(exchange.headers.contains(&(
-        "idempotency-key".into(),
-        run.idempotency_key.clone()
-    )));
+    assert!(
+        exchange
+            .headers
+            .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+    );
+    assert!(
+        exchange
+            .headers
+            .contains(&("idempotency-key".into(), run.idempotency_key.clone()))
+    );
     assert!(exchange.headers.iter().all(|(name, _)| {
         !matches!(
             name.to_ascii_lowercase().as_str(),
@@ -68,10 +69,7 @@ fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     let mut service = AnalysisRunLiveService::new();
 
     let naruon = service.handle_http_request(&http_request("naruon", &run));
-    let lineageweave = service.handle_http_request(&http_request(
-        LINEAGEWEAVE_CONSUMER_CODE,
-        &run,
-    ));
+    let lineageweave = service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &run));
 
     assert_eq!(naruon.status_code, 202);
     assert_eq!(lineageweave.status_code, 202);
@@ -82,10 +80,7 @@ fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     assert_eq!(lineageweave_accepted.run_state, "accepted");
     assert_eq!(lineageweave_accepted.idempotency_key, run.idempotency_key);
 
-    let replay = service.handle_http_request(&http_request(
-        LINEAGEWEAVE_CONSUMER_CODE,
-        &run,
-    ));
+    let replay = service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &run));
     assert_eq!(replay.status_code, 202);
     assert_eq!(replay.body, lineageweave.body);
 }
@@ -93,6 +88,7 @@ fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
 #[test]
 fn live_listener_refuses_an_unpublished_consumer() {
     let mut service = AnalysisRunLiveService::new();
-    let response = service.handle_http_request(&http_request("unpublished-consumer", &sample_run()));
+    let response =
+        service.handle_http_request(&http_request("unpublished-consumer", &sample_run()));
     assert_eq!(response.status_code, 400);
 }

@@ -7,12 +7,9 @@
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
-use std::time::Duration;
+use std::net::{IpAddr, SocketAddr, TcpListener};
 
-use crate::lineageweave_http::{
-    LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, consumer_is_supported,
-};
+use crate::lineageweave_http::consumer_is_supported;
 use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, header_is_credential};
 use crate::{
     AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
@@ -287,9 +284,7 @@ where
 }
 
 fn split_header_line(line: &str) -> Result<(&str, &str), ApiError> {
-    let (name, value) = line
-        .split_once(':')
-        .ok_or(ApiError::InvalidWirePayload)?;
+    let (name, value) = line.split_once(':').ok_or(ApiError::InvalidWirePayload)?;
     if name.is_empty() || name.chars().any(|ch| ch.is_whitespace() || ch.is_control()) {
         return Err(ApiError::InvalidWirePayload);
     }
@@ -416,11 +411,8 @@ fn json_response(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        AnalysisRunLiveService, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE,
-        consumer_tenant_idempotency_key, host_is_loopback,
-    };
-    use crate::ApiError;
+    use super::{AnalysisRunLiveService, consumer_tenant_idempotency_key, host_is_loopback};
+    use crate::{ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE};
 
     #[test]
     fn helper_contracts_cover_consumer_identity_and_loopback_ports() {
@@ -435,12 +427,13 @@ mod tests {
         assert!(host_is_loopback("localhost:8080", None));
         assert!(!host_is_loopback("localhost:not-a-port", None));
         assert_eq!(
-            AnalysisRunLiveService::bind("0.0.0.0:0".parse().expect("addr"))
-                .expect_err("denied"),
+            AnalysisRunLiveService::bind("0.0.0.0:0".parse().expect("addr")).expect_err("denied"),
             ApiError::AuthorizationDenied
         );
         assert_eq!(
-            AnalysisRunLiveService::new().local_addr().expect_err("unbound"),
+            AnalysisRunLiveService::new()
+                .local_addr()
+                .expect_err("unbound"),
             ApiError::InvalidWirePayload
         );
     }
