@@ -7,19 +7,20 @@ use psychometric_core::{
     ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
     recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
     recover_discrete_lag_from_log_rate, recover_discrete_lagged_latent_covariance,
-    recover_discrete_latent_mean, recover_discrete_latent_variance, recover_discrete_process_noise,
-    recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
-    recover_kish_weighted_slope, recover_manifest_lagged_observed_covariance,
-    recover_manifest_observed_mean, recover_manifest_observed_variance,
-    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_discrete_latent_mean, recover_discrete_latent_variance, recover_discrete_observed_mean,
+    recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
+    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+    recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
+    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
     refuse_finite_interval_process_noise_as_stationary_variance,
     refuse_initial_latent_mean_as_evolved_mean,
+    refuse_initial_observed_mean_as_evolved_observed_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
     refuse_manifest_trait_variance_as_measurement_error,
@@ -1061,6 +1062,144 @@ fn discrete_latent_mean_recovers_driver_equation_three() {
     );
     assert_eq!(
         recover_discrete_latent_mean(1e308, 1.0, 0.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn discrete_observed_mean_recovers_driver_equations_three_and_five() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let evolved =
+        recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+            .expect("mu-t");
+    let expected = manifest_mean + loading * evolved;
+    let error = rmse(&[expected], &[observed]);
+    assert!(
+        error < 1e-15,
+        "Driver Eq. 5 of Eq. 3 evolved mean RMSE {error}"
+    );
+    let first_occasion =
+        recover_manifest_observed_mean(loading, initial, manifest_mean).expect("t0");
+    let first_error = rmse(&[expected], &[first_occasion]);
+    assert!(
+        first_error > error,
+        "τ + λ μ_0 is not E(y_t): RMSE {first_error} must exceed {error}"
+    );
+    let intercept_error = rmse(&[expected], &[manifest_mean]);
+    assert!(
+        intercept_error > error,
+        "MANIFESTMEANS is not E(y_t): RMSE {intercept_error} must exceed {error}"
+    );
+    let latent_error = rmse(&[expected], &[evolved]);
+    assert!(
+        latent_error > error,
+        "μ_t is not E(y_t): RMSE {latent_error} must exceed {error}"
+    );
+    let zero_loading = recover_discrete_observed_mean(
+        0.0,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("lambda0");
+    let dropped_error = rmse(&[expected], &[zero_loading]);
+    assert!(
+        dropped_error > error,
+        "zero loading is τ, not τ + λ μ_t: RMSE {dropped_error} must exceed {error}"
+    );
+}
+
+#[test]
+fn discrete_observed_mean_refuses_first_occasion_and_overflow() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let evolved =
+        recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+            .expect("mu-t");
+    let first_occasion =
+        recover_manifest_observed_mean(loading, initial, manifest_mean).expect("t0");
+    assert_eq!(
+        refuse_initial_observed_mean_as_evolved_observed_mean(first_occasion, observed),
+        Err(PsychometricError::InitialObservedMeanIsNotEvolvedObservedMean)
+    );
+    assert_eq!(
+        refuse_latent_mean_as_observed_mean(evolved, observed),
+        Err(PsychometricError::LatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_manifest_means_as_observed_mean(manifest_mean, observed),
+        Err(PsychometricError::ManifestMeansIsNotObservedMean)
+    );
+    let integrator = recover_discrete_observed_mean(
+        loading,
+        initial,
+        0.0,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("a0");
+    assert!(
+        (integrator - (manifest_mean + loading * (initial + intercept * delta))).abs() < 1e-15,
+        "Driver Eq. 5 of A=0 mean is τ + λ(μ_0 + κ Δt): got {integrator}"
+    );
+    let equilibrium = recover_discrete_observed_mean(
+        loading,
+        initial,
+        -1e308,
+        1.0,
+        manifest_mean,
+        2.0,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-equilibrium");
+    let equilibrium_expected = manifest_mean + loading * (-(1.0 / -1e308));
+    assert!(
+        (equilibrium - equilibrium_expected).abs() < 1e-15,
+        "Driver Eq. 5 of z→-∞ mean keeps τ + λ(-κ/a): got {equilibrium}"
+    );
+    let scaled =
+        recover_discrete_observed_mean(1e308, 1e-308, 0.0, 0.0, 0.0, 1.0, LagClock::EventTime)
+            .expect("scale");
+    assert!(
+        (scaled - 1.0).abs() < 1e-15,
+        "Driver Eq. 5 of Eq. 3 mean must keep λ=1e308, μ_t=1e-308: got {scaled}"
+    );
+    assert_eq!(
+        recover_discrete_observed_mean(1e308, 2.0, 0.0, 0.0, 0.0, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }

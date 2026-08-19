@@ -31,7 +31,9 @@
 //! not `E(y)`; `CINT` is not `MANIFESTMEANS`; Equation 1
 //! is the SDE), recovers the Driver Eq. 3 expected-value latent
 //! mean `exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ` (`T0MEANS` is not
-//! `μ_t`; `CINT` is not the discrete increment),
+//! `μ_t`; `CINT` is not the discrete increment), recovers the
+//! Driver Eq. 5 of that evolved mean as `τ + λ μ_t` (the
+//! first-occasion map `τ + λ μ_0` is not `E(y_t)`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -94,6 +96,8 @@ pub use event_time::recover_discrete_lagged_latent_covariance;
 pub use event_time::recover_discrete_latent_mean;
 /// Exact scalar discrete latent variance `A_Δt P A_Δt⊤ + Q_Δt`.
 pub use event_time::recover_discrete_latent_variance;
+/// Exact scalar discrete observed mean `τ + λ μ_t` from Eq. 3 then Eq. 5.
+pub use event_time::recover_discrete_observed_mean;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
 pub use event_time::recover_discrete_process_noise;
 /// First-order discrete effect of a time-varying event-time predictor.
@@ -134,6 +138,8 @@ pub use event_time::refuse_difference_quotient_as_local_rate;
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
 /// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
 pub use event_time::refuse_initial_latent_mean_as_evolved_mean;
+/// Refuse treating first-occasion `τ + λ μ_0` as `E(y_t)`.
+pub use event_time::refuse_initial_observed_mean_as_evolved_observed_mean;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.

@@ -5,17 +5,19 @@ use psychometric_core::{
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
-    recover_discrete_latent_mean, recover_discrete_latent_variance, recover_discrete_process_noise,
-    recover_discrete_time_varying_predictor_effect, recover_irregular_centered_residual_log_rate,
-    recover_loading_point_estimate_mean, recover_manifest_lagged_observed_covariance,
-    recover_manifest_observed_mean, recover_manifest_observed_variance,
-    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_discrete_latent_mean, recover_discrete_latent_variance, recover_discrete_observed_mean,
+    recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
+    recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
+    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_stationary_latent_variance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
     refuse_finite_interval_process_noise_as_stationary_variance,
     refuse_initial_latent_mean_as_evolved_mean,
+    refuse_initial_observed_mean_as_evolved_observed_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
     refuse_manifest_trait_variance_as_measurement_error,
@@ -486,5 +488,54 @@ fn initial_latent_mean_and_continuous_intercept_are_not_evolved_mean() {
     assert_eq!(
         refuse_continuous_intercept_as_initial_latent_mean(intercept, initial),
         Err(psychometric_core::PsychometricError::ContinuousInterceptIsNotInitialLatentMean)
+    );
+}
+
+#[test]
+fn first_occasion_observed_mean_is_not_evolved_observed_mean() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let evolved_observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let first_occasion =
+        recover_manifest_observed_mean(loading, initial, manifest_mean).expect("t0");
+    let evolved_latent =
+        recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+            .expect("mu-t");
+    assert!(
+        (first_occasion - evolved_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of Eq. 3): τ + λ μ_0 is not E(y_t)"
+    );
+    assert!(
+        (manifest_mean - evolved_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 / Table 2 p. 12): MANIFESTMEANS is not E(y_t)"
+    );
+    assert!(
+        (evolved_latent - evolved_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): μ_t is not E(y_t)"
+    );
+    assert_eq!(
+        refuse_initial_observed_mean_as_evolved_observed_mean(first_occasion, evolved_observed),
+        Err(psychometric_core::PsychometricError::InitialObservedMeanIsNotEvolvedObservedMean)
+    );
+    assert_eq!(
+        refuse_latent_mean_as_observed_mean(evolved_latent, evolved_observed),
+        Err(psychometric_core::PsychometricError::LatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_manifest_means_as_observed_mean(manifest_mean, evolved_observed),
+        Err(psychometric_core::PsychometricError::ManifestMeansIsNotObservedMean)
     );
 }

@@ -1227,6 +1227,67 @@ pub fn recover_discrete_latent_mean(
     require_finite(carried + intercept_effect)
 }
 
+/// Exact scalar discrete observed-indicator mean from Driver
+/// Equations 3 and 5.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; Eq. 5, p. 5;
+/// Table 2, p. 12; JSS PDF re-opened 2026-08-19T22:10Z) write
+/// `η_i(t) = exp(A Δt) η_i(t0) + A^{-1}[exp(A Δt) − I] ξ_i + …`
+/// with `ξ_i ~ N(κ, φ_ξ)` (p. 4) and a stochastic integral of
+/// mean zero, then `y_i(t) = Γ_i + Λ η_i(t) + ζ_i(t)` with
+/// `Γ ~ N(τ, Ψ)` and `ζ ~ N(0, Θ)`. The scalar expected-value
+/// composition is `E(y_t) = τ + λ μ_t` with
+/// `μ_t = exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`. Form `μ_t`
+/// first, then `τ + λ μ_t`. Table 2 names `μ_0` `T0MEANS`, `κ`
+/// `CINT`, and `τ` `MANIFESTMEANS`. A zero loading is exactly
+/// `τ`. A zero evolved latent mean is exactly `τ`. A zero
+/// intercept is exactly `λ μ_t`. The first-occasion map
+/// `τ + λ μ_0` is not `E(y_t)`. `MANIFESTMEANS` is not
+/// `E(y_t)`. `T0MEANS` is not `E(y_t)`. `μ_t` is not `E(y_t)`.
+/// `CINT` is not `E(y_t)`. This is not a Kalman filter and not
+/// ctsem estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_latent_mean`] and
+/// [`recover_manifest_observed_mean`].
+pub fn recover_discrete_observed_mean(
+    loading: f64,
+    initial_latent_mean: f64,
+    log_rate: f64,
+    continuous_intercept: f64,
+    manifest_mean: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let evolved_latent_mean = recover_discrete_latent_mean(
+        initial_latent_mean,
+        log_rate,
+        continuous_intercept,
+        event_delta,
+        clock,
+    )?;
+    recover_manifest_observed_mean(loading, evolved_latent_mean, manifest_mean)
+}
+
+/// Refuse treating the first-occasion observed mean as `E(y_t)`.
+///
+/// Equation 5 of `T0MEANS` is `τ + λ μ_0`. Equation 5 of the
+/// Eq. 3 evolved mean is `τ + λ μ_t`. Those are not the same
+/// map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialObservedMeanIsNotEvolvedObservedMean`].
+pub fn refuse_initial_observed_mean_as_evolved_observed_mean(
+    initial_observed_mean: f64,
+    evolved_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_observed_mean, evolved_observed_mean);
+    Err(PsychometricError::InitialObservedMeanIsNotEvolvedObservedMean)
+}
+
 /// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
 ///
 /// Equation 3 maps `μ_t = exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`.
@@ -1530,18 +1591,20 @@ mod tests {
         recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
         recover_discrete_lag_one, recover_discrete_lagged_latent_covariance,
         recover_discrete_latent_mean, recover_discrete_latent_variance,
-        recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
-        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
-        recover_irregular_centered_residual_log_rate, recover_local_log_rate,
-        recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-        recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-        recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
-        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+        recover_discrete_observed_mean, recover_discrete_process_noise,
+        recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
+        recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
+        recover_local_log_rate, recover_manifest_lagged_observed_covariance,
+        recover_manifest_observed_mean, recover_manifest_observed_variance,
+        recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+        recover_within_residual_event_time_log_rate,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
         refuse_finite_interval_process_noise_as_stationary_variance,
         refuse_initial_latent_mean_as_evolved_mean,
+        refuse_initial_observed_mean_as_evolved_observed_mean,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
         refuse_manifest_means_as_observed_mean,
@@ -3234,6 +3297,13 @@ mod tests {
             recover_discrete_latent_mean(0.0, 1e308, 0.0, 2.0, LagClock::EventTime),
             Ok(0.0)
         );
+        // CINT = 0 so the increment path stays finite; exp(a Δt) then
+        // overflows and the carried T0MEANS term fails closed.
+        assert_eq!(
+            recover_discrete_latent_mean(1.0, 710.0, 0.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert!(!(710.0_f64.exp()).is_finite());
     }
 
     #[test]
@@ -3279,5 +3349,148 @@ mod tests {
         let underflow = recover_discrete_latent_mean(2.0, 1e-308, 4.0, 1e-308, LagClock::EventTime)
             .expect("a-delta-underflow");
         assert!((underflow - 2.0).abs() < 1e-15);
+    }
+
+    #[test]
+    fn discrete_observed_mean_recovers_driver_equations_three_and_five() {
+        let loading = 2.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let manifest_mean = 0.5_f64;
+        let recovered = recover_discrete_observed_mean(
+            loading,
+            initial,
+            drift,
+            intercept,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq3-eq5-mean");
+        let evolved =
+            recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+                .expect("mu-t");
+        let expected = manifest_mean + loading * evolved;
+        assert!((recovered - expected).abs() < 1e-15);
+        let first_occasion =
+            recover_manifest_observed_mean(loading, initial, manifest_mean).expect("t0");
+        assert!((first_occasion - recovered).abs() > 1e-3);
+        assert_eq!(
+            recover_discrete_observed_mean(
+                0.0,
+                initial,
+                drift,
+                intercept,
+                manifest_mean,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(manifest_mean)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean(
+                loading,
+                initial,
+                drift,
+                intercept,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(loading * evolved)
+        );
+        let zero_evolved = recover_discrete_observed_mean(
+            loading,
+            0.0,
+            0.0,
+            0.0,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("zero-mu");
+        assert!((zero_evolved - manifest_mean).abs() < 1e-15);
+        let integrator = recover_discrete_observed_mean(
+            loading,
+            initial,
+            0.0,
+            intercept,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("a0");
+        assert!(
+            (integrator - (manifest_mean + loading * (initial + intercept * delta))).abs() < 1e-15
+        );
+        let equilibrium = recover_discrete_observed_mean(
+            loading,
+            initial,
+            -1e308,
+            1.0,
+            manifest_mean,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("eq3-eq5-equilibrium");
+        let equilibrium_latent = -(1.0 / -1e308);
+        assert!((equilibrium - (manifest_mean + loading * equilibrium_latent)).abs() < 1e-15);
+    }
+
+    #[test]
+    fn discrete_observed_mean_refuses_first_occasion_and_overflow() {
+        let loading = 2.0_f64;
+        let recovered =
+            recover_discrete_observed_mean(loading, 1.0, -0.5, 0.3, 0.5, 2.0, LagClock::EventTime)
+                .expect("eq3-eq5-mean");
+        let evolved =
+            recover_discrete_latent_mean(1.0, -0.5, 0.3, 2.0, LagClock::EventTime).expect("mu-t");
+        let first_occasion = recover_manifest_observed_mean(loading, 1.0, 0.5).expect("t0");
+        assert_eq!(
+            refuse_initial_observed_mean_as_evolved_observed_mean(first_occasion, recovered),
+            Err(PsychometricError::InitialObservedMeanIsNotEvolvedObservedMean)
+        );
+        assert_eq!(
+            refuse_latent_mean_as_observed_mean(evolved, recovered),
+            Err(PsychometricError::LatentMeanIsNotObservedMean)
+        );
+        assert_eq!(
+            refuse_manifest_means_as_observed_mean(0.5, recovered),
+            Err(PsychometricError::ManifestMeansIsNotObservedMean)
+        );
+        let scaled =
+            recover_discrete_observed_mean(1e308, 1e-308, 0.0, 0.0, 0.0, 1.0, LagClock::EventTime)
+                .expect("scale");
+        assert!((scaled - 1.0).abs() < 1e-15);
+        let finite_loaded =
+            recover_discrete_observed_mean(1e308, 1.0, 0.0, 0.0, 0.0, 1.0, LagClock::EventTime)
+                .expect("lambda-mu");
+        assert!((finite_loaded - 1e308).abs() / 1e308 < 1e-15);
+    }
+
+    #[test]
+    fn discrete_observed_mean_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_discrete_observed_mean(f64::NAN, 1.0, -0.5, 0.3, 0.5, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean(2.0, 1.0, -0.5, 0.3, 0.5, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean(2.0, 1.0, -0.5, 0.3, 0.5, 2.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean(1e308, 2.0, 0.0, 0.0, 0.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean(1.0, 1.0, 710.0, 0.0, 0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 }

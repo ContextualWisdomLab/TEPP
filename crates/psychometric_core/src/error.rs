@@ -98,6 +98,9 @@ pub enum PsychometricError {
     /// Driver Table 2 `CINT` was treated as `T0MEANS`. `κ` is not
     /// the first-occasion latent mean.
     ContinuousInterceptIsNotInitialLatentMean,
+    /// Driver Eq. 5 of the first-occasion mean was treated as
+    /// `E(y_t)`. `τ + λ μ_0` is not `τ + λ μ_t`.
+    InitialObservedMeanIsNotEvolvedObservedMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -180,6 +183,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::ContinuousInterceptIsNotInitialLatentMean => {
                 "continuous intercept is not the initial latent mean"
+            }
+            Self::InitialObservedMeanIsNotEvolvedObservedMean => {
+                "first-occasion observed mean is not the evolved observed mean"
             }
         };
         formatter.write_str(message)
@@ -325,6 +331,10 @@ mod tests {
         assert_eq!(
             PsychometricError::ContinuousInterceptIsNotInitialLatentMean.to_string(),
             "continuous intercept is not the initial latent mean"
+        );
+        assert_eq!(
+            PsychometricError::InitialObservedMeanIsNotEvolvedObservedMean.to_string(),
+            "first-occasion observed mean is not the evolved observed mean"
         );
     }
 }
