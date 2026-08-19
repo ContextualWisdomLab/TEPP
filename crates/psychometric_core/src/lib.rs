@@ -21,7 +21,9 @@
 //! variance (Driver et al., 2017, Eq. 4 as `Δt → ∞`; §4.3; p. 16
 //! `asymDIFFUSION`), recovers the Driver §4.3 trait-plus-state
 //! variance and lagged covariance (`TRAITVAR` is not process noise
-//! and not `asymDIFFUSION`),
+//! and not `asymDIFFUSION`), recovers the Driver Eq. 1 scalar
+//! observed-indicator variance (`λ² Var(η) + θ`; `MANIFESTVAR` is
+//! not `Var(y)`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -92,6 +94,8 @@ pub use event_time::recover_event_time_discrete_lag_and_log_rate;
 pub use event_time::recover_irregular_centered_residual_log_rate;
 /// Exact scalar inverse `a = ln(φ) / Δt`.
 pub use event_time::recover_local_log_rate;
+/// Exact scalar observed-indicator variance `λ² Var(η) + θ`.
+pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
 /// Exact scalar trait-plus-state lagged covariance.
@@ -104,6 +108,10 @@ pub use event_time::recover_within_residual_event_time_log_rate;
 pub use event_time::refuse_difference_quotient_as_local_rate;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
+/// Refuse treating Driver Eq. 1 latent variance as `Var(y)`.
+pub use event_time::refuse_latent_variance_as_observed_variance;
+/// Refuse treating Driver Eq. 1 measurement error as `Var(y)`.
+pub use event_time::refuse_measurement_error_as_observed_variance;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.

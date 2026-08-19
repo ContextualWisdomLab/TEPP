@@ -7,9 +7,10 @@ use psychometric_core::{
     recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
-    recover_stationary_latent_variance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_manifest_observed_variance, recover_stationary_latent_variance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_latent_variance_as_observed_variance, refuse_measurement_error_as_observed_variance,
     refuse_process_noise_as_unconditional_variance, refuse_trait_variance_as_process_noise,
     refuse_trait_variance_as_stationary_within_subject,
 };
@@ -310,5 +311,30 @@ fn trait_variance_is_not_process_noise_or_stationary_within_subject() {
     assert_eq!(
         refuse_trait_variance_as_stationary_within_subject(trait_variance, state),
         Err(psychometric_core::PsychometricError::TraitVarianceIsNotStationaryWithinSubject)
+    );
+}
+
+#[test]
+fn measurement_error_and_latent_variance_are_not_the_observed_variance() {
+    let loading = 2.0_f64;
+    let latent = 0.4_f64;
+    let measurement_error = 0.1_f64;
+    let observed =
+        recover_manifest_observed_variance(loading, latent, measurement_error).expect("eq1");
+    assert!(
+        (measurement_error - observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 1 / p. 16): MANIFESTVAR is not Var(y)"
+    );
+    assert!(
+        (latent - observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 1): Var(η) is not Var(y)"
+    );
+    assert_eq!(
+        refuse_measurement_error_as_observed_variance(measurement_error, observed),
+        Err(psychometric_core::PsychometricError::MeasurementErrorIsNotObservedVariance)
+    );
+    assert_eq!(
+        refuse_latent_variance_as_observed_variance(latent, observed),
+        Err(psychometric_core::PsychometricError::LatentVarianceIsNotObservedVariance)
     );
 }

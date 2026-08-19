@@ -62,6 +62,12 @@ pub enum PsychometricError {
     /// within-subject variance. `TRAITVAR` is between-subject and
     /// time-invariant; `asymDIFFUSION` is the `Δt → ∞` state variance.
     TraitVarianceIsNotStationaryWithinSubject,
+    /// Driver Eq. 1 measurement-error variance was treated as the
+    /// observed-indicator variance. `MANIFESTVAR` is `Θ`, not `Var(y)`.
+    MeasurementErrorIsNotObservedVariance,
+    /// Driver Eq. 1 latent variance was treated as the observed-indicator
+    /// variance. `Var(η)` is not `Var(y)`.
+    LatentVarianceIsNotObservedVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -113,6 +119,12 @@ impl fmt::Display for PsychometricError {
             }
             Self::TraitVarianceIsNotStationaryWithinSubject => {
                 "trait variance is not the stationary within-subject variance"
+            }
+            Self::MeasurementErrorIsNotObservedVariance => {
+                "measurement-error variance is not the observed-indicator variance"
+            }
+            Self::LatentVarianceIsNotObservedVariance => {
+                "latent variance is not the observed-indicator variance"
             }
         };
         formatter.write_str(message)
@@ -210,6 +222,14 @@ mod tests {
         assert_eq!(
             PsychometricError::TraitVarianceIsNotStationaryWithinSubject.to_string(),
             "trait variance is not the stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotObservedVariance.to_string(),
+            "measurement-error variance is not the observed-indicator variance"
+        );
+        assert_eq!(
+            PsychometricError::LatentVarianceIsNotObservedVariance.to_string(),
+            "latent variance is not the observed-indicator variance"
         );
     }
 }

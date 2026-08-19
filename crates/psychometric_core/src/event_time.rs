@@ -24,7 +24,11 @@
 //! `-q / (2 a)`. Section 4.3 (p. 9) then adds a stable trait process
 //! with `DRIFT` and `DIFFUSION` fixed to zero. That `TRAITVAR` is
 //! time-invariant between-subject variance; it is not process noise
-//! and not `asymDIFFUSION`. The JSS article
+//! and not `asymDIFFUSION`. Equation 1 (p. 4) writes
+//! `y_i(t) = Λ η_i(t) + τ + ε_i(t)` with `ε ~ N(0, Θ)`. The JSS
+//! summary (p. 16) names `Θ` `MANIFESTVAR`. The scalar observed
+//! variance is `λ² Var(η) + θ`. `MANIFESTVAR` is not `Var(y)` and
+//! `Var(η)` is not `Var(y)`. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -783,6 +787,81 @@ pub fn refuse_trait_variance_as_stationary_within_subject(
     Err(PsychometricError::TraitVarianceIsNotStationaryWithinSubject)
 }
 
+/// Exact scalar observed-indicator variance from Driver Equation 1.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 1, p. 4; JSS PDF re-opened
+/// 2026-08-19T00:14Z) write `y_i(t) = Λ η_i(t) + τ + ε_i(t)` with
+/// `ε ~ N(0, Θ)`. The JSS summary (p. 16) names `Θ` `MANIFESTVAR`.
+/// The scalar map is `Var(y) = λ² Var(η) + θ`. Form `(λ p) λ` then
+/// add `θ`. Do not form `λ²` first: at `λ = 1e308`, `p = 1e-308`,
+/// `λ²` overflows and `λ² p` is non-finite, but `(λ p) λ = 1e308`.
+/// A zero loading or zero latent variance is exactly `θ`. A zero
+/// measurement error is exactly `λ² p`. Negative latent or
+/// measurement-error variance fails closed. An overflowing product
+/// or sum fails closed. This is not a Kalman filter, not ESEM
+/// estimation, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::InvalidNumericInput`] when the loading
+/// is non-finite, either variance is negative or non-finite, or the
+/// mapped variance is non-finite.
+pub fn recover_manifest_observed_variance(
+    loading: f64,
+    latent_variance: f64,
+    measurement_error_variance: f64,
+) -> Result<f64, PsychometricError> {
+    if !loading.is_finite()
+        || !latent_variance.is_finite()
+        || latent_variance < 0.0
+        || !measurement_error_variance.is_finite()
+        || measurement_error_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if loading == 0.0 || latent_variance == 0.0 {
+        return Ok(measurement_error_variance);
+    }
+    let explained = require_finite((loading * latent_variance) * loading)?;
+    if measurement_error_variance == 0.0 {
+        return Ok(explained);
+    }
+    require_finite(explained + measurement_error_variance)
+}
+
+/// Refuse treating Driver Eq. 1 measurement error as `Var(y)`.
+///
+/// `MANIFESTVAR` is `Θ`, the variance of `ε`. Equation 1 maps
+/// `Var(y) = λ² Var(η) + θ`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::MeasurementErrorIsNotObservedVariance`].
+pub fn refuse_measurement_error_as_observed_variance(
+    measurement_error_variance: f64,
+    observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (measurement_error_variance, observed_variance);
+    Err(PsychometricError::MeasurementErrorIsNotObservedVariance)
+}
+
+/// Refuse treating Driver Eq. 1 latent variance as `Var(y)`.
+///
+/// `Var(η)` is the latent process variance. Equation 1 maps
+/// `Var(y) = λ² Var(η) + θ`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::LatentVarianceIsNotObservedVariance`].
+pub fn refuse_latent_variance_as_observed_variance(
+    latent_variance: f64,
+    observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (latent_variance, observed_variance);
+    Err(PsychometricError::LatentVarianceIsNotObservedVariance)
+}
+
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5):
@@ -1037,10 +1116,11 @@ mod tests {
         recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
         recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_irregular_centered_residual_log_rate, recover_local_log_rate,
-        recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
-        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
-        refuse_difference_quotient_as_local_rate,
+        recover_manifest_observed_variance, recover_stationary_latent_variance,
+        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
         refuse_finite_interval_process_noise_as_stationary_variance,
+        refuse_latent_variance_as_observed_variance, refuse_measurement_error_as_observed_variance,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance, refuse_trait_variance_as_process_noise,
         refuse_trait_variance_as_stationary_within_subject,
@@ -2369,6 +2449,76 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::NonPositiveInterval)
+        );
+    }
+
+    #[test]
+    fn manifest_observed_variance_recovers_driver_equation_one() {
+        let loading = 2.0_f64;
+        let latent = 0.4_f64;
+        let measurement_error = 0.1_f64;
+        let recovered =
+            recover_manifest_observed_variance(loading, latent, measurement_error).expect("eq1");
+        let expected = (loading * latent) * loading + measurement_error;
+        assert!((recovered - expected).abs() < 1e-15);
+        assert!((recovered - 1.7).abs() < 1e-15);
+        assert!((measurement_error - recovered).abs() > 1e-3);
+        assert!((latent - recovered).abs() > 1e-3);
+        assert_eq!(
+            refuse_measurement_error_as_observed_variance(measurement_error, recovered),
+            Err(PsychometricError::MeasurementErrorIsNotObservedVariance)
+        );
+        assert_eq!(
+            refuse_latent_variance_as_observed_variance(latent, recovered),
+            Err(PsychometricError::LatentVarianceIsNotObservedVariance)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(0.0, latent, measurement_error),
+            Ok(measurement_error)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(loading, 0.0, measurement_error),
+            Ok(measurement_error)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(loading, latent, 0.0),
+            Ok(1.6)
+        );
+        // Do not form λ² first: (1e308)² overflows; (λ p) λ is 1e308.
+        let scaled = recover_manifest_observed_variance(1e308, 1e-308, 0.0).expect("scale");
+        assert!((scaled - 1e308).abs() / 1e308 < 1e-15);
+        assert!(!(1e308_f64 * 1e308_f64).is_finite());
+    }
+
+    #[test]
+    fn manifest_observed_variance_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_manifest_observed_variance(f64::NAN, 0.4, 0.1),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(2.0, -0.1, 0.1),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(2.0, 0.4, -0.1),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(2.0, f64::NAN, 0.1),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(2.0, 0.4, f64::NAN),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(1e308, 1.0, 0.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_observed_variance(1e308, 1.0, 1e308),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 }
