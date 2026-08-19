@@ -136,6 +136,16 @@ fn streamed_cardinality_does_not_require_a_hypothetical_full_tensor() {
     .expect("streamed dimensions are independently representable");
     assert_eq!(request.document_count(), u64::MAX);
     assert_eq!(request.topic_count(), u64::MAX);
+
+    let controller = VramController::new(
+        DeviceInventory::gpu(VramProfile::Gib4, VramProfile::Gib4.bytes()).expect("4 GiB"),
+        1,
+    )
+    .expect("controller");
+    let plan = controller.plan(&request).expect("streamed plan");
+    assert_eq!(plan.backend(), ComputeBackendKind::GpuStreamed);
+    assert_eq!(plan.batch_size(), 1);
+    assert_eq!(plan.predicted_peak_bytes(), 8);
 }
 
 #[test]

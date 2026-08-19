@@ -345,6 +345,7 @@ mod tests {
             .recover_from_oom(&workload, &retry)
             .expect("fallback");
         assert_eq!(fallback.backend(), ComputeBackendKind::CpuF64Reference);
+        // CPU `f64` fallback restores the requested batch; it is not a GPU retry plan.
         assert_eq!(fallback.batch_size(), 4);
         assert_eq!(fallback.oom_retry_count(), 2);
 
