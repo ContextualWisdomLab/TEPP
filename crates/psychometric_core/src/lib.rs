@@ -33,7 +33,9 @@
 //! mean `exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ` (`T0MEANS` is not
 //! `μ_t`; `CINT` is not the discrete increment), recovers the
 //! Driver Eq. 5 of that evolved mean as `τ + λ μ_t` (the
-//! first-occasion map `τ + λ μ_0` is not `E(y_t)`),
+//! first-occasion map `τ + λ μ_0` is not `E(y_t)`), recovers the
+//! Driver Eq. 3 fourth-summand impulse `m x` (Table 2 `TDPREDEFFECT`
+//! is `M`, not `CINT`, not `TIPREDEFFECT`, and not Voelkle Eq. 14),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -94,6 +96,8 @@ pub use event_time::recover_discrete_lag_one;
 pub use event_time::recover_discrete_lagged_latent_covariance;
 /// Exact scalar discrete latent mean `exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`.
 pub use event_time::recover_discrete_latent_mean;
+/// Exact scalar evolved latent mean plus a contemporaneous impulse.
+pub use event_time::recover_discrete_latent_mean_with_impulse;
 /// Exact scalar discrete latent variance `A_Δt P A_Δt⊤ + Q_Δt`.
 pub use event_time::recover_discrete_latent_variance;
 /// Exact scalar discrete observed mean `τ + λ μ_t` from Eq. 3 then Eq. 5.
@@ -120,6 +124,8 @@ pub use event_time::recover_manifest_observed_variance;
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
+/// Exact scalar contemporaneous `TDPREDEFFECT` impulse `m x`.
+pub use event_time::recover_time_dependent_predictor_impulse;
 /// Exact scalar trait-plus-state lagged covariance.
 pub use event_time::recover_trait_plus_state_lagged_covariance;
 /// Exact scalar trait-plus-state latent variance.
@@ -158,6 +164,12 @@ pub use event_time::refuse_measurement_error_as_observed_variance;
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
+/// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
+pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
+/// Refuse treating Driver Eq. 3 impulse as `TIPREDEFFECT`.
+pub use event_time::refuse_time_dependent_impulse_as_time_independent_effect;
+/// Refuse treating Driver Eq. 3 impulse as Voelkle Eq. 14.
+pub use event_time::refuse_time_dependent_impulse_as_time_varying_discrete_effect;
 /// Refuse treating Driver §4.3 trait variance as process noise.
 pub use event_time::refuse_trait_variance_as_process_noise;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.

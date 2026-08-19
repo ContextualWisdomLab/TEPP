@@ -101,6 +101,16 @@ pub enum PsychometricError {
     /// Driver Eq. 5 of the first-occasion mean was treated as
     /// `E(y_t)`. `τ + λ μ_0` is not `τ + λ μ_t`.
     InitialObservedMeanIsNotEvolvedObservedMean,
+    /// Driver Eq. 3 fourth-summand impulse was treated as `CINT`.
+    /// Table 2 names `M` `TDPREDEFFECT`, not `κ`.
+    TimeDependentImpulseIsNotContinuousIntercept,
+    /// Driver Eq. 3 fourth-summand impulse was treated as the
+    /// time-independent discrete effect. `M x` is not
+    /// `A^{-1}[e^{A Δt} − I] B z`.
+    TimeDependentImpulseIsNotTimeIndependentEffect,
+    /// Driver Eq. 3 fourth-summand impulse was treated as Voelkle
+    /// et al. (2012, Eq. 14). `M x` is not `a_{yx} Δt`.
+    TimeDependentImpulseIsNotTimeVaryingDiscreteEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -186,6 +196,15 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialObservedMeanIsNotEvolvedObservedMean => {
                 "first-occasion observed mean is not the evolved observed mean"
+            }
+            Self::TimeDependentImpulseIsNotContinuousIntercept => {
+                "time-dependent predictor impulse is not the continuous intercept"
+            }
+            Self::TimeDependentImpulseIsNotTimeIndependentEffect => {
+                "time-dependent predictor impulse is not the time-independent discrete effect"
+            }
+            Self::TimeDependentImpulseIsNotTimeVaryingDiscreteEffect => {
+                "time-dependent predictor impulse is not the time-varying discrete effect"
             }
         };
         formatter.write_str(message)
@@ -335,6 +354,22 @@ mod tests {
         assert_eq!(
             PsychometricError::InitialObservedMeanIsNotEvolvedObservedMean.to_string(),
             "first-occasion observed mean is not the evolved observed mean"
+        );
+    }
+
+    #[test]
+    fn time_dependent_impulse_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseIsNotContinuousIntercept.to_string(),
+            "time-dependent predictor impulse is not the continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseIsNotTimeIndependentEffect.to_string(),
+            "time-dependent predictor impulse is not the time-independent discrete effect"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseIsNotTimeVaryingDiscreteEffect.to_string(),
+            "time-dependent predictor impulse is not the time-varying discrete effect"
         );
     }
 }

@@ -5,13 +5,14 @@ use psychometric_core::{
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
-    recover_discrete_latent_mean, recover_discrete_latent_variance, recover_discrete_observed_mean,
+    recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
+    recover_discrete_latent_variance, recover_discrete_observed_mean,
     recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
@@ -23,6 +24,9 @@ use psychometric_core::{
     refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance, refuse_process_noise_as_unconditional_variance,
+    refuse_time_dependent_impulse_as_continuous_intercept,
+    refuse_time_dependent_impulse_as_time_independent_effect,
+    refuse_time_dependent_impulse_as_time_varying_discrete_effect,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
 };
 
@@ -537,5 +541,65 @@ fn first_occasion_observed_mean_is_not_evolved_observed_mean() {
     assert_eq!(
         refuse_manifest_means_as_observed_mean(manifest_mean, evolved_observed),
         Err(psychometric_core::PsychometricError::ManifestMeansIsNotObservedMean)
+    );
+}
+
+#[test]
+fn time_dependent_impulse_is_not_cint_tipred_or_equation_fourteen() {
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+    let intercept_effect =
+        recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
+            .expect("cint");
+    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+        effect,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq14");
+    let evolved =
+        recover_discrete_latent_mean(1.0, drift, 0.3, delta, LagClock::EventTime).expect("mu-t");
+    let composed = recover_discrete_latent_mean_with_impulse(
+        1.0,
+        drift,
+        0.3,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-impulse");
+    assert!(
+        (impulse - effect).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3 / Table 2 p. 12): TDPREDEFFECT is not CINT"
+    );
+    assert!(
+        (impulse - intercept_effect).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): M x is not the time-independent discrete effect"
+    );
+    assert!(
+        (impulse - equation_fourteen).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): M x is not Voelkle Eq. 14"
+    );
+    assert!(
+        (composed - evolved).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): μ_t is not μ_t + M x"
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_as_continuous_intercept(impulse, effect),
+        Err(psychometric_core::PsychometricError::TimeDependentImpulseIsNotContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_as_time_independent_effect(impulse, intercept_effect),
+        Err(psychometric_core::PsychometricError::TimeDependentImpulseIsNotTimeIndependentEffect)
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_as_time_varying_discrete_effect(impulse, equation_fourteen),
+        Err(psychometric_core::PsychometricError::TimeDependentImpulseIsNotTimeVaryingDiscreteEffect)
     );
 }
