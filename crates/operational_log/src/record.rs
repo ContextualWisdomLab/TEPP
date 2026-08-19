@@ -211,10 +211,12 @@ mod tests {
 
     #[test]
     fn local_branches_cover_replay_and_fail_closed_paths() {
+        let default_subject = AnalyticalSubject::default();
+        let default_source_identity = SourceIdentity::default();
         let truth = [
             OperationalLogRecord::try_record(
                 ActionCode::AnalyticalRead,
-                AnalyticalSubject::new(),
+                default_subject,
                 10,
                 None,
                 None,
@@ -232,6 +234,7 @@ mod tests {
             .expect("second record"),
         ];
         assert_eq!(truth[0].action_code(), ActionCode::AnalyticalRead);
+        assert_eq!(truth[0].analytical_subject(), default_subject);
         assert_eq!(truth[0].system_time_seconds(), 10);
         let replayed = replay_operational_log(&truth).expect("replay");
         let matched = log_recovery_rate(&truth, &replayed).expect("rate");
@@ -241,7 +244,7 @@ mod tests {
             Err(OperationalLogError::SourceTextNotLoggable)
         );
         assert_eq!(
-            refuse_source_identity_in_log(Some(SourceIdentity::new())),
+            refuse_source_identity_in_log(Some(default_source_identity)),
             Err(OperationalLogError::SourceIdentityNotLoggable)
         );
         assert_eq!(
