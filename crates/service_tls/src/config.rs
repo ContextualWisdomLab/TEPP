@@ -2,9 +2,7 @@
 
 use crate::TlsError;
 use rustls::ServerConfig;
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use rustls_pemfile::{certs, private_key};
-use std::io::Cursor;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 
 /// Build a rustls `ServerConfig` from PEM certificate and private-key material.
 ///
@@ -30,8 +28,7 @@ pub fn rustls_server_config(
 }
 
 fn parse_certificates(certificate_pem: &str) -> Result<Vec<CertificateDer<'static>>, TlsError> {
-    let mut reader = Cursor::new(certificate_pem.as_bytes());
-    certs(&mut reader)
+    CertificateDer::pem_slice_iter(certificate_pem.as_bytes())
         .collect::<Result<Vec<_>, _>>()
         .ok()
         .filter(|certificates| !certificates.is_empty())
@@ -39,10 +36,8 @@ fn parse_certificates(certificate_pem: &str) -> Result<Vec<CertificateDer<'stati
 }
 
 fn parse_private_key(private_key_pem: &str) -> Result<PrivateKeyDer<'static>, TlsError> {
-    let mut reader = Cursor::new(private_key_pem.as_bytes());
-    private_key(&mut reader)
+    PrivateKeyDer::from_pem_slice(private_key_pem.as_bytes())
         .ok()
-        .flatten()
         .ok_or(TlsError::InvalidCertificateMaterial)
 }
 
