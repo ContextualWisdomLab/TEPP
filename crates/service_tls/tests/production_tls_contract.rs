@@ -200,8 +200,7 @@ fn recovered_tls_decisions_match_known_truth_better_than_a_collapsed_grant() {
         .iter()
         .map(|request| {
             authorize_orchestrator_live_port(request)
-                .map(|authorized| authorized.decision())
-                .unwrap_or(BindDecision::Refused)
+                .map_or(BindDecision::Refused, |authorized| authorized.decision())
         })
         .collect();
     let collapsed = [
