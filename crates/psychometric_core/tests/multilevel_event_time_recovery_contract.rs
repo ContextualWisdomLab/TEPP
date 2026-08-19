@@ -5,17 +5,21 @@ use psychometric_core::{
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
     ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
-    recover_discrete_constant_predictor_effect, recover_discrete_lag_from_log_rate,
-    recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
-    recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
-    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
-    recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
+    recover_discrete_lag_from_log_rate, recover_discrete_lagged_latent_covariance,
+    recover_discrete_latent_mean, recover_discrete_latent_variance, recover_discrete_process_noise,
+    recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
+    recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
+    recover_kish_weighted_slope, recover_manifest_lagged_observed_covariance,
+    recover_manifest_observed_mean, recover_manifest_observed_variance,
+    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
+    refuse_continuous_intercept_as_discrete_mean_increment,
+    refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_initial_latent_mean_as_evolved_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
     refuse_manifest_trait_variance_as_measurement_error,
@@ -995,6 +999,68 @@ fn manifest_observed_mean_recovers_driver_equation_five() {
     );
     assert_eq!(
         recover_manifest_observed_mean(1e308, 2.0, 0.0),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn discrete_latent_mean_recovers_driver_equation_three() {
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let observed =
+        recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+            .expect("eq3-mean");
+    let expected = (drift * delta).exp() * initial + intercept * ((drift * delta).exp_m1() / drift);
+    let error = rmse(&[expected], &[observed]);
+    assert!(error < 1e-15, "Driver Eq. 3 latent mean RMSE {error}");
+    let initial_error = rmse(&[expected], &[initial]);
+    assert!(
+        initial_error > error,
+        "T0MEANS is not μ_t: RMSE {initial_error} must exceed {error}"
+    );
+    let intercept_error = rmse(&[expected], &[intercept]);
+    assert!(
+        intercept_error > error,
+        "CINT is not μ_t: RMSE {intercept_error} must exceed {error}"
+    );
+    let increment =
+        recover_discrete_continuous_intercept_effect(intercept, drift, delta, LagClock::EventTime)
+            .expect("cint");
+    let increment_error = rmse(&[increment], &[intercept]);
+    assert!(
+        increment_error > 1e-3,
+        "CINT is not the discrete increment: RMSE {increment_error}"
+    );
+    assert_eq!(
+        refuse_initial_latent_mean_as_evolved_mean(initial, observed),
+        Err(PsychometricError::InitialLatentMeanIsNotEvolvedMean)
+    );
+    assert_eq!(
+        refuse_continuous_intercept_as_discrete_mean_increment(intercept, increment),
+        Err(PsychometricError::ContinuousInterceptIsNotDiscreteMeanIncrement)
+    );
+    assert_eq!(
+        refuse_continuous_intercept_as_initial_latent_mean(intercept, initial),
+        Err(PsychometricError::ContinuousInterceptIsNotInitialLatentMean)
+    );
+    let integrator =
+        recover_discrete_latent_mean(initial, 0.0, intercept, delta, LagClock::EventTime)
+            .expect("a0");
+    assert!(
+        (integrator - (initial + intercept * delta)).abs() < 1e-15,
+        "Driver Eq. 3 A=0 integral is κ Δt: got {integrator}"
+    );
+    let equilibrium = recover_discrete_latent_mean(initial, -1e308, 1.0, 2.0, LagClock::EventTime)
+        .expect("eq3-equilibrium");
+    let equilibrium_expected = -(1.0 / -1e308);
+    assert!(
+        (equilibrium - equilibrium_expected).abs() / 1e-308 < 1e-12,
+        "Driver Eq. 3 z→-∞ drops T0MEANS and keeps -κ/a: got {equilibrium}"
+    );
+    assert_eq!(
+        recover_discrete_latent_mean(1e308, 1.0, 0.0, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }

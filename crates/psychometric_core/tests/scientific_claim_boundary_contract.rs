@@ -4,14 +4,18 @@ use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
-    recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
-    recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
-    recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate, refuse_continuous_intercept_as_manifest_means,
+    recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
+    recover_discrete_latent_mean, recover_discrete_latent_variance, recover_discrete_process_noise,
+    recover_discrete_time_varying_predictor_effect, recover_irregular_centered_residual_log_rate,
+    recover_loading_point_estimate_mean, recover_manifest_lagged_observed_covariance,
+    recover_manifest_observed_mean, recover_manifest_observed_variance,
+    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    refuse_continuous_intercept_as_discrete_mean_increment,
+    refuse_continuous_intercept_as_initial_latent_mean,
+    refuse_continuous_intercept_as_manifest_means,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_initial_latent_mean_as_evolved_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
     refuse_manifest_trait_variance_as_measurement_error,
@@ -444,5 +448,43 @@ fn manifest_means_and_latent_mean_are_not_observed_mean() {
     assert_eq!(
         refuse_continuous_intercept_as_manifest_means(continuous_intercept, manifest_mean),
         Err(psychometric_core::PsychometricError::ContinuousInterceptIsNotManifestMeans)
+    );
+}
+
+#[test]
+fn initial_latent_mean_and_continuous_intercept_are_not_evolved_mean() {
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let evolved =
+        recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+            .expect("eq3-mean");
+    let increment =
+        recover_discrete_continuous_intercept_effect(intercept, drift, delta, LagClock::EventTime)
+            .expect("cint");
+    assert!(
+        (initial - evolved).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3 / Table 2 p. 12): T0MEANS is not μ_t"
+    );
+    assert!(
+        (intercept - increment).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3 / Table 2 p. 12): CINT is not the discrete mean increment"
+    );
+    assert!(
+        (intercept - initial).abs() > 1e-3,
+        "Driver et al. (2017, Table 2 p. 12): CINT is not T0MEANS"
+    );
+    assert_eq!(
+        refuse_initial_latent_mean_as_evolved_mean(initial, evolved),
+        Err(psychometric_core::PsychometricError::InitialLatentMeanIsNotEvolvedMean)
+    );
+    assert_eq!(
+        refuse_continuous_intercept_as_discrete_mean_increment(intercept, increment),
+        Err(psychometric_core::PsychometricError::ContinuousInterceptIsNotDiscreteMeanIncrement)
+    );
+    assert_eq!(
+        refuse_continuous_intercept_as_initial_latent_mean(intercept, initial),
+        Err(psychometric_core::PsychometricError::ContinuousInterceptIsNotInitialLatentMean)
     );
 }

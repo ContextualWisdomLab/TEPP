@@ -89,6 +89,15 @@ pub enum PsychometricError {
     /// Driver Table 2 `CINT` was treated as `MANIFESTMEANS`. `κ` is
     /// the latent continuous intercept, not the expected `Γ`.
     ContinuousInterceptIsNotManifestMeans,
+    /// Driver Table 2 `T0MEANS` was treated as the evolved latent mean.
+    /// Equation 3 maps `μ_t = exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`.
+    InitialLatentMeanIsNotEvolvedMean,
+    /// Driver Table 2 `CINT` was treated as the discrete mean increment.
+    /// `κ` is not `A^{-1}[e^{A Δt} − I] κ`.
+    ContinuousInterceptIsNotDiscreteMeanIncrement,
+    /// Driver Table 2 `CINT` was treated as `T0MEANS`. `κ` is not
+    /// the first-occasion latent mean.
+    ContinuousInterceptIsNotInitialLatentMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -162,6 +171,15 @@ impl fmt::Display for PsychometricError {
             Self::LatentMeanIsNotObservedMean => "latent mean is not the observed-indicator mean",
             Self::ContinuousInterceptIsNotManifestMeans => {
                 "continuous intercept is not the manifest mean"
+            }
+            Self::InitialLatentMeanIsNotEvolvedMean => {
+                "initial latent mean is not the evolved latent mean"
+            }
+            Self::ContinuousInterceptIsNotDiscreteMeanIncrement => {
+                "continuous intercept is not the discrete mean increment"
+            }
+            Self::ContinuousInterceptIsNotInitialLatentMean => {
+                "continuous intercept is not the initial latent mean"
             }
         };
         formatter.write_str(message)
@@ -295,6 +313,18 @@ mod tests {
         assert_eq!(
             PsychometricError::ContinuousInterceptIsNotManifestMeans.to_string(),
             "continuous intercept is not the manifest mean"
+        );
+        assert_eq!(
+            PsychometricError::InitialLatentMeanIsNotEvolvedMean.to_string(),
+            "initial latent mean is not the evolved latent mean"
+        );
+        assert_eq!(
+            PsychometricError::ContinuousInterceptIsNotDiscreteMeanIncrement.to_string(),
+            "continuous intercept is not the discrete mean increment"
+        );
+        assert_eq!(
+            PsychometricError::ContinuousInterceptIsNotInitialLatentMean.to_string(),
+            "continuous intercept is not the initial latent mean"
         );
     }
 }

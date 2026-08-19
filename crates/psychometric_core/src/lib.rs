@@ -29,7 +29,9 @@
 //! `λ² cov(η_t, η_{t-1}) + ψ` and does not include `Θ`; the
 //! observed-indicator mean is `τ + λ μ` (`MANIFESTMEANS` is `τ`,
 //! not `E(y)`; `CINT` is not `MANIFESTMEANS`; Equation 1
-//! is the SDE),
+//! is the SDE), recovers the Driver Eq. 3 expected-value latent
+//! mean `exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ` (`T0MEANS` is not
+//! `μ_t`; `CINT` is not the discrete increment),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -80,12 +82,16 @@ pub use event_time::LaggedWithinResidual;
 pub use event_time::map_discrete_lag_across_event_intervals;
 /// Exact scalar discrete effect of a constant event-time predictor.
 pub use event_time::recover_discrete_constant_predictor_effect;
+/// Exact scalar discrete intercept increment `A^{-1}[e^{A Δt} − I] κ`.
+pub use event_time::recover_discrete_continuous_intercept_effect;
 /// Exact scalar forward map `φ = exp(a Δt)`.
 pub use event_time::recover_discrete_lag_from_log_rate;
 /// Noiseless scalar discrete lag `later / earlier`.
 pub use event_time::recover_discrete_lag_one;
 /// Exact scalar lagged latent covariance `A_Δt cov(η_{t-1})`.
 pub use event_time::recover_discrete_lagged_latent_covariance;
+/// Exact scalar discrete latent mean `exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`.
+pub use event_time::recover_discrete_latent_mean;
 /// Exact scalar discrete latent variance `A_Δt P A_Δt⊤ + Q_Δt`.
 pub use event_time::recover_discrete_latent_variance;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
@@ -116,12 +122,18 @@ pub use event_time::recover_trait_plus_state_lagged_covariance;
 pub use event_time::recover_trait_plus_state_latent_variance;
 /// CWC-then-event-time local log-rate (not DSEM; not raw-process AR drift).
 pub use event_time::recover_within_residual_event_time_log_rate;
+/// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
+pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
+/// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.
+pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating Driver Table 2 `CINT` as `MANIFESTMEANS`.
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
+/// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
+pub use event_time::refuse_initial_latent_mean_as_evolved_mean;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.

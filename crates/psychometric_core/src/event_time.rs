@@ -36,7 +36,9 @@
 //! observed covariance is `λ² cov(η_t, η_{t-1}) + ψ`; `Θ` does not
 //! enter. The scalar observed mean is `τ + λ μ` (Table 2, p. 12:
 //! `MANIFESTMEANS` is `τ`, not `E(y)`; `CINT` is `κ`, not `τ`;
-//! `T0MEANS` is the initial latent mean, not `E(y)`). The JSS article
+//! `T0MEANS` is the initial latent mean, not `E(y)`). Equation 3's
+//! expected-value map is `μ_t = exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`
+//! (`T0MEANS` is not `μ_t`; `CINT` is not that discrete increment). The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -1112,6 +1114,170 @@ pub fn refuse_continuous_intercept_as_manifest_means(
     Err(PsychometricError::ContinuousInterceptIsNotManifestMeans)
 }
 
+/// Exact scalar discrete intercept increment from Driver Equation 3.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
+/// PDF re-opened 2026-08-19T18:10Z) write the expected-value term
+/// `A^{-1}[e^{A Δt} − I] b` after the stochastic integral is taken
+/// to have mean zero. Table 2 names `κ` `CINT`. The scalar map is
+/// `κ (expm1(a Δt) / a)` for `a ≠ 0`. A zero drift is the Eq. 3
+/// integral with `A = 0`: `κ Δt`. That path has no matrix inverse.
+/// A zero intercept is exactly zero. `CINT` is not this discrete
+/// increment. The `a ≠ 0` evaluation is
+/// [`recover_discrete_constant_predictor_effect`]. This is not a
+/// Kalman filter and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::NonPositiveInterval`] when
+/// `event_delta` is not strictly positive, and
+/// [`PsychometricError::InvalidNumericInput`] when the intercept or
+/// drift is non-finite or the mapped increment is non-finite.
+pub fn recover_discrete_continuous_intercept_effect(
+    continuous_intercept: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !continuous_intercept.is_finite() || !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if log_rate == 0.0 {
+        if continuous_intercept == 0.0 {
+            return Ok(0.0);
+        }
+        return require_finite(continuous_intercept * event_delta);
+    }
+    recover_discrete_constant_predictor_effect(continuous_intercept, log_rate, event_delta, clock)
+}
+
+/// Exact scalar discrete latent mean from Driver Equation 3.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
+/// PDF re-opened 2026-08-19T18:10Z) write
+/// `η(t) = exp(A Δt) η(t0) + ∫ exp(A(t−s)) (b + …) ds` plus a
+/// stochastic integral of mean zero. With no time-varying covariates
+/// the scalar expected-value map is
+/// `μ_t = exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`. Table 2 names `μ_0`
+/// at the first occasion `T0MEANS` and `κ` `CINT`. Form the CINT
+/// increment first, then add the carried `T0MEANS` term. A zero
+/// initial mean is exactly the increment. A zero intercept is exactly
+/// `exp(a Δt) μ_0`. A zero drift carries `T0MEANS` unchanged and adds
+/// `κ Δt`. As `Δt → ∞` with stable `a < 0`, `μ_t → −κ / a`. Binary64
+/// underflow of `exp(a Δt)` to `+0` drops the carried `T0MEANS` and
+/// keeps the equilibrium increment. `T0MEANS` is not `μ_t`. `CINT` is
+/// not the discrete increment. `CINT` is not `T0MEANS`. This is not a
+/// Kalman filter and not ctsem estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_continuous_intercept_effect`] and
+/// returns [`PsychometricError::InvalidNumericInput`] when the initial
+/// mean is non-finite, the carried exponential overflows, or the
+/// mapped mean is non-finite.
+pub fn recover_discrete_latent_mean(
+    initial_latent_mean: f64,
+    log_rate: f64,
+    continuous_intercept: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let intercept_effect = recover_discrete_continuous_intercept_effect(
+        continuous_intercept,
+        log_rate,
+        event_delta,
+        clock,
+    )?;
+    if !initial_latent_mean.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_latent_mean == 0.0 {
+        return Ok(intercept_effect);
+    }
+    let carried = if log_rate == 0.0 {
+        initial_latent_mean
+    } else {
+        let increment_argument = log_rate * event_delta;
+        if increment_argument == 0.0 {
+            initial_latent_mean
+        } else {
+            let discrete_lag = increment_argument.exp();
+            if discrete_lag == 0.0 {
+                0.0
+            } else if !discrete_lag.is_finite() {
+                return Err(PsychometricError::InvalidNumericInput);
+            } else {
+                require_finite(discrete_lag * initial_latent_mean)?
+            }
+        }
+    };
+    if intercept_effect == 0.0 {
+        return Ok(carried);
+    }
+    if carried == 0.0 {
+        return Ok(intercept_effect);
+    }
+    require_finite(carried + intercept_effect)
+}
+
+/// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
+///
+/// Equation 3 maps `μ_t = exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`.
+/// `T0MEANS` is `μ_0`, not `μ_t`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialLatentMeanIsNotEvolvedMean`].
+pub fn refuse_initial_latent_mean_as_evolved_mean(
+    initial_latent_mean: f64,
+    evolved_latent_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_latent_mean, evolved_latent_mean);
+    Err(PsychometricError::InitialLatentMeanIsNotEvolvedMean)
+}
+
+/// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
+///
+/// `κ` is the continuous intercept. Equation 3 maps it through
+/// `A^{-1}[e^{A Δt} − I]`. `κ` is not that increment.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ContinuousInterceptIsNotDiscreteMeanIncrement`].
+pub fn refuse_continuous_intercept_as_discrete_mean_increment(
+    continuous_intercept: f64,
+    discrete_mean_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (continuous_intercept, discrete_mean_increment);
+    Err(PsychometricError::ContinuousInterceptIsNotDiscreteMeanIncrement)
+}
+
+/// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.
+///
+/// Table 2 (p. 12) names `κ` `CINT` and the first-occasion latent
+/// mean `T0MEANS`. `κ` is not `E(η_{i1})`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ContinuousInterceptIsNotInitialLatentMean`].
+pub fn refuse_continuous_intercept_as_initial_latent_mean(
+    continuous_intercept: f64,
+    initial_latent_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (continuous_intercept, initial_latent_mean);
+    Err(PsychometricError::ContinuousInterceptIsNotInitialLatentMean)
+}
+
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5):
@@ -1361,8 +1527,9 @@ mod tests {
     use super::{
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, recover_discrete_constant_predictor_effect,
-        recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
-        recover_discrete_lagged_latent_covariance, recover_discrete_latent_variance,
+        recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
+        recover_discrete_lag_one, recover_discrete_lagged_latent_covariance,
+        recover_discrete_latent_mean, recover_discrete_latent_variance,
         recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
         recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_irregular_centered_residual_log_rate, recover_local_log_rate,
@@ -1370,8 +1537,11 @@ mod tests {
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
         recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
         recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+        refuse_continuous_intercept_as_discrete_mean_increment,
+        refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
         refuse_finite_interval_process_noise_as_stationary_variance,
+        refuse_initial_latent_mean_as_evolved_mean,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
         refuse_manifest_means_as_observed_mean,
@@ -2992,5 +3162,122 @@ mod tests {
         );
         assert_eq!(recover_manifest_observed_mean(0.0, 1e308, 0.5), Ok(0.5));
         assert_eq!(recover_manifest_observed_mean(1e308, 0.0, 0.5), Ok(0.5));
+    }
+
+    #[test]
+    fn discrete_latent_mean_recovers_driver_equation_three() {
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let recovered =
+            recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+                .expect("eq3-mean");
+        let expected =
+            (drift * delta).exp() * initial + intercept * ((drift * delta).exp_m1() / drift);
+        assert!((recovered - expected).abs() < 1e-15);
+        let increment = recover_discrete_continuous_intercept_effect(
+            intercept,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("cint");
+        assert!((increment - intercept * ((drift * delta).exp_m1() / drift)).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_latent_mean(0.0, drift, intercept, delta, LagClock::EventTime),
+            Ok(increment)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(initial, drift, 0.0, delta, LagClock::EventTime),
+            Ok((drift * delta).exp() * initial)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(initial, 0.0, intercept, delta, LagClock::EventTime),
+            Ok(initial + intercept * delta)
+        );
+        assert_eq!(
+            recover_discrete_continuous_intercept_effect(
+                intercept,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(intercept * delta)
+        );
+        assert_eq!(
+            recover_discrete_continuous_intercept_effect(0.0, 0.0, delta, LagClock::EventTime),
+            Ok(0.0)
+        );
+        assert_eq!(
+            refuse_initial_latent_mean_as_evolved_mean(initial, recovered),
+            Err(PsychometricError::InitialLatentMeanIsNotEvolvedMean)
+        );
+        assert_eq!(
+            refuse_continuous_intercept_as_discrete_mean_increment(intercept, increment),
+            Err(PsychometricError::ContinuousInterceptIsNotDiscreteMeanIncrement)
+        );
+        assert_eq!(
+            refuse_continuous_intercept_as_initial_latent_mean(intercept, initial),
+            Err(PsychometricError::ContinuousInterceptIsNotInitialLatentMean)
+        );
+        let equilibrium =
+            recover_discrete_latent_mean(initial, -1e308, 1.0, 2.0, LagClock::EventTime)
+                .expect("eq3-equilibrium");
+        let equilibrium_expected = -(1.0 / -1e308);
+        assert!((equilibrium - equilibrium_expected).abs() / 1e-308 < 1e-12);
+        assert_eq!(
+            recover_discrete_latent_mean(1e308, 1.0, 0.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(0.0, 1e308, 0.0, 2.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn discrete_latent_mean_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_discrete_latent_mean(f64::NAN, -0.5, 0.3, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(1.0, f64::NAN, 0.3, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(1.0, -0.5, f64::NAN, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(1.0, -0.5, 0.3, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(1.0, -0.5, 0.3, 2.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_continuous_intercept_effect(1.0, 1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(1.0, 1e308, 1.0, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(1e308, 0.0, 1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean(1e308, 0.0, 1e308, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let underflow_argument = 1e-308_f64 * 1e-308_f64;
+        assert_eq!(underflow_argument.to_bits(), 0.0_f64.to_bits());
+        let underflow = recover_discrete_latent_mean(2.0, 1e-308, 4.0, 1e-308, LagClock::EventTime)
+            .expect("a-delta-underflow");
+        assert!((underflow - 2.0).abs() < 1e-15);
     }
 }
