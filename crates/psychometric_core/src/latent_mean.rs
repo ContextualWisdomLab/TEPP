@@ -8,8 +8,13 @@
 //! Wire names `configural` / `metric` / `scalar` match the unpublished
 //! `measurement_invariance` crate (#84) without importing it. That crate's
 //! `Metric` gate is not used here for latent means. `#84` `scalar` is the
-//! strong/scalar status. Meredith (1993) names weak/strong/strict are used
-//! only as conventional labels; that PDF was not opened.
+//! strong/scalar status. Putnick and Bornstein (2016, PMC author manuscript
+//! opened 2026-08-19T22:15Z) require scalar invariance before latent-mean
+//! comparison; residual invariance is not a prerequisite for those means.
+//! Two-observation series have no residual degrees of freedom
+//! (`ordinary_least_squares_fit` returns residual variance `0`) and
+//! therefore cannot be classified as strict. Meredith (1993) names
+//! weak/strong/strict remain unread labels.
 
 use crate::error::PsychometricError;
 use crate::indicator::{IndicatorKind, require_finite, require_valid_indicator};
@@ -125,11 +130,13 @@ pub fn classify_two_group_ols_invariance(
     let loading_gap = (reference_fit.slope - comparison_fit.slope).abs();
     let intercept_gap = (reference_fit.intercept - comparison_fit.intercept).abs();
     let residual_gap = (reference_fit.residual_variance - comparison_fit.residual_variance).abs();
+    let residual_degrees_of_freedom =
+        reference.factor_scores.len() > 2 && comparison.factor_scores.len() > 2;
     let status = if loading_gap > loading_tolerance {
         MeanInvarianceStatus::Configural
     } else if intercept_gap > intercept_tolerance {
         MeanInvarianceStatus::Metric
-    } else if residual_gap > residual_tolerance {
+    } else if !residual_degrees_of_freedom || residual_gap > residual_tolerance {
         MeanInvarianceStatus::Strong
     } else {
         MeanInvarianceStatus::Strict
@@ -322,6 +329,40 @@ mod tests {
         )
         .expect("configural");
         assert_eq!(classified.status, MeanInvarianceStatus::Configural);
+    }
+
+    #[test]
+    fn two_observation_series_cap_at_strong_and_still_license_means() {
+        let reference = series(&[-1.0, 1.0], 0.5, 1.2);
+        let comparison = series(&[0.0, 2.0], 0.5, 1.2);
+        let classified = classify_two_group_ols_invariance(
+            &reference,
+            &comparison,
+            IndicatorKind::AdditiveLogRatio,
+            1e-9,
+            1e-9,
+            1e-9,
+        )
+        .expect("two-obs");
+        assert_eq!(classified.status, MeanInvarianceStatus::Strong);
+        assert_eq!(
+            classified.reference_residual_variance.to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert_eq!(
+            classified.comparison_residual_variance.to_bits(),
+            0.0_f64.to_bits()
+        );
+        let difference = recover_strong_gated_latent_mean_difference(
+            &reference,
+            &comparison,
+            IndicatorKind::AdditiveLogRatio,
+            1e-9,
+            1e-9,
+            1e-9,
+        )
+        .expect("licensed");
+        assert!((difference - 1.0).abs() < 1e-12);
     }
 
     #[test]

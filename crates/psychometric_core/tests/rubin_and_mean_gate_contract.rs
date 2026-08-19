@@ -120,3 +120,49 @@ fn strong_status_matches_hash84_scalar_and_recovers_mean_difference() {
     let error = rmse(&[2.0], &[difference]);
     assert!(error < 1e-12, "latent-mean RMSE {error}");
 }
+
+#[test]
+fn two_observation_series_cap_at_strong_scalar_and_still_license_means() {
+    let reference = GroupIndicatorSeries {
+        factor_scores: vec![-1.0, 1.0],
+        indicators: vec![-0.7, 1.7],
+    };
+    let comparison = GroupIndicatorSeries {
+        factor_scores: vec![0.0, 2.0],
+        indicators: vec![0.5, 2.9],
+    };
+    let classified = classify_two_group_ols_invariance(
+        &reference,
+        &comparison,
+        IndicatorKind::AdditiveLogRatio,
+        1e-9,
+        1e-9,
+        1e-9,
+    )
+    .expect("two-obs");
+    assert_eq!(classified.status, MeanInvarianceStatus::Strong);
+    assert_eq!(
+        classified.status.as_measurement_invariance_wire_name(),
+        "scalar"
+    );
+    assert_eq!(
+        classified.reference_residual_variance.to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        classified.comparison_residual_variance.to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert!(classified.status.licenses_latent_mean_comparison());
+    let difference = recover_strong_gated_latent_mean_difference(
+        &reference,
+        &comparison,
+        IndicatorKind::AdditiveLogRatio,
+        1e-9,
+        1e-9,
+        1e-9,
+    )
+    .expect("licensed");
+    let error = rmse(&[1.0], &[difference]);
+    assert!(error < 1e-12, "two-obs latent-mean RMSE {error}");
+}

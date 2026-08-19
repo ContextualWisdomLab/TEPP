@@ -9,7 +9,7 @@ This slice delivers the first executable ADR 0005 contract in `psychometric_core
 3. admit ALR, ILR, or logistic-normal coordinates as unconstrained structural inputs while reserving orthonormal Aitchison-distance claims for ILR;
 4. recover a reflective loading point estimate by ordinary least squares on a CPU `f64` path;
 5. average recovered loading point estimates across posterior indicator draws without claiming Rubin within/between uncertainty pooling (the Rubin `T` helper is a separate API; see `docs/research/rubin-total-variance.md`);
-6. refuse latent-mean comparison without invariance evidence, and recover a mean difference only under strong or strict two-group OLS status;
+6. refuse latent-mean comparison without invariance evidence, and recover a mean difference only under strong or strict two-group OLS status (Putnick & Bornstein, 2016: scalar licenses means; residual invariance is not required; two-observation series cap at strong because residual variance is identically `0`);
 7. refuse causal language that rests only on temporal precedence, document linkage, event tracking, or model prediction.
 
 Cluster-mean CWC, the CWC contextual effect, Kish WLS, event-time log-rate, CWC-then-lag, irregular already-centered residual log-rate, and the Driver Eq. 5 of the Eq. 3 evolved mean live in the same crate and are documented in `docs/research/multilevel-event-time-recovery.md`. Full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target.

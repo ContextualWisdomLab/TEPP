@@ -10,17 +10,26 @@ This slice does **not** import the unpublished `measurement_invariance` crate on
 
 - `#84` `metric` licenses shared **metric** meaning. It does **not** license latent means.
 - `#84` `scalar` is the strong/scalar status (equal loading and intercept). That status licenses latent means.
-- Strict (also equal residual variance) also licenses latent means.
+- Strict (also equal residual variance) also licenses latent means. Residual invariance is **not** required for those means.
+- Two-observation series have no residual degrees of freedom. OLS residual variance is then identically `0` and is not an estimated residual. Those series cap at strong/scalar and still license means.
 - This is two-group OLS, not MGCFA, not partial invariance, and not alignment optimization.
-- Meredith (1993) names weak/strong/strict are used only as conventional labels. That PDF was not opened (Unpaywall/OpenAlex/Semantic Scholar/CORE/OpenAIRE/archive.org 2026-08-18T03:07Z: closed; Springer remains an HTML stub). Do not cite Meredith equations as having been read.
+- Meredith (1993) names weak/strong/strict are used only as conventional labels. That PDF was not opened (Unpaywall/OpenAlex/Semantic Scholar 2026-08-19T22:15Z: closed; Springer `content/pdf` is HTML 200). Do not cite Meredith equations as having been read. Putnick and Bornstein (2016) cite Meredith for residual invariance as part of *full factorial invariance*; that citation is not a reading of Meredith.
 
 ## Authoritative sources used for the mean gate
 
-The executable gate follows the ADR 0005 rule that mean comparison requires the invariance level needed for that claim, and the `#84` terminology split between metric meaning and scalar/strong means. Opened sources that constrain the surrounding longitudinal/invariance stance:
+Putnick, D. L., & Bornstein, M. H. (2016). Measurement invariance conventions and reporting: The state of the art and future directions for psychological research. *Developmental Review, 41*, 71–90. https://doi.org/10.1016/j.dr.2016.06.004
+
+PMC author manuscript (PMC5145197) opened 2026-08-19T22:15Z from https://pmc.ncbi.nlm.nih.gov/articles/PMC5145197/. The NIHMS PDF endpoints returned HTML/500 on this cycle; the PMC HTML full text is the opened copy.
+
+Putnick and Bornstein write that measurement invariance is a prerequisite to comparing group means. Metric invariance is equivalence of item loadings: each item contributes to the latent construct to a similar degree across groups. Scalar invariance is equivalence of item intercepts after metric: “mean differences in the latent construct capture all mean differences in the shared variance of the items.” After those steps, “the researcher is free to compare group means on the latent factors.” Residual invariance “is not a prerequisite for testing mean differences because the residuals are not part of the latent factor” (they cite Vandenberg & Lance, 2000, unread). Configural, metric, and scalar “are required prior to group mean comparisons.” This crate’s `#84` `metric` / `scalar` split follows that terminology. The executable map remains two-group OLS, not their multiple-group CFA.
+
+Opened sources that constrain the surrounding longitudinal/invariance stance:
 
 Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. *Structural Equation Modeling: A Multidisciplinary Journal, 16*(3), 397–438. https://doi.org/10.1080/10705510903008204
 
 Hamaker, E. L., Kuiper, R. M., & Grasman, R. P. P. P. (2015). A critique of the cross-lagged panel model. *Psychological Methods, 20*(1), 102–116. https://doi.org/10.1037/a0038889
+
+Vandenberg, R. J., & Lance, C. E. (2000). A review and synthesis of the measurement invariance literature: Suggestions, practices, and recommendations for organizational research. *Organizational Research Methods, 3*(1), 4–70. https://doi.org/10.1177/109442810031002 (cited by Putnick & Bornstein, 2016, for residual invariance not being required for latent means; PDF not opened).
 
 ## Formula notes
 
@@ -28,8 +37,8 @@ Per group, \(y=\nu+\lambda f+e\) is fit by OLS. Status is:
 
 - configural when \(|\lambda_r-\lambda_c|\) exceeds tolerance;
 - metric when loadings match and intercepts differ;
-- strong when loadings and intercepts match and residual variances differ;
-- strict when loadings, intercepts, and residual variances match.
+- strong when loadings and intercepts match and residual variances differ, or when residual degrees of freedom are absent;
+- strict when both groups have residual degrees of freedom and loadings, intercepts, and residual variances match.
 
 The latent-mean difference is \((\bar y_c-\bar y_r)/\lambda\) with \(\lambda\) the midpoint of the two loadings, and only after strong or strict.
 
@@ -37,4 +46,5 @@ The latent-mean difference is \((\bar y_c-\bar y_r)/\lambda\) with \(\lambda\) t
 
 - strong/strict series recover a known mean difference with computed RMSE;
 - metric-only (equal loading, shifted intercept) and configural series return `StrongInvarianceRequired`;
+- two-observation series with matching loading and intercept classify as strong, not strict, and still recover the known mean difference;
 - `#84` wire-name tests: `metric` licenses shared metric meaning and refuses means; `scalar` is strong and licenses means.
