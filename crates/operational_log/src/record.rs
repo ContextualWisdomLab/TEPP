@@ -27,6 +27,12 @@ impl AnalyticalSubject {
     }
 }
 
+impl Default for AnalyticalSubject {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Source identity that must never become an operational-log subject.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SourceIdentity(Uuid);
@@ -36,6 +42,12 @@ impl SourceIdentity {
     #[must_use]
     pub fn new() -> Self {
         Self(Uuid::now_v7())
+    }
+}
+
+impl Default for SourceIdentity {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
