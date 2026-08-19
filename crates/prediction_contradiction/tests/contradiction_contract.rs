@@ -89,18 +89,35 @@ fn meeting_intervals_are_adjacent_not_allen_contradiction() {
 }
 
 #[test]
-fn overlapping_observation_may_support_promotion() {
+fn partially_overlapping_observation_lacks_full_support() {
     let predicted = closed_event_interval(0, 10);
     let overlapping = closed_event_interval(5, 15);
     let (observed_available, knowledge_cutoff) = eligible_clocks();
     assert!(!intervals_contradict(&predicted, &overlapping).expect("overlaps"));
-    refuse_promotion(
-        &predicted,
-        &overlapping,
-        observed_available,
-        knowledge_cutoff,
-    )
-    .expect("overlapping support");
+    assert_eq!(
+        refuse_promotion(
+            &predicted,
+            &overlapping,
+            observed_available,
+            knowledge_cutoff,
+        ),
+        Err(PredictionContradictionError::PredictionLacksFullSupport)
+    );
+}
+
+#[test]
+fn full_interval_coverage_may_support_promotion() {
+    let (observed_available, knowledge_cutoff) = eligible_clocks();
+    let predictions = [
+        (closed_event_interval(0, 5), closed_event_interval(0, 10)),
+        (closed_event_interval(2, 8), closed_event_interval(0, 10)),
+        (closed_event_interval(5, 10), closed_event_interval(0, 10)),
+        (closed_event_interval(0, 10), closed_event_interval(0, 10)),
+    ];
+    for (predicted, observed) in predictions {
+        refuse_promotion(&predicted, &observed, observed_available, knowledge_cutoff)
+            .expect("observed interval fully covers prediction");
+    }
 }
 
 #[test]

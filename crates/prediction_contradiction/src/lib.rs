@@ -4,10 +4,10 @@
 //!
 //! A forecast cannot be promoted to an observed event when
 //! [`temporal_core::classify_interval_relation`] returns Allen `before` or
-//! `after`, or when the pair only `meets` / is `met_by`. Evidence whose
-//! availability time exceeds the analysis knowledge cutoff is ineligible
-//! (ADR 0002, ADR 0016). This crate does not run the path-consistency
-//! reasoner.
+//! `after`, when the pair only `meets` / is `met_by`, or when observed evidence
+//! covers only part of the prediction. Evidence whose availability time exceeds
+//! the analysis knowledge cutoff is ineligible (ADR 0002, ADR 0016). This crate
+//! does not run the path-consistency reasoner.
 
 mod error;
 mod interval;

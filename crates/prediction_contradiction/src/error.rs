@@ -10,6 +10,8 @@ pub enum PredictionContradictionError {
     PredictionContradictsObservation,
     /// Predicted and observed intervals meet but do not overlap in their interiors.
     PredictionLacksOverlappingSupport,
+    /// Observed evidence covers only part of the predicted interval.
+    PredictionLacksFullSupport,
     /// Observed evidence became available after the analysis knowledge cutoff.
     EvidenceAfterCutoff,
     /// An interval is not a closed proper Allen input.
@@ -25,7 +27,10 @@ impl fmt::Display for PredictionContradictionError {
                 "predicted interval contradicts observed evidence"
             }
             Self::PredictionLacksOverlappingSupport => {
-                "predicted interval meets observation without overlapping support"
+                "predicted interval is adjacent to observation without overlapping support"
+            }
+            Self::PredictionLacksFullSupport => {
+                "predicted interval is not fully supported by observed evidence"
             }
             Self::EvidenceAfterCutoff => {
                 "observed evidence is available after the knowledge cutoff"
@@ -52,7 +57,11 @@ mod tests {
             ),
             (
                 PredictionContradictionError::PredictionLacksOverlappingSupport,
-                "predicted interval meets observation without overlapping support",
+                "predicted interval is adjacent to observation without overlapping support",
+            ),
+            (
+                PredictionContradictionError::PredictionLacksFullSupport,
+                "predicted interval is not fully supported by observed evidence",
             ),
             (
                 PredictionContradictionError::EvidenceAfterCutoff,

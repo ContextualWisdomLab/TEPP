@@ -54,7 +54,9 @@ pub fn intervals_contradict(
 /// [`PredictionContradictionError::PredictionContradictsObservation`] for
 /// Allen `before` / `after`. Returns
 /// [`PredictionContradictionError::PredictionLacksOverlappingSupport`] for
-/// `meets` / `met_by`. Returns
+/// `meets` / `met_by`, and
+/// [`PredictionContradictionError::PredictionLacksFullSupport`] when observed
+/// evidence covers only part of the prediction. Returns
 /// [`PredictionContradictionError::InvalidIntervalPayload`] when either
 /// interval is not a closed proper Allen input.
 pub fn refuse_promotion(
@@ -73,15 +75,17 @@ pub fn refuse_promotion(
         AllenRelation::Meets | AllenRelation::MetBy => {
             Err(PredictionContradictionError::PredictionLacksOverlappingSupport)
         }
+        AllenRelation::Starts
+        | AllenRelation::During
+        | AllenRelation::Finishes
+        | AllenRelation::Equals => Ok(()),
         AllenRelation::Overlaps
         | AllenRelation::OverlappedBy
-        | AllenRelation::Starts
         | AllenRelation::StartedBy
-        | AllenRelation::During
         | AllenRelation::Contains
-        | AllenRelation::Finishes
-        | AllenRelation::FinishedBy
-        | AllenRelation::Equals => Ok(()),
+        | AllenRelation::FinishedBy => {
+            Err(PredictionContradictionError::PredictionLacksFullSupport)
+        }
     }
 }
 
@@ -158,12 +162,24 @@ mod tests {
         assert!(!intervals_contradict(&predicted, &closed(2, 10)).expect("finished_by"));
         assert!(!intervals_contradict(&closed(2, 10), &predicted).expect("finishes"));
         assert!(!intervals_contradict(&predicted, &closed(0, 10)).expect("equals"));
-        refuse_promotion(&predicted, &closed(5, 15), available, cutoff).expect("overlap");
-        refuse_promotion(&predicted, &closed(0, 8), available, cutoff).expect("started_by");
+        assert_eq!(
+            refuse_promotion(&predicted, &closed(5, 15), available, cutoff),
+            Err(PredictionContradictionError::PredictionLacksFullSupport)
+        );
+        assert_eq!(
+            refuse_promotion(&predicted, &closed(0, 8), available, cutoff),
+            Err(PredictionContradictionError::PredictionLacksFullSupport)
+        );
         refuse_promotion(&closed(0, 8), &predicted, available, cutoff).expect("starts");
-        refuse_promotion(&predicted, &closed(2, 8), available, cutoff).expect("contains");
+        assert_eq!(
+            refuse_promotion(&predicted, &closed(2, 8), available, cutoff),
+            Err(PredictionContradictionError::PredictionLacksFullSupport)
+        );
         refuse_promotion(&closed(2, 8), &predicted, available, cutoff).expect("during");
-        refuse_promotion(&predicted, &closed(2, 10), available, cutoff).expect("finished_by");
+        assert_eq!(
+            refuse_promotion(&predicted, &closed(2, 10), available, cutoff),
+            Err(PredictionContradictionError::PredictionLacksFullSupport)
+        );
         refuse_promotion(&closed(2, 10), &predicted, available, cutoff).expect("finishes");
         refuse_promotion(&predicted, &closed(0, 10), available, cutoff).expect("equals");
         assert_eq!(
