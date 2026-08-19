@@ -51,9 +51,10 @@ def is_executable_source_line(
     """Return whether *line_number* in *source_path* is an executable source line.
 
     LLVM LCOV sometimes emits zero-count DA records for documentation comments,
-    attributes, pure structural braces, multi-line signatures, and in-file
-    ``#[cfg(test)]`` modules. Those records are not evidence of uncovered
-    production behavior and are excluded from the authored-line gate.
+    attributes, pure structural braces, multi-line signatures, Rust multiline
+    string continuations, and in-file ``#[cfg(test)]`` modules. Those records
+    are not evidence of uncovered production behavior and are excluded from the
+    authored-line gate.
 
     When *repository_root* is provided, *source_path* must resolve under that
     root (same fail-closed rule as LCOV ``SF:`` loading).
@@ -75,6 +76,8 @@ def is_executable_source_line(
         return False
     if _line_in_cfg_not_feature_block(lines, line_number):
         return False
+    if _line_in_multiline_string_literal(lines, line_number):
+        return False
     text = lines[line_number - 1].strip()
     if not text:
         return False
@@ -82,7 +85,9 @@ def is_executable_source_line(
         return False
     if text.startswith("#[") or text.startswith("#!["):
         return False
-    if text in {"{", "}", "},", ");", "];", "();", "};"}:
+    if text in {"{", "}", "},", ")", ");", "];", "();", "};"}:
+        return False
+    if text.startswith('"') or text.startswith("} else"):
         return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False
@@ -161,6 +166,18 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
             index = cursor + 1
             continue
         index += 1
+    return False
+
+
+def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
+    """Return whether a line is inside a Rust normal-string continuation."""
+    in_string = False
+    for index, raw in enumerate(lines, start=1):
+        if in_string and index == line_number:
+            return True
+        quote_count = raw.replace('\\"', "").count('"')
+        if quote_count % 2:
+            in_string = not in_string
     return False
 
 
