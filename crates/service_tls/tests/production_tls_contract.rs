@@ -186,16 +186,24 @@ fn bind_request_debug_redacts_certificate_and_private_key_pem() {
 
 #[test]
 fn recovered_tls_decisions_match_known_truth_better_than_a_collapsed_grant() {
+    let requests = [
+        request("203.0.113.10", "https", CERTIFICATE_PEM, PRIVATE_KEY_PEM),
+        request("localhost", "http", "", ""),
+        request("0.0.0.0", "http", CERTIFICATE_PEM, PRIVATE_KEY_PEM),
+    ];
     let truth = [
         BindDecision::ProductionTls,
-        BindDecision::DevelopmentOnly,
+        BindDecision::Refused,
         BindDecision::Refused,
     ];
-    let recovered = [
-        BindDecision::ProductionTls,
-        BindDecision::DevelopmentOnly,
-        BindDecision::Refused,
-    ];
+    let recovered: Vec<_> = requests
+        .iter()
+        .map(|request| {
+            authorize_orchestrator_live_port(request)
+                .map(|authorized| authorized.decision())
+                .unwrap_or(BindDecision::Refused)
+        })
+        .collect();
     let collapsed = [
         BindDecision::ProductionTls,
         BindDecision::ProductionTls,
