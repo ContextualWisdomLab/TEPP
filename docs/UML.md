@@ -140,8 +140,8 @@ GPU may be absent or fall back to CPU. A GPU result is not accepted merely becau
 stateDiagram-v2
     [*] --> workspace_foundation
     workspace_foundation --> immutable_evidence: protected_main
-    immutable_evidence --> six_clock_temporal: PR_8_active_replacement
-    six_clock_temporal --> interval_reasoning: Task_4_replay_required
+    immutable_evidence --> six_clock_temporal: PR_8_merged_implemented_main
+    six_clock_temporal --> interval_reasoning: PR_9_merged_implemented_main
     interval_reasoning --> event_relation_membership: accepted_target
     event_relation_membership --> persistence_and_splits: accepted_target
     persistence_and_splits --> topic_measurement: accepted_target
