@@ -1,7 +1,7 @@
 # TEPP Requirements, Research, and Evidence Traceability
 
 **Status:** Accepted cross-cutting traceability baseline  
-**Last reviewed:** 2026-08-16
+**Last reviewed:** 2026-08-19
 
 The full APA 7th standards/literature register remains `docs/research/standards-and-literature.md`. This matrix links durable requirements to their owning decisions and implementation/evidence maturity without duplicating the bibliography.
 
@@ -14,15 +14,16 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | Allen relation algebra/bounded closure | ADR 0002; Allen (1983) | merged PR #9 `temporal_core` path-consistency on protected main | implemented-main |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
-| time-varying cross-classified multiple membership | PRD; ADR 0003; Fox & Glas (2001); AERA/APA/NCME (2014) | `membership_core` network on protected main; multilevel estimators remaining | partial |
+| time-varying cross-classified multiple membership | PRD; ADR 0003; Fox & Glas (2001) for multilevel IRT; AERA/APA/NCME (2014) | `membership_core` network on protected main; Fox & Glas does not establish an arbitrary multiple-membership estimator; multilevel estimators remain | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
 | PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, tenant RLS (`0002` + session GUC/role helpers), `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` driver, exact-head live PostgreSQL CI with isolation proof, append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006` implemented-main), event-relation/mention/instance SQL (#37–#39 implemented-main), source-artifact SQL (#40 implemented-main), audit-event SQL (#41 implemented-main), concurrent document-write stress (#43 implemented-main), backup/restore integrity revalidation (active PR); remaining physical ERD constraints | partial |
 | known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | `tepp_simulation` on protected main; recovery metrics in `validation_core` | implemented-main |
-| versioned service/API contracts and exports | PRD; API contract; ADR 0011/0013 | `tepp_api` analysis-run/export/JSON-LD/GraphML contracts on protected main (PR #21); HTTP service remaining accepted-target | partial |
+| analysis-run/export DTO and artifact contracts | PRD; API contract; ADR 0011/0013 | `tepp_api` analysis-run/export/JSON-LD/GraphML contracts on protected main (merged PR #21) | implemented-main |
+| production HTTP service routing | PRD; API contract; ADR 0011 | No deployed HTTP service; endpoint shapes remain a future service target | partial |
 | immutable split/run/reproducibility manifests | ADR 0013; ERD | `tepp_api` reproducibility manifest contract on protected main; `persistence_postgres` append-only SQL insert/lookup for `reproducibility_manifest`, `corpus_split_manifest`, `model_run`, and `model_artifact` (migration `0003`); full physical ERD constraints remaining | partial |
-| multilingual shared latent semantic space | PRD; ADR 0004; Blei & Lafferty (2006); Roberts et al. (2014, 2019) | future semantic/concept/topic crates | accepted-target |
-| TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004; Blei & Lafferty (2006); Roberts et al. (2014, 2019) | future `topic_measurement`; TRSL-TM is the product contract, STM-style logistic-normal the reference family | accepted-target |
+| multilingual shared latent semantic space | PRD; ADR 0004; Mimno et al. (2009); Blei & Lafferty (2006); Roberts et al. (2014, 2019) | future semantic/concept/topic crates | accepted-target |
+| TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004; Chang & Blei (2009); Blei & Lafferty (2006); Roberts et al. (2014, 2019) | future `topic_measurement`; TRSL-TM is the product contract, STM-style logistic-normal the reference family | accepted-target |
 | global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
 | report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
@@ -30,7 +31,9 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | compositional topic correlation / stable clustering | ADR 0005/0012; Aitchison (1982) | future `network_analysis` | accepted-target |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005; Asparouhov & Muthén (2009); Asparouhov et al. (2018); Marsh et al. (2014); AERA/APA/NCME (2014) | future `psychometric_core` | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
-| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; Allan (2002); Anagnostopoulos et al. (2013) | future `event_intelligence` | accepted-target |
+| TDT detection/tracking | ADR 0016; Allan (2002) | future `event_intelligence` | accepted-target |
+| neural event-schema induction and prediction | ADR 0016; Li et al. (2021) | future `event_intelligence` | accepted-target |
+| symbolic qualitative temporal consistency | ADR 0016; Anagnostopoulos et al. (2013) | future `event_intelligence` | accepted-target |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router plus future `interpretation_gateway` | partial |
 | adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | `tepp_api::route_orchestration` + ablation record on the active PR; live contextual-orchestrator execution remaining | partial |
 | purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `tepp_api` export authorization plus provider-payload minimization / elevated re-identification implemented-main; persistence retention/deletion remaining | partial |

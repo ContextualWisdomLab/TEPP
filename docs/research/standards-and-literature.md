@@ -10,11 +10,11 @@ Asparouhov, T., Hamaker, E. L., & Muthén, B. (2018). Dynamic structural equatio
 
 Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. *Structural Equation Modeling: A Multidisciplinary Journal, 16*(3), 397–438. https://doi.org/10.1080/10705510903008204
 
-Fox, J.-P., & Glas, C. A. W. (2001). Bayesian estimation of a multilevel IRT model. *Psychometrika, 66*(2), 271–288. https://doi.org/10.1007/BF02294837
+Fox, J.-P., & Glas, C. A. W. (2001). Bayesian estimation of a multilevel IRT model using Gibbs sampling. *Psychometrika, 66*(2), 271–288. https://doi.org/10.1007/BF02294839
 
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, DSEM, and multilevel/non-independence measurement. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Clustered or cross-classified observations are not flattened into independent rows (Fox & Glas, 2001; American Educational Research Association et al., 2014).
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, DSEM, and multilevel/non-independence measurement. Fox and Glas (2001) support Bayesian multilevel IRT estimation; they are not evidence for every cross-classified or multiple-membership estimator TEPP may later implement. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Clustered or cross-classified observations are not flattened into independent rows (Fox & Glas, 2001; American Educational Research Association et al., 2014).
 
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 
@@ -70,7 +70,9 @@ Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information 
 
 Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reasoning engine for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 70–77. https://doi.org/10.1016/j.procs.2013.09.082
 
-TEPP uses Allen interval algebra and partial-order reasoning, ISO-TimeML/OWL-Time vocabulary, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers (Allen, 1983; International Organization for Standardization, 2012; Hobbs & Pan, 2017; Allan, 2002; Anagnostopoulos et al., 2013).
+Li, M., Li, S., Wang, Z., Huang, L., Cho, K., Ji, H., Han, J., & Voss, C. (2021). The future is not one-dimensional: Complex event schema induction by graph modeling for event prediction. In *Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing* (pp. 5203–5215). Association for Computational Linguistics. https://doi.org/10.18653/v1/2021.emnlp-main.422
+
+TEPP uses Allen interval algebra and partial-order reasoning, ISO-TimeML/OWL-Time vocabulary, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, neural event-schema induction/prediction, and separate symbolic temporal-consistency reasoning (Allen, 1983; International Organization for Standardization, 2012; Hobbs & Pan, 2017; Allan, 2002; Li et al., 2021; Anagnostopoulos et al., 2013).
 
 ## Unicode, language tags, and multilingual structure
 
