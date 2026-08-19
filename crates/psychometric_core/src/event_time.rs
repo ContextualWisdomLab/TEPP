@@ -611,19 +611,22 @@ pub fn recover_discrete_latent_variance(
 /// Exact scalar stationary within-subject variance on event time.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 4, p. 5; JSS PDF re-opened
-/// 2026-08-18T18:03Z) write `Q_Δt` as
+/// 2026-08-19T00:14Z) write `Q_Δt` as
 /// `irow(A#^{-1}[e^{A# Δt} − I] row(Q))` with `A# = A ⊗ I + I ⊗ A`.
 /// The scalar Kronecker sum is `2 a`. As `Δt → ∞` with stable
 /// `a < 0`, `e^{2 a Δt} → 0` and Eq. 4 becomes `-q / (2 a)`. The
 /// JSS summary names that limit `asymDIFFUSION` and takes it as the
 /// total within-subject variance (p. 16). Section 4.3 (pp. 9–10)
 /// constrains a stationary `T0VAR` to that same model-predicted
-/// variance. Form `-0.5 q / a`. Do not form `2 a` first: at
+/// variance. Form `(q / a) * -0.5`. Do not form `2 a` first: at
 /// `a = -1e308`, `q = 1e308`, `2 a` overflows and `-q / (2 a)`
-/// collapses to `+0`, but `-0.5 q / a = 0.5`. A zero diffusion is
+/// collapses to `+0`, but `(q / a) * -0.5 = 0.5`. Do not form
+/// `0.5 q` first: at `q = from_bits(1)`, `a = -from_bits(1)`,
+/// `-0.5 * q` underflows to `-0` and the quotient is `+0`, but
+/// the representable Lyapunov solution is `0.5`. A zero diffusion is
 /// exactly zero. `a ≥ 0` has no finite stationary variance
 /// (including Brownian `a = 0`, whose variance grows as `q Δt`).
-/// An overflowing `-0.5 q / a` fails closed. This is not a Kalman
+/// An overflowing `(q / a) * -0.5` fails closed. This is not a Kalman
 /// filter, not DSEM, not a matrix `expm`, and not ctsem estimation.
 ///
 /// # Errors
@@ -653,8 +656,9 @@ pub fn recover_stationary_latent_variance(
     if continuous_diffusion == 0.0 {
         return Ok(0.0);
     }
-    // −q / (2 a) = −0.5 q / a. Do not form 2 a first.
-    require_finite(-0.5 * continuous_diffusion / log_rate)
+    // −q / (2 a). Form the ratio first. Do not form 2 a (overflows
+    // at |a| = 1e308). Do not form 0.5 q (underflows at min subnormal).
+    require_finite((continuous_diffusion / log_rate) * -0.5)
 }
 
 /// Refuse treating finite-interval process noise as `asymDIFFUSION`.
@@ -1711,7 +1715,7 @@ mod tests {
         let drift = -0.5_f64;
         let recovered = recover_stationary_latent_variance(diffusion, drift, LagClock::EventTime)
             .expect("asym");
-        let expected = -0.5 * diffusion / drift;
+        let expected = (diffusion / drift) * -0.5;
         assert!((recovered - expected).abs() < 1e-15);
         assert!((recovered - 0.4).abs() < 1e-15);
         // Starting from p_∞, Var(η_t) is invariant across finite Δt.
@@ -1745,7 +1749,7 @@ mod tests {
             recover_stationary_latent_variance(0.0, drift, LagClock::EventTime),
             Ok(0.0)
         );
-        // Do not form 2 a first: 2*(-1e308) overflows; -0.5 q / a is 0.5.
+        // Do not form 2 a first: 2*(-1e308) overflows; (q/a)*-0.5 is 0.5.
         let twice_rate_overflow =
             recover_stationary_latent_variance(1e308, -1e308, LagClock::EventTime)
                 .expect("2a overflow");
@@ -1753,6 +1757,15 @@ mod tests {
         assert!(!(2.0 * -1e308_f64).is_finite());
         let lost = -1e308_f64 / (2.0 * -1e308_f64);
         assert!(lost.abs() < 1e-15);
+        // Do not form 0.5 q first: 0.5 * from_bits(1) underflows.
+        let min_subnormal = f64::from_bits(1);
+        assert!((0.5 * min_subnormal).abs() < 1e-300);
+        assert!((-0.5 * min_subnormal / -min_subnormal).abs() < 1e-300);
+        let subnormal_ratio =
+            recover_stationary_latent_variance(min_subnormal, -min_subnormal, LagClock::EventTime)
+                .expect("subnormal ratio");
+        assert!((subnormal_ratio - 0.5).abs() < 1e-15);
+        assert!(((min_subnormal / -min_subnormal) * -0.5 - 0.5).abs() < 1e-15);
     }
 
     #[test]
@@ -1785,8 +1798,8 @@ mod tests {
             recover_stationary_latent_variance(0.4, f64::NAN, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
-        // −0.5 q / a overflows when q is huge relative to |a|.
-        assert!(!(-0.5 * 1e308_f64 / -1e-10_f64).is_finite());
+        // (q / a) * -0.5 overflows when q is huge relative to |a|.
+        assert!(!((1e308_f64 / -1e-10_f64) * -0.5).is_finite());
         assert_eq!(
             recover_stationary_latent_variance(1e308, -1e-10, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)

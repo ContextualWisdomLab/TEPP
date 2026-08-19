@@ -270,6 +270,11 @@ fn finite_interval_process_noise_is_not_the_stationary_variance() {
         recover_stationary_latent_variance(diffusion, 0.0, LagClock::EventTime),
         Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
     );
+    let min_subnormal = f64::from_bits(1);
+    let subnormal_ratio =
+        recover_stationary_latent_variance(min_subnormal, -min_subnormal, LagClock::EventTime)
+            .expect("subnormal ratio");
+    assert!((subnormal_ratio - 0.5).abs() < 1e-15);
 }
 
 #[test]

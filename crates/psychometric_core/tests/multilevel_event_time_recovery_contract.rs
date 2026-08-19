@@ -653,7 +653,7 @@ fn stationary_variance_recovers_driver_equation_four_asymptote() {
     let drift = -0.5_f64;
     let stationary =
         recover_stationary_latent_variance(diffusion, drift, LagClock::EventTime).expect("asym");
-    let expected = -0.5 * diffusion / drift;
+    let expected = (diffusion / drift) * -0.5;
     let error = rmse(&[expected], &[stationary]);
     assert!(error < 1e-15, "Driver Eq. 4 asymDIFFUSION RMSE {error}");
     for delta in [0.5_f64, 1.0, 2.0, 10.0] {
@@ -692,6 +692,11 @@ fn stationary_variance_recovers_driver_equation_four_asymptote() {
     );
     assert_eq!(
         recover_stationary_latent_variance(1e308, -1e308, LagClock::EventTime),
+        Ok(0.5)
+    );
+    let min_subnormal = f64::from_bits(1);
+    assert_eq!(
+        recover_stationary_latent_variance(min_subnormal, -min_subnormal, LagClock::EventTime),
         Ok(0.5)
     );
     assert_eq!(
