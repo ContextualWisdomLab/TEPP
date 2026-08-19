@@ -60,7 +60,7 @@ jobs:
       - name: Checkout exact PR branch
         uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
         with:
-          ref: agent/compute-backend-vram-budget
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: true
       - name: Merge current protected main
@@ -152,19 +152,19 @@ jobs:
           standards = standards_path.read_text(encoding='utf-8')
           section = '''## Numerical backends, VRAM, and mixed precision
 
-IEEE. (2019). *IEEE standard for floating-point arithmetic* (IEEE Std 754-2019). https://doi.org/10.1109/IEEESTD.2019.8766229
+          IEEE. (2019). *IEEE standard for floating-point arithmetic* (IEEE Std 754-2019). https://doi.org/10.1109/IEEESTD.2019.8766229
 
-Micikevicius, P., Narang, S., Alben, J., Diamos, G., Elsen, E., Garcia, D., Ginsburg, B., Houston, M., Kuchaiev, O., Venkatesh, G., & Wu, H. (2018). Mixed precision training. In *International Conference on Learning Representations*. https://openreview.net/forum?id=r1gs9JgRZ
+          Micikevicius, P., Narang, S., Alben, J., Diamos, G., Elsen, E., Garcia, D., Ginsburg, B., Houston, M., Kuchaiev, O., Venkatesh, G., & Wu, H. (2018). Mixed precision training. In *International Conference on Learning Representations*. https://openreview.net/forum?id=r1gs9JgRZ
 
-NVIDIA Corporation. (2024). *CUDA C++ programming guide*. https://docs.nvidia.com/cuda/cuda-c-programming-guide/
+          NVIDIA Corporation. (2024). *CUDA C++ programming guide*. https://docs.nvidia.com/cuda/cuda-c-programming-guide/
 
-Ogita, T., Rump, S. M., & Oishi, S. (2005). Accurate sum and dot product. *SIAM Journal on Scientific Computing, 26*(6), 1955–1988. https://doi.org/10.1137/030601818
+          Ogita, T., Rump, S. M., & Oishi, S. (2005). Accurate sum and dot product. *SIAM Journal on Scientific Computing, 26*(6), 1955–1988. https://doi.org/10.1137/030601818
 
-Rhu, M., Gimelshein, N., Clemons, J., Zulfiqar, A., & Keckler, S. W. (2016). vDNN: Virtualized deep neural networks for scalable, memory-efficient neural network design. In *2016 49th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO)* (pp. 1–13). IEEE. https://doi.org/10.1109/MICRO.2016.7783721
+          Rhu, M., Gimelshein, N., Clemons, J., Zulfiqar, A., & Keckler, S. W. (2016). vDNN: Virtualized deep neural networks for scalable, memory-efficient neural network design. In *2016 49th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO)* (pp. 1–13). IEEE. https://doi.org/10.1109/MICRO.2016.7783721
 
-TEPP keeps IEEE 754 binary64 as the numerical reference and uses compensated deterministic summation for the sequential oracle. GPU work is streamed under a VRAM budget with reserved safety headroom, executable bounded OOM retries, and CPU fallback. Mixed precision is not permitted for final diagnostic quantities. Full-corpus document-by-topic tensors are refused on device memory. Hardware acceleration is not claimed from software-fallback tests.
+          TEPP keeps IEEE 754 binary64 as the numerical reference and uses compensated deterministic summation for the sequential oracle. GPU work is streamed under a VRAM budget with reserved safety headroom, executable bounded OOM retries, and CPU fallback. Mixed precision is not permitted for final diagnostic quantities. Full-corpus document-by-topic tensors are refused on device memory. Hardware acceleration is not claimed from software-fallback tests.
 
-'''
+          '''
           marker = '## AI risk, management systems, and assurance readiness\n'
           if section not in standards:
               if standards.count(marker) != 1:

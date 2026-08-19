@@ -46,6 +46,7 @@ fn profiles_cover_the_adr_device_classes() {
 
 #[test]
 fn compensated_reference_recovers_cancellation_and_known_total() {
+    // CPU-reference evidence only; this crate has no GPU execution path yet.
     let weights = [0.25_f64, 0.25, 0.25, 0.25];
     let values = [4.0_f64, 8.0, 12.0, 16.0];
     let recovered = streamed_weighted_sum(&weights, &values).expect("finite reference");

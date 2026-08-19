@@ -68,8 +68,7 @@ impl VramController {
             ));
         }
 
-        let usable = self.inventory.budget().usable_bytes();
-        if usable == 0 {
+        if self.inventory.budget().usable_bytes() == 0 {
             return Ok(Self::cpu_plan(
                 request.requested_batch(),
                 0,
@@ -77,32 +76,12 @@ impl VramController {
             ));
         }
 
-        let mut batch = request.requested_batch();
-        loop {
-            let peak = predicted_peak_bytes(
-                batch,
-                request.bytes_per_observation(),
-                request.working_set_bytes(),
-            )?;
-            if peak <= usable {
-                return Ok(MicroBatchPlan::new(
-                    ComputeBackendKind::GpuStreamed,
-                    batch,
-                    peak,
-                    PrecisionMode::ReferenceF64,
-                    0,
-                    None,
-                ));
-            }
-            if batch == 1 {
-                return Ok(Self::cpu_plan(
-                    request.requested_batch(),
-                    0,
-                    FallbackReason::InsufficientVram,
-                ));
-            }
-            batch /= 2;
-        }
+        Ok(self.gpu_plan_or_cpu(
+            request,
+            request.requested_batch(),
+            0,
+            FallbackReason::InsufficientVram,
+        ))
     }
 
     /// Return the next executable plan after one observed device OOM.
@@ -131,19 +110,11 @@ impl VramController {
             .checked_add(1)
             .ok_or(ComputeBackendError::InvalidBudget)?;
         if next_retry <= self.max_retries && plan.batch_size() > 1 {
-            let batch = plan.batch_size() / 2;
-            let peak = predicted_peak_bytes(
-                batch,
-                request.bytes_per_observation(),
-                request.working_set_bytes(),
-            )?;
-            return Ok(MicroBatchPlan::new(
-                ComputeBackendKind::GpuStreamed,
-                batch,
-                peak,
-                PrecisionMode::ReferenceF64,
+            return Ok(self.gpu_plan_or_cpu(
+                request,
+                plan.batch_size() / 2,
                 next_retry,
-                None,
+                FallbackReason::OutOfMemoryRetryExhausted,
             ));
         }
         Ok(Self::cpu_plan(
@@ -170,6 +141,49 @@ impl VramController {
             return Err(ComputeBackendError::UnsupportedPrecision);
         }
         Ok(())
+    }
+
+    fn gpu_plan_or_cpu(
+        &self,
+        request: &WorkloadRequest,
+        mut batch: u32,
+        oom_retry_count: u32,
+        fallback_reason: FallbackReason,
+    ) -> MicroBatchPlan {
+        loop {
+            if let Some(plan) = self.gpu_plan_if_fits(request, batch, oom_retry_count) {
+                return plan;
+            }
+            if batch == 1 {
+                return Self::cpu_plan(request.requested_batch(), oom_retry_count, fallback_reason);
+            }
+            batch /= 2;
+        }
+    }
+
+    fn gpu_plan_if_fits(
+        &self,
+        request: &WorkloadRequest,
+        batch: u32,
+        oom_retry_count: u32,
+    ) -> Option<MicroBatchPlan> {
+        let peak = predicted_peak_bytes(
+            batch,
+            request.bytes_per_observation(),
+            request.working_set_bytes(),
+        )
+        .ok()?;
+        if peak > self.inventory.budget().usable_bytes() {
+            return None;
+        }
+        Some(MicroBatchPlan::new(
+            ComputeBackendKind::GpuStreamed,
+            batch,
+            peak,
+            PrecisionMode::ReferenceF64,
+            oom_retry_count,
+            None,
+        ))
     }
 
     const fn cpu_plan(
@@ -256,7 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn overflowing_peak_fails_closed() {
+    fn overflowing_peak_falls_back_to_cpu() {
         let inventory =
             DeviceInventory::gpu(VramProfile::Gib24, VramProfile::Gib24.bytes()).expect("24");
         let controller = VramController::new(inventory, 1).expect("controller");
@@ -273,14 +287,13 @@ mod tests {
             PrecisionMode::ReferenceF64,
         )
         .expect("request");
-        assert_eq!(
-            controller.plan(&huge),
-            Err(ComputeBackendError::InvalidBudget)
-        );
+        let plan = controller.plan(&huge).expect("overflow falls back");
+        assert_eq!(plan.backend(), ComputeBackendKind::CpuF64Reference);
+        assert_eq!(plan.fallback(), Some(FallbackReason::InsufficientVram));
     }
 
     #[test]
-    fn overflowing_oom_retry_peak_fails_closed() {
+    fn overflowing_oom_retry_peak_falls_back_to_cpu() {
         let inventory =
             DeviceInventory::gpu(VramProfile::Gib24, VramProfile::Gib24.bytes()).expect("24");
         let controller = VramController::new(inventory, 1).expect("controller");
@@ -305,9 +318,13 @@ mod tests {
             0,
             None,
         );
+        let plan = controller
+            .recover_from_oom(&huge, &initial)
+            .expect("overflow falls back");
+        assert_eq!(plan.backend(), ComputeBackendKind::CpuF64Reference);
         assert_eq!(
-            controller.recover_from_oom(&huge, &initial),
-            Err(ComputeBackendError::InvalidBudget)
+            plan.fallback(),
+            Some(FallbackReason::OutOfMemoryRetryExhausted)
         );
     }
 

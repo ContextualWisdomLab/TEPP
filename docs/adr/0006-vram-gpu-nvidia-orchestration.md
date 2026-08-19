@@ -1,7 +1,7 @@
 # ADR 0006 — VRAM-adaptive GPU compute and model-credential boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — VRAM profiles, safety reserve, peak prediction, micro-batch autotune, typed OOM with bounded CPU `f64` fallback, and forbidden-adaptation refusal are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; live GPU kernels, mixed-precision device lanes, and hardware parity remain accepted-target  
+**Implementation maturity:** active-PR — VRAM profiles, safety reserve, peak prediction, micro-batch autotune, typed OOM with bounded CPU `f64` fallback, and forbidden-adaptation refusal are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; live GPU kernels, mixed-precision device lanes, and hardware parity remain accepted-target
 **Date:** 2026-08-05  
 **Supersession:** LLM orchestration-selection and test-time-compute policy is superseded by ADR 0010. Autonomous development/review/merge authority separation is governed by ADR 0015. This ADR remains authoritative for GPU/VRAM execution and the model-credential boundary.
 
