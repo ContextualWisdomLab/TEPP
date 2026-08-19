@@ -615,22 +615,25 @@ pub fn recover_discrete_latent_variance(
 /// Exact scalar stationary within-subject variance on event time.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 4, p. 5; JSS PDF re-opened
-/// 2026-08-19T00:14Z) write `Q_Δt` as
+/// 2026-08-19T04:10Z) write `Q_Δt` as
 /// `irow(A#^{-1}[e^{A# Δt} − I] row(Q))` with `A# = A ⊗ I + I ⊗ A`.
 /// The scalar Kronecker sum is `2 a`. As `Δt → ∞` with stable
 /// `a < 0`, `e^{2 a Δt} → 0` and Eq. 4 becomes `-q / (2 a)`. The
 /// JSS summary names that limit `asymDIFFUSION` and takes it as the
 /// total within-subject variance (p. 16). Section 4.3 (pp. 9–10)
 /// constrains a stationary `T0VAR` to that same model-predicted
-/// variance. Form `(q / a) * -0.5`. Do not form `2 a` first: at
-/// `a = -1e308`, `q = 1e308`, `2 a` overflows and `-q / (2 a)`
-/// collapses to `+0`, but `(q / a) * -0.5 = 0.5`. Do not form
-/// `0.5 q` first: at `q = from_bits(1)`, `a = -from_bits(1)`,
+/// variance. When `2 a` is finite, form `q / -(2 a)` so `q / a`
+/// overflow does not lose a finite Lyapunov solution (`q = MAX`,
+/// `a = -0.75` → `MAX / 1.5`; `CodeRabbit` on `75ecdd3`). When `2 a`
+/// overflows, form `(q / a) * -0.5`. Do not form `2 a` as the only
+/// path: at `a = -1e308`, `q = 1e308`, `2 a` overflows and
+/// `-q / (2 a)` collapses to `+0`, but `(q / a) * -0.5 = 0.5`. Do
+/// not form `0.5 q` first: at `q = from_bits(1)`, `a = -from_bits(1)`,
 /// `-0.5 * q` underflows to `-0` and the quotient is `+0`, but
 /// the representable Lyapunov solution is `0.5`. A zero diffusion is
 /// exactly zero. `a ≥ 0` has no finite stationary variance
 /// (including Brownian `a = 0`, whose variance grows as `q Δt`).
-/// An overflowing `(q / a) * -0.5` fails closed. This is not a Kalman
+/// An overflowing Lyapunov solution fails closed. This is not a Kalman
 /// filter, not DSEM, not a matrix `expm`, and not ctsem estimation.
 ///
 /// # Errors
@@ -660,9 +663,18 @@ pub fn recover_stationary_latent_variance(
     if continuous_diffusion == 0.0 {
         return Ok(0.0);
     }
-    // −q / (2 a). Form the ratio first. Do not form 2 a (overflows
-    // at |a| = 1e308). Do not form 0.5 q (underflows at min subnormal).
-    require_finite((continuous_diffusion / log_rate) * -0.5)
+    // −q / (2 a). When 2 a is finite, divide by that Kronecker sum
+    // so q/a overflow does not lose a finite Lyapunov solution
+    // (q = MAX, a = −0.75 → MAX/1.5; CodeRabbit on 75ecdd3).
+    // When 2 a overflows (|a| = 1e308), form (q/a)*−0.5 instead.
+    // Do not form 0.5 q first (min-subnormal underflow).
+    let twice_rate = log_rate * 2.0;
+    let stationary = if twice_rate.is_finite() {
+        continuous_diffusion / -twice_rate
+    } else {
+        (continuous_diffusion / log_rate) * -0.5
+    };
+    require_finite(stationary)
 }
 
 /// Refuse treating finite-interval process noise as `asymDIFFUSION`.
@@ -1846,6 +1858,18 @@ mod tests {
                 .expect("subnormal ratio");
         assert!((subnormal_ratio - 0.5).abs() < 1e-15);
         assert!(((min_subnormal / -min_subnormal) * -0.5 - 0.5).abs() < 1e-15);
+        // Do not form q/a first: MAX/-0.75 overflows; MAX/(2*0.75) is finite.
+        assert!(!(f64::MAX / -0.75_f64).is_finite());
+        assert!(!((f64::MAX / -0.75_f64) * -0.5).is_finite());
+        let twice = -0.75_f64 * 2.0;
+        assert!(twice.is_finite());
+        let expected_max = f64::MAX / -twice;
+        assert!(expected_max.is_finite());
+        assert_eq!(expected_max.to_bits(), (f64::MAX / 1.5).to_bits());
+        let quotient_overflow =
+            recover_stationary_latent_variance(f64::MAX, -0.75, LagClock::EventTime)
+                .expect("q/a overflow");
+        assert_eq!(quotient_overflow.to_bits(), expected_max.to_bits());
     }
 
     #[test]
@@ -1878,8 +1902,9 @@ mod tests {
             recover_stationary_latent_variance(0.4, f64::NAN, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
-        // (q / a) * -0.5 overflows when q is huge relative to |a|.
+        // The Lyapunov solution overflows when |q| >> |a|.
         assert!(!((1e308_f64 / -1e-10_f64) * -0.5).is_finite());
+        assert!(!(1e308_f64 / (2.0 * 1e-10_f64)).is_finite());
         assert_eq!(
             recover_stationary_latent_variance(1e308, -1e-10, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)

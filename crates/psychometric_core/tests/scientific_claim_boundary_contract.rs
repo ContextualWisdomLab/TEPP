@@ -276,6 +276,11 @@ fn finite_interval_process_noise_is_not_the_stationary_variance() {
         recover_stationary_latent_variance(min_subnormal, -min_subnormal, LagClock::EventTime)
             .expect("subnormal ratio");
     assert!((subnormal_ratio - 0.5).abs() < 1e-15);
+    assert!(!(f64::MAX / -0.75_f64).is_finite());
+    let quotient_overflow =
+        recover_stationary_latent_variance(f64::MAX, -0.75, LagClock::EventTime)
+            .expect("q/a overflow");
+    assert_eq!(quotient_overflow.to_bits(), (f64::MAX / 1.5).to_bits());
 }
 
 #[test]

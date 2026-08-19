@@ -700,6 +700,13 @@ fn stationary_variance_recovers_driver_equation_four_asymptote() {
         recover_stationary_latent_variance(min_subnormal, -min_subnormal, LagClock::EventTime),
         Ok(0.5)
     );
+    assert!(!(f64::MAX / -0.75_f64).is_finite());
+    assert_eq!(
+        recover_stationary_latent_variance(f64::MAX, -0.75, LagClock::EventTime)
+            .expect("q/a overflow")
+            .to_bits(),
+        (f64::MAX / 1.5).to_bits()
+    );
     assert_eq!(
         recover_stationary_latent_variance(diffusion, drift, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
