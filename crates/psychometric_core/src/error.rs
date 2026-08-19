@@ -72,6 +72,14 @@ pub enum PsychometricError {
     /// Driver Eq. 5 `MANIFESTTRAITVAR` was treated as `MANIFESTVAR`.
     /// Table 2 (p. 12) names `Ψ_τ` separately from `Θ`.
     ManifestTraitVarianceIsNotMeasurementError,
+    /// Driver Eq. 3–4 lagged latent covariance was treated as the
+    /// lagged observed-indicator covariance. Equation 5 maps
+    /// `cov(y_t, y_{t-1}) = λ² cov(η_t, η_{t-1}) + ψ`.
+    LatentLaggedCovarianceIsNotObservedCovariance,
+    /// Driver Eq. 5 measurement-error variance was treated as the
+    /// lagged observed-indicator covariance. Independent `ε` does
+    /// not enter `cov(y_t, y_{t-1})`.
+    MeasurementErrorIsNotLaggedObservedCovariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -132,6 +140,12 @@ impl fmt::Display for PsychometricError {
             }
             Self::ManifestTraitVarianceIsNotMeasurementError => {
                 "manifest-trait variance is not measurement-error variance"
+            }
+            Self::LatentLaggedCovarianceIsNotObservedCovariance => {
+                "lagged latent covariance is not the lagged observed-indicator covariance"
+            }
+            Self::MeasurementErrorIsNotLaggedObservedCovariance => {
+                "measurement-error variance is not the lagged observed-indicator covariance"
             }
         };
         formatter.write_str(message)
@@ -230,6 +244,10 @@ mod tests {
             PsychometricError::TraitVarianceIsNotStationaryWithinSubject.to_string(),
             "trait variance is not the stationary within-subject variance"
         );
+    }
+
+    #[test]
+    fn observed_indicator_boundary_messages_are_stable() {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotObservedVariance.to_string(),
             "measurement-error variance is not the observed-indicator variance"
@@ -241,6 +259,14 @@ mod tests {
         assert_eq!(
             PsychometricError::ManifestTraitVarianceIsNotMeasurementError.to_string(),
             "manifest-trait variance is not measurement-error variance"
+        );
+        assert_eq!(
+            PsychometricError::LatentLaggedCovarianceIsNotObservedCovariance.to_string(),
+            "lagged latent covariance is not the lagged observed-indicator covariance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotLaggedObservedCovariance.to_string(),
+            "measurement-error variance is not the lagged observed-indicator covariance"
         );
     }
 }

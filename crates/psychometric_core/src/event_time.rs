@@ -32,7 +32,9 @@
 //! The scalar observed variance is `λ² Var(η) + θ` when `Ψ_τ = 0`
 //! and `λ² Var(η) + θ + ψ` otherwise. `MANIFESTVAR` is not `Var(y)`,
 //! `MANIFESTTRAITVAR` is not `MANIFESTVAR`, `TRAITVAR` is latent
-//! (scaled by `λ²`), and `Var(η)` is not `Var(y)`. The JSS article
+//! (scaled by `λ²`), and `Var(η)` is not `Var(y)`. The lagged
+//! observed covariance is `λ² cov(η_t, η_{t-1}) + ψ`; `Θ` does not
+//! enter. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -939,6 +941,88 @@ pub fn refuse_manifest_trait_variance_as_measurement_error(
     Err(PsychometricError::ManifestTraitVarianceIsNotMeasurementError)
 }
 
+/// Exact scalar lagged observed-indicator covariance from Driver
+/// Equation 5.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 3–4, pp. 4–5;
+/// Table 2, p. 12; JSS PDF re-opened 2026-08-19T04:18Z) write
+/// `y_i(t) = τ_i + Λ η_i(t) + ε_i(t)` with independent measurement
+/// error and a person-level intercept `τ_i ~ N(μ_τ, Ψ_τ)`. The
+/// scalar lagged covariance is `cov(y_t, y_{t-1}) = λ² cov(η_t,
+/// η_{t-1}) + ψ`. `Θ` does not enter: `ε_t` and `ε_{t-1}` are
+/// independent. Form `(λ c) λ` then add `ψ`. Do not form `λ²`
+/// first. A zero loading or zero latent lagged covariance is
+/// exactly `ψ`. A zero manifest trait is exactly `λ² c`. Negative
+/// latent lagged covariance or trait variance fails closed. An
+/// overflowing product or sum fails closed. This is not a Kalman
+/// filter and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::InvalidNumericInput`] when the loading
+/// is non-finite, the latent lagged covariance is negative or
+/// non-finite, the manifest-trait variance is negative or
+/// non-finite, or the mapped covariance is non-finite.
+pub fn recover_manifest_lagged_observed_covariance(
+    loading: f64,
+    lagged_latent_covariance: f64,
+    manifest_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    if !loading.is_finite()
+        || !lagged_latent_covariance.is_finite()
+        || lagged_latent_covariance < 0.0
+        || !manifest_trait_variance.is_finite()
+        || manifest_trait_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if loading == 0.0 || lagged_latent_covariance == 0.0 {
+        return Ok(manifest_trait_variance);
+    }
+    let explained = require_finite((loading * lagged_latent_covariance) * loading)?;
+    if manifest_trait_variance == 0.0 {
+        return Ok(explained);
+    }
+    require_finite(explained + manifest_trait_variance)
+}
+
+/// Refuse treating Driver Eq. 3–4 lagged latent covariance as
+/// `cov(y_t, y_{t-1})`.
+///
+/// Equation 5 maps `cov(y_t, y_{t-1}) = λ² cov(η_t, η_{t-1}) + ψ`.
+/// The latent lagged covariance is not the observed lagged
+/// covariance.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LatentLaggedCovarianceIsNotObservedCovariance`].
+pub fn refuse_latent_lagged_covariance_as_observed_covariance(
+    lagged_latent_covariance: f64,
+    observed_lagged_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (lagged_latent_covariance, observed_lagged_covariance);
+    Err(PsychometricError::LatentLaggedCovarianceIsNotObservedCovariance)
+}
+
+/// Refuse treating Driver Eq. 5 measurement error as lagged observed
+/// covariance.
+///
+/// `MANIFESTVAR` is `Θ`. Independent `ε_t` does not enter
+/// `cov(y_t, y_{t-1})`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::MeasurementErrorIsNotLaggedObservedCovariance`].
+pub fn refuse_measurement_error_as_lagged_observed_covariance(
+    measurement_error_variance: f64,
+    observed_lagged_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (measurement_error_variance, observed_lagged_covariance);
+    Err(PsychometricError::MeasurementErrorIsNotLaggedObservedCovariance)
+}
+
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3–4, pp. 4–5):
@@ -1193,13 +1277,15 @@ mod tests {
         recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
         recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_irregular_centered_residual_log_rate, recover_local_log_rate,
-        recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-        recover_stationary_latent_variance, recover_trait_plus_state_lagged_covariance,
-        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
-        refuse_difference_quotient_as_local_rate,
+        recover_manifest_lagged_observed_covariance, recover_manifest_observed_variance,
+        recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+        recover_within_residual_event_time_log_rate, refuse_difference_quotient_as_local_rate,
         refuse_finite_interval_process_noise_as_stationary_variance,
+        refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_variance_as_observed_variance,
         refuse_manifest_trait_variance_as_measurement_error,
+        refuse_measurement_error_as_lagged_observed_covariance,
         refuse_measurement_error_as_observed_variance,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance, refuse_trait_variance_as_process_noise,
@@ -2684,6 +2770,67 @@ mod tests {
         );
         assert_eq!(
             recover_manifest_observed_variance(1e308, 1.0, 1e308),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn manifest_lagged_observed_covariance_recovers_driver_equation_five() {
+        let loading = 2.0_f64;
+        let lagged = 0.4_f64;
+        let manifest_trait = 0.5_f64;
+        let recovered =
+            recover_manifest_lagged_observed_covariance(loading, lagged, manifest_trait)
+                .expect("eq5-lag");
+        let expected = (loading * lagged) * loading + manifest_trait;
+        assert!((recovered - expected).abs() < 1e-15);
+        assert!((recovered - 2.1).abs() < 1e-15);
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(loading, lagged, 0.0),
+            Ok(1.6)
+        );
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(0.0, lagged, manifest_trait),
+            Ok(manifest_trait)
+        );
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(loading, 0.0, manifest_trait),
+            Ok(manifest_trait)
+        );
+        assert_eq!(
+            refuse_latent_lagged_covariance_as_observed_covariance(lagged, recovered),
+            Err(PsychometricError::LatentLaggedCovarianceIsNotObservedCovariance)
+        );
+        assert_eq!(
+            refuse_measurement_error_as_lagged_observed_covariance(0.1, recovered),
+            Err(PsychometricError::MeasurementErrorIsNotLaggedObservedCovariance)
+        );
+        let scaled =
+            recover_manifest_lagged_observed_covariance(1e308, 1e-308, 0.0).expect("scale");
+        assert!((scaled - 1e308).abs() / 1e308 < 1e-15);
+        assert!(!(1e308_f64 * 1e308_f64).is_finite());
+    }
+
+    #[test]
+    fn manifest_lagged_observed_covariance_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(f64::NAN, 0.4, 0.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(2.0, -0.1, 0.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(2.0, 0.4, -0.1),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(1e308, 1.0, 0.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(1e308, 1e-308, 1e308),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
