@@ -56,10 +56,6 @@ pub fn embedded_image_units(
             continue;
         }
         let media_type = &text[start + "data:".len()..media_end];
-        if media_type.is_empty() || !media_type.starts_with("image/") {
-            search_from = payload_end;
-            continue;
-        }
         let scalar_start = text[..start].chars().count();
         let scalar_end = scalar_start + text[start..payload_end].chars().count();
         let span = SourceSpan::new(document, start, payload_end, scalar_start, scalar_end, None)?;
@@ -111,6 +107,15 @@ mod tests {
         assert_eq!(
             refuse_base64_image_as_lexical_text("data:image/png;base64,AAAA"),
             Err(EvidenceError::EmbeddedImageIsNotLexicalText)
+        );
+
+        let empty_text = "data:image/png;base64, following text";
+        let empty_artifact = SourceArtifact::from_bytes(empty_text.as_bytes()).expect("artifact");
+        let empty_document =
+            DocumentRecord::from_text(empty_artifact.id(), empty_text).expect("document");
+        assert_eq!(
+            embedded_image_units(&empty_document),
+            Err(EvidenceError::EmptySourceSpan)
         );
     }
 }
