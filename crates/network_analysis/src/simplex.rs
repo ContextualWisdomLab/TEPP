@@ -39,5 +39,17 @@ mod tests {
             refuse_raw_simplex_as_euclidean(&[-0.2, 1.2]),
             Err(NetworkError::InvalidCoordinate)
         );
+        assert_eq!(
+            refuse_raw_simplex_as_euclidean(&[0.25, 0.25, 0.5]),
+            Err(NetworkError::RawSimplexIsNotEuclidean)
+        );
+        assert_eq!(
+            refuse_raw_simplex_as_euclidean(&[0.25, 0.25]),
+            Err(NetworkError::InvalidCoordinate)
+        );
+        assert_eq!(
+            refuse_raw_simplex_as_euclidean(&[f64::NAN, 0.5]),
+            Err(NetworkError::InvalidCoordinate)
+        );
     }
 }
