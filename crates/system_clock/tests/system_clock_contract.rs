@@ -62,13 +62,14 @@ fn recovered_system_stamps_match_known_truth_better_than_event_stand_in() {
     let recovered_rate = identity_recovery_rate(&truth_flags, &recovered_flags).expect("ok");
     let collapsed_rate = identity_recovery_rate(&truth_flags, &collapsed_flags).expect("bad");
     let expected = {
-        let mut matches = 0_u32;
+        let mut matches = 0_usize;
         for (truth_flag, decided_flag) in truth_flags.iter().zip(recovered_flags.iter()) {
             if truth_flag == decided_flag {
                 matches += 1;
             }
         }
-        f64::from(matches) / f64::from(u32::try_from(truth_flags.len()).expect("len"))
+        f64::from(u32::try_from(matches).expect("test count fits"))
+            / f64::from(u32::try_from(truth_flags.len()).expect("len"))
     };
     assert!((recovered_rate - expected).abs() < f64::EPSILON);
     assert!(recovered_rate > collapsed_rate);

@@ -85,13 +85,13 @@ pub fn identity_recovery_rate(truth: &[bool], decided: &[bool]) -> Result<f64, S
     if truth.is_empty() || truth.len() != decided.len() {
         return Err(SystemClockError::InvalidSystemPayload);
     }
-    let mut matches = 0_u32;
+    let mut matches = 0_usize;
     for (truth_flag, decided_flag) in truth.iter().zip(decided) {
         if truth_flag == decided_flag {
             matches += 1;
         }
     }
-    Ok(f64::from(matches) / truth.len() as f64)
+    Ok(matches as f64 / truth.len() as f64)
 }
 
 #[cfg(test)]
