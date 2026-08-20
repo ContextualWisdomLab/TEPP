@@ -18,7 +18,7 @@ Dyreson, C. E., & Snodgrass, R. T. (1998). Supporting valid-time indeterminacy. 
 
 ## Application
 
-Jensen and Snodgrass (1999) separate valid time from when a fact becomes known. TEPP's availability clock is the known-time analogue for historical fits, so a document written at `document_time` but released later cannot enter a cutoff that precedes `available_time` (Jensen & Snodgrass, 1999; Dyreson & Snodgrass, 1998).
+Jensen and Snodgrass (1999) distinguish valid time from transaction time. TEPP defines `available_time` as an application-specific knowledge-availability clock for historical fits. This mapping is specified by ADR 0002 and the `tepp_simulation` eligibility and fail-closed validation APIs. A document written at `document_time` but released later cannot enter a cutoff that precedes `available_time` (Jensen & Snodgrass, 1999; Dyreson & Snodgrass, 1998).
 
 ## Verification
 

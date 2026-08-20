@@ -21,6 +21,21 @@ fn delayed_documents_are_excluded_and_counts_match_known_truth() {
         "cutoff must exclude at least one delayed document"
     );
 
+    let boundary_document = manifest.documents().first().expect("boundary document");
+    let boundary_cutoff = KnowledgeCutoff::parse_rfc3339(
+        &boundary_document.available_time().to_rfc3339(),
+    )
+    .expect("boundary cutoff");
+    let boundary_eligible = manifest.documents_eligible_at_cutoff(&boundary_cutoff);
+    assert!(
+        boundary_eligible
+            .iter()
+            .any(|document| document.document_id() == boundary_document.document_id()),
+        "a document available exactly at cutoff must be eligible"
+    );
+    refuse_unavailable_document(boundary_document, &boundary_cutoff)
+        .expect("availability equal to cutoff is valid");
+
     for document in eligible {
         refuse_unavailable_document(document, &cutoff).expect("eligible");
     }
