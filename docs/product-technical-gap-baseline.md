@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-20 22:10 KST
+**Snapshot:** 2026-08-21 04:34 KST
 **Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
 **Workspace version on protected main:** `0.1.0`
 
@@ -26,8 +26,8 @@ GitHub state before any customer, release, certification, or valuation claim.
 | Protected-main SHA | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | All as-built claims are bounded to this commit. |
 | Workspace members | 10 Rust crates | The foundation is modular, but the approved target contains additional semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual boundaries. |
 | Open pull requests | **92** | The queue is itself a release blocker and requires consolidation. |
-| Draft pull requests | **55** | Most queued work is not independently review-ready. |
-| Non-draft pull requests | **37** | A non-draft state is not a qualifying review or required-check result. |
+| Draft pull requests | **19** | Most queued work is not independently review-ready. |
+| Non-draft pull requests | **73** | A non-draft state is not a qualifying review or required-check result. |
 | Open product issues | **12** | Issue #156 plus the product-completion program #166–#176. |
 | Current package version | `0.1.0` | No supported product release is established by the repository version alone. |
 
