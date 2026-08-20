@@ -222,6 +222,29 @@ pub enum PsychometricError {
     /// within-interval impulse carry. `e^{A Δt} t0_m x0` is not
     /// `e^{A(t−u)} M x` for `t0 < u < t`.
     InitialTimeDependentCarryIsNotImpulseCarry,
+    /// Driver Eq. 5 of the Eq. 3 evolved mean was treated as
+    /// Equation 5 of the Table 3 first-occasion TD predictor.
+    /// `τ + λ μ_t` is not `τ + λ(μ_t + e^{a Δt} t0_m x0)`.
+    EvolvedObservedMeanIsNotInitialTimeDependentObservedMean,
+    /// Driver Eq. 5 of the Eq. 3 process increment was treated as
+    /// Equation 5 of the Table 3 first-occasion TD predictor.
+    /// `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not
+    /// `τ + λ(μ_t + e^{a Δt} t0_m x0)`.
+    TimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean,
+    /// Driver Eq. 5 of the contemporaneous impulse was treated as
+    /// Equation 5 of the Table 3 first-occasion TD predictor.
+    /// `τ + λ(μ_t + m x)` is not `τ + λ(μ_t + e^{a Δt} t0_m x0)`.
+    ImpulseObservedMeanIsNotInitialTimeDependentObservedMean,
+    /// Driver Eq. 5 of the Eq. 1–2 carried latent mean was treated as
+    /// Equation 5 of the Table 3 first-occasion TD predictor.
+    /// `τ + λ(μ_t + e^{a(t−u)} m x)` is not
+    /// `τ + λ(μ_t + e^{a Δt} t0_m x0)`.
+    ImpulseCarryObservedMeanIsNotInitialTimeDependentObservedMean,
+    /// Driver Eq. 5 of Table 3 `T0TIPREDEFFECT` was treated as
+    /// Equation 5 of Table 3 `T0TDPREDEFFECT`.
+    /// `τ + λ(μ_t + e^{a Δt} t0_b z)` is not
+    /// `τ + λ(μ_t + e^{a Δt} t0_m x0)`.
+    InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -407,6 +430,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialTimeDependentCarryIsNotImpulseCarry => {
                 "carried first-occasion time-dependent predictor is not the impulse carry"
+            }
+            Self::EvolvedObservedMeanIsNotInitialTimeDependentObservedMean => {
+                "evolved observed mean is not the first-occasion time-dependent-predictor observed mean"
+            }
+            Self::TimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean => {
+                "time-independent-predictor observed mean is not the first-occasion time-dependent-predictor observed mean"
+            }
+            Self::ImpulseObservedMeanIsNotInitialTimeDependentObservedMean => {
+                "contemporaneous-impulse observed mean is not the first-occasion time-dependent-predictor observed mean"
+            }
+            Self::ImpulseCarryObservedMeanIsNotInitialTimeDependentObservedMean => {
+                "impulse-carry observed mean is not the first-occasion time-dependent-predictor observed mean"
+            }
+            Self::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean => {
+                "first-occasion time-independent-predictor observed mean is not the first-occasion time-dependent-predictor observed mean"
             }
         };
         formatter.write_str(message)
@@ -701,6 +739,29 @@ mod tests {
         assert_eq!(
             PsychometricError::InitialTimeDependentCarryIsNotImpulseCarry.to_string(),
             "carried first-occasion time-dependent predictor is not the impulse carry"
+        );
+        assert_eq!(
+            PsychometricError::EvolvedObservedMeanIsNotInitialTimeDependentObservedMean.to_string(),
+            "evolved observed mean is not the first-occasion time-dependent-predictor observed mean"
+        );
+        assert_eq!(
+            PsychometricError::TimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean
+                .to_string(),
+            "time-independent-predictor observed mean is not the first-occasion time-dependent-predictor observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseObservedMeanIsNotInitialTimeDependentObservedMean.to_string(),
+            "contemporaneous-impulse observed mean is not the first-occasion time-dependent-predictor observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseCarryObservedMeanIsNotInitialTimeDependentObservedMean
+                .to_string(),
+            "impulse-carry observed mean is not the first-occasion time-dependent-predictor observed mean"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean
+                .to_string(),
+            "first-occasion time-independent-predictor observed mean is not the first-occasion time-dependent-predictor observed mean"
         );
     }
 }
