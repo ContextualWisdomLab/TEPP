@@ -1,7 +1,7 @@
 # TEPP Requirements, Research, and Evidence Traceability
 
 **Status:** Accepted cross-cutting traceability baseline  
-**Last reviewed:** 2026-08-13
+**Last reviewed:** 2026-08-20
 
 The full APA 7th standards/literature register remains `docs/research/standards-and-literature.md`. This matrix links durable requirements to their owning decisions and implementation/evidence maturity without duplicating the bibliography.
 
@@ -17,7 +17,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
-| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, tenant RLS (`0002` + session GUC/role helpers), `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` driver, exact-head live PostgreSQL CI with isolation proof, append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006` on active PR); remaining physical ERD/backup remaining | partial |
+| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, tenant RLS (`0002` + session GUC/role helpers), `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` driver, exact-head live PostgreSQL CI with isolation proof, append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006` implemented-main), event-relation/mention/instance SQL (`#37–#39` implemented-main), source-artifact SQL (`#40` implemented-main), audit-event SQL (`#41` implemented-main), concurrent document-write stress (`#43` implemented-main), backup/restore integrity revalidation (`#44` implemented-main); remaining physical ERD constraints | partial |
 | known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | `tepp_simulation` on protected main; recovery metrics in `validation_core` | implemented-main |
 | versioned service/API contracts and exports | PRD; API contract; ADR 0011/0013 | `tepp_api` analysis-run/export/JSON-LD/GraphML contracts on protected main (PR #21); HTTP service remaining accepted-target | partial |
 | immutable split/run/reproducibility manifests | ADR 0013; ERD | `tepp_api` reproducibility manifest contract on protected main; `persistence_postgres` append-only SQL insert/lookup for `reproducibility_manifest`, `corpus_split_manifest`, `model_run`, and `model_artifact` (migration `0003`); full physical ERD constraints remaining | partial |
@@ -30,13 +30,13 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
-| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
+| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` evidence-layer admission and known-stream first-story rates on PR #50; full tracking/calibration and schema extraction remain future | active-PR |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router plus future `interpretation_gateway` | partial |
-| adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | `tepp_api::route_orchestration` + ablation record on the active PR; live contextual-orchestrator execution remaining | partial |
-| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `tepp_api` export authorization and elevated re-identification are implemented-main; provider-payload minimization remains active-PR; migration `0007` retention/deletion/legal-hold SQL contracts are implemented-main; deployment/provider evidence remains accepted-target | partial |
+| adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | `tepp_api::route_orchestration`, ablation record, and credential-free contextual-orchestrator binding on protected main; live execution and learned conductor calibration remain future | partial |
+| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `tepp_api` export authorization, elevated re-identification, and provider-payload minimization are implemented-main; migration `0007` retention/deletion/legal-hold SQL contracts are implemented-main; deployment/provider evidence remains accepted-target | partial |
 | tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | `tepp_api` time-bounded `PurposeGrant` + cross-tenant denial implemented-main; persistent `access_grant` storage remaining | partial |
 | standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; future service ports | partial |
-| naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract on protected main; HTTP service remaining | partial |
+| naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract and `tepp_api` HTTP interchange on protected main; live HTTP service remaining | partial |
 | contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `docs/connectors/contextual-orchestrator-interpretation-port.md`; live port remaining | partial |
 | Actions registry identities bound to protected-main tree (orphan disable) | Operability; GitHub Actions REST | `scripts/actions_workflow_fleet.py` + issue #20 tests/doctoring; live disable remains operator-authorized | active-PR |
 | autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | future safe OpenCode/NVIDIA autonomous-development workflow | accepted-target |
