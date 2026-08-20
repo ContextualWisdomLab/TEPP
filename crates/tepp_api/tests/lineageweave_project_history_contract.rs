@@ -275,3 +275,45 @@ fn projection_response_revalidates_cutoff_order_findings_and_payload_size() {
         Err(ApiError::InvalidWirePayload)
     );
 }
+
+#[test]
+fn projection_response_rejects_inconsistent_span_and_participant_count() {
+    let projection = project_history_projection(&sample_request()).expect("projection");
+    let payload = projection.to_json().expect("projection json");
+
+    let mut reversed_span: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    reversed_span["history_span_start"] = serde_json::Value::String("2999-01-01T00:00:00Z".into());
+    let reversed_span_json = serde_json::to_string(&reversed_span).expect("reversed span json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&reversed_span_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut mismatched_start: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    mismatched_start["history_span_start"] =
+        serde_json::Value::String("2022-03-10T00:00:00Z".into());
+    let mismatched_start_json =
+        serde_json::to_string(&mismatched_start).expect("mismatched start json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&mismatched_start_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut mismatched_end: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    mismatched_end["history_span_end"] = serde_json::Value::String("2026-08-09T00:00:00Z".into());
+    let mismatched_end_json = serde_json::to_string(&mismatched_end).expect("mismatched end json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&mismatched_end_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut mismatched_participants: serde_json::Value =
+        serde_json::from_str(&payload).expect("value");
+    mismatched_participants["participant_count"] = serde_json::Value::Number(0.into());
+    let mismatched_participants_json =
+        serde_json::to_string(&mismatched_participants).expect("participants json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&mismatched_participants_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
