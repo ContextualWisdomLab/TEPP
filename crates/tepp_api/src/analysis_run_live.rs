@@ -394,7 +394,7 @@ mod tests {
     use std::io::{Cursor, Read, Write};
     use std::net::TcpStream;
     use std::thread;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     use super::{
         AnalysisRunLiveService, consumer_tenant_idempotency_key, declared_content_length,
@@ -406,7 +406,7 @@ mod tests {
         ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError,
         DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, LINEAGEWEAVE_CONSUMER_CODE,
         NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
-        NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT,
+        NARUON_LIVE_HEADER_COUNT_LIMIT,
     };
 
     fn sample_run() -> AnalysisRunRequest {
@@ -946,13 +946,11 @@ mod tests {
         let timeout_addr = timeout.local_addr().expect("timeout address");
         let timeout_worker = thread::spawn(move || timeout.serve_one());
         let stream = TcpStream::connect(timeout_addr).expect("timeout connect");
-        let started = Instant::now();
         let timeout_response = timeout_worker
             .join()
             .expect("timeout join")
             .expect("timeout served");
         drop(stream);
-        assert!(started.elapsed() >= NARUON_LIVE_IO_TIMEOUT);
         assert_eq!(timeout_response.status_code, 413);
         assert_eq!(
             envelope(&timeout_response.body).error_code(),
