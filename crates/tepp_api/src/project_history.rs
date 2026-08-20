@@ -471,7 +471,8 @@ fn compose_https_target(origin: &str) -> Result<String, ApiError> {
 mod tests {
     use super::{
         PROJECT_HISTORY_CONTRACT_VERSION, ProjectHistoryEvent, ProjectHistoryProjection,
-        ProjectHistoryRequest, project_history_projection,
+        ProjectHistoryRequest, build_project_history_exchange, compose_https_target,
+        project_history_projection, validate_code,
     };
     use crate::ApiError;
 
@@ -532,6 +533,112 @@ mod tests {
         assert_eq!(
             project_history_projection(&excess),
             Err(ApiError::LimitExceeded)
+        );
+    }
+
+    #[test]
+    fn validation_edges_cover_cutoffs_bounds_projection_and_origins() {
+        let mut empty = request_with_single_event();
+        empty.events.clear();
+        assert_eq!(
+            project_history_projection(&empty),
+            Err(ApiError::LimitExceeded)
+        );
+
+        let mut future_cutoff = request_with_single_event();
+        future_cutoff.knowledge_cutoff = "2999-01-01T00:00:00Z".into();
+        assert_eq!(
+            project_history_projection(&future_cutoff),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut occurred_after_cutoff = request_with_single_event();
+        occurred_after_cutoff.events[0].occurred_at = "2026-08-20T00:00:00Z".into();
+        assert_eq!(
+            project_history_projection(&occurred_after_cutoff),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut available_after_cutoff = request_with_single_event();
+        available_after_cutoff.events[0].available_at = "2026-08-20T00:00:00Z".into();
+        assert_eq!(
+            project_history_projection(&available_after_cutoff),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut too_many_actors = request_with_single_event();
+        too_many_actors.events[0].actor_ids = vec!["actor".into(); 65];
+        assert_eq!(
+            project_history_projection(&too_many_actors),
+            Err(ApiError::LimitExceeded)
+        );
+
+        let mut oversized_title = request_with_single_event();
+        oversized_title.events[0].event_title = "x".repeat(513);
+        assert_eq!(
+            project_history_projection(&oversized_title),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(validate_code("_"), Ok(()));
+        assert_eq!(validate_code("1"), Ok(()));
+
+        let projection =
+            project_history_projection(&request_with_single_event()).expect("projection");
+        let mut wrong_status = projection.clone();
+        wrong_status.inference_status = "causal_score".into();
+        assert_eq!(wrong_status.to_json(), Err(ApiError::InvalidWirePayload));
+
+        let mut empty_projection = projection.clone();
+        empty_projection.events.clear();
+        assert_eq!(
+            empty_projection.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut inverted_span = projection;
+        inverted_span.history_span_start = "2026-08-20T00:00:00Z".into();
+        inverted_span.history_span_end = "2026-08-19T00:00:00Z".into();
+        assert_eq!(inverted_span.to_json(), Err(ApiError::InvalidWirePayload));
+
+        let request = request_with_single_event();
+        assert_eq!(
+            build_project_history_exchange("", "lineageweave", &request),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            build_project_history_exchange("https://example.test", &"x".repeat(65), &request),
+            Err(ApiError::LimitExceeded)
+        );
+        assert!(
+            build_project_history_exchange("https://example.test", "lineageweave", &request)
+                .is_ok()
+        );
+
+        for origin in [
+            "http://example.test",
+            "https://",
+            "https:///path",
+            "https://user@example.test",
+            "https://example.test/path",
+            "https://example.test?query",
+            "https://example.test#fragment",
+            "https://example test",
+            "https://example'test",
+            "https://example;test",
+            "https://example\\test",
+            "https://example\ntest",
+            "https://postgres.example.test",
+            "https://jdbc.example.test",
+        ] {
+            assert_eq!(
+                compose_https_target(origin),
+                Err(ApiError::InvalidWirePayload),
+                "origin must be rejected: {origin:?}"
+            );
+        }
+        assert_eq!(
+            compose_https_target("https://example.test").expect("origin"),
+            "https://example.test/v1/project-histories"
         );
     }
 }
