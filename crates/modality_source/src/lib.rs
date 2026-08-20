@@ -12,11 +12,11 @@ mod kind;
 
 /// Fail-closed modality-source errors.
 pub use error::ModalitySourceError;
+/// Closed vocabulary of modality-related token treatments.
+pub use kind::ModalityKind;
 /// Fraction of recovered modality kinds that match known truth.
 pub use kind::identity_recovery_rate;
 /// Refuse to treat non-lexical modality as stopword deletion.
 pub use kind::refuse_modality_as_stopword_deletion;
 /// Refuse to treat non-lexical modality as unique latent content.
 pub use kind::refuse_modality_as_unique_content;
-/// Closed vocabulary of modality-related token treatments.
-pub use kind::ModalityKind;

@@ -1,8 +1,8 @@
 //! Non-lexical modality is not unique content and not stopword deletion.
 
 use modality_source::{
-    identity_recovery_rate, refuse_modality_as_stopword_deletion,
-    refuse_modality_as_unique_content, ModalityKind, ModalitySourceError,
+    ModalityKind, ModalitySourceError, identity_recovery_rate,
+    refuse_modality_as_stopword_deletion, refuse_modality_as_unique_content,
 };
 
 #[test]

@@ -87,8 +87,8 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_modality_as_stopword_deletion,
-        refuse_modality_as_unique_content, ModalityKind,
+        ModalityKind, identity_recovery_rate, refuse_modality_as_stopword_deletion,
+        refuse_modality_as_unique_content,
     };
     use crate::ModalitySourceError;
 
