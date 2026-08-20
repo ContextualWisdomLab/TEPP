@@ -67,6 +67,15 @@ fn table_access_and_hostile_workflow_refs_fail_closed() {
 }
 
 #[test]
+fn legitimate_workflow_filenames_do_not_trigger_table_host_guard() {
+    for filename in ["graphql-lint.yml", "mysql-migrations.yml", "postgresql.yml"] {
+        let identity =
+            format!("ContextualWisdomLab/.github/.github/workflows/{filename}@{PINNED_SHA}");
+        bind_org_github_workflow(&identity).expect("workflow filename is not a table host");
+    }
+}
+
+#[test]
 fn review_agent_and_copilot_secrets_are_refused() {
     assert_eq!(
         refuse_org_workflow_secret("COPILOT_GITHUB_TOKEN"),

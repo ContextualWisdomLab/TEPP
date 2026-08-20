@@ -92,11 +92,18 @@ pub fn refuse_check_conclusion_as_scientific_claim(conclusion: &str) -> Result<(
 /// [`ApiError::AuthorizationDenied`] for SQL, JDBC, or table hosts.
 pub fn refuse_org_workflow_table_access(target: &str) -> Result<(), ApiError> {
     require_nonempty(target)?;
-    let lowered = target.to_ascii_lowercase();
-    if ["postgres", "jdbc", "sql", "tables"]
+    let lowered = target.trim().to_ascii_lowercase();
+    let authority = lowered
+        .split_once("://")
+        .map_or(lowered.as_str(), |(_, remainder)| remainder);
+    let host = authority.split(['/', '?', '#']).next().unwrap_or_default();
+    let blocked_scheme = ["jdbc:", "postgres://", "postgresql://"]
         .iter()
-        .any(|needle| lowered.contains(needle))
-    {
+        .any(|scheme| lowered.starts_with(scheme));
+    let blocked_host = host
+        .split('.')
+        .any(|label| matches!(label, "postgres" | "postgresql" | "sql" | "tables"));
+    if blocked_scheme || blocked_host {
         return Err(ApiError::AuthorizationDenied);
     }
     Ok(())
