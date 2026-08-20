@@ -22,10 +22,9 @@ fn delayed_documents_are_excluded_and_counts_match_known_truth() {
     );
 
     let boundary_document = manifest.documents().first().expect("boundary document");
-    let boundary_cutoff = KnowledgeCutoff::parse_rfc3339(
-        &boundary_document.available_time().to_rfc3339(),
-    )
-    .expect("boundary cutoff");
+    let boundary_cutoff =
+        KnowledgeCutoff::parse_rfc3339(&boundary_document.available_time().to_rfc3339())
+            .expect("boundary cutoff");
     let boundary_eligible = manifest.documents_eligible_at_cutoff(&boundary_cutoff);
     assert!(
         boundary_eligible
