@@ -8,7 +8,7 @@ This note doctors the `tepp_simulation` historical-fit filter:
 2. eligible counts must match the known-truth count computed from generated clocks;
 3. a late document fails closed.
 
-No database migration is allocated. Interval-aware cutoff on uncertain availability remains on the `temporal_core` active PR.
+No database migration is allocated. Interval-aware cutoff on uncertain availability remains a separate follow-up capability; no open PR currently claims it.
 
 ## Authoritative sources
 
@@ -24,4 +24,4 @@ Jensen and Snodgrass (1999) distinguish valid time from transaction time. TEPP d
 
 - a delayed corpus has fewer eligible documents than total documents at an early cutoff;
 - eligible count equals the known-truth count from generated clocks;
-- `refuse_unavailable_document` admits early documents and denies late ones.
+- `refuse_unavailable_document` admits a document whose availability is exactly the cutoff and denies late ones with `TemporalInvariantViolation`.
