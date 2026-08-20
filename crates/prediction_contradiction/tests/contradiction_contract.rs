@@ -187,3 +187,16 @@ fn empty_or_mismatched_agreement_slices_fail_closed() {
         Err(PredictionContradictionError::AgreementSliceMismatch)
     );
 }
+
+#[test]
+fn adjacency_failure_explains_missing_interior_overlap() {
+    let message = PredictionContradictionError::PredictionLacksOverlappingSupport.to_string();
+    assert_eq!(
+        message,
+        "predicted interval is adjacent to observation without overlapping support"
+    );
+    assert_ne!(
+        message,
+        PredictionContradictionError::PredictionContradictsObservation.to_string()
+    );
+}
