@@ -22,8 +22,11 @@ or replace `method_effects`, `section_source`, `style_source`,
 
 ### Supporting literature
 
-Liu et al. (2023) treat prompting as a method condition that shapes
-emissions. Prompt text is not the document's unique latent meaning.
+Liu et al. (2023) is retained as a secondary survey of prompting methods and
+is not used as evidence for the repository's latent-content classification.
+The statement that prompt boilerplate is not unique latent content is a
+normative TEPP measurement contract derived from ADR 0004 and ADR 0012, not a
+universal empirical claim about every prompt or corpus.
 
 Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, G. (2023).
 Pre-train, prompt, and predict: A systematic survey of prompting methods
