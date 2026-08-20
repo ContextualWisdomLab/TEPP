@@ -74,6 +74,12 @@ Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J
 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Typed `entity_record` and `project_record` SQL keep multiple-membership targets referentially intact and refuse hostile labels before insert (Snijders & Bosker, 2012; Beretvas, 2011; Jensen & Snodgrass, 1999).
 
+## Roles, membership, and multilevel structure
+
+Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100201
+
+Language, episode, template, department, and opportunity-pool memberships are crossed classifications. TEPP refuses collapsing those targets into the entity/project pair stored by migration `0006` (Browne et al., 2001).
+
 ## Unicode, language tags, and multilingual structure
 
 Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #15: Unicode normalization forms*. Unicode Consortium.
