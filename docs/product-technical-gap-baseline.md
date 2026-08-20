@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-20 18:15 KST
+**Snapshot:** 2026-08-20 18:57 KST
 **Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
 
 ## Purpose
@@ -46,28 +46,30 @@ The gap register is derived from these canonical sources:
 
 ## Current pull-request queue
 
-The following table was read from GitHub at the snapshot time. `pending` is the
-number of queued or in-progress check entries returned for that exact HEAD;
-`failed` counts completed failure/cancellation/timeout/action-required entries.
+The following table was read from GitHub at the snapshot time. Check evidence is
+reported qualitatively so a queued run cannot be mistaken for a completed pass.
 An empty review decision means that no qualifying decision was reported by the
 API at snapshot time. These values do not authorize a merge by themselves.
 
-| PR | Head | Base | Merge state | Review decision | Pending | Failed | Delivery role |
-|---:|---|---|---|---|---:|---:|---|
-| [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `5295f5e` | `feat/lineageweave-live-consumer-contract` | `MERGEABLE/UNSTABLE` | required | 6 | 0 | LineageWeave cutoff-safe history projection |
-| [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `99c8d4c` | `feat/lineageweave-live-consumer-contract` | `MERGEABLE/UNSTABLE` | required | 4 | 0 | LineageWeave temporal evidence context |
-| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `30918e5` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | 0 | 0 | Completed analysis-run result contract |
-| [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `0e29108` | `cursor/bc-422aba2a-86ab-45e3-9911-95cff5c28a87-5627` | `MERGEABLE/CLEAN` | required | 0 | 0 | Modular LineageWeave consumer parent |
-| [116](https://github.com/ContextualWisdomLab/TEPP/pull/116) | `5f9d7bf` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | 0 | 0 | APA 7 method-paper doctoring |
-| [115](https://github.com/ContextualWisdomLab/TEPP/pull/115) | `2525b8e` | `main` | `MERGEABLE/BLOCKED` | required | 1 | 0 | Coverage-authority quality validator |
-| [110](https://github.com/ContextualWisdomLab/TEPP/pull/110) | `c63e1cf` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | 17 | 0 | Corpus-split leakage-audit manifest |
-| [107](https://github.com/ContextualWisdomLab/TEPP/pull/107) | `a6cea38` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | 17 | 0 | Loopback Naruon analysis-run service |
-| [106](https://github.com/ContextualWisdomLab/TEPP/pull/106) | `d01892e` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | 0 | 0 | Privacy audit-event inspection |
-| [100](https://github.com/ContextualWisdomLab/TEPP/pull/100) | `3e928bc` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | 0 | 0 | Live service-TLS bind policy |
-| [91](https://github.com/ContextualWisdomLab/TEPP/pull/91) | `53a5a31` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | 1 | 0 | Derived-artifact sensitivity inheritance |
-| [51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | `0111a1a` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | 0 | 0 | VRAM budget and CPU fallback types |
-| [50](https://github.com/ContextualWisdomLab/TEPP/pull/50) | `af67f14` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | 17 | 0 | TDT/CHRONOS transition boundary |
-| [48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | `8e88b33` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | 0 | 0 | Logistic-normal topic coordinates |
+| PR | Head | Base | Merge state | Review decision | Current check evidence | Delivery role |
+|---:|---|---|---|---|---|---|
+| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `b613ec3` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Product/technical gap baseline |
+| [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `586cda5` | `feat/lineageweave-live-consumer-contract` | `MERGEABLE/UNSTABLE` | required | required Checks queued; no completed failure observed | LineageWeave cutoff-safe history projection |
+| [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `99c8d4c` | `feat/lineageweave-live-consumer-contract` | `MERGEABLE/CLEAN` | required | current Checks green; independent review still required | LineageWeave temporal evidence context |
+| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `f1c94f7` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Completed analysis-run result contract |
+| [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `0e29108` | `cursor/bc-422aba2a-86ab-45e3-9911-95cff5c28a87-5627` | `MERGEABLE/CLEAN` | required | current Checks green; independent review still required | Modular LineageWeave consumer parent |
+| [144](https://github.com/ContextualWisdomLab/TEPP/pull/144) | `980b62b` | `agent/psychometric-posterior-esem-input` | `MERGEABLE/UNSTABLE` | required | required Checks queued; scientific tests pass locally | Multilevel event-time psychometric recovery |
+| [116](https://github.com/ContextualWisdomLab/TEPP/pull/116) | `5f9d7bf` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | current Checks green; independent review still required | APA 7 method-paper doctoring |
+| [115](https://github.com/ContextualWisdomLab/TEPP/pull/115) | `2106170` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Coverage-authority quality validator |
+| [110](https://github.com/ContextualWisdomLab/TEPP/pull/110) | `c63e1cf` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | current Checks green; independent review still required | Corpus-split leakage-audit manifest |
+| [107](https://github.com/ContextualWisdomLab/TEPP/pull/107) | `542fa0a` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | current Checks green; independent review still required | Loopback Naruon analysis-run service |
+| [106](https://github.com/ContextualWisdomLab/TEPP/pull/106) | `d01892e` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | current Checks green; independent review still required | Privacy audit-event inspection |
+| [100](https://github.com/ContextualWisdomLab/TEPP/pull/100) | `3e928bc` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | current Checks green; independent review still required | Live service-TLS bind policy |
+| [91](https://github.com/ContextualWisdomLab/TEPP/pull/91) | `53a5a31` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | no completed failure; review changes remain | Derived-artifact sensitivity inheritance |
+| [62](https://github.com/ContextualWisdomLab/TEPP/pull/62) | `1951ab4` | `main` | `MERGEABLE/BLOCKED` | required | required Checks queued; no completed failure observed | Simulation cutoff eligibility |
+| [51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | `0111a1a` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | VRAM budget and CPU fallback types |
+| [50](https://github.com/ContextualWisdomLab/TEPP/pull/50) | `fa4dff2` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | TDT/CHRONOS transition boundary |
+| [48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | `8e88b33` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | Logistic-normal topic coordinates |
 
 ### Merge and review order
 
