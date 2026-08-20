@@ -34,16 +34,8 @@ fn recovered_identities_match_known_truth_better_than_minted_replacements() {
 
     let recovered_rate = identity_recovery_rate(&truth, &recovered).expect("recovered");
     let minted_rate = identity_recovery_rate(&truth, &minted).expect("minted");
-    let expected = {
-        let mut matches = 0_u32;
-        for (truth_id, decided_id) in truth.iter().zip(recovered.iter()) {
-            if truth_id == decided_id {
-                matches += 1;
-            }
-        }
-        f64::from(matches) / f64::from(u32::try_from(truth.len()).expect("len"))
-    };
-    assert!((recovered_rate - expected).abs() < f64::EPSILON);
+    assert!((recovered_rate - 1.0).abs() < f64::EPSILON);
+    assert!((minted_rate - (2.0 / 3.0)).abs() < 1e-12);
     assert!(recovered_rate > minted_rate);
 }
 

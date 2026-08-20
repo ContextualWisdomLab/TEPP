@@ -27,6 +27,7 @@ impl TopicIdentity {
 ///
 /// Returns [`TopicLineageError::InvalidIdentityPayload`] when either slice is
 /// empty or the lengths differ.
+#[allow(clippy::cast_precision_loss)]
 pub fn identity_recovery_rate(
     truth: &[TopicIdentity],
     decided: &[TopicIdentity],
@@ -34,13 +35,13 @@ pub fn identity_recovery_rate(
     if truth.is_empty() || truth.len() != decided.len() {
         return Err(TopicLineageError::InvalidIdentityPayload);
     }
-    let mut matches = 0_u32;
+    let mut matches = 0_usize;
     for (truth_id, decided_id) in truth.iter().zip(decided) {
         if truth_id == decided_id {
             matches += 1;
         }
     }
-    Ok(f64::from(matches) / truth.len() as f64)
+    Ok(matches as f64 / truth.len() as f64)
 }
 
 /// Explicit refusal to treat reactivation as a newly minted topic.

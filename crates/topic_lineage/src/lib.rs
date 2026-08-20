@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
-#![allow(clippy::cast_precision_loss)]
 //! Global topic identity that survives dormancy and reactivation.
 //!
 //! A P0 topic identity is selected once for the modeled period. Activity may
