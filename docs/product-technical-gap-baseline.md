@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-20 19:27 KST
+**Snapshot:** 2026-08-20 19:44 KST
 **Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
 
 ## Purpose
@@ -72,6 +72,7 @@ API at snapshot time. These values do not authorize a merge by themselves.
 | [59](https://github.com/ContextualWisdomLab/TEPP/pull/59) | `43bf6cf` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Unicode NFC/NFD canonical identity for split leakage |
 | [51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | `0111a1a` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | VRAM budget and CPU fallback types |
 | [50](https://github.com/ContextualWisdomLab/TEPP/pull/50) | `fa4dff2` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | TDT/CHRONOS transition boundary |
+| [49](https://github.com/ContextualWisdomLab/TEPP/pull/49) | `199ed6c` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Posterior ESEM input gates and true-parameter RMSE |
 | [48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | `8e88b33` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | Logistic-normal topic coordinates |
 
 ### Merge and review order
