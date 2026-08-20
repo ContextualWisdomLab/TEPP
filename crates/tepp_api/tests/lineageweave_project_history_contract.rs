@@ -1,8 +1,8 @@
 //! LineageWeave project-history requests remain cutoff-safe and non-causal.
 
 use tepp_api::{
-    LINEAGEWEAVE_CONSUMER_CODE, PROJECT_HISTORY_CONTRACT_VERSION, PROJECT_HISTORY_PATH,
-    ProjectHistoryEvent, ProjectHistoryRequest, ApiError, lineageweave_project_history_exchange,
+    ApiError, LINEAGEWEAVE_CONSUMER_CODE, PROJECT_HISTORY_CONTRACT_VERSION, PROJECT_HISTORY_PATH,
+    ProjectHistoryEvent, ProjectHistoryRequest, lineageweave_project_history_exchange,
     project_history_projection,
 };
 
@@ -92,7 +92,10 @@ fn sample_request() -> ProjectHistoryRequest {
 fn projection_orders_the_cycle_and_explains_only_explicit_temporal_evidence() {
     let projection = project_history_projection(&sample_request()).expect("projection");
 
-    assert_eq!(projection.contract_version, PROJECT_HISTORY_CONTRACT_VERSION);
+    assert_eq!(
+        projection.contract_version,
+        PROJECT_HISTORY_CONTRACT_VERSION
+    );
     assert_eq!(projection.focus_event_id, "event-voc");
     assert_eq!(projection.inference_status, "temporal_association_only");
     assert_eq!(projection.participant_count, 3);
@@ -120,10 +123,12 @@ fn projection_orders_the_cycle_and_explains_only_explicit_temporal_evidence() {
     assert!(finding_codes.contains(&"handoff_before_focus"));
     assert!(finding_codes.contains(&"rebid_after_focus"));
     assert!(finding_codes.contains(&"specification_change_and_handoff_before_focus"));
-    assert!(projection
-        .findings
-        .iter()
-        .all(|finding| !finding.evidence_post_ids.is_empty()));
+    assert!(
+        projection
+            .findings
+            .iter()
+            .all(|finding| !finding.evidence_post_ids.is_empty())
+    );
 }
 
 #[test]
@@ -143,11 +148,7 @@ fn projection_rejects_future_evidence_duplicates_and_unknown_json_fields() {
     );
 
     let json = sample_request().to_json().expect("json");
-    let hostile = json.replacen(
-        "{",
-        "{\"unpublished_causal_score\":1,",
-        1,
-    );
+    let hostile = json.replacen("{", "{\"unpublished_causal_score\":1,", 1);
     assert_eq!(
         ProjectHistoryRequest::from_json(&hostile),
         Err(ApiError::InvalidWirePayload)
@@ -156,24 +157,26 @@ fn projection_rejects_future_evidence_duplicates_and_unknown_json_fields() {
 
 #[test]
 fn lineageweave_exchange_uses_the_versioned_credential_free_tepp_path() {
-    let exchange = lineageweave_project_history_exchange(
-        "https://tepp.example.test",
-        &sample_request(),
-    )
-    .expect("exchange");
+    let exchange =
+        lineageweave_project_history_exchange("https://tepp.example.test", &sample_request())
+            .expect("exchange");
 
     assert_eq!(
         exchange.target_url,
         format!("https://tepp.example.test{PROJECT_HISTORY_PATH}")
     );
     assert_eq!(exchange.method, "POST");
-    assert!(exchange
-        .headers
-        .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into())));
-    assert!(exchange
-        .headers
-        .iter()
-        .all(|(name, _)| !name.eq_ignore_ascii_case("authorization")));
+    assert!(
+        exchange
+            .headers
+            .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+    );
+    assert!(
+        exchange
+            .headers
+            .iter()
+            .all(|(name, _)| !name.eq_ignore_ascii_case("authorization"))
+    );
     assert_eq!(
         lineageweave_project_history_exchange("http://tepp.example.test", &sample_request()),
         Err(ApiError::InvalidWirePayload)

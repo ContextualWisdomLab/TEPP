@@ -10,10 +10,10 @@ use std::collections::{BTreeSet, HashSet};
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
+use crate::ApiError;
 use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
-use crate::ApiError;
 
 /// Supported project-history request and response contract version.
 pub const PROJECT_HISTORY_CONTRACT_VERSION: u16 = 1;
@@ -527,10 +527,8 @@ mod tests {
         );
 
         let mut excess = request_with_single_event();
-        excess.events = vec![
-            excess.events[0].clone();
-            super::DEFAULT_PROJECT_HISTORY_EVENT_LIMIT + 1
-        ];
+        excess.events =
+            vec![excess.events[0].clone(); super::DEFAULT_PROJECT_HISTORY_EVENT_LIMIT + 1];
         assert_eq!(
             project_history_projection(&excess),
             Err(ApiError::LimitExceeded)

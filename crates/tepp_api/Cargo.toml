@@ -17,7 +17,8 @@ publish = false
 jiff = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-temporal_core = { path = "../temporal_core" }
+sha2 = { workspace = true }
+temporal_core = { path = "../temporal_core", version = "0.1.0" }
 
 [lints]
 workspace = true
