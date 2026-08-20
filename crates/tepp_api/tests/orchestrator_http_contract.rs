@@ -47,6 +47,7 @@ fn table_access_and_non_https_origins_fail_closed() {
     for host in [
         "",
         "bad host",
+        "\0.example",
         "h@x",
         "h/sql",
         "h?x",
@@ -59,6 +60,10 @@ fn table_access_and_non_https_origins_fail_closed() {
             Err(ApiError::AuthorizationDenied)
         );
     }
+    assert_eq!(
+        orchestrator_interpretation_exchange(&"a".repeat(254), "idem-1", "{}"),
+        Err(ApiError::AuthorizationDenied)
+    );
     assert_eq!(
         orchestrator_interpretation_exchange("tables.example", "idem-1", "{}"),
         Err(ApiError::AuthorizationDenied)

@@ -76,6 +76,10 @@ fn rows_from_different_members_fail_closed() {
             .expect("second rows"),
     );
     assert_eq!(
+        refuse_atomistic_collapse(&mixed, 0),
+        Err(MembershipError::InvalidWirePayload)
+    );
+    assert_eq!(
         refuse_atomistic_collapse(&mixed, 2),
         Err(MembershipError::InvalidWirePayload)
     );

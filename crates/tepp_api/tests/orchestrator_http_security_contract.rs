@@ -31,11 +31,23 @@ fn normalized_nested_secret_names_fail_closed() {
         r#"{"nested":{"review-agent-github-token":"x"}}"#,
         r#"{"credential_name":"GITHUB_TOKEN"}"#,
         r#"{"credential_name":"copilot github token"}"#,
+        r#"{"credential_name":"OPENCODE_GITHUB_TOKEN"}"#,
+        r#"{"credential_name":"copilot interpretation token"}"#,
+        r#"{"credential_name":"reviewagent interpretation token"}"#,
+        r#"{"credential_name":"github interpretation token"}"#,
     ] {
         assert_eq!(
             orchestrator_interpretation_exchange("orchestrator.example", "idem-1", body),
             Err(ApiError::AuthorizationDenied)
         );
+    }
+
+    for body in [
+        r#"{"credential_name":"copilot credential"}"#,
+        r#"{"credential_name":"reviewagent credential"}"#,
+    ] {
+        orchestrator_interpretation_exchange("orchestrator.example", "idem-1", body)
+            .expect("names without a token suffix remain ordinary payload text");
     }
 
     orchestrator_interpretation_exchange(
@@ -59,6 +71,10 @@ fn idempotency_key_is_bounded_and_header_safe() {
             "idem\r\ninjected: true",
             "{}",
         ),
+        Err(ApiError::InvalidWirePayload)
+    );
+    assert_eq!(
+        orchestrator_interpretation_exchange("orchestrator.example", "idem\0key", "{}"),
         Err(ApiError::InvalidWirePayload)
     );
 }
