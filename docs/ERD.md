@@ -3,7 +3,7 @@
 **Status:** Accepted logical target model with current implementation maturity explicitly marked.  
 **Last reviewed:** 2026-08-13
 
-Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`), tenant row-level security (`0002`), the model-run/artifact chain (`0003`), append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006`), event-relation vocabulary SQL, and event-mention SQL as executable migration/application contracts with live CI. Event-instance insert/as-known-at SQL is on the active PR and is not implemented-main until exact-head checks, review, and protected-main integration complete. Broader planned ERD entities, concurrent-write acceptance, and backup/recovery gates remain accepted-target.
+Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`), tenant row-level security (`0002`), the model-run/artifact chain (`0003`), append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006`), event-relation/mention/instance SQL, source-artifact SQL, audit-event SQL, concurrent document-write stress, and naruon HTTP interchange contracts as executable migration/application contracts with live CI. Migration `0007` (active PR) adds `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` and is not implemented-main until exact-head checks, review, and protected-main integration complete. Broader planned ERD entities and backup/recovery gates remain accepted-target.
 
 ## Current domain foundation
 
@@ -67,6 +67,11 @@ erDiagram
     MODEL_RUN ||--o{ FACTOR_SOLUTION : estimates
     FACTOR_SOLUTION ||--o{ FACTOR_LOADING : contains
     MODEL_RUN ||--o{ AUDIT_EVENT : evidenced_by
+    TENANT_RECORD ||--o{ RETENTION_POLICY : governs
+    TENANT_RECORD ||--o{ LEGAL_HOLD : imposes
+    RETENTION_POLICY ||--o{ DELETION_REQUEST : authorizes
+    LEGAL_HOLD ||--o{ DELETION_REQUEST : may_block
+    DELETION_REQUEST ||--o{ EVIDENCE_TOMBSTONE : records
 
     TENANT_RECORD {
       uuid tenant_record_id PK
@@ -312,6 +317,46 @@ erDiagram
       text outcome_code
       text evidence_digest
       timestamptz system_time
+    }
+
+    RETENTION_POLICY {
+      uuid retention_policy_id PK
+      uuid tenant_record_id FK
+      text data_class_code
+      text processing_purpose_code
+      integer retention_period_days
+      text policy_status_code
+      text authority_citation
+    }
+
+    LEGAL_HOLD {
+      uuid legal_hold_id PK
+      uuid tenant_record_id FK
+      text hold_scope_code
+      uuid held_document_id
+      text hold_authority_code
+      text hold_status_code
+      text authority_citation
+    }
+
+    DELETION_REQUEST {
+      uuid deletion_request_id PK
+      uuid tenant_record_id FK
+      uuid retention_policy_id FK
+      uuid target_document_id
+      text target_data_class_code
+      text deletion_kind_code
+      text request_status_code
+      uuid legal_hold_id FK
+    }
+
+    EVIDENCE_TOMBSTONE {
+      uuid evidence_tombstone_id PK
+      uuid tenant_record_id FK
+      uuid tombstoned_document_id
+      uuid deletion_request_id FK
+      text evidence_digest
+      text reproduction_status_code
     }
 ```
 
