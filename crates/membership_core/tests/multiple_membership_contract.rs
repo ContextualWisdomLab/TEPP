@@ -1,8 +1,8 @@
 //! Realistic multiple-membership contracts that prevent atomistic fallacy.
 
 use membership_core::{
-    GroupId, MemberId, MembershipAssignment, MembershipError, MembershipNetwork, MembershipRole,
-    MembershipWeight,
+    EstimationMembershipRow, GroupId, MemberId, MembershipAssignment, MembershipError,
+    MembershipNetwork, MembershipRole, MembershipWeight,
 };
 use temporal_core::EventTime;
 
@@ -148,6 +148,35 @@ fn duplicate_member_group_role_keys_are_rejected() {
         network.insert(assignment),
         Err(MembershipError::DuplicateMembershipAssignment)
     );
+}
+
+#[test]
+fn active_memberships_collect_and_map_to_rows() {
+    let member = MemberId::new();
+    let group = GroupId::new();
+    let start = event_time("2026-01-01T00:00:00Z");
+    let end = event_time("2026-02-01T00:00:00Z");
+    let instant = event_time("2026-01-15T00:00:00Z");
+
+    let assignment = MembershipAssignment::new(
+        member,
+        group,
+        MembershipRole::Language,
+        MembershipWeight::full().expect("full"),
+        start,
+        end,
+    )
+    .expect("assignment");
+    let mut network = MembershipNetwork::new();
+    network.insert(assignment).expect("insert assignment");
+
+    let active = network.active_memberships_for(member, instant);
+    assert_eq!(active.len(), 1);
+    let row = EstimationMembershipRow::from_assignment(active[0]);
+    assert_eq!(row.member_id(), member);
+    assert_eq!(row.group_id(), group);
+    assert_eq!(row.role(), MembershipRole::Language);
+    assert!((row.weight() - 1.0).abs() < f64::EPSILON);
 }
 
 #[test]
