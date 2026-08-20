@@ -38,7 +38,7 @@ def main() -> None:
         """//! Consumer-neutral live analysis-run ingress for modular CWL services.
 //!
 //! This module keeps the Naruon compatibility listener intact while providing
-//! the shared `/v1/analysis-runs` boundary needed by Naruon and LineageWeave.
+//! the shared `/v1/analysis-runs` boundary needed by Naruon and `LineageWeave`.
 //! It accepts transport acknowledgements only; completed psychometric results
 //! remain outside this crate.
 """,
@@ -47,7 +47,7 @@ def main() -> None:
 //! This module keeps the Naruon compatibility listener intact while providing
 //! shared `/v1/analysis-runs` and `/v1/project-histories` boundaries. Analysis
 //! runs return transport acknowledgements only. Project histories return a
-//! deterministic projection over authorized evidence supplied by LineageWeave;
+//! deterministic projection over authorized evidence supplied by `LineageWeave`;
 //! neither path claims a completed psychometric result or causal conclusion.
 """,
     )
@@ -55,6 +55,11 @@ def main() -> None:
         source,
         "use crate::lineageweave_http::consumer_is_supported;\n",
         "use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};\n",
+    )
+    replace_once(
+        source,
+        "use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, header_is_credential};\n",
+        "use crate::naruon_http::header_is_credential;\n",
     )
     replace_once(
         source,
@@ -72,33 +77,22 @@ def main() -> None:
     requests_are_idempotent_matches,
 };
 
-const LIVE_BODY_BYTE_LIMIT: usize = if DEFAULT_PROJECT_HISTORY_BYTE_LIMIT
-    > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT
-{
-    DEFAULT_PROJECT_HISTORY_BYTE_LIMIT
-} else {
-    DEFAULT_ANALYSIS_RUN_BYTE_LIMIT
-};
+const LIVE_BODY_BYTE_LIMIT: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
 """,
-    )
-    replace_once(
-        source,
-        "use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, header_is_credential};\n",
-        "use crate::naruon_http::header_is_credential;\n",
     )
     replace_once(
         source,
         """/// Loopback HTTP/1.1 analysis-run service shared by published CWL consumers.
 ///
-/// The service accepts only Naruon and LineageWeave consumer identities. Its
+/// The service accepts only Naruon and `LineageWeave` consumer identities. Its
 /// idempotency namespace includes consumer, tenant, and caller key so one
 /// product cannot replay or conflict with another product's accepted run.
 """,
         """/// Loopback HTTP/1.1 TEPP service shared by published CWL consumers.
 ///
-/// The analysis-run path accepts Naruon and LineageWeave and scopes mutable
+/// The analysis-run path accepts Naruon and `LineageWeave` and scopes mutable
 /// acknowledgement idempotency by consumer, tenant, and caller key. The
-/// project-history path accepts LineageWeave only and computes a stateless,
+/// project-history path accepts `LineageWeave` only and computes a stateless,
 /// cutoff-safe projection from the bounded request body.
 """,
     )
@@ -114,10 +108,10 @@ const LIVE_BODY_BYTE_LIMIT: usize = if DEFAULT_PROJECT_HISTORY_BYTE_LIMIT
         let request_path = require_request_line(lines.next().unwrap_or(""))?;
         let headers = parse_headers(lines)?;
         let consumer = require_headers(&headers, self.bound_addr)?;
-        match request_path {
-            NARUON_ANALYSIS_RUN_PATH => self.accept_analysis_run(consumer, &headers, body),
-            PROJECT_HISTORY_PATH => Self::project_history(consumer, &headers, body),
-            _ => Err(ApiError::InvalidWirePayload),
+        if request_path == NARUON_ANALYSIS_RUN_PATH {
+            self.accept_analysis_run(consumer, &headers, body)
+        } else {
+            Self::project_history(consumer, &headers, body)
         }
 """,
     )
@@ -155,7 +149,6 @@ const LIVE_BODY_BYTE_LIMIT: usize = if DEFAULT_PROJECT_HISTORY_BYTE_LIMIT
     }
 """,
     )
-    # The in-memory request path repeats the same bound once.
     replace_once(
         source,
         """    if declared > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
