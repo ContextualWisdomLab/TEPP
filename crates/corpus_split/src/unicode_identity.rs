@@ -5,7 +5,7 @@
 //! independence between identical evidence.
 
 use crate::{CorpusSplitError, LeakageLink, LeakageLinkKind};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use unicode_normalization::UnicodeNormalization;
 use uuid::Uuid;
 
@@ -51,6 +51,10 @@ pub fn texts_are_canonically_equivalent(left: &str, right: &str) -> Result<bool,
 
 /// Emit undirected [`LeakageLinkKind::CanonicalEquivalent`] links for NFC/NFD pairs.
 ///
+/// Documents are normalized once and grouped before links are emitted. The
+/// unavoidable pair output remains quadratic only within one equivalence
+/// group; unrelated documents are not compared against one another.
+///
 /// # Errors
 ///
 /// Returns [`CorpusSplitError::DuplicateDocumentIdentity`] for repeated identities
@@ -59,6 +63,7 @@ pub fn canonical_equivalence_links(
     documents: &[(Uuid, &str)],
 ) -> Result<Vec<LeakageLink>, CorpusSplitError> {
     let mut seen = BTreeSet::new();
+    let mut groups: BTreeMap<String, Vec<Uuid>> = BTreeMap::new();
     for (document_id, text) in documents {
         if !seen.insert(*document_id) {
             return Err(CorpusSplitError::DuplicateDocumentIdentity);
@@ -66,17 +71,19 @@ pub fn canonical_equivalence_links(
         if text.is_empty() {
             return Err(CorpusSplitError::EmptyCanonicalText);
         }
+        groups
+            .entry(text.nfc().collect())
+            .or_default()
+            .push(*document_id);
     }
 
     let mut links = Vec::new();
-    for left_index in 0..documents.len() {
-        for right_index in (left_index + 1)..documents.len() {
-            let (left_id, left_text) = documents[left_index];
-            let (right_id, right_text) = documents[right_index];
-            if left_text.nfc().eq(right_text.nfc()) {
+    for document_ids in groups.values() {
+        for left_index in 0..document_ids.len() {
+            for right_index in (left_index + 1)..document_ids.len() {
                 links.push(LeakageLink {
-                    left: left_id,
-                    right: right_id,
+                    left: document_ids[left_index],
+                    right: document_ids[right_index],
                     kind: LeakageLinkKind::CanonicalEquivalent,
                 });
             }
