@@ -22,7 +22,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
-crates/support_edge
+crates/checkpoint_authority
 ```
 
 ## Local verification
