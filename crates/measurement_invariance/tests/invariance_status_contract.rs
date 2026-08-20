@@ -56,6 +56,10 @@ fn mismatched_loading_coordinates_fail_closed() {
     let truth = [GroupLoading::new(0, 0, 0, 0.80)];
     let wrong_indicator = [GroupLoading::new(0, 1, 0, 0.80)];
     let wrong_factor = [GroupLoading::new(0, 0, 1, 0.80)];
+    let length_mismatch = [
+        GroupLoading::new(0, 0, 0, 0.80),
+        GroupLoading::new(0, 1, 0, 0.40),
+    ];
 
     assert_eq!(
         loading_root_mean_square_error(&truth, &wrong_indicator),
@@ -65,12 +69,28 @@ fn mismatched_loading_coordinates_fail_closed() {
         loading_root_mean_square_error(&truth, &wrong_factor),
         Err(InvarianceError::InvalidLoadingPayload)
     );
+    assert_eq!(
+        loading_root_mean_square_error(&truth, &length_mismatch),
+        Err(InvarianceError::InvalidLoadingPayload)
+    );
 }
 
 #[test]
 fn empty_or_non_finite_loadings_fail_closed() {
     assert_eq!(
         loading_root_mean_square_error(&[], &[]),
+        Err(InvarianceError::InvalidLoadingPayload)
+    );
+    let truth_nan = [GroupLoading::new(0, 0, 0, f64::NAN)];
+    let decided_finite = [GroupLoading::new(0, 0, 0, 0.80)];
+    assert_eq!(
+        loading_root_mean_square_error(&truth_nan, &decided_finite),
+        Err(InvarianceError::InvalidLoadingPayload)
+    );
+    let decided_nan = [GroupLoading::new(0, 0, 0, f64::NAN)];
+    let truth_finite = [GroupLoading::new(0, 0, 0, 0.80)];
+    assert_eq!(
+        loading_root_mean_square_error(&truth_finite, &decided_nan),
         Err(InvarianceError::InvalidLoadingPayload)
     );
 }

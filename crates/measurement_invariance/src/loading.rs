@@ -126,6 +126,13 @@ mod tests {
             loading_root_mean_square_error(&truth, &nan),
             Err(InvarianceError::InvalidLoadingPayload)
         );
+        let truth_nan = [GroupLoading::new(0, 0, 0, f64::NAN)];
+        let finite = [GroupLoading::new(0, 0, 0, 0.5)];
+        assert_eq!(
+            loading_root_mean_square_error(&truth_nan, &finite),
+            Err(InvarianceError::InvalidLoadingPayload)
+        );
+        assert_eq!(loading_root_mean_square_error(&truth, &truth), Ok(0.0));
         let identified = GroupLoading::new(2, 3, 4, 0.1);
         assert_eq!(identified.group_index(), 2);
         assert_eq!(identified.indicator_index(), 3);
