@@ -184,6 +184,33 @@ mod tests {
             Err(ApiError::AuthorizationDenied)
         );
         assert_eq!(
+            require_org_workflow_identity(
+                " ContextualWisdomLab/.github/.github/workflows/security-scan.yml@f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae"
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            require_org_workflow_identity(
+                "ContextualWisdomLab/.github/.github/workflows/security-scan.yml"
+            ),
+            Err(ApiError::AuthorizationDenied)
+        );
+        for invalid in [
+            "ContextualWisdomLab/.github/.github/workflows/@f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae",
+            "ContextualWisdomLab/.github/.github/workflows/subdir/security-scan.yml@f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae",
+            "ContextualWisdomLab/.github/.github/workflows/security-scan.txt@f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae",
+            "ContextualWisdomLab/.github/.github/workflows/security..yml@f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae",
+            "ContextualWisdomLab/.github/.github/workflows/security scan.yml@f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae",
+            "ContextualWisdomLab/.github/.github/workflows/security-scan.yml@main",
+            "ContextualWisdomLab/.github/.github/workflows/security-scan.yml@f070c504",
+            "ContextualWisdomLab/.github/.github/workflows/security-scan.yml@F070C504C1CB06891B800D7AB0CF6AC7D3CF8EAE",
+        ] {
+            assert_eq!(
+                require_org_workflow_identity(invalid),
+                Err(ApiError::AuthorizationDenied)
+            );
+        }
+        assert_eq!(
             require_org_workflow_identity(&format!(
                 "ContextualWisdomLab/.github/.github/workflows/scientific-acceptance.yml@{SHA}"
             )),
