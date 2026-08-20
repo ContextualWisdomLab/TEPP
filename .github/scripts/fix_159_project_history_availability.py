@@ -28,7 +28,7 @@ def main() -> None:
     pub occurred_at: String,
     /// Instant at which this evidence was available to the analysis.
     pub available_at: String,
-    /// Authorized LineageWeave source-post identity.
+    /// Authorized `LineageWeave` source-post identity.
 """,
         """    /// Event occurrence instant as RFC 3339.
     pub event_time: String,
@@ -36,16 +36,29 @@ def main() -> None:
     pub available_at: String,
     /// Explicit provenance basis for `available_at`.
     pub availability_basis: String,
-    /// Authorized LineageWeave source-post identity.
+    /// Authorized `LineageWeave` source-post identity.
 """,
     )
     replace_once(
         source,
-        """        let left_time = parse_timestamp(&left.occurred_at);
+        """    ordered.sort_by(|left, right| {
+        let left_time = parse_timestamp(&left.occurred_at);
         let right_time = parse_timestamp(&right.occurred_at);
+        match (left_time, right_time) {
+            (Ok(left_time), Ok(right_time)) => left_time
+                .cmp(&right_time)
+                .then_with(|| left.event_id.cmp(&right.event_id)),
+            _ => std::cmp::Ordering::Equal,
+        }
+    });
 """,
-        """        let left_time = parse_timestamp(&left.event_time);
-        let right_time = parse_timestamp(&right.event_time);
+        """    ordered.sort_by_cached_key(|event| {
+        (
+            parse_timestamp(&event.event_time)
+                .expect("validated project-history event time"),
+            event.event_id.clone(),
+        )
+    });
 """,
     )
     replace_once(
@@ -55,7 +68,6 @@ def main() -> None:
         """        .map(|event| event.event_time.clone())
 """,
     )
-    # The same expression occurs once for the end after the start replacement.
     replace_once(
         source,
         """        .map(|event| event.occurred_at.clone())
@@ -69,7 +81,7 @@ def main() -> None:
     validate_bounded_text(&event.event_title, 512)?;
 """,
         """    validate_code(&event.event_type_code)?;
-    validate_code(&event.availability_basis)?;
+    validate_bounded_text(&event.availability_basis, 128)?;
     validate_bounded_text(&event.event_title, 512)?;
 """,
     )
@@ -83,9 +95,8 @@ def main() -> None:
 """,
         """    let _event_time = parse_timestamp(&event.event_time)?;
     let available_at = parse_timestamp(&event.available_at)?;
-    // Event time may lie after the analysis cutoff when a future commitment or
-    // scheduled milestone was already known. Leakage is governed by evidence
-    // availability, not by the time the described event occurs.
+    // A future commitment may already be known. Leakage is governed by
+    // evidence availability, not by the time the described event occurs.
     if available_at > *cutoff {
         return Err(ApiError::InvalidWirePayload);
     }
@@ -147,7 +158,7 @@ def main() -> None:
     let focus = &ordered[focus_index];
     let after = &ordered[focus_index + 1..];
     let specification = first_type(before, "specification_changed");
-    let handoff = first_type(before, "handoff_recorded");
+    let handoff = first_type(before, "operational_handoff");
     let mut findings = Vec::new();
     append_single_finding(
         &mut findings,
@@ -305,7 +316,7 @@ fn combined_finding(
 """,
         """                event_time: "2026-08-19T09:00:00Z".into(),
                 available_at: "2026-08-19T10:00:00Z".into(),
-                availability_basis: "source_created_at_proxy".into(),
+                availability_basis: "source_post.created_at".into(),
                 source_post_id: "post".into(),
 """,
     )
@@ -318,9 +329,19 @@ fn combined_finding(
 """,
         """        event_time: occurred_at.into(),
         available_at: occurred_at.into(),
-        availability_basis: "source_created_at_proxy".into(),
+        availability_basis: "source_post.created_at".into(),
         source_post_id: source_post_id.into(),
 """,
+    )
+    replace_once(
+        contract_test,
+        '"handoff_recorded",\n                "Operational handoff",',
+        '"operational_handoff",\n                "Operational handoff",',
+    )
+    replace_once(
+        contract_test,
+        '            "handoff_recorded",\n            "voc_received",',
+        '            "operational_handoff",\n            "voc_received",',
     )
     replace_once(
         contract_test,
@@ -332,15 +353,17 @@ fn combined_finding(
     assert!(projection
         .events
         .iter()
-        .all(|event| event.availability_basis == "source_created_at_proxy"));
+        .all(|event| event.availability_basis == "source_post.created_at"));
 """,
     )
     replace_once(
         contract_test,
-        """    assert!(projection
-        .findings
-        .iter()
-        .all(|finding| !finding.evidence_post_ids.is_empty()));
+        """    assert!(
+        projection
+            .findings
+            .iter()
+            .all(|finding| !finding.evidence_post_ids.is_empty())
+    );
 }
 """,
         """    assert!(projection.findings.iter().all(|finding| {
@@ -363,7 +386,7 @@ fn combined_finding(
     assert!(project_history_projection(&scheduled).is_ok());
 
     let mut invalid_basis = sample_request();
-    invalid_basis.events[0].availability_basis = "source.post.created_at".into();
+    invalid_basis.events[0].availability_basis.clear();
     assert_eq!(
         project_history_projection(&invalid_basis),
         Err(ApiError::InvalidWirePayload)
