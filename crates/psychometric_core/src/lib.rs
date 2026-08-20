@@ -36,7 +36,10 @@
 //! first-occasion map `τ + λ μ_0` is not `E(y_t)`), recovers the
 //! Driver Eq. 3 fourth-summand impulse `m x` (Table 2 `TDPREDEFFECT`
 //! is `M`, not `CINT`, not `TIPREDEFFECT`, and not Voelkle Eq. 14),
-//! recovers the Driver Eq. 1–2 within-interval impulse carry
+//! recovers the Driver Eq. 5 of that contemporaneous impulse as
+//! `τ + λ(μ_t + m x)` (`τ + λ μ_t` is not that observed mean;
+//! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
+//! `u ≠ t`), recovers the Driver Eq. 1–2 within-interval impulse carry
 //! `e^{A(t−u)} M x` for `t0 < u < t` (not the contemporaneous Dirac,
 //! not `CINT`, not `TIPREDEFFECT`, and not Voelkle Eq. 14; §7.2
 //! dissipation), recovers the Driver Eq. 5 of that carried latent
@@ -115,6 +118,8 @@ pub use event_time::recover_discrete_latent_mean_with_time_independent_predictor
 pub use event_time::recover_discrete_latent_variance;
 /// Exact scalar discrete observed mean `τ + λ μ_t` from Eq. 3 then Eq. 5.
 pub use event_time::recover_discrete_observed_mean;
+/// Exact scalar discrete observed mean of a contemporaneous impulse.
+pub use event_time::recover_discrete_observed_mean_with_impulse;
 /// Exact scalar discrete observed mean of a within-interval impulse carry.
 pub use event_time::recover_discrete_observed_mean_with_impulse_carry;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
@@ -161,8 +166,12 @@ pub use event_time::refuse_continuous_intercept_as_manifest_means;
 pub use event_time::refuse_difference_quotient_as_local_rate;
 /// Refuse treating evolved `τ + λ μ_t` as the impulse-carry observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_impulse_carry_observed_mean;
+/// Refuse treating evolved `τ + λ μ_t` as the contemporaneous-impulse observed mean.
+pub use event_time::refuse_evolved_observed_mean_as_impulse_observed_mean;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
+/// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the impulse-carry observed mean.
+pub use event_time::refuse_impulse_observed_mean_as_impulse_carry_observed_mean;
 /// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
 pub use event_time::refuse_initial_latent_mean_as_evolved_mean;
 /// Refuse treating first-occasion `τ + λ μ_0` as `E(y_t)`.

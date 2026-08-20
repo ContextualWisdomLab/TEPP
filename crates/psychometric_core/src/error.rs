@@ -144,6 +144,14 @@ pub enum PsychometricError {
     /// Equation 5 of the Eq. 1–2 carried latent mean.
     /// `τ + λ μ_t` is not `τ + λ(μ_t + e^{a(t−u)} m x)`.
     EvolvedObservedMeanIsNotImpulseCarryObservedMean,
+    /// Driver Eq. 5 of the Eq. 3 evolved mean was treated as
+    /// Equation 5 of the contemporaneous impulse.
+    /// `τ + λ μ_t` is not `τ + λ(μ_t + m x)`.
+    EvolvedObservedMeanIsNotImpulseObservedMean,
+    /// Driver Eq. 5 of the contemporaneous impulse was treated as
+    /// Equation 5 of the Eq. 1–2 carried latent mean.
+    /// `τ + λ(μ_t + m x)` is not `τ + λ(μ_t + e^{a(t−u)} m x)`.
+    ImpulseObservedMeanIsNotImpulseCarryObservedMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -266,6 +274,12 @@ impl fmt::Display for PsychometricError {
             }
             Self::EvolvedObservedMeanIsNotImpulseCarryObservedMean => {
                 "evolved observed mean is not the impulse-carry observed mean"
+            }
+            Self::EvolvedObservedMeanIsNotImpulseObservedMean => {
+                "evolved observed mean is not the contemporaneous-impulse observed mean"
+            }
+            Self::ImpulseObservedMeanIsNotImpulseCarryObservedMean => {
+                "contemporaneous-impulse observed mean is not the impulse-carry observed mean"
             }
         };
         formatter.write_str(message)
@@ -467,6 +481,14 @@ mod tests {
         assert_eq!(
             PsychometricError::EvolvedObservedMeanIsNotImpulseCarryObservedMean.to_string(),
             "evolved observed mean is not the impulse-carry observed mean"
+        );
+        assert_eq!(
+            PsychometricError::EvolvedObservedMeanIsNotImpulseObservedMean.to_string(),
+            "evolved observed mean is not the contemporaneous-impulse observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseObservedMeanIsNotImpulseCarryObservedMean.to_string(),
+            "contemporaneous-impulse observed mean is not the impulse-carry observed mean"
         );
     }
 }

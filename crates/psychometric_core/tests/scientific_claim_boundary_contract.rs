@@ -8,8 +8,9 @@ use psychometric_core::{
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
     recover_discrete_latent_mean_with_impulse_carry,
     recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
-    recover_discrete_observed_mean, recover_discrete_observed_mean_with_impulse_carry,
-    recover_discrete_process_noise, recover_discrete_time_independent_predictor_effect,
+    recover_discrete_observed_mean, recover_discrete_observed_mean_with_impulse,
+    recover_discrete_observed_mean_with_impulse_carry, recover_discrete_process_noise,
+    recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_irregular_centered_residual_log_rate,
     recover_loading_point_estimate_mean, recover_manifest_lagged_observed_covariance,
     recover_manifest_observed_mean, recover_manifest_observed_variance,
@@ -20,7 +21,9 @@ use psychometric_core::{
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
+    refuse_evolved_observed_mean_as_impulse_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_impulse_observed_mean_as_impulse_carry_observed_mean,
     refuse_initial_latent_mean_as_evolved_mean,
     refuse_initial_observed_mean_as_evolved_observed_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
@@ -531,6 +534,98 @@ fn first_occasion_observed_mean_is_not_evolved_observed_mean() {
 }
 
 #[test]
+fn evolved_observed_mean_is_not_impulse_observed_mean() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let impulse_observed = recover_discrete_observed_mean_with_impulse(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-impulse-mean");
+    let evolved_observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let composed = recover_discrete_latent_mean_with_impulse(
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("mx");
+    let carried_observed = recover_discrete_observed_mean_with_impulse_carry(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("eq5-carry-mean");
+    assert!(
+        (evolved_observed - impulse_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of Eq. 3 impulse): τ + λ μ_t is not contemporaneous-impulse E(y_t)"
+    );
+    assert!(
+        (manifest_mean - impulse_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 / Table 2 p. 12): MANIFESTMEANS is not contemporaneous-impulse E(y_t)"
+    );
+    assert!(
+        (composed - impulse_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): evolved-plus-impulse latent mean is not E(y_t)"
+    );
+    assert!(
+        (carried_observed - impulse_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of Eq. 1–2): τ + λ(μ_t + carry) is not contemporaneous-impulse E(y_t)"
+    );
+    assert_eq!(
+        refuse_evolved_observed_mean_as_impulse_observed_mean(evolved_observed, impulse_observed),
+        Err(psychometric_core::PsychometricError::EvolvedObservedMeanIsNotImpulseObservedMean)
+    );
+    assert_eq!(
+        refuse_impulse_observed_mean_as_impulse_carry_observed_mean(
+            impulse_observed,
+            carried_observed
+        ),
+        Err(psychometric_core::PsychometricError::ImpulseObservedMeanIsNotImpulseCarryObservedMean)
+    );
+    assert_eq!(
+        refuse_latent_mean_as_observed_mean(composed, impulse_observed),
+        Err(psychometric_core::PsychometricError::LatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_manifest_means_as_observed_mean(manifest_mean, impulse_observed),
+        Err(psychometric_core::PsychometricError::ManifestMeansIsNotObservedMean)
+    );
+}
+
+#[test]
 fn time_dependent_impulse_is_not_cint_tipred_or_equation_fourteen() {
     let effect = 0.4_f64;
     let predictor = 3.0_f64;
@@ -803,19 +898,18 @@ fn evolved_observed_mean_is_not_impulse_carry_observed_mean() {
         LagClock::EventTime,
     )
     .expect("carried");
-    let contemporaneous_latent = recover_discrete_latent_mean_with_impulse(
+    let contemporaneous = recover_discrete_observed_mean_with_impulse(
+        loading,
         initial,
         drift,
         intercept,
         effect,
         predictor,
+        manifest_mean,
         delta,
         LagClock::EventTime,
     )
-    .expect("mx");
-    let contemporaneous =
-        recover_manifest_observed_mean(loading, contemporaneous_latent, manifest_mean)
-            .expect("eq5-mx");
+    .expect("eq5-mx");
     assert!(
         (evolved_observed - impulse_carry_observed).abs() > 1e-3,
         "Driver et al. (2017, Eq. 5 of Eq. 1–2): τ + λ μ_t is not impulse-carry E(y_t)"
@@ -838,6 +932,13 @@ fn evolved_observed_mean_is_not_impulse_carry_observed_mean() {
             impulse_carry_observed
         ),
         Err(psychometric_core::PsychometricError::EvolvedObservedMeanIsNotImpulseCarryObservedMean)
+    );
+    assert_eq!(
+        refuse_impulse_observed_mean_as_impulse_carry_observed_mean(
+            contemporaneous,
+            impulse_carry_observed
+        ),
+        Err(psychometric_core::PsychometricError::ImpulseObservedMeanIsNotImpulseCarryObservedMean)
     );
     assert_eq!(
         refuse_latent_mean_as_observed_mean(carried, impulse_carry_observed),
