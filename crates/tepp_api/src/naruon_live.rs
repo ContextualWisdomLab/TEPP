@@ -188,11 +188,9 @@ impl NaruonLiveService {
             return Err(ApiError::LimitExceeded);
         }
         let mut body = vec![0_u8; content_length];
-        if content_length > 0 {
-            reader
-                .read_exact(&mut body)
-                .map_err(|error| map_io_error(&error))?;
-        }
+        reader
+            .read_exact(&mut body)
+            .map_err(|error| map_io_error(&error))?;
         let body_text = std::str::from_utf8(&body).map_err(|_| ApiError::InvalidWirePayload)?;
         Ok(format!("{header_text}{body_text}"))
     }
@@ -519,9 +517,13 @@ mod tests {
         host_implies_table_access, host_is_loopback, map_io_error, parse_request_line,
         split_header_line, split_request, status_for, tenant_idempotency_key,
     };
-    use crate::ApiError;
-    use std::io::ErrorKind;
-    use std::net::SocketAddr;
+    use crate::{
+        ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalyticalPurpose, ApiError,
+        ExportAuthorizationRequest, NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH,
+    };
+    use std::io::{Cursor, ErrorKind, Read, Write};
+    use std::net::{SocketAddr, TcpStream};
+    use std::thread;
 
     #[test]
     fn helpers_cover_status_io_host_and_request_line_edges() {
@@ -566,6 +568,7 @@ mod tests {
         assert!(host_is_loopback("127.0.0.1", None));
         assert!(host_is_loopback("localhost", None));
         assert!(host_is_loopback("localhost:8080", None));
+        assert!(host_is_loopback("localhost:0", None));
         assert!(!host_is_loopback("localhost:invalid", None));
         assert!(!host_is_loopback("localhost:", None));
         assert!(host_is_loopback("[::1]:9", None));
@@ -575,6 +578,9 @@ mod tests {
         let bound: SocketAddr = "127.0.0.1:43789".parse().expect("bound");
         assert!(host_is_loopback("127.0.0.1:43789", Some(bound)));
         assert!(host_is_loopback("127.0.0.1", Some(bound)));
+        assert!(host_is_loopback("127.0.0.1:1", Some(bound)));
+        assert!(!host_is_loopback("8.8.8.8:1", Some(bound)));
+        assert!(!host_is_loopback("[::2]:9", None));
         assert_eq!(
             tenant_idempotency_key("tenant-a", "idem-1"),
             "tenant-a\u{1f}idem-1"
@@ -592,8 +598,28 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            parse_request_line("POST /proxy://tepp.example/v1/analysis-runs HTTP/1.1"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_request_line("POST /v1/analysis-runs?query HTTP/1.1"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             parse_request_line("POST /v1/analysis-runs#x HTTP/1.1"),
             Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_request_line("POST /v1/analysis-runs HTTP/1.0"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_request_line("POST /v1/analysis-runs HTTP/1.1"),
+            Ok(("POST", "/v1/analysis-runs"))
+        );
+        assert_eq!(
+            parse_request_line("GET /v1/analysis-runs HTTP/1.1"),
+            Ok(("GET", "/v1/analysis-runs"))
         );
         assert_eq!(
             parse_request_line("POST"),
@@ -616,6 +642,10 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            split_header_line("Bad\u{0001}Name: v"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             split_header_line("Host: 127.0.0.1").expect("hdr"),
             ("Host", "127.0.0.1")
         );
@@ -630,8 +660,22 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: \r\n\r\n"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             declared_content_length("POST /x HTTP/1.1\r\nHost: 127.0.0.1\r\n"),
             Err(ApiError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn helpers_cover_request_limits_envelopes_and_accept_failure() {
+        assert_eq!(
+            NaruonLiveService::read_http_request(&mut Cursor::new(
+                b"POST /v1/analysis-runs HTTP/1.1\r\ncontent-length: 0\r\n\r\n".to_vec(),
+            )),
+            Ok("POST /v1/analysis-runs HTTP/1.1\r\ncontent-length: 0\r\n\r\n".into())
         );
         assert_eq!(
             split_request(&"x".repeat(super::NARUON_LIVE_HEADER_BYTE_LIMIT)),
@@ -654,6 +698,105 @@ mod tests {
                 .serve_accepted(Err(std::io::Error::other("accept")))
                 .expect_err("accept"),
             ApiError::InvalidWirePayload
+        );
+    }
+
+    #[test]
+    fn live_service_unit_path_accepts_and_replays_a_real_analysis_run() {
+        let run = AnalysisRunRequest {
+            contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
+            idempotency_key: "unit-live-idem".into(),
+            tenant_workspace_id: "unit-live-tenant".into(),
+            snapshot_id: "unit-live-snapshot".into(),
+            knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            model_contract_version: "topic-measurement-v1".into(),
+            output_profile: "unit-validation".into(),
+        };
+        let body = run.to_json().expect("run json");
+        let wire = format!(
+            "POST {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{body}",
+            run.idempotency_key,
+            body.len()
+        );
+        let mut service = NaruonLiveService::new();
+        let first = service.handle_http_request(&wire);
+        assert_eq!(first.status_code, 202);
+        assert_eq!(service.handle_http_request(&wire).body, first.body);
+        assert_eq!(
+            service
+                .handle_http_request(&wire.replace(
+                    "idempotency-key: unit-live-idem",
+                    "idempotency-key: different-idem",
+                ))
+                .status_code,
+            400
+        );
+        let conflicting_body = body.replace("unit-live-snapshot", "other-snapshot");
+        let conflicting_wire = wire
+            .replace(
+                &format!("content-length: {}", body.len()),
+                &format!("content-length: {}", conflicting_body.len()),
+            )
+            .replace(&body, &conflicting_body);
+        assert_eq!(
+            service.handle_http_request(&conflicting_wire).status_code,
+            400
+        );
+        let expected_wire = wire.clone();
+        assert_eq!(
+            NaruonLiveService::read_http_request(&mut Cursor::new(wire.into_bytes()))
+                .expect("wire read"),
+            expected_wire
+        );
+    }
+
+    #[test]
+    fn live_service_unit_path_authorizes_a_modular_export() {
+        let export = ExportAuthorizationRequest {
+            tenant_workspace_id: "unit-live-tenant".into(),
+            principal_id: "unit-live-principal".into(),
+            purpose: AnalyticalPurpose::ModularServiceConsumer,
+            artifact_id: "unit-live-artifact".into(),
+            includes_source_text: false,
+        };
+        let body = serde_json::to_string(&export).expect("export json");
+        let wire = format!(
+            "POST {NARUON_EXPORT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: export-unit\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        assert_eq!(
+            NaruonLiveService::new()
+                .handle_http_request(&wire)
+                .status_code,
+            200
+        );
+
+        let mut service = NaruonLiveService::bind_loopback().expect("loopback bind");
+        let address = service.local_addr().expect("address");
+        let worker = thread::spawn(move || service.serve_one());
+        let mut client = TcpStream::connect(address).expect("connect");
+        client
+            .write_all(
+                b"POST /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: empty-body\r\ncontent-length: 0\r\n\r\n",
+            )
+            .expect("request");
+        client
+            .shutdown(std::net::Shutdown::Write)
+            .expect("shutdown");
+        let mut response_bytes = Vec::new();
+        client.read_to_end(&mut response_bytes).expect("response");
+        assert!(
+            String::from_utf8(response_bytes)
+                .expect("HTTP response")
+                .starts_with("HTTP/1.1 400 Bad Request\r\n")
+        );
+        assert_eq!(
+            worker
+                .join()
+                .expect("server thread")
+                .expect("serve")
+                .status_code,
+            400
         );
     }
 }
