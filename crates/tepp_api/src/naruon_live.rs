@@ -588,7 +588,15 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            parse_request_line("POST /v1/analysis-runs HTTP/1.1"),
+            Ok(("POST", "/v1/analysis-runs"))
+        );
+        assert_eq!(
             parse_request_line("POST https://tepp.example/v1/analysis-runs HTTP/1.1"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_request_line("POST /proxy://tepp.example/v1/analysis-runs HTTP/1.1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
@@ -630,6 +638,14 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: \r\n\r\n"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: 1\r\n\r\n"),
+            Ok(1)
+        );
+        assert_eq!(
             declared_content_length("POST /x HTTP/1.1\r\nHost: 127.0.0.1\r\n"),
             Err(ApiError::InvalidWirePayload)
         );
@@ -649,6 +665,8 @@ mod tests {
             ),
             Err(ApiError::InvalidWirePayload)
         );
+        let bound: SocketAddr = "127.0.0.1:43789".parse().expect("bound");
+        assert!(host_is_loopback("127.0.0.1:1", Some(bound)));
         assert_eq!(
             NaruonLiveService::new()
                 .serve_accepted(Err(std::io::Error::other("accept")))
