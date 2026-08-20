@@ -20,7 +20,8 @@ that a topic cluster is a causal construct.
 
 ### Supporting literature
 
-Aitchison (1982) establishes that simplex observations are not Euclidean.
+Aitchison (1982) motivates compositional geometry and log-ratio transformations;
+raw simplex proportions must not be analyzed with ordinary Euclidean distances.
 Traag, Waltman, and van Eck (2019) motivate later community-detection work;
 they do **not** authorize Euclidean distances on raw topic proportions.
 
