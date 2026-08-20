@@ -38,14 +38,22 @@ pub use analysis_result::terminal_result_matches_accepted;
 pub use analysis_result::terminal_result_matches_request;
 /// Analysis-run contract version constant.
 pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
+/// Analysis-run status/read contract version constant.
+pub use analysis_run::ANALYSIS_RUN_STATUS_CONTRACT_VERSION;
 /// Accepted analysis-run response.
 pub use analysis_run::AnalysisRunAccepted;
 /// Analysis-run create request.
 pub use analysis_run::AnalysisRunRequest;
+/// Typed analysis-run status/read response.
+pub use analysis_run::AnalysisRunStatus;
+/// Analysis-run status/read lifecycle state.
+pub use analysis_run::AnalysisRunStatusState;
 /// Default analysis-run payload byte limit.
 pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 /// Idempotent request equality helper.
 pub use analysis_run::requests_are_idempotent_matches;
+/// Require exact status binding to a request and accepted receipt.
+pub use analysis_run::require_status_binding;
 /// Content-redacting error envelope.
 pub use envelope::ErrorEnvelope;
 /// Fail-closed API errors.

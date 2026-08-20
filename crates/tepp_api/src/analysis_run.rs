@@ -4,6 +4,7 @@ use crate::ApiError;
 use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
+use crate::{AnalysisRunTerminalResult, AnalysisRunTerminalState, require_terminal_binding};
 use serde::{Deserialize, Serialize};
 
 /// Supported analysis-run contract version.
@@ -11,6 +12,9 @@ pub const ANALYSIS_RUN_CONTRACT_VERSION: u16 = 1;
 
 /// Default maximum analysis-run JSON payload size in bytes.
 pub const DEFAULT_ANALYSIS_RUN_BYTE_LIMIT: usize = 64 * 1024;
+
+/// Supported analysis-run status/read contract version.
+pub const ANALYSIS_RUN_STATUS_CONTRACT_VERSION: u16 = 1;
 
 /// Request to create a durable analysis run.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -44,6 +48,36 @@ pub struct AnalysisRunAccepted {
     pub run_state: String,
     /// Echo of the validated idempotency key.
     pub idempotency_key: String,
+}
+
+/// Lifecycle state returned by the typed analysis-run status contract.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnalysisRunStatusState {
+    /// The server durably accepted the run.
+    Accepted,
+    /// The server is processing the accepted run.
+    Running,
+    /// The run completed with a measurement artifact.
+    Succeeded,
+    /// The run completed without a measurement artifact.
+    Failed,
+}
+
+/// Typed status/read response for an accepted analysis run.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnalysisRunStatus {
+    /// Semantic contract version for this status payload family.
+    pub contract_version: u16,
+    /// Opaque server-assigned run identity.
+    pub run_id: String,
+    /// Current lifecycle state.
+    pub run_state: AnalysisRunStatusState,
+    /// Exact request idempotency key.
+    pub idempotency_key: String,
+    /// Validated terminal result, present only for terminal states.
+    pub terminal_result: Option<AnalysisRunTerminalResult>,
 }
 
 impl AnalysisRunRequest {
@@ -141,6 +175,123 @@ impl AnalysisRunAccepted {
     }
 }
 
+impl AnalysisRunStatus {
+    /// Construct an accepted status from a durable receipt.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed error when the receipt is invalid.
+    pub fn accepted(accepted: &AnalysisRunAccepted) -> Result<Self, ApiError> {
+        Self::new(accepted, AnalysisRunStatusState::Accepted, None)
+    }
+
+    /// Construct a running status from a durable receipt.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed error when the receipt is invalid.
+    pub fn running(accepted: &AnalysisRunAccepted) -> Result<Self, ApiError> {
+        Self::new(accepted, AnalysisRunStatusState::Running, None)
+    }
+
+    /// Construct a terminal status bound to the submitted request and receipt.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed error when the result or its binding is invalid.
+    pub fn terminal(
+        request: &AnalysisRunRequest,
+        accepted: &AnalysisRunAccepted,
+        result: AnalysisRunTerminalResult,
+    ) -> Result<Self, ApiError> {
+        require_terminal_binding(request, accepted, &result)?;
+        let state = match result.run_state {
+            AnalysisRunTerminalState::Succeeded => AnalysisRunStatusState::Succeeded,
+            AnalysisRunTerminalState::Failed => AnalysisRunStatusState::Failed,
+        };
+        Self::new(accepted, state, Some(result))
+    }
+
+    /// Parse and validate a status/read payload with the default byte limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns wire, version, limit, shape, or field-validation errors.
+    pub fn from_json(payload: &str) -> Result<Self, ApiError> {
+        Self::from_json_with_limit(payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
+    }
+
+    /// Parse and validate a status/read payload with a caller-supplied limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns wire, version, limit, shape, or field-validation errors.
+    pub fn from_json_with_limit(payload: &str, maximum_bytes: usize) -> Result<Self, ApiError> {
+        require_byte_limit(payload, maximum_bytes)?;
+        let status: Self = from_json(payload)?;
+        status.validate()?;
+        Ok(status)
+    }
+
+    /// Serialize a status/read payload after complete validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns validation or serialization errors.
+    pub fn to_json(&self) -> Result<String, ApiError> {
+        self.validate()?;
+        to_json(self)
+    }
+
+    fn new(
+        accepted: &AnalysisRunAccepted,
+        run_state: AnalysisRunStatusState,
+        terminal_result: Option<AnalysisRunTerminalResult>,
+    ) -> Result<Self, ApiError> {
+        accepted.validate()?;
+        let status = Self {
+            contract_version: ANALYSIS_RUN_STATUS_CONTRACT_VERSION,
+            run_id: accepted.run_id.clone(),
+            run_state,
+            idempotency_key: accepted.idempotency_key.clone(),
+            terminal_result,
+        };
+        status.validate()?;
+        Ok(status)
+    }
+
+    fn validate(&self) -> Result<(), ApiError> {
+        require_contract_version(self.contract_version, ANALYSIS_RUN_STATUS_CONTRACT_VERSION)?;
+        require_nonempty(&self.run_id)?;
+        require_nonempty(&self.idempotency_key)?;
+        match self.run_state {
+            AnalysisRunStatusState::Accepted | AnalysisRunStatusState::Running => {
+                if self.terminal_result.is_some() {
+                    return Err(ApiError::InvalidWirePayload);
+                }
+            }
+            AnalysisRunStatusState::Succeeded | AnalysisRunStatusState::Failed => {
+                let result = self
+                    .terminal_result
+                    .as_ref()
+                    .ok_or(ApiError::InvalidWirePayload)?;
+                result.validate()?;
+                let expected_state = match result.run_state {
+                    AnalysisRunTerminalState::Succeeded => AnalysisRunStatusState::Succeeded,
+                    AnalysisRunTerminalState::Failed => AnalysisRunStatusState::Failed,
+                };
+                if expected_state != self.run_state
+                    || result.run_id != self.run_id
+                    || result.idempotency_key != self.idempotency_key
+                {
+                    return Err(ApiError::InvalidWirePayload);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Compare two requests for idempotent-retry semantic equality.
 #[must_use]
 pub fn requests_are_idempotent_matches(
@@ -148,6 +299,27 @@ pub fn requests_are_idempotent_matches(
     right: &AnalysisRunRequest,
 ) -> bool {
     left == right
+}
+
+/// Require exact status identity and, for terminal states, request binding.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] when the status does not match the
+/// receipt or its terminal result does not match the request.
+pub fn require_status_binding(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+    status: &AnalysisRunStatus,
+) -> Result<(), ApiError> {
+    status.validate()?;
+    if status.run_id != accepted.run_id || status.idempotency_key != accepted.idempotency_key {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    if let Some(result) = status.terminal_result.as_ref() {
+        require_terminal_binding(request, accepted, result)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

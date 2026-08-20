@@ -20,7 +20,7 @@ Current protected main exposes Rust library/domain contracts, not a production H
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
-| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
+| analysis-run request/accepted/status/terminal-result contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR #157 |
 
 ## 3. Versioning
 
@@ -49,6 +49,14 @@ GET    /v1/exports/{export_id}
 ```
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.
+
+The typed status/read contract returns `accepted`, `running`, `succeeded`, or
+`failed`. Accepted and running statuses contain no measurement result. A
+terminal status contains exactly one request-bound
+`AnalysisRunTerminalResult`; consumers must validate its request, receipt,
+snapshot, cutoff, model, profile, and idempotency bindings before treating the
+run as measurement evidence. The Rust DTO is available before the future HTTP
+service is deployed.
 
 ## 5. Analysis request authority
 

@@ -1,8 +1,11 @@
+//! Contract tests for request-bound terminal analysis results.
+
 use tepp_api::{
-    ANALYSIS_RESULT_CONTRACT_VERSION, ANALYSIS_RUN_CONTRACT_VERSION, AnalysisResultSummary,
-    AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult, AnalysisRunTerminalState,
-    ApiError, DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT, require_terminal_binding,
-    terminal_result_matches_accepted, terminal_result_matches_request,
+    ANALYSIS_RESULT_CONTRACT_VERSION, ANALYSIS_RUN_CONTRACT_VERSION,
+    ANALYSIS_RUN_STATUS_CONTRACT_VERSION, AnalysisResultSummary, AnalysisRunAccepted,
+    AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState, AnalysisRunTerminalResult,
+    AnalysisRunTerminalState, ApiError, DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT, require_status_binding,
+    require_terminal_binding, terminal_result_matches_accepted, terminal_result_matches_request,
 };
 
 const DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -24,8 +27,7 @@ fn accepted() -> AnalysisRunAccepted {
 }
 
 fn summary() -> AnalysisResultSummary {
-    AnalysisResultSummary::new("temporal_topic_measurement", 120, 42, "validated")
-        .expect("summary")
+    AnalysisResultSummary::new("temporal_topic_measurement", 120, 42, "validated").expect("summary")
 }
 
 fn succeeded() -> AnalysisRunTerminalResult {
@@ -103,10 +105,7 @@ fn wire_version_limit_extension_and_time_validation_fail_closed() {
 
     let mut value = succeeded();
     value.contract_version = ANALYSIS_RESULT_CONTRACT_VERSION + 1;
-    assert_eq!(
-        value.to_json(),
-        Err(ApiError::UnsupportedContractVersion)
-    );
+    assert_eq!(value.to_json(), Err(ApiError::UnsupportedContractVersion));
 
     let mut value = succeeded();
     value.knowledge_cutoff = "yesterday".into();
@@ -237,6 +236,17 @@ fn summary_is_nonempty_and_bounded_in_constructor_and_wire_shape() {
 #[test]
 fn failed_shape_refuses_measurement_fields_and_invalid_failure_codes() {
     let base = failed();
+    let digit_code = AnalysisRunTerminalResult::failed(
+        &request(),
+        &accepted(),
+        "2026-08-02T03:04:05Z",
+        "estimation_failed_2",
+    )
+    .expect("digits are valid failure-code characters");
+    assert_eq!(
+        digit_code.failure_code.as_deref(),
+        Some("estimation_failed_2")
+    );
 
     let mut value = base.clone();
     value.result_artifact_id = Some("artifact".into());
@@ -290,16 +300,14 @@ fn every_request_binding_dimension_and_receipt_identity_is_checked() {
         );
     }
 
-    let other_run =
-        AnalysisRunAccepted::new("other-run", "accepted", "idem-1").expect("accepted");
+    let other_run = AnalysisRunAccepted::new("other-run", "accepted", "idem-1").expect("accepted");
     assert!(!terminal_result_matches_accepted(&other_run, &result));
     assert_eq!(
         require_terminal_binding(&request(), &other_run, &result),
         Err(ApiError::InvalidWirePayload)
     );
 
-    let other_key =
-        AnalysisRunAccepted::new("run-1", "accepted", "other-key").expect("accepted");
+    let other_key = AnalysisRunAccepted::new("run-1", "accepted", "other-key").expect("accepted");
     assert!(!terminal_result_matches_accepted(&other_key, &result));
     assert_eq!(
         require_terminal_binding(&request(), &other_key, &result),
@@ -323,6 +331,136 @@ fn every_request_binding_dimension_and_receipt_identity_is_checked() {
             &other_key,
             "2026-08-02T03:04:05Z",
             "provider_timeout",
+        ),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn status_read_contract_round_trips_lifecycle_and_terminal_results() {
+    let accepted_status = AnalysisRunStatus::accepted(&accepted()).expect("accepted status");
+    assert_eq!(accepted_status.run_state, AnalysisRunStatusState::Accepted);
+    assert_eq!(accepted_status.terminal_result, None);
+    assert_eq!(
+        require_status_binding(&request(), &accepted(), &accepted_status),
+        Ok(())
+    );
+    let accepted_json = accepted_status.to_json().expect("accepted json");
+    assert_eq!(
+        AnalysisRunStatus::from_json(&accepted_json).expect("accepted decode"),
+        accepted_status
+    );
+
+    let running_status = AnalysisRunStatus::running(&accepted()).expect("running status");
+    assert_eq!(running_status.run_state, AnalysisRunStatusState::Running);
+    assert_eq!(
+        require_status_binding(&request(), &accepted(), &running_status),
+        Ok(())
+    );
+
+    for (result, expected_state) in [
+        (succeeded(), AnalysisRunStatusState::Succeeded),
+        (failed(), AnalysisRunStatusState::Failed),
+    ] {
+        let status =
+            AnalysisRunStatus::terminal(&request(), &accepted(), result).expect("terminal status");
+        assert_eq!(status.run_state, expected_state);
+        assert!(status.terminal_result.is_some());
+        assert_eq!(
+            require_status_binding(&request(), &accepted(), &status),
+            Ok(())
+        );
+        let json = status.to_json().expect("terminal json");
+        assert_eq!(
+            AnalysisRunStatus::from_json(&json).expect("terminal decode"),
+            status
+        );
+    }
+
+    assert_eq!(
+        ANALYSIS_RUN_STATUS_CONTRACT_VERSION,
+        ANALYSIS_RUN_CONTRACT_VERSION
+    );
+}
+
+#[test]
+fn status_read_contract_rejects_unknown_oversized_and_invalid_shapes() {
+    let accepted_status = AnalysisRunStatus::accepted(&accepted()).expect("status");
+    let mut value: serde_json::Value =
+        serde_json::from_str(&accepted_status.to_json().expect("json")).expect("value");
+    value["extra"] = serde_json::json!(true);
+    assert_eq!(
+        AnalysisRunStatus::from_json(&value.to_string()),
+        Err(ApiError::InvalidWirePayload)
+    );
+    let json = accepted_status.to_json().expect("json");
+    assert_eq!(
+        AnalysisRunStatus::from_json_with_limit(&json, 1),
+        Err(ApiError::LimitExceeded)
+    );
+
+    let mut invalid = accepted_status.clone();
+    invalid.contract_version = ANALYSIS_RUN_STATUS_CONTRACT_VERSION + 1;
+    assert_eq!(invalid.to_json(), Err(ApiError::UnsupportedContractVersion));
+    invalid = accepted_status.clone();
+    invalid.run_id.clear();
+    assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+    invalid = accepted_status.clone();
+    invalid.idempotency_key.clear();
+    assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut invalid = accepted_status.clone();
+    invalid.terminal_result = Some(succeeded());
+    assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let terminal =
+        AnalysisRunStatus::terminal(&request(), &accepted(), succeeded()).expect("terminal status");
+    let mut invalid = terminal.clone();
+    invalid.terminal_result = None;
+    assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+    invalid = terminal.clone();
+    invalid.run_state = AnalysisRunStatusState::Failed;
+    assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut invalid = terminal.clone();
+    invalid.terminal_result.as_mut().expect("result").run_id = "other".into();
+    assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+    let mut invalid = terminal;
+    invalid
+        .terminal_result
+        .as_mut()
+        .expect("result")
+        .idempotency_key = "other".into();
+    assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+}
+
+#[test]
+fn status_read_binding_rejects_receipt_and_request_mismatches() {
+    let accepted_status = AnalysisRunStatus::accepted(&accepted()).expect("status");
+    let other_run = AnalysisRunAccepted::new("other-run", "accepted", "idem-1").expect("run");
+    assert_eq!(
+        require_status_binding(&request(), &other_run, &accepted_status),
+        Err(ApiError::InvalidWirePayload)
+    );
+    let other_key = AnalysisRunAccepted::new("run-1", "accepted", "other-key").expect("key");
+    assert_eq!(
+        require_status_binding(&request(), &other_key, &accepted_status),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let terminal =
+        AnalysisRunStatus::terminal(&request(), &accepted(), succeeded()).expect("terminal status");
+    let mut other_request = request();
+    other_request.snapshot_id = "other-snapshot".into();
+    assert_eq!(
+        require_status_binding(&other_request, &accepted(), &terminal),
+        Err(ApiError::InvalidWirePayload)
+    );
+    assert_eq!(
+        AnalysisRunStatus::terminal(
+            &other_request,
+            &accepted(),
+            terminal.terminal_result.unwrap()
         ),
         Err(ApiError::InvalidWirePayload)
     );

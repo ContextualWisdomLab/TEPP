@@ -223,7 +223,7 @@ impl AnalysisRunTerminalResult {
         to_json(self)
     }
 
-    fn validate(&self) -> Result<(), ApiError> {
+    pub(crate) fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(self.contract_version, ANALYSIS_RESULT_CONTRACT_VERSION)?;
         for value in [
             &self.run_id,
@@ -260,10 +260,7 @@ impl AnalysisRunTerminalResult {
             .result_schema_version
             .as_deref()
             .ok_or(ApiError::InvalidWirePayload)?;
-        let summary = self
-            .summary
-            .as_ref()
-            .ok_or(ApiError::InvalidWirePayload)?;
+        let summary = self.summary.as_ref().ok_or(ApiError::InvalidWirePayload)?;
         require_nonempty(artifact_id)?;
         require_nonempty(schema)?;
         require_canonical_sha256(digest)?;
