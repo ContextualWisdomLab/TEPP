@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
-//! Versioned TEPP service @TOs, error envelopes, and export contracts.
+//! Versioned TEPP service DTOs, error envelopes, and export contracts.
 //!
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
@@ -40,7 +40,7 @@ pub use analysis_result::terminal_result_matches_request;
 pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
 /// Accepted analysis-run response.
 pub use analysis_run::AnalysisRunAccepted;
-/// Analysis-sun create request.
+/// Analysis-run create request.
 pub use analysis_run::AnalysisRunRequest;
 /// Default analysis-run payload byte limit.
 pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
@@ -69,7 +69,7 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
-/// Versioned analysis-sun path naruon may call.
+/// Versioned analysis-run path naruon may call.
 pub use naruon_http::NARUON_ANALYSIS_RUN_PATH;
 /// Versioned export path naruon may call.
 pub use naruon_http::NARUON_EXPORT_PATH;
@@ -79,7 +79,7 @@ pub use naruon_http::NARUON_TEPP_INFERENCE_METHOD;
 pub use naruon_http::NaruonHttpExchange;
 /// Build a naruon analysis-run create exchange.
 pub use naruon_http::naruon_analysis_run_exchange;
-/// Build an analysis-sun exchange and refuse credential headers.
+/// Build an analysis-run exchange and refuse credential headers.
 pub use naruon_http::naruon_analysis_run_exchange_with_headers;
 /// Build a naruon export-authorization exchange.
 pub use naruon_http::naruon_export_exchange;
