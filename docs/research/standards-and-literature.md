@@ -98,6 +98,14 @@ TEPP separates stable record identity, content equality, exact text location, wi
 
 Snodgrass, R. T. (2000). *Developing time-oriented database applications in SQL*. Morgan Kaufmann. Valid vs transaction time informs `available_clock`; availability is a third TEPP clock.
 
+## Privacy lifecycle, retention, and legal hold
+
+European Union. (2016). *Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data (General Data Protection Regulation)*. Official Journal of the European Union, L 119, 1–88. https://eur-lex.europa.eu/eli/reg/2016/679/oj
+
+National Institute of Standards and Technology. (2020). *NIST privacy framework: A tool for improving privacy through enterprise risk management, version 1.0*. https://doi.org/10.6028/NIST.CSWP.01162020
+
+TEPP uses these sources, together with the AICPA Trust Services Criteria cited below, as readiness inputs for purpose-bound retention, deletion, and legal hold. They are not self-certification authority. Persistence migration `0007` records policy, hold, deletion requests, and evidence tombstones; it does not assert that a deployment is lawful under GDPR Article 17 or attested under SOC 2.
+
 ## AI risk, management systems, and assurance readiness
 
 International Organization for Standardization. (2023a). *Information technology—Artificial intelligence—Guidance on risk management* (ISO/IEC Standard No. 23894:2023). https://www.iso.org/standard/77304.html
@@ -115,6 +123,16 @@ American Institute of Certified Public Accountants. (2023). *2017 Trust services
 National Institute of Standards and Technology. (n.d.). *AI risk management framework*. Retrieved August 11, 2026, from https://www.nist.gov/itl/ai-risk-management-framework
 
 한국인터넷진흥원. (n.d.). *클라우드서비스 보안인증제 제도소개*. Retrieved August 11, 2026, from https://isms.kisa.or.kr/main/csap/intro/index.jsp
+
+## Privacy purpose limitation and provider minimization
+
+ISO/IEC. (2025). *ISO/IEC 27701:2025 Information security, cybersecurity and privacy protection — Privacy information management systems — Requirements and guidance*. International Organization for Standardization.
+
+ISO/IEC. (2019). *ISO/IEC 27701:2019 Security techniques — Extension to ISO/IEC 27001 and ISO/IEC 27002 for privacy information management — Requirements and guidelines*. International Organization for Standardization.
+
+National Institute of Standards and Technology. (2020). *NIST Privacy Framework: A tool for improving privacy through enterprise risk management* (Version 1.0). U.S. Department of Commerce. https://doi.org/10.6028/NIST.CSWP.01162020
+
+TEPP applies ISO/IEC 27701:2025 purpose limitation and disclosure minimization, and the NIST Privacy Framework Control-P / Communicate-P functions, to provider payloads and separately authorized re-identification (ISO/IEC, 2025; National Institute of Standards and Technology, 2020). The 2019 edition is retained for earlier doctoring that treated PIMS as an ISO/IEC 27001 extension (ISO/IEC, 2019). Re-identification audit evidence is bound with FIPS 180-4 SHA-256 over a length-delimited canonical encoding (National Institute of Standards and Technology, 2015). These sources are readiness mappings, not certification.
 
 TEPP uses these sources as management/risk/readiness inputs, not as self-certification authority. ISO/IEC 42001:2023 and ISO/IEC 23894:2023 are published international standards (International Organization for Standardization, 2023a, 2023b). NIST AI RMF 1.0 remains the published framework while NIST is preparing a revision (Tabassi, 2023; National Institute of Standards and Technology, n.d.); the repository tracks the revision but does not silently treat an unpublished successor as normative. AICPA Trust Services Criteria are readiness inputs rather than self-issued attestation (American Institute of Certified Public Accountants, 2023). KISA currently describes CSAP service types as IaaS, SaaS, and DaaS and grades as high, medium, and low, while noting that the high and medium grades await later implementation (한국인터넷진흥원, n.d.). CSAP and SOC 2 evidence depend on actual deployment/organization controls and independent assessment.
 
@@ -144,4 +162,4 @@ Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2026). Lea
 
 Tang, Y., Cetin, E., Xu, J., Sun, Q., Nielsen, S., Richard, V., Goda, H., Tymchenko, I., Nguyen, N., Lee, H., Ashiga, M., Kotyan, S., Kuroki, S., & Clanuwat, T. (2026). *Sakana Fugu technical report* [Preprint]. arXiv. https://arxiv.org/abs/2606.21228
 
-TRINITY motivates lightweight learned model/role delegation over multiple turns; Conductor motivates query-adaptive natural-language workflow/topology/instruction generation and recursive test-time scaling; Fugu demonstrates a production-oriented family of query-adaptive agentic scaffolds building on these research lines (Xu et al., 2026; Nielsen et al., 2026; Tang et al., 2026). TEPP therefore treats direct routing, verification, fixed multi-agent workflows, adaptive orchestration, stage count, decomposition, recursion, access lists, role-specific reasoning effort, and total test-time budget as explicit experimental variables. Deeper/more-agent orchestration is never assumed better by default. Comparable-budget ablation, evidence support, calibration, disagreement, safety, cost, and failure behavior are required before a production claim.
+TRINITY motivates lightweight learned model/role delegation over multiple turns; Conductor motivates query-adaptive natural-language workflow/topology/instruction generation and recursive test-time scaling; Fugu demonstrates a production-oriented family of query-adaptive agentic scaffolds building on these research lines (Xu et al., 2026; Nielsen et al., 2026; Tang et al., 2026). TEPP therefore treats direct routing, verification, fixed multi-agent workflows, adaptive orchestration, stage count, decomposition, recursion, access lists, role-specific reasoning effort, and total test-time budget as explicit experimental variables. `tepp_api::route_orchestration` is the deterministic selector for those variables; live provider execution and production-quality claims remain later work. Deeper/more-agent orchestration is never assumed better by default. Comparable-budget ablation, evidence support, calibration, disagreement, safety, cost, and failure behavior are required before a production claim. See `docs/research/adaptive-orchestration-router.md`.
