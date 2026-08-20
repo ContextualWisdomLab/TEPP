@@ -17,6 +17,8 @@ mod error;
 mod export;
 mod naruon_http;
 mod naruon_live;
+mod orchestration;
+mod provider_payload;
 mod wire;
 
 /// Analysis-run contract version constant.
@@ -78,3 +80,61 @@ pub use naruon_live::NARUON_LIVE_IO_TIMEOUT;
 pub use naruon_live::NaruonLiveResponse;
 /// Loopback live HTTP/1.1 service for naruon POSTs.
 pub use naruon_live::NaruonLiveService;
+/// Comparable-budget ablation record.
+pub use orchestration::BudgetAblationRecord;
+/// Credential-free contextual-orchestrator binding.
+pub use orchestration::ContextualOrchestratorBinding;
+/// Document attempt to override TEPP orchestration authority.
+pub use orchestration::DocumentControlAttempt;
+/// Bounded interpretation task kind.
+pub use orchestration::InterpretationTaskKind;
+/// Maximum access capabilities on one orchestration request.
+pub use orchestration::MAX_ORCHESTRATION_ACCESS_ENTRIES;
+/// Maximum UTF-8 bytes in one orchestration access token.
+pub use orchestration::MAX_ORCHESTRATION_ACCESS_TOKEN_BYTES;
+/// Maximum billable token budget on one orchestration request.
+pub use orchestration::MAX_ORCHESTRATION_TOKEN_BUDGET;
+/// Orchestration contract version for contextual-orchestrator bindings.
+pub use orchestration::ORCHESTRATION_CONTRACT_VERSION;
+/// Versioned TEPP orchestration policy identity.
+pub use orchestration::ORCHESTRATION_POLICY_VERSION;
+/// Versioned orchestration mode.
+pub use orchestration::OrchestrationMode;
+/// Governed orchestration plan.
+pub use orchestration::OrchestrationPlan;
+/// Orchestration router request.
+pub use orchestration::OrchestrationRequest;
+/// Orchestration role identity.
+pub use orchestration::OrchestrationRole;
+/// Role-specific reasoning effort.
+pub use orchestration::ReasoningEffort;
+/// Role plus recorded reasoning effort.
+pub use orchestration::RoleAssignment;
+/// Bind a plan for contextual-orchestrator execution.
+pub use orchestration::bind_contextual_orchestrator;
+/// Record a comparable-budget ablation against a direct baseline.
+pub use orchestration::record_budget_ablation;
+/// Route a task onto a versioned orchestration plan.
+pub use orchestration::route_orchestration;
+/// Elevated re-identification result.
+pub use provider_payload::DisclosedIdentityMapping;
+/// Separately protected identity mapping.
+pub use provider_payload::IdentityMappingRecord;
+/// Minimized provider payload without direct identity.
+pub use provider_payload::MinimizedProviderPayload;
+/// Log-safe provider disclosure record.
+pub use provider_payload::ProviderDisclosureLog;
+/// Evidence offered to a model provider.
+pub use provider_payload::ProviderEvidenceOffer;
+/// Time-bounded purpose grant.
+pub use provider_payload::PurposeGrant;
+/// Redacted re-identification decision outcome.
+pub use provider_payload::ReidentificationAuditOutcome;
+/// Redacted append-only re-identification audit record.
+pub use provider_payload::ReidentificationAuditRecord;
+/// Append-only persistence port for re-identification audit evidence.
+pub use provider_payload::ReidentificationAuditSink;
+/// Disclose a mapping on the elevated scientific path.
+pub use provider_payload::disclose_identity_mapping;
+/// Minimize evidence for a model provider.
+pub use provider_payload::minimize_provider_payload;
