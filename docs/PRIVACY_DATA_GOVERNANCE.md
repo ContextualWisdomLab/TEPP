@@ -52,6 +52,8 @@ LLM use is optional and bounded. The default provider payload is evidence-minimi
 4. treat returned content as untrusted and subject to deterministic verification;
 5. allow local/private provider profiles for deployments that prohibit external disclosure.
 
+`tepp_api::minimize_provider_payload` is the fail-closed adapter for this policy: a time-bounded purpose grant is required, identity mappings cannot ride on a provider offer, and ordinary disclosure logs record purpose and field-class flags without source text. Re-identification uses `tepp_api::disclose_identity_mapping` and is limited to scientific validation with an explicit grant flag.
+
 `NVIDIA_NIM_API_KEY` is a development/test credential boundary, not authorization to send unrestricted production data.
 
 ## 6. Retention, deletion, and legal hold
