@@ -1,16 +1,17 @@
 //! Consumer-neutral live analysis-run ingress for modular CWL services.
 //!
 //! This module keeps the Naruon compatibility listener intact while providing
-//! the shared `/v1/analysis-runs` boundary needed by Naruon and LineageWeave.
+//! the shared `/v1/analysis-runs` boundary needed by Naruon and `LineageWeave`.
 //! It accepts transport acknowledgements only; completed psychometric results
 //! remain outside this crate.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{IpAddr, SocketAddr, TcpListener};
+use std::net::{SocketAddr, TcpListener};
 
 use crate::lineageweave_http::consumer_is_supported;
 use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, header_is_credential};
+use crate::naruon_live::host_is_loopback;
 use crate::{
     AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
     ErrorEnvelope, NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT,
@@ -19,7 +20,7 @@ use crate::{
 
 /// Loopback HTTP/1.1 analysis-run service shared by published CWL consumers.
 ///
-/// The service accepts only Naruon and LineageWeave consumer identities. Its
+/// The service accepts only Naruon and `LineageWeave` consumer identities. Its
 /// idempotency namespace includes consumer, tenant, and caller key so one
 /// product cannot replay or conflict with another product's accepted run.
 #[derive(Debug)]
@@ -291,10 +292,10 @@ fn split_header_line(line: &str) -> Result<(&str, &str), ApiError> {
     Ok((name, value.trim()))
 }
 
-fn require_headers<'a>(
-    headers: &'a HashMap<String, String>,
+fn require_headers(
+    headers: &HashMap<String, String>,
     bound_addr: Option<SocketAddr>,
-) -> Result<&'a str, ApiError> {
+) -> Result<&str, ApiError> {
     for name in headers.keys() {
         if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);
@@ -344,27 +345,6 @@ fn host_implies_table_access(host: &str) -> bool {
         || lowered.chars().any(char::is_control)
 }
 
-fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
-    if let Some(bound) = bound_addr
-        && (host == bound.to_string() || host == bound.ip().to_string())
-    {
-        return true;
-    }
-    if host.eq_ignore_ascii_case("localhost") {
-        return true;
-    }
-    if let Some(port) = host.strip_prefix("localhost:") {
-        return !port.is_empty() && port.bytes().all(|byte| byte.is_ascii_digit());
-    }
-    if let Ok(addr) = host.parse::<SocketAddr>() {
-        return addr.ip().is_loopback();
-    }
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        return ip.is_loopback();
-    }
-    false
-}
-
 fn consumer_tenant_idempotency_key(
     consumer: &str,
     tenant_workspace_id: &str,
@@ -411,7 +391,8 @@ fn json_response(
 
 #[cfg(test)]
 mod tests {
-    use super::{AnalysisRunLiveService, consumer_tenant_idempotency_key, host_is_loopback};
+    use super::{AnalysisRunLiveService, consumer_tenant_idempotency_key};
+    use crate::naruon_live::host_is_loopback;
     use crate::{ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE};
 
     #[test]

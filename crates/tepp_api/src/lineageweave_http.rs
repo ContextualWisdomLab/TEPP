@@ -1,14 +1,14 @@
-//! Published modular-consumer identity and LineageWeave analysis-run exchange.
+//! Published modular-consumer identity and `LineageWeave` analysis-run exchange.
 
 use crate::{AnalysisRunRequest, ApiError, NaruonHttpExchange, naruon_analysis_run_exchange};
 
 /// Stable consumer identity used by the Naruon adapter.
 pub const NARUON_CONSUMER_CODE: &str = "naruon";
 
-/// Stable consumer identity used by the LineageWeave adapter.
+/// Stable consumer identity used by the `LineageWeave` adapter.
 pub const LINEAGEWEAVE_CONSUMER_CODE: &str = "lineageweave";
 
-/// Build a credential-free LineageWeave → TEPP analysis-run exchange.
+/// Build a credential-free `LineageWeave` → TEPP analysis-run exchange.
 ///
 /// The function reuses TEPP's existing origin, body, and header validation,
 /// then replaces only the published modular-consumer identity. The accepted
@@ -28,7 +28,7 @@ pub fn lineageweave_analysis_run_exchange(
         .iter_mut()
         .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
         .ok_or(ApiError::InvalidWirePayload)?;
-    consumer_header.1 = LINEAGEWEAVE_CONSUMER_CODE.to_owned();
+    LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
     Ok(exchange)
 }
 

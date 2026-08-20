@@ -489,13 +489,17 @@ fn host_implies_table_access(host: &str) -> bool {
         || lowered.chars().any(char::is_control)
 }
 
-fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
+pub(crate) fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
     if let Some(bound) = bound_addr
         && (host == bound.to_string() || host == bound.ip().to_string())
     {
         return true;
     }
-    if host.eq_ignore_ascii_case("localhost") || host.to_ascii_lowercase().starts_with("localhost:")
+    let lowered = host.to_ascii_lowercase();
+    if lowered == "localhost"
+        || lowered
+            .strip_prefix("localhost:")
+            .is_some_and(|port| !port.is_empty() && port.parse::<u16>().is_ok())
     {
         return true;
     }
@@ -562,6 +566,8 @@ mod tests {
         assert!(host_is_loopback("127.0.0.1", None));
         assert!(host_is_loopback("localhost", None));
         assert!(host_is_loopback("localhost:8080", None));
+        assert!(!host_is_loopback("localhost:invalid", None));
+        assert!(!host_is_loopback("localhost:", None));
         assert!(host_is_loopback("[::1]:9", None));
         assert!(host_is_loopback("::1", None));
         assert!(!host_is_loopback("8.8.8.8", None));
