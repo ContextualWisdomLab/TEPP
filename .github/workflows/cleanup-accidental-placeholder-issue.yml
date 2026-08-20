@@ -1,0 +1,43 @@
+name: Cleanup accidental placeholder issue
+
+on:
+  push:
+    branches:
+      - feat/lineageweave-project-history-projection
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Close the accidental placeholder issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          issue_number=$(gh api --paginate repos/ContextualWisdomLab/TEPP/issues \
+            --jq '.[] | select(.title == "placeholder" and .body == "placeholder" and (has("pull_request") | not)) | .number' \
+            | head -n 1)
+          if [ -n "$issue_number" ]; then
+            gh api --method PATCH "repos/ContextualWisdomLab/TEPP/issues/${issue_number}" \
+              -f state=closed \
+              -f state_reason=not_planned \
+              -f title='Closed accidental automation placeholder' \
+              -f body='Closed immediately after an erroneous connector invocation; no product work was tracked here.'
+          fi
+      - name: Remove this one-shot cleanup workflow
+        env:
+          BRANCH_NAME: feat/lineageweave-project-history-projection
+        run: |
+          rm -f .github/workflows/cleanup-accidental-placeholder-issue.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -- .github/workflows/cleanup-accidental-placeholder-issue.yml
+          git commit -m 'chore: retire accidental issue cleanup workflow'
+          git push origin "HEAD:${BRANCH_NAME}"
