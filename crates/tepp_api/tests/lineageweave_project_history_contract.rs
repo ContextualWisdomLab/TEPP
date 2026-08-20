@@ -2,8 +2,8 @@
 
 use tepp_api::{
     ApiError, LINEAGEWEAVE_CONSUMER_CODE, PROJECT_HISTORY_CONTRACT_VERSION, PROJECT_HISTORY_PATH,
-    ProjectHistoryEvent, ProjectHistoryRequest, lineageweave_project_history_exchange,
-    project_history_projection,
+    ProjectHistoryEvent, ProjectHistoryProjection, ProjectHistoryRequest,
+    lineageweave_project_history_exchange, project_history_projection,
 };
 
 fn event(
@@ -97,6 +97,10 @@ fn projection_orders_the_cycle_and_explains_only_explicit_temporal_evidence() {
         PROJECT_HISTORY_CONTRACT_VERSION
     );
     assert_eq!(projection.focus_event_id, "event-voc");
+    assert_eq!(
+        projection.knowledge_cutoff,
+        sample_request().knowledge_cutoff
+    );
     assert_eq!(projection.inference_status, "temporal_association_only");
     assert_eq!(projection.participant_count, 3);
     assert_eq!(
@@ -188,6 +192,37 @@ fn lineageweave_exchange_uses_the_versioned_credential_free_tepp_path() {
     );
     assert_eq!(
         lineageweave_project_history_exchange("http://tepp.example.test", &sample_request()),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn projection_response_revalidates_cutoff_order_findings_and_payload_size() {
+    let projection = project_history_projection(&sample_request()).expect("projection");
+    let payload = projection.to_json().expect("projection json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json_with_limit(&payload, payload.len() - 1),
+        Err(ApiError::LimitExceeded)
+    );
+
+    let mut value: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    value["events"][0]["available_at"] = serde_json::Value::String("2026-08-20T00:00:00Z".into());
+    let future = serde_json::to_string(&value).expect("future json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&future),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut value: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    value["findings"] = serde_json::json!([{
+        "finding_code": "causal_score",
+        "summary": "causal",
+        "related_event_ids": ["event-award"],
+        "evidence_post_ids": ["post-award"]
+    }]);
+    let fabricated = serde_json::to_string(&value).expect("fabricated json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&fabricated),
         Err(ApiError::InvalidWirePayload)
     );
 }

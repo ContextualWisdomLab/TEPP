@@ -17,12 +17,14 @@ This doctoring record documents the authorities used by TEPP's versioned Lineage
 
 1. `available_at` must not exceed the request `knowledge_cutoff`.
 2. Event identities must be unique and the focus event must belong to the request.
-3. The response must preserve every submitted event and its evidence fields.
-4. Participant count must equal the distinct opaque actor identities present in the supplied events.
-5. Findings must cite only supplied event IDs and source-post IDs.
-6. LineageWeave and Naruon use consumer-scoped idempotency namespaces.
-7. No caller credential or cross-service database access is part of the project-history contract.
-8. Loopback HTTP is a local modular boundary; a non-loopback deployment requires HTTPS/TLS at the service edge.
+3. The response echoes the applied `knowledge_cutoff` and revalidates every event against it.
+4. The response must preserve every submitted event and its evidence fields in deterministic occurrence-time/event-ID order.
+5. Participant count must equal the distinct opaque actor identities present in the supplied events.
+6. Findings are recomputed from explicit event types; fabricated causal or unsupported findings fail closed.
+7. Findings may cite only supplied event IDs and source-post IDs.
+8. LineageWeave and Naruon use consumer-scoped idempotency namespaces.
+9. No caller credential or cross-service database access is part of the project-history contract.
+10. Loopback HTTP is a local modular boundary; a non-loopback deployment requires HTTPS/TLS at the service edge.
 
 ## APA 7th references
 

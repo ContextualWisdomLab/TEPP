@@ -97,6 +97,8 @@ pub struct ProjectHistoryProjection {
     pub project_name: String,
     /// Focus event echoed after validation.
     pub focus_event_id: String,
+    /// Knowledge cutoff applied to every event in the response.
+    pub knowledge_cutoff: String,
     /// Earliest event instant in the response.
     pub history_span_start: String,
     /// Latest event instant in the response.
@@ -193,6 +195,16 @@ impl ProjectHistoryProjection {
     ///
     /// Returns a JSON, version, field, or claim-boundary error.
     pub fn from_json(payload: &str) -> Result<Self, ApiError> {
+        Self::from_json_with_limit(payload, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)
+    }
+
+    /// Parse and validate a serialized TEPP projection with a caller limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns a size, JSON, version, field, or claim-boundary error.
+    pub fn from_json_with_limit(payload: &str, maximum_bytes: usize) -> Result<Self, ApiError> {
+        require_byte_limit(payload, maximum_bytes)?;
         let projection: Self = from_json(payload)?;
         projection.validate()?;
         Ok(projection)
@@ -216,9 +228,58 @@ impl ProjectHistoryProjection {
         if self.inference_status != "temporal_association_only" || self.events.is_empty() {
             return Err(ApiError::InvalidWirePayload);
         }
+        if self.events.len() > DEFAULT_PROJECT_HISTORY_EVENT_LIMIT {
+            return Err(ApiError::LimitExceeded);
+        }
+        let cutoff = parse_timestamp(&self.knowledge_cutoff)?;
+        if cutoff > Timestamp::now() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let mut event_ids = HashSet::with_capacity(self.events.len());
+        let mut focus_index = None;
+        for (index, event) in self.events.iter().enumerate() {
+            validate_event(event, &cutoff)?;
+            if !event_ids.insert(event.event_id.as_str()) {
+                return Err(ApiError::InvalidWirePayload);
+            }
+            if event.event_id == self.focus_event_id {
+                focus_index = Some(index);
+            }
+        }
+        let focus_index = focus_index.ok_or(ApiError::InvalidWirePayload)?;
+        let mut previous = None;
+        for event in &self.events {
+            let occurred_at = parse_timestamp(&event.occurred_at)?;
+            if let Some((previous_time, previous_id)) = previous
+                && (occurred_at < previous_time
+                    || (occurred_at == previous_time && event.event_id.as_str() <= previous_id))
+            {
+                return Err(ApiError::InvalidWirePayload);
+            }
+            previous = Some((occurred_at, event.event_id.as_str()));
+        }
         let start = parse_timestamp(&self.history_span_start)?;
         let end = parse_timestamp(&self.history_span_end)?;
-        if start > end {
+        let first_event_time = parse_timestamp(&self.events[0].occurred_at)?;
+        let last_event_time = parse_timestamp(
+            &self
+                .events
+                .last()
+                .ok_or(ApiError::InvalidWirePayload)?
+                .occurred_at,
+        )?;
+        if start > end || start != first_event_time || end != last_event_time {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let participant_count = self
+            .events
+            .iter()
+            .flat_map(|event| event.actor_ids.iter().map(String::as_str))
+            .collect::<BTreeSet<_>>()
+            .len();
+        if self.participant_count != participant_count
+            || self.findings != build_findings(&self.events, focus_index)
+        {
             return Err(ApiError::InvalidWirePayload);
         }
         Ok(())
@@ -240,15 +301,15 @@ pub fn project_history_projection(
     request.validate()?;
     let mut ordered = request.events.clone();
     ordered.sort_by(|left, right| {
-        // `request.validate()` above proves both event timestamps parse; an
-        // error here would indicate an internal mutation after validation.
-        let left_time = parse_timestamp(&left.occurred_at)
-            .expect("validated project-history event has a valid occurred_at");
-        let right_time = parse_timestamp(&right.occurred_at)
-            .expect("validated project-history event has a valid occurred_at");
-        left_time
-            .cmp(&right_time)
-            .then_with(|| left.event_id.cmp(&right.event_id))
+        match (
+            parse_timestamp(&left.occurred_at),
+            parse_timestamp(&right.occurred_at),
+        ) {
+            (Ok(left_time), Ok(right_time)) => left_time
+                .cmp(&right_time)
+                .then_with(|| left.event_id.cmp(&right.event_id)),
+            _ => std::cmp::Ordering::Equal,
+        }
     });
     let focus_index = ordered
         .iter()
@@ -273,6 +334,7 @@ pub fn project_history_projection(
         project_key: request.project_key.clone(),
         project_name: request.project_name.clone(),
         focus_event_id: request.focus_event_id.clone(),
+        knowledge_cutoff: request.knowledge_cutoff.clone(),
         history_span_start,
         history_span_end,
         participant_count,
