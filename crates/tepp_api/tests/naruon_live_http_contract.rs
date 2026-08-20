@@ -302,6 +302,17 @@ fn handle_http_requires_loopback_host_and_refuses_transfer_encoding() {
     let mut service = NaruonLiveService::new();
     let run = sample_run();
     let body = run.to_json().expect("json");
+
+    let mut localhost_headers = naruon_headers(&run.idempotency_key);
+    localhost_headers[0] = ("Host".into(), "localhost".into());
+    let localhost = service.handle_http_request(&http_request(
+        "POST",
+        NARUON_ANALYSIS_RUN_PATH,
+        &localhost_headers,
+        &body,
+    ));
+    assert_eq!(localhost.status_code, 202);
+
     for host in ["attacker.example.com", "mysql.internal", "8.8.8.8"] {
         let mut headers = naruon_headers(&run.idempotency_key);
         headers[0] = ("Host".into(), host.into());
