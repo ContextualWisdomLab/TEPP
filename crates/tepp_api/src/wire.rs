@@ -90,6 +90,7 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         require_nonempty("tenant-a").expect("ok");
+        require_nonempty("line one\nline two").expect("multiline text stays valid");
         assert_eq!(require_nonempty("   "), Err(ApiError::InvalidWirePayload));
         assert_eq!(require_nonempty(""), Err(ApiError::InvalidWirePayload));
         assert_eq!(
