@@ -243,6 +243,19 @@ mod tests {
 
         assert_eq!(
             AnalysisRunRequest::from_json(
+                r#"{"contract_version":1,"idempotency_key":"a\u001fb","tenant_workspace_id":"t","snapshot_id":"s","knowledge_cutoff":"2026-08-01T00:00:00Z","model_contract_version":"m","output_profile":"o"}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            AnalysisRunRequest::from_json(
+                r#"{"contract_version":1,"idempotency_key":"a","tenant_workspace_id":"t\u001fb","snapshot_id":"s","knowledge_cutoff":"2026-08-01T00:00:00Z","model_contract_version":"m","output_profile":"o"}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        assert_eq!(
+            AnalysisRunRequest::from_json(
                 r#"{"contract_version":1,"idempotency_key":"a","tenant_workspace_id":"t","snapshot_id":"s","knowledge_cutoff":"k","model_contract_version":"m","output_profile":"o"}"#
             ),
             Err(ApiError::InvalidWirePayload)
