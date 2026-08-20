@@ -55,7 +55,9 @@ pub fn require_finite(value: f64) -> Result<f64, ComputeBackendError> {
 /// Returns [`ComputeBackendError::NonFiniteOutput`] when either value or the
 /// tolerance is non-finite, [`ComputeBackendError::InvalidTolerance`] for a
 /// negative tolerance, and [`ComputeBackendError::ParityFailure`] when the
-/// absolute gap exceeds the non-negative tolerance.
+/// absolute gap exceeds `tolerance * max(1, |reference|, |candidate|)`.
+/// This normalized bound keeps the same tolerance useful for small absolute
+/// values and large relative values.
 pub fn require_cpu_gpu_parity(
     cpu_reference: f64,
     candidate: f64,
@@ -67,7 +69,8 @@ pub fn require_cpu_gpu_parity(
     if bound < 0.0 {
         return Err(ComputeBackendError::InvalidTolerance);
     }
-    if (left - right).abs() <= bound {
+    let scale = left.abs().max(right.abs()).max(1.0);
+    if (left - right).abs() <= bound * scale {
         Ok(())
     } else {
         Err(ComputeBackendError::ParityFailure)
@@ -120,6 +123,12 @@ mod tests {
         require_cpu_gpu_parity(1.0, 1.0, 0.0).expect("exact parity");
         assert_eq!(
             require_cpu_gpu_parity(1.0, 2.0, 0.1),
+            Err(ComputeBackendError::ParityFailure)
+        );
+        require_cpu_gpu_parity(1.0e12, 1.0e12 + 1.0e6, 1.0e-6)
+            .expect("relative parity at large scale");
+        assert_eq!(
+            require_cpu_gpu_parity(1.0e12, 1.0e12 + 2.0e6, 1.0e-6),
             Err(ComputeBackendError::ParityFailure)
         );
         assert_eq!(

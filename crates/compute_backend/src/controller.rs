@@ -210,8 +210,8 @@ mod tests {
     use crate::plan::{ComputeBackendKind, FallbackReason, MicroBatchPlan};
     use crate::profile::VramProfile;
     use crate::request::{
-        CorpusPlacement, CutoffPolicy, ModelComplexity, ObservationRetention, PrecisionMode,
-        WorkloadRequest,
+        AdaptationPolicy, CorpusPlacement, CutoffPolicy, ModelComplexity, ObservationRetention,
+        PrecisionMode, WorkloadRequest,
     };
 
     fn request(batch: u32, bytes_per_observation: u64) -> WorkloadRequest {
@@ -221,10 +221,12 @@ mod tests {
             bytes_per_observation,
             8,
             batch,
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::KeepAll,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::KeepCutoff,
+            AdaptationPolicy {
+                corpus_placement: CorpusPlacement::StreamedMicroBatches,
+                observation_retention: ObservationRetention::KeepAll,
+                model_complexity: ModelComplexity::KeepSpecified,
+                cutoff_policy: CutoffPolicy::KeepCutoff,
+            },
             PrecisionMode::ReferenceF64,
         )
         .expect("valid")
@@ -280,10 +282,12 @@ mod tests {
             u64::MAX,
             u64::MAX,
             2,
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::KeepAll,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::KeepCutoff,
+            AdaptationPolicy {
+                corpus_placement: CorpusPlacement::StreamedMicroBatches,
+                observation_retention: ObservationRetention::KeepAll,
+                model_complexity: ModelComplexity::KeepSpecified,
+                cutoff_policy: CutoffPolicy::KeepCutoff,
+            },
             PrecisionMode::ReferenceF64,
         )
         .expect("request");
@@ -303,10 +307,12 @@ mod tests {
             u64::MAX,
             u64::MAX,
             2,
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::KeepAll,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::KeepCutoff,
+            AdaptationPolicy {
+                corpus_placement: CorpusPlacement::StreamedMicroBatches,
+                observation_retention: ObservationRetention::KeepAll,
+                model_complexity: ModelComplexity::KeepSpecified,
+                cutoff_policy: CutoffPolicy::KeepCutoff,
+            },
             PrecisionMode::ReferenceF64,
         )
         .expect("request");

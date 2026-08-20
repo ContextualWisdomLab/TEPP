@@ -2,9 +2,10 @@
 #![allow(clippy::cast_precision_loss)]
 
 use compute_backend::{
-    AllocationTelemetry, ComputeBackendError, ComputeBackendKind, CorpusPlacement, CutoffPolicy,
-    DeviceInventory, FallbackReason, ModelComplexity, ObservationRetention, PrecisionMode,
-    VramController, VramProfile, WorkloadRequest, require_cpu_gpu_parity, streamed_weighted_sum,
+    AdaptationPolicy, AllocationTelemetry, ComputeBackendError, ComputeBackendKind,
+    CorpusPlacement, CutoffPolicy, DeviceInventory, FallbackReason, ModelComplexity,
+    ObservationRetention, PrecisionMode, VramController, VramProfile, WorkloadRequest,
+    require_cpu_gpu_parity, streamed_weighted_sum,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -27,10 +28,12 @@ fn base_request(batch: u32, bytes_per_observation: u64) -> WorkloadRequest {
         bytes_per_observation,
         1_048_576,
         batch,
-        CorpusPlacement::StreamedMicroBatches,
-        ObservationRetention::KeepAll,
-        ModelComplexity::KeepSpecified,
-        CutoffPolicy::KeepCutoff,
+        AdaptationPolicy {
+            corpus_placement: CorpusPlacement::StreamedMicroBatches,
+            observation_retention: ObservationRetention::KeepAll,
+            model_complexity: ModelComplexity::KeepSpecified,
+            cutoff_policy: CutoffPolicy::KeepCutoff,
+        },
         PrecisionMode::ReferenceF64,
     )
     .expect("valid workload")
@@ -127,10 +130,12 @@ fn streamed_cardinality_does_not_require_a_hypothetical_full_tensor() {
         8,
         0,
         1,
-        CorpusPlacement::StreamedMicroBatches,
-        ObservationRetention::KeepAll,
-        ModelComplexity::KeepSpecified,
-        CutoffPolicy::KeepCutoff,
+        AdaptationPolicy {
+            corpus_placement: CorpusPlacement::StreamedMicroBatches,
+            observation_retention: ObservationRetention::KeepAll,
+            model_complexity: ModelComplexity::KeepSpecified,
+            cutoff_policy: CutoffPolicy::KeepCutoff,
+        },
         PrecisionMode::ReferenceF64,
     )
     .expect("streamed dimensions are independently representable");
@@ -164,7 +169,18 @@ fn forbidden_request(
     precision: PrecisionMode,
 ) -> WorkloadRequest {
     WorkloadRequest::new(
-        8, 4, 8, 64, 2, placement, retention, complexity, cutoff, precision,
+        8,
+        4,
+        8,
+        64,
+        2,
+        AdaptationPolicy {
+            corpus_placement: placement,
+            observation_retention: retention,
+            model_complexity: complexity,
+            cutoff_policy: cutoff,
+        },
+        precision,
     )
     .expect("request")
 }

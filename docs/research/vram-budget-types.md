@@ -10,7 +10,7 @@ This slice delivers the first executable ADR 0006 contract in `compute_backend`:
 4. autotune the micro-batch by successive halving until the predicted peak fits usable VRAM;
 5. after each observed OOM, emit a smaller executable GPU plan with an incremented retry count, then fall back to the CPU `f64` reference after the bounded retry budget or a failed unit batch;
 6. refuse full-corpus document-by-topic device tensors and refuse dropping observations, shrinking topic/model complexity, or moving a knowledge cutoff to fit memory;
-7. keep mixed precision out of final diagnostic quantities and reject negative parity tolerances;
+7. keep mixed precision out of final diagnostic quantities and compare CPU/candidate outputs with a normalized parity tolerance;
 8. keep raw source text out of allocation telemetry;
 9. use compensated deterministic summation for the sequential CPU `f64` numerical reference.
 

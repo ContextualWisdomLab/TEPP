@@ -49,6 +49,8 @@ pub use reference::require_cpu_gpu_parity;
 pub use reference::require_finite;
 /// CPU `f64` streamed weighted sum.
 pub use reference::streamed_weighted_sum;
+/// Memory-adaptation policies grouped for safe workload construction.
+pub use request::AdaptationPolicy;
 /// Corpus placement policy.
 pub use request::CorpusPlacement;
 /// Cutoff-mutation policy.

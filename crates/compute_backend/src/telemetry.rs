@@ -41,8 +41,8 @@ impl AllocationTelemetry {
     /// # Errors
     ///
     /// Always returns [`ComputeBackendError::SourceTextInTelemetry`].
+    #[allow(clippy::unused_self)]
     pub fn attach_source_text(&self, _source_text: &str) -> Result<(), ComputeBackendError> {
-        let _ = self.allocated_bytes;
         Err(ComputeBackendError::SourceTextInTelemetry)
     }
 

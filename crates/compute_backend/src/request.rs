@@ -47,6 +47,19 @@ pub enum CutoffPolicy {
     MoveToFit,
 }
 
+/// Memory-adaptation policies that must remain explicit at workload creation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AdaptationPolicy {
+    /// Whether the corpus may be fully resident on the device.
+    pub corpus_placement: CorpusPlacement,
+    /// Whether observations may be dropped to fit the device budget.
+    pub observation_retention: ObservationRetention,
+    /// Whether model complexity may be reduced to fit the device budget.
+    pub model_complexity: ModelComplexity,
+    /// Whether the knowledge cutoff may move to fit the device budget.
+    pub cutoff_policy: CutoffPolicy,
+}
+
 /// A streamed workload that must never pin a full document-by-topic tensor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WorkloadRequest {
@@ -73,17 +86,13 @@ impl WorkloadRequest {
     ///
     /// Returns [`ComputeBackendError::InvalidBudget`] when counts, batch size,
     /// or per-observation bytes are zero.
-    #[allow(clippy::too_many_arguments)]
     pub const fn new(
         document_count: u64,
         topic_count: u64,
         bytes_per_observation: u64,
         working_set_bytes: u64,
         requested_batch: u32,
-        corpus_placement: CorpusPlacement,
-        observation_retention: ObservationRetention,
-        model_complexity: ModelComplexity,
-        cutoff_policy: CutoffPolicy,
+        policy: AdaptationPolicy,
         final_quantity_precision: PrecisionMode,
     ) -> Result<Self, ComputeBackendError> {
         if document_count == 0
@@ -99,10 +108,10 @@ impl WorkloadRequest {
             bytes_per_observation,
             working_set_bytes,
             requested_batch,
-            corpus_placement,
-            observation_retention,
-            model_complexity,
-            cutoff_policy,
+            corpus_placement: policy.corpus_placement,
+            observation_retention: policy.observation_retention,
+            model_complexity: policy.model_complexity,
+            cutoff_policy: policy.cutoff_policy,
             final_quantity_precision,
         })
     }
@@ -171,8 +180,8 @@ impl WorkloadRequest {
 #[cfg(test)]
 mod tests {
     use super::{
-        CorpusPlacement, CutoffPolicy, ModelComplexity, ObservationRetention, PrecisionMode,
-        WorkloadRequest,
+        AdaptationPolicy, CorpusPlacement, CutoffPolicy, ModelComplexity, ObservationRetention,
+        PrecisionMode, WorkloadRequest,
     };
     use crate::error::ComputeBackendError;
 
@@ -188,10 +197,12 @@ mod tests {
             bytes_per_observation,
             0,
             batch,
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::KeepAll,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::KeepCutoff,
+            AdaptationPolicy {
+                corpus_placement: CorpusPlacement::StreamedMicroBatches,
+                observation_retention: ObservationRetention::KeepAll,
+                model_complexity: ModelComplexity::KeepSpecified,
+                cutoff_policy: CutoffPolicy::KeepCutoff,
+            },
             PrecisionMode::ReferenceF64,
         )
     }
@@ -219,10 +230,12 @@ mod tests {
             8,
             16,
             4,
-            CorpusPlacement::StreamedMicroBatches,
-            ObservationRetention::KeepAll,
-            ModelComplexity::KeepSpecified,
-            CutoffPolicy::KeepCutoff,
+            AdaptationPolicy {
+                corpus_placement: CorpusPlacement::StreamedMicroBatches,
+                observation_retention: ObservationRetention::KeepAll,
+                model_complexity: ModelComplexity::KeepSpecified,
+                cutoff_policy: CutoffPolicy::KeepCutoff,
+            },
             PrecisionMode::TransientMixed,
         )
         .expect("valid");
