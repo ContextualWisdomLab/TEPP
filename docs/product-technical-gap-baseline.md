@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-20 18:57 KST
+**Snapshot:** 2026-08-20 19:19 KST
 **Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
 
 ## Purpose
@@ -67,6 +67,8 @@ API at snapshot time. These values do not authorize a merge by themselves.
 | [100](https://github.com/ContextualWisdomLab/TEPP/pull/100) | `3e928bc` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | current Checks green; independent review still required | Live service-TLS bind policy |
 | [91](https://github.com/ContextualWisdomLab/TEPP/pull/91) | `53a5a31` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | no completed failure; review changes remain | Derived-artifact sensitivity inheritance |
 | [62](https://github.com/ContextualWisdomLab/TEPP/pull/62) | `1951ab4` | `main` | `MERGEABLE/BLOCKED` | required | required Checks queued; no completed failure observed | Simulation cutoff eligibility |
+| [61](https://github.com/ContextualWisdomLab/TEPP/pull/61) | `8ebbc04` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Interval-aware uncertain availability cutoff |
+| [58](https://github.com/ContextualWisdomLab/TEPP/pull/58) | `e98ada4` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Positional embedded image source units |
 | [51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | `0111a1a` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | VRAM budget and CPU fallback types |
 | [50](https://github.com/ContextualWisdomLab/TEPP/pull/50) | `fa4dff2` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | TDT/CHRONOS transition boundary |
 | [48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | `8e88b33` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | Logistic-normal topic coordinates |
