@@ -226,6 +226,7 @@ mod tests {
             assert_source_artifact_matches_sql(&with_ref).expect("referenced assertion");
         assert!(referenced_assertion.contains("s3://tepp/object"));
         assert!(referenced_assertion.contains("IS NOT DISTINCT FROM 's3://tepp/object'"));
+        assert!(referenced_assertion.contains("protected_object_ref IS NOT DISTINCT FROM"));
 
         assert_eq!(
             insert_source_artifact_sql(&SourceArtifactRecord {
