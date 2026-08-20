@@ -20,7 +20,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | backup/restore integrity | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event + concurrent-write (#37–#43 implemented-main) + restore integrity probes (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#43 + restore integrity |
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
-| Inferential TF-IDF/BM25/stopword refusal | `corpus_split` | active-PR | this PR | retrieval scores fail closed + computed ESS-vs-TF-IDF RMSE | ADR 0004/0012; `docs/research/inferential-retrieval-weight-gate.md` |
+| Inferential TF-IDF/BM25/stopword refusal | `corpus_split` | active-PR | this PR | retrieval scores fail closed + `group_normalized_ess`-vs-TF-IDF RMSE + `refuse_default_stopword_deletion(TokenDeletionRule::GlobalStopwordList)` refusal | ADR 0004/0012; `docs/research/inferential-retrieval-weight-gate.md` |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |

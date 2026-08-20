@@ -20,11 +20,11 @@ Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for stru
 
 ## Application
 
-Salton and Buckley (1988) and Robertson and Zaragoza (2009) specify TF-IDF and BM25 as *retrieval ranking* functions. They are not sampling or inferential weights for a generative topic or psychometric estimator (Roberts et al., 2019). TEPP therefore refuses `tf_idf` and `bm25` as estimator inputs and refuses global stopword deletion as the default token rule (Salton & Buckley, 1988; Robertson & Zaragoza, 2009; Roberts et al., 2019).
+Salton and Buckley (1988) and Robertson and Zaragoza (2009) describe TF-IDF and BM25 as *retrieval ranking* functions. Based on that distinction, TEPP implements an explicit policy that refuses `tf_idf` and `bm25` as estimator inputs. Independently, TEPP refuses global stopword deletion as the default token rule so token and background effects remain available for modeling; both policies are enforced by the `corpus_split` contract.
 
 ## Verification
 
 - `refuse_inferential_retrieval_weight` admits `group_normalized_ess` and `uniform`;
 - `tf_idf` and `bm25` return `InferentialRetrievalWeight`;
 - `refuse_default_stopword_deletion` admits `preserve_and_model_background` and refuses `global_stopword_list`;
-- computed RMSE of known membership shares is lower under the allowed observation masses than under an L1-normalized TF-IDF surrogate.
+- computed RMSE of known membership shares is lower under `group_normalized_ess` than under an L1-normalized TF-IDF surrogate.

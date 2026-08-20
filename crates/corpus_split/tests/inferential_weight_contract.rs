@@ -85,6 +85,7 @@ fn global_stopword_deletion_is_not_the_default_rule() {
 #[test]
 fn group_normalized_mass_recovers_true_shares_with_lower_rmse_than_tfidf() {
     let truth = [0.40_f64, 0.10, 0.30, 0.20];
+    let observation_mass = [4.0_f64, 1.0, 3.0, 2.0];
     let documents: [&[&str]; 4] = [
         &["report", "report", "report", "event"],
         &["report", "unique"],
@@ -103,7 +104,11 @@ fn group_normalized_mass_recovers_true_shares_with_lower_rmse_than_tfidf() {
     let groups = build_connected_groups(&document_ids, &links);
     let normalized_by_id: BTreeMap<Uuid, f64> = group_normalized_weights(
         &groups,
-        &document_ids.iter().copied().zip(truth).collect::<Vec<_>>(),
+        &document_ids
+            .iter()
+            .copied()
+            .zip(observation_mass)
+            .collect::<Vec<_>>(),
     )
     .into_iter()
     .collect();
