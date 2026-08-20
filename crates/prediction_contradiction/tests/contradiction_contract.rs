@@ -166,12 +166,7 @@ fn refuse_promotion_refuses_unmatched_predicted_mass() {
         Err(PredictionContradictionError::PredictionNotCoveredByObservation)
     );
     assert_eq!(
-        refuse_promotion(
-            &predicted,
-            &contained,
-            observed_available,
-            knowledge_cutoff
-        ),
+        refuse_promotion(&predicted, &contained, observed_available, knowledge_cutoff),
         Err(PredictionContradictionError::PredictionNotCoveredByObservation)
     );
     assert_eq!(
