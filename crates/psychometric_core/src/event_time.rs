@@ -66,7 +66,17 @@
 //! carry is not `t0_m x0`, not `M x`, not `e^{A(t−u)} M x` for
 //! `t0 < u < t`, not `t0_b z`, not `A^{-1}[e^{A Δt} − I] B z`, and
 //! not `CINT`. An impulse at `u ≤ t0` that used `M` is already in
-//! `η(t0)` as `TDPREDEFFECT`, not as `T0TDPREDEFFECT`. The JSS article
+//! `η(t0)` as `TDPREDEFFECT`, not as `T0TDPREDEFFECT`. Equation 5 of
+//! that carried first-occasion TD shift is
+//! `τ + λ(μ_t + e^{a Δt} t0_m x0)` (`τ + λ μ_t` is not that
+//! observed mean; `τ + λ(μ_t + e^{a Δt} t0_b z)` is not that
+//! observed mean). The JSS §7.2 lasting level change sets
+//! `CINT` to `TDPREDEFFECT * −DRIFT` (`κ = −a m x`; `a < 0` so
+//! `−κ / a = m x`). That `CINT` setting is not the dissipating
+//! Dirac, not a free `CINT`, and not the extra near-zero-drift
+//! latent process also named in §7.2. Equation 3 maps that
+//! intercept as `(1 − e^{a Δt}) m x` (`(1 − e^{a Δt}) m x` is not
+//! `m x`, not `κ`, and not `A^{-1}[e^{A Δt} − I] B z`). The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -1331,10 +1341,11 @@ pub fn refuse_initial_observed_mean_as_evolved_observed_mean(
 /// the second-summand `CINT` map `A^{-1}[e^{A Δt} − I] κ`, not the
 /// third-summand time-independent map `A^{-1}[e^{A Δt} − I] B z`,
 /// and not Voelkle et al. (2012, Eq. 14) `a_{yx} Δt`. The §7.2
-/// level-change form is a different specification (an extra latent
-/// process with near-zero drift) and is not this map. A zero effect
-/// or zero predictor is exactly zero. This is not a Kalman filter
-/// and not ctsem estimation.
+/// lasting level change sets `CINT` to `TDPREDEFFECT * −DRIFT`
+/// (`κ = −a m x`) and is not this jump. The extra near-zero-drift
+/// latent process also named in §7.2 is a third specification. A
+/// zero effect or zero predictor is exactly zero. This is not a
+/// Kalman filter and not ctsem estimation.
 ///
 /// # Errors
 ///
@@ -1351,6 +1362,186 @@ pub fn recover_time_dependent_predictor_impulse(
         return Ok(0.0);
     }
     require_finite(time_dependent_effect * time_dependent_predictor)
+}
+
+/// Exact scalar level-change `CINT` from Driver Section 7.2.
+///
+/// Driver, Oud, and Voelkle (2017, §7.2, pp. 20–21; Eq. 1–3, pp. 4–5;
+/// Table 2, p. 12; JSS PDF re-opened 2026-08-20T19:45Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// contrast a sudden Dirac that dissipates back to the process mean
+/// with a lasting level change. To generate that lasting change,
+/// `CINT` is set to `TDPREDEFFECT * −DRIFT`. The scalar setting is
+/// `κ = −a m x`. Form `m x` first, then multiply by `−a`. A zero
+/// effect or zero predictor is exactly zero. Stable `a < 0` is
+/// required so `−κ / a = m x` is an equilibrium offset. `a ≥ 0`
+/// cannot hold a new process mean. `−a m x` is not the
+/// contemporaneous jump `m x`. `−a m x` is not a free `CINT`.
+/// `−a m x` is not `A^{-1}[e^{A Δt} − I] B z`. The extra
+/// near-zero-drift latent process also named in §7.2 is a different
+/// specification and is not this `CINT` setting. This is not a
+/// Kalman filter and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::InvalidNumericInput`] when an input
+/// is non-finite or a product overflows, and
+/// [`PsychometricError::LevelChangeRequiresStableDrift`] when the
+/// drift is not strictly negative and the impulse is nonzero.
+pub fn recover_level_change_continuous_intercept(
+    time_dependent_effect: f64,
+    time_dependent_predictor: f64,
+    log_rate: f64,
+) -> Result<f64, PsychometricError> {
+    if !time_dependent_effect.is_finite()
+        || !time_dependent_predictor.is_finite()
+        || !log_rate.is_finite()
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if time_dependent_effect == 0.0 || time_dependent_predictor == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::LevelChangeRequiresStableDrift);
+    }
+    let impulse = require_finite(time_dependent_effect * time_dependent_predictor)?;
+    require_finite(-log_rate * impulse)
+}
+
+/// Refuse treating the §7.2 level-change `CINT` as the
+/// contemporaneous Dirac.
+///
+/// `κ = −a m x` is not the jump `m x`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::LevelChangeInterceptIsNotImpulse`].
+pub fn refuse_level_change_intercept_as_impulse(
+    level_change_intercept: f64,
+    time_dependent_impulse: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_intercept, time_dependent_impulse);
+    Err(PsychometricError::LevelChangeInterceptIsNotImpulse)
+}
+
+/// Refuse treating the §7.2 level-change `CINT` as a free `CINT`.
+///
+/// `κ = −a m x` is not an arbitrary continuous intercept.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LevelChangeInterceptIsNotFreeContinuousIntercept`].
+pub fn refuse_level_change_intercept_as_free_continuous_intercept(
+    level_change_intercept: f64,
+    continuous_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_intercept, continuous_intercept);
+    Err(PsychometricError::LevelChangeInterceptIsNotFreeContinuousIntercept)
+}
+
+/// Refuse treating the §7.2 level-change `CINT` as the Eq. 3
+/// process increment.
+///
+/// `κ = −a m x` is not `A^{-1}[e^{A Δt} − I] B z`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LevelChangeInterceptIsNotProcessIncrement`].
+pub fn refuse_level_change_intercept_as_process_increment(
+    level_change_intercept: f64,
+    time_independent_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_intercept, time_independent_increment);
+    Err(PsychometricError::LevelChangeInterceptIsNotProcessIncrement)
+}
+
+/// Exact scalar discrete increment of the §7.2 level-change `CINT`.
+///
+/// Driver, Oud, and Voelkle (2017, §7.2, pp. 20–21; Eq. 3, pp. 4–5;
+/// Table 2, p. 12; JSS PDF re-opened 2026-08-20T19:50Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// set `CINT` to `TDPREDEFFECT * −DRIFT` so a sudden impulse holds a
+/// new process mean. Equation 3 maps that intercept through
+/// `A^{-1}[e^{A Δt} − I] κ`. With `κ = −a m x` the scalar increment
+/// is `(e^{a Δt} − 1)/a · (−a m x) = (1 − e^{a Δt}) m x`. Form the
+/// level-change `CINT` first, then the discrete intercept map.
+/// Underflow of `e^{a Δt}` to `+0` keeps the equilibrium offset
+/// `m x`. A zero effect or zero predictor is exactly zero. Stable
+/// `a < 0` is required. `(1 − e^{a Δt}) m x` is not the
+/// contemporaneous jump `m x`. `(1 − e^{a Δt}) m x` is not `κ`.
+/// `(1 − e^{a Δt}) m x` is not `A^{-1}[e^{A Δt} − I] B z`. The extra
+/// near-zero-drift latent process also named in §7.2 is a different
+/// specification. This is not a Kalman filter and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_level_change_continuous_intercept`] and
+/// [`recover_discrete_continuous_intercept_effect`].
+pub fn recover_level_change_discrete_increment(
+    time_dependent_effect: f64,
+    time_dependent_predictor: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let intercept = recover_level_change_continuous_intercept(
+        time_dependent_effect,
+        time_dependent_predictor,
+        log_rate,
+    )?;
+    recover_discrete_continuous_intercept_effect(intercept, log_rate, event_delta, clock)
+}
+
+/// Refuse treating the §7.2 level-change CINT increment as the
+/// contemporaneous Dirac.
+///
+/// `(1 − e^{a Δt}) m x` is not the jump `m x`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::LevelChangeIncrementIsNotImpulse`].
+pub fn refuse_level_change_increment_as_impulse(
+    level_change_increment: f64,
+    time_dependent_impulse: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_increment, time_dependent_impulse);
+    Err(PsychometricError::LevelChangeIncrementIsNotImpulse)
+}
+
+/// Refuse treating the §7.2 level-change CINT increment as `CINT`.
+///
+/// `(1 − e^{a Δt}) m x` is not `κ = −a m x`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::LevelChangeIncrementIsNotIntercept`].
+pub fn refuse_level_change_increment_as_intercept(
+    level_change_increment: f64,
+    level_change_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_increment, level_change_intercept);
+    Err(PsychometricError::LevelChangeIncrementIsNotIntercept)
+}
+
+/// Refuse treating the §7.2 level-change CINT increment as the Eq. 3
+/// process increment.
+///
+/// `(1 − e^{a Δt}) m x` is not `A^{-1}[e^{A Δt} − I] B z`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LevelChangeIncrementIsNotProcessIncrement`].
+pub fn refuse_level_change_increment_as_process_increment(
+    level_change_increment: f64,
+    time_independent_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_increment, time_independent_increment);
+    Err(PsychometricError::LevelChangeIncrementIsNotProcessIncrement)
 }
 
 /// Exact scalar evolved latent mean plus a contemporaneous impulse.
@@ -2476,6 +2667,172 @@ pub fn refuse_initial_time_dependent_carry_as_impulse_carry(
     Err(PsychometricError::InitialTimeDependentCarryIsNotImpulseCarry)
 }
 
+/// Exact scalar observed mean of a first-occasion time-dependent
+/// predictor.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 3 first summand,
+/// p. 5; Table 3, p. 13; JSS PDF re-opened 2026-08-20T19:20Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `y_i(t) = Γ + Λ η_i(t) + ζ_i(t)` with `ζ ~ N(0, Θ)` and
+/// `Γ ~ N(τ, Ψ)`. Table 3 names `T0TDPREDEFFECT` the effect of
+/// time-dependent predictors on latents at `T0`. Equation 3's first
+/// summand carries that shift as `e^{A Δt} t0_m x0`. The expected
+/// intercept is `τ`. The latent process at `t` after that carry is
+/// `μ_t + e^{a Δt} t0_m x0`. The scalar composition is
+/// `E(y_t) = τ + λ(μ_t + e^{a Δt} t0_m x0)`. Form the
+/// evolved-plus-carry latent mean first, then `τ + λ` of that mean.
+/// A zero loading is exactly `τ`. A zero evolved-plus-carry latent
+/// mean is exactly `τ`. A zero intercept is exactly
+/// `λ(μ_t + e^{a Δt} t0_m x0)`. The evolved observed mean
+/// `τ + λ μ_t` is not this composition when the carry is nonzero.
+/// The process-increment map
+/// `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not this composition.
+/// The contemporaneous map `τ + λ(μ_t + m x)` is not this
+/// composition. The impulse-carry map
+/// `τ + λ(μ_t + e^{a(t−u)} m x)` is not this composition when
+/// `u ≠ t0`. The first-occasion TI map
+/// `τ + λ(μ_t + e^{a Δt} t0_b z)` is not this composition.
+/// `MANIFESTMEANS` is not `E(y_t)`. The evolved-plus-carry latent
+/// mean is not `E(y_t)`. `T0TDPREDEFFECT` is the coefficient, not
+/// that observed mean. This is not a Kalman filter and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Propagates
+/// [`recover_discrete_latent_mean_with_initial_time_dependent_predictor`]
+/// and [`recover_manifest_observed_mean`].
+#[allow(clippy::too_many_arguments)]
+pub fn recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+    loading: f64,
+    initial_latent_mean: f64,
+    log_rate: f64,
+    continuous_intercept: f64,
+    initial_time_dependent_effect: f64,
+    time_dependent_predictor: f64,
+    manifest_mean: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let composed_latent_mean = recover_discrete_latent_mean_with_initial_time_dependent_predictor(
+        initial_latent_mean,
+        log_rate,
+        continuous_intercept,
+        initial_time_dependent_effect,
+        time_dependent_predictor,
+        event_delta,
+        clock,
+    )?;
+    recover_manifest_observed_mean(loading, composed_latent_mean, manifest_mean)
+}
+
+/// Refuse treating the evolved observed mean as the first-occasion
+/// time-dependent-predictor observed mean.
+///
+/// Equation 5 of the Eq. 3 evolved mean is `τ + λ μ_t`. Equation 5
+/// of the Table 3 first-occasion TD predictor is
+/// `τ + λ(μ_t + e^{a Δt} t0_m x0)`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::EvolvedObservedMeanIsNotInitialTimeDependentObservedMean`].
+pub fn refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean(
+    evolved_observed_mean: f64,
+    initial_time_dependent_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (evolved_observed_mean, initial_time_dependent_observed_mean);
+    Err(PsychometricError::EvolvedObservedMeanIsNotInitialTimeDependentObservedMean)
+}
+
+/// Refuse treating the process-increment observed mean as the
+/// first-occasion time-dependent-predictor observed mean.
+///
+/// Equation 5 of the Eq. 3 `TIPREDEFFECT` increment is
+/// `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)`. Equation 5 of the
+/// Table 3 first-occasion TD predictor is
+/// `τ + λ(μ_t + e^{a Δt} t0_m x0)`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean`].
+pub fn refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean(
+    time_independent_observed_mean: f64,
+    initial_time_dependent_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        time_independent_observed_mean,
+        initial_time_dependent_observed_mean,
+    );
+    Err(PsychometricError::TimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean)
+}
+
+/// Refuse treating the contemporaneous-impulse observed mean as the
+/// first-occasion time-dependent-predictor observed mean.
+///
+/// Equation 5 of the contemporaneous Dirac is `τ + λ(μ_t + m x)`.
+/// Equation 5 of the Table 3 first-occasion TD predictor is
+/// `τ + λ(μ_t + e^{a Δt} t0_m x0)`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ImpulseObservedMeanIsNotInitialTimeDependentObservedMean`].
+pub fn refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean(
+    impulse_observed_mean: f64,
+    initial_time_dependent_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (impulse_observed_mean, initial_time_dependent_observed_mean);
+    Err(PsychometricError::ImpulseObservedMeanIsNotInitialTimeDependentObservedMean)
+}
+
+/// Refuse treating the impulse-carry observed mean as the
+/// first-occasion time-dependent-predictor observed mean.
+///
+/// Equation 5 of the Eq. 1–2 carried latent mean is
+/// `τ + λ(μ_t + e^{a(t−u)} m x)`. Equation 5 of the Table 3
+/// first-occasion TD predictor is `τ + λ(μ_t + e^{a Δt} t0_m x0)`.
+/// Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ImpulseCarryObservedMeanIsNotInitialTimeDependentObservedMean`].
+pub fn refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean(
+    impulse_carry_observed_mean: f64,
+    initial_time_dependent_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        impulse_carry_observed_mean,
+        initial_time_dependent_observed_mean,
+    );
+    Err(PsychometricError::ImpulseCarryObservedMeanIsNotInitialTimeDependentObservedMean)
+}
+
+/// Refuse treating the first-occasion TI observed mean as the
+/// first-occasion TD observed mean.
+///
+/// Equation 5 of Table 3 `T0TIPREDEFFECT` is
+/// `τ + λ(μ_t + e^{a Δt} t0_b z)`. Equation 5 of Table 3
+/// `T0TDPREDEFFECT` is `τ + λ(μ_t + e^{a Δt} t0_m x0)`. Those are
+/// not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean`].
+pub fn refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean(
+    initial_time_independent_observed_mean: f64,
+    initial_time_dependent_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_time_independent_observed_mean,
+        initial_time_dependent_observed_mean,
+    );
+    Err(PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean)
+}
+
 /// Exact scalar within-interval time-dependent impulse carry from
 /// Driver Equations 1–2.
 ///
@@ -3051,6 +3408,7 @@ mod tests {
         recover_discrete_latent_variance, recover_discrete_observed_mean,
         recover_discrete_observed_mean_with_impulse,
         recover_discrete_observed_mean_with_impulse_carry,
+        recover_discrete_observed_mean_with_initial_time_dependent_predictor,
         recover_discrete_observed_mean_with_initial_time_independent_predictor,
         recover_discrete_observed_mean_with_time_independent_predictor,
         recover_discrete_process_noise, recover_discrete_time_independent_predictor_effect,
@@ -3060,7 +3418,8 @@ mod tests {
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_predictor_carry,
         recover_initial_time_independent_predictor_effect,
-        recover_irregular_centered_residual_log_rate, recover_local_log_rate,
+        recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
+        recover_level_change_discrete_increment, recover_local_log_rate,
         recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
         recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
@@ -3071,12 +3430,15 @@ mod tests {
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
         refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
         refuse_evolved_observed_mean_as_impulse_observed_mean,
+        refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
         refuse_evolved_observed_mean_as_time_independent_observed_mean,
         refuse_finite_interval_process_noise_as_stationary_variance,
+        refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
         refuse_impulse_carry_observed_mean_as_time_independent_observed_mean,
         refuse_impulse_observed_mean_as_impulse_carry_observed_mean,
+        refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_impulse_observed_mean_as_initial_time_independent_observed_mean,
         refuse_impulse_observed_mean_as_time_independent_observed_mean,
         refuse_initial_latent_mean_as_evolved_mean,
@@ -3093,9 +3455,14 @@ mod tests {
         refuse_initial_time_independent_effect_as_continuous_intercept,
         refuse_initial_time_independent_effect_as_process_increment,
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
+        refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
-        refuse_manifest_means_as_observed_mean,
+        refuse_level_change_increment_as_impulse, refuse_level_change_increment_as_intercept,
+        refuse_level_change_increment_as_process_increment,
+        refuse_level_change_intercept_as_free_continuous_intercept,
+        refuse_level_change_intercept_as_impulse,
+        refuse_level_change_intercept_as_process_increment, refuse_manifest_means_as_observed_mean,
         refuse_manifest_trait_variance_as_measurement_error,
         refuse_measurement_error_as_lagged_observed_covariance,
         refuse_measurement_error_as_observed_variance,
@@ -3112,6 +3479,7 @@ mod tests {
         refuse_time_independent_effect_as_continuous_intercept,
         refuse_time_independent_effect_as_time_dependent_impulse,
         refuse_time_independent_effect_as_time_varying_discrete_effect,
+        refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
@@ -5135,6 +5503,227 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn level_change_continuous_intercept_recovers_driver_section_seven_point_two() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let intercept = recover_level_change_continuous_intercept(effect, predictor, drift)
+            .expect("level-change");
+        let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+        assert!((intercept - 0.6).abs() < 1e-15);
+        assert!((impulse - 1.2).abs() < 1e-15);
+        let equilibrium = intercept / (-drift);
+        assert!((equilibrium - impulse).abs() < 1e-15);
+        assert_eq!(
+            recover_level_change_continuous_intercept(0.0, predictor, drift),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_level_change_continuous_intercept(effect, 0.0, drift),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_level_change_continuous_intercept(effect, predictor, 0.0),
+            Err(PsychometricError::LevelChangeRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_level_change_continuous_intercept(effect, predictor, 0.5),
+            Err(PsychometricError::LevelChangeRequiresStableDrift)
+        );
+        let increment = recover_discrete_time_independent_predictor_effect(
+            effect,
+            predictor,
+            drift,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("tipred");
+        assert_eq!(
+            refuse_level_change_intercept_as_impulse(intercept, impulse),
+            Err(PsychometricError::LevelChangeInterceptIsNotImpulse)
+        );
+        assert_eq!(
+            refuse_level_change_intercept_as_free_continuous_intercept(intercept, 0.3),
+            Err(PsychometricError::LevelChangeInterceptIsNotFreeContinuousIntercept)
+        );
+        assert_eq!(
+            refuse_level_change_intercept_as_process_increment(intercept, increment),
+            Err(PsychometricError::LevelChangeInterceptIsNotProcessIncrement)
+        );
+    }
+
+    #[test]
+    fn level_change_continuous_intercept_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_level_change_continuous_intercept(f64::NAN, 1.0, -0.5),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_continuous_intercept(1.0, f64::INFINITY, -0.5),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_continuous_intercept(0.4, 3.0, f64::NAN),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_continuous_intercept(1e308, 2.0, -0.5),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_continuous_intercept(1.0, 2.0, -1e308),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let scaled = recover_level_change_continuous_intercept(1e-308, 1.0, -1.0).expect("scale");
+        assert!((scaled - 1e-308).abs() < 1e-320);
+        let rewritten =
+            recover_level_change_continuous_intercept(1e-308, 1.0, -1e308).expect("rewrite");
+        assert!((rewritten - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn level_change_discrete_increment_recovers_driver_equation_three_of_section_seven_point_two() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let increment = recover_level_change_discrete_increment(
+            effect,
+            predictor,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("level-change-increment");
+        let intercept = recover_level_change_continuous_intercept(effect, predictor, drift)
+            .expect("level-change");
+        let via_cint = recover_discrete_continuous_intercept_effect(
+            intercept,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("cint-increment");
+        let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+        let expected = (1.0 - (drift * delta).exp()) * impulse;
+        assert!((increment - expected).abs() < 1e-15);
+        assert!((increment - via_cint).abs() < 1e-15);
+        assert!((increment - impulse).abs() > 1e-3);
+        assert!((increment - intercept).abs() > 1e-3);
+        let tipred = recover_discrete_time_independent_predictor_effect(
+            effect,
+            predictor,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("tipred");
+        assert_eq!(
+            refuse_level_change_increment_as_impulse(increment, impulse),
+            Err(PsychometricError::LevelChangeIncrementIsNotImpulse)
+        );
+        assert_eq!(
+            refuse_level_change_increment_as_intercept(increment, intercept),
+            Err(PsychometricError::LevelChangeIncrementIsNotIntercept)
+        );
+        assert_eq!(
+            refuse_level_change_increment_as_process_increment(increment, tipred),
+            Err(PsychometricError::LevelChangeIncrementIsNotProcessIncrement)
+        );
+        let equilibrated = recover_level_change_discrete_increment(
+            effect,
+            predictor,
+            -800.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("underflow");
+        assert!((equilibrated - impulse).abs() < 1e-15);
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                0.0,
+                predictor,
+                drift,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn level_change_discrete_increment_invalid_inputs_fail_closed() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                effect,
+                predictor,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::LevelChangeRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                effect,
+                predictor,
+                0.5,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::LevelChangeRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                effect,
+                predictor,
+                drift,
+                delta,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                effect,
+                predictor,
+                drift,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(1e308, 2.0, drift, delta, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                f64::NAN,
+                predictor,
+                drift,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                0.0,
+                predictor,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
         );
     }
 
@@ -7570,6 +8159,300 @@ mod tests {
                 1.0,
                 1.0,
                 f64::INFINITY,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_recovers_driver_equation_five()
+    {
+        let loading = 2.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let manifest_mean = 0.5_f64;
+        let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            predictor,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-t0tdpred-mean");
+        let composed = recover_discrete_latent_mean_with_initial_time_dependent_predictor(
+            initial,
+            drift,
+            intercept,
+            effect,
+            predictor,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq3-t0tdpred");
+        let expected = manifest_mean + loading * composed;
+        assert!((recovered - expected).abs() < 1e-15);
+        let evolved_observed = recover_discrete_observed_mean(
+            loading,
+            initial,
+            drift,
+            intercept,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq3-eq5-mean");
+        let process_observed = recover_discrete_observed_mean_with_time_independent_predictor(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            predictor,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-tipred");
+        let impulse_observed = recover_discrete_observed_mean_with_impulse(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            predictor,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-impulse");
+        let carry_observed = recover_discrete_observed_mean_with_impulse_carry(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            predictor,
+            manifest_mean,
+            delta,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("eq5-carry");
+        let tipred_observed =
+            recover_discrete_observed_mean_with_initial_time_independent_predictor(
+                loading,
+                initial,
+                drift,
+                intercept,
+                effect,
+                predictor,
+                manifest_mean,
+                delta,
+                LagClock::EventTime,
+            )
+            .expect("eq5-t0tipred");
+        assert!((recovered - evolved_observed).abs() > 1e-3);
+        assert!((recovered - process_observed).abs() > 1e-3);
+        assert!((recovered - impulse_observed).abs() > 1e-3);
+        assert!((recovered - carry_observed).abs() > 1e-3);
+        // Same numbers as T0TIPRED yield the same product, but Table 3 names a different matrix.
+        assert!((recovered - tipred_observed).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+                0.0,
+                initial,
+                drift,
+                intercept,
+                effect,
+                predictor,
+                manifest_mean,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(manifest_mean)
+        );
+        assert!((recovered - composed).abs() > 1e-3);
+        assert!((recovered - manifest_mean).abs() > 1e-3);
+    }
+
+    #[test]
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
+     {
+        let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("eq5-t0tdpred");
+        let evolved =
+            recover_discrete_observed_mean(2.0, 1.0, -0.5, 0.3, 0.5, 2.0, LagClock::EventTime)
+                .expect("evolved");
+        let process = recover_discrete_observed_mean_with_time_independent_predictor(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("tipred");
+        let impulse = recover_discrete_observed_mean_with_impulse(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("impulse");
+        let carry = recover_discrete_observed_mean_with_impulse_carry(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("carry");
+        let tipred = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("t0tipred");
+        assert_eq!(
+            refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean(
+                evolved, recovered
+            ),
+            Err(PsychometricError::EvolvedObservedMeanIsNotInitialTimeDependentObservedMean)
+        );
+        assert_eq!(
+            refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean(
+                process, recovered
+            ),
+            Err(
+                PsychometricError::TimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean
+            )
+        );
+        assert_eq!(
+            refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean(
+                impulse, recovered
+            ),
+            Err(PsychometricError::ImpulseObservedMeanIsNotInitialTimeDependentObservedMean)
+        );
+        assert_eq!(
+            refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean(
+                carry, recovered
+            ),
+            Err(PsychometricError::ImpulseCarryObservedMeanIsNotInitialTimeDependentObservedMean)
+        );
+        assert_eq!(
+            refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean(
+                tipred, recovered
+            ),
+            Err(PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean)
+        );
+    }
+
+    #[test]
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_invalid_inputs_fail_closed() {
+        let scaled = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+            1e308,
+            1e-308,
+            0.0,
+            0.0,
+            0.0,
+            3.0,
+            0.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("scale");
+        assert!((scaled - 1.0).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+                1e308,
+                2.0,
+                0.0,
+                0.0,
+                0.0,
+                3.0,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+                2.0,
+                1.0,
+                -0.5,
+                0.3,
+                0.4,
+                3.0,
+                0.5,
+                2.0,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+                2.0,
+                1.0,
+                -0.5,
+                0.3,
+                0.4,
+                3.0,
+                0.5,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+                1e308,
+                0.0,
+                0.0,
+                0.0,
+                1e308,
+                1.0,
+                0.0,
                 1.0,
                 LagClock::EventTime
             ),

@@ -12,6 +12,7 @@ use psychometric_core::{
     recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
     recover_discrete_observed_mean, recover_discrete_observed_mean_with_impulse,
     recover_discrete_observed_mean_with_impulse_carry,
+    recover_discrete_observed_mean_with_initial_time_dependent_predictor,
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
@@ -19,7 +20,8 @@ use psychometric_core::{
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
-    recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
+    recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
+    recover_level_change_discrete_increment, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
@@ -30,12 +32,15 @@ use psychometric_core::{
     refuse_continuous_intercept_as_manifest_means,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
     refuse_evolved_observed_mean_as_impulse_observed_mean,
+    refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
     refuse_evolved_observed_mean_as_time_independent_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
     refuse_impulse_carry_observed_mean_as_time_independent_observed_mean,
     refuse_impulse_observed_mean_as_impulse_carry_observed_mean,
+    refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_observed_mean_as_initial_time_independent_observed_mean,
     refuse_impulse_observed_mean_as_time_independent_observed_mean,
     refuse_initial_latent_mean_as_evolved_mean,
@@ -52,9 +57,13 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_continuous_intercept,
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
+    refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
-    refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
-    refuse_manifest_trait_variance_as_measurement_error,
+    refuse_latent_variance_as_observed_variance, refuse_level_change_increment_as_impulse,
+    refuse_level_change_increment_as_intercept, refuse_level_change_increment_as_process_increment,
+    refuse_level_change_intercept_as_free_continuous_intercept,
+    refuse_level_change_intercept_as_impulse, refuse_level_change_intercept_as_process_increment,
+    refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance, refuse_process_noise_as_unconditional_variance,
     refuse_time_dependent_impulse_as_continuous_intercept,
@@ -68,6 +77,7 @@ use psychometric_core::{
     refuse_time_independent_effect_as_continuous_intercept,
     refuse_time_independent_effect_as_time_dependent_impulse,
     refuse_time_independent_effect_as_time_varying_discrete_effect,
+    refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
 };
@@ -1147,6 +1157,179 @@ fn evolved_and_process_observed_mean_are_not_initial_time_independent_observed_m
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
+fn evolved_and_process_observed_mean_are_not_initial_time_dependent_observed_mean() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let initial_observed = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0tdpred-mean");
+    let evolved_observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let process_observed = recover_discrete_observed_mean_with_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-tipred-mean");
+    let impulse_observed = recover_discrete_observed_mean_with_impulse(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-impulse-mean");
+    let carried_observed = recover_discrete_observed_mean_with_impulse_carry(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("eq5-carry-mean");
+    let tipred_observed = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0tipred-mean");
+    let composed = recover_discrete_latent_mean_with_initial_time_dependent_predictor(
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-t0tdpred");
+    assert!(
+        (evolved_observed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of Table 3 T0TDPREDEFFECT): τ + λ μ_t is not T0TDPREDEFFECT E(y_t)"
+    );
+    assert!(
+        (process_observed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): TIPREDEFFECT E(y_t) is not T0TDPREDEFFECT E(y_t)"
+    );
+    assert!(
+        (impulse_observed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): τ + λ(μ_t + m x) is not T0TDPREDEFFECT E(y_t)"
+    );
+    assert!(
+        (carried_observed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): τ + λ(μ_t + carry) is not T0TDPREDEFFECT E(y_t)"
+    );
+    assert!(
+        (composed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): evolved-plus-T0TDPRED latent mean is not E(y_t)"
+    );
+    assert!(
+        (manifest_mean - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 / Table 2 p. 12): MANIFESTMEANS is not T0TDPREDEFFECT E(y_t)"
+    );
+    // Same numbers as T0TIPRED yield the same product; Table 3 names a different matrix.
+    assert!((tipred_observed - initial_observed).abs() < 1e-15);
+    assert_eq!(
+        refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean(
+            evolved_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::EvolvedObservedMeanIsNotInitialTimeDependentObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean(
+            process_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::TimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean(
+            impulse_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::ImpulseObservedMeanIsNotInitialTimeDependentObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean(
+            carried_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::ImpulseCarryObservedMeanIsNotInitialTimeDependentObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean(
+            tipred_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_latent_mean_as_observed_mean(composed, initial_observed),
+        Err(psychometric_core::PsychometricError::LatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_manifest_means_as_observed_mean(manifest_mean, initial_observed),
+        Err(psychometric_core::PsychometricError::ManifestMeansIsNotObservedMean)
+    );
+}
+
+#[test]
 fn time_dependent_impulse_carry_is_not_contemporaneous_cint_tipred_or_equation_fourteen() {
     let effect = 0.4_f64;
     let predictor = 3.0_f64;
@@ -1480,5 +1663,98 @@ fn impulse_and_carry_observed_mean_are_not_time_independent_observed_mean() {
         Err(
             psychometric_core::PsychometricError::ImpulseCarryObservedMeanIsNotTimeIndependentObservedMean
         )
+    );
+}
+
+#[test]
+fn level_change_cint_is_not_impulse_free_cint_or_process_increment() {
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let drift = -0.5_f64;
+    let intercept =
+        recover_level_change_continuous_intercept(effect, predictor, drift).expect("level-change");
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+    let increment = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        drift,
+        2.0,
+        LagClock::EventTime,
+    )
+    .expect("tipred");
+    assert!(
+        (intercept - impulse).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): −a m x is not the dissipating Dirac m x"
+    );
+    assert!(
+        (intercept - 0.3).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): −a m x is not a free CINT"
+    );
+    assert!(
+        (intercept - increment).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): −a m x is not TIPREDEFFECT increment"
+    );
+    assert_eq!(
+        refuse_level_change_intercept_as_impulse(intercept, impulse),
+        Err(psychometric_core::PsychometricError::LevelChangeInterceptIsNotImpulse)
+    );
+    assert_eq!(
+        refuse_level_change_intercept_as_free_continuous_intercept(intercept, 0.3),
+        Err(psychometric_core::PsychometricError::LevelChangeInterceptIsNotFreeContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_level_change_intercept_as_process_increment(intercept, increment),
+        Err(psychometric_core::PsychometricError::LevelChangeInterceptIsNotProcessIncrement)
+    );
+}
+
+#[test]
+fn level_change_increment_is_not_impulse_intercept_or_process_increment() {
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let intercept =
+        recover_level_change_continuous_intercept(effect, predictor, drift).expect("level-change");
+    let increment = recover_level_change_discrete_increment(
+        effect,
+        predictor,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("level-change-increment");
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+    let tipred = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("tipred");
+    assert!(
+        (increment - impulse).abs() > 1e-3,
+        "Driver et al. (2017, §7.2 / Eq. 3): (1 − e^{{aΔt}}) m x is not the dissipating Dirac m x"
+    );
+    assert!(
+        (increment - intercept).abs() > 1e-3,
+        "Driver et al. (2017, §7.2 / Eq. 3): (1 − e^{{aΔt}}) m x is not κ"
+    );
+    assert!(
+        (increment - tipred).abs() > 1e-3,
+        "Driver et al. (2017, §7.2 / Eq. 3): (1 − e^{{aΔt}}) m x is not TIPREDEFFECT increment"
+    );
+    assert_eq!(
+        refuse_level_change_increment_as_impulse(increment, impulse),
+        Err(psychometric_core::PsychometricError::LevelChangeIncrementIsNotImpulse)
+    );
+    assert_eq!(
+        refuse_level_change_increment_as_intercept(increment, intercept),
+        Err(psychometric_core::PsychometricError::LevelChangeIncrementIsNotIntercept)
+    );
+    assert_eq!(
+        refuse_level_change_increment_as_process_increment(increment, tipred),
+        Err(psychometric_core::PsychometricError::LevelChangeIncrementIsNotProcessIncrement)
     );
 }

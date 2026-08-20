@@ -68,6 +68,20 @@
 //! `e^{A Δt} t0_m x0` is not `e^{A(t−u)} M x` for `t0 < u < t`;
 //! `t0_m x0` is not `t0_b z`; an impulse at `u ≤ t0` that used `M`
 //! is already in `η(t0)` as `TDPREDEFFECT`, not as `T0TDPREDEFFECT`),
+//! recovers the Driver Eq. 5 of that first-occasion TD carry as
+//! `τ + λ(μ_t + e^{a Δt} t0_m x0)` (`τ + λ μ_t` is not that observed
+//! mean; `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not that
+//! observed mean; `τ + λ(μ_t + m x)` is not that observed mean;
+//! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
+//! `u ≠ t0`; `τ + λ(μ_t + e^{a Δt} t0_b z)` is not that observed
+//! mean),
+//! recovers the Driver §7.2 level-change `CINT` setting `κ = −a m x`
+//! (`a < 0` so `−κ / a = m x`; not the dissipating Dirac `m x`, not
+//! a free `CINT`, not `A^{-1}[e^{A Δt} − I] B z`, and not the extra
+//! near-zero-drift latent process also named in §7.2),
+//! recovers the Driver Eq. 3 increment of that setting as
+//! `(1 − e^{a Δt}) m x` (`(1 − e^{a Δt}) m x` is not `m x`, not `κ`,
+//! and not `A^{-1}[e^{A Δt} − I] B z`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -146,6 +160,8 @@ pub use event_time::recover_discrete_observed_mean;
 pub use event_time::recover_discrete_observed_mean_with_impulse;
 /// Exact scalar discrete observed mean of a within-interval impulse carry.
 pub use event_time::recover_discrete_observed_mean_with_impulse_carry;
+/// Exact scalar discrete observed mean of a first-occasion TD predictor.
+pub use event_time::recover_discrete_observed_mean_with_initial_time_dependent_predictor;
 /// Exact scalar discrete observed mean of a first-occasion TI predictor.
 pub use event_time::recover_discrete_observed_mean_with_initial_time_independent_predictor;
 /// Exact scalar discrete observed mean of a time-independent predictor.
@@ -170,6 +186,10 @@ pub use event_time::recover_initial_time_independent_predictor_carry;
 pub use event_time::recover_initial_time_independent_predictor_effect;
 /// Mean exact log-rate on already-centered irregular residuals.
 pub use event_time::recover_irregular_centered_residual_log_rate;
+/// Exact scalar §7.2 level-change `CINT` `κ = −a m x`.
+pub use event_time::recover_level_change_continuous_intercept;
+/// Exact scalar Eq. 3 increment of that `CINT` `(1 − e^{a Δt}) m x`.
+pub use event_time::recover_level_change_discrete_increment;
 /// Exact scalar inverse `a = ln(φ) / Δt`.
 pub use event_time::recover_local_log_rate;
 /// Exact scalar lagged observed-indicator covariance `λ² cov(η) + ψ`.
@@ -204,18 +224,24 @@ pub use event_time::refuse_difference_quotient_as_local_rate;
 pub use event_time::refuse_evolved_observed_mean_as_impulse_carry_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the contemporaneous-impulse observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_impulse_observed_mean;
+/// Refuse treating evolved `τ + λ μ_t` as the first-occasion TD-predictor observed mean.
+pub use event_time::refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the time-independent-predictor observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_time_independent_observed_mean;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
+/// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the first-occasion TD-predictor observed mean.
+pub use event_time::refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the time-independent-predictor observed mean.
 pub use event_time::refuse_impulse_carry_observed_mean_as_time_independent_observed_mean;
 /// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the impulse-carry observed mean.
 pub use event_time::refuse_impulse_observed_mean_as_impulse_carry_observed_mean;
+/// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the first-occasion TD-predictor observed mean.
+pub use event_time::refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_impulse_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the time-independent-predictor observed mean.
@@ -248,12 +274,26 @@ pub use event_time::refuse_initial_time_independent_effect_as_continuous_interce
 pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
 /// Refuse treating the Table 3 first-occasion TI shift as `M x`.
 pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_impulse;
+/// Refuse treating first-occasion TI observed mean as the first-occasion TD observed mean.
+pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.
 pub use event_time::refuse_latent_mean_as_observed_mean;
 /// Refuse treating Driver Eq. 5 latent variance as `Var(y)`.
 pub use event_time::refuse_latent_variance_as_observed_variance;
+/// Refuse treating the §7.2 level-change CINT increment as the contemporaneous Dirac.
+pub use event_time::refuse_level_change_increment_as_impulse;
+/// Refuse treating the §7.2 level-change CINT increment as `CINT`.
+pub use event_time::refuse_level_change_increment_as_intercept;
+/// Refuse treating the §7.2 level-change CINT increment as the Eq. 3 process increment.
+pub use event_time::refuse_level_change_increment_as_process_increment;
+/// Refuse treating Driver §7.2 level-change `CINT` as a free `CINT`.
+pub use event_time::refuse_level_change_intercept_as_free_continuous_intercept;
+/// Refuse treating Driver §7.2 level-change `CINT` as the contemporaneous Dirac.
+pub use event_time::refuse_level_change_intercept_as_impulse;
+/// Refuse treating Driver §7.2 level-change `CINT` as the Eq. 3 process increment.
+pub use event_time::refuse_level_change_intercept_as_process_increment;
 /// Refuse treating Driver Eq. 5 `MANIFESTMEANS` as `E(y)`.
 pub use event_time::refuse_manifest_means_as_observed_mean;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.
@@ -288,6 +328,8 @@ pub use event_time::refuse_time_independent_effect_as_continuous_intercept;
 pub use event_time::refuse_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating Driver Eq. 3 `TIPREDEFFECT` increment as Voelkle Eq. 14.
 pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effect;
+/// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TD-predictor observed mean.
+pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating Driver §4.3 trait variance as process noise.
