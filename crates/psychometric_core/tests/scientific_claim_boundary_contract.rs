@@ -20,12 +20,12 @@ use psychometric_core::{
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
-    recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
+    recover_loading_point_estimate_mean, recover_manifest_lagged_observed_covariance,
+    recover_manifest_observed_mean, recover_manifest_observed_variance,
+    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
@@ -58,8 +58,10 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
-    refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
-    refuse_manifest_trait_variance_as_measurement_error,
+    refuse_latent_variance_as_observed_variance,
+    refuse_level_change_intercept_as_free_continuous_intercept,
+    refuse_level_change_intercept_as_impulse, refuse_level_change_intercept_as_process_increment,
+    refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance, refuse_process_noise_as_unconditional_variance,
     refuse_time_dependent_impulse_as_continuous_intercept,
@@ -1659,5 +1661,47 @@ fn impulse_and_carry_observed_mean_are_not_time_independent_observed_mean() {
         Err(
             psychometric_core::PsychometricError::ImpulseCarryObservedMeanIsNotTimeIndependentObservedMean
         )
+    );
+}
+
+#[test]
+fn level_change_cint_is_not_impulse_free_cint_or_process_increment() {
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let drift = -0.5_f64;
+    let intercept =
+        recover_level_change_continuous_intercept(effect, predictor, drift).expect("level-change");
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+    let increment = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        drift,
+        2.0,
+        LagClock::EventTime,
+    )
+    .expect("tipred");
+    assert!(
+        (intercept - impulse).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): −a m x is not the dissipating Dirac m x"
+    );
+    assert!(
+        (intercept - 0.3).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): −a m x is not a free CINT"
+    );
+    assert!(
+        (intercept - increment).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): −a m x is not TIPREDEFFECT increment"
+    );
+    assert_eq!(
+        refuse_level_change_intercept_as_impulse(intercept, impulse),
+        Err(psychometric_core::PsychometricError::LevelChangeInterceptIsNotImpulse)
+    );
+    assert_eq!(
+        refuse_level_change_intercept_as_free_continuous_intercept(intercept, 0.3),
+        Err(psychometric_core::PsychometricError::LevelChangeInterceptIsNotFreeContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_level_change_intercept_as_process_increment(intercept, increment),
+        Err(psychometric_core::PsychometricError::LevelChangeInterceptIsNotProcessIncrement)
     );
 }

@@ -75,6 +75,10 @@
 //! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
 //! `u ≠ t0`; `τ + λ(μ_t + e^{a Δt} t0_b z)` is not that observed
 //! mean),
+//! recovers the Driver §7.2 level-change `CINT` setting `κ = −a m x`
+//! (`a < 0` so `−κ / a = m x`; not the dissipating Dirac `m x`, not
+//! a free `CINT`, not `A^{-1}[e^{A Δt} − I] B z`, and not the extra
+//! near-zero-drift latent process also named in §7.2),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -179,6 +183,8 @@ pub use event_time::recover_initial_time_independent_predictor_carry;
 pub use event_time::recover_initial_time_independent_predictor_effect;
 /// Mean exact log-rate on already-centered irregular residuals.
 pub use event_time::recover_irregular_centered_residual_log_rate;
+/// Exact scalar §7.2 level-change `CINT` `κ = −a m x`.
+pub use event_time::recover_level_change_continuous_intercept;
 /// Exact scalar inverse `a = ln(φ) / Δt`.
 pub use event_time::recover_local_log_rate;
 /// Exact scalar lagged observed-indicator covariance `λ² cov(η) + ψ`.
@@ -271,6 +277,12 @@ pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 pub use event_time::refuse_latent_mean_as_observed_mean;
 /// Refuse treating Driver Eq. 5 latent variance as `Var(y)`.
 pub use event_time::refuse_latent_variance_as_observed_variance;
+/// Refuse treating Driver §7.2 level-change `CINT` as a free `CINT`.
+pub use event_time::refuse_level_change_intercept_as_free_continuous_intercept;
+/// Refuse treating Driver §7.2 level-change `CINT` as the contemporaneous Dirac.
+pub use event_time::refuse_level_change_intercept_as_impulse;
+/// Refuse treating Driver §7.2 level-change `CINT` as the Eq. 3 process increment.
+pub use event_time::refuse_level_change_intercept_as_process_increment;
 /// Refuse treating Driver Eq. 5 `MANIFESTMEANS` as `E(y)`.
 pub use event_time::refuse_manifest_means_as_observed_mean;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.

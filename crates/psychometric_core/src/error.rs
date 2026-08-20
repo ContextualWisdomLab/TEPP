@@ -245,6 +245,20 @@ pub enum PsychometricError {
     /// `τ + λ(μ_t + e^{a Δt} t0_b z)` is not
     /// `τ + λ(μ_t + e^{a Δt} t0_m x0)`.
     InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean,
+    /// Driver §7.2 level-change `CINT` was requested for a non-stable
+    /// drift. Lasting level change via `CINT = TDPREDEFFECT × (−DRIFT)`
+    /// requires `a < 0` so `−κ / a = m x` is an equilibrium offset.
+    LevelChangeRequiresStableDrift,
+    /// Driver §7.2 level-change `CINT` was treated as the
+    /// contemporaneous Dirac. `−a m x` is not `m x`.
+    LevelChangeInterceptIsNotImpulse,
+    /// Driver §7.2 level-change `CINT` was treated as a free `CINT`.
+    /// `−a m x` is not an arbitrary `κ`.
+    LevelChangeInterceptIsNotFreeContinuousIntercept,
+    /// Driver §7.2 level-change `CINT` was treated as the Eq. 3
+    /// process increment. `−a m x` is not
+    /// `A^{-1}[e^{A Δt} − I] B z`.
+    LevelChangeInterceptIsNotProcessIncrement,
 }
 
 impl fmt::Display for PsychometricError {
@@ -445,6 +459,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean => {
                 "first-occasion time-independent-predictor observed mean is not the first-occasion time-dependent-predictor observed mean"
+            }
+            Self::LevelChangeRequiresStableDrift => {
+                "lasting level-change CINT requires stable negative drift"
+            }
+            Self::LevelChangeInterceptIsNotImpulse => {
+                "level-change CINT is not the contemporaneous impulse"
+            }
+            Self::LevelChangeInterceptIsNotFreeContinuousIntercept => {
+                "level-change CINT is not a free continuous intercept"
+            }
+            Self::LevelChangeInterceptIsNotProcessIncrement => {
+                "level-change CINT is not the time-independent process increment"
             }
         };
         formatter.write_str(message)
@@ -762,6 +788,26 @@ mod tests {
             PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean
                 .to_string(),
             "first-occasion time-independent-predictor observed mean is not the first-occasion time-dependent-predictor observed mean"
+        );
+    }
+
+    #[test]
+    fn level_change_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::LevelChangeRequiresStableDrift.to_string(),
+            "lasting level-change CINT requires stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeInterceptIsNotImpulse.to_string(),
+            "level-change CINT is not the contemporaneous impulse"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeInterceptIsNotFreeContinuousIntercept.to_string(),
+            "level-change CINT is not a free continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeInterceptIsNotProcessIncrement.to_string(),
+            "level-change CINT is not the time-independent process increment"
         );
     }
 }
