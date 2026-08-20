@@ -13,15 +13,7 @@ from dataclasses import replace
 import json
 import os
 from pathlib import Path
-
-from contextual_orchestrator import InMemoryConfigStore, ModelAgent, PriceBook, TaskOrchestrator, register_credential
-from contextual_orchestrator.model_discovery import (
-    agent_from_discovered,
-    discover_all_models,
-    refresh_price_book,
-    select_top_n_cheapest_discovered_agents,
-)
-from contextual_orchestrator.server import SecurityConfig, serve
+from typing import Any
 
 PROVIDER_CREDENTIAL_NAMES = (
     "BYTEZ_API_KEY",
@@ -32,6 +24,14 @@ PROVIDER_CREDENTIAL_NAMES = (
 )
 
 
+def _register_credential(name: str, value: str) -> None:
+    """Register one bootstrap secret through contextual-orchestrator's KV seam."""
+
+    from contextual_orchestrator import register_credential
+
+    register_credential(name, value)
+
+
 def _register_bootstrap_credentials() -> None:
     """Move all provider keys from bootstrap environment into the KV registry."""
 
@@ -39,15 +39,23 @@ def _register_bootstrap_credentials() -> None:
     for name in PROVIDER_CREDENTIAL_NAMES:
         value = os.environ.pop(name, "")
         if value:
-            register_credential(name, value)
+            _register_credential(name, value)
         else:
             missing.append(name)
     if missing:
         raise RuntimeError(f"missing provider credentials: {', '.join(missing)}")
 
 
-def _selected_agents() -> tuple[list[ModelAgent], dict[str, object]]:
+def _selected_agents() -> tuple[list[Any], dict[str, object]]:
     """Discover all providers and enable the three lowest-cost candidates."""
+
+    from contextual_orchestrator import InMemoryConfigStore, PriceBook
+    from contextual_orchestrator.model_discovery import (
+        agent_from_discovered,
+        discover_all_models,
+        refresh_price_book,
+        select_top_n_cheapest_discovered_agents,
+    )
 
     discovered, errors = discover_all_models()
     if not discovered:
@@ -78,6 +86,20 @@ def _write_report(path: Path, report: dict[str, object]) -> None:
     path.chmod(0o600)
 
 
+def _start_gateway(agents: list[Any], gateway_token: str, host: str, port: int) -> None:
+    """Construct and serve the contextual-orchestrator HTTP gateway."""
+
+    from contextual_orchestrator import TaskOrchestrator
+    from contextual_orchestrator.server import SecurityConfig, serve
+
+    serve(
+        TaskOrchestrator(agents),
+        host=host,
+        port=port,
+        security=SecurityConfig(auth_token=gateway_token),
+    )
+
+
 def main() -> None:
     """Start the authenticated gateway after provider discovery succeeds."""
 
@@ -93,14 +115,8 @@ def main() -> None:
         raise RuntimeError("CONTEXTUAL_ORCHESTRATOR_INFERENCE_TOKEN is required")
     agents, report = _selected_agents()
     _write_report(args.report, report)
-    orchestrator = TaskOrchestrator(agents)
-    serve(
-        orchestrator,
-        host=args.host,
-        port=args.port,
-        security=SecurityConfig(auth_token=gateway_token),
-    )
+    _start_gateway(agents, gateway_token, args.host, args.port)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - exercised by the workflow process
     main()

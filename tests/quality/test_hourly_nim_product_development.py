@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+import os
+import sys
 import unittest
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 WORKFLOW = Path(".github/workflows/hourly-nim-product-development.yml")
 BOOTSTRAP = Path("scripts/run_contextual_orchestrator.py")
@@ -241,6 +245,149 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             self.assertIn(token, runbook)
         self.assertIn("APA", doctoring)
         self.assertIn("Do not configure `COPILOT_GITHUB_TOKEN`", runbook)
+
+    def test_bootstrap_registers_each_provider_key_and_removes_environment_values(self) -> None:
+        """Exercise the real bootstrap loop with a key-counting KV double."""
+
+        import scripts.run_contextual_orchestrator as bootstrap
+
+        calls: list[tuple[str, str]] = []
+        fake_package = ModuleType("contextual_orchestrator")
+        fake_package.register_credential = lambda name, value: calls.append((name, value))
+        values = {name: f"test-value-{name}" for name in bootstrap.PROVIDER_CREDENTIAL_NAMES}
+        with patch.dict(sys.modules, {"contextual_orchestrator": fake_package}), patch.dict(
+            os.environ, values, clear=False
+        ):
+            bootstrap._register_bootstrap_credentials()
+            self.assertEqual(
+                calls,
+                [(name, values[name]) for name in bootstrap.PROVIDER_CREDENTIAL_NAMES],
+            )
+            for name in bootstrap.PROVIDER_CREDENTIAL_NAMES:
+                self.assertNotIn(name, os.environ)
+
+    def test_bootstrap_fails_closed_when_one_provider_key_is_missing(self) -> None:
+        """Reject incomplete provider bootstrap without silently selecting a subset."""
+
+        import scripts.run_contextual_orchestrator as bootstrap
+
+        fake_package = ModuleType("contextual_orchestrator")
+        fake_package.register_credential = lambda _name, _value: None
+        values = {
+            name: ("present" if index == 0 else "")
+            for index, name in enumerate(bootstrap.PROVIDER_CREDENTIAL_NAMES)
+        }
+        with patch.dict(sys.modules, {"contextual_orchestrator": fake_package}), patch.dict(
+            os.environ, values, clear=False
+        ):
+            with self.assertRaisesRegex(RuntimeError, "missing provider credentials"):
+                bootstrap._register_bootstrap_credentials()
+
+    def test_discovery_selection_and_empty_provider_fail_closed_paths(self) -> None:
+        """Select discovered candidates and reject a discovery result with no models."""
+
+        import scripts.run_contextual_orchestrator as bootstrap
+
+        @dataclass(frozen=True)
+        class FakeAgent:
+            """Small dataclass matching the fields changed by dataclasses.replace."""
+
+            model: str
+            priority: int = 0
+            disabled: bool = True
+
+        class FakePriceBook:
+            """Minimal price-book constructor accepted by the selection seam."""
+
+            def __init__(self, _store: object) -> None:
+                pass
+
+        sample = type("SampleModel", (), {"model_id": "model_one", "provider_name": "provider_one"})()
+        error = type("SampleError", (), {"provider_name": "provider_two"})()
+        fake_package = ModuleType("contextual_orchestrator")
+        fake_package.InMemoryConfigStore = lambda: object()
+        fake_package.PriceBook = FakePriceBook
+        fake_discovery = ModuleType("contextual_orchestrator.model_discovery")
+        fake_discovery.agent_from_discovered = lambda model, priority=0: FakeAgent(
+            model.model_id, priority=priority
+        )
+        fake_discovery.discover_all_models = lambda: ([sample], [error])
+        fake_discovery.refresh_price_book = lambda _models, _book: 1
+        fake_discovery.select_top_n_cheapest_discovered_agents = lambda models, _book, _limit: models
+        fake_modules = {
+            "contextual_orchestrator": fake_package,
+            "contextual_orchestrator.model_discovery": fake_discovery,
+        }
+        with patch.dict(sys.modules, fake_modules):
+            agents, report = bootstrap._selected_agents()
+            self.assertEqual([agent.model for agent in agents], ["model_one"])
+            self.assertFalse(agents[0].disabled)
+            self.assertEqual(report["providers_with_errors"], ["provider_two"])
+
+            fake_discovery.discover_all_models = lambda: ([], [])
+            with self.assertRaisesRegex(RuntimeError, "providers_with_errors=none"):
+                bootstrap._selected_agents()
+
+    def test_report_gateway_and_main_contract_are_executable_with_seams(self) -> None:
+        """Cover report permissions, gateway construction, and CLI orchestration."""
+
+        import tempfile
+
+        import scripts.run_contextual_orchestrator as bootstrap
+
+        class FakeOrchestrator:
+            """Capture the selected agent pool passed to the gateway runtime."""
+
+            def __init__(self, agents: list[object]) -> None:
+                self.agents = agents
+
+        class FakeSecurity:
+            """Capture the loopback bearer token passed to the HTTP server."""
+
+            def __init__(self, auth_token: str) -> None:
+                self.auth_token = auth_token
+
+        server_calls: list[tuple[object, str, int, object]] = []
+        fake_package = ModuleType("contextual_orchestrator")
+        fake_package.TaskOrchestrator = FakeOrchestrator
+        fake_server = ModuleType("contextual_orchestrator.server")
+        fake_server.SecurityConfig = FakeSecurity
+        fake_server.serve = lambda orchestrator, *, host, port, security: server_calls.append(
+            (orchestrator, host, port, security)
+        )
+        with patch.dict(
+            sys.modules,
+            {"contextual_orchestrator": fake_package, "contextual_orchestrator.server": fake_server},
+        ):
+            with tempfile.TemporaryDirectory() as tmp:
+                report_path = Path(tmp) / "nested" / "discovery.json"
+                bootstrap._write_report(report_path, {"discovered_count": 1})
+                self.assertEqual(report_path.read_text(encoding="utf-8"), '{"discovered_count": 1}\n')
+                self.assertEqual(report_path.stat().st_mode & 0o777, 0o600)
+
+            bootstrap._start_gateway(["agent"], "gateway-token", "127.0.0.1", 18000)
+            self.assertEqual(server_calls[0][0].agents, ["agent"])
+            self.assertEqual(server_calls[0][1], "127.0.0.1")
+            self.assertEqual(server_calls[0][2], 18000)
+            self.assertEqual(server_calls[0][3].auth_token, "gateway-token")
+
+        with patch.object(bootstrap, "_register_bootstrap_credentials"), patch.object(
+            bootstrap, "_selected_agents", return_value=([], {"discovered_count": 0})
+        ) as selected, patch.object(bootstrap, "_write_report") as written, patch.object(
+            bootstrap, "_start_gateway"
+        ) as started, patch.dict(
+            os.environ, {"CONTEXTUAL_ORCHESTRATOR_INFERENCE_TOKEN": "gateway-token"}, clear=False
+        ), patch.object(sys, "argv", ["run_contextual_orchestrator.py", "--report", "report.json"]):
+            bootstrap.main()
+            selected.assert_called_once_with()
+            written.assert_called_once_with(Path("report.json"), {"discovered_count": 0})
+            started.assert_called_once_with([], "gateway-token", "127.0.0.1", 18000)
+
+        with patch.object(bootstrap, "_register_bootstrap_credentials"), patch.dict(
+            os.environ, {}, clear=False
+        ), patch.object(sys, "argv", ["run_contextual_orchestrator.py", "--report", "report.json"]):
+            with self.assertRaisesRegex(RuntimeError, "INFERENCE_TOKEN is required"):
+                bootstrap.main()
 
 
 if __name__ == "__main__":
