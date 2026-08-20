@@ -152,6 +152,19 @@ pub enum PsychometricError {
     /// Equation 5 of the Eq. 1–2 carried latent mean.
     /// `τ + λ(μ_t + m x)` is not `τ + λ(μ_t + e^{a(t−u)} m x)`.
     ImpulseObservedMeanIsNotImpulseCarryObservedMean,
+    /// Driver Eq. 5 of the Eq. 3 evolved mean was treated as
+    /// Equation 5 of the time-independent predictor.
+    /// `τ + λ μ_t` is not `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)`.
+    EvolvedObservedMeanIsNotTimeIndependentObservedMean,
+    /// Driver Eq. 5 of the contemporaneous impulse was treated as
+    /// Equation 5 of the time-independent predictor.
+    /// `τ + λ(μ_t + m x)` is not `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)`.
+    ImpulseObservedMeanIsNotTimeIndependentObservedMean,
+    /// Driver Eq. 5 of the Eq. 1–2 carried latent mean was treated as
+    /// Equation 5 of the time-independent predictor.
+    /// `τ + λ(μ_t + e^{a(t−u)} m x)` is not
+    /// `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)`.
+    ImpulseCarryObservedMeanIsNotTimeIndependentObservedMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -280,6 +293,15 @@ impl fmt::Display for PsychometricError {
             }
             Self::ImpulseObservedMeanIsNotImpulseCarryObservedMean => {
                 "contemporaneous-impulse observed mean is not the impulse-carry observed mean"
+            }
+            Self::EvolvedObservedMeanIsNotTimeIndependentObservedMean => {
+                "evolved observed mean is not the time-independent-predictor observed mean"
+            }
+            Self::ImpulseObservedMeanIsNotTimeIndependentObservedMean => {
+                "contemporaneous-impulse observed mean is not the time-independent-predictor observed mean"
+            }
+            Self::ImpulseCarryObservedMeanIsNotTimeIndependentObservedMean => {
+                "impulse-carry observed mean is not the time-independent-predictor observed mean"
             }
         };
         formatter.write_str(message)
@@ -489,6 +511,18 @@ mod tests {
         assert_eq!(
             PsychometricError::ImpulseObservedMeanIsNotImpulseCarryObservedMean.to_string(),
             "contemporaneous-impulse observed mean is not the impulse-carry observed mean"
+        );
+        assert_eq!(
+            PsychometricError::EvolvedObservedMeanIsNotTimeIndependentObservedMean.to_string(),
+            "evolved observed mean is not the time-independent-predictor observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseObservedMeanIsNotTimeIndependentObservedMean.to_string(),
+            "contemporaneous-impulse observed mean is not the time-independent-predictor observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseCarryObservedMeanIsNotTimeIndependentObservedMean.to_string(),
+            "impulse-carry observed mean is not the time-independent-predictor observed mean"
         );
     }
 }
