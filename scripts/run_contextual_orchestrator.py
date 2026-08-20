@@ -13,6 +13,7 @@ from dataclasses import replace
 import json
 import os
 from pathlib import Path
+import re
 from typing import Any
 
 PROVIDER_CREDENTIAL_NAMES = (
@@ -22,6 +23,53 @@ PROVIDER_CREDENTIAL_NAMES = (
     "OPENROUTER_API_KEY",
     "OPENAI_API_KEY",
 )
+
+_MODEL_TOKEN_RE = re.compile(r"[a-z0-9]+")
+_NON_CHAT_MODEL_TOKENS = frozenset(
+    {
+        "bge",
+        "clip",
+        "dall",
+        "e5",
+        "embed",
+        "embedding",
+        "embeddings",
+        "image",
+        "images",
+        "moderation",
+        "realtime",
+        "rerank",
+        "reranker",
+        "siglip",
+        "sora",
+        "speech",
+        "transcribe",
+        "transcription",
+        "tts",
+        "whisper",
+    }
+)
+_NON_CHAT_MODEL_PREFIXES = ("embed", "moderat", "rerank", "transcrib")
+
+
+def _is_general_chat_model(model_id: object) -> bool:
+    """Keep endpoint-only and safety-only catalog rows out of chat routing."""
+    if not isinstance(model_id, str):
+        return False
+    tokens = tuple(_MODEL_TOKEN_RE.findall(model_id.casefold()))
+    if not tokens or any(
+        token in _NON_CHAT_MODEL_TOKENS
+        or token.startswith(_NON_CHAT_MODEL_PREFIXES)
+        for token in tokens
+    ):
+        return False
+    return not any(
+        token == "safety"
+        or token == "guard"
+        or token == "shieldgemma"
+        or token.startswith("nemoguard")
+        for token in tokens
+    )
 
 
 def _register_credential(name: str, value: str) -> None:
@@ -62,14 +110,23 @@ def _selected_agents() -> tuple[list[Any], dict[str, object]]:
         providers = ", ".join(sorted(error.provider_name for error in errors)) or "none"
         raise RuntimeError(f"model discovery produced no candidates; providers_with_errors={providers}")
     price_book = PriceBook(InMemoryConfigStore())
-    priced_count = refresh_price_book(discovered, price_book)
-    selected = select_top_n_cheapest_discovered_agents(discovered, price_book, 3)
+    chat_discovered = [
+        model for model in discovered if _is_general_chat_model(model.model_id)
+    ]
+    if not chat_discovered:
+        raise RuntimeError("model discovery produced no general chat candidates")
+    priced_count = refresh_price_book(chat_discovered, price_book)
+    selected = select_top_n_cheapest_discovered_agents(chat_discovered, price_book, 3)
+    if not selected:
+        raise RuntimeError("model discovery selected no general chat candidates")
     agents = [
         replace(agent_from_discovered(model, priority=3 - index), disabled=False)
         for index, model in enumerate(selected)
     ]
     report = {
         "discovered_count": len(discovered),
+        "chat_candidate_count": len(chat_discovered),
+        "excluded_non_chat_count": len(discovered) - len(chat_discovered),
         "priced_count": priced_count,
         "providers_discovered": sorted({model.provider_name for model in discovered}),
         "providers_with_errors": sorted({error.provider_name for error in errors}),
