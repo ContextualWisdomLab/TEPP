@@ -22,7 +22,6 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
-| Versioned API/export contracts | `tepp_api` | implemented-main | — | unknown-field/version/limit tests | Task 12 / PR #21; HTTP service remaining |
 | Causal-identification gate | `relation_graph` | active-PR | association ≠ cause | LeadsTo/References denied | ADR 0003; `docs/research/causal-identification-gate.md` |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
 | Purpose-bound provider payloads | `tepp_api` | implemented-main | provider-payload minimization | expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay | ADR 0009; `docs/research/provider-payload-minimization.md` |
