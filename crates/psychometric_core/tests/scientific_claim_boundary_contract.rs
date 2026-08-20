@@ -7,17 +7,21 @@ use psychometric_core::{
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
     recover_discrete_latent_mean_with_impulse_carry,
+    recover_discrete_latent_mean_with_initial_time_independent_predictor,
     recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
     recover_discrete_observed_mean, recover_discrete_observed_mean_with_impulse,
     recover_discrete_observed_mean_with_impulse_carry,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
-    recover_discrete_time_varying_predictor_effect, recover_irregular_centered_residual_log_rate,
-    recover_loading_point_estimate_mean, recover_manifest_lagged_observed_covariance,
-    recover_manifest_observed_mean, recover_manifest_observed_variance,
-    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_discrete_time_varying_predictor_effect,
+    recover_initial_time_independent_predictor_carry,
+    recover_initial_time_independent_predictor_effect,
+    recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
+    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
@@ -30,6 +34,11 @@ use psychometric_core::{
     refuse_impulse_observed_mean_as_time_independent_observed_mean,
     refuse_initial_latent_mean_as_evolved_mean,
     refuse_initial_observed_mean_as_evolved_observed_mean,
+    refuse_initial_time_independent_carry_as_initial_effect,
+    refuse_initial_time_independent_coefficient_as_initial_effect,
+    refuse_initial_time_independent_effect_as_continuous_intercept,
+    refuse_initial_time_independent_effect_as_process_increment,
+    refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_manifest_means_as_observed_mean,
     refuse_manifest_trait_variance_as_measurement_error,
@@ -762,6 +771,100 @@ fn time_independent_predictor_is_not_cint_impulse_equation_fourteen_or_coefficie
     assert_eq!(
         refuse_time_independent_coefficient_as_discrete_effect(effect, increment),
         Err(psychometric_core::PsychometricError::TimeIndependentCoefficientIsNotDiscreteEffect)
+    );
+}
+
+#[test]
+fn initial_time_independent_predictor_is_not_process_increment_cint_or_impulse() {
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let shift =
+        recover_initial_time_independent_predictor_effect(effect, predictor).expect("t0-tipred");
+    let carry = recover_initial_time_independent_predictor_carry(
+        effect,
+        predictor,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("t0-carry");
+    let increment = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("tipred");
+    let intercept_effect =
+        recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
+            .expect("cint");
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+    let evolved =
+        recover_discrete_latent_mean(1.0, drift, 0.3, delta, LagClock::EventTime).expect("mu-t");
+    let composed = recover_discrete_latent_mean_with_initial_time_independent_predictor(
+        1.0,
+        drift,
+        0.3,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-t0tipred");
+    assert!(
+        (shift - effect).abs() > 1e-3,
+        "Driver et al. (2017, Table 3 p. 13): T0TIPREDEFFECT is not t0_b z"
+    );
+    assert!(
+        (shift - increment).abs() > 1e-3,
+        "Driver et al. (2017, Table 3 / Eq. 3): t0_b z is not A^{{-1}}[e^{{A Δt}} − I] B z"
+    );
+    assert!(
+        (carry - shift).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): e^{{A Δt}} t0_b z is not t0_b z"
+    );
+    assert!(
+        (carry - increment).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): e^{{A Δt}} t0_b z is not A^{{-1}}[e^{{A Δt}} − I] B z"
+    );
+    assert!(
+        (shift - intercept_effect).abs() > 1e-3,
+        "Driver et al. (2017, Table 3): t0_b z is not CINT"
+    );
+    assert!(
+        (composed - evolved).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): μ_t is not μ_t + e^{{A Δt}} t0_b z"
+    );
+    assert_eq!(
+        refuse_initial_time_independent_effect_as_process_increment(shift, increment),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentEffectIsNotProcessIncrement
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_carry_as_initial_effect(carry, shift),
+        Err(psychometric_core::PsychometricError::InitialTimeIndependentCarryIsNotInitialEffect)
+    );
+    assert_eq!(
+        refuse_initial_time_independent_effect_as_continuous_intercept(shift, effect),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentEffectIsNotContinuousIntercept
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_effect_as_time_dependent_impulse(shift, impulse),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentEffectIsNotTimeDependentImpulse
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_coefficient_as_initial_effect(effect, shift),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentCoefficientIsNotInitialEffect
+        )
     );
 }
 

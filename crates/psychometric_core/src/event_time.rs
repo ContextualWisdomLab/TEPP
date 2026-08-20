@@ -51,7 +51,12 @@
 //! the process mean. Equation 3's second summand also
 //! maps the time-independent predictor as `A^{-1}[e^{A Δt} − I] B z`
 //! (Table 2 `TIPREDEFFECT` is `B`, not `κ`, not `M`, and not Voelkle
-//! Eq. 14). The JSS article
+//! Eq. 14). Table 3 (p. 13) names a different matrix
+//! `T0TIPREDEFFECT` for time-independent predictors on latents at
+//! `T0`. The scalar first-occasion shift is `t0_b z`. Equation 3's
+//! first summand carries that shift as `e^{A Δt} t0_b z`. That carry
+//! is not `t0_b z`, not `A^{-1}[e^{A Δt} − I] B z`, not `CINT`, and
+//! not `M x`. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -1811,6 +1816,237 @@ pub fn refuse_impulse_carry_observed_mean_as_time_independent_observed_mean(
     Err(PsychometricError::ImpulseCarryObservedMeanIsNotTimeIndependentObservedMean)
 }
 
+/// Exact scalar first-occasion time-independent predictor shift.
+///
+/// Driver, Oud, and Voelkle (2017, Table 3, p. 13; Eq. 3 first
+/// summand, p. 5; JSS PDF opened 2026-08-20T15:14Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `T0TIPREDEFFECT` the effect of time-independent predictors on
+/// latents at `T0`. Table 2 / Table 3 name `TIPREDEFFECT` `B`, which
+/// enters Equation 3 as the printed addend
+/// `A^{-1}[e^{A(t−t0)} − I] B z`. Those are not the same matrix. The
+/// scalar first-occasion shift is `t0_b z`. It is not `B`, not
+/// `A^{-1}[e^{A Δt} − I] B z`, not `κ`, and not `M x`. A zero effect
+/// or zero predictor is exactly zero. This is not a Kalman filter and
+/// not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::InvalidNumericInput`] when the effect
+/// or predictor is non-finite or the product overflows.
+pub fn recover_initial_time_independent_predictor_effect(
+    initial_time_independent_effect: f64,
+    time_independent_predictor: f64,
+) -> Result<f64, PsychometricError> {
+    if !initial_time_independent_effect.is_finite() || !time_independent_predictor.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_time_independent_effect == 0.0 || time_independent_predictor == 0.0 {
+        return Ok(0.0);
+    }
+    require_finite(initial_time_independent_effect * time_independent_predictor)
+}
+
+/// Exact scalar carried first-occasion time-independent predictor.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; Table 3, p. 13; JSS
+/// PDF opened 2026-08-20T15:14Z) write the first summand as
+/// `e^{A(t−t0)} η_i(t0)`. A Table 3 `T0TIPREDEFFECT` shift that is
+/// already in `η(t0)` therefore appears at `t` as `e^{A Δt} t0_b z`.
+/// Form `t0_b z` first, then `e^{a Δt} t0_b z`. A zero drift is
+/// `t0_b z` with no dissipation of the first-occasion shift. Binary64
+/// underflow of `e^{a Δt}` to `+0` is a vanishing carry of that
+/// shift and is kept. This carry is not the first-occasion shift, not
+/// `A^{-1}[e^{A Δt} − I] B z` (`TIPREDEFFECT`), not `CINT`, and not
+/// `M x`. When `exp` overflows at a finite `a Δt`, rewrite as
+/// `sign(t0_b z) exp(ln|t0_b z| + a Δt)`. An overflowing rewrite
+/// fails closed. This is not a Kalman filter and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::NonPositiveInterval`] when
+/// `event_delta` is not strictly positive, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite or the mapped carry overflows.
+pub fn recover_initial_time_independent_predictor_carry(
+    initial_time_independent_effect: f64,
+    time_independent_predictor: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let initial_shift = recover_initial_time_independent_predictor_effect(
+        initial_time_independent_effect,
+        time_independent_predictor,
+    )?;
+    if initial_shift == 0.0 {
+        return Ok(0.0);
+    }
+    let drift_interval = log_rate * event_delta;
+    let auto_effect = drift_interval.exp();
+    if auto_effect.is_finite() {
+        // +0 underflow is a vanishing carry of the T0 shift.
+        return require_finite(auto_effect * initial_shift);
+    }
+    if !drift_interval.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // Finite a Δt, overflowed exp.
+    // e^{a Δt} t0_b z = sign(t0_b z) exp(ln|t0_b z| + a Δt).
+    require_finite(initial_shift.signum() * (initial_shift.abs().ln() + drift_interval).exp())
+}
+
+/// Exact scalar evolved latent mean plus a first-occasion TI predictor.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; Table 3, p. 13) write
+/// the first summand as the carried `T0MEANS`, which includes any
+/// `T0TIPREDEFFECT` shift already in `η(t0)`. Form `μ_t` first, then
+/// add `e^{a Δt} t0_b z`. A zero carry is exactly `μ_t`. A zero
+/// evolved mean is exactly the carry. Adding `t0_b z` without the
+/// exponential is not this composition when `a Δt ≠ 0`. Adding
+/// `A^{-1}[e^{A Δt} − I] B z` is not this composition.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_latent_mean`] and
+/// [`recover_initial_time_independent_predictor_carry`], and returns
+/// [`PsychometricError::InvalidNumericInput`] when the sum overflows.
+#[allow(clippy::too_many_arguments)]
+pub fn recover_discrete_latent_mean_with_initial_time_independent_predictor(
+    initial_latent_mean: f64,
+    log_rate: f64,
+    continuous_intercept: f64,
+    initial_time_independent_effect: f64,
+    time_independent_predictor: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let evolved_latent_mean = recover_discrete_latent_mean(
+        initial_latent_mean,
+        log_rate,
+        continuous_intercept,
+        event_delta,
+        clock,
+    )?;
+    let initial_carry = recover_initial_time_independent_predictor_carry(
+        initial_time_independent_effect,
+        time_independent_predictor,
+        log_rate,
+        event_delta,
+        clock,
+    )?;
+    if initial_carry == 0.0 {
+        return Ok(evolved_latent_mean);
+    }
+    if evolved_latent_mean == 0.0 {
+        return Ok(initial_carry);
+    }
+    require_finite(evolved_latent_mean + initial_carry)
+}
+
+/// Refuse treating the Table 3 first-occasion shift as the Eq. 3
+/// process increment.
+///
+/// `T0TIPREDEFFECT` shifts `η(t0)`. `TIPREDEFFECT` `B` enters the
+/// SDE and maps as `A^{-1}[e^{A Δt} − I] B z`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentEffectIsNotProcessIncrement`].
+pub fn refuse_initial_time_independent_effect_as_process_increment(
+    initial_time_independent_effect: f64,
+    time_independent_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_time_independent_effect, time_independent_increment);
+    Err(PsychometricError::InitialTimeIndependentEffectIsNotProcessIncrement)
+}
+
+/// Refuse treating the Eq. 3 carry of `T0TIPREDEFFECT` as the
+/// first-occasion shift.
+///
+/// `e^{A Δt} t0_b z` is the first summand's contribution at `t`.
+/// `t0_b z` is the shift at `T0`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentCarryIsNotInitialEffect`].
+pub fn refuse_initial_time_independent_carry_as_initial_effect(
+    initial_time_independent_carry: f64,
+    initial_time_independent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_time_independent_carry,
+        initial_time_independent_effect,
+    );
+    Err(PsychometricError::InitialTimeIndependentCarryIsNotInitialEffect)
+}
+
+/// Refuse treating the Table 3 first-occasion shift as `CINT`.
+///
+/// `t0_b z` is an initial-mean shift. `κ` is the continuous intercept.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentEffectIsNotContinuousIntercept`].
+pub fn refuse_initial_time_independent_effect_as_continuous_intercept(
+    initial_time_independent_effect: f64,
+    continuous_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_time_independent_effect, continuous_intercept);
+    Err(PsychometricError::InitialTimeIndependentEffectIsNotContinuousIntercept)
+}
+
+/// Refuse treating the Table 3 first-occasion shift as `M x`.
+///
+/// The product `t0_b z` is algebraically a product, as is `M x`.
+/// Table 3 names `T0TIPREDEFFECT` for `T0`. Table 2 names `M`
+/// `TDPREDEFFECT` for the Dirac impulse.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentEffectIsNotTimeDependentImpulse`].
+pub fn refuse_initial_time_independent_effect_as_time_dependent_impulse(
+    initial_time_independent_effect: f64,
+    time_dependent_impulse: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_time_independent_effect, time_dependent_impulse);
+    Err(PsychometricError::InitialTimeIndependentEffectIsNotTimeDependentImpulse)
+}
+
+/// Refuse treating Driver Table 3 `T0TIPREDEFFECT` as the
+/// first-occasion shift.
+///
+/// `T0TIPREDEFFECT` is the coefficient. The shift is `t0_b z`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentCoefficientIsNotInitialEffect`].
+pub fn refuse_initial_time_independent_coefficient_as_initial_effect(
+    initial_time_independent_coefficient: f64,
+    initial_time_independent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_time_independent_coefficient,
+        initial_time_independent_effect,
+    );
+    Err(PsychometricError::InitialTimeIndependentCoefficientIsNotInitialEffect)
+}
+
 /// Exact scalar within-interval time-dependent impulse carry from
 /// Driver Equations 1–2.
 ///
@@ -2380,6 +2616,7 @@ mod tests {
         recover_discrete_lag_one, recover_discrete_lagged_latent_covariance,
         recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
         recover_discrete_latent_mean_with_impulse_carry,
+        recover_discrete_latent_mean_with_initial_time_independent_predictor,
         recover_discrete_latent_mean_with_time_independent_predictor,
         recover_discrete_latent_variance, recover_discrete_observed_mean,
         recover_discrete_observed_mean_with_impulse,
@@ -2387,13 +2624,15 @@ mod tests {
         recover_discrete_observed_mean_with_time_independent_predictor,
         recover_discrete_process_noise, recover_discrete_time_independent_predictor_effect,
         recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-        recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
-        recover_local_log_rate, recover_manifest_lagged_observed_covariance,
-        recover_manifest_observed_mean, recover_manifest_observed_variance,
-        recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate,
+        recover_event_time_discrete_lag_and_log_rate,
+        recover_initial_time_independent_predictor_carry,
+        recover_initial_time_independent_predictor_effect,
+        recover_irregular_centered_residual_log_rate, recover_local_log_rate,
+        recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+        recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+        recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
+        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -2406,6 +2645,11 @@ mod tests {
         refuse_impulse_observed_mean_as_time_independent_observed_mean,
         refuse_initial_latent_mean_as_evolved_mean,
         refuse_initial_observed_mean_as_evolved_observed_mean,
+        refuse_initial_time_independent_carry_as_initial_effect,
+        refuse_initial_time_independent_coefficient_as_initial_effect,
+        refuse_initial_time_independent_effect_as_continuous_intercept,
+        refuse_initial_time_independent_effect_as_process_increment,
+        refuse_initial_time_independent_effect_as_time_dependent_impulse,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
         refuse_manifest_means_as_observed_mean,
@@ -6006,6 +6250,264 @@ mod tests {
                 1e308,
                 1.0,
                 2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn initial_time_independent_predictor_recovers_table_three_t0_shift_and_carry() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let shift = recover_initial_time_independent_predictor_effect(effect, predictor)
+            .expect("t0-tipred");
+        assert!((shift - 1.2).abs() < 1e-15);
+        assert_eq!(
+            recover_initial_time_independent_predictor_effect(0.0, predictor),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_effect(effect, 0.0),
+            Ok(0.0)
+        );
+        let carry = recover_initial_time_independent_predictor_carry(
+            effect,
+            predictor,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("t0-carry");
+        let expected = 1.2 * (drift * delta).exp();
+        assert!((carry - expected).abs() < 1e-15);
+        let zero_drift = recover_initial_time_independent_predictor_carry(
+            effect,
+            predictor,
+            0.0,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("zero-drift");
+        assert!((zero_drift - 1.2).abs() < 1e-15);
+        let vanished = recover_initial_time_independent_predictor_carry(
+            effect,
+            predictor,
+            -800.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("underflow");
+        assert_eq!(vanished.to_bits(), 0.0_f64.to_bits());
+        let increment = recover_discrete_time_independent_predictor_effect(
+            effect,
+            predictor,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("tipred");
+        let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+        assert!((carry - shift).abs() > 1e-3);
+        assert!((carry - increment).abs() > 1e-3);
+        assert!((shift - increment).abs() > 1e-3);
+        assert!((shift - effect).abs() > 1e-3);
+        // Algebraically a product, like M x, but Table 3 names a different matrix.
+        assert!((shift - impulse).abs() < 1e-15);
+    }
+
+    #[test]
+    fn initial_time_independent_predictor_composes_evolved_mean_and_keeps_scale() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let carry = recover_initial_time_independent_predictor_carry(
+            effect,
+            predictor,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("t0-carry");
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let composed = recover_discrete_latent_mean_with_initial_time_independent_predictor(
+            initial,
+            drift,
+            intercept,
+            effect,
+            predictor,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq3-t0tipred");
+        let evolved =
+            recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+                .expect("mu-t");
+        assert!((composed - (evolved + carry)).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_time_independent_predictor(
+                initial,
+                drift,
+                intercept,
+                0.0,
+                predictor,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(evolved)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_time_independent_predictor(
+                0.0,
+                drift,
+                0.0,
+                effect,
+                predictor,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(carry)
+        );
+        let scaled = recover_initial_time_independent_predictor_carry(
+            1e308,
+            1e-308,
+            0.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("scale");
+        assert!((scaled - 1.0).abs() < 1e-15);
+        let rewritten = recover_initial_time_independent_predictor_carry(
+            2.0,
+            0.5,
+            710.0,
+            1.0,
+            LagClock::EventTime,
+        );
+        assert_eq!(rewritten, Err(PsychometricError::InvalidNumericInput));
+        let finite_rewrite = recover_initial_time_independent_predictor_carry(
+            1e-308,
+            1.0,
+            700.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("log-rewrite");
+        let expected_rewrite = (1e-308_f64.ln() + 700.0).exp();
+        assert!((finite_rewrite - expected_rewrite).abs() / expected_rewrite < 1e-12);
+    }
+
+    #[test]
+    fn initial_time_independent_predictor_refuses_process_increment_cint_impulse_and_coefficient() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let shift = recover_initial_time_independent_predictor_effect(effect, predictor)
+            .expect("t0-tipred");
+        let carry = recover_initial_time_independent_predictor_carry(
+            effect,
+            predictor,
+            -0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("t0-carry");
+        let increment = recover_discrete_time_independent_predictor_effect(
+            effect,
+            predictor,
+            -0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("tipred");
+        let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+        assert_eq!(
+            refuse_initial_time_independent_effect_as_process_increment(shift, increment),
+            Err(PsychometricError::InitialTimeIndependentEffectIsNotProcessIncrement)
+        );
+        assert_eq!(
+            refuse_initial_time_independent_carry_as_initial_effect(carry, shift),
+            Err(PsychometricError::InitialTimeIndependentCarryIsNotInitialEffect)
+        );
+        assert_eq!(
+            refuse_initial_time_independent_effect_as_continuous_intercept(shift, 0.4),
+            Err(PsychometricError::InitialTimeIndependentEffectIsNotContinuousIntercept)
+        );
+        assert_eq!(
+            refuse_initial_time_independent_effect_as_time_dependent_impulse(shift, impulse),
+            Err(PsychometricError::InitialTimeIndependentEffectIsNotTimeDependentImpulse)
+        );
+        assert_eq!(
+            refuse_initial_time_independent_coefficient_as_initial_effect(effect, shift),
+            Err(PsychometricError::InitialTimeIndependentCoefficientIsNotInitialEffect)
+        );
+    }
+
+    #[test]
+    fn initial_time_independent_predictor_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_initial_time_independent_predictor_effect(f64::NAN, 1.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_effect(1.0, f64::INFINITY),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_effect(1e308, 2.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_carry(
+                0.4,
+                3.0,
+                f64::NAN,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_carry(
+                0.4,
+                3.0,
+                -0.5,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_carry(
+                0.4,
+                3.0,
+                -0.5,
+                2.0,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_time_independent_predictor(
+                1e308,
+                0.0,
+                0.0,
+                1e308,
+                1.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_carry(
+                1.0,
+                1.0,
+                f64::INFINITY,
                 1.0,
                 LagClock::EventTime
             ),
