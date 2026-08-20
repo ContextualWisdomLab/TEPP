@@ -261,10 +261,11 @@ pub(crate) fn status_for(error: OrchestratorLiveError) -> (u16, &'static str) {
 #[cfg(test)]
 mod tests {
     use super::{
-        declared_content_length, header_is_credential, map_io_error, parse_request_line,
-        split_header_line, split_request, status_for,
+        declared_content_length, header_is_credential, map_io_error, parse_headers,
+        parse_request_line, refuse_live_headers, split_header_line, split_request, status_for,
     };
     use crate::error::OrchestratorLiveError;
+    use std::collections::HashMap;
     use std::io::ErrorKind;
 
     #[test]
@@ -364,5 +365,62 @@ mod tests {
         assert!(header_is_credential("Authorization"));
         assert!(header_is_credential("x-github-token"));
         assert!(!header_is_credential("host"));
+    }
+
+    #[test]
+    fn helpers_cover_short_circuit_and_transport_edges() {
+        assert_eq!(
+            parse_request_line("POST relative HTTP/1.1"),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        assert_eq!(
+            declared_content_length("POST /x HTTP/1.1\r\nmalformed\r\ncontent-length: 0\r\n\r\n"),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        assert_eq!(
+            declared_content_length("POST /x HTTP/1.1\r\ncontent-length:\r\n\r\n"),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_headers(["malformed"].into_iter()),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_headers(["Bad\u{0001}Name: value"].into_iter()),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+
+        let mut missing = HashMap::new();
+        assert_eq!(
+            refuse_live_headers(&missing),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        missing.insert("host".into(), "127.0.0.1".into());
+        assert_eq!(
+            refuse_live_headers(&missing),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        missing.insert("content-type".into(), "application/json".into());
+        assert_eq!(
+            refuse_live_headers(&missing),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        missing.insert("tepp-consumer".into(), "contextual-orchestrator".into());
+        assert_eq!(
+            refuse_live_headers(&missing),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        missing.insert("tepp-contract-version".into(), "1".into());
+        assert_eq!(
+            refuse_live_headers(&missing),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        missing.insert("idempotency-key".into(), "idem".into());
+        refuse_live_headers(&missing).expect("complete headers");
+
+        assert!(header_is_credential("x-github"));
+        assert!(header_is_credential("x-copilot"));
+        assert!(header_is_credential("x-nvidia_nim_api_key"));
+        assert!(!header_is_credential("x-safe-header"));
     }
 }

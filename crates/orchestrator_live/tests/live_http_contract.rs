@@ -56,6 +56,21 @@ fn interpretation_http(request: &InterpretationRunRequest) -> String {
     )
 }
 
+fn serve_once(payload: &[u8]) -> orchestrator_live::OrchestratorLiveResponse {
+    let mut service = OrchestratorLiveService::bind_loopback().expect("bind");
+    let address = service.local_addr().expect("address");
+    let worker = thread::spawn(move || service.serve_one());
+    let mut stream = TcpStream::connect(address).expect("connect");
+    stream.write_all(payload).expect("write");
+    let mut received = String::new();
+    match stream.read_to_string(&mut received) {
+        Ok(_) => assert!(!received.is_empty()),
+        Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {}
+        Err(error) => panic!("read: {error}"),
+    }
+    worker.join().expect("join").expect("serve")
+}
+
 fn error_code(body: &str) -> String {
     let value: serde_json::Value = serde_json::from_str(body).expect("envelope");
     value["error_code"].as_str().expect("error_code").to_owned()
@@ -203,6 +218,21 @@ fn handle_http_refuses_methods_paths_and_table_hosts() {
                 INTERPRETATION_RUN_PATH,
                 &headers,
                 &body
+            ))
+            .status_code,
+        400
+    );
+    let over_budget = body.replace(
+        "\"compute_budget_tokens\":2048",
+        "\"compute_budget_tokens\":1000001",
+    );
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "POST",
+                INTERPRETATION_RUN_PATH,
+                &headers,
+                &over_budget,
             ))
             .status_code,
         400
@@ -415,6 +445,255 @@ fn handle_http_refuses_malformed_framing_and_header_limits() {
 }
 
 #[test]
+fn public_contract_covers_library_parser_short_circuits() {
+    let mut service = OrchestratorLiveService::new();
+    let request = sample_request();
+    let body = request.to_json().expect("json");
+    let headers = orchestrator_headers(request.idempotency_key());
+
+    assert_eq!(
+        service
+            .handle_http_request(&http_request("POST", "relative", &headers, &body))
+            .status_code,
+        400
+    );
+    let zero_budget = body.replace(
+        "\"compute_budget_tokens\":2048",
+        "\"compute_budget_tokens\":0",
+    );
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "POST",
+                INTERPRETATION_RUN_PATH,
+                &headers,
+                &zero_budget,
+            ))
+            .status_code,
+        400
+    );
+
+    let no_length = format!("POST {INTERPRETATION_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+    assert_eq!(service.handle_http_request(&no_length).status_code, 400);
+    let empty_length = format!(
+        "POST {INTERPRETATION_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length:\r\n\r\n"
+    );
+    assert_eq!(service.handle_http_request(&empty_length).status_code, 400);
+    let duplicate_length = format!(
+        "POST {INTERPRETATION_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length: 0\r\ncontent-length: 0\r\n\r\n"
+    );
+    assert_eq!(
+        service.handle_http_request(&duplicate_length).status_code,
+        400
+    );
+    let invalid_length = format!(
+        "POST {INTERPRETATION_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length: +1\r\n\r\n"
+    );
+    assert_eq!(
+        service.handle_http_request(&invalid_length).status_code,
+        400
+    );
+
+    let duplicate_header = http_request(
+        "POST",
+        INTERPRETATION_RUN_PATH,
+        &[
+            ("Host".into(), "127.0.0.1".into()),
+            ("Host".into(), "127.0.0.1".into()),
+            ("content-type".into(), "application/json".into()),
+            ("tepp-consumer".into(), "contextual-orchestrator".into()),
+            ("tepp-contract-version".into(), "1".into()),
+            ("idempotency-key".into(), request.idempotency_key().into()),
+        ],
+        &body,
+    );
+    assert_eq!(
+        service.handle_http_request(&duplicate_header).status_code,
+        400
+    );
+    let control_header = http_request(
+        "POST",
+        INTERPRETATION_RUN_PATH,
+        &[
+            ("Host".into(), "127.0.0.1".into()),
+            ("Bad\u{0001}Name".into(), "value".into()),
+        ],
+        &body,
+    );
+    assert_eq!(
+        service.handle_http_request(&control_header).status_code,
+        400
+    );
+
+    for credential_header in ["x-github", "x-copilot"] {
+        let mut credential_headers = headers.clone();
+        credential_headers.push((credential_header.into(), "value".into()));
+        assert_eq!(
+            service
+                .handle_http_request(&http_request(
+                    "POST",
+                    INTERPRETATION_RUN_PATH,
+                    &credential_headers,
+                    &body,
+                ))
+                .status_code,
+            403
+        );
+    }
+}
+
+#[test]
+fn public_contract_covers_accepted_validation() {
+    assert_eq!(
+        InterpretationRunAccepted::from_json(
+            r#"{"contract_version":1,"interpretation_run_id":"r","orchestration_mode":"direct","claim_status":"hypothetical","scientific_authority":true,"idempotency_key":"i"}"#
+        )
+        .expect_err("authority"),
+        OrchestratorLiveError::ScientificAuthorityRefused
+    );
+    assert_eq!(
+        InterpretationRunAccepted::from_json(
+            r#"{"contract_version":1,"interpretation_run_id":"r","orchestration_mode":"direct","claim_status":"accepted","scientific_authority":false,"idempotency_key":"i"}"#
+        )
+        .expect_err("claim"),
+        OrchestratorLiveError::ScientificAuthorityRefused
+    );
+    assert_eq!(
+        InterpretationRunAccepted::new(" ", OrchestrationMode::Direct, "i").expect_err("id"),
+        OrchestratorLiveError::InvalidWirePayload
+    );
+    assert_eq!(
+        InterpretationRunAccepted::from_json(&"x".repeat(DEFAULT_INTERPRETATION_BYTE_LIMIT + 1))
+            .expect_err("limit"),
+        OrchestratorLiveError::LimitExceeded
+    );
+}
+
+#[test]
+fn public_contract_covers_request_validation_edges() {
+    let request = sample_request();
+    let body = request.to_json().expect("json");
+    let mut value: serde_json::Value = serde_json::from_str(&body).expect("value");
+
+    value["evidence_span_ids"] = serde_json::json!([]);
+    assert_eq!(
+        InterpretationRunRequest::from_json(&value.to_string()).expect_err("empty spans"),
+        OrchestratorLiveError::InvalidWirePayload
+    );
+    value["evidence_span_ids"] = serde_json::json!(vec!["span"; 33]);
+    assert_eq!(
+        InterpretationRunRequest::from_json(&value.to_string()).expect_err("many spans"),
+        OrchestratorLiveError::InvalidWirePayload
+    );
+
+    for snapshot_id in [
+        "postgres://db",
+        "jdbc://db",
+        "127.0.0.1/sql",
+        "127.0.0.1/tables/document_record",
+        "bad'host",
+        "bad;host",
+        "bad\\host",
+        "bad host",
+        "bad\\u0001host",
+    ] {
+        value["evidence_span_ids"] = serde_json::json!(["span"]);
+        value["snapshot_id"] = serde_json::Value::String(snapshot_id.into());
+        assert_eq!(
+            InterpretationRunRequest::from_json(&value.to_string()).expect_err("table label"),
+            OrchestratorLiveError::InvalidWirePayload,
+            "snapshot_id={snapshot_id}"
+        );
+    }
+}
+
+#[test]
+fn public_contract_covers_http_path_and_header_edges() {
+    let mut service = OrchestratorLiveService::new();
+    let request = sample_request();
+    let body = request.to_json().expect("json");
+    let headers = orchestrator_headers(request.idempotency_key());
+
+    for path in [
+        "/v1/interpretation-runs#fragment",
+        "https://tepp.example/v1/interpretation-runs",
+        "/v1/interpretation-runs://reserved",
+    ] {
+        assert_eq!(
+            service
+                .handle_http_request(&http_request("POST", path, &headers, &body))
+                .status_code,
+            400,
+            "path={path}"
+        );
+    }
+    let extra_request_line = format!(
+        "POST {INTERPRETATION_RUN_PATH} HTTP/1.1 extra\r\nHost: 127.0.0.1\r\ncontent-length: 0\r\n\r\n"
+    );
+    assert_eq!(
+        service.handle_http_request(&extra_request_line).status_code,
+        400
+    );
+    let missing_path = "POST\r\nHost: 127.0.0.1\r\ncontent-length: 0\r\n\r\n";
+    assert_eq!(service.handle_http_request(missing_path).status_code, 400);
+    let no_delimiter_limit = "x".repeat(LIVE_HEADER_BYTE_LIMIT);
+    assert_eq!(
+        service.handle_http_request(&no_delimiter_limit).status_code,
+        413
+    );
+    for header_line in ["malformed", ": empty-name"] {
+        let malformed = format!(
+            "POST {INTERPRETATION_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\n{header_line}\r\ncontent-length: 0\r\n\r\n"
+        );
+        assert_eq!(service.handle_http_request(&malformed).status_code, 400);
+    }
+    let whitespace_name = format!(
+        "POST {INTERPRETATION_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\nBad Name: value\r\ncontent-length: 0\r\n\r\n"
+    );
+    assert_eq!(
+        service.handle_http_request(&whitespace_name).status_code,
+        400
+    );
+    for credential_header in ["cookie", "x-api-key", "x-nvidia_nim_api_key"] {
+        let mut credential_headers = headers.clone();
+        credential_headers.push((credential_header.into(), "value".into()));
+        assert_eq!(
+            service
+                .handle_http_request(&http_request(
+                    "POST",
+                    INTERPRETATION_RUN_PATH,
+                    &credential_headers,
+                    &body,
+                ))
+                .status_code,
+            403,
+            "header={credential_header}"
+        );
+    }
+}
+
+#[test]
+fn serve_one_covers_stream_framing_limits() {
+    let request = sample_request();
+    let zero_body = http_request(
+        "POST",
+        INTERPRETATION_RUN_PATH,
+        &orchestrator_headers(request.idempotency_key()),
+        "",
+    );
+    assert_eq!(serve_once(zero_body.as_bytes()).status_code, 400);
+
+    let oversized_header = vec![b'x'; LIVE_HEADER_BYTE_LIMIT + 1];
+    assert_eq!(serve_once(&oversized_header).status_code, 413);
+
+    let huge_length = format!(
+        "POST {INTERPRETATION_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length: {}\r\n\r\n",
+        DEFAULT_INTERPRETATION_BYTE_LIMIT + 1
+    );
+    assert_eq!(serve_once(huge_length.as_bytes()).status_code, 413);
+}
+
+#[test]
 fn read_http_request_covers_transport_and_limit_errors() {
     assert_eq!(
         OrchestratorLiveService::read_http_request(&mut Cursor::new(Vec::<u8>::new()))
@@ -432,6 +711,12 @@ fn read_http_request_covers_transport_and_limit_errors() {
     let oversized = vec![b'x'; LIVE_HEADER_BYTE_LIMIT + 1];
     assert_eq!(
         OrchestratorLiveService::read_http_request(&mut Cursor::new(oversized)).expect_err("limit"),
+        OrchestratorLiveError::LimitExceeded
+    );
+    let oversized_slice = vec![b'x'; LIVE_HEADER_BYTE_LIMIT + 1];
+    assert_eq!(
+        OrchestratorLiveService::read_http_request(&mut Cursor::new(oversized_slice.as_slice()))
+            .expect_err("slice limit"),
         OrchestratorLiveError::LimitExceeded
     );
 
@@ -483,11 +768,57 @@ fn read_http_request_covers_transport_and_limit_errors() {
 
     let zero = b"POST /v1/interpretation-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: contextual-orchestrator\r\ntepp-contract-version: 1\r\nidempotency-key: k\r\ncontent-length: 0\r\n\r\n";
     assert!(OrchestratorLiveService::read_http_request(&mut Cursor::new(zero.as_slice())).is_ok());
+    assert!(OrchestratorLiveService::read_http_request(&mut Cursor::new(zero.to_vec())).is_ok());
 
     let truncated = b"POST /v1/interpretation-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: contextual-orchestrator\r\ntepp-contract-version: 1\r\nidempotency-key: k\r\ncontent-length: 4\r\n\r\nab";
     assert_eq!(
         OrchestratorLiveService::read_http_request(&mut Cursor::new(truncated.as_slice()))
             .expect_err("short body"),
+        OrchestratorLiveError::InvalidWirePayload
+    );
+}
+
+#[test]
+fn read_http_request_covers_slice_reader_edges() {
+    assert_eq!(
+        OrchestratorLiveService::read_http_request(&mut Cursor::new([].as_slice()))
+            .expect_err("empty slice"),
+        OrchestratorLiveError::InvalidWirePayload
+    );
+    let oversized = vec![b'x'; LIVE_HEADER_BYTE_LIMIT + 1];
+    assert_eq!(
+        OrchestratorLiveService::read_http_request(&mut Cursor::new(oversized.as_slice()))
+            .expect_err("oversized slice"),
+        OrchestratorLiveError::LimitExceeded
+    );
+    let huge_length = format!(
+        "POST {INTERPRETATION_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length: {}\r\n\r\n",
+        DEFAULT_INTERPRETATION_BYTE_LIMIT + 1
+    );
+    assert_eq!(
+        OrchestratorLiveService::read_http_request(&mut Cursor::new(huge_length.as_bytes()))
+            .expect_err("huge length slice"),
+        OrchestratorLiveError::LimitExceeded
+    );
+    let mut invalid_header = b"POST /v1/interpretation-runs HTTP/1.1\r\n".to_vec();
+    invalid_header.push(0xff);
+    invalid_header.extend_from_slice(b"\r\n\r\n");
+    assert_eq!(
+        OrchestratorLiveService::read_http_request(&mut Cursor::new(invalid_header.as_slice()))
+            .expect_err("header utf8 slice"),
+        OrchestratorLiveError::InvalidWirePayload
+    );
+    let invalid_body = b"POST /v1/interpretation-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length: 1\r\n\r\n\xff";
+    assert_eq!(
+        OrchestratorLiveService::read_http_request(&mut Cursor::new(invalid_body.as_slice()))
+            .expect_err("body utf8 slice"),
+        OrchestratorLiveError::InvalidWirePayload
+    );
+    let truncated =
+        b"POST /v1/interpretation-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length: 2\r\n\r\na";
+    assert_eq!(
+        OrchestratorLiveService::read_http_request(&mut Cursor::new(truncated.as_slice()))
+            .expect_err("truncated slice"),
         OrchestratorLiveError::InvalidWirePayload
     );
 }

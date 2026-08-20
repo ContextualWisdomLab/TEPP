@@ -440,6 +440,25 @@ mod tests {
     }
 
     #[test]
+    fn request_constructor_rejects_unsupported_version() {
+        assert_eq!(
+            InterpretationRunRequest::new(
+                0,
+                "i",
+                "t",
+                "s",
+                "k",
+                OrchestrationMode::Direct,
+                1,
+                vec!["span".into()],
+                false,
+            )
+            .expect_err("version"),
+            OrchestratorLiveError::UnsupportedContractVersion
+        );
+    }
+
+    #[test]
     fn accepted_and_wire_helpers_cover_failure_arms() {
         assert_eq!(
             InterpretationRunAccepted::from_json(
