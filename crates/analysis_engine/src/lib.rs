@@ -165,17 +165,13 @@ impl AnalysisArtifact {
 
     /// Return the lowercase SHA-256 digest of the canonical artifact JSON.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics only if the fixed `Serialize` implementation for this artifact's
-    /// string and integer fields violates the `serde_json` serializer contract.
-    #[must_use]
-    pub fn sha256(&self) -> String {
-        let bytes = self
-            .to_json()
-            .expect("analysis artifact fields must be JSON-serializable")
-            .into_bytes();
-        format_digest(Sha256::digest(bytes))
+    /// Returns [`AnalysisEngineError::SerializationFailure`] if serialization
+    /// unexpectedly fails.
+    pub fn sha256(&self) -> Result<String, AnalysisEngineError> {
+        self.to_json()
+            .map(|json| format_digest(Sha256::digest(json.into_bytes())))
     }
 }
 
@@ -307,26 +303,28 @@ pub fn execute_analysis_run(
         earliest_event_time: earliest.to_rfc3339(),
         latest_event_time: latest.to_rfc3339(),
     };
-    let digest = artifact.sha256();
-    let artifact_id = format!("analysis_artifact_{}", &digest[..16]);
-    let summary = AnalysisResultSummary {
-        analysis_family: "temporal_evidence_readiness".to_owned(),
-        evidence_count: eligible_evidence_count,
-        statistic_count: ANALYSIS_STATISTIC_COUNT,
-        validation_status: "validated".to_owned(),
-    };
-    let terminal_result = AnalysisRunTerminalResult::succeeded(
-        request,
-        accepted,
-        artifact_id,
-        digest,
-        ANALYSIS_ARTIFACT_SCHEMA_VERSION,
-        completed_at,
-        summary,
-    )?;
-    Ok(AnalysisExecution {
-        artifact: Some(artifact),
-        terminal_result,
+    artifact.sha256().and_then(move |digest| {
+        let artifact_id = format!("analysis_artifact_{}", &digest[..16]);
+        let summary = AnalysisResultSummary {
+            analysis_family: "temporal_evidence_readiness".to_owned(),
+            evidence_count: eligible_evidence_count,
+            statistic_count: ANALYSIS_STATISTIC_COUNT,
+            validation_status: "validated".to_owned(),
+        };
+        AnalysisRunTerminalResult::succeeded(
+            request,
+            accepted,
+            artifact_id,
+            digest,
+            ANALYSIS_ARTIFACT_SCHEMA_VERSION,
+            completed_at,
+            summary,
+        )
+        .map_err(AnalysisEngineError::from)
+        .map(|terminal_result| AnalysisExecution {
+            artifact: Some(artifact),
+            terminal_result,
+        })
     })
 }
 
