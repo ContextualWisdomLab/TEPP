@@ -19,6 +19,8 @@ pub enum MembershipError {
     UnknownMembershipRole,
     /// A duplicate assignment key was rejected by the membership network.
     DuplicateMembershipAssignment,
+    /// An estimator collapsed multiple active memberships into one row.
+    AtomisticCollapseRefused,
 }
 
 impl fmt::Display for MembershipError {
@@ -30,6 +32,7 @@ impl fmt::Display for MembershipError {
             Self::UnsupportedWireVersion => "unsupported membership wire version",
             Self::UnknownMembershipRole => "unknown membership role",
             Self::DuplicateMembershipAssignment => "duplicate membership assignment",
+            Self::AtomisticCollapseRefused => "atomistic membership collapse refused",
         };
         formatter.write_str(message)
     }
@@ -67,6 +70,10 @@ mod tests {
             (
                 MembershipError::DuplicateMembershipAssignment,
                 "duplicate membership assignment",
+            ),
+            (
+                MembershipError::AtomisticCollapseRefused,
+                "atomistic membership collapse refused",
             ),
         ] {
             assert_eq!(error.to_string(), message);

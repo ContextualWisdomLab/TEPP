@@ -48,6 +48,31 @@ impl MembershipNetwork {
         self.assignments.len()
     }
 
+    /// Emit one estimation row per active assignment at `instant`.
+    ///
+    /// Cross-classified and multiple-membership structure is preserved. Callers
+    /// must not collapse these rows into a single independent observation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MembershipError::InvalidWirePayload`] when the member has no
+    /// active assignment at `instant`.
+    pub fn estimation_rows_at(
+        &self,
+        member_id: MemberId,
+        instant: EventTime,
+    ) -> Result<Vec<EstimationMembershipRow>, MembershipError> {
+        let rows: Vec<EstimationMembershipRow> = self
+            .active_memberships_for(member_id, instant)
+            .into_iter()
+            .map(EstimationMembershipRow::from_assignment)
+            .collect();
+        if rows.is_empty() {
+            return Err(MembershipError::InvalidWirePayload);
+        }
+        Ok(rows)
+    }
+
     /// Iterate all assignments.
     pub fn assignments(&self) -> impl Iterator<Item = MembershipAssignment> + '_ {
         self.assignments.iter().copied()
@@ -97,10 +122,91 @@ impl MembershipNetwork {
     }
 }
 
+/// One multilevel estimation row; never a collapsed independent observation.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EstimationMembershipRow {
+    member_id: MemberId,
+    group_id: GroupId,
+    role: MembershipRole,
+    weight: f64,
+}
+
+impl EstimationMembershipRow {
+    /// Copy the scientifically relevant fields from one assignment.
+    #[must_use]
+    pub fn from_assignment(assignment: MembershipAssignment) -> Self {
+        Self {
+            member_id: assignment.member_id(),
+            group_id: assignment.group_id(),
+            role: assignment.role(),
+            weight: assignment.weight().value(),
+        }
+    }
+
+    /// Member identity on this row.
+    #[must_use]
+    pub const fn member_id(self) -> MemberId {
+        self.member_id
+    }
+
+    /// Group identity on this row.
+    #[must_use]
+    pub fn group_id(self) -> GroupId {
+        self.group_id
+    }
+
+    /// Contextual role on this row.
+    #[must_use]
+    pub const fn role(self) -> MembershipRole {
+        self.role
+    }
+
+    /// Membership weight used by the multilevel estimator.
+    #[must_use]
+    pub const fn weight(self) -> f64 {
+        self.weight
+    }
+}
+
+/// Refuse an estimator input that dropped known multiple memberships.
+///
+/// Rows must represent one member and must preserve at least the required
+/// number of distinct group identities. Multiple roles within one group cannot
+/// substitute for a missing group context.
+///
+/// # Errors
+///
+/// Returns [`MembershipError::InvalidWirePayload`] for an empty row set, a zero
+/// required multiplicity, or mixed member identities. Returns
+/// [`MembershipError::AtomisticCollapseRefused`] when fewer distinct groups than
+/// `required_group_multiplicity` remain.
+pub fn refuse_atomistic_collapse(
+    rows: &[EstimationMembershipRow],
+    required_group_multiplicity: usize,
+) -> Result<(), MembershipError> {
+    if rows.is_empty() || required_group_multiplicity == 0 {
+        return Err(MembershipError::InvalidWirePayload);
+    }
+    let expected_member = rows[0].member_id();
+    let mut distinct_groups = BTreeSet::new();
+    for row in rows {
+        if row.member_id() != expected_member {
+            return Err(MembershipError::InvalidWirePayload);
+        }
+        distinct_groups.insert(row.group_id());
+    }
+    if distinct_groups.len() < required_group_multiplicity {
+        return Err(MembershipError::AtomisticCollapseRefused);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::MembershipNetwork;
-    use crate::{GroupId, MemberId, MembershipAssignment, MembershipRole, MembershipWeight};
+    use crate::{
+        GroupId, MemberId, MembershipAssignment, MembershipError, MembershipRole, MembershipWeight,
+    };
     use temporal_core::EventTime;
 
     fn event_time(value: &str) -> EventTime {
@@ -144,5 +250,16 @@ mod tests {
         assert_eq!(assignment_total, 1);
         assert_eq!(network.active_group_multiplicity(member, before), 0);
         assert!(network.active_weight_by_role(other, during).is_empty());
+        let rows = network.estimation_rows_at(member, during).expect("one row");
+        assert_eq!(rows.len(), 1);
+        super::refuse_atomistic_collapse(&rows, 1).expect("single membership");
+        assert_eq!(rows[0].member_id(), member);
+        assert_eq!(rows[0].group_id(), group);
+        assert_eq!(rows[0].role(), MembershipRole::Template);
+        assert!((rows[0].weight() - 1.0).abs() < 1e-15);
+        assert_eq!(
+            super::refuse_atomistic_collapse(&rows, 0),
+            Err(MembershipError::InvalidWirePayload)
+        );
     }
 }

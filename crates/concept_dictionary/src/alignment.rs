@@ -62,7 +62,9 @@ pub const fn compare_cross_language_means(level: InvarianceLevel) -> Result<(), 
 /// # Errors
 ///
 /// Returns [`ConceptError::InvalidNumericInput`] for empty, unequal-length, or
-/// non-finite vectors, an unrepresentable residual, or a non-finite result.
+/// non-finite vectors, or an unrepresentable residual. The scaled accumulator
+/// keeps the normalized sum of squares at or below one, so finite residuals
+/// produce a finite RMSE without a second unreachable result branch.
 #[allow(clippy::cast_precision_loss)]
 pub fn concept_coordinate_rmse(left: &[f64], right: &[f64]) -> Result<f64, ConceptError> {
     if left.is_empty() || left.len() != right.len() {
@@ -96,12 +98,7 @@ pub fn concept_coordinate_rmse(left: &[f64], right: &[f64]) -> Result<f64, Conce
     if scale == 0.0 {
         return Ok(0.0);
     }
-    let result = scale * (scaled_sum_squares / left.len() as f64).sqrt();
-    if result.is_finite() {
-        Ok(result)
-    } else {
-        Err(ConceptError::InvalidNumericInput)
-    }
+    Ok(scale * (scaled_sum_squares / left.len() as f64).sqrt())
 }
 
 #[cfg(test)]
@@ -123,5 +120,13 @@ mod tests {
         );
         let error = concept_coordinate_rmse(&[1.0, 2.0], &[1.0, 2.0]).expect("identity");
         assert!(error < 1e-12);
+    }
+
+    #[test]
+    fn finite_maximum_coordinates_keep_the_scaled_rmse_finite() {
+        let error = concept_coordinate_rmse(&[f64::MAX, f64::MAX], &[0.0, 0.0])
+            .expect("scaled maximum coordinates");
+        assert!(error.is_finite());
+        assert_eq!(error.to_bits(), f64::MAX.to_bits());
     }
 }

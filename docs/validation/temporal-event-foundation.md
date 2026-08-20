@@ -24,6 +24,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | — | unknown-field/version/limit tests | Task 12 / PR #21; HTTP service remaining |
 | Multilingual language-profile / concept gates | `concept_dictionary` | active-PR | language-profile status + shared-concept RMSE | computed coordinate RMSE + translation/stopword/TF-IDF refusal | ADR 0004; `docs/research/multilingual-concept-alignment.md` |
+| Multiple-membership estimation rows | `membership_core` | active-PR | rows + collapse refusal | 3-row RMSE + collapse deny | ADR 0003; `docs/research/membership-estimation-rows.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 
