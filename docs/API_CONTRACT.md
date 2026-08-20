@@ -18,6 +18,7 @@ Current protected main exposes Rust library/domain contracts, not a production H
 | interval relation/reasoner API | `temporal_core` | event/relation validation | active-PR #6 |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
+| LLM interpretation provider port | `orchestrator_live` loopback `POST /v1/interpretation-runs` | contextual-orchestrator | partial |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
 | analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
@@ -41,6 +42,7 @@ When the service layer is introduced, use resources such as:
 ```text
 POST   /v1/evidence-imports
 GET    /v1/evidence-imports/{import_id}
+POST   /v1/interpretation-runs
 POST   /v1/analysis-runs
 GET    /v1/analysis-runs/{run_id}
 POST   /v1/analysis-runs/{run_id}/cancel
@@ -118,7 +120,7 @@ Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers mu
 
 ### contextual-orchestrator
 
-TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
+TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. The standalone `orchestrator_live::OrchestratorLiveService` also serves a loopback-only `POST /v1/interpretation-runs` proof listener. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. The listener is not TLS termination. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
 
 ### organization `.github`
 

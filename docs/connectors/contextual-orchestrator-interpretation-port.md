@@ -1,7 +1,7 @@
 # contextual-orchestrator interpretation port for TEPP
 
-**Status:** Partial modular integration contract — `tepp_api::bind_contextual_orchestrator` is the credential-free binding; live HTTP remains accepted-target.  
-**Last reviewed:** 2026-08-13
+**Status:** Partial modular integration contract — `tepp_api::bind_contextual_orchestrator` is the credential-free binding and the `orchestrator_live` loopback HTTP/1.1 listener is active-PR; production TLS remains accepted-target.  
+**Last reviewed:** 2026-08-16
 
 ## Boundary
 
@@ -13,6 +13,12 @@ TEPP may call a provider-neutral interpretation/orchestration port for semantic 
 - merge, release, or independent review authority (ADR 0010; ADR 0015).
 
 LLM/provider settings are execution policy only. Deterministic scientific gates remain authoritative (AGENTS.md §11).
+
+`orchestrator_live::OrchestratorLiveService` binds loopback TCP and serves
+`POST /v1/interpretation-runs`. Accepted output is always hypothetical and
+never scientific authority. Non-loopback binds, table-access hosts, and
+review/Copilot/GitHub credential headers fail closed. The listener does not
+call a model provider.
 
 ## Allowed orchestration modes
 
