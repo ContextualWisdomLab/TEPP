@@ -71,10 +71,11 @@ pub fn from_additive_log_ratio(coordinates: &[f64]) -> Result<Vec<f64>, TopicMea
 /// Map a strictly positive unit simplex vector to isometric log-ratio coordinates.
 ///
 /// The sequential Egozcue orthonormal basis sends a `K`-part composition to
-/// the `K-1` vector whose Euclidean norm equals Aitchison distance. This is
-/// the coordinate system for distance-based topic geometry. It is not the
-/// reference-dependent logistic-normal map; use [`additive_log_ratio`] when
-/// that regression interface is the estimand.
+/// the `K-1` vector whose Euclidean distance from another composition's ILR
+/// vector equals their Aitchison distance. A vector norm is only the distance
+/// from the equal-share origin. This is the coordinate system for distance-based
+/// topic geometry. It is not the reference-dependent logistic-normal map; use
+/// [`additive_log_ratio`] when that regression interface is the estimand.
 ///
 /// # Errors
 ///
