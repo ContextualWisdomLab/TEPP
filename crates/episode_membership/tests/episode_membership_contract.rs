@@ -1,7 +1,7 @@
 //! Episode membership cannot escape the episode event-time interval.
 
 use episode_membership::{
-    identity_recovery_rate, refuse_membership_outside_episode, EpisodeMembershipError, EventWindow,
+    EpisodeMembershipError, EventWindow, identity_recovery_rate, refuse_membership_outside_episode,
 };
 
 #[test]

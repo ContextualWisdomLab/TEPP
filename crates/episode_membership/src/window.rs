@@ -79,7 +79,7 @@ pub fn identity_recovery_rate(
 
 #[cfg(test)]
 mod tests {
-    use super::{identity_recovery_rate, refuse_membership_outside_episode, EventWindow};
+    use super::{EventWindow, identity_recovery_rate, refuse_membership_outside_episode};
     use crate::EpisodeMembershipError;
 
     #[test]

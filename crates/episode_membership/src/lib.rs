@@ -12,9 +12,9 @@ mod window;
 
 /// Fail-closed episode-membership errors.
 pub use error::EpisodeMembershipError;
+/// A closed event-time window with inclusive integer bounds.
+pub use window::EventWindow;
 /// Fraction of recovered containment flags that match known truth.
 pub use window::identity_recovery_rate;
 /// Refuse a membership window that starts before or ends after the episode.
 pub use window::refuse_membership_outside_episode;
-/// A closed event-time window with inclusive integer bounds.
-pub use window::EventWindow;
