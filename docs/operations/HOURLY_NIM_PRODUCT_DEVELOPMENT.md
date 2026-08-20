@@ -94,8 +94,8 @@ build scripts, packages, binaries, or shell files.
 The copied parser rejects symlinks, non-regular files, malformed UTF-8,
 unsupported controls, bidirectional spoofing, and byte-limit violations. Only
 after bounded metadata is written does the publisher mint the repository-scoped
-Maintainer App token. It then rechecks open-PR inventory and live `main`, pushes
-one unique branch, and calls `gh pr create` exactly once.
+Maintainer App token. It then rechecks open-PR and open-issue inventory plus live
+`main`, pushes one unique branch, and calls `gh pr create` exactly once.
 
 ## Proposal contract
 

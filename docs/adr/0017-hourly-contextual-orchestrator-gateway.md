@@ -34,7 +34,8 @@ loopback bearer token. It receives no provider credential. Liveness and
 authenticated model-list checks must pass before the proposal agent runs.
 
 The workflow remains fail-closed when any provider credential is absent, the
-queue is unreadable, an open PR exists, or the publication App is unavailable.
+PR or issue queue is unreadable, an open PR or issue exists, or the publication
+App is unavailable.
 The verifier and publisher receive neither provider nor model credentials.
 
 ## Alternatives considered
