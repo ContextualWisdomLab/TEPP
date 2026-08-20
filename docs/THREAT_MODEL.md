@@ -46,7 +46,7 @@ No external document, model output, provider response, serialized payload, datab
 | Formula/active-content injection | exported artifacts execute spreadsheet/formula/HTML payloads | export escaping/sanitization, no active document execution |
 | Supply-chain compromise | mutable Actions/installers/dependencies alter build or release | full-SHA Actions, orphan registry-identity audit/disable, lockfiles, advisories/licenses, SBOM, SLSA-style provenance, reproducible release |
 | Credential exfiltration | model/test/doc obtains secrets | minimum-scope secret materialization, `NVIDIA_NIM_API_KEY` only where required, never log/prompt secrets |
-| Evidence over-retention | raw source/PII remains after purpose expires | lifecycle classification, configurable retention, deletion/tombstone evidence, immutable audit digest not raw copy |
+| Evidence over-retention | raw source/PII remains after purpose expires | lifecycle classification, configurable retention (`0007` `retention_policy`), deletion/tombstone evidence, legal-hold exception, immutable audit digest not raw copy |
 
 ## 4. PII handling without blanket masking
 
