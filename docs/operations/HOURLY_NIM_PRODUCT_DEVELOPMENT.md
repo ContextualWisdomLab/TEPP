@@ -18,8 +18,8 @@ request and one open issue. Unreadable inventory, any open PR or issue, any
 missing provider key, or a missing Maintainer App configuration produces a stable
 fail-closed no-op. A dry run may print the task contract without credentials.
 
-When a PR exists, normal review → repair → exact-head Checks → merge governance
-owns the hour. The scheduler does not create a competing branch.
+When a PR or issue exists, normal review → repair → exact-head Checks → merge
+governance owns the hour. The scheduler does not create a competing branch.
 
 ## Required repository configuration
 
