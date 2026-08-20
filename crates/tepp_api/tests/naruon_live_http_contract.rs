@@ -222,6 +222,49 @@ fn handle_http_refuses_methods_paths_versions_and_table_hosts() {
     ));
     assert_eq!(query.status_code, 400);
 
+    assert_eq!(
+        service
+            .handle_http_request("POST /v1/analysis-runs HTTP/1.1")
+            .status_code,
+        400
+    );
+    assert_eq!(
+        service
+            .handle_http_request(&"x".repeat(NARUON_LIVE_HEADER_BYTE_LIMIT))
+            .status_code,
+        413
+    );
+    assert_eq!(
+        service
+            .handle_http_request(
+                "POST /v1/analysis-runs HTTP/1.1 extra\r\ncontent-length: 0\r\n\r\n"
+            )
+            .status_code,
+        400
+    );
+    assert_eq!(
+        service
+            .handle_http_request(
+                "POST /v1/analysis-runs#drop HTTP/1.1\r\ncontent-length: 0\r\n\r\n"
+            )
+            .status_code,
+        400
+    );
+    assert_eq!(
+        service
+            .handle_http_request("POST /proxy://target HTTP/1.1\r\ncontent-length: 0\r\n\r\n")
+            .status_code,
+        400
+    );
+    assert_eq!(
+        service
+            .handle_http_request(
+                "POST /v1/analysis-runs HTTP/1.1\r\ncontent-length: 0\r\ncontent-length: 0\r\n\r\n"
+            )
+            .status_code,
+        400
+    );
+
     let http10 = format!(
         "POST {NARUON_ANALYSIS_RUN_PATH} HTTP/1.0\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{body}",
         run.idempotency_key,
@@ -526,6 +569,7 @@ fn read_http_request_covers_transport_and_limit_errors() {
 
     let zero = b"POST /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: k\r\ncontent-length: 0\r\n\r\n";
     assert!(NaruonLiveService::read_http_request(&mut Cursor::new(zero.as_slice())).is_ok());
+    assert!(NaruonLiveService::read_http_request(&mut Cursor::new(zero.to_vec())).is_ok());
 
     let truncated = b"POST /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: k\r\ncontent-length: 4\r\n\r\nab";
     assert_eq!(
@@ -587,6 +631,35 @@ fn serve_one_accepts_committed_naruon_exchange_over_loopback_tcp() {
     drop(TcpStream::connect(idle_addr).expect("connect2"));
     let idle_response = idle_worker.join().expect("join2").expect("served closed");
     assert_eq!(idle_response.status_code, 400);
+
+    let mut empty_listener = NaruonLiveService::bind_loopback().expect("bind3");
+    let empty_addr = empty_listener.local_addr().expect("addr3");
+    let empty_worker = thread::spawn(move || empty_listener.serve_one());
+    let mut empty_stream = TcpStream::connect(empty_addr).expect("connect3");
+    empty_stream
+        .write_all(
+            http_request(
+                "POST",
+                NARUON_ANALYSIS_RUN_PATH,
+                &naruon_headers("empty-body"),
+                "",
+            )
+            .as_bytes(),
+        )
+        .expect("write3");
+    let mut empty_received = String::new();
+    empty_stream
+        .read_to_string(&mut empty_received)
+        .expect("read3");
+    assert!(empty_received.starts_with("HTTP/1.1 400 Bad Request"));
+    assert_eq!(
+        empty_worker
+            .join()
+            .expect("join3")
+            .expect("served empty")
+            .status_code,
+        400
+    );
 }
 
 #[test]
