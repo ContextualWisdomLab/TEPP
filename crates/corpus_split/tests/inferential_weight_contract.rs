@@ -1,9 +1,12 @@
 //! TF-IDF, BM25, and global stopword deletion are not inferential inputs.
 
 use corpus_split::{
-    CorpusSplitError, TokenDeletionRule, WeightingScheme, refuse_default_stopword_deletion,
+    CorpusSplitError, LeakageLink, LeakageLinkKind, TokenDeletionRule, WeightingScheme,
+    build_connected_groups, group_normalized_weights, refuse_default_stopword_deletion,
     refuse_inferential_retrieval_weight,
 };
+use std::collections::BTreeMap;
+use uuid::Uuid;
 
 fn computed_rmse(truth: &[f64], recovered: &[f64]) -> f64 {
     assert_eq!(truth.len(), recovered.len());
@@ -28,7 +31,7 @@ fn l1_normalize(values: &[f64]) -> Vec<f64> {
 /// Classic summed TF-IDF retrieval scores used only as a negative surrogate.
 fn tf_idf_document_scores(documents: &[&[&str]]) -> Vec<f64> {
     let document_count = f64::from(u32::try_from(documents.len()).expect("tiny fixture"));
-    let mut document_frequency = std::collections::BTreeMap::<&str, f64>::new();
+    let mut document_frequency = BTreeMap::<&str, f64>::new();
     for document in documents {
         let mut seen = std::collections::BTreeSet::new();
         for token in *document {
@@ -40,7 +43,7 @@ fn tf_idf_document_scores(documents: &[&[&str]]) -> Vec<f64> {
     documents
         .iter()
         .map(|document| {
-            let mut term_frequency = std::collections::BTreeMap::<&str, f64>::new();
+            let mut term_frequency = BTreeMap::<&str, f64>::new();
             for token in *document {
                 *term_frequency.entry(*token).or_insert(0.0) += 1.0;
             }
@@ -88,7 +91,26 @@ fn group_normalized_mass_recovers_true_shares_with_lower_rmse_than_tfidf() {
         &["report", "event", "event"],
         &["report", "report", "unique", "event"],
     ];
-    let ess_recovered = truth;
+    let document_ids: Vec<Uuid> = (0..truth.len()).map(|_| Uuid::now_v7()).collect();
+    let links: Vec<LeakageLink> = document_ids
+        .windows(2)
+        .map(|pair| LeakageLink {
+            left: pair[0],
+            right: pair[1],
+            kind: LeakageLinkKind::SameEpisode,
+        })
+        .collect();
+    let groups = build_connected_groups(&document_ids, &links);
+    let normalized_by_id: BTreeMap<Uuid, f64> = group_normalized_weights(
+        &groups,
+        &document_ids.iter().copied().zip(truth).collect::<Vec<_>>(),
+    )
+    .into_iter()
+    .collect();
+    let ess_recovered: Vec<f64> = document_ids
+        .iter()
+        .map(|document_id| *normalized_by_id.get(document_id).expect("normalized mass"))
+        .collect();
     let tfidf_recovered = l1_normalize(&tf_idf_document_scores(&documents));
     let ess_rmse = computed_rmse(&truth, &ess_recovered);
     let tfidf_rmse = computed_rmse(&truth, &tfidf_recovered);
