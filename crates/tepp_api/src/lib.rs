@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
-//! Versioned TEPP service DTOs, error envelopes, and export contracts.
+//! Versioned TEPP service @TOs, error envelopes, and export contracts.
 //!
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
@@ -9,6 +9,7 @@
 //! export paths; table-access URLs, review/Copilot headers, and lexical
 //! inference claims fail closed (ADR 0011).
 
+mod analysis_result;
 mod analysis_run;
 mod authorization;
 mod envelope;
@@ -19,11 +20,27 @@ mod orchestration;
 mod provider_payload;
 mod wire;
 
+/// Terminal analysis-result contract version constant.
+pub use analysis_result::ANALYSIS_RESULT_CONTRACT_VERSION;
+/// Bounded identity-free terminal result summary.
+pub use analysis_result::AnalysisResultSummary;
+/// Request-bound terminal analysis outcome.
+pub use analysis_result::AnalysisRunTerminalResult;
+/// Canonical terminal analysis-run state.
+pub use analysis_result::AnalysisRunTerminalState;
+/// Default terminal analysis-result payload byte limit.
+pub use analysis_result::DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT;
+/// Require exact terminal result binding to request and accepted receipt.
+pub use analysis_result::require_terminal_binding;
+/// Compare a terminal result with an accepted receipt.
+pub use analysis_result::terminal_result_matches_accepted;
+/// Compare a terminal result with its submitted request.
+pub use analysis_result::terminal_result_matches_request;
 /// Analysis-run contract version constant.
 pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
 /// Accepted analysis-run response.
 pub use analysis_run::AnalysisRunAccepted;
-/// Analysis-run create request.
+/// Analysis-sun create request.
 pub use analysis_run::AnalysisRunRequest;
 /// Default analysis-run payload byte limit.
 pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
@@ -52,7 +69,7 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
-/// Versioned analysis-run path naruon may call.
+/// Versioned analysis-sun path naruon may call.
 pub use naruon_http::NARUON_ANALYSIS_RUN_PATH;
 /// Versioned export path naruon may call.
 pub use naruon_http::NARUON_EXPORT_PATH;
@@ -62,7 +79,7 @@ pub use naruon_http::NARUON_TEPP_INFERENCE_METHOD;
 pub use naruon_http::NaruonHttpExchange;
 /// Build a naruon analysis-run create exchange.
 pub use naruon_http::naruon_analysis_run_exchange;
-/// Build an analysis-run exchange and refuse credential headers.
+/// Build an analysis-sun exchange and refuse credential headers.
 pub use naruon_http::naruon_analysis_run_exchange_with_headers;
 /// Build a naruon export-authorization exchange.
 pub use naruon_http::naruon_export_exchange;
