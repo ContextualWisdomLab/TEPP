@@ -21,13 +21,14 @@ pub fn from_json<'de, T: Deserialize<'de>>(payload: &'de str) -> Result<T, ApiEr
     serde_json::from_str(payload).map_err(|_| ApiError::InvalidWirePayload)
 }
 
-/// Reject empty or whitespace-only identity/key strings.
+/// Reject empty, whitespace-only, or control-containing identity/key strings.
 ///
 /// # Errors
 ///
-/// Returns [`ApiError::InvalidWirePayload`] when the value is empty after trim.
+/// Returns [`ApiError::InvalidWirePayload`] when the value is empty after trim
+/// or contains an ASCII/Unicode control character.
 pub fn require_nonempty(value: &str) -> Result<(), ApiError> {
-    if value.trim().is_empty() {
+    if value.trim().is_empty() || value.chars().any(char::is_control) {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(())
@@ -91,6 +92,10 @@ mod tests {
         require_nonempty("tenant-a").expect("ok");
         assert_eq!(require_nonempty("   "), Err(ApiError::InvalidWirePayload));
         assert_eq!(require_nonempty(""), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            require_nonempty("tenant\u{1f}workspace"),
+            Err(ApiError::InvalidWirePayload)
+        );
         require_byte_limit("abc", 3).expect("ok");
         assert_eq!(require_byte_limit("abcd", 3), Err(ApiError::LimitExceeded));
         require_contract_version(1, 1).expect("ok");

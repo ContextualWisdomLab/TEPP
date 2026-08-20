@@ -136,6 +136,14 @@ fn serialization_enforces_default_result_and_status_limits() {
         "idem-1",
     )
     .expect("accepted");
+    assert_eq!(oversized_accepted.to_json(), Err(ApiError::LimitExceeded));
+    assert_eq!(
+        AnalysisRunAccepted::from_json(&format!(
+            "{{\"contract_version\":1,\"run_id\":\"{}\",\"run_state\":\"accepted\",\"idempotency_key\":\"idem-1\"}}",
+            "x".repeat(DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
+        )),
+        Err(ApiError::LimitExceeded)
+    );
     let status = AnalysisRunStatus::accepted(&oversized_accepted).expect("status");
     assert_eq!(status.to_json(), Err(ApiError::LimitExceeded));
 }

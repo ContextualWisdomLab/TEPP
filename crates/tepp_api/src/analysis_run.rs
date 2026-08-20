@@ -153,6 +153,16 @@ impl AnalysisRunAccepted {
     ///
     /// Returns wire, version, or field-validation errors.
     pub fn from_json(payload: &str) -> Result<Self, ApiError> {
+        Self::from_json_with_limit(payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
+    }
+
+    /// Parse an accepted-run payload with a caller-supplied byte limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns wire, version, limit, or field-validation errors.
+    pub fn from_json_with_limit(payload: &str, maximum_bytes: usize) -> Result<Self, ApiError> {
+        require_byte_limit(payload, maximum_bytes)?;
         let accepted: Self = from_json(payload)?;
         accepted.validate()?;
         Ok(accepted)
@@ -165,7 +175,9 @@ impl AnalysisRunAccepted {
     /// Returns validation or serialization errors.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        to_json(self)
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)?;
+        Ok(payload)
     }
 
     pub(crate) fn validate(&self) -> Result<(), ApiError> {
