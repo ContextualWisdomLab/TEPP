@@ -205,6 +205,55 @@ fn projection_response_revalidates_cutoff_order_findings_and_payload_size() {
         Err(ApiError::LimitExceeded)
     );
 
+    let mut too_many: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    let events = too_many["events"].as_array_mut().expect("events");
+    let template = events[0].clone();
+    while events.len() <= 128 {
+        events.push(template.clone());
+    }
+    let too_many_json = serde_json::to_string(&too_many).expect("too many json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&too_many_json),
+        Err(ApiError::LimitExceeded)
+    );
+
+    let mut future_cutoff: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    future_cutoff["knowledge_cutoff"] = serde_json::Value::String("2999-01-01T00:00:00Z".into());
+    let future_cutoff_json = serde_json::to_string(&future_cutoff).expect("future cutoff json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&future_cutoff_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut duplicate: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    duplicate["events"][1]["event_id"] = duplicate["events"][0]["event_id"].clone();
+    let duplicate_json = serde_json::to_string(&duplicate).expect("duplicate json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&duplicate_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut reversed: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    reversed["events"][1]["occurred_at"] = serde_json::Value::String("2020-01-01T00:00:00Z".into());
+    let reversed_json = serde_json::to_string(&reversed).expect("reversed json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&reversed_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut equal_time: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    equal_time["events"][1]["occurred_at"] = equal_time["events"][0]["occurred_at"].clone();
+    equal_time["events"][1]["available_at"] = equal_time["events"][0]["available_at"].clone();
+    let equal_time_json = serde_json::to_string(&equal_time).expect("equal time json");
+    assert!(ProjectHistoryProjection::from_json(&equal_time_json).is_ok());
+
+    equal_time["events"][1]["event_id"] = serde_json::Value::String("event-aaa".into());
+    let equal_id_regression = serde_json::to_string(&equal_time).expect("equal id json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&equal_id_regression),
+        Err(ApiError::InvalidWirePayload)
+    );
+
     let mut value: serde_json::Value = serde_json::from_str(&payload).expect("value");
     value["events"][0]["available_at"] = serde_json::Value::String("2026-08-20T00:00:00Z".into());
     let future = serde_json::to_string(&value).expect("future json");

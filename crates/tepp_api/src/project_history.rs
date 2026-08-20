@@ -261,13 +261,9 @@ impl ProjectHistoryProjection {
         let start = parse_timestamp(&self.history_span_start)?;
         let end = parse_timestamp(&self.history_span_end)?;
         let first_event_time = parse_timestamp(&self.events[0].occurred_at)?;
-        let last_event_time = parse_timestamp(
-            &self
-                .events
-                .last()
-                .ok_or(ApiError::InvalidWirePayload)?
-                .occurred_at,
-        )?;
+        // The non-empty guard above makes this index safe and removes an
+        // unreachable second empty-events error path from the response contract.
+        let last_event_time = parse_timestamp(&self.events[self.events.len() - 1].occurred_at)?;
         if start > end || start != first_event_time || end != last_event_time {
             return Err(ApiError::InvalidWirePayload);
         }
@@ -300,16 +296,11 @@ pub fn project_history_projection(
 ) -> Result<ProjectHistoryProjection, ApiError> {
     request.validate()?;
     let mut ordered = request.events.clone();
-    ordered.sort_by(|left, right| {
-        match (
-            parse_timestamp(&left.occurred_at),
-            parse_timestamp(&right.occurred_at),
-        ) {
-            (Ok(left_time), Ok(right_time)) => left_time
-                .cmp(&right_time)
-                .then_with(|| left.event_id.cmp(&right.event_id)),
-            _ => std::cmp::Ordering::Equal,
-        }
+    ordered.sort_by_key(|event| {
+        (
+            parse_timestamp(&event.occurred_at).ok(),
+            event.event_id.clone(),
+        )
     });
     let focus_index = ordered
         .iter()
