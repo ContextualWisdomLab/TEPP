@@ -1,4 +1,4 @@
-"""Lock the hourly NVIDIA NIM OpenCode development security contract."""
+"""Lock the hourly contextual-orchestrator OpenCode security contract."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 from types import ModuleType
 
 WORKFLOW = Path(".github/workflows/hourly-nim-product-development.yml")
+BOOTSTRAP = Path("scripts/run_contextual_orchestrator.py")
 PARSER = Path("scripts/prepare_agent_pr_message.py")
 RUNBOOK = Path("docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md")
 DOCTORING = Path("docs/doctoring/hourly-nim-opencode-development.md")
@@ -32,31 +33,43 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
     """Structural tests for the credential-separated product-development loop."""
 
     def test_hourly_workflow_schedule_credentials_and_queue_gate(self) -> None:
-        """Run at minute 47 with NIM only and fail closed around PR inventory."""
+        """Run at minute 47 with provider discovery and fail closed around inventory."""
 
         text = _text(WORKFLOW)
+        bootstrap = _text(BOOTSTRAP)
         for token in (
             'cron: "47 * * * *"',
             "workflow_dispatch:",
             "dry_run:",
             "hourly-nim-product-development-${{ github.repository }}",
             "cancel-in-progress: false",
+            "secrets.BYTEZ_API_KEY",
             "secrets.NVIDIA_NIM_API_KEY",
-            "{env:NVIDIA_NIM_API_KEY}",
+            "secrets.NVIDIA_NIM_API_KEY_SUB",
+            "secrets.OPENROUTER_API_KEY",
+            "secrets.OPENAI_API_KEY",
+            "CONTEXTUAL_ORCHESTRATOR_COMMIT",
+            "CONTEXTUAL_ORCHESTRATOR_SHA256",
+            "run_contextual_orchestrator.py",
+            "/healthz",
+            "/v1/models",
+            "{env:OPENCODE_GATEWAY_TOKEN}",
             "OPENCODE_VERSION",
             "OPENCODE_SHA256",
             "sha256sum -c",
             "pull_request_inventory_unavailable",
             "open_pull_request",
-            "nim_api_key_unavailable",
+            "contextual_orchestrator_credentials_unavailable",
             "maintainer_app_unavailable",
             "base_branch_advanced",
             "open_pull_request_after_generation",
             "ContextualWisdomLab/TEPP",
         ):
             self.assertIn(token, text)
+        for token in ("discover_all_models", "register_credential", "PROVIDER_CREDENTIAL_NAMES"):
+            self.assertIn(token, bootstrap)
         self.assertNotIn("COPILOT_GITHUB_TOKEN", text)
-        self.assertNotIn("CONTEXTUAL_ORCHESTRATOR_TOKEN", text)
+        self.assertNotIn("CONTEXTUAL_ORCHESTRATOR_TOKEN=", text)
         self.assertEqual(text.count("gh pr create"), 1)
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("gh release create", text)
@@ -73,7 +86,8 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         )[0]
         publisher = text.split("publish_product_increment:", 1)[1]
 
-        self.assertIn("NVIDIA_NIM_API_KEY", proposer)
+        self.assertIn("BYTEZ_API_KEY", proposer)
+        self.assertIn("OPENAI_API_KEY", proposer)
         self.assertNotIn("create-github-app-token", proposer)
         self.assertNotIn("gh pr create", proposer)
         self.assertNotIn("NVIDIA_NIM_API_KEY", verifier)
@@ -199,7 +213,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             title_path = tmp_path / "title.txt"
             body_path = tmp_path / "body.md"
             source.write_text(
-                "feat: 시간별 NIM 제품 개발 루프 추가\r\n\r\n"
+                "feat: 시간별 오케스트레이터 제품 개발 루프 추가\r\n\r\n"
                 "구매자가 체감하는 제품 Gap 하나를 안전하게 닫습니다.\r\n",
                 encoding="utf-8",
             )
@@ -212,7 +226,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             )
             self.assertEqual(
                 title_path.read_text(encoding="utf-8"),
-                "feat: 시간별 NIM 제품 개발 루프 추가",
+                "feat: 시간별 오케스트레이터 제품 개발 루프 추가",
             )
             self.assertIn("구매자가 체감하는 제품 Gap", body_path.read_text(encoding="utf-8"))
             for path in (title_path, body_path):
@@ -223,7 +237,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
 
         runbook = _text(RUNBOOK)
         doctoring = _text(DOCTORING)
-        for token in ("NVIDIA_NIM_API_KEY", "proposal", "verification", "publication"):
+        for token in ("OPENAI_API_KEY", "contextual-orchestrator", "proposal", "verification", "publication"):
             self.assertIn(token, runbook)
         self.assertIn("APA", doctoring)
         self.assertIn("Do not configure `COPILOT_GITHUB_TOKEN`", runbook)

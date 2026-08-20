@@ -1,4 +1,4 @@
-# Hourly NVIDIA NIM OpenCode Development — Evidence Doctoring
+# Hourly Contextual Orchestrator OpenCode Development — Evidence Doctoring
 
 ## Claim boundary
 
@@ -15,8 +15,9 @@ and exact-head branch rules remain independent controls.
 | GitHub jobs | Jobs run on separate runner instances and receive scoped tokens | Model, verifier, and publisher are separate jobs |
 | GitHub App authentication | A workflow can mint an installation token with explicit repository permissions | Publication token is minted only after non-executing validation |
 | Artifact handoff | Artifact upload/download actions expose immutable IDs and digests | Patch ID, digest, base, size, count, and modes are checked twice |
-| OpenCode | OpenCode is a programmable coding agent with provider configuration | One checksum-pinned binary uses NVIDIA NIM only |
-| NVIDIA NIM | NIM exposes OpenAI-compatible hosted inference APIs | Only `NVIDIA_NIM_API_KEY` reaches the proposal process |
+| OpenCode | OpenCode is a programmable coding agent with provider configuration | One checksum-pinned binary calls only the loopback gateway |
+| contextual-orchestrator | The pinned gateway discovers configured provider models and routes through its KV credential seam | All five provider keys are registered at bootstrap; OpenCode receives only a loopback token |
+| Provider APIs | OpenAI-compatible and provider-specific model-list APIs expose discoverable models | Discovery is attempted for OpenAI, OpenRouter, both NVIDIA NIM keys, and Bytez before selection |
 | SSDF | NIST SP 800-218 recommends protected build environments, review, provenance, and vulnerability response | Fresh verification and ordinary PR governance remain mandatory |
 | AI risk | ISO/IEC 23894:2023 and 42001:2023 require contextual risk treatment and controlled change | Stable no-op reasons, bounded proposals, traceable decisions, and rollback are documented |
 | Test-time compute | Fugu, Conductor, and TRINITY distinguish routing from deeper role-based workflows | Runtime LLM increments must preserve route/conduct and access-list controls |
@@ -67,6 +68,10 @@ GitHub. (n.d.). *Making authenticated API requests with a GitHub App in a GitHub
 Actions workflow*. GitHub Docs. Retrieved August 6, 2026, from
 https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/making-authenticated-api-requests-with-a-github-app-in-a-github-actions-workflow
 
+ContextualWisdomLab. (2026). *contextual-orchestrator* (commit
+e226e1197bdfc890c9d8e5b9b648c78857d7e465) [Computer software]. GitHub.
+https://github.com/ContextualWisdomLab/contextual-orchestrator
+
 International Organization for Standardization, & International Electrotechnical
 Commission. (2023a). *Information technology—Artificial intelligence—Guidance
 on risk management* (ISO/IEC Standard No. 23894:2023).
@@ -109,8 +114,9 @@ deterministic workflow tests and must be revisited in a later literature update.
 
 ## Residual risk
 
-The NIM key exists inside the model process, proposed code is executed by an
-uncredentialed verifier with ordinary hosted-runner egress, and artifact digests
-do not establish semantic safety. A later broker can narrow NIM egress; a later
-central reusable workflow can remove duplicated repository policy. Neither
-future improvement may combine model execution with publication authority.
+Provider keys exist inside the ephemeral gateway process during bootstrap,
+proposed code is executed by an uncredentialed verifier with ordinary
+hosted-runner egress, and artifact digests do not establish semantic safety. A
+later broker can narrow provider egress; a later central reusable workflow can
+remove duplicated repository policy. Neither future improvement may combine
+model execution with publication authority.
