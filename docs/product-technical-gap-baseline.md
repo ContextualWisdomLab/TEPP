@@ -149,6 +149,10 @@ could not connect to `127.0.0.1:48080`. The superseded leaf repair
 [ContextualWisdomLab/.github#1153](https://github.com/ContextualWisdomLab/.github/pull/1153),
 currently at exact head `a82b8012be5d57f99c1a2b029f08837d4d10d564` with the
 diagnostic-disclosure fix locally verified and hosted Checks still settling.
+The exact failed job records are [PR #146 Strix](https://github.com/ContextualWisdomLab/TEPP/actions/runs/32415603746/job/96575931760)
+and [PR #148 Strix](https://github.com/ContextualWisdomLab/TEPP/actions/runs/32415173665/job/96574570528);
+their logs are the source for the bounded infrastructure diagnosis, not a
+source-test failure claim.
 PRs #164, #165, and #177 had queued required Checks at this snapshot. These
 observations are evidence, not merge authorization.
 
