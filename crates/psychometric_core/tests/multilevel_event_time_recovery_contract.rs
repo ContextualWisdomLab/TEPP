@@ -533,7 +533,7 @@ fn within_residual_event_time_log_rate_beats_pooled_levels() {
     let within_error = rmse(&[true_drift], &[recovered]);
 
     let mut pooled = Vec::new();
-    for (cluster, person_mean, start) in [(1_u64, 8.0_f64, 1.0_f64), (2, -5.0, 1.4)] {
+    for (cluster, person_mean, start) in [(1_u64, 8.0_f64, 1.0_f64), (2, 1.0, 1.4)] {
         let time = cluster as f64;
         pooled.push(EventOccasion {
             event_time: time,
