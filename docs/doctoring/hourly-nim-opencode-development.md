@@ -2,7 +2,8 @@
 
 ## Claim boundary
 
-This workflow can propose one bounded pull request. It does not claim autonomous
+This workflow can propose one bounded pull request only after both the pull-request
+and issue queues are empty. It does not claim autonomous
 semantic correctness, production safety, customer acceptance, scientific
 validity, or permission to merge, release, deploy, or approve. Deterministic
 tests, schemas, security scanners, CodeRabbit/OpenCode review, human judgment,

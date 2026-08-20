@@ -1,7 +1,8 @@
 # Hourly Contextual Orchestrator Product Development
 
 The hourly contextual-orchestrator product-development workflow proposes one bounded
-commercial-quality increment when the repository has no open pull request. It is
+commercial-quality increment when the repository has no open pull request or open
+issue. It is
 separate from the deterministic minute-17 quality sentinel and never merges,
 releases, deploys, approves, or changes reviewer credentials.
 
@@ -13,9 +14,9 @@ avoids the busiest scheduler boundary. A repository-scoped concurrency group
 does not cancel an active run.
 
 Before checkout or model execution, the proposal job reads at most one open pull
-request. Unreadable inventory, any open PR, any missing provider key, or a
-missing Maintainer App configuration produces a stable fail-closed no-op. A dry
-run may print the task contract without credentials.
+request and one open issue. Unreadable inventory, any open PR or issue, any
+missing provider key, or a missing Maintainer App configuration produces a stable
+fail-closed no-op. A dry run may print the task contract without credentials.
 
 When a PR exists, normal review → repair → exact-head Checks → merge governance
 owns the hour. The scheduler does not create a competing branch.
@@ -115,6 +116,10 @@ Stable no-op reasons are:
 
 - `pull_request_inventory_unavailable`
 - `open_pull_request`
+- `issue_inventory_unavailable`
+- `open_issue`
+- `issue_inventory_unavailable_after_generation`
+- `open_issue_after_generation`
 - `contextual_orchestrator_credentials_unavailable`
 - `maintainer_app_unavailable`
 

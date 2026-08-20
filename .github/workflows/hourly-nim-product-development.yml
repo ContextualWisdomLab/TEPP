@@ -55,7 +55,7 @@ jobs:
     env:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
     steps:
-      - name: Enforce zero-open-PR single-flight gate
+      - name: Enforce zero-open-PR-and-issue single-flight gate
         id: gate
         shell: bash
         env:
@@ -73,6 +73,16 @@ jobs:
           if [ "$(jq 'length' <<<"$open_prs")" -gt 0 ]; then
             echo 'dispatch=false' >>"$GITHUB_OUTPUT"
             echo 'reason=open_pull_request' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! open_issues="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 1 --json number,url)"; then
+            echo 'dispatch=false' >>"$GITHUB_OUTPUT"
+            echo 'reason=issue_inventory_unavailable' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$(jq 'length' <<<"$open_issues")" -gt 0 ]; then
+            echo 'dispatch=false' >>"$GITHUB_OUTPUT"
+            echo 'reason=open_issue' >>"$GITHUB_OUTPUT"
             exit 0
           fi
           if [ "$ORCHESTRATOR_KEYS_CONFIGURED" != true ] && [ "$DRY_RUN" != true ]; then
@@ -603,6 +613,11 @@ jobs:
             exit 1
           fi
           [ "$(jq 'length' <<<"$open_prs")" -eq 0 ] || { echo '::error::open_pull_request_after_generation'; exit 1; }
+          if ! open_issues="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 1 --json number,url)"; then
+            echo '::error::issue_inventory_unavailable_after_generation'
+            exit 1
+          fi
+          [ "$(jq 'length' <<<"$open_issues")" -eq 0 ] || { echo '::error::open_issue_after_generation'; exit 1; }
           live_base="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${DEFAULT_BRANCH}" --jq '.object.sha')"
           [ "$live_base" = "$expected_base" ] || { echo '::error::base_branch_advanced'; exit 1; }
 

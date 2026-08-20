@@ -63,10 +63,14 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "sha256sum -c",
             "pull_request_inventory_unavailable",
             "open_pull_request",
+            "issue_inventory_unavailable",
+            "open_issue",
             "contextual_orchestrator_credentials_unavailable",
             "maintainer_app_unavailable",
             "base_branch_advanced",
             "open_pull_request_after_generation",
+            "issue_inventory_unavailable_after_generation",
+            "open_issue_after_generation",
             "ContextualWisdomLab/TEPP",
         ):
             self.assertIn(token, text)
