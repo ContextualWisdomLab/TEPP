@@ -177,25 +177,31 @@ pub fn first_story_detection_rates(
 #[cfg(test)]
 mod tests {
     use super::{
-        EventEvidenceLayer, FirstStoryRates, TdtStoryDecision, classify_tdt_story,
-        first_story_detection_rates,
+        EventEvidenceLayer, TdtStoryDecision, classify_tdt_story, first_story_detection_rates,
     };
 
     #[test]
     fn zero_denominator_rates_are_zero_and_track_is_not_first() {
         assert_eq!(classify_tdt_story(&[7], 7), TdtStoryDecision::Track);
-        let empty_classes = FirstStoryRates {
-            hits: 0,
-            misses: 0,
-            false_alarms: 0,
-            first_story_truth: 0,
-            continuation_truth: 0,
-        };
-        assert!(empty_classes.miss_rate() < 1e-15);
-        assert!(empty_classes.false_alarm_rate() < 1e-15);
+        assert_eq!(classify_tdt_story(&[], 8), TdtStoryDecision::FirstStory);
+        assert!(first_story_detection_rates(&[], &[]).is_err());
+        assert!(first_story_detection_rates(&[true], &[true, false]).is_err());
+        let no_first_story = std::hint::black_box(
+            first_story_detection_rates(&[false], &[false]).expect("no first"),
+        );
+        assert!(no_first_story.miss_rate() < 1e-15);
+        let no_continuation =
+            std::hint::black_box(first_story_detection_rates(&[true], &[true]).expect("no track"));
+        assert!(no_continuation.false_alarm_rate() < 1e-15);
         let all_first = first_story_detection_rates(&[true, true], &[true, false]).expect("all");
         assert!((all_first.miss_rate() - 0.5).abs() < 1e-15);
         assert!(all_first.false_alarm_rate() < 1e-15);
+        let continuations =
+            first_story_detection_rates(&[false, false], &[true, false]).expect("continuations");
+        assert_eq!(continuations.false_alarms(), 1);
+        assert_eq!(continuations.misses(), 0);
+        assert!(continuations.miss_rate() < 1e-15);
+        assert!((continuations.false_alarm_rate() - 0.5).abs() < 1e-15);
         assert_eq!(
             EventEvidenceLayer::TdtDetection.wire_name(),
             "tdt_detection"
