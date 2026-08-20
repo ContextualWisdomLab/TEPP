@@ -259,6 +259,16 @@ pub enum PsychometricError {
     /// process increment. `−a m x` is not
     /// `A^{-1}[e^{A Δt} − I] B z`.
     LevelChangeInterceptIsNotProcessIncrement,
+    /// Driver §7.2 level-change CINT increment was treated as the
+    /// contemporaneous Dirac. `(1 − e^{a Δt}) m x` is not `m x`.
+    LevelChangeIncrementIsNotImpulse,
+    /// Driver §7.2 level-change CINT increment was treated as `CINT`.
+    /// `(1 − e^{a Δt}) m x` is not `κ = −a m x`.
+    LevelChangeIncrementIsNotIntercept,
+    /// Driver §7.2 level-change CINT increment was treated as the
+    /// Eq. 3 process increment. `(1 − e^{a Δt}) m x` is not
+    /// `A^{-1}[e^{A Δt} − I] B z`.
+    LevelChangeIncrementIsNotProcessIncrement,
 }
 
 impl fmt::Display for PsychometricError {
@@ -471,6 +481,15 @@ impl fmt::Display for PsychometricError {
             }
             Self::LevelChangeInterceptIsNotProcessIncrement => {
                 "level-change CINT is not the time-independent process increment"
+            }
+            Self::LevelChangeIncrementIsNotImpulse => {
+                "level-change CINT increment is not the contemporaneous impulse"
+            }
+            Self::LevelChangeIncrementIsNotIntercept => {
+                "level-change CINT increment is not the level-change intercept"
+            }
+            Self::LevelChangeIncrementIsNotProcessIncrement => {
+                "level-change CINT increment is not the time-independent process increment"
             }
         };
         formatter.write_str(message)
@@ -808,6 +827,18 @@ mod tests {
         assert_eq!(
             PsychometricError::LevelChangeInterceptIsNotProcessIncrement.to_string(),
             "level-change CINT is not the time-independent process increment"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeIncrementIsNotImpulse.to_string(),
+            "level-change CINT increment is not the contemporaneous impulse"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeIncrementIsNotIntercept.to_string(),
+            "level-change CINT increment is not the level-change intercept"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeIncrementIsNotProcessIncrement.to_string(),
+            "level-change CINT increment is not the time-independent process increment"
         );
     }
 }

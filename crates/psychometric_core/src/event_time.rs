@@ -74,7 +74,9 @@
 //! `CINT` to `TDPREDEFFECT * −DRIFT` (`κ = −a m x`; `a < 0` so
 //! `−κ / a = m x`). That `CINT` setting is not the dissipating
 //! Dirac, not a free `CINT`, and not the extra near-zero-drift
-//! latent process also named in §7.2. The JSS article
+//! latent process also named in §7.2. Equation 3 maps that
+//! intercept as `(1 − e^{a Δt}) m x` (`(1 − e^{a Δt}) m x` is not
+//! `m x`, not `κ`, and not `A^{-1}[e^{A Δt} − I] B z`). The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -1454,6 +1456,92 @@ pub fn refuse_level_change_intercept_as_process_increment(
 ) -> Result<f64, PsychometricError> {
     let _ = (level_change_intercept, time_independent_increment);
     Err(PsychometricError::LevelChangeInterceptIsNotProcessIncrement)
+}
+
+/// Exact scalar discrete increment of the §7.2 level-change `CINT`.
+///
+/// Driver, Oud, and Voelkle (2017, §7.2, pp. 20–21; Eq. 3, pp. 4–5;
+/// Table 2, p. 12; JSS PDF re-opened 2026-08-20T19:50Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// set `CINT` to `TDPREDEFFECT * −DRIFT` so a sudden impulse holds a
+/// new process mean. Equation 3 maps that intercept through
+/// `A^{-1}[e^{A Δt} − I] κ`. With `κ = −a m x` the scalar increment
+/// is `(e^{a Δt} − 1)/a · (−a m x) = (1 − e^{a Δt}) m x`. Form the
+/// level-change `CINT` first, then the discrete intercept map.
+/// Underflow of `e^{a Δt}` to `+0` keeps the equilibrium offset
+/// `m x`. A zero effect or zero predictor is exactly zero. Stable
+/// `a < 0` is required. `(1 − e^{a Δt}) m x` is not the
+/// contemporaneous jump `m x`. `(1 − e^{a Δt}) m x` is not `κ`.
+/// `(1 − e^{a Δt}) m x` is not `A^{-1}[e^{A Δt} − I] B z`. The extra
+/// near-zero-drift latent process also named in §7.2 is a different
+/// specification. This is not a Kalman filter and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_level_change_continuous_intercept`] and
+/// [`recover_discrete_continuous_intercept_effect`].
+pub fn recover_level_change_discrete_increment(
+    time_dependent_effect: f64,
+    time_dependent_predictor: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let intercept = recover_level_change_continuous_intercept(
+        time_dependent_effect,
+        time_dependent_predictor,
+        log_rate,
+    )?;
+    recover_discrete_continuous_intercept_effect(intercept, log_rate, event_delta, clock)
+}
+
+/// Refuse treating the §7.2 level-change CINT increment as the
+/// contemporaneous Dirac.
+///
+/// `(1 − e^{a Δt}) m x` is not the jump `m x`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::LevelChangeIncrementIsNotImpulse`].
+pub fn refuse_level_change_increment_as_impulse(
+    level_change_increment: f64,
+    time_dependent_impulse: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_increment, time_dependent_impulse);
+    Err(PsychometricError::LevelChangeIncrementIsNotImpulse)
+}
+
+/// Refuse treating the §7.2 level-change CINT increment as `CINT`.
+///
+/// `(1 − e^{a Δt}) m x` is not `κ = −a m x`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::LevelChangeIncrementIsNotIntercept`].
+pub fn refuse_level_change_increment_as_intercept(
+    level_change_increment: f64,
+    level_change_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_increment, level_change_intercept);
+    Err(PsychometricError::LevelChangeIncrementIsNotIntercept)
+}
+
+/// Refuse treating the §7.2 level-change CINT increment as the Eq. 3
+/// process increment.
+///
+/// `(1 − e^{a Δt}) m x` is not `A^{-1}[e^{A Δt} − I] B z`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LevelChangeIncrementIsNotProcessIncrement`].
+pub fn refuse_level_change_increment_as_process_increment(
+    level_change_increment: f64,
+    time_independent_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (level_change_increment, time_independent_increment);
+    Err(PsychometricError::LevelChangeIncrementIsNotProcessIncrement)
 }
 
 /// Exact scalar evolved latent mean plus a contemporaneous impulse.
@@ -3331,12 +3419,12 @@ mod tests {
         recover_initial_time_independent_predictor_carry,
         recover_initial_time_independent_predictor_effect,
         recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
-        recover_local_log_rate, recover_manifest_lagged_observed_covariance,
-        recover_manifest_observed_mean, recover_manifest_observed_variance,
-        recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate,
+        recover_level_change_discrete_increment, recover_local_log_rate,
+        recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+        recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+        recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
+        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -3370,6 +3458,8 @@ mod tests {
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
+        refuse_level_change_increment_as_impulse, refuse_level_change_increment_as_intercept,
+        refuse_level_change_increment_as_process_increment,
         refuse_level_change_intercept_as_free_continuous_intercept,
         refuse_level_change_intercept_as_impulse,
         refuse_level_change_intercept_as_process_increment, refuse_manifest_means_as_observed_mean,
@@ -5493,6 +5583,148 @@ mod tests {
         let rewritten =
             recover_level_change_continuous_intercept(1e-308, 1.0, -1e308).expect("rewrite");
         assert!((rewritten - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn level_change_discrete_increment_recovers_driver_equation_three_of_section_seven_point_two() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let increment = recover_level_change_discrete_increment(
+            effect,
+            predictor,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("level-change-increment");
+        let intercept = recover_level_change_continuous_intercept(effect, predictor, drift)
+            .expect("level-change");
+        let via_cint = recover_discrete_continuous_intercept_effect(
+            intercept,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("cint-increment");
+        let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+        let expected = (1.0 - (drift * delta).exp()) * impulse;
+        assert!((increment - expected).abs() < 1e-15);
+        assert!((increment - via_cint).abs() < 1e-15);
+        assert!((increment - impulse).abs() > 1e-3);
+        assert!((increment - intercept).abs() > 1e-3);
+        let tipred = recover_discrete_time_independent_predictor_effect(
+            effect,
+            predictor,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("tipred");
+        assert_eq!(
+            refuse_level_change_increment_as_impulse(increment, impulse),
+            Err(PsychometricError::LevelChangeIncrementIsNotImpulse)
+        );
+        assert_eq!(
+            refuse_level_change_increment_as_intercept(increment, intercept),
+            Err(PsychometricError::LevelChangeIncrementIsNotIntercept)
+        );
+        assert_eq!(
+            refuse_level_change_increment_as_process_increment(increment, tipred),
+            Err(PsychometricError::LevelChangeIncrementIsNotProcessIncrement)
+        );
+        let equilibrated = recover_level_change_discrete_increment(
+            effect,
+            predictor,
+            -800.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("underflow");
+        assert!((equilibrated - impulse).abs() < 1e-15);
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                0.0,
+                predictor,
+                drift,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn level_change_discrete_increment_invalid_inputs_fail_closed() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                effect,
+                predictor,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::LevelChangeRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                effect,
+                predictor,
+                0.5,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::LevelChangeRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                effect,
+                predictor,
+                drift,
+                delta,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                effect,
+                predictor,
+                drift,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(1e308, 2.0, drift, delta, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                f64::NAN,
+                predictor,
+                drift,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_discrete_increment(
+                0.0,
+                predictor,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
     }
 
     #[test]
