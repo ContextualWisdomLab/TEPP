@@ -61,6 +61,8 @@ The verifier and publisher receive neither provider nor model credentials.
   every configured provider before the schedule is enabled.
 - The workflow is not a Figma or visual interaction surface; no Figma file is
   applicable to this headless scheduler decision.
+- Figma File ID: N/A — this headless scheduler introduces no visual interaction
+  contract or design artifact.
 
 ## Verification
 
