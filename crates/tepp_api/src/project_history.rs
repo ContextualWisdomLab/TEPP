@@ -240,14 +240,15 @@ pub fn project_history_projection(
     request.validate()?;
     let mut ordered = request.events.clone();
     ordered.sort_by(|left, right| {
-        let left_time = parse_timestamp(&left.occurred_at);
-        let right_time = parse_timestamp(&right.occurred_at);
-        match (left_time, right_time) {
-            (Ok(left_time), Ok(right_time)) => left_time
-                .cmp(&right_time)
-                .then_with(|| left.event_id.cmp(&right.event_id)),
-            _ => std::cmp::Ordering::Equal,
-        }
+        // `request.validate()` above proves both event timestamps parse; an
+        // error here would indicate an internal mutation after validation.
+        let left_time = parse_timestamp(&left.occurred_at)
+            .expect("validated project-history event has a valid occurred_at");
+        let right_time = parse_timestamp(&right.occurred_at)
+            .expect("validated project-history event has a valid occurred_at");
+        left_time
+            .cmp(&right_time)
+            .then_with(|| left.event_id.cmp(&right.event_id))
     });
     let focus_index = ordered
         .iter()

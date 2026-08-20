@@ -156,6 +156,15 @@ fn projection_rejects_future_evidence_duplicates_and_unknown_json_fields() {
 }
 
 #[test]
+fn request_json_with_explicit_limit_round_trips_a_valid_contract() {
+    let request = sample_request();
+    let payload = request.to_json().expect("request json");
+    let parsed = ProjectHistoryRequest::from_json_with_limit(&payload, payload.len() + 1)
+        .expect("request with explicit limit");
+    assert_eq!(parsed, request);
+}
+
+#[test]
 fn lineageweave_exchange_uses_the_versioned_credential_free_tepp_path() {
     let exchange =
         lineageweave_project_history_exchange("https://tepp.example.test", &sample_request())
