@@ -44,6 +44,12 @@ pub enum PersistenceError {
     RestoreIntegrityFailed,
     /// A text segment had a negative or inverted UTF-8 byte span.
     InvalidTextSegment,
+    /// A retention, hold, deletion, or tombstone record failed closed validation.
+    InvalidRetentionLifecycle,
+    /// An active legal hold blocked completed deletion.
+    LegalHoldBlocksDeletion,
+    /// Tombstoned evidence cannot be restored, and raw-source deletion cannot keep reproduction available.
+    UngovernedEvidenceRestore,
 }
 
 impl fmt::Display for PersistenceError {
@@ -68,6 +74,9 @@ impl fmt::Display for PersistenceError {
             Self::ConcurrentWriteConflict => "concurrent write conflict",
             Self::RestoreIntegrityFailed => "restore integrity failed",
             Self::InvalidTextSegment => "invalid text segment",
+            Self::InvalidRetentionLifecycle => "invalid retention lifecycle",
+            Self::LegalHoldBlocksDeletion => "legal hold blocks deletion",
+            Self::UngovernedEvidenceRestore => "ungoverned evidence restore",
         };
         formatter.write_str(message)
     }
@@ -99,6 +108,8 @@ pub enum MigrationContractError {
     MissingAppendOnlyTrigger,
     /// Temporal interval ordering checks were incomplete when declared.
     MissingTemporalIntervalConstraint,
+    /// Retention/legal-hold migration declarations were incomplete.
+    MissingRetentionLegalHold,
 }
 
 impl fmt::Display for MigrationContractError {
@@ -114,6 +125,7 @@ impl fmt::Display for MigrationContractError {
             Self::MissingTenantSessionGuc => "missing tenant session guc",
             Self::MissingAppendOnlyTrigger => "missing append-only immutability trigger",
             Self::MissingTemporalIntervalConstraint => "missing temporal interval constraint",
+            Self::MissingRetentionLegalHold => "missing retention legal hold",
         };
         formatter.write_str(message)
     }
@@ -205,6 +217,18 @@ mod tests {
             "invalid text segment"
         );
         assert_eq!(
+            PersistenceError::InvalidRetentionLifecycle.to_string(),
+            "invalid retention lifecycle"
+        );
+        assert_eq!(
+            PersistenceError::LegalHoldBlocksDeletion.to_string(),
+            "legal hold blocks deletion"
+        );
+        assert_eq!(
+            PersistenceError::UngovernedEvidenceRestore.to_string(),
+            "ungoverned evidence restore"
+        );
+        assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),
             "single-word database object name"
         );
@@ -243,6 +267,10 @@ mod tests {
         assert_eq!(
             MigrationContractError::MissingTemporalIntervalConstraint.to_string(),
             "missing temporal interval constraint"
+        );
+        assert_eq!(
+            MigrationContractError::MissingRetentionLegalHold.to_string(),
+            "missing retention legal hold"
         );
     }
 }
