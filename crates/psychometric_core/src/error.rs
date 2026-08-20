@@ -269,6 +269,23 @@ pub enum PsychometricError {
     /// Eq. 3 process increment. `(1 − e^{a Δt}) m x` is not
     /// `A^{-1}[e^{A Δt} − I] B z`.
     LevelChangeIncrementIsNotProcessIncrement,
+    /// Driver §7.2 extra-process contribution was requested for a
+    /// non-negative extra drift. Lasting level change via the extra
+    /// latent process requires `ε < 0`. Precisely `ε = 0` causes
+    /// computational problems in the printed ctsem specification.
+    LevelChangeExtraProcessRequiresNegativeDrift,
+    /// Driver §7.2 extra-process contribution was treated as the
+    /// contemporaneous Dirac. `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`
+    /// is not `m x`.
+    LevelChangeExtraProcessIsNotImpulse,
+    /// Driver §7.2 extra-process contribution was treated as the
+    /// level-change `CINT`. `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`
+    /// is not `κ = −a m x`.
+    LevelChangeExtraProcessIsNotIntercept,
+    /// Driver §7.2 extra-process contribution was treated as the
+    /// Eq. 3 level-change increment. `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`
+    /// is not `(1 − e^{a Δt}) m x`.
+    LevelChangeExtraProcessIsNotIncrement,
 }
 
 impl fmt::Display for PsychometricError {
@@ -490,6 +507,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::LevelChangeIncrementIsNotProcessIncrement => {
                 "level-change CINT increment is not the time-independent process increment"
+            }
+            Self::LevelChangeExtraProcessRequiresNegativeDrift => {
+                "lasting level-change extra process requires strictly negative extra drift"
+            }
+            Self::LevelChangeExtraProcessIsNotImpulse => {
+                "level-change extra-process contribution is not the contemporaneous impulse"
+            }
+            Self::LevelChangeExtraProcessIsNotIntercept => {
+                "level-change extra-process contribution is not the level-change intercept"
+            }
+            Self::LevelChangeExtraProcessIsNotIncrement => {
+                "level-change extra-process contribution is not the level-change increment"
             }
         };
         formatter.write_str(message)
@@ -839,6 +868,22 @@ mod tests {
         assert_eq!(
             PsychometricError::LevelChangeIncrementIsNotProcessIncrement.to_string(),
             "level-change CINT increment is not the time-independent process increment"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeExtraProcessRequiresNegativeDrift.to_string(),
+            "lasting level-change extra process requires strictly negative extra drift"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeExtraProcessIsNotImpulse.to_string(),
+            "level-change extra-process contribution is not the contemporaneous impulse"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeExtraProcessIsNotIntercept.to_string(),
+            "level-change extra-process contribution is not the level-change intercept"
+        );
+        assert_eq!(
+            PsychometricError::LevelChangeExtraProcessIsNotIncrement.to_string(),
+            "level-change extra-process contribution is not the level-change increment"
         );
     }
 }

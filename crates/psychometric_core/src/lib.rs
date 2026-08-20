@@ -82,6 +82,11 @@
 //! recovers the Driver Eq. 3 increment of that setting as
 //! `(1 − e^{a Δt}) m x` (`(1 − e^{a Δt}) m x` is not `m x`, not `κ`,
 //! and not `A^{-1}[e^{A Δt} − I] B z`),
+//! recovers the Driver §7.2 extra near-zero-drift latent process
+//! contribution `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)` (pp. 22–23;
+//! identification `TDPREDEFFECT` on the extra process is 1; `ε < 0`;
+//! printed extra `DRIFT` is `−0.000001`; not `κ = −a m x`, not
+//! `(1 − e^{a Δt}) m x`, and not the dissipating Dirac `m x`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -190,6 +195,8 @@ pub use event_time::recover_irregular_centered_residual_log_rate;
 pub use event_time::recover_level_change_continuous_intercept;
 /// Exact scalar Eq. 3 increment of that `CINT` `(1 − e^{a Δt}) m x`.
 pub use event_time::recover_level_change_discrete_increment;
+/// Exact scalar §7.2 extra-process contribution `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`.
+pub use event_time::recover_level_change_extra_process_contribution;
 /// Exact scalar inverse `a = ln(φ) / Δt`.
 pub use event_time::recover_local_log_rate;
 /// Exact scalar lagged observed-indicator covariance `λ² cov(η) + ψ`.
@@ -282,6 +289,12 @@ pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 pub use event_time::refuse_latent_mean_as_observed_mean;
 /// Refuse treating Driver Eq. 5 latent variance as `Var(y)`.
 pub use event_time::refuse_latent_variance_as_observed_variance;
+/// Refuse treating the §7.2 extra-process contribution as the contemporaneous Dirac.
+pub use event_time::refuse_level_change_extra_process_as_impulse;
+/// Refuse treating the §7.2 extra-process contribution as the Eq. 3 level-change increment.
+pub use event_time::refuse_level_change_extra_process_as_increment;
+/// Refuse treating the §7.2 extra-process contribution as the level-change `CINT`.
+pub use event_time::refuse_level_change_extra_process_as_intercept;
 /// Refuse treating the §7.2 level-change CINT increment as the contemporaneous Dirac.
 pub use event_time::refuse_level_change_increment_as_impulse;
 /// Refuse treating the §7.2 level-change CINT increment as `CINT`.

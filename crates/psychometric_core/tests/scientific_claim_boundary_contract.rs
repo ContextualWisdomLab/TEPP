@@ -21,12 +21,12 @@ use psychometric_core::{
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
-    recover_level_change_discrete_increment, recover_loading_point_estimate_mean,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
+    recover_loading_point_estimate_mean, recover_manifest_lagged_observed_covariance,
+    recover_manifest_observed_mean, recover_manifest_observed_variance,
+    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
@@ -59,8 +59,10 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
-    refuse_latent_variance_as_observed_variance, refuse_level_change_increment_as_impulse,
-    refuse_level_change_increment_as_intercept, refuse_level_change_increment_as_process_increment,
+    refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
+    refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
+    refuse_level_change_increment_as_impulse, refuse_level_change_increment_as_intercept,
+    refuse_level_change_increment_as_process_increment,
     refuse_level_change_intercept_as_free_continuous_intercept,
     refuse_level_change_intercept_as_impulse, refuse_level_change_intercept_as_process_increment,
     refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
@@ -1756,5 +1758,58 @@ fn level_change_increment_is_not_impulse_intercept_or_process_increment() {
     assert_eq!(
         refuse_level_change_increment_as_process_increment(increment, tipred),
         Err(psychometric_core::PsychometricError::LevelChangeIncrementIsNotProcessIncrement)
+    );
+}
+
+#[test]
+fn extra_process_contribution_is_not_cint_rewrite_increment_or_impulse() {
+    let coupling = 0.4_f64;
+    let predictor = 3.0_f64;
+    let original = -0.5_f64;
+    let extra = -0.05_f64;
+    let delta = 2.0_f64;
+    let recovered = recover_level_change_extra_process_contribution(
+        coupling,
+        predictor,
+        original,
+        extra,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("extra-process");
+    let intercept =
+        recover_level_change_continuous_intercept(coupling, predictor, original).expect("cint");
+    let increment = recover_level_change_discrete_increment(
+        coupling,
+        predictor,
+        original,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("increment");
+    let impulse = recover_time_dependent_predictor_impulse(coupling, predictor).expect("impulse");
+    assert!(
+        (recovered - intercept).abs() > 1e-3,
+        "Driver et al. (2017, §7.2 pp. 22–23): extra-process contribution is not κ = −a m x"
+    );
+    assert!(
+        (recovered - increment).abs() > 1e-3,
+        "Driver et al. (2017, §7.2 pp. 22–23): extra-process contribution is not (1 − e^{{aΔt}}) m x"
+    );
+    assert!(
+        (recovered - impulse).abs() > 1e-3,
+        "Driver et al. (2017, §7.2 pp. 22–23): extra-process contribution is not the dissipating Dirac m x"
+    );
+    assert_eq!(
+        refuse_level_change_extra_process_as_impulse(recovered, impulse),
+        Err(psychometric_core::PsychometricError::LevelChangeExtraProcessIsNotImpulse)
+    );
+    assert_eq!(
+        refuse_level_change_extra_process_as_intercept(recovered, intercept),
+        Err(psychometric_core::PsychometricError::LevelChangeExtraProcessIsNotIntercept)
+    );
+    assert_eq!(
+        refuse_level_change_extra_process_as_increment(recovered, increment),
+        Err(psychometric_core::PsychometricError::LevelChangeExtraProcessIsNotIncrement)
     );
 }

@@ -25,11 +25,12 @@ use psychometric_core::{
     recover_initial_time_independent_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
     recover_level_change_continuous_intercept, recover_level_change_discrete_increment,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_level_change_extra_process_contribution, recover_manifest_lagged_observed_covariance,
+    recover_manifest_observed_mean, recover_manifest_observed_variance,
+    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -62,8 +63,10 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
-    refuse_latent_variance_as_observed_variance, refuse_level_change_increment_as_impulse,
-    refuse_level_change_increment_as_intercept, refuse_level_change_increment_as_process_increment,
+    refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
+    refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
+    refuse_level_change_increment_as_impulse, refuse_level_change_increment_as_intercept,
+    refuse_level_change_increment_as_process_increment,
     refuse_level_change_intercept_as_free_continuous_intercept,
     refuse_level_change_intercept_as_impulse, refuse_level_change_intercept_as_process_increment,
     refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
@@ -3573,6 +3576,141 @@ fn level_change_discrete_increment_refuses_unstable_drift_clock_and_overflow() {
     );
     assert_eq!(
         recover_level_change_discrete_increment(0.0, 3.0, 0.0, 2.0, LagClock::EventTime),
+        Ok(0.0)
+    );
+}
+
+#[test]
+fn extra_process_contribution_recovers_driver_section_seven_point_two() {
+    let coupling = 0.569_907_f64;
+    let predictor = 1.0_f64;
+    let original = -0.1393_f64;
+    let extra = -0.000_001_f64;
+    let delta = 1.0_f64;
+    let recovered = recover_level_change_extra_process_contribution(
+        coupling,
+        predictor,
+        original,
+        extra,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("extra-process");
+    let expected = coupling * predictor * ((extra * delta).exp() - (original * delta).exp())
+        / (extra - original);
+    assert!(
+        rmse(&[expected], &[recovered]) < 1e-15,
+        "Driver et al. (2017, §7.2 pp. 22–23) extra-process map: expected {expected}, got {recovered}"
+    );
+    let intercept =
+        recover_level_change_continuous_intercept(coupling, predictor, original).expect("cint");
+    let increment = recover_level_change_discrete_increment(
+        coupling,
+        predictor,
+        original,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("increment");
+    let impulse = recover_time_dependent_predictor_impulse(coupling, predictor).expect("impulse");
+    let distinction = recover_level_change_extra_process_contribution(
+        0.4,
+        3.0,
+        -0.5,
+        -0.05,
+        2.0,
+        LagClock::EventTime,
+    )
+    .expect("distinction");
+    let distinct_intercept =
+        recover_level_change_continuous_intercept(0.4, 3.0, -0.5).expect("distinct-cint");
+    let distinct_increment =
+        recover_level_change_discrete_increment(0.4, 3.0, -0.5, 2.0, LagClock::EventTime)
+            .expect("distinct-increment");
+    let distinct_impulse = recover_time_dependent_predictor_impulse(0.4, 3.0).expect("dirac");
+    assert!(rmse(&[distinct_intercept], &[distinction]) > 1e-3);
+    assert!(rmse(&[distinct_increment], &[distinction]) > 1e-3);
+    assert!(rmse(&[distinct_impulse], &[distinction]) > 1e-3);
+    assert_eq!(
+        refuse_level_change_extra_process_as_impulse(recovered, impulse),
+        Err(PsychometricError::LevelChangeExtraProcessIsNotImpulse)
+    );
+    assert_eq!(
+        refuse_level_change_extra_process_as_intercept(recovered, intercept),
+        Err(PsychometricError::LevelChangeExtraProcessIsNotIntercept)
+    );
+    assert_eq!(
+        refuse_level_change_extra_process_as_increment(recovered, increment),
+        Err(PsychometricError::LevelChangeExtraProcessIsNotIncrement)
+    );
+}
+
+#[test]
+fn extra_process_contribution_refuses_nonnegative_extra_drift_clock_and_overflow() {
+    assert_eq!(
+        recover_level_change_extra_process_contribution(
+            0.4,
+            3.0,
+            -0.5,
+            0.0,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::LevelChangeExtraProcessRequiresNegativeDrift)
+    );
+    assert_eq!(
+        recover_level_change_extra_process_contribution(
+            0.4,
+            3.0,
+            -0.5,
+            0.5,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::LevelChangeExtraProcessRequiresNegativeDrift)
+    );
+    assert_eq!(
+        recover_level_change_extra_process_contribution(
+            0.4,
+            3.0,
+            -0.5,
+            -0.000_001,
+            2.0,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_level_change_extra_process_contribution(
+            0.4,
+            3.0,
+            -0.5,
+            -0.000_001,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_level_change_extra_process_contribution(
+            1e308,
+            2.0,
+            -0.5,
+            -0.000_001,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_level_change_extra_process_contribution(
+            0.0,
+            3.0,
+            -0.5,
+            0.0,
+            2.0,
+            LagClock::EventTime
+        ),
         Ok(0.0)
     );
 }

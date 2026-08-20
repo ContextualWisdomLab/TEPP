@@ -76,7 +76,18 @@
 //! Dirac, not a free `CINT`, and not the extra near-zero-drift
 //! latent process also named in §7.2. Equation 3 maps that
 //! intercept as `(1 − e^{a Δt}) m x` (`(1 − e^{a Δt}) m x` is not
-//! `m x`, not `κ`, and not `A^{-1}[e^{A Δt} − I] B z`). The JSS article
+//! `m x`, not `κ`, and not `A^{-1}[e^{A Δt} − I] B z`). Section 7.2
+//! (pp. 22–23) then specifies a lasting level change by an extra
+//! latent process: `T0MEANS`, `CINT`, `T0VAR`, `DIFFUSION`, and
+//! `TRAITVAR` of that process are fixed to 0; `TDPREDEFFECT` on it
+//! is fixed to 1; its `DRIFT` diagonal is very close to 0 (printed
+//! example `−0.000001`; precisely 0 causes computational problems);
+//! and its effect on the original process is the `DRIFT` coupling
+//! `a_{ηξ}`. After a unit identification impulse the scalar
+//! contribution is `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`
+//! (`ε = a` is `a_{ηξ} x Δt e^{a Δt}`). That contribution is not
+//! `κ = −a m x`, not `(1 − e^{a Δt}) m x`, and not the dissipating
+//! Dirac `m x`. `ε ≥ 0` fails closed. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -1542,6 +1553,148 @@ pub fn refuse_level_change_increment_as_process_increment(
 ) -> Result<f64, PsychometricError> {
     let _ = (level_change_increment, time_independent_increment);
     Err(PsychometricError::LevelChangeIncrementIsNotProcessIncrement)
+}
+
+/// Exact scalar contribution of the §7.2 extra near-zero-drift process.
+///
+/// Driver, Oud, and Voelkle (2017, §7.2, pp. 22–23; Eq. 1–3, pp. 4–5;
+/// Table 2, p. 12; JSS PDF re-opened 2026-08-20T23:10Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// specify a lasting level change by an extra latent process, not by
+/// rewriting `CINT`. `T0MEANS`, `CINT`, `T0VAR`, `DIFFUSION`, and
+/// `TRAITVAR` of that process are fixed to 0. `TDPREDEFFECT` on it is
+/// fixed to 1 to identify the effect. Its `DRIFT` diagonal is very
+/// close to 0 (printed example `−0.000001`; precisely 0 causes
+/// computational problems). The original process is driven by the
+/// `DRIFT` coupling `a_{ηξ}`. After a unit identification impulse the
+/// extra state is `x e^{ε t}` and the scalar contribution to the
+/// original process is `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`.
+/// Form `a_{ηξ} x` first. When `ε = a` the contribution is
+/// `a_{ηξ} x Δt e^{a Δt}`. A zero coupling or zero predictor is
+/// exactly zero. `ε ≥ 0` cannot hold a lasting extra state and fails
+/// closed. That contribution is not `κ = −a m x`, not
+/// `(1 − e^{a Δt}) m x`, and not the dissipating Dirac `m x`. This
+/// is not a Kalman filter, not a matrix `expm`, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::NonPositiveInterval`] when the interval
+/// is not strictly positive,
+/// [`PsychometricError::LevelChangeExtraProcessRequiresNegativeDrift`]
+/// when the extra drift is not strictly negative and the contribution
+/// is nonzero, and [`PsychometricError::InvalidNumericInput`] when an
+/// input is non-finite or a product, exponential, or quotient
+/// overflows.
+pub fn recover_level_change_extra_process_contribution(
+    original_from_extra_drift: f64,
+    time_dependent_predictor: f64,
+    original_log_rate: f64,
+    extra_log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !original_from_extra_drift.is_finite()
+        || !time_dependent_predictor.is_finite()
+        || !original_log_rate.is_finite()
+        || !extra_log_rate.is_finite()
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if original_from_extra_drift == 0.0 || time_dependent_predictor == 0.0 {
+        return Ok(0.0);
+    }
+    if extra_log_rate >= 0.0 {
+        return Err(PsychometricError::LevelChangeExtraProcessRequiresNegativeDrift);
+    }
+    let coupling = require_finite(original_from_extra_drift * time_dependent_predictor)?;
+    let extra_argument = extra_log_rate * event_delta;
+    let extra_lag = if extra_argument == 0.0 {
+        1.0
+    } else {
+        extra_argument.exp()
+    };
+    let original_argument = original_log_rate * event_delta;
+    let original_lag = if original_log_rate == 0.0 || original_argument == 0.0 {
+        1.0
+    } else {
+        let lag = original_argument.exp();
+        if !lag.is_finite() {
+            return Err(PsychometricError::InvalidNumericInput);
+        }
+        lag
+    };
+    let rate_gap = extra_log_rate - original_log_rate;
+    let gap_argument = rate_gap * event_delta;
+    if gap_argument == 0.0 {
+        return require_finite(coupling * event_delta * original_lag);
+    }
+    let increment = gap_argument.exp_m1();
+    if increment.is_finite() {
+        if original_lag == 0.0 {
+            return require_finite(coupling * extra_lag / rate_gap);
+        }
+        return require_finite(coupling * original_lag * (increment / rate_gap));
+    }
+    require_finite(coupling * (extra_lag - original_lag) / rate_gap)
+}
+
+/// Refuse treating the §7.2 extra-process contribution as the
+/// contemporaneous Dirac.
+///
+/// `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)` is not the jump `m x`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::LevelChangeExtraProcessIsNotImpulse`].
+pub fn refuse_level_change_extra_process_as_impulse(
+    extra_process_contribution: f64,
+    time_dependent_impulse: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (extra_process_contribution, time_dependent_impulse);
+    Err(PsychometricError::LevelChangeExtraProcessIsNotImpulse)
+}
+
+/// Refuse treating the §7.2 extra-process contribution as the
+/// level-change `CINT`.
+///
+/// `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)` is not `κ = −a m x`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LevelChangeExtraProcessIsNotIntercept`].
+pub fn refuse_level_change_extra_process_as_intercept(
+    extra_process_contribution: f64,
+    level_change_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (extra_process_contribution, level_change_intercept);
+    Err(PsychometricError::LevelChangeExtraProcessIsNotIntercept)
+}
+
+/// Refuse treating the §7.2 extra-process contribution as the Eq. 3
+/// level-change increment.
+///
+/// `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)` is not
+/// `(1 − e^{a Δt}) m x`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LevelChangeExtraProcessIsNotIncrement`].
+pub fn refuse_level_change_extra_process_as_increment(
+    extra_process_contribution: f64,
+    level_change_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (extra_process_contribution, level_change_increment);
+    Err(PsychometricError::LevelChangeExtraProcessIsNotIncrement)
 }
 
 /// Exact scalar evolved latent mean plus a contemporaneous impulse.
@@ -3419,12 +3572,13 @@ mod tests {
         recover_initial_time_independent_predictor_carry,
         recover_initial_time_independent_predictor_effect,
         recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
-        recover_level_change_discrete_increment, recover_local_log_rate,
-        recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-        recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-        recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
-        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+        recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
+        recover_local_log_rate, recover_manifest_lagged_observed_covariance,
+        recover_manifest_observed_mean, recover_manifest_observed_variance,
+        recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+        recover_within_residual_event_time_log_rate,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -3458,7 +3612,10 @@ mod tests {
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
-        refuse_level_change_increment_as_impulse, refuse_level_change_increment_as_intercept,
+        refuse_level_change_extra_process_as_impulse,
+        refuse_level_change_extra_process_as_increment,
+        refuse_level_change_extra_process_as_intercept, refuse_level_change_increment_as_impulse,
+        refuse_level_change_increment_as_intercept,
         refuse_level_change_increment_as_process_increment,
         refuse_level_change_intercept_as_free_continuous_intercept,
         refuse_level_change_intercept_as_impulse,
@@ -5725,6 +5882,277 @@ mod tests {
             ),
             Ok(0.0)
         );
+    }
+
+    #[test]
+    fn extra_process_contribution_recovers_driver_section_seven_point_two() {
+        let coupling = 0.569_907_f64;
+        let predictor = 1.0_f64;
+        let original = -0.1393_f64;
+        let extra = -0.000_001_f64;
+        let delta = 1.0_f64;
+        let recovered = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            original,
+            extra,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("extra-process");
+        let expected = coupling * predictor * ((extra * delta).exp() - (original * delta).exp())
+            / (extra - original);
+        assert!((recovered - expected).abs() < 1e-15);
+        let equal_rate = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            extra,
+            extra,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("equal-rate");
+        let equal_expected = coupling * predictor * delta * (extra * delta).exp();
+        assert!((equal_rate - equal_expected).abs() < 1e-15);
+        let brownian = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            0.0,
+            extra,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("brownian-original");
+        let brownian_expected = coupling * predictor * (extra * delta).exp_m1() / extra;
+        assert!((brownian - brownian_expected).abs() < 1e-15);
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                0.0,
+                predictor,
+                original,
+                extra,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                coupling,
+                0.0,
+                original,
+                extra,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                coupling,
+                0.0,
+                original,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn extra_process_contribution_is_not_cint_rewrite_or_impulse() {
+        let coupling = 0.4_f64;
+        let predictor = 3.0_f64;
+        let original = -0.5_f64;
+        let extra = -0.05_f64;
+        let delta = 2.0_f64;
+        let recovered = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            original,
+            extra,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("extra-process");
+        let intercept = recover_level_change_continuous_intercept(coupling, predictor, original)
+            .expect("level-change");
+        let increment = recover_level_change_discrete_increment(
+            coupling,
+            predictor,
+            original,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("level-change-increment");
+        let impulse =
+            recover_time_dependent_predictor_impulse(coupling, predictor).expect("impulse");
+        assert!((recovered - intercept).abs() > 1e-3);
+        assert!((recovered - increment).abs() > 1e-3);
+        assert!((recovered - impulse).abs() > 1e-3);
+        assert_eq!(
+            refuse_level_change_extra_process_as_impulse(recovered, impulse),
+            Err(PsychometricError::LevelChangeExtraProcessIsNotImpulse)
+        );
+        assert_eq!(
+            refuse_level_change_extra_process_as_intercept(recovered, intercept),
+            Err(PsychometricError::LevelChangeExtraProcessIsNotIntercept)
+        );
+        assert_eq!(
+            refuse_level_change_extra_process_as_increment(recovered, increment),
+            Err(PsychometricError::LevelChangeExtraProcessIsNotIncrement)
+        );
+    }
+
+    #[test]
+    fn extra_process_contribution_invalid_inputs_fail_closed() {
+        let coupling = 0.4_f64;
+        let predictor = 3.0_f64;
+        let original = -0.5_f64;
+        let extra = -0.000_001_f64;
+        let delta = 2.0_f64;
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                coupling,
+                predictor,
+                original,
+                0.0,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::LevelChangeExtraProcessRequiresNegativeDrift)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                coupling,
+                predictor,
+                original,
+                0.5,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::LevelChangeExtraProcessRequiresNegativeDrift)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                coupling,
+                predictor,
+                original,
+                extra,
+                delta,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                coupling,
+                predictor,
+                original,
+                extra,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                f64::NAN,
+                predictor,
+                original,
+                extra,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                1e308,
+                2.0,
+                original,
+                extra,
+                delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(
+                coupling,
+                predictor,
+                710.0,
+                extra,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn extra_process_contribution_underflow_and_overflow_paths() {
+        let coupling = 0.4_f64;
+        let predictor = 3.0_f64;
+        let original = -0.5_f64;
+        let extra = -0.000_001_f64;
+        let vanished = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            -800.0,
+            extra,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("underflow");
+        let vanished_expected = coupling * predictor * (extra * 1.0).exp() / (extra - -800.0);
+        assert!((vanished - vanished_expected).abs() < 1e-15);
+        let extra_underflow = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            original,
+            -f64::from_bits(1),
+            0.5,
+            LagClock::EventTime,
+        )
+        .expect("extra-argument-underflow");
+        assert!(extra_underflow.is_finite());
+        let original_underflow = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            -2e-160_f64,
+            -1e-160_f64,
+            1e-200_f64,
+            LagClock::EventTime,
+        )
+        .expect("gap-argument-underflow");
+        let original_underflow_expected = coupling * predictor * 1e-200_f64;
+        assert!((original_underflow - original_underflow_expected).abs() <= 1e-200_f64);
+        let vanished_finite_increment = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            -800.0,
+            -92.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("original-lag-underflow-finite-increment");
+        let vanished_finite_expected = coupling * predictor * (-92.0_f64).exp() / (-92.0 - -800.0);
+        assert!((vanished_finite_increment - vanished_finite_expected).abs() < 1e-15);
+        let overflow_fallback = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            -0.8,
+            extra,
+            900.0,
+            LagClock::EventTime,
+        )
+        .expect("expm1-overflow-fallback");
+        let overflow_expected =
+            coupling * predictor * ((extra * 900.0).exp() - (-0.8_f64 * 900.0).exp())
+                / (extra - -0.8);
+        assert!((overflow_fallback - overflow_expected).abs() < 1e-12);
     }
 
     #[test]
