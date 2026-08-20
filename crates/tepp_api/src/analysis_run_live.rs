@@ -134,6 +134,9 @@ impl AnalysisRunLiveService {
         let headers = parse_headers(&mut lines)?;
         let consumer = require_headers(&headers, self.bound_addr)?;
         if path == TEMPORAL_CONTEXT_PATH {
+            if consumer != crate::lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE {
+                return Err(ApiError::InvalidWirePayload);
+            }
             let context_request = TemporalContextRequest::from_json(body)?;
             let response = build_temporal_context(&context_request)?;
             return Ok(json_response(200, "OK", response.to_json()?));

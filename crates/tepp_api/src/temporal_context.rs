@@ -243,11 +243,14 @@ impl TemporalContextResponse {
         }
         if self.timeline_events.is_empty()
             || self.timeline_events.len() != self.source_post_ids.len()
-            || self.temporal_relations.len() + 1 != self.timeline_events.len()
-            || self.transition_gap_candidates.len() + 1 != self.timeline_events.len()
+            || self.temporal_relations.len().checked_add(1) != Some(self.timeline_events.len())
+            || self.transition_gap_candidates.len().checked_add(1)
+                != Some(self.timeline_events.len())
         {
             return Err(ApiError::InvalidWirePayload);
         }
+        let mut event_ids = HashSet::with_capacity(self.timeline_events.len());
+        let mut previous_key: Option<(TemporalInstant, &str)> = None;
         for (ordinal, event) in self.timeline_events.iter().enumerate() {
             if event.sequence_ordinal != ordinal
                 || event.event_id.is_empty()
@@ -259,6 +262,25 @@ impl TemporalContextResponse {
                 || self.source_post_ids[ordinal] != event.source_post_id
             {
                 return Err(ApiError::InvalidWirePayload);
+            }
+            if !event_ids.insert(event.event_id.clone()) {
+                return Err(ApiError::InvalidWirePayload);
+            }
+            let event_time = EventTime::parse_rfc3339(&event.event_time)
+                .map_err(|_| ApiError::InvalidWirePayload)?
+                .instant();
+            if let Some((previous_time, previous_id)) = previous_key
+                && (event_time < previous_time
+                    || (event_time == previous_time && event.event_id.as_str() <= previous_id))
+            {
+                return Err(ApiError::InvalidWirePayload);
+            }
+            previous_key = Some((event_time, event.event_id.as_str()));
+            if let Some(project_reference) = &event.project_reference {
+                require_nonempty(project_reference)?;
+            }
+            for actor_reference in &event.actor_references {
+                require_nonempty(actor_reference)?;
             }
         }
         for (index, relation) in self.temporal_relations.iter().enumerate() {

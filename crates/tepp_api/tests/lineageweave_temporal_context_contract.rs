@@ -3,7 +3,7 @@
 use std::fmt::Write as _;
 
 use tepp_api::{
-    AnalysisRunLiveService, ApiError, LINEAGEWEAVE_CONSUMER_CODE,
+    AnalysisRunLiveService, ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE,
     TEMPORAL_ASSOCIATION_CLAIM_BOUNDARY, TEMPORAL_CONTEXT_CONTRACT_VERSION, TEMPORAL_CONTEXT_PATH,
     TemporalContextEvent, TemporalContextRequest, TemporalContextResponse, build_temporal_context,
     lineageweave_temporal_context_exchange,
@@ -78,11 +78,15 @@ fn request() -> TemporalContextRequest {
 }
 
 fn http_request(body: &str) -> String {
+    http_request_for_consumer(body, LINEAGEWEAVE_CONSUMER_CODE)
+}
+
+fn http_request_for_consumer(body: &str, consumer: &str) -> String {
     let mut value = format!("POST {TEMPORAL_CONTEXT_PATH} HTTP/1.1\r\n");
     for (name, header_value) in [
         ("Host", "127.0.0.1"),
         ("content-type", "application/json"),
-        ("tepp-consumer", LINEAGEWEAVE_CONSUMER_CODE),
+        ("tepp-consumer", consumer),
         ("tepp-contract-version", "1"),
         ("idempotency-key", "timeline-001"),
     ] {
@@ -335,6 +339,26 @@ fn temporal_context_rejects_invalid_response_fields_and_edges() {
     for invalid in [
         {
             let mut value = two_response.clone();
+            value.timeline_events[0].event_time = "2026-08-02T09:00:00Z".into();
+            value
+        },
+        {
+            let mut value = two_response.clone();
+            value.timeline_events[1].event_id = value.timeline_events[0].event_id.clone();
+            value
+        },
+        {
+            let mut value = two_response.clone();
+            value.timeline_events[0].project_reference = Some(" ".into());
+            value
+        },
+        {
+            let mut value = two_response.clone();
+            value.timeline_events[0].actor_references = vec![" ".into()];
+            value
+        },
+        {
+            let mut value = two_response.clone();
             value.temporal_relations[0].from_event_id = "wrong".into();
             value
         },
@@ -366,4 +390,12 @@ fn temporal_context_rejects_invalid_response_fields_and_edges() {
     ] {
         assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
     }
+}
+
+#[test]
+fn temporal_context_requires_matching_lineageweave_header() {
+    let body = request().to_json().expect("request json");
+    let response = AnalysisRunLiveService::new()
+        .handle_http_request(&http_request_for_consumer(&body, NARUON_CONSUMER_CODE));
+    assert_eq!(response.status_code, 400);
 }
