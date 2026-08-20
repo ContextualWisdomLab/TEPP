@@ -17,7 +17,12 @@
 //! can belong to multiple entities and projects without atomistic collapse.
 //! Concurrent document revises use one transactional `DO` block that requires
 //! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
-//! typed conflict errors.
+//! typed conflict errors. Restore integrity probes refuse to mark analytical
+//! state usable until tenant, digest, cutoff, temporal windows, and append-only
+//! triggers revalidate. Retention, deletion, and legal-hold SQL (migration
+//! `0007`) records policy-driven lifecycle without restoring tombstoned
+//! evidence or completing a deletion under an active hold. Analysis exclusion
+//! is kind-aligned, and deletion requests bind to the cited policy.
 
 mod artifact_sql;
 mod concurrent_write;
@@ -35,6 +40,8 @@ mod migration;
 mod model_run_sql;
 mod naming;
 mod relation_sql;
+mod restore_integrity;
+mod retention_sql;
 mod sql_session;
 mod sqlx_gate;
 #[cfg(feature = "live-sqlx")]
@@ -55,6 +62,8 @@ pub use artifact_sql::source_artifacts_are_idempotent_matches;
 pub use concurrent_write::DEADLOCK_DETECTED_SQLSTATE;
 /// `PostgreSQL` `exclusion_violation` SQLSTATE.
 pub use concurrent_write::EXCLUSION_VIOLATION_SQLSTATE;
+/// `PostgreSQL` `lock_not_available` SQLSTATE (`FOR UPDATE NOWAIT`).
+pub use concurrent_write::LOCK_NOT_AVAILABLE_SQLSTATE;
 /// `PostgreSQL` `serialization_failure` SQLSTATE.
 pub use concurrent_write::SERIALIZATION_FAILURE_SQLSTATE;
 /// `PostgreSQL` `unique_violation` SQLSTATE.
@@ -149,6 +158,42 @@ pub use naming::is_multi_word_snake_case;
 pub use relation_sql::EventRelationRecord;
 /// Render insert SQL for a validated event relation.
 pub use relation_sql::insert_event_relation_sql;
+/// Opaque usable-state token after restore integrity passes.
+pub use restore_integrity::RestoreUsableState;
+/// Restored snapshot values that must be revalidated before use.
+pub use restore_integrity::RestoredAnalyticalSnapshot;
+/// Physical tables a backup/restore pair must cover.
+pub use restore_integrity::backup_scope_tables;
+/// Mark restored analytical state usable only after integrity revalidation.
+pub use restore_integrity::mark_restored_state_usable;
+/// SQL probes that fail closed on unusable restored rows.
+pub use restore_integrity::restore_integrity_probe_sqls;
+/// Auditable deletion request row.
+pub use retention_sql::DeletionRequestRecord;
+/// Append-only evidence tombstone row.
+pub use retention_sql::EvidenceTombstoneRecord;
+/// Legal or contractual hold row.
+pub use retention_sql::LegalHoldRecord;
+/// Tenant-scoped retention policy row.
+pub use retention_sql::RetentionPolicyRecord;
+/// Map a lifecycle SQL failure message onto a typed persistence error.
+pub use retention_sql::classify_lifecycle_sql_failure;
+/// Render insert SQL for a completed deletion after hold evaluation.
+pub use retention_sql::insert_completed_deletion_request_sql;
+/// Render insert SQL for a validated deletion request.
+pub use retention_sql::insert_deletion_request_sql;
+/// Render insert SQL for a validated evidence tombstone.
+pub use retention_sql::insert_evidence_tombstone_sql;
+/// Render insert SQL for a validated legal hold.
+pub use retention_sql::insert_legal_hold_sql;
+/// Render insert SQL for a validated retention policy.
+pub use retention_sql::insert_retention_policy_sql;
+/// Render SQL that releases one active legal hold.
+pub use retention_sql::release_legal_hold_sql;
+/// Render active-analysis selection that excludes revoked or tombstoned documents.
+pub use retention_sql::select_active_analysis_document_sql;
+/// Render supersede SQL for a successive retention policy.
+pub use retention_sql::supersede_retention_policy_sql;
 /// Recording SQL transport for offline contract tests.
 pub use sql_session::RecordingSqlSession;
 /// Live SQL transport contract.

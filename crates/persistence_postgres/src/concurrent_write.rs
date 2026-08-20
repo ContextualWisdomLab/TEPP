@@ -14,10 +14,13 @@ pub const DEADLOCK_DETECTED_SQLSTATE: &str = "40P01";
 /// `PostgreSQL` `exclusion_violation` SQLSTATE.
 pub const EXCLUSION_VIOLATION_SQLSTATE: &str = "23P01";
 
+/// `PostgreSQL` `lock_not_available` SQLSTATE (`FOR UPDATE NOWAIT`).
+pub const LOCK_NOT_AVAILABLE_SQLSTATE: &str = "55P03";
+
 /// Map a `PostgreSQL` SQLSTATE from a racing write onto a domain error.
 ///
 /// Unique identity collisions stay [`PersistenceError::DuplicateDocumentRecord`].
-/// Serialization, deadlock, and exclusion failures become
+/// Serialization, deadlock, exclusion, and `NOWAIT` lock failures become
 /// [`PersistenceError::ConcurrentWriteConflict`]. Other codes stay unmapped so
 /// the transport can fail closed as a generic execution error.
 #[must_use]
@@ -26,7 +29,8 @@ pub fn classify_write_conflict(sqlstate: &str) -> Option<PersistenceError> {
         UNIQUE_VIOLATION_SQLSTATE => Some(PersistenceError::DuplicateDocumentRecord),
         SERIALIZATION_FAILURE_SQLSTATE
         | DEADLOCK_DETECTED_SQLSTATE
-        | EXCLUSION_VIOLATION_SQLSTATE => Some(PersistenceError::ConcurrentWriteConflict),
+        | EXCLUSION_VIOLATION_SQLSTATE
+        | LOCK_NOT_AVAILABLE_SQLSTATE => Some(PersistenceError::ConcurrentWriteConflict),
         _ => None,
     }
 }
@@ -34,8 +38,8 @@ pub fn classify_write_conflict(sqlstate: &str) -> Option<PersistenceError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        DEADLOCK_DETECTED_SQLSTATE, EXCLUSION_VIOLATION_SQLSTATE, SERIALIZATION_FAILURE_SQLSTATE,
-        UNIQUE_VIOLATION_SQLSTATE, classify_write_conflict,
+        DEADLOCK_DETECTED_SQLSTATE, EXCLUSION_VIOLATION_SQLSTATE, LOCK_NOT_AVAILABLE_SQLSTATE,
+        SERIALIZATION_FAILURE_SQLSTATE, UNIQUE_VIOLATION_SQLSTATE, classify_write_conflict,
     };
     use crate::PersistenceError;
 
@@ -55,6 +59,10 @@ mod tests {
         );
         assert_eq!(
             classify_write_conflict(EXCLUSION_VIOLATION_SQLSTATE),
+            Some(PersistenceError::ConcurrentWriteConflict)
+        );
+        assert_eq!(
+            classify_write_conflict(LOCK_NOT_AVAILABLE_SQLSTATE),
             Some(PersistenceError::ConcurrentWriteConflict)
         );
         assert_eq!(classify_write_conflict("00000"), None);
