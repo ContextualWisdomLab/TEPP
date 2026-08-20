@@ -133,7 +133,7 @@ pub fn identity_recovery_rate(truth: &[bool], decided: &[bool]) -> Result<f64, P
 
 #[cfg(test)]
 mod tests {
-    use super::{identity_recovery_rate, refuse_untrusted_payload, PayloadBound, PayloadKind};
+    use super::{PayloadBound, PayloadKind, identity_recovery_rate, refuse_untrusted_payload};
     use crate::PayloadBoundError;
 
     #[test]

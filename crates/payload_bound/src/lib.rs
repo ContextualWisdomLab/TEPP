@@ -10,13 +10,13 @@
 mod bound;
 mod error;
 
-/// Fraction of recovered accept/reject flags that match known truth.
-pub use bound::identity_recovery_rate;
-/// Refuse an untrusted payload that fails identity, provenance, size, or depth.
-pub use bound::refuse_untrusted_payload;
 /// Positive byte and nesting-depth limits for one untrusted payload.
 pub use bound::PayloadBound;
 /// Closed vocabulary of untrusted inbound payload kinds.
 pub use bound::PayloadKind;
+/// Fraction of recovered accept/reject flags that match known truth.
+pub use bound::identity_recovery_rate;
+/// Refuse an untrusted payload that fails identity, provenance, size, or depth.
+pub use bound::refuse_untrusted_payload;
 /// Fail-closed payload-bound errors.
 pub use error::PayloadBoundError;

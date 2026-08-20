@@ -1,7 +1,7 @@
 //! Untrusted payloads fail closed without identity, provenance, size, and depth.
 
 use payload_bound::{
-    identity_recovery_rate, refuse_untrusted_payload, PayloadBound, PayloadBoundError, PayloadKind,
+    PayloadBound, PayloadBoundError, PayloadKind, identity_recovery_rate, refuse_untrusted_payload,
 };
 
 fn bound() -> PayloadBound {
