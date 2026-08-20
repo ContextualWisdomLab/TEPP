@@ -112,7 +112,7 @@ Article 29 Data Protection Working Party. (2007). *Opinion 4/2007 on the concept
 
 International Organization for Standardization and International Electrotechnical Commission. (2024). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2024). https://www.iso.org/standard/85938.html
 
-International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011) (withdrawn; superseded by ISO/IEC 29100:2024).
+International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011) (withdrawn; superseded by ISO/IEC 29100:2024). https://www.iso.org/standard/45123.html
 
 GDPR Article 4(1) and Recital 26 keep information personal when it relates to an identified or identifiable person, including after pseudonymisation if attribution remains possible. WP 136 treats content, purpose, and result as alternative “relating to” tests and gives derived medical-analysis and taxi-location examples. ISO/IEC 29100:2024 is the current published privacy-framework edition; TEPP does not quote unread 2024 clause text and does not treat the 2011 edition as current authority for use-limitation of derived artifacts. See `docs/research/derived-sensitivity-inheritance.md` and ADR 0009. Blanket masking is not declassification. These citations are readiness inputs, not certification.
 

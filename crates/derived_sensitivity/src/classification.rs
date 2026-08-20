@@ -98,9 +98,8 @@ pub fn refuse_blanket_mask_as_declassification() -> Result<(), DerivedSensitivit
     Err(DerivedSensitivityError::BlanketMaskIsNotAuthorization)
 }
 
-/// Fraction of paired records whose inherited sensitivity class matches known
-/// truth. Kind identity is validated at construction but is not part of this
-/// class-recovery estimand.
+/// Fraction of paired records whose complete derived-artifact identity matches
+/// known truth, including both kind and inherited sensitivity class.
 ///
 /// # Errors
 ///
@@ -115,7 +114,7 @@ pub fn sensitivity_recovery_rate(
     }
     let mut matches = 0_u32;
     for (truth_record, decided_record) in truth.iter().zip(decided) {
-        if truth_record.source_class() == decided_record.source_class() {
+        if truth_record == decided_record {
             matches += 1;
         }
     }

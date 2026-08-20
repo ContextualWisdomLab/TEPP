@@ -76,7 +76,7 @@ fn inherited_classes_match_known_truth_better_than_a_public_collapse() {
     let topic_same_class = [artifact(KIND_TOPIC, SensitivityClass::Restricted)];
     let mismatch_rate =
         sensitivity_recovery_rate(&kind_mismatch, &topic_same_class).expect("kind mismatch");
-    assert!((mismatch_rate - 1.0).abs() < f64::EPSILON);
+    assert!(mismatch_rate.abs() < f64::EPSILON);
 }
 
 #[test]
