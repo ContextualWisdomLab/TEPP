@@ -1,7 +1,7 @@
 # ADR 0010 — Adaptive LLM orchestration and test-time compute
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — loopback `orchestrator_live` listener records mode/budget and refuses scientific-authority promotion; adaptive routing, provider execution, and comparable-budget ablation remain accepted-target  
+**Implementation maturity:** partial — `tepp_api` governed router, comparable-budget ablation record, credential-free contextual-orchestrator binding, and the `orchestrator_live` loopback listener are implemented on active PRs and are not implemented-main until exact-head checks, review, and protected-main integration complete; live NIM execution, learned conductor calibration, production ablation evidence, and TLS termination remain accepted-target  
 **Date:** 2026-08-10  
 **Supersedes:** The LLM orchestration-selection/ablation clauses previously co-located in ADR 0006. ADR 0006 remains authoritative for GPU/VRAM and model-credential separation; ADR 0015 governs autonomous repository-write/review/merge authority.
 

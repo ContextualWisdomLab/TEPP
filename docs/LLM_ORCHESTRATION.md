@@ -1,7 +1,7 @@
 # TEPP LLM Orchestration and Test-Time Compute Contract
 
-**Status:** Accepted target orchestration baseline; production implementation is not yet shipped.  
-**Last reviewed:** 2026-08-10
+**Status:** Partial — `tepp_api::route_orchestration` is the governed selector; live provider execution is not yet shipped.  
+**Last reviewed:** 2026-08-13
 
 ## 1. Purpose
 
@@ -29,7 +29,7 @@ These results motivate experiments; they do not prove that deeper orchestration 
 | conductor | complex evidence synthesis or multi-stage semantic reasoning | adaptive roles/topology under explicit budget |
 | abstain | provider/evidence/validation insufficient | no forced answer |
 
-A router chooses the cheapest mode expected to satisfy the quality/risk profile, but latency is not the primary objective. Quality, evidence support, calibration, disagreement, controllability, and reproducibility dominate.
+`tepp_api::route_orchestration` is the governed selector. It chooses the cheapest mode expected to satisfy the quality/risk profile, but latency is not the primary objective. Quality, evidence support, calibration, disagreement, controllability, and reproducibility dominate. The returned plan is a proposal: `scientific_authority_code` remains `deterministic_statistical_gates`.
 
 ## 4. Explicit experimental variables
 
