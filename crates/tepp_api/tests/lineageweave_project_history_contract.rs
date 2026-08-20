@@ -262,6 +262,37 @@ fn projection_response_revalidates_cutoff_order_findings_and_payload_size() {
         Err(ApiError::InvalidWirePayload)
     );
 
+    let mut mismatched_span_start: serde_json::Value =
+        serde_json::from_str(&payload).expect("value");
+    mismatched_span_start["history_span_start"] =
+        serde_json::Value::String("2022-03-10T09:00:00Z".into());
+    let mismatched_span_start_json =
+        serde_json::to_string(&mismatched_span_start).expect("span start json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&mismatched_span_start_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut mismatched_span_end: serde_json::Value = serde_json::from_str(&payload).expect("value");
+    mismatched_span_end["history_span_end"] =
+        serde_json::Value::String("2026-08-11T09:00:00Z".into());
+    let mismatched_span_end_json =
+        serde_json::to_string(&mismatched_span_end).expect("span end json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&mismatched_span_end_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut mismatched_participant_count: serde_json::Value =
+        serde_json::from_str(&payload).expect("value");
+    mismatched_participant_count["participant_count"] = serde_json::Value::from(99);
+    let mismatched_participant_count_json =
+        serde_json::to_string(&mismatched_participant_count).expect("participant count json");
+    assert_eq!(
+        ProjectHistoryProjection::from_json(&mismatched_participant_count_json),
+        Err(ApiError::InvalidWirePayload)
+    );
+
     let mut value: serde_json::Value = serde_json::from_str(&payload).expect("value");
     value["findings"] = serde_json::json!([{
         "finding_code": "causal_score",
