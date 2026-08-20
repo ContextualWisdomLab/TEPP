@@ -15,7 +15,6 @@ publish = false
 
 [dependencies]
 rustls = { workspace = true }
-rustls-pemfile = { workspace = true }
 
 [lints]
 workspace = true
