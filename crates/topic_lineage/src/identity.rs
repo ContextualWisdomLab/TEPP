@@ -75,9 +75,20 @@ mod tests {
             refuse_new_identity_on_reactivation(identity, identity),
             Ok(())
         );
+        let other = TopicIdentity::from_uuid(Uuid::from_u128(2));
+        assert_eq!(
+            refuse_new_identity_on_reactivation(identity, other),
+            Err(TopicLineageError::ReactivationIsNotNewTopic)
+        );
         assert_eq!(
             identity_recovery_rate(&[identity], &[]),
             Err(TopicLineageError::InvalidIdentityPayload)
         );
+        assert_eq!(
+            identity_recovery_rate(&[], &[identity]),
+            Err(TopicLineageError::InvalidIdentityPayload)
+        );
+        assert_eq!(identity_recovery_rate(&[identity], &[identity]), Ok(1.0));
+        assert_eq!(identity_recovery_rate(&[identity], &[other]), Ok(0.0));
     }
 }
