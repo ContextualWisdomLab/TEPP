@@ -1,10 +1,15 @@
 //! `LineageWeave` uses the published asynchronous TEPP analysis-run boundary.
 
 use std::fmt::Write as _;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::thread;
+use std::time::Duration;
 
 use tepp_api::{
     ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
-    LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, lineageweave_analysis_run_exchange,
+    ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_LIVE_HEADER_BYTE_LIMIT,
+    lineageweave_analysis_run_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -65,6 +70,20 @@ fn lineageweave_exchange_uses_the_published_consumer_header_without_credentials(
 
 #[test]
 fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
+    let loopback = AnalysisRunLiveService::bind_loopback().expect("loopback bind");
+    assert!(
+        loopback
+            .local_addr()
+            .expect("loopback address")
+            .ip()
+            .is_loopback()
+    );
+    assert_eq!(
+        AnalysisRunLiveService::bind("0.0.0.0:0".parse().expect("non-loopback address"))
+            .expect_err("non-loopback bind must fail"),
+        ApiError::AuthorizationDenied
+    );
+
     let run = sample_run();
     let mut service = AnalysisRunLiveService::new();
 
@@ -83,12 +102,54 @@ fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     let replay = service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &run));
     assert_eq!(replay.status_code, 202);
     assert_eq!(replay.body, lineageweave.body);
+
+    let mut conflict = run.clone();
+    conflict.snapshot_id = "lineageweave-snapshot-conflict".into();
+    let conflict_response =
+        service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &conflict));
+    assert_eq!(conflict_response.status_code, 400);
 }
 
 #[test]
 fn live_listener_refuses_an_unpublished_consumer() {
     let mut service = AnalysisRunLiveService::new();
+    assert_eq!(service.handle_http_request("").status_code, 400);
+    assert_eq!(
+        service
+            .handle_http_request(&"x".repeat(NARUON_LIVE_HEADER_BYTE_LIMIT))
+            .status_code,
+        413
+    );
+    let duplicate_headers = format!(
+        "POST {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\nhost: 127.0.0.1\r\ncontent-length: 0\r\n\r\n"
+    );
+    assert_eq!(
+        service.handle_http_request(&duplicate_headers).status_code,
+        400
+    );
     let response =
         service.handle_http_request(&http_request("unpublished-consumer", &sample_run()));
     assert_eq!(response.status_code, 400);
+}
+
+#[test]
+fn live_listener_serves_lineageweave_over_loopback() {
+    let run = sample_run();
+    let mut service = AnalysisRunLiveService::bind_loopback().expect("loopback bind");
+    let address = service.local_addr().expect("loopback address");
+    let worker = thread::spawn(move || service.serve_one());
+    let mut stream = TcpStream::connect(address).expect("connect");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .expect("read timeout");
+    stream
+        .write_all(http_request(LINEAGEWEAVE_CONSUMER_CODE, &run).as_bytes())
+        .expect("request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("response");
+    assert!(response.starts_with("HTTP/1.1 202 Accepted"));
+    assert_eq!(
+        worker.join().expect("join").expect("served").status_code,
+        202
+    );
 }

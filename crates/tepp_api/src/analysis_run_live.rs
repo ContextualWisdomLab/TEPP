@@ -130,7 +130,7 @@ impl AnalysisRunLiveService {
         let (header_block, body) = split_request(request)?;
         let mut lines = header_block.split("\r\n");
         require_request_line(lines.next().unwrap_or(""))?;
-        let headers = parse_headers(lines)?;
+        let headers = parse_headers(&mut lines)?;
         let consumer = require_headers(&headers, self.bound_addr)?;
         self.accept_analysis_run(consumer, &headers, body)
     }
@@ -178,7 +178,7 @@ impl AnalysisRunLiveService {
     }
 }
 
-fn read_http_request<R: Read>(reader: &mut R) -> Result<String, ApiError> {
+fn read_http_request(reader: &mut dyn Read) -> Result<String, ApiError> {
     let mut header_bytes = Vec::new();
     let mut byte = [0_u8; 1];
     loop {
@@ -266,10 +266,9 @@ fn require_request_line(line: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn parse_headers<'a, I>(lines: I) -> Result<HashMap<String, String>, ApiError>
-where
-    I: Iterator<Item = &'a str>,
-{
+fn parse_headers(
+    lines: &mut dyn Iterator<Item = &str>,
+) -> Result<HashMap<String, String>, ApiError> {
     let mut headers = HashMap::new();
     for (index, line) in lines.enumerate() {
         if index >= NARUON_LIVE_HEADER_COUNT_LIMIT {
@@ -826,16 +825,12 @@ mod tests {
             ),
             Err(ApiError::InvalidWirePayload)
         );
+        let mut crowded = (0..=NARUON_LIVE_HEADER_COUNT_LIMIT)
+            .map(|index| Box::leak(format!("x-{index}: value").into_boxed_str()) as &str);
+        assert_eq!(parse_headers(&mut crowded), Err(ApiError::LimitExceeded));
+        let mut duplicate = ["x-header: one", "X-HEADER: two"].into_iter();
         assert_eq!(
-            parse_headers(
-                (0..=NARUON_LIVE_HEADER_COUNT_LIMIT).map(|index| {
-                    Box::leak(format!("x-{index}: value").into_boxed_str()) as &str
-                })
-            ),
-            Err(ApiError::LimitExceeded)
-        );
-        assert_eq!(
-            parse_headers(["x-header: one", "X-HEADER: two"].into_iter()),
+            parse_headers(&mut duplicate),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
