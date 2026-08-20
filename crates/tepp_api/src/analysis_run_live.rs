@@ -782,7 +782,7 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            parse_headers(["X-Header: one"].into_iter()).expect("header"),
+            parse_headers(&mut ["X-Header: one"].into_iter()).expect("header"),
             HashMap::from([(String::from("x-header"), String::from("one"))])
         );
     }
