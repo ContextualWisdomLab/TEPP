@@ -148,6 +148,7 @@ fn raw_proportions_and_invalid_numeric_inputs_fail_closed() {
         ),
         Err(PsychometricError::InvalidNumericInput)
     );
+    assert_eq!(
         posterior_draw_point_estimate_mean(&[]),
         Err(PsychometricError::InvalidNumericInput)
     );
