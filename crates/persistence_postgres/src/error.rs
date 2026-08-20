@@ -38,6 +38,16 @@ pub enum PersistenceError {
     InvalidSourceArtifact,
     /// An audit action code was empty, oversized, or hostile.
     InvalidAuditEvent,
+    /// A concurrent writer won the open-row lock or serialization contest.
+    ConcurrentWriteConflict,
+    /// A restored snapshot failed integrity revalidation and is not usable.
+    RestoreIntegrityFailed,
+    /// A retention, hold, deletion, or tombstone record failed closed validation.
+    InvalidRetentionLifecycle,
+    /// An active legal hold blocked completed deletion.
+    LegalHoldBlocksDeletion,
+    /// Tombstoned evidence cannot be restored, and raw-source deletion cannot keep reproduction available.
+    UngovernedEvidenceRestore,
 }
 
 impl fmt::Display for PersistenceError {
@@ -59,6 +69,11 @@ impl fmt::Display for PersistenceError {
             Self::ConflictingSourceArtifact => "conflicting source artifact",
             Self::InvalidSourceArtifact => "invalid source artifact",
             Self::InvalidAuditEvent => "invalid audit event",
+            Self::ConcurrentWriteConflict => "concurrent write conflict",
+            Self::RestoreIntegrityFailed => "restore integrity failed",
+            Self::InvalidRetentionLifecycle => "invalid retention lifecycle",
+            Self::LegalHoldBlocksDeletion => "legal hold blocks deletion",
+            Self::UngovernedEvidenceRestore => "ungoverned evidence restore",
         };
         formatter.write_str(message)
     }
@@ -90,6 +105,8 @@ pub enum MigrationContractError {
     MissingAppendOnlyTrigger,
     /// Temporal interval ordering checks were incomplete when declared.
     MissingTemporalIntervalConstraint,
+    /// Retention/legal-hold migration declarations were incomplete.
+    MissingRetentionLegalHold,
 }
 
 impl fmt::Display for MigrationContractError {
@@ -105,6 +122,7 @@ impl fmt::Display for MigrationContractError {
             Self::MissingTenantSessionGuc => "missing tenant session guc",
             Self::MissingAppendOnlyTrigger => "missing append-only immutability trigger",
             Self::MissingTemporalIntervalConstraint => "missing temporal interval constraint",
+            Self::MissingRetentionLegalHold => "missing retention legal hold",
         };
         formatter.write_str(message)
     }
@@ -160,6 +178,10 @@ mod tests {
             "invalid membership assignment"
         );
         assert_eq!(
+            PersistenceError::ConcurrentWriteConflict.to_string(),
+            "concurrent write conflict"
+        );
+        assert_eq!(
             PersistenceError::InvalidEventRelation.to_string(),
             "invalid event relation"
         );
@@ -182,6 +204,22 @@ mod tests {
         assert_eq!(
             PersistenceError::InvalidAuditEvent.to_string(),
             "invalid audit event"
+        );
+        assert_eq!(
+            PersistenceError::RestoreIntegrityFailed.to_string(),
+            "restore integrity failed"
+        );
+        assert_eq!(
+            PersistenceError::InvalidRetentionLifecycle.to_string(),
+            "invalid retention lifecycle"
+        );
+        assert_eq!(
+            PersistenceError::LegalHoldBlocksDeletion.to_string(),
+            "legal hold blocks deletion"
+        );
+        assert_eq!(
+            PersistenceError::UngovernedEvidenceRestore.to_string(),
+            "ungoverned evidence restore"
         );
         assert_eq!(
             MigrationContractError::SingleWordObjectName.to_string(),
@@ -222,6 +260,10 @@ mod tests {
         assert_eq!(
             MigrationContractError::MissingTemporalIntervalConstraint.to_string(),
             "missing temporal interval constraint"
+        );
+        assert_eq!(
+            MigrationContractError::MissingRetentionLegalHold.to_string(),
+            "missing retention legal hold"
         );
     }
 }
