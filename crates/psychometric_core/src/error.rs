@@ -199,6 +199,29 @@ pub enum PsychometricError {
     /// `τ + λ(μ_t + e^{a(t−u)} m x)` is not
     /// `τ + λ(μ_t + e^{a Δt} t0_b z)`.
     ImpulseCarryObservedMeanIsNotInitialTimeIndependentObservedMean,
+    /// Driver Table 3 `T0TDPREDEFFECT` first-occasion shift was treated
+    /// as the contemporaneous Dirac. `t0_m x0` is not `M x`.
+    InitialTimeDependentEffectIsNotContemporaneousImpulse,
+    /// Driver Eq. 3 carry of `T0TDPREDEFFECT` was treated as the
+    /// first-occasion shift. `e^{A Δt} t0_m x0` is not `t0_m x0`.
+    InitialTimeDependentCarryIsNotInitialEffect,
+    /// Driver Table 3 `T0TDPREDEFFECT` first-occasion shift was treated
+    /// as `CINT`. `t0_m x0` is not `κ`.
+    InitialTimeDependentEffectIsNotContinuousIntercept,
+    /// Driver Table 3 `T0TDPREDEFFECT` first-occasion shift was treated
+    /// as the Eq. 3 process increment. `t0_m x0` is not
+    /// `A^{-1}[e^{A Δt} − I] B z`.
+    InitialTimeDependentEffectIsNotProcessIncrement,
+    /// Driver Table 3 `T0TDPREDEFFECT` first-occasion shift was treated
+    /// as the Table 3 `T0TIPREDEFFECT` shift. `t0_m x0` is not `t0_b z`.
+    InitialTimeDependentEffectIsNotInitialTimeIndependentEffect,
+    /// Driver Table 3 `T0TDPREDEFFECT` was treated as the first-occasion
+    /// shift. The coefficient is not `t0_m x0`.
+    InitialTimeDependentCoefficientIsNotInitialEffect,
+    /// Driver Eq. 3 carry of `T0TDPREDEFFECT` was treated as the
+    /// within-interval impulse carry. `e^{A Δt} t0_m x0` is not
+    /// `e^{A(t−u)} M x` for `t0 < u < t`.
+    InitialTimeDependentCarryIsNotImpulseCarry,
 }
 
 impl fmt::Display for PsychometricError {
@@ -363,6 +386,27 @@ impl fmt::Display for PsychometricError {
             }
             Self::ImpulseCarryObservedMeanIsNotInitialTimeIndependentObservedMean => {
                 "impulse-carry observed mean is not the first-occasion time-independent-predictor observed mean"
+            }
+            Self::InitialTimeDependentEffectIsNotContemporaneousImpulse => {
+                "first-occasion time-dependent predictor shift is not the contemporaneous impulse"
+            }
+            Self::InitialTimeDependentCarryIsNotInitialEffect => {
+                "carried first-occasion time-dependent predictor is not the first-occasion shift"
+            }
+            Self::InitialTimeDependentEffectIsNotContinuousIntercept => {
+                "first-occasion time-dependent predictor shift is not the continuous intercept"
+            }
+            Self::InitialTimeDependentEffectIsNotProcessIncrement => {
+                "first-occasion time-dependent predictor shift is not the process increment"
+            }
+            Self::InitialTimeDependentEffectIsNotInitialTimeIndependentEffect => {
+                "first-occasion time-dependent predictor shift is not the first-occasion time-independent predictor shift"
+            }
+            Self::InitialTimeDependentCoefficientIsNotInitialEffect => {
+                "first-occasion time-dependent predictor coefficient is not the first-occasion shift"
+            }
+            Self::InitialTimeDependentCarryIsNotImpulseCarry => {
+                "carried first-occasion time-dependent predictor is not the impulse carry"
             }
         };
         formatter.write_str(message)
@@ -628,6 +672,35 @@ mod tests {
             PsychometricError::ImpulseCarryObservedMeanIsNotInitialTimeIndependentObservedMean
                 .to_string(),
             "impulse-carry observed mean is not the first-occasion time-independent-predictor observed mean"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentEffectIsNotContemporaneousImpulse.to_string(),
+            "first-occasion time-dependent predictor shift is not the contemporaneous impulse"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentCarryIsNotInitialEffect.to_string(),
+            "carried first-occasion time-dependent predictor is not the first-occasion shift"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentEffectIsNotContinuousIntercept.to_string(),
+            "first-occasion time-dependent predictor shift is not the continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentEffectIsNotProcessIncrement.to_string(),
+            "first-occasion time-dependent predictor shift is not the process increment"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentEffectIsNotInitialTimeIndependentEffect
+                .to_string(),
+            "first-occasion time-dependent predictor shift is not the first-occasion time-independent predictor shift"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentCoefficientIsNotInitialEffect.to_string(),
+            "first-occasion time-dependent predictor coefficient is not the first-occasion shift"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentCarryIsNotImpulseCarry.to_string(),
+            "carried first-occasion time-dependent predictor is not the impulse carry"
         );
     }
 }

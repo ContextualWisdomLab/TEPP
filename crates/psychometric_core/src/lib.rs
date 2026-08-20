@@ -61,7 +61,13 @@
 //! observed mean; `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not
 //! that observed mean; `τ + λ(μ_t + m x)` is not that observed mean;
 //! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
-//! `u ≠ t0`),
+//! `u ≠ t0`), recovers the Driver Table 3 first-occasion
+//! `T0TDPREDEFFECT` shift `t0_m x0` and its Eq. 3 first-summand carry
+//! `e^{A Δt} t0_m x0` (`T0TDPREDEFFECT` is not `TDPREDEFFECT` `M`;
+//! `t0_m x0` is not `M x`; `e^{A Δt} t0_m x0` is not `t0_m x0`;
+//! `e^{A Δt} t0_m x0` is not `e^{A(t−u)} M x` for `t0 < u < t`;
+//! `t0_m x0` is not `t0_b z`; an impulse at `u ≤ t0` that used `M`
+//! is already in `η(t0)` as `TDPREDEFFECT`, not as `T0TDPREDEFFECT`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -126,6 +132,8 @@ pub use event_time::recover_discrete_latent_mean;
 pub use event_time::recover_discrete_latent_mean_with_impulse;
 /// Exact scalar evolved latent mean plus a within-interval impulse carry.
 pub use event_time::recover_discrete_latent_mean_with_impulse_carry;
+/// Exact scalar evolved latent mean plus a first-occasion TD predictor.
+pub use event_time::recover_discrete_latent_mean_with_initial_time_dependent_predictor;
 /// Exact scalar evolved latent mean plus a first-occasion TI predictor.
 pub use event_time::recover_discrete_latent_mean_with_initial_time_independent_predictor;
 /// Exact scalar evolved latent mean plus a time-independent predictor.
@@ -152,6 +160,10 @@ pub use event_time::recover_discrete_time_varying_predictor_effect;
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
 pub use event_time::recover_event_time_discrete_lag_and_log_rate;
+/// Exact scalar carried first-occasion `T0TDPREDEFFECT` `e^{A Δt} t0_m x0`.
+pub use event_time::recover_initial_time_dependent_predictor_carry;
+/// Exact scalar first-occasion `T0TDPREDEFFECT` shift `t0_m x0`.
+pub use event_time::recover_initial_time_dependent_predictor_effect;
 /// Exact scalar carried first-occasion `T0TIPREDEFFECT` `e^{A Δt} t0_b z`.
 pub use event_time::recover_initial_time_independent_predictor_carry;
 /// Exact scalar first-occasion `T0TIPREDEFFECT` shift `t0_b z`.
@@ -212,15 +224,29 @@ pub use event_time::refuse_impulse_observed_mean_as_time_independent_observed_me
 pub use event_time::refuse_initial_latent_mean_as_evolved_mean;
 /// Refuse treating first-occasion `τ + λ μ_0` as `E(y_t)`.
 pub use event_time::refuse_initial_observed_mean_as_evolved_observed_mean;
+/// Refuse treating the Eq. 3 `T0TDPREDEFFECT` carry as the within-interval impulse carry.
+pub use event_time::refuse_initial_time_dependent_carry_as_impulse_carry;
+/// Refuse treating the Eq. 3 `T0TDPREDEFFECT` carry as the first-occasion shift.
+pub use event_time::refuse_initial_time_dependent_carry_as_initial_effect;
+/// Refuse treating Driver Table 3 `T0TDPREDEFFECT` as the first-occasion shift.
+pub use event_time::refuse_initial_time_dependent_coefficient_as_initial_effect;
+/// Refuse treating the Table 3 first-occasion TD shift as `M x`.
+pub use event_time::refuse_initial_time_dependent_effect_as_contemporaneous_impulse;
+/// Refuse treating the Table 3 first-occasion TD shift as `CINT`.
+pub use event_time::refuse_initial_time_dependent_effect_as_continuous_intercept;
+/// Refuse treating the Table 3 first-occasion TD shift as the Table 3 TI shift.
+pub use event_time::refuse_initial_time_dependent_effect_as_initial_time_independent_effect;
+/// Refuse treating the Table 3 first-occasion TD shift as the Eq. 3 process increment.
+pub use event_time::refuse_initial_time_dependent_effect_as_process_increment;
 /// Refuse treating the Eq. 3 `T0TIPREDEFFECT` carry as the first-occasion shift.
 pub use event_time::refuse_initial_time_independent_carry_as_initial_effect;
 /// Refuse treating Driver Table 3 `T0TIPREDEFFECT` as the first-occasion shift.
 pub use event_time::refuse_initial_time_independent_coefficient_as_initial_effect;
-/// Refuse treating the Table 3 first-occasion shift as `CINT`.
+/// Refuse treating the Table 3 first-occasion TI shift as `CINT`.
 pub use event_time::refuse_initial_time_independent_effect_as_continuous_intercept;
-/// Refuse treating the Table 3 first-occasion shift as the Eq. 3 process increment.
+/// Refuse treating the Table 3 first-occasion TI shift as the Eq. 3 process increment.
 pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
-/// Refuse treating the Table 3 first-occasion shift as `M x`.
+/// Refuse treating the Table 3 first-occasion TI shift as `M x`.
 pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
