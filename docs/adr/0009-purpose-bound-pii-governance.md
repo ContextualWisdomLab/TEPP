@@ -1,7 +1,7 @@
 # ADR 0009 — Purpose-bound PII governance without blanket masking
 
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR  
+**Implementation maturity:** partial — persistence retention/deletion/legal-hold (migration `0007`) and provider-payload minimization are implemented-main; selective field grants are active-PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; deployment/provider-region evidence remains accepted-target
 **Date:** 2026-08-10  
 **Supersedes:** None.
 
