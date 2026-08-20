@@ -65,6 +65,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "sha256sum -c",
             "pull_request_inventory_unavailable",
             "open_pull_request",
+            "gh issue list --repo",
             "issue_inventory_unavailable",
             "open_issue",
             "contextual_orchestrator_credentials_unavailable",
