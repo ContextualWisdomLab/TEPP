@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-21 07:15 KST
+**Snapshot:** 2026-08-21 07:52 KST
 **Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
 **Workspace version on protected main:** `0.1.0`
 
@@ -48,7 +48,7 @@ Checks, and branch rules immediately before every mutation.
 |---:|---|:---:|---|
 | #177 | `8a5dee50d4b0fa2396893ad26fa775f2629e2fcd` | false | fix(workflow): pin scheduler budget hardening |
 | #165 | `3a0fbfc24a2294e43ad04ee72064362e4385dee9` | false | feat: route hourly product agents through contextual orchestrator |
-| #164 | `5b707221ecc4fda68db8c571d57ab2ad181493ab` | false | docs: define TEPP product completion and technical gap baseline |
+| #164 | `8817be07dc34c1fcc285b3501d377fc28b81220f` | false | docs: define TEPP product completion and technical gap baseline |
 | #159 | `855c6c7153c2f66a1c14e842ad700f571592dd35` | false | feat(api): project LineageWeave evidence into cutoff-safe histories |
 | #158 | `6d28d23c432288c4dbecbd74a25f093ed9d9ef61` | false | feat(api): expose temporal evidence context for LineageWeave Ask |
 | #157 | `0cb9ff6b32afb56849214bbe464ea39004c1e106` | false | feat(api): publish completed analysis-run result contract |
@@ -201,6 +201,7 @@ visual workspace, or a supported multi-tenant release.
 | GAP-002 | LineageWeave and other modular consumers cannot yet rely on the complete protected-main HTTP evidence/result boundary. | `active-PR` | stacked dependency | `7c29e7c` (versioned API contracts) | [#107](https://github.com/ContextualWisdomLab/TEPP/pull/107) → [#155](https://github.com/ContextualWisdomLab/TEPP/pull/155) → [#158](https://github.com/ContextualWisdomLab/TEPP/pull/158) / [#159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `07bb21f` → `0e29108` → `6d28d23` / `855c6c7` | Merge in dependency order with live loopback, framing, credential, idempotency, cutoff, tenant, and result-evidence tests. |
 | GAP-003A | Immutable evidence cannot yet be submitted to a durable validation run that produces buyer-usable scientific acceptance evidence. | `accepted-target` | product-completion | `7c29e7c` (validation metrics are library-level only) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | `—` (issue program; no current implementation PR) | Compose/CLI/API execution must bind immutable evidence, cutoffs, model configuration, validation metrics, and reproducibility manifests to one idempotent run. |
 | GAP-003B | Scientific result artifacts cannot yet be persisted, restarted, and recovered as one supported buyer workflow. | `accepted-target` | product-completion | `7c29e7c` (persistence contracts lack E2E recovery) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | `—` (issue program; no current implementation PR) | Durable storage, migration/rollback, restart/recovery, artifact digest verification, and terminal retrieval must pass against a real Compose deployment. |
+| GAP-003C | The persistence slice classifies concurrent-write SQLSTATEs, but has no measured hot-partition detection, routing, or mitigation for tenant/result workloads. | `accepted-target` | product-completion | `7c29e7c` (conflict classification only; no measured partition control) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | `—` (issue program; no current implementation PR) | A real Compose/PostgreSQL workload identifies hot keys and partition skew, applies bounded tenant/time or result routing without weakening 3NF or temporal authority, and proves conflict rate, latency, recovery, and migration/rollback behavior under load. |
 | GAP-004 | The central shared-latent temporal/relational topic estimator is absent. | `accepted-target` | product vertical | `7c29e7c` (no production estimator) | [#167](https://github.com/ContextualWisdomLab/TEPP/issues/167) / [PR #48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | `45224e5` | Rust CPU `f64` fitting, sparse bounded parallelism, posterior artifacts, convergence, true-parameter RMSE/bias/coverage, and real candidate-K fitting. |
 | GAP-005 | Real multilingual documents are not yet transformed into validated exact-span semantic units and versioned shared concepts. | `accepted-target` | product vertical | `7c29e7c` (evidence spans exist without full semantic pipeline) | [#168](https://github.com/ContextualWisdomLab/TEPP/issues/168) / [PR #53](https://github.com/ContextualWisdomLab/TEPP/pull/53) | `c07e512` | Unicode/layout/language-tailored processing, unknown-concept review, multilingual calibration/invariance, image-position evidence, and prompt-injection tests. |
 | GAP-006 | Posterior topic measurements cannot yet be fitted through a complete cross-classified longitudinal ESEM/DSEM engine. | `accepted-target` | product vertical | `7c29e7c` (temporal and membership primitives only) | [#169](https://github.com/ContextualWisdomLab/TEPP/issues/169) / [PR #119](https://github.com/ContextualWisdomLab/TEPP/pull/119) | `2ea08a8` | Plausible-value/joint uncertainty, invariance, irregular event time, within/between separation, multiple membership, true-parameter recovery, and causal-claim refusal. |
@@ -212,7 +213,7 @@ visual workspace, or a supported multi-tenant release.
 | GAP-012 | The 93-PR queue obscures authority, repeatedly stales exact-head evidence, and fragments product boundaries. | `partial` | release blocker | `7c29e7c` (protected-main truth) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (live queue program) | Every PR classified; unique landing vehicles; compatible slices folded; superseded work closed with provenance; scheduler prioritizes consolidation; queue reaches zero before GA. |
 | GAP-013 | Evidence-grounded LLM interpretation is routed but not executed and validated as a production interpreter/verifier port. | `partial` | active integration | `7c29e7c` (routing and refusal contracts only) | [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176), [PR #69](https://github.com/ContextualWisdomLab/TEPP/pull/69), [PR #165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `e780e1d` / `5a98c8a` | Contextual-orchestrator execution, evidence citations, verifier refusals, comparable-budget ablations, provider eligibility/fallback, abstention, live/offline contract tests, and no numerical-authority escalation. |
 | GAP-014 | README/TRD and some PR descriptions lag protected-main and live queue reality. | `partial` | documentation drift | `7c29e7c` (documentation is not fully synchronized) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (queue-consolidation work) | Reconcile README, TRD, traceability, ADR maturity, CHANGELOG, preferred-merge declarations, and exact protected-main evidence. |
-| GAP-015 | There was no canonical live product/buyer-gap register tied to documentation validation. | `active-PR` | landing vehicle | `7c29e7c` (no live gap register) | [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `5b70722` | Merge this document and its validator/map integration after exact-head checks and independent review. |
+| GAP-015 | There was no canonical live product/buyer-gap register tied to documentation validation. | `active-PR` | landing vehicle | `7c29e7c` (no live gap register) | [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `8817be0` | Merge this document and its validator/map integration after exact-head checks and independent review. |
 | GAP-016 | Hourly PR maintenance used an older central scheduler revision whose per-repository sweep budgets could amplify the queued review workload. | `active-PR` | operability hardening | `7c29e7c` (caller pin before central budget hardening) | [PR #177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `8a5dee5` | The change pins central revision `8319ae5` immutably; closure still requires exact-head hosted Checks, resolved threads, and independent review. |
 
 ## Product-completion issue register
@@ -220,7 +221,7 @@ visual workspace, or a supported multi-tenant release.
 | Issue | Product vertical | Depends on / constrains |
 |---:|---|---|
 | [#156](https://github.com/ContextualWisdomLab/TEPP/issues/156) | Completed analysis-run result contract | Must land before consumers can call accepted work a measurement result. |
-| [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | Executable end-to-end analysis run | Integrates all scientific/service verticals; cannot substitute placeholders. |
+| [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | Executable end-to-end analysis run, recovery, and hot-partition readiness | Integrates all scientific/service verticals; cannot substitute placeholders or hide write skew behind an unmeasured queue. |
 | [#167](https://github.com/ContextualWisdomLab/TEPP/issues/167) | Shared-latent temporal topic CPU estimator | Numerical foundation for K selection, networks, psychometrics, interpretation, and product E2E. |
 | [#168](https://github.com/ContextualWisdomLab/TEPP/issues/168) | Multilingual semantic units and concept dictionary | Supplies validated span-grounded estimator evidence. |
 | [#169](https://github.com/ContextualWisdomLab/TEPP/issues/169) | Multilevel longitudinal ESEM/DSEM | Consumes posterior topic coordinates and membership/time contracts. |
@@ -324,8 +325,10 @@ independent diligence evidence.
 - Topic proportions remain compositional; valid latent/log-ratio coordinates
   feed ESEM and network analysis.
 - Database objects use descriptive two-or-more-word `snake_case`, third-normal
-  form where applicable, explicit tenant/temporal/provenance authority, and
-  measured hot-partition mitigation.
+  form where applicable, explicit tenant/temporal/provenance authority. Hot
+  partition readiness is a separate acceptance gate: measure skew first, then
+  mitigate it without denormalizing authority tables or changing temporal
+  semantics.
 - Documents, web/search results, connector data, and LLM output are untrusted.
 - Purpose-bound access and protected identity mappings preserve PII utility
   without broadcasting or blanket masking.
