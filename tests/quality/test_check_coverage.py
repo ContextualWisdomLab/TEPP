@@ -547,6 +547,50 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract._is_standalone_string_literal('"unfinished')
             )
 
+            raw_string = [
+                '    let text = r##"',
+                '        a " quote in raw text',
+                '    "##;',
+                '    execute(text);',
+            ]
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(raw_string, 1)
+            )
+            self.assertTrue(
+                coverage_contract._line_in_multiline_string_literal(raw_string, 2)
+            )
+            self.assertTrue(
+                coverage_contract._line_in_multiline_string_literal(raw_string, 3)
+            )
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(raw_string, 4)
+            )
+
+            byte_raw_string = [
+                '    let bytes = br#"',
+                '        raw bytes',
+                '    "#;',
+            ]
+            self.assertTrue(
+                coverage_contract._line_in_multiline_string_literal(byte_raw_string, 2)
+            )
+
+            character_and_lifetime = [
+                "fn query<'a>() {",
+                "    let quote: char = '\"';",
+                "    execute();",
+                "}",
+            ]
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(
+                    character_and_lifetime, 3
+                )
+            )
+            self.assertIsNone(coverage_contract._character_literal_end("'", 0))
+            self.assertEqual(
+                coverage_contract._character_literal_end(r"'\''", 0), 4
+            )
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
