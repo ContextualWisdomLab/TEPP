@@ -98,8 +98,8 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_inferred_as_observed, refuse_inferred_as_transition,
-        status_is_observed, EvidenceStatus,
+        EvidenceStatus, identity_recovery_rate, refuse_inferred_as_observed,
+        refuse_inferred_as_transition, status_is_observed,
     };
     use crate::InferredStatusError;
 

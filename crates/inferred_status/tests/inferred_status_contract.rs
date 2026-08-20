@@ -1,8 +1,8 @@
 //! Inferred relations cannot be promoted to observed evidence or transitions.
 
 use inferred_status::{
-    identity_recovery_rate, refuse_inferred_as_observed, refuse_inferred_as_transition,
-    status_is_observed, EvidenceStatus, InferredStatusError,
+    EvidenceStatus, InferredStatusError, identity_recovery_rate, refuse_inferred_as_observed,
+    refuse_inferred_as_transition, status_is_observed,
 };
 
 #[test]
