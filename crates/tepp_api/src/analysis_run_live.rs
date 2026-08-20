@@ -131,7 +131,7 @@ impl AnalysisRunLiveService {
         let (header_block, body) = split_request(request)?;
         let mut lines = header_block.split("\r\n");
         let path = require_request_line(lines.next().unwrap_or(""))?;
-        let headers = parse_headers(lines)?;
+        let headers = parse_headers(&mut lines)?;
         let consumer = require_headers(&headers, self.bound_addr)?;
         if path == TEMPORAL_CONTEXT_PATH {
             let context_request = TemporalContextRequest::from_json(body)?;
@@ -184,7 +184,7 @@ impl AnalysisRunLiveService {
     }
 }
 
-fn read_http_request<R: Read>(reader: &mut R) -> Result<String, ApiError> {
+fn read_http_request(reader: &mut dyn Read) -> Result<String, ApiError> {
     let mut header_bytes = Vec::new();
     let mut byte = [0_u8; 1];
     loop {
@@ -272,10 +272,9 @@ fn require_request_line(line: &str) -> Result<&str, ApiError> {
     path.ok_or(ApiError::InvalidWirePayload)
 }
 
-fn parse_headers<'a, I>(lines: I) -> Result<HashMap<String, String>, ApiError>
-where
-    I: Iterator<Item = &'a str>,
-{
+fn parse_headers(
+    lines: &mut dyn Iterator<Item = &str>,
+) -> Result<HashMap<String, String>, ApiError> {
     let mut headers = HashMap::new();
     for (index, line) in lines.enumerate() {
         if index >= NARUON_LIVE_HEADER_COUNT_LIMIT {
@@ -751,16 +750,40 @@ mod tests {
         let too_many: Vec<_> = (0..=NARUON_LIVE_HEADER_COUNT_LIMIT)
             .map(|index| format!("x-header-{index}: value"))
             .collect();
+        let mut too_many_lines = too_many.iter().map(String::as_str);
         assert_eq!(
-            parse_headers(too_many.iter().map(String::as_str)),
+            parse_headers(&mut too_many_lines),
             Err(ApiError::LimitExceeded)
         );
         assert_eq!(
-            parse_headers(["X-Header: one", "x-header: two"].into_iter()),
+            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: \r\n\r\n"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            parse_headers(["X-Header: one"].into_iter()).expect("header"),
+            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: +1\r\n\r\n"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            declared_content_length("POST /x HTTP/1.1\r\nHost: 127.0.0.1\r\n"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            declared_content_length(
+                "POST /x HTTP/1.1\r\ncontent-length: 999999999999999999999\r\n\r\n"
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut crowded = (0..=NARUON_LIVE_HEADER_COUNT_LIMIT)
+            .map(|index| Box::leak(format!("x-{index}: value").into_boxed_str()) as &str);
+        assert_eq!(parse_headers(&mut crowded), Err(ApiError::LimitExceeded));
+        let mut duplicate = ["x-header: one", "X-HEADER: two"].into_iter();
+        assert_eq!(
+            parse_headers(&mut duplicate),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut single_header = ["X-Header: one"].into_iter();
+        assert_eq!(
+            parse_headers(&mut single_header).expect("header"),
             HashMap::from([(String::from("x-header"), String::from("one"))])
         );
     }
