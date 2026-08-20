@@ -1,8 +1,8 @@
 //! Prompt boilerplate is not unique content and not stopword deletion.
 
 use prompt_source::{
-    identity_recovery_rate, refuse_prompt_as_stopword_deletion, refuse_prompt_as_unique_content,
-    PromptKind, PromptSourceError,
+    PromptKind, PromptSourceError, identity_recovery_rate, refuse_prompt_as_stopword_deletion,
+    refuse_prompt_as_unique_content,
 };
 
 #[test]

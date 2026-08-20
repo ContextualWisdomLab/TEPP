@@ -87,8 +87,8 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_prompt_as_stopword_deletion,
-        refuse_prompt_as_unique_content, PromptKind,
+        PromptKind, identity_recovery_rate, refuse_prompt_as_stopword_deletion,
+        refuse_prompt_as_unique_content,
     };
     use crate::PromptSourceError;
 
