@@ -781,8 +781,9 @@ mod tests {
             parse_headers(&mut duplicate),
             Err(ApiError::InvalidWirePayload)
         );
+        let mut single_header = ["X-Header: one"].into_iter();
         assert_eq!(
-            parse_headers(&mut ["X-Header: one"].into_iter()).expect("header"),
+            parse_headers(&mut single_header).expect("header"),
             HashMap::from([(String::from("x-header"), String::from("one"))])
         );
     }
