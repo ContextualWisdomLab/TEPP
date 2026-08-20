@@ -12,7 +12,7 @@ This slice delivers the first executable ADR 0005 contract in `psychometric_core
 6. refuse latent-mean comparison without invariance evidence, and recover a mean difference only under strong or strict two-group OLS status (Putnick & Bornstein, 2016: scalar licenses means; residual invariance is not required; two-observation series cap at strong because residual variance is identically `0`);
 7. refuse causal language that rests only on temporal precedence, document linkage, event tracking, or model prediction.
 
-Cluster-mean CWC, the CWC contextual effect, Kish WLS, event-time log-rate, CWC-then-lag, irregular already-centered residual log-rate, the Driver Eq. 5 of the Eq. 3 evolved mean, the Driver Eq. 3 contemporaneous `TDPREDEFFECT` impulse, and the Driver Eq. 3 `TIPREDEFFECT` increment live in the same crate and are documented in `docs/research/multilevel-event-time-recovery.md`. Full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target.
+Cluster-mean CWC, the CWC contextual effect, Kish WLS, event-time log-rate, CWC-then-lag, irregular already-centered residual log-rate, the Driver Eq. 5 of the Eq. 3 evolved mean, the Driver Eq. 3 contemporaneous `TDPREDEFFECT` impulse, the Driver Eq. 1–2 within-interval impulse carry, and the Driver Eq. 3 `TIPREDEFFECT` increment live in the same crate and are documented in `docs/research/multilevel-event-time-recovery.md`. Full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target.
 
 ## Authoritative sources
 

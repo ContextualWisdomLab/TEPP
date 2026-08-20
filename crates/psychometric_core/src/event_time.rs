@@ -41,7 +41,12 @@
 //! (`T0MEANS` is not `μ_t`; `CINT` is not that discrete increment). Equation 3's
 //! fourth summand is the contemporaneous Dirac impulse `M x` (Table 2
 //! `TDPREDEFFECT` is `M`, not `CINT`, not `TIPREDEFFECT`, and not
-//! Voelkle et al., 2012, Eq. 14). Equation 3's second summand also
+//! Voelkle et al., 2012, Eq. 14). Equations 1–2 plus the Eq. 3
+//! exponential map a time-dependent impulse that occurred strictly
+//! inside `(t0, t)` as `e^{A(t−u)} M x` (`t0 < u < t`). That carry
+//! is not the contemporaneous Dirac, not `CINT`, not `TIPREDEFFECT`,
+//! and not Voelkle Eq. 14. Section 7.2 calls this dissipation back to
+//! the process mean. Equation 3's second summand also
 //! maps the time-independent predictor as `A^{-1}[e^{A Δt} − I] B z`
 //! (Table 2 `TIPREDEFFECT` is `B`, not `κ`, not `M`, and not Voelkle
 //! Eq. 14). The JSS article
@@ -1600,6 +1605,200 @@ pub fn refuse_time_independent_coefficient_as_discrete_effect(
     Err(PsychometricError::TimeIndependentCoefficientIsNotDiscreteEffect)
 }
 
+/// Exact scalar within-interval time-dependent impulse carry from
+/// Driver Equations 1–2.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 1–3, pp. 4–5; Table 2, p. 12;
+/// §7.2, pp. 20–21; JSS PDF re-opened 2026-08-20T10:33Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `dη = (A η + ξ + B z + M χ(t)) dt + G dW` with
+/// `χ_i(t) = Σ_{u ∈ U_i} x_{i,u} δ(t − u)`. The Green-function
+/// integral of that Dirac on `(t0, t)` is `e^{A(t−u)} M x`. The
+/// printed Eq. 3 fourth summand is the contemporaneous jump `M x`
+/// at `u = t`. This map is the strictly within-interval case
+/// `t0 < u < t`: form `m x` first, then `e^{a(t−u)} m x`. A zero
+/// drift is `m x` with no dissipation. Binary64 underflow of
+/// `e^{a(t−u)}` to `+0` is vanishing dissipation back to the process
+/// mean (§7.2) and is kept. A zero effect or zero predictor is
+/// exactly zero even if the exponential overflows. When `e^{a(t−u)}`
+/// overflows at a finite `a(t−u)`, rewrite as
+/// `sign(m x) exp(ln|m x| + a(t−u))`. An impulse at `u = t` is the
+/// contemporaneous map. An impulse at `u ≤ t0` is already in `η(t0)`.
+/// The §7.2 level-change form is a different specification and is
+/// not this map. This is not a Kalman filter and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::NonPositiveInterval`] when
+/// `event_delta` or `elapsed_after_impulse` is not strictly positive
+/// or the impulse is not strictly inside `(t0, t)`, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite or `m x` or the carried product overflows.
+pub fn recover_time_dependent_predictor_impulse_carry(
+    time_dependent_effect: f64,
+    time_dependent_predictor: f64,
+    log_rate: f64,
+    event_delta: f64,
+    elapsed_after_impulse: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !elapsed_after_impulse.is_finite() || elapsed_after_impulse <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    // I_{t0 < u < t}: t−u strictly less than t−t0, so u−t0 > 0.
+    if elapsed_after_impulse >= event_delta {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let impulse =
+        recover_time_dependent_predictor_impulse(time_dependent_effect, time_dependent_predictor)?;
+    if impulse == 0.0 {
+        return Ok(0.0);
+    }
+    let drift_interval = log_rate * elapsed_after_impulse;
+    let auto_effect = drift_interval.exp();
+    if auto_effect.is_finite() {
+        // +0 underflow is vanishing dissipation (§7.2).
+        return require_finite(auto_effect * impulse);
+    }
+    if !drift_interval.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // Finite a(t−u), overflowed exp.
+    // e^{a(t−u)} m x = sign(m x) exp(ln|m x| + a(t−u)).
+    require_finite(impulse.signum() * (impulse.abs().ln() + drift_interval).exp())
+}
+
+/// Exact scalar evolved latent mean plus a within-interval impulse carry.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 1–3, p. 5; §7.2) write the
+/// first two summands as the carried `T0MEANS` and `CINT` increment,
+/// then add a Dirac impulse that occurred strictly inside `(t0, t)`
+/// after it has dissipated by `e^{A(t−u)}`. Form `μ_t` first, then
+/// add `e^{a(t−u)} m x`. A zero carry is exactly `μ_t`. A zero
+/// evolved mean is exactly the carry. Adding the contemporaneous
+/// `m x` is not this composition when `u ≠ t`. The level-change
+/// form is not this map.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_latent_mean`] and
+/// [`recover_time_dependent_predictor_impulse_carry`], and returns
+/// [`PsychometricError::InvalidNumericInput`] when the sum overflows.
+#[allow(clippy::too_many_arguments)]
+pub fn recover_discrete_latent_mean_with_impulse_carry(
+    initial_latent_mean: f64,
+    log_rate: f64,
+    continuous_intercept: f64,
+    time_dependent_effect: f64,
+    time_dependent_predictor: f64,
+    event_delta: f64,
+    elapsed_after_impulse: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let evolved_latent_mean = recover_discrete_latent_mean(
+        initial_latent_mean,
+        log_rate,
+        continuous_intercept,
+        event_delta,
+        clock,
+    )?;
+    let impulse_carry = recover_time_dependent_predictor_impulse_carry(
+        time_dependent_effect,
+        time_dependent_predictor,
+        log_rate,
+        event_delta,
+        elapsed_after_impulse,
+        clock,
+    )?;
+    if impulse_carry == 0.0 {
+        return Ok(evolved_latent_mean);
+    }
+    if evolved_latent_mean == 0.0 {
+        return Ok(impulse_carry);
+    }
+    require_finite(evolved_latent_mean + impulse_carry)
+}
+
+/// Refuse treating the Eq. 1–2 impulse carry as the contemporaneous Dirac.
+///
+/// The printed Eq. 3 fourth summand is `M x` at `u = t`. The
+/// within-interval carry is `e^{A(t−u)} M x` for `t0 < u < t`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TimeDependentImpulseCarryIsNotContemporaneousImpulse`].
+pub fn refuse_time_dependent_impulse_carry_as_contemporaneous_impulse(
+    time_dependent_impulse_carry: f64,
+    time_dependent_impulse: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (time_dependent_impulse_carry, time_dependent_impulse);
+    Err(PsychometricError::TimeDependentImpulseCarryIsNotContemporaneousImpulse)
+}
+
+/// Refuse treating the Eq. 1–2 impulse carry as `CINT`.
+///
+/// Table 2 names `M` `TDPREDEFFECT` and `κ` `CINT`. The dissipated
+/// impulse is not the continuous intercept.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TimeDependentImpulseCarryIsNotContinuousIntercept`].
+pub fn refuse_time_dependent_impulse_carry_as_continuous_intercept(
+    time_dependent_impulse_carry: f64,
+    continuous_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (time_dependent_impulse_carry, continuous_intercept);
+    Err(PsychometricError::TimeDependentImpulseCarryIsNotContinuousIntercept)
+}
+
+/// Refuse treating the Eq. 1–2 impulse carry as `TIPREDEFFECT`.
+///
+/// The second-summand map integrates a constant `B z` over the event
+/// interval. The within-interval TDPRED carry dissipates a Dirac.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TimeDependentImpulseCarryIsNotTimeIndependentEffect`].
+pub fn refuse_time_dependent_impulse_carry_as_time_independent_effect(
+    time_dependent_impulse_carry: f64,
+    time_independent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (time_dependent_impulse_carry, time_independent_effect);
+    Err(PsychometricError::TimeDependentImpulseCarryIsNotTimeIndependentEffect)
+}
+
+/// Refuse treating the Eq. 1–2 impulse carry as Voelkle et al.
+/// (2012, Eq. 14).
+///
+/// Equation 14 is `a_{yx} Δt` for a piecewise-constant time-varying
+/// predictor. The Dirac carry is `e^{A(t−u)} M x`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect`].
+pub fn refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect(
+    time_dependent_impulse_carry: f64,
+    time_varying_discrete_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (time_dependent_impulse_carry, time_varying_discrete_effect);
+    Err(PsychometricError::TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect)
+}
+
 /// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
 ///
 /// Equation 3 maps `μ_t = exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`.
@@ -1903,6 +2102,7 @@ mod tests {
         recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
         recover_discrete_lag_one, recover_discrete_lagged_latent_covariance,
         recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
+        recover_discrete_latent_mean_with_impulse_carry,
         recover_discrete_latent_mean_with_time_independent_predictor,
         recover_discrete_latent_variance, recover_discrete_observed_mean,
         recover_discrete_process_noise, recover_discrete_time_independent_predictor_effect,
@@ -1911,8 +2111,9 @@ mod tests {
         recover_local_log_rate, recover_manifest_lagged_observed_covariance,
         recover_manifest_observed_mean, recover_manifest_observed_variance,
         recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-        recover_time_dependent_predictor_impulse, recover_trait_plus_state_lagged_covariance,
-        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+        recover_within_residual_event_time_log_rate,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -1930,6 +2131,10 @@ mod tests {
         refuse_time_dependent_impulse_as_continuous_intercept,
         refuse_time_dependent_impulse_as_time_independent_effect,
         refuse_time_dependent_impulse_as_time_varying_discrete_effect,
+        refuse_time_dependent_impulse_carry_as_contemporaneous_impulse,
+        refuse_time_dependent_impulse_carry_as_continuous_intercept,
+        refuse_time_dependent_impulse_carry_as_time_independent_effect,
+        refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect,
         refuse_time_independent_coefficient_as_discrete_effect,
         refuse_time_independent_effect_as_continuous_intercept,
         refuse_time_independent_effect_as_time_dependent_impulse,
@@ -4200,6 +4405,345 @@ mod tests {
                 0.0,
                 1.0,
                 1e308,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn time_dependent_impulse_carry_recovers_driver_equation_one_two_dissipation() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let elapsed = 1.0_f64;
+        let carry = recover_time_dependent_predictor_impulse_carry(
+            effect,
+            predictor,
+            drift,
+            delta,
+            elapsed,
+            LagClock::EventTime,
+        )
+        .expect("tdpred-carry");
+        let expected = (-0.5_f64).exp() * 1.2;
+        assert!((carry - expected).abs() < 1e-15);
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                0.0,
+                predictor,
+                drift,
+                delta,
+                elapsed,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                effect,
+                0.0,
+                drift,
+                delta,
+                elapsed,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+        let zero_drift = recover_time_dependent_predictor_impulse_carry(
+            effect,
+            predictor,
+            0.0,
+            delta,
+            elapsed,
+            LagClock::EventTime,
+        )
+        .expect("zero-drift");
+        assert!((zero_drift - 1.2).abs() < 1e-15);
+        let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+        assert!((carry - impulse).abs() > 1e-3);
+        let vanished = recover_time_dependent_predictor_impulse_carry(
+            effect,
+            predictor,
+            -800.0,
+            delta,
+            elapsed,
+            LagClock::EventTime,
+        )
+        .expect("vanish");
+        assert_eq!(vanished.to_bits(), 0.0_f64.to_bits());
+    }
+
+    #[test]
+    fn time_dependent_impulse_carry_composes_evolved_mean_and_keeps_scale() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let elapsed = 1.0_f64;
+        let carry = recover_time_dependent_predictor_impulse_carry(
+            effect,
+            predictor,
+            drift,
+            delta,
+            elapsed,
+            LagClock::EventTime,
+        )
+        .expect("tdpred-carry");
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let composed = recover_discrete_latent_mean_with_impulse_carry(
+            initial,
+            drift,
+            intercept,
+            effect,
+            predictor,
+            delta,
+            elapsed,
+            LagClock::EventTime,
+        )
+        .expect("eq3-carry");
+        let evolved =
+            recover_discrete_latent_mean(initial, drift, intercept, delta, LagClock::EventTime)
+                .expect("mu-t");
+        assert!((composed - (evolved + carry)).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_latent_mean_with_impulse_carry(
+                initial,
+                drift,
+                intercept,
+                0.0,
+                predictor,
+                delta,
+                elapsed,
+                LagClock::EventTime
+            ),
+            Ok(evolved)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_impulse_carry(
+                0.0,
+                drift,
+                0.0,
+                effect,
+                predictor,
+                delta,
+                elapsed,
+                LagClock::EventTime
+            ),
+            Ok(carry)
+        );
+        let scaled = recover_time_dependent_predictor_impulse_carry(
+            1e308,
+            1e-308,
+            0.0,
+            2.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("scale");
+        assert!((scaled - 1.0).abs() < 1e-15);
+        let rewritten = recover_time_dependent_predictor_impulse_carry(
+            1e-308,
+            1.0,
+            710.0,
+            2.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("rewrite");
+        let expected_rewrite = (1e-308_f64.ln() + 710.0).exp();
+        assert!((rewritten - expected_rewrite).abs() <= expected_rewrite * 1e-12);
+    }
+
+    #[test]
+    fn time_dependent_impulse_carry_refuses_contemporaneous_cint_tipred_and_equation_fourteen() {
+        let effect = 0.4_f64;
+        let predictor = 3.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let elapsed = 1.0_f64;
+        let carry = recover_time_dependent_predictor_impulse_carry(
+            effect,
+            predictor,
+            drift,
+            delta,
+            elapsed,
+            LagClock::EventTime,
+        )
+        .expect("tdpred-carry");
+        let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+        let intercept_effect =
+            recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
+                .expect("cint");
+        let time_independent = recover_discrete_time_independent_predictor_effect(
+            effect,
+            predictor,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("tipred");
+        let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+            effect,
+            delta,
+            delta,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq14");
+        assert!((carry - impulse).abs() > 1e-3);
+        assert!((carry - intercept_effect).abs() > 1e-3);
+        assert!((carry - time_independent).abs() > 1e-3);
+        assert!((carry - equation_fourteen).abs() > 1e-3);
+        assert_eq!(
+            refuse_time_dependent_impulse_carry_as_contemporaneous_impulse(carry, impulse),
+            Err(PsychometricError::TimeDependentImpulseCarryIsNotContemporaneousImpulse)
+        );
+        assert_eq!(
+            refuse_time_dependent_impulse_carry_as_continuous_intercept(carry, effect),
+            Err(PsychometricError::TimeDependentImpulseCarryIsNotContinuousIntercept)
+        );
+        assert_eq!(
+            refuse_time_dependent_impulse_carry_as_time_independent_effect(carry, time_independent),
+            Err(PsychometricError::TimeDependentImpulseCarryIsNotTimeIndependentEffect)
+        );
+        assert_eq!(
+            refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect(
+                carry,
+                equation_fourteen
+            ),
+            Err(PsychometricError::TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect)
+        );
+    }
+
+    #[test]
+    fn time_dependent_impulse_carry_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                f64::NAN,
+                1.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                0.4,
+                3.0,
+                f64::INFINITY,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                1e308,
+                2.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                1.2,
+                1.0,
+                800.0,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                0.0,
+                3.0,
+                800.0,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                -1e-308,
+                1.0,
+                710.0,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            )
+            .map(f64::signum),
+            Ok(-1.0)
+        );
+    }
+
+    #[test]
+    fn time_dependent_impulse_carry_interval_and_clock_fail_closed() {
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                0.4,
+                3.0,
+                -0.5,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                0.4,
+                3.0,
+                -0.5,
+                2.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                0.4,
+                3.0,
+                -0.5,
+                2.0,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(
+                0.4,
+                3.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_impulse_carry(
+                1e308,
+                0.0,
+                0.0,
+                1e308,
+                1.0,
+                2.0,
                 1.0,
                 LagClock::EventTime
             ),

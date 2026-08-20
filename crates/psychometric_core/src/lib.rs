@@ -36,10 +36,13 @@
 //! first-occasion map `τ + λ μ_0` is not `E(y_t)`), recovers the
 //! Driver Eq. 3 fourth-summand impulse `m x` (Table 2 `TDPREDEFFECT`
 //! is `M`, not `CINT`, not `TIPREDEFFECT`, and not Voelkle Eq. 14),
-//! recovers the Driver Eq. 3 second-summand time-independent
-//! predictor increment `A^{-1}[e^{A Δt} − I] B z` (Table 2
-//! `TIPREDEFFECT` is `B`, not `κ`, not `M`, and not Voelkle Eq. 14;
-//! `B` is not that discrete increment),
+//! recovers the Driver Eq. 1–2 within-interval impulse carry
+//! `e^{A(t−u)} M x` for `t0 < u < t` (not the contemporaneous Dirac,
+//! not `CINT`, not `TIPREDEFFECT`, and not Voelkle Eq. 14; §7.2
+//! dissipation), recovers the Driver Eq. 3 second-summand
+//! time-independent predictor increment `A^{-1}[e^{A Δt} − I] B z`
+//! (Table 2 `TIPREDEFFECT` is `B`, not `κ`, not `M`, and not Voelkle
+//! Eq. 14; `B` is not that discrete increment),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -102,6 +105,8 @@ pub use event_time::recover_discrete_lagged_latent_covariance;
 pub use event_time::recover_discrete_latent_mean;
 /// Exact scalar evolved latent mean plus a contemporaneous impulse.
 pub use event_time::recover_discrete_latent_mean_with_impulse;
+/// Exact scalar evolved latent mean plus a within-interval impulse carry.
+pub use event_time::recover_discrete_latent_mean_with_impulse_carry;
 /// Exact scalar evolved latent mean plus a time-independent predictor.
 pub use event_time::recover_discrete_latent_mean_with_time_independent_predictor;
 /// Exact scalar discrete latent variance `A_Δt P A_Δt⊤ + Q_Δt`.
@@ -134,6 +139,8 @@ pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 pub use event_time::recover_stationary_latent_variance;
 /// Exact scalar contemporaneous `TDPREDEFFECT` impulse `m x`.
 pub use event_time::recover_time_dependent_predictor_impulse;
+/// Exact scalar within-interval `TDPREDEFFECT` carry `e^{A(t−u)} M x`.
+pub use event_time::recover_time_dependent_predictor_impulse_carry;
 /// Exact scalar trait-plus-state lagged covariance.
 pub use event_time::recover_trait_plus_state_lagged_covariance;
 /// Exact scalar trait-plus-state latent variance.
@@ -178,6 +185,14 @@ pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
 pub use event_time::refuse_time_dependent_impulse_as_time_independent_effect;
 /// Refuse treating Driver Eq. 3 impulse as Voelkle Eq. 14.
 pub use event_time::refuse_time_dependent_impulse_as_time_varying_discrete_effect;
+/// Refuse treating Driver Eq. 1–2 impulse carry as the contemporaneous Dirac.
+pub use event_time::refuse_time_dependent_impulse_carry_as_contemporaneous_impulse;
+/// Refuse treating Driver Eq. 1–2 impulse carry as `CINT`.
+pub use event_time::refuse_time_dependent_impulse_carry_as_continuous_intercept;
+/// Refuse treating Driver Eq. 1–2 impulse carry as `TIPREDEFFECT`.
+pub use event_time::refuse_time_dependent_impulse_carry_as_time_independent_effect;
+/// Refuse treating Driver Eq. 1–2 impulse carry as Voelkle Eq. 14.
+pub use event_time::refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect;
 /// Refuse treating Driver Table 2 `TIPREDEFFECT` as the discrete increment.
 pub use event_time::refuse_time_independent_coefficient_as_discrete_effect;
 /// Refuse treating Driver Eq. 3 `TIPREDEFFECT` increment as `CINT`.

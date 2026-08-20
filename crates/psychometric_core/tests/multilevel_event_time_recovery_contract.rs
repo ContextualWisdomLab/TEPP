@@ -8,6 +8,7 @@ use psychometric_core::{
     recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
     recover_discrete_lag_from_log_rate, recover_discrete_lagged_latent_covariance,
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
+    recover_discrete_latent_mean_with_impulse_carry,
     recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
     recover_discrete_observed_mean, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
@@ -16,8 +17,9 @@ use psychometric_core::{
     recover_kish_weighted_slope, recover_manifest_lagged_observed_covariance,
     recover_manifest_observed_mean, recover_manifest_observed_variance,
     recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-    recover_time_dependent_predictor_impulse, recover_trait_plus_state_lagged_covariance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -34,6 +36,10 @@ use psychometric_core::{
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
     refuse_time_dependent_impulse_as_time_varying_discrete_effect,
+    refuse_time_dependent_impulse_carry_as_contemporaneous_impulse,
+    refuse_time_dependent_impulse_carry_as_continuous_intercept,
+    refuse_time_dependent_impulse_carry_as_time_independent_effect,
+    refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect,
     refuse_time_independent_coefficient_as_discrete_effect,
     refuse_time_independent_effect_as_continuous_intercept,
     refuse_time_independent_effect_as_time_dependent_impulse,
@@ -1412,6 +1418,141 @@ fn time_independent_predictor_refuses_overflow_and_non_event_clocks() {
             0.0,
             1e308,
             1.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn time_dependent_impulse_carry_recovers_driver_equation_one_two_dissipation() {
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let elapsed = 1.0_f64;
+    let carry = recover_time_dependent_predictor_impulse_carry(
+        effect,
+        predictor,
+        drift,
+        delta,
+        elapsed,
+        LagClock::EventTime,
+    )
+    .expect("tdpred-carry");
+    let expected = (-0.5_f64).exp() * 1.2;
+    let error = rmse(&[expected], &[carry]);
+    assert!(
+        error < 1e-15,
+        "Driver Eq. 1–2 impulse carry RMSE {error}: got {carry}"
+    );
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+    let intercept_effect =
+        recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
+            .expect("cint");
+    let time_independent = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("tipred");
+    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+        effect,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq14");
+    assert!(rmse(&[carry], &[impulse]) > rmse(&[expected], &[carry]));
+    assert!(rmse(&[carry], &[intercept_effect]) > rmse(&[expected], &[carry]));
+    assert!(rmse(&[carry], &[time_independent]) > rmse(&[expected], &[carry]));
+    assert!(rmse(&[carry], &[equation_fourteen]) > rmse(&[expected], &[carry]));
+    let composed = recover_discrete_latent_mean_with_impulse_carry(
+        1.0,
+        drift,
+        0.3,
+        effect,
+        predictor,
+        delta,
+        elapsed,
+        LagClock::EventTime,
+    )
+    .expect("eq3-carry");
+    let evolved =
+        recover_discrete_latent_mean(1.0, drift, 0.3, delta, LagClock::EventTime).expect("mu-t");
+    let composed_error = rmse(&[evolved + carry], &[composed]);
+    assert!(
+        composed_error < 1e-15,
+        "Driver Eq. 1–2 μ_t + e^{{A(t−u)}} M x RMSE {composed_error}: got {composed}"
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_carry_as_contemporaneous_impulse(carry, impulse),
+        Err(PsychometricError::TimeDependentImpulseCarryIsNotContemporaneousImpulse)
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_carry_as_continuous_intercept(carry, effect),
+        Err(PsychometricError::TimeDependentImpulseCarryIsNotContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_carry_as_time_independent_effect(carry, time_independent),
+        Err(PsychometricError::TimeDependentImpulseCarryIsNotTimeIndependentEffect)
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect(
+            carry,
+            equation_fourteen
+        ),
+        Err(PsychometricError::TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect)
+    );
+}
+
+#[test]
+fn time_dependent_impulse_carry_refuses_overflow_and_non_event_clocks() {
+    assert_eq!(
+        recover_time_dependent_predictor_impulse_carry(
+            1e308,
+            2.0,
+            -0.5,
+            2.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_time_dependent_predictor_impulse_carry(
+            0.4,
+            3.0,
+            -0.5,
+            2.0,
+            1.0,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_time_dependent_predictor_impulse_carry(
+            0.4,
+            3.0,
+            -0.5,
+            2.0,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_latent_mean_with_impulse_carry(
+            1e308,
+            0.0,
+            0.0,
+            1e308,
+            1.0,
+            2.0,
             1.0,
             LagClock::EventTime
         ),

@@ -125,6 +125,21 @@ pub enum PsychometricError {
     /// Driver Table 2 `TIPREDEFFECT` was treated as the discrete
     /// increment. `B` is not `A^{-1}[e^{A Δt} − I] B z`.
     TimeIndependentCoefficientIsNotDiscreteEffect,
+    /// Driver Eq. 1–2 within-interval impulse carry was treated as
+    /// the contemporaneous Dirac. `e^{A(t−u)} M x` for `t0 < u < t`
+    /// is not `M x`.
+    TimeDependentImpulseCarryIsNotContemporaneousImpulse,
+    /// Driver Eq. 1–2 within-interval impulse carry was treated as
+    /// `CINT`. `e^{A(t−u)} M x` is not `κ`.
+    TimeDependentImpulseCarryIsNotContinuousIntercept,
+    /// Driver Eq. 1–2 within-interval impulse carry was treated as
+    /// the time-independent discrete effect. `e^{A(t−u)} M x` is not
+    /// `A^{-1}[e^{A Δt} − I] B z`.
+    TimeDependentImpulseCarryIsNotTimeIndependentEffect,
+    /// Driver Eq. 1–2 within-interval impulse carry was treated as
+    /// Voelkle et al. (2012, Eq. 14). `e^{A(t−u)} M x` is not
+    /// `a_{yx} Δt`.
+    TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -232,6 +247,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::TimeIndependentCoefficientIsNotDiscreteEffect => {
                 "time-independent predictor coefficient is not the discrete effect"
+            }
+            Self::TimeDependentImpulseCarryIsNotContemporaneousImpulse => {
+                "time-dependent predictor impulse carry is not the contemporaneous impulse"
+            }
+            Self::TimeDependentImpulseCarryIsNotContinuousIntercept => {
+                "time-dependent predictor impulse carry is not the continuous intercept"
+            }
+            Self::TimeDependentImpulseCarryIsNotTimeIndependentEffect => {
+                "time-dependent predictor impulse carry is not the time-independent discrete effect"
+            }
+            Self::TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect => {
+                "time-dependent predictor impulse carry is not the time-varying discrete effect"
             }
         };
         formatter.write_str(message)
@@ -413,6 +440,22 @@ mod tests {
         assert_eq!(
             PsychometricError::TimeIndependentCoefficientIsNotDiscreteEffect.to_string(),
             "time-independent predictor coefficient is not the discrete effect"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseCarryIsNotContemporaneousImpulse.to_string(),
+            "time-dependent predictor impulse carry is not the contemporaneous impulse"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseCarryIsNotContinuousIntercept.to_string(),
+            "time-dependent predictor impulse carry is not the continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseCarryIsNotTimeIndependentEffect.to_string(),
+            "time-dependent predictor impulse carry is not the time-independent discrete effect"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect.to_string(),
+            "time-dependent predictor impulse carry is not the time-varying discrete effect"
         );
     }
 }
