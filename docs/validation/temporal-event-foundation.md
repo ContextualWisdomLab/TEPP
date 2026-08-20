@@ -1,7 +1,7 @@
 # Temporal Event Foundation — validation and release-readiness report
 
 **Status:** Living validation ledger for the Temporal/Event foundation program
-**Last reviewed:** 2026-08-12
+**Last reviewed:** 2026-08-20
 **Authority:** ADR 0014 (claim promotion), ADR 0007 (quality gates), AGENTS.md scientific acceptance
 
 ## Scope
@@ -23,7 +23,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
-| Psychometric structural input gates | `psychometric_core` | partial | stacked psychometric PR | construct-class refusal + ALR/ILR boundary + true-loading RMSE + posterior-draw point-estimate mean + Rubin `T` + CWC within/between + CWC contextual effect + event-time log-rate + constant- and time-varying-predictor discrete effects + exact scalar discrete process noise + lagged latent covariance and unconditional latent variance + stationary within-subject variance + trait-plus-state variance + observed-indicator variance + discrete latent mean (`T0MEANS`/`CINT`) + evolved observed mean (`τ + λ μ_t`; `τ + λ μ_0` is not `E(y_t)`) + contemporaneous `TDPREDEFFECT` impulse (`m x`; not `CINT`, not `TIPREDEFFECT`, not Voelkle Eq. 14) + irregular already-centered residual lag + strong-gated latent means (n=2 residual variance is identically `0` and caps at strong/scalar; Putnick & Bornstein, 2016); full ESEM/DSEM remaining | ADR 0005; `docs/research/posterior-esem-input-gates.md`; `docs/research/multilevel-event-time-recovery.md`; `docs/research/rubin-total-variance.md`; `docs/research/strong-invariance-latent-means.md` |
+| Psychometric structural input gates | `psychometric_core` | partial | stacked psychometric PR | construct-class refusal + ALR/ILR boundary + true-loading RMSE + posterior-draw point-estimate mean + Rubin `T` + CWC within/between + CWC contextual effect + event-time log-rate + constant- and time-varying-predictor discrete effects + exact scalar discrete process noise + lagged latent covariance and unconditional latent variance + stationary within-subject variance + trait-plus-state variance + observed-indicator variance + discrete latent mean (`T0MEANS`/`CINT`) + evolved observed mean (`τ + λ μ_t`; `τ + λ μ_0` is not `E(y_t)`) + contemporaneous `TDPREDEFFECT` impulse (`m x`; not `CINT`, not `TIPREDEFFECT`, not Voelkle Eq. 14) + time-independent `TIPREDEFFECT` increment (`A^{-1}[e^{A Δt} − I] B z`; not `CINT`, not `M x`, not Voelkle Eq. 14, not the coefficient `B`) + irregular already-centered residual lag + strong-gated latent means (n=2 residual variance is identically `0` and caps at strong/scalar; Putnick & Bornstein, 2016); full ESEM/DSEM remaining | ADR 0005; `docs/research/posterior-esem-input-gates.md`; `docs/research/multilevel-event-time-recovery.md`; `docs/research/rubin-total-variance.md`; `docs/research/strong-invariance-latent-means.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 

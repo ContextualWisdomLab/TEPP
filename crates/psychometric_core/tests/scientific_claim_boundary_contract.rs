@@ -6,13 +6,15 @@ use psychometric_core::{
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
-    recover_discrete_latent_variance, recover_discrete_observed_mean,
-    recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
-    recover_irregular_centered_residual_log_rate, recover_loading_point_estimate_mean,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
+    recover_discrete_observed_mean, recover_discrete_process_noise,
+    recover_discrete_time_independent_predictor_effect,
+    recover_discrete_time_varying_predictor_effect, recover_irregular_centered_residual_log_rate,
+    recover_loading_point_estimate_mean, recover_manifest_lagged_observed_covariance,
+    recover_manifest_observed_mean, recover_manifest_observed_variance,
+    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+    recover_time_dependent_predictor_impulse, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
@@ -27,6 +29,10 @@ use psychometric_core::{
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
     refuse_time_dependent_impulse_as_time_varying_discrete_effect,
+    refuse_time_independent_coefficient_as_discrete_effect,
+    refuse_time_independent_effect_as_continuous_intercept,
+    refuse_time_independent_effect_as_time_dependent_impulse,
+    refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
 };
 
@@ -601,5 +607,81 @@ fn time_dependent_impulse_is_not_cint_tipred_or_equation_fourteen() {
     assert_eq!(
         refuse_time_dependent_impulse_as_time_varying_discrete_effect(impulse, equation_fourteen),
         Err(psychometric_core::PsychometricError::TimeDependentImpulseIsNotTimeVaryingDiscreteEffect)
+    );
+}
+
+#[test]
+fn time_independent_predictor_is_not_cint_impulse_equation_fourteen_or_coefficient() {
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let increment = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("tipred");
+    let intercept_effect =
+        recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
+            .expect("cint");
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+        effect,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq14");
+    let evolved =
+        recover_discrete_latent_mean(1.0, drift, 0.3, delta, LagClock::EventTime).expect("mu-t");
+    let composed = recover_discrete_latent_mean_with_time_independent_predictor(
+        1.0,
+        drift,
+        0.3,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-tipred");
+    assert!(
+        (increment - effect).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3 / Table 2 p. 12): TIPREDEFFECT is not the discrete increment"
+    );
+    assert!(
+        (increment - intercept_effect).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): A^{{-1}}[e^{{A Δt}} − I] B z is not CINT"
+    );
+    assert!(
+        (increment - impulse).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): A^{{-1}}[e^{{A Δt}} − I] B z is not M x"
+    );
+    assert!(
+        (increment - equation_fourteen).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): A^{{-1}}[e^{{A Δt}} − I] B z is not Voelkle Eq. 14"
+    );
+    assert!(
+        (composed - evolved).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): μ_t is not μ_t + A^{{-1}}[e^{{A Δt}} − I] B z"
+    );
+    assert_eq!(
+        refuse_time_independent_effect_as_continuous_intercept(increment, effect),
+        Err(psychometric_core::PsychometricError::TimeIndependentEffectIsNotContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_time_independent_effect_as_time_dependent_impulse(increment, impulse),
+        Err(psychometric_core::PsychometricError::TimeIndependentEffectIsNotTimeDependentImpulse)
+    );
+    assert_eq!(
+        refuse_time_independent_effect_as_time_varying_discrete_effect(increment, equation_fourteen),
+        Err(psychometric_core::PsychometricError::TimeIndependentEffectIsNotTimeVaryingDiscreteEffect)
+    );
+    assert_eq!(
+        refuse_time_independent_coefficient_as_discrete_effect(effect, increment),
+        Err(psychometric_core::PsychometricError::TimeIndependentCoefficientIsNotDiscreteEffect)
     );
 }

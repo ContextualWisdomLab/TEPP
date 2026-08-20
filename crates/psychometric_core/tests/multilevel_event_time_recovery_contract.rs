@@ -8,15 +8,16 @@ use psychometric_core::{
     recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
     recover_discrete_lag_from_log_rate, recover_discrete_lagged_latent_covariance,
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
-    recover_discrete_latent_variance, recover_discrete_observed_mean,
-    recover_discrete_process_noise, recover_discrete_time_varying_predictor_effect,
-    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
-    recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
-    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
-    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
+    recover_discrete_observed_mean, recover_discrete_process_noise,
+    recover_discrete_time_independent_predictor_effect,
+    recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
+    recover_event_time_discrete_lag_and_log_rate, recover_irregular_centered_residual_log_rate,
+    recover_kish_weighted_slope, recover_manifest_lagged_observed_covariance,
+    recover_manifest_observed_mean, recover_manifest_observed_variance,
+    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
+    recover_time_dependent_predictor_impulse, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -33,6 +34,10 @@ use psychometric_core::{
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
     refuse_time_dependent_impulse_as_time_varying_discrete_effect,
+    refuse_time_independent_coefficient_as_discrete_effect,
+    refuse_time_independent_effect_as_continuous_intercept,
+    refuse_time_independent_effect_as_time_dependent_impulse,
+    refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
 };
@@ -1288,6 +1293,120 @@ fn time_dependent_impulse_refuses_overflow_and_non_event_clocks() {
     );
     assert_eq!(
         recover_discrete_latent_mean_with_impulse(
+            1e308,
+            0.0,
+            0.0,
+            1e308,
+            1.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn time_independent_predictor_recovers_driver_equation_three_second_summand() {
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let increment = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("tipred");
+    let expected =
+        recover_discrete_constant_predictor_effect(1.2, drift, delta, LagClock::EventTime)
+            .expect("bz-map");
+    let error = rmse(&[expected], &[increment]);
+    assert!(
+        error < 1e-15,
+        "Driver Eq. 3 TIPREDEFFECT RMSE {error}: got {increment}"
+    );
+    let intercept_effect =
+        recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
+            .expect("cint");
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
+    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+        effect,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq14");
+    assert!(rmse(&[increment], &[intercept_effect]) > rmse(&[expected], &[increment]));
+    assert!(rmse(&[increment], &[impulse]) > rmse(&[expected], &[increment]));
+    assert!(rmse(&[increment], &[equation_fourteen]) > rmse(&[expected], &[increment]));
+    assert!(rmse(&[increment], &[effect]) > rmse(&[expected], &[increment]));
+    let composed = recover_discrete_latent_mean_with_time_independent_predictor(
+        1.0,
+        drift,
+        0.3,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-tipred");
+    let evolved =
+        recover_discrete_latent_mean(1.0, drift, 0.3, delta, LagClock::EventTime).expect("mu-t");
+    let composed_error = rmse(&[evolved + increment], &[composed]);
+    assert!(
+        composed_error < 1e-15,
+        "Driver Eq. 3 μ_t + A^{{-1}}[e^{{A Δt}} − I] B z RMSE {composed_error}: got {composed}"
+    );
+    assert_eq!(
+        refuse_time_independent_effect_as_continuous_intercept(increment, effect),
+        Err(PsychometricError::TimeIndependentEffectIsNotContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_time_independent_effect_as_time_dependent_impulse(increment, impulse),
+        Err(PsychometricError::TimeIndependentEffectIsNotTimeDependentImpulse)
+    );
+    assert_eq!(
+        refuse_time_independent_effect_as_time_varying_discrete_effect(
+            increment,
+            equation_fourteen
+        ),
+        Err(PsychometricError::TimeIndependentEffectIsNotTimeVaryingDiscreteEffect)
+    );
+    assert_eq!(
+        refuse_time_independent_coefficient_as_discrete_effect(effect, increment),
+        Err(PsychometricError::TimeIndependentCoefficientIsNotDiscreteEffect)
+    );
+}
+
+#[test]
+fn time_independent_predictor_refuses_overflow_and_non_event_clocks() {
+    assert_eq!(
+        recover_discrete_time_independent_predictor_effect(
+            1e308,
+            2.0,
+            -0.5,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_latent_mean_with_time_independent_predictor(
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            2.0,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_latent_mean_with_time_independent_predictor(
             1e308,
             0.0,
             0.0,

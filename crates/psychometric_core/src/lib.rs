@@ -36,6 +36,10 @@
 //! first-occasion map `τ + λ μ_0` is not `E(y_t)`), recovers the
 //! Driver Eq. 3 fourth-summand impulse `m x` (Table 2 `TDPREDEFFECT`
 //! is `M`, not `CINT`, not `TIPREDEFFECT`, and not Voelkle Eq. 14),
+//! recovers the Driver Eq. 3 second-summand time-independent
+//! predictor increment `A^{-1}[e^{A Δt} − I] B z` (Table 2
+//! `TIPREDEFFECT` is `B`, not `κ`, not `M`, and not Voelkle Eq. 14;
+//! `B` is not that discrete increment),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -98,12 +102,16 @@ pub use event_time::recover_discrete_lagged_latent_covariance;
 pub use event_time::recover_discrete_latent_mean;
 /// Exact scalar evolved latent mean plus a contemporaneous impulse.
 pub use event_time::recover_discrete_latent_mean_with_impulse;
+/// Exact scalar evolved latent mean plus a time-independent predictor.
+pub use event_time::recover_discrete_latent_mean_with_time_independent_predictor;
 /// Exact scalar discrete latent variance `A_Δt P A_Δt⊤ + Q_Δt`.
 pub use event_time::recover_discrete_latent_variance;
 /// Exact scalar discrete observed mean `τ + λ μ_t` from Eq. 3 then Eq. 5.
 pub use event_time::recover_discrete_observed_mean;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
 pub use event_time::recover_discrete_process_noise;
+/// Exact scalar discrete `TIPREDEFFECT` increment `A^{-1}[e^{A Δt} − I] B z`.
+pub use event_time::recover_discrete_time_independent_predictor_effect;
 /// First-order discrete effect of a time-varying event-time predictor.
 pub use event_time::recover_discrete_time_varying_predictor_effect;
 /// Mean local log-rate on a sorted event-time series.
@@ -170,6 +178,14 @@ pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
 pub use event_time::refuse_time_dependent_impulse_as_time_independent_effect;
 /// Refuse treating Driver Eq. 3 impulse as Voelkle Eq. 14.
 pub use event_time::refuse_time_dependent_impulse_as_time_varying_discrete_effect;
+/// Refuse treating Driver Table 2 `TIPREDEFFECT` as the discrete increment.
+pub use event_time::refuse_time_independent_coefficient_as_discrete_effect;
+/// Refuse treating Driver Eq. 3 `TIPREDEFFECT` increment as `CINT`.
+pub use event_time::refuse_time_independent_effect_as_continuous_intercept;
+/// Refuse treating Driver Eq. 3 `TIPREDEFFECT` increment as `M x`.
+pub use event_time::refuse_time_independent_effect_as_time_dependent_impulse;
+/// Refuse treating Driver Eq. 3 `TIPREDEFFECT` increment as Voelkle Eq. 14.
+pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effect;
 /// Refuse treating Driver §4.3 trait variance as process noise.
 pub use event_time::refuse_trait_variance_as_process_noise;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.

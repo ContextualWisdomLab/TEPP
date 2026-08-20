@@ -111,9 +111,24 @@ pub enum PsychometricError {
     /// Driver Eq. 3 fourth-summand impulse was treated as Voelkle
     /// et al. (2012, Eq. 14). `M x` is not `a_{yx} Δt`.
     TimeDependentImpulseIsNotTimeVaryingDiscreteEffect,
+    /// Driver Eq. 3 time-independent discrete effect was treated as
+    /// `CINT`. `A^{-1}[e^{A Δt} − I] B z` is not `κ`.
+    TimeIndependentEffectIsNotContinuousIntercept,
+    /// Driver Eq. 3 time-independent discrete effect was treated as
+    /// the fourth-summand impulse. `A^{-1}[e^{A Δt} − I] B z` is not
+    /// `M x`.
+    TimeIndependentEffectIsNotTimeDependentImpulse,
+    /// Driver Eq. 3 time-independent discrete effect was treated as
+    /// Voelkle et al. (2012, Eq. 14). `A^{-1}[e^{A Δt} − I] B z` is
+    /// not `a_{yx} Δt`.
+    TimeIndependentEffectIsNotTimeVaryingDiscreteEffect,
+    /// Driver Table 2 `TIPREDEFFECT` was treated as the discrete
+    /// increment. `B` is not `A^{-1}[e^{A Δt} − I] B z`.
+    TimeIndependentCoefficientIsNotDiscreteEffect,
 }
 
 impl fmt::Display for PsychometricError {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::RawProportionForbidden => {
@@ -205,6 +220,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::TimeDependentImpulseIsNotTimeVaryingDiscreteEffect => {
                 "time-dependent predictor impulse is not the time-varying discrete effect"
+            }
+            Self::TimeIndependentEffectIsNotContinuousIntercept => {
+                "time-independent predictor effect is not the continuous intercept"
+            }
+            Self::TimeIndependentEffectIsNotTimeDependentImpulse => {
+                "time-independent predictor effect is not the time-dependent impulse"
+            }
+            Self::TimeIndependentEffectIsNotTimeVaryingDiscreteEffect => {
+                "time-independent predictor effect is not the time-varying discrete effect"
+            }
+            Self::TimeIndependentCoefficientIsNotDiscreteEffect => {
+                "time-independent predictor coefficient is not the discrete effect"
             }
         };
         formatter.write_str(message)
@@ -370,6 +397,22 @@ mod tests {
         assert_eq!(
             PsychometricError::TimeDependentImpulseIsNotTimeVaryingDiscreteEffect.to_string(),
             "time-dependent predictor impulse is not the time-varying discrete effect"
+        );
+        assert_eq!(
+            PsychometricError::TimeIndependentEffectIsNotContinuousIntercept.to_string(),
+            "time-independent predictor effect is not the continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::TimeIndependentEffectIsNotTimeDependentImpulse.to_string(),
+            "time-independent predictor effect is not the time-dependent impulse"
+        );
+        assert_eq!(
+            PsychometricError::TimeIndependentEffectIsNotTimeVaryingDiscreteEffect.to_string(),
+            "time-independent predictor effect is not the time-varying discrete effect"
+        );
+        assert_eq!(
+            PsychometricError::TimeIndependentCoefficientIsNotDiscreteEffect.to_string(),
+            "time-independent predictor coefficient is not the discrete effect"
         );
     }
 }
