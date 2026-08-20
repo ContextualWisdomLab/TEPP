@@ -129,6 +129,10 @@ fn raw_proportions_and_invalid_numeric_inputs_fail_closed() {
         Err(PsychometricError::SingularDesign)
     );
     assert_eq!(
+        ordinary_least_squares_slope(&[0.0, f64::MAX], &[0.0, f64::MAX]),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
         pearson_correlation(&[1.0, 1.0], &[2.0, 3.0], IndicatorKind::AdditiveLogRatio),
         Err(PsychometricError::SingularDesign)
     );
@@ -137,6 +141,13 @@ fn raw_proportions_and_invalid_numeric_inputs_fail_closed() {
         Err(PsychometricError::SingularDesign)
     );
     assert_eq!(
+        pearson_correlation(
+            &[1.0, 2.0],
+            &[1.0, f64::NAN],
+            IndicatorKind::AdditiveLogRatio
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
         posterior_draw_point_estimate_mean(&[]),
         Err(PsychometricError::InvalidNumericInput)
     );

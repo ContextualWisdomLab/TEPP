@@ -146,11 +146,19 @@ mod tests {
             Err(PsychometricError::SingularDesign)
         );
         assert_eq!(
-            pearson_correlation(
-                &[1.0, 2.0],
-                &[1.0, f64::NAN],
-                IndicatorKind::AdditiveLogRatio
-            ),
+            pearson_correlation(&[1.0, 1.0], &[2.0, 3.0], IndicatorKind::LogisticNormal),
+            Err(PsychometricError::SingularDesign)
+        );
+        assert_eq!(
+            pearson_correlation(&[1.0, 2.0], &[1.0], IndicatorKind::LogisticNormal),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            pearson_correlation(&[f64::NAN, 2.0], &[1.0, 2.0], IndicatorKind::LogisticNormal),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            pearson_correlation(&[1.0, 2.0], &[1.0, f64::NAN], IndicatorKind::LogisticNormal),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
