@@ -1,4 +1,4 @@
-//! Published modular-consumer identity and LineageWeave TEPP exchanges.
+//! Published modular-consumer identity and `LineageWeave` TEPP exchanges.
 
 use crate::project_history::build_project_history_exchange;
 use crate::{
@@ -9,10 +9,10 @@ use crate::{
 /// Stable consumer identity used by the Naruon adapter.
 pub const NARUON_CONSUMER_CODE: &str = "naruon";
 
-/// Stable consumer identity used by the LineageWeave adapter.
+/// Stable consumer identity used by the `LineageWeave` adapter.
 pub const LINEAGEWEAVE_CONSUMER_CODE: &str = "lineageweave";
 
-/// Build a LineageWeave → TEPP analysis-run exchange without provider credentials.
+/// Build a `LineageWeave` → TEPP analysis-run exchange without provider credentials.
 ///
 /// The function reuses TEPP's existing origin, body, and header validation,
 /// then replaces only the published modular-consumer identity. The accepted
@@ -32,14 +32,14 @@ pub fn lineageweave_analysis_run_exchange(
         .iter_mut()
         .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
         .ok_or(ApiError::InvalidWirePayload)?;
-    consumer_header.1 = LINEAGEWEAVE_CONSUMER_CODE.to_owned();
+    LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
     Ok(exchange)
 }
 
-/// Build a LineageWeave → TEPP project-history exchange without credentials.
+/// Build a `LineageWeave` → TEPP project-history exchange without credentials.
 ///
 /// The request contains only bounded source evidence selected after
-/// LineageWeave authorization. TEPP validates the cutoff and returns a
+/// `LineageWeave` authorization. TEPP validates the cutoff and returns a
 /// deterministic temporal-association projection, never a causal score.
 ///
 /// # Errors

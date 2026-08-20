@@ -1,6 +1,6 @@
-//! Cutoff-safe project-history projection for LineageWeave buyer surfaces.
+//! Cutoff-safe project-history projection for `LineageWeave` buyer surfaces.
 //!
-//! TEPP owns temporal validation and deterministic ordering. LineageWeave owns
+//! TEPP owns temporal validation and deterministic ordering. `LineageWeave` owns
 //! authorization and selects the bounded source evidence supplied here. The
 //! projection reports explicit temporal associations only; it never upgrades
 //! sequence into causality or emits a psychometric score.
@@ -41,7 +41,7 @@ pub struct ProjectHistoryEvent {
     pub occurred_at: String,
     /// Instant at which this evidence was available to the analysis.
     pub available_at: String,
-    /// Authorized LineageWeave source-post identity.
+    /// Authorized `LineageWeave` source-post identity.
     pub source_post_id: String,
     /// Bounded evidence excerpt; never an instruction or causal conclusion.
     pub evidence_text: String,

@@ -1,4 +1,4 @@
-//! LineageWeave project-history requests remain cutoff-safe and non-causal.
+//! `LineageWeave` project-history requests remain cutoff-safe and non-causal.
 
 use tepp_api::{
     ApiError, LINEAGEWEAVE_CONSUMER_CODE, PROJECT_HISTORY_CONTRACT_VERSION, PROJECT_HISTORY_PATH,
@@ -148,7 +148,7 @@ fn projection_rejects_future_evidence_duplicates_and_unknown_json_fields() {
     );
 
     let json = sample_request().to_json().expect("json");
-    let hostile = json.replacen("{", "{\"unpublished_causal_score\":1,", 1);
+    let hostile = json.replacen('{', "{\"unpublished_causal_score\":1,", 1);
     assert_eq!(
         ProjectHistoryRequest::from_json(&hostile),
         Err(ApiError::InvalidWirePayload)

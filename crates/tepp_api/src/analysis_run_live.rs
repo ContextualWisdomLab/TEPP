@@ -1,7 +1,7 @@
 //! Consumer-neutral live analysis-run ingress for modular CWL services.
 //!
 //! This module keeps the Naruon compatibility listener intact while providing
-//! the shared `/v1/analysis-runs` boundary needed by Naruon and LineageWeave.
+//! the shared `/v1/analysis-runs` boundary needed by Naruon and `LineageWeave`.
 //! It accepts transport acknowledgements only; completed psychometric results
 //! remain outside this crate.
 
@@ -19,7 +19,7 @@ use crate::{
 
 /// Loopback HTTP/1.1 analysis-run service shared by published CWL consumers.
 ///
-/// The service accepts only Naruon and LineageWeave consumer identities. Its
+/// The service accepts only Naruon and `LineageWeave` consumer identities. Its
 /// idempotency namespace includes consumer, tenant, and caller key so one
 /// product cannot replay or conflict with another product's accepted run.
 #[derive(Debug)]
@@ -291,10 +291,10 @@ fn split_header_line(line: &str) -> Result<(&str, &str), ApiError> {
     Ok((name, value.trim()))
 }
 
-fn require_headers<'a>(
-    headers: &'a HashMap<String, String>,
+fn require_headers(
+    headers: &HashMap<String, String>,
     bound_addr: Option<SocketAddr>,
-) -> Result<&'a str, ApiError> {
+) -> Result<&str, ApiError> {
     for name in headers.keys() {
         if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);
