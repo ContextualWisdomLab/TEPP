@@ -1,8 +1,8 @@
 //! Retrospective reporting is not a transition and not a translation.
 
 use retrospective_edge::{
-    identity_recovery_rate, refuse_retrospective_as_transition,
-    refuse_retrospective_as_translation, RetrospectiveEdgeError, RetrospectiveKind,
+    RetrospectiveEdgeError, RetrospectiveKind, identity_recovery_rate,
+    refuse_retrospective_as_transition, refuse_retrospective_as_translation,
 };
 
 #[test]

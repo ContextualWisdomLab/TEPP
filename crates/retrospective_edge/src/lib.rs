@@ -11,11 +11,11 @@ mod kind;
 
 /// Fail-closed retrospective-edge errors.
 pub use error::RetrospectiveEdgeError;
+/// Closed vocabulary of reporting edges that may point at earlier event time.
+pub use kind::RetrospectiveKind;
 /// Fraction of recovered reporting kinds that match known truth.
 pub use kind::identity_recovery_rate;
 /// Refuse to treat a retrospective report as a forward state transition.
 pub use kind::refuse_retrospective_as_transition;
 /// Refuse to treat a retrospective report as a translation.
 pub use kind::refuse_retrospective_as_translation;
-/// Closed vocabulary of reporting edges that may point at earlier event time.
-pub use kind::RetrospectiveKind;

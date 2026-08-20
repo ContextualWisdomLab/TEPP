@@ -95,8 +95,8 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_retrospective_as_transition,
-        refuse_retrospective_as_translation, RetrospectiveKind,
+        RetrospectiveKind, identity_recovery_rate, refuse_retrospective_as_transition,
+        refuse_retrospective_as_translation,
     };
     use crate::RetrospectiveEdgeError;
 
