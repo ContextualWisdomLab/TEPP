@@ -140,7 +140,11 @@ fn require_org_workflow_identity(workflow_ref: &str) -> Result<(), ApiError> {
         || !workflow_file.chars().all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
         })
-        || !(workflow_file.ends_with(".yml") || workflow_file.ends_with(".yaml"))
+        || !std::path::Path::new(workflow_file)
+            .extension()
+            .is_some_and(|extension| {
+                extension.eq_ignore_ascii_case("yml") || extension.eq_ignore_ascii_case("yaml")
+            })
     {
         return Err(ApiError::AuthorizationDenied);
     }
@@ -195,6 +199,10 @@ mod tests {
             "ContextualWisdomLab/.github/.github/workflows/security-scan.yml@{SHA}"
         ))
         .expect("org workflow");
+        require_org_workflow_identity(&format!(
+            "ContextualWisdomLab/.github/.github/workflows/security-scan.yaml@{SHA}"
+        ))
+        .expect("yaml org workflow");
         assert_eq!(
             refuse_org_workflow_secret("AWS_SECRET"),
             Err(ApiError::AuthorizationDenied)

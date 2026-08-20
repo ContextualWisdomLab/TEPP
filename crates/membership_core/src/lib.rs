@@ -26,6 +26,8 @@ pub use error::MembershipError;
 pub use identifier::GroupId;
 /// Opaque analytical member identifier.
 pub use identifier::MemberId;
+/// One multilevel estimation row.
+pub use network::EstimationMembershipRow;
 /// In-memory multiple-membership network for estimation inputs.
 pub use network::MembershipNetwork;
 /// Contextual membership roles (not permanent entity classes).
@@ -39,3 +41,5 @@ pub use ess::design_effect;
 pub use ess::group_normalized_kish_ess;
 /// Kish effective sample size for membership weights.
 pub use ess::kish_effective_sample_size;
+/// Refuse atomistic collapse of multiple memberships.
+pub use network::refuse_atomistic_collapse;
