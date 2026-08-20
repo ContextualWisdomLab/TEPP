@@ -13,6 +13,7 @@ use psychometric_core::{
     recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
     recover_discrete_observed_mean, recover_discrete_observed_mean_with_impulse,
     recover_discrete_observed_mean_with_impulse_carry,
+    recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
@@ -29,10 +30,13 @@ use psychometric_core::{
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
     refuse_evolved_observed_mean_as_impulse_observed_mean,
+    refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
     refuse_evolved_observed_mean_as_time_independent_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
     refuse_impulse_carry_observed_mean_as_time_independent_observed_mean,
     refuse_impulse_observed_mean_as_impulse_carry_observed_mean,
+    refuse_impulse_observed_mean_as_initial_time_independent_observed_mean,
     refuse_impulse_observed_mean_as_time_independent_observed_mean,
     refuse_initial_latent_mean_as_evolved_mean,
     refuse_initial_observed_mean_as_evolved_observed_mean,
@@ -59,6 +63,7 @@ use psychometric_core::{
     refuse_time_independent_effect_as_continuous_intercept,
     refuse_time_independent_effect_as_time_dependent_impulse,
     refuse_time_independent_effect_as_time_varying_discrete_effect,
+    refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
 };
@@ -1794,6 +1799,377 @@ fn initial_time_independent_predictor_refuses_overflow_and_non_event_clocks() {
             LagClock::EventTime
         ),
         Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let observed = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0tipred-mean");
+    let composed = recover_discrete_latent_mean_with_initial_time_independent_predictor(
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-t0tipred");
+    let expected = manifest_mean + loading * composed;
+    let error = rmse(&[expected], &[observed]);
+    assert!(
+        error < 1e-15,
+        "Driver Eq. 5 of Table 3 T0TIPREDEFFECT RMSE {error}"
+    );
+    let evolved_observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let evolved_error = rmse(&[expected], &[evolved_observed]);
+    assert!(
+        evolved_error > error,
+        "τ + λ μ_t is not T0TIPREDEFFECT E(y_t): RMSE {evolved_error} must exceed {error}"
+    );
+    let process_observed = recover_discrete_observed_mean_with_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-tipred-mean");
+    let process_error = rmse(&[expected], &[process_observed]);
+    assert!(
+        process_error > error,
+        "τ + λ(μ_t + increment) is not T0TIPREDEFFECT E(y_t): RMSE {process_error} must exceed {error}"
+    );
+}
+
+#[test]
+fn discrete_observed_mean_with_initial_time_independent_predictor_is_not_impulse_or_carry() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let observed = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0tipred-mean");
+    let composed = recover_discrete_latent_mean_with_initial_time_independent_predictor(
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-t0tipred");
+    let expected = manifest_mean + loading * composed;
+    let error = rmse(&[expected], &[observed]);
+    let impulse_observed = recover_discrete_observed_mean_with_impulse(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-impulse-mean");
+    let impulse_error = rmse(&[expected], &[impulse_observed]);
+    assert!(
+        impulse_error > error,
+        "τ + λ(μ_t + m x) is not T0TIPREDEFFECT E(y_t): RMSE {impulse_error} must exceed {error}"
+    );
+    let carried_observed = recover_discrete_observed_mean_with_impulse_carry(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("eq5-carry-mean");
+    let carry_error = rmse(&[expected], &[carried_observed]);
+    assert!(
+        carry_error > error,
+        "τ + λ(μ_t + carry) is not T0TIPREDEFFECT E(y_t): RMSE {carry_error} must exceed {error}"
+    );
+    let intercept_error = rmse(&[expected], &[manifest_mean]);
+    assert!(
+        intercept_error > error,
+        "MANIFESTMEANS is not T0TIPREDEFFECT E(y_t): RMSE {intercept_error} must exceed {error}"
+    );
+    let latent_error = rmse(&[expected], &[composed]);
+    assert!(
+        latent_error > error,
+        "evolved-plus-T0TIPRED latent mean is not E(y_t): RMSE {latent_error} must exceed {error}"
+    );
+}
+
+#[test]
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry()
+ {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let observed = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0tipred-mean");
+    let evolved_observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let process_observed = recover_discrete_observed_mean_with_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-tipred-mean");
+    let impulse_observed = recover_discrete_observed_mean_with_impulse(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-impulse-mean");
+    let carried_observed = recover_discrete_observed_mean_with_impulse_carry(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("eq5-carry-mean");
+    assert_eq!(
+        refuse_evolved_observed_mean_as_initial_time_independent_observed_mean(
+            evolved_observed,
+            observed
+        ),
+        Err(PsychometricError::EvolvedObservedMeanIsNotInitialTimeIndependentObservedMean)
+    );
+    assert_eq!(
+        refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean(
+            process_observed,
+            observed
+        ),
+        Err(PsychometricError::TimeIndependentObservedMeanIsNotInitialTimeIndependentObservedMean)
+    );
+    assert_eq!(
+        refuse_impulse_observed_mean_as_initial_time_independent_observed_mean(
+            impulse_observed,
+            observed
+        ),
+        Err(PsychometricError::ImpulseObservedMeanIsNotInitialTimeIndependentObservedMean)
+    );
+    assert_eq!(
+        refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean(
+            carried_observed,
+            observed
+        ),
+        Err(PsychometricError::ImpulseCarryObservedMeanIsNotInitialTimeIndependentObservedMean)
+    );
+}
+
+#[test]
+fn discrete_observed_mean_with_initial_time_independent_predictor_zero_loading_is_manifest_mean() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let effect = 0.4_f64;
+    let predictor = 3.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let observed = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0tipred-mean");
+    let composed = recover_discrete_latent_mean_with_initial_time_independent_predictor(
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-t0tipred");
+    assert_eq!(
+        refuse_latent_mean_as_observed_mean(composed, observed),
+        Err(PsychometricError::LatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_manifest_means_as_observed_mean(manifest_mean, observed),
+        Err(PsychometricError::ManifestMeansIsNotObservedMean)
+    );
+    let zero_loading = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+        0.0,
+        initial,
+        drift,
+        intercept,
+        effect,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("lambda0");
+    assert!((zero_loading - manifest_mean).abs() < 1e-15);
+}
+
+#[test]
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks()
+ {
+    assert_eq!(
+        recover_discrete_observed_mean_with_initial_time_independent_predictor(
+            1e308,
+            2.0,
+            0.0,
+            0.0,
+            0.0,
+            3.0,
+            0.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_observed_mean_with_initial_time_independent_predictor(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_observed_mean_with_initial_time_independent_predictor(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    let scaled = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+        1e308,
+        1e-308,
+        0.0,
+        0.0,
+        0.0,
+        3.0,
+        0.0,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("scale");
+    assert!(
+        (scaled - 1.0).abs() < 1e-15,
+        "Driver Eq. 5 of Table 3 T0TIPREDEFFECT must keep λ=1e308, μ=1e-308: got {scaled}"
     );
 }
 

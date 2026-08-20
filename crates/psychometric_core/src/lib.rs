@@ -56,7 +56,12 @@
 //! `T0TIPREDEFFECT` shift `t0_b z` and its Eq. 3 first-summand carry
 //! `e^{A Δt} t0_b z` (`T0TIPREDEFFECT` is not `TIPREDEFFECT` `B`;
 //! `t0_b z` is not `A^{-1}[e^{A Δt} − I] B z`; `e^{A Δt} t0_b z` is
-//! not `t0_b z`),
+//! not `t0_b z`), recovers the Driver Eq. 5 of that first-occasion
+//! carry as `τ + λ(μ_t + e^{a Δt} t0_b z)` (`τ + λ μ_t` is not that
+//! observed mean; `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not
+//! that observed mean; `τ + λ(μ_t + m x)` is not that observed mean;
+//! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
+//! `u ≠ t0`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -133,6 +138,8 @@ pub use event_time::recover_discrete_observed_mean;
 pub use event_time::recover_discrete_observed_mean_with_impulse;
 /// Exact scalar discrete observed mean of a within-interval impulse carry.
 pub use event_time::recover_discrete_observed_mean_with_impulse_carry;
+/// Exact scalar discrete observed mean of a first-occasion TI predictor.
+pub use event_time::recover_discrete_observed_mean_with_initial_time_independent_predictor;
 /// Exact scalar discrete observed mean of a time-independent predictor.
 pub use event_time::recover_discrete_observed_mean_with_time_independent_predictor;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
@@ -185,14 +192,20 @@ pub use event_time::refuse_difference_quotient_as_local_rate;
 pub use event_time::refuse_evolved_observed_mean_as_impulse_carry_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the contemporaneous-impulse observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_impulse_observed_mean;
+/// Refuse treating evolved `τ + λ μ_t` as the first-occasion TI-predictor observed mean.
+pub use event_time::refuse_evolved_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the time-independent-predictor observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_time_independent_observed_mean;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
+/// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the first-occasion TI-predictor observed mean.
+pub use event_time::refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the time-independent-predictor observed mean.
 pub use event_time::refuse_impulse_carry_observed_mean_as_time_independent_observed_mean;
 /// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the impulse-carry observed mean.
 pub use event_time::refuse_impulse_observed_mean_as_impulse_carry_observed_mean;
+/// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the first-occasion TI-predictor observed mean.
+pub use event_time::refuse_impulse_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the time-independent-predictor observed mean.
 pub use event_time::refuse_impulse_observed_mean_as_time_independent_observed_mean;
 /// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
@@ -249,6 +262,8 @@ pub use event_time::refuse_time_independent_effect_as_continuous_intercept;
 pub use event_time::refuse_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating Driver Eq. 3 `TIPREDEFFECT` increment as Voelkle Eq. 14.
 pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effect;
+/// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
+pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating Driver §4.3 trait variance as process noise.
 pub use event_time::refuse_trait_variance_as_process_noise;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.
