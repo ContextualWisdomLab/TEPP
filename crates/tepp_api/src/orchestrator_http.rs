@@ -222,4 +222,12 @@ mod tests {
         assert_eq!(exchange.method(), "POST");
         assert!(exchange.headers().is_empty());
     }
+
+    #[test]
+    fn bounded_json_walks_arrays_and_scalar_values() {
+        assert_eq!(
+            super::require_bounded_json_object(r#"{"items":[null,true,1,{"name":"ok"}]}"#),
+            Ok(())
+        );
+    }
 }
