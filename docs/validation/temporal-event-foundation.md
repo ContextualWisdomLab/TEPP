@@ -27,6 +27,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Adaptive orchestration router | `tepp_api` | accepted-target | active PR | mode selection, document-control denial, ablation, credential-free bind | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
+| Untrusted payload scientific semantics | `payload_semantics` | accepted-target | active PR | refuse estimator/posterior claims + refuse LLM-as-evidence + refuse bounds-as-semantics + recovery vs estimator collapse | ADR 0008/0014; AGENTS.md |
 
 
 ## Scientific acceptance checklist (foundation)

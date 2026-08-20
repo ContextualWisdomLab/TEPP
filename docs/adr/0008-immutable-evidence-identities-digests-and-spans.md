@@ -41,7 +41,7 @@ A content digest proves only byte equality/difference under the selected algorit
 
 ## Consequences
 
-Evidence records remain stable even when identical content is ingested into distinct provenance contexts. Exact spans round-trip across Unicode/page evidence. Strict wire reconstruction detects substitution, stale ownership, unknown extensions, unsupported versions, and hostile coordinate changes. Locale/language segmentation remains a separate concern under ADR 0004.
+Evidence records remain stable even when identical content is ingested into distinct provenance contexts. Exact spans round-trip across Unicode/page evidence. Strict wire reconstruction detects substitution, stale ownership, unknown extensions, unsupported versions, and hostile coordinate changes. Untrusted payloads still require a scientific-role gate (`payload_semantics` on the active PR) before they can be treated as estimator or posterior authority. Locale/language segmentation remains a separate concern under ADR 0004.
 
 ## Failure and recovery
 
