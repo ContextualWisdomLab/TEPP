@@ -100,6 +100,38 @@ fn relation_leakage_fails_closed_when_linked_members_split() {
 }
 
 #[test]
+fn links_outside_the_cutoff_eligible_universe_are_not_governed() {
+    let manifest = CorpusSplitManifest::from_domain(
+        "split-outside-universe",
+        &cutoff("2026-03-01T00:00:00Z"),
+        "relation-aware-v1",
+        &sample_candidates(),
+        &[
+            LeakageLink {
+                left: Uuid::from_u128(99),
+                right: Uuid::from_u128(1),
+                kind: LeakageLinkKind::SameEpisode,
+            },
+            LeakageLink {
+                left: Uuid::from_u128(1),
+                right: Uuid::from_u128(9),
+                kind: LeakageLinkKind::CopiedVariant,
+            },
+            LeakageLink {
+                left: Uuid::from_u128(1),
+                right: Uuid::from_u128(2),
+                kind: LeakageLinkKind::Translation,
+            },
+        ],
+        &sample_partitions(),
+    )
+    .expect("outside-universe links are ignored");
+
+    assert_eq!(manifest.governed_link_kinds, vec!["translation".to_owned()]);
+    assert_eq!(manifest.connected_group_count, 3);
+}
+
+#[test]
 fn unknown_fields_and_tampered_digest_fail_closed() {
     let manifest = CorpusSplitManifest::from_domain(
         "split-demo-001",
