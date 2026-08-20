@@ -2,15 +2,26 @@
 
 use crate::EncryptedMappingError;
 use sha2::{Digest, Sha256};
+use std::fmt;
 
 const ENC_CONTEXT: &[u8] = b"tepp-encrypted-mapping-enc";
 const MAC_CONTEXT: &[u8] = b"tepp-encrypted-mapping-mac";
 
 /// Caller-held mapping key identity and bytes.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct MappingKey {
     key_id: u128,
     key_bytes: [u8; 32],
+}
+
+impl fmt::Debug for MappingKey {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("MappingKey")
+            .field("key_id", &self.key_id)
+            .field("key_bytes", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl MappingKey {
@@ -116,7 +127,12 @@ pub fn seal_identity(
     if source_identity.is_empty() {
         return Err(EncryptedMappingError::EmptyIdentity);
     }
-    let ciphertext = xor_keystream(source_identity, &derive_key(key, ENC_CONTEXT), &nonce);
+    let ciphertext = xor_keystream(
+        source_identity,
+        &derive_key(key, ENC_CONTEXT),
+        analytical_id,
+        &nonce,
+    );
     let tag = authenticate(key, analytical_id, &nonce, &ciphertext);
     Ok(EncryptedIdentityMapping {
         analytical_id,
@@ -156,6 +172,7 @@ pub fn open_identity(
     Ok(xor_keystream(
         &envelope.ciphertext,
         &derive_key(key, ENC_CONTEXT),
+        envelope.analytical_id,
         &envelope.nonce,
     ))
 }
@@ -217,14 +234,20 @@ fn authenticate(
     hmac_sha256(&derive_key(key, MAC_CONTEXT), &message)
 }
 
-fn xor_keystream(payload: &[u8], enc_key: &[u8; 32], nonce: &[u8; 16]) -> Vec<u8> {
+fn xor_keystream(
+    payload: &[u8],
+    enc_key: &[u8; 32],
+    analytical_id: u128,
+    nonce: &[u8; 16],
+) -> Vec<u8> {
     payload
         .chunks(32)
         .enumerate()
         .flat_map(|(block_index, chunk)| {
-            let mut block_input = [0_u8; 24];
-            block_input[..16].copy_from_slice(nonce);
-            block_input[16..].copy_from_slice(&(block_index as u64).to_be_bytes());
+            let mut block_input = [0_u8; 40];
+            block_input[..16].copy_from_slice(&analytical_id.to_be_bytes());
+            block_input[16..32].copy_from_slice(nonce);
+            block_input[32..].copy_from_slice(&(block_index as u64).to_be_bytes());
             let block = hmac_sha256(enc_key, &block_input);
             chunk
                 .iter()
@@ -365,5 +388,42 @@ mod tests {
         assert!(!rendered.contains("secret-name"));
         assert_eq!(sealed.analytical_id(), 11);
         assert_eq!(sealed.key_id(), 3);
+    }
+
+    #[test]
+    fn mapping_key_debug_redacts_key_bytes() {
+        let key = MappingKey::new(4, [0xa5; 32]).expect("key");
+        let rendered = format!("{key:?}");
+        assert!(rendered.contains("REDACTED"));
+        assert!(!rendered.contains("a5"));
+    }
+
+    #[test]
+    fn same_nonce_different_analytical_ids_do_not_reuse_keystream() {
+        let key = MappingKey::new(5, [0x66; 32]).expect("key");
+        let left = b"source-alpha";
+        let right = b"source-bravo";
+        let first = seal_identity(1, left, &key, [7; 16]).expect("first seal");
+        let second = seal_identity(2, right, &key, [7; 16]).expect("second seal");
+        let plaintext_xor: Vec<u8> = left
+            .iter()
+            .zip(right)
+            .map(|(left, right)| left ^ right)
+            .collect();
+        let ciphertext_xor: Vec<u8> = first
+            .ciphertext
+            .iter()
+            .zip(&second.ciphertext)
+            .map(|(left, right)| left ^ right)
+            .collect();
+        assert_ne!(ciphertext_xor, plaintext_xor);
+        assert_eq!(
+            open_identity(&first, &key, MappingPurpose::ReidentificationExport),
+            Ok(left.to_vec())
+        );
+        assert_eq!(
+            open_identity(&second, &key, MappingPurpose::ReidentificationExport),
+            Ok(right.to_vec())
+        );
     }
 }
