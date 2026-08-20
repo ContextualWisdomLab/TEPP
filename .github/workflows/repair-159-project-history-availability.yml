@@ -1,4 +1,4 @@
-name: Repair PR 159 project-history availability clock
+name: Repair PR 159 project-history availability and live route
 
 on:
   pull_request:
@@ -15,6 +15,7 @@ jobs:
   patch-and-verify:
     if: github.event.pull_request.number == 159 && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       REPAIR_BRANCH: feat/lineageweave-project-history-projection
       REPAIR_BASE_SHA: ${{ github.event.pull_request.head.sha }}
@@ -31,11 +32,73 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal --component rustfmt clippy
           rustup default 1.97.1
 
-      - name: Apply the explicit availability-basis contract
+      - name: Prove the missing live project-history route is RED
+        shell: bash
         run: |
-          python3 -m py_compile .github/scripts/fix_159_project_history_availability.py
+          cat > crates/tepp_api/tests/project_history_live_red.rs <<'RS'
+          use tepp_api::{
+              AnalysisRunLiveService, LINEAGEWEAVE_CONSUMER_CODE,
+              PROJECT_HISTORY_CONTRACT_VERSION, PROJECT_HISTORY_PATH, ProjectHistoryEvent,
+              ProjectHistoryRequest,
+          };
+
+          #[test]
+          fn shared_live_service_must_serve_lineageweave_project_history() {
+              let request = ProjectHistoryRequest {
+                  contract_version: PROJECT_HISTORY_CONTRACT_VERSION,
+                  idempotency_key: "live-red-1".into(),
+                  tenant_workspace_id: "tenant-red".into(),
+                  project_key: "project-red".into(),
+                  project_name: "Project RED".into(),
+                  knowledge_cutoff: "2026-08-19T23:59:59Z".into(),
+                  focus_event_id: "event-voc".into(),
+                  events: vec![ProjectHistoryEvent {
+                      event_id: "event-voc".into(),
+                      event_type_code: "voc_received".into(),
+                      event_title: "VOC received".into(),
+                      occurred_at: "2026-08-19T10:00:00Z".into(),
+                      available_at: "2026-08-19T10:00:00Z".into(),
+                      source_post_id: "post-voc".into(),
+                      evidence_text: "Explicit VOC evidence".into(),
+                      actor_ids: vec!["actor-1".into()],
+                  }],
+              };
+              let body = request.to_json().expect("request json");
+              let raw = format!(
+                  "POST {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: localhost\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{body}",
+                  request.idempotency_key,
+                  body.len(),
+              );
+              let response = AnalysisRunLiveService::new().handle_http_request(&raw);
+              assert_eq!(response.status_code, 200);
+          }
+          RS
+
+          set +e
+          cargo test -p tepp_api --test project_history_live_red \
+            > /tmp/project-history-live-red.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/project-history-live-red.log
+          rm crates/tepp_api/tests/project_history_live_red.rs
+          if [ "$status" -eq 0 ]; then
+            echo 'Expected the absent live project-history route to fail before implementation.' >&2
+            exit 1
+          fi
+          grep -q 'shared_live_service_must_serve_lineageweave_project_history' \
+            /tmp/project-history-live-red.log || {
+              echo 'RED failure did not exercise the missing live route.' >&2
+              exit 1
+            }
+
+      - name: Apply the availability and live-service contracts
+        run: |
+          python3 -m py_compile \
+            .github/scripts/fix_159_project_history_availability.py \
+            .github/scripts/fix_159_project_history_live.py
           python3 .github/scripts/fix_159_project_history_availability.py
-          cargo fmt --all -- --check
+          python3 .github/scripts/fix_159_project_history_live.py
+          cargo fmt --all
           git diff --check
 
       - name: Verify the TEPP API contract
@@ -52,12 +115,16 @@ jobs:
         run: |
           rm -f .github/workflows/repair-159-project-history-availability.yml
           rm -f .github/scripts/fix_159_project_history_availability.py
+          rm -f .github/scripts/fix_159_project_history_live.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/tepp_api/src/project_history.rs crates/tepp_api/tests/lineageweave_project_history_contract.rs
+          git add \
+            crates/tepp_api/src/analysis_run_live.rs \
+            crates/tepp_api/src/project_history.rs \
+            crates/tepp_api/tests/lineageweave_project_history_contract.rs
           git add -u .github/workflows .github/scripts
           git diff --cached --check
-          git commit -m "fix(api): preserve project-history availability provenance"
+          git commit -m "fix(api): serve cutoff-safe project histories live"
           test -z "$(git status --porcelain)" || {
             echo 'repair left uncommitted or untracked files' >&2
             git status --short
