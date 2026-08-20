@@ -1,7 +1,7 @@
 # ADR 0009 — Purpose-bound PII governance without blanket masking
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — persistence retention/deletion/legal-hold (migration `0007`) and purpose-bound provider-payload minimization are implemented-main; provider-disclosure receipts with field-code-only evidence are on this active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; deployment/provider-region evidence remains accepted-target
+**Implementation maturity:** partial — persistence retention/deletion/legal-hold (migration `0007`) and purpose-bound provider-payload minimization are implemented-main; untrusted-intake grant presence in `intake_authorization` is on the active PR and is not implemented-main until exact-head checks, review, and protected-main integration complete; deployment/provider-region evidence remains accepted-target  
 **Date:** 2026-08-10  
 **Supersedes:** None.
 
