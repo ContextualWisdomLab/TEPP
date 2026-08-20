@@ -12,11 +12,11 @@ mod kind;
 
 /// Fail-closed summarizes-edge errors.
 pub use error::SummarizesEdgeError;
+/// Closed vocabulary of summary-related document identities.
+pub use kind::SummarizesKind;
 /// Fraction of recovered summary kinds that match known truth.
 pub use kind::identity_recovery_rate;
 /// Refuse to treat a summary as the source document identity.
 pub use kind::refuse_summary_as_source_identity;
 /// Refuse to treat a summary as a forward state transition.
 pub use kind::refuse_summary_as_transition;
-/// Closed vocabulary of summary-related document identities.
-pub use kind::SummarizesKind;

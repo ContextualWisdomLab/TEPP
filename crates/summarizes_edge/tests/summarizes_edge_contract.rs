@@ -1,8 +1,8 @@
 //! A summary is not a state transition and not the source document.
 
 use summarizes_edge::{
-    identity_recovery_rate, refuse_summary_as_source_identity, refuse_summary_as_transition,
-    SummarizesEdgeError, SummarizesKind,
+    SummarizesEdgeError, SummarizesKind, identity_recovery_rate, refuse_summary_as_source_identity,
+    refuse_summary_as_transition,
 };
 
 #[test]

@@ -87,8 +87,8 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_summary_as_source_identity, refuse_summary_as_transition,
-        SummarizesKind,
+        SummarizesKind, identity_recovery_rate, refuse_summary_as_source_identity,
+        refuse_summary_as_transition,
     };
     use crate::SummarizesEdgeError;
 
