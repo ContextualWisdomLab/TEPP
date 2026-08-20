@@ -14,7 +14,10 @@ fn request_body_must_be_a_bounded_json_object() {
         );
     }
 
-    let oversized = format!(r#"{{"payload":"{}"}}"#, "x".repeat(MAX_ORCHESTRATOR_BODY_BYTES));
+    let oversized = format!(
+        r#"{{"payload":"{}"}}"#,
+        "x".repeat(MAX_ORCHESTRATOR_BODY_BYTES)
+    );
     assert_eq!(
         orchestrator_interpretation_exchange("orchestrator.example", "idem-1", &oversized),
         Err(ApiError::LimitExceeded)
