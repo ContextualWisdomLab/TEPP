@@ -62,11 +62,10 @@ fn slot_precision_and_recall_are_computed_from_known_truth_fills() {
     let calibrated_recall = schema_slot_recall(&truth, &calibrated).expect("recall");
     let naive_recall = schema_slot_recall(&truth, &always_fill).expect("naive r");
 
-    assert!(
-        calibrated_precision > naive_precision,
-        "computed precision {calibrated_precision} must exceed always-fill precision {naive_precision}"
-    );
-    assert!((calibrated_recall - naive_recall).abs() < f64::EPSILON);
+    assert!((calibrated_precision - (2.0 / 3.0)).abs() < 1.0e-12);
+    assert!((naive_precision - (1.0 / 3.0)).abs() < 1.0e-12);
+    assert!((calibrated_recall - 1.0).abs() < f64::EPSILON);
+    assert!((naive_recall - 1.0).abs() < f64::EPSILON);
 }
 
 #[test]
