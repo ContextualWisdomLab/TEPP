@@ -32,11 +32,6 @@ impl<'document> EmbeddedImageUnit<'document> {
 ///
 /// Returns [`EvidenceError::EmptySourceSpan`] when the document contains no
 /// well-formed embedded image URI.
-///
-/// # Panics
-///
-/// Panics only if the coordinates derived from the validated document violate
-/// the source-span invariant, which indicates an internal implementation bug.
 pub fn embedded_image_units(
     document: &DocumentRecord,
 ) -> Result<Vec<EmbeddedImageUnit<'_>>, EvidenceError> {
@@ -66,11 +61,7 @@ pub fn embedded_image_units(
         let media_type = &text[start + "data:".len()..media_end];
         let scalar_start = text[..start].chars().count();
         let scalar_end = scalar_start + text[start..payload_end].chars().count();
-        // These coordinates are derived from this validated document's own
-        // UTF-8 boundaries and scalar counts, so SourceSpan validation cannot
-        // reject them without an internal invariant violation.
-        let span = SourceSpan::new(document, start, payload_end, scalar_start, scalar_end, None)
-            .expect("derived embedded-image coordinates must form a valid source span");
+        let span = SourceSpan::new(document, start, payload_end, scalar_start, scalar_end, None)?;
         units.push(EmbeddedImageUnit { span, media_type });
         search_from = payload_end;
     }
