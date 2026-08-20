@@ -1,7 +1,7 @@
 # TEPP API and Modular Integration Contract
 
 **Status:** Accepted target contract; exact endpoints are introduced only with executable services.  
-**Last reviewed:** 2026-08-10
+**Last reviewed:** 2026-08-13
 
 ## 1. Authority boundary
 
@@ -18,7 +18,7 @@ Current protected main exposes Rust library/domain contracts, not a production H
 | interval relation/reasoner API | `temporal_core` | event/relation validation | active-PR #6 |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
-| LLM interpretation provider port | TEPP interpretation gateway | contextual-orchestrator | accepted-target |
+| LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
 | analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
 
@@ -112,9 +112,13 @@ TEPP owns its application/API state, authorized evidence, model runs, and artifa
 
 `naruon` may submit evidence/analysis requests or consume versioned topic/event/psychometric artifacts. It must not treat lexical heuristics as TEPP topic inference and must not read TEPP database tables directly. HTTP interchange is `tepp_api::naruon_analysis_run_exchange` / `naruon_export_exchange` (`POST /v1/analysis-runs` and `/v1/exports` over `https` only). Detailed modular surfaces and failure modes are recorded in [`docs/connectors/naruon-artifact-consumer.md`](connectors/naruon-artifact-consumer.md).
 
+### Provider payload minimization
+
+Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers must build the payload through `tepp_api::minimize_provider_payload`. That function preserves opaque analytical identifiers and membership roles, applies purpose-bound source-text rules, refuses expired, not-yet-valid, inverted, cross-tenant, or impossible-calendar grants, and never copies a direct identity mapping into the provider body or ordinary log. Re-identification is a separate elevated scientific path (`disclose_identity_mapping`), not a provider header or prompt field.
+
 ### contextual-orchestrator
 
-TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. A production live port must pass `service_tls::authorize_orchestrator_live_port` (valid rustls PEM on an `https` bind). Loopback plaintext is refused; loopback `https` with valid PEM is authorized as production TLS, not as a development-only exception. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
+TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. A production live port must pass `service_tls::authorize_orchestrator_live_port` (valid rustls PEM on an `https` bind); loopback plaintext is refused and loopback `https` with valid PEM is authorized as production TLS. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
 
 ### organization `.github`
 
