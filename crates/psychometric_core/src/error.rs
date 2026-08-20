@@ -140,6 +140,10 @@ pub enum PsychometricError {
     /// Voelkle et al. (2012, Eq. 14). `e^{A(t−u)} M x` is not
     /// `a_{yx} Δt`.
     TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect,
+    /// Driver Eq. 5 of the Eq. 3 evolved mean was treated as
+    /// Equation 5 of the Eq. 1–2 carried latent mean.
+    /// `τ + λ μ_t` is not `τ + λ(μ_t + e^{a(t−u)} m x)`.
+    EvolvedObservedMeanIsNotImpulseCarryObservedMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -259,6 +263,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect => {
                 "time-dependent predictor impulse carry is not the time-varying discrete effect"
+            }
+            Self::EvolvedObservedMeanIsNotImpulseCarryObservedMean => {
+                "evolved observed mean is not the impulse-carry observed mean"
             }
         };
         formatter.write_str(message)
@@ -456,6 +463,10 @@ mod tests {
         assert_eq!(
             PsychometricError::TimeDependentImpulseCarryIsNotTimeVaryingDiscreteEffect.to_string(),
             "time-dependent predictor impulse carry is not the time-varying discrete effect"
+        );
+        assert_eq!(
+            PsychometricError::EvolvedObservedMeanIsNotImpulseCarryObservedMean.to_string(),
+            "evolved observed mean is not the impulse-carry observed mean"
         );
     }
 }

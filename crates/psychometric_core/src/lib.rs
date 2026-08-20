@@ -39,7 +39,9 @@
 //! recovers the Driver Eq. 1–2 within-interval impulse carry
 //! `e^{A(t−u)} M x` for `t0 < u < t` (not the contemporaneous Dirac,
 //! not `CINT`, not `TIPREDEFFECT`, and not Voelkle Eq. 14; §7.2
-//! dissipation), recovers the Driver Eq. 3 second-summand
+//! dissipation), recovers the Driver Eq. 5 of that carried latent
+//! mean as `τ + λ(μ_t + e^{a(t−u)} m x)` (`τ + λ μ_t` is not that
+//! observed mean), recovers the Driver Eq. 3 second-summand
 //! time-independent predictor increment `A^{-1}[e^{A Δt} − I] B z`
 //! (Table 2 `TIPREDEFFECT` is `B`, not `κ`, not `M`, and not Voelkle
 //! Eq. 14; `B` is not that discrete increment),
@@ -113,6 +115,8 @@ pub use event_time::recover_discrete_latent_mean_with_time_independent_predictor
 pub use event_time::recover_discrete_latent_variance;
 /// Exact scalar discrete observed mean `τ + λ μ_t` from Eq. 3 then Eq. 5.
 pub use event_time::recover_discrete_observed_mean;
+/// Exact scalar discrete observed mean of a within-interval impulse carry.
+pub use event_time::recover_discrete_observed_mean_with_impulse_carry;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
 pub use event_time::recover_discrete_process_noise;
 /// Exact scalar discrete `TIPREDEFFECT` increment `A^{-1}[e^{A Δt} − I] B z`.
@@ -155,6 +159,8 @@ pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating evolved `τ + λ μ_t` as the impulse-carry observed mean.
+pub use event_time::refuse_evolved_observed_mean_as_impulse_carry_observed_mean;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
 /// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
