@@ -4,8 +4,9 @@ use tepp_api::{
     ANALYSIS_RESULT_CONTRACT_VERSION, ANALYSIS_RUN_CONTRACT_VERSION,
     ANALYSIS_RUN_STATUS_CONTRACT_VERSION, AnalysisResultSummary, AnalysisRunAccepted,
     AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState, AnalysisRunTerminalResult,
-    AnalysisRunTerminalState, ApiError, DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT, require_status_binding,
-    require_terminal_binding, terminal_result_matches_accepted, terminal_result_matches_request,
+    AnalysisRunTerminalState, ApiError, DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT,
+    DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, require_status_binding, require_terminal_binding,
+    terminal_result_matches_accepted, terminal_result_matches_request,
 };
 
 const DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -114,6 +115,29 @@ fn wire_version_limit_extension_and_time_validation_fail_closed() {
     let mut value = succeeded();
     value.completed_at = "2026-99-99T25:00:00Z".into();
     assert_eq!(value.to_json(), Err(ApiError::InvalidWirePayload));
+
+    // System time is distinct from the knowledge cutoff; a pre-cutoff run may
+    // legitimately publish a result for a historical snapshot.
+    let mut value = succeeded();
+    value.completed_at = "2026-07-31T23:59:59Z".into();
+    assert!(value.to_json().is_ok());
+}
+
+#[test]
+fn serialization_enforces_default_result_and_status_limits() {
+    let mut result = succeeded();
+    result.summary.as_mut().expect("summary").analysis_family =
+        "x".repeat(DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT);
+    assert_eq!(result.to_json(), Err(ApiError::LimitExceeded));
+
+    let oversized_accepted = AnalysisRunAccepted::new(
+        "x".repeat(DEFAULT_ANALYSIS_RUN_BYTE_LIMIT),
+        "accepted",
+        "idem-1",
+    )
+    .expect("accepted");
+    let status = AnalysisRunStatus::accepted(&oversized_accepted).expect("status");
+    assert_eq!(status.to_json(), Err(ApiError::LimitExceeded));
 }
 
 #[test]
@@ -334,6 +358,19 @@ fn every_request_binding_dimension_and_receipt_identity_is_checked() {
         ),
         Err(ApiError::InvalidWirePayload)
     );
+
+    let mut invalid_request = request();
+    invalid_request.contract_version += 1;
+    assert_eq!(
+        require_terminal_binding(&invalid_request, &accepted(), &result),
+        Err(ApiError::UnsupportedContractVersion)
+    );
+    let mut invalid_accepted = accepted();
+    invalid_accepted.contract_version += 1;
+    assert_eq!(
+        require_terminal_binding(&request(), &invalid_accepted, &result),
+        Err(ApiError::UnsupportedContractVersion)
+    );
 }
 
 #[test]
@@ -455,6 +492,28 @@ fn status_read_binding_rejects_receipt_and_request_mismatches() {
     assert_eq!(
         require_status_binding(&other_request, &accepted(), &terminal),
         Err(ApiError::InvalidWirePayload)
+    );
+
+    let accepted_status = AnalysisRunStatus::accepted(&accepted()).expect("status");
+    let mut other_idempotency = request();
+    other_idempotency.idempotency_key = "other-key".into();
+    assert_eq!(
+        require_status_binding(&other_idempotency, &accepted(), &accepted_status),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut invalid_status = accepted_status.clone();
+    invalid_status.idempotency_key = "other-key".into();
+    assert_eq!(
+        require_status_binding(&request(), &accepted(), &invalid_status),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut invalid_request = request();
+    invalid_request.contract_version += 1;
+    assert_eq!(
+        require_status_binding(&invalid_request, &accepted(), &accepted_status),
+        Err(ApiError::UnsupportedContractVersion)
     );
     assert_eq!(
         AnalysisRunStatus::terminal(

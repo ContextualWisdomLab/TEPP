@@ -109,10 +109,12 @@ impl AnalysisRunRequest {
     /// Returns field-validation or serialization errors.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        to_json(self)
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)?;
+        Ok(payload)
     }
 
-    fn validate(&self) -> Result<(), ApiError> {
+    pub(crate) fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(self.contract_version, ANALYSIS_RUN_CONTRACT_VERSION)?;
         require_nonempty(&self.idempotency_key)?;
         require_nonempty(&self.tenant_workspace_id)?;
@@ -166,7 +168,7 @@ impl AnalysisRunAccepted {
         to_json(self)
     }
 
-    fn validate(&self) -> Result<(), ApiError> {
+    pub(crate) fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(self.contract_version, ANALYSIS_RUN_CONTRACT_VERSION)?;
         require_nonempty(&self.run_id)?;
         require_nonempty(&self.run_state)?;
@@ -240,7 +242,9 @@ impl AnalysisRunStatus {
     /// Returns validation or serialization errors.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        to_json(self)
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)?;
+        Ok(payload)
     }
 
     fn new(
@@ -312,8 +316,13 @@ pub fn require_status_binding(
     accepted: &AnalysisRunAccepted,
     status: &AnalysisRunStatus,
 ) -> Result<(), ApiError> {
+    request.validate()?;
+    accepted.validate()?;
     status.validate()?;
-    if status.run_id != accepted.run_id || status.idempotency_key != accepted.idempotency_key {
+    if request.idempotency_key != accepted.idempotency_key
+        || status.run_id != accepted.run_id
+        || status.idempotency_key != accepted.idempotency_key
+    {
         return Err(ApiError::InvalidWirePayload);
     }
     if let Some(result) = status.terminal_result.as_ref() {

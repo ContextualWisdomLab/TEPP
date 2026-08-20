@@ -220,7 +220,9 @@ impl AnalysisRunTerminalResult {
     /// Returns validation or serialization errors.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        to_json(self)
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT)?;
+        Ok(payload)
     }
 
     pub(crate) fn validate(&self) -> Result<(), ApiError> {
@@ -320,6 +322,8 @@ pub fn require_terminal_binding(
     accepted: &AnalysisRunAccepted,
     result: &AnalysisRunTerminalResult,
 ) -> Result<(), ApiError> {
+    request.validate()?;
+    accepted.validate()?;
     if terminal_result_matches_request(request, result)
         && terminal_result_matches_accepted(accepted, result)
     {
