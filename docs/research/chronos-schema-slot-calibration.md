@@ -20,7 +20,7 @@ Doddington, G., Mitchell, A., Przybocki, M., Ramshaw, L., Strassel, S., & Weisch
 
 ## Application
 
-Anagnostopoulos et al. (2013) keep CHRONOS completions in a qualitative reasoning layer rather than treating them as observed chronology. Chambers and Jurafsky (2009) evaluate narrative schemas by recovered participant slots, and Doddington et al. (2004) score argument fills with precision and recall against known truth. TEPP therefore refuses to cast a schema prediction as an event instance or transition and requires computed slot precision, recall, and RMSE against known truth (Anagnostopoulos et al., 2013; Chambers & Jurafsky, 2009; Doddington et al., 2004).
+Anagnostopoulos et al. (2013) keep CHRONOS completions in a qualitative reasoning layer rather than treating them as observed chronology. Chambers and Jurafsky (2009) provide narrative-schema participant-slot precedent, while Doddington et al. (2004) describe ACE system-to-reference mapping and application-value evaluation; neither source defines TEPP's metric contract. TEPP therefore refuses to cast a schema prediction as an event instance or transition and requires its own computed slot precision, recall, and RMSE against known truth (see [`schema_slot_contract.rs`](../../crates/event_core/tests/schema_slot_contract.rs) and the `event_core` API; Anagnostopoulos et al., 2013; Chambers & Jurafsky, 2009; Doddington et al., 2004).
 
 ## Verification
 

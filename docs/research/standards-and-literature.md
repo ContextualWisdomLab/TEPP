@@ -70,7 +70,7 @@ Chambers, N., & Jurafsky, D. (2009). Unsupervised learning of narrative schemas 
 
 Doddington, G., Mitchell, A., Przybocki, M., Ramshaw, L., Strassel, S., & Weischedel, R. (2004). The Automatic Content Extraction (ACE) program—Tasks, data, and evaluation. In *Proceedings of the Fourth International Conference on Language Resources and Evaluation (LREC’04)* (pp. 837–840). European Language Resources Association.
 
-TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Predicted schema-slot fills stay hypothetical until independently promoted.
+TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks (Allan, 2002), qualitative temporal reasoning (Anagnostopoulos et al., 2013), and separate neural/symbolic event-schema and narrative participant-slot layers (Chambers & Jurafsky, 2009). Under [ADR 0016](../adr/0016-tdt-chronos-event-intelligence-boundary.md), predicted schema-slot fills stay hypothetical until independently promoted; this is a TEPP policy boundary, not a literature result.
 
 ## Unicode, language tags, and multilingual structure
 

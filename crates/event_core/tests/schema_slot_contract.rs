@@ -70,11 +70,45 @@ fn slot_precision_and_recall_are_computed_from_known_truth_fills() {
 
 #[test]
 fn calibrated_slot_occupancy_scores_have_lower_rmse_than_always_fill() {
-    let truth = [1.0_f64, 1.0, 0.0, 0.0, 0.0, 1.0];
-    let calibrated = [0.90_f64, 0.85, 0.15, 0.10, 0.20, 0.88];
-    let always_fill = [1.0_f64, 1.0, 1.0, 1.0, 1.0, 1.0];
+    let fixture = [
+        (
+            SchemaSlotLabel::Filled,
+            EventConfidence::new(0.90).expect("score"),
+        ),
+        (
+            SchemaSlotLabel::Filled,
+            EventConfidence::new(0.85).expect("score"),
+        ),
+        (
+            SchemaSlotLabel::Empty,
+            EventConfidence::new(0.15).expect("score"),
+        ),
+        (
+            SchemaSlotLabel::Empty,
+            EventConfidence::new(0.10).expect("score"),
+        ),
+        (
+            SchemaSlotLabel::Empty,
+            EventConfidence::new(0.20).expect("score"),
+        ),
+        (
+            SchemaSlotLabel::Filled,
+            EventConfidence::new(0.88).expect("score"),
+        ),
+    ];
+    let truth: Vec<f64> = fixture
+        .iter()
+        .map(|(label, _)| label.as_probability_target())
+        .collect();
+    let calibrated: Vec<f64> = fixture
+        .iter()
+        .map(|(_, confidence)| confidence.value())
+        .collect();
+    let always_fill = vec![1.0_f64; fixture.len()];
     let calibrated_rmse = computed_rmse(&truth, &calibrated);
     let naive_rmse = computed_rmse(&truth, &always_fill);
+    assert!((calibrated_rmse - 0.141_067_359_796_658_94).abs() < 1.0e-12);
+    assert!((naive_rmse - std::f64::consts::FRAC_1_SQRT_2).abs() < 1.0e-12);
     assert!(
         calibrated_rmse < naive_rmse,
         "computed calibrated RMSE {calibrated_rmse} must be below always-fill RMSE {naive_rmse}"
