@@ -118,6 +118,7 @@ fn each_oom_returns_a_smaller_gpu_plan_before_cpu_fallback() {
         fallback.fallback(),
         Some(FallbackReason::OutOfMemoryRetryExhausted)
     );
+    // CPU f64 fallback is not VRAM-limited, so it restores the requested batch.
     assert_eq!(fallback.batch_size(), request.requested_batch());
     assert_eq!(fallback.oom_retry_count(), 3);
 }
