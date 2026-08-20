@@ -242,12 +242,16 @@ fn window_probe(
     }
     let probe_count = (truth.unit_count - window) as usize;
     let window = window as usize;
+    let truth_prefix = boundary_prefix_counts(&truth.boundary_after);
+    let recovered_prefix = boundary_prefix_counts(&recovered.boundary_after);
     let mut disagreements = 0_usize;
     for start in 0..probe_count {
         let end = start + window;
         if disagree(
-            count_boundaries(&truth.boundary_after, start, end),
-            count_boundaries(&recovered.boundary_after, start, end),
+            usize::try_from(truth_prefix[end] - truth_prefix[start])
+                .map_err(|_| EventError::InvalidWirePayload)?,
+            usize::try_from(recovered_prefix[end] - recovered_prefix[start])
+                .map_err(|_| EventError::InvalidWirePayload)?,
         ) {
             disagreements += 1;
         }
@@ -255,11 +259,14 @@ fn window_probe(
     counted_rate(disagreements, probe_count)
 }
 
-fn count_boundaries(boundary_after: &[bool], start: usize, end: usize) -> usize {
-    boundary_after[start..end]
-        .iter()
-        .filter(|flag| **flag)
-        .count()
+fn boundary_prefix_counts(boundary_after: &[bool]) -> Vec<u32> {
+    let mut prefix = Vec::with_capacity(boundary_after.len() + 1);
+    prefix.push(0);
+    for &is_boundary in boundary_after {
+        let next = prefix.last().copied().unwrap_or(0) + u32::from(is_boundary);
+        prefix.push(next);
+    }
+    prefix
 }
 
 fn counted_rate(numerator: usize, denominator: usize) -> Result<f64, EventError> {

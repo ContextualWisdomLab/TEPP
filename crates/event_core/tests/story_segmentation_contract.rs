@@ -54,14 +54,10 @@ fn window_diff_and_pk_are_computed_from_known_truth_boundaries() {
     let calibrated_pk = story_pk(&truth, &calibrated, 3).expect("pk");
     let naive_pk = story_pk(&truth, &always_cut, 3).expect("naive pk");
 
-    assert!(
-        calibrated_wd < naive_wd,
-        "computed WindowDiff {calibrated_wd} must stay below always-cut WindowDiff {naive_wd}"
-    );
-    assert!(
-        calibrated_pk < naive_pk,
-        "computed Pk {calibrated_pk} must stay below always-cut Pk {naive_pk}"
-    );
+    assert!((calibrated_wd - (2.0 / 7.0)).abs() < 1.0e-12);
+    assert!((naive_wd - 1.0).abs() < f64::EPSILON);
+    assert!((calibrated_pk - (2.0 / 7.0)).abs() < 1.0e-12);
+    assert!((naive_pk - (4.0 / 7.0)).abs() < 1.0e-12);
     assert!(
         story_window_diff(&truth, &truth, 3)
             .expect("identity")
@@ -82,14 +78,10 @@ fn boundary_precision_and_recall_are_computed_from_known_truth() {
     let calibrated_recall = story_boundary_recall(&truth, &calibrated).expect("recall");
     let naive_recall = story_boundary_recall(&truth, &always_cut).expect("naive recall");
 
-    assert!(
-        calibrated_precision > naive_precision,
-        "computed precision {calibrated_precision} must exceed always-cut precision {naive_precision}"
-    );
-    assert!(
-        calibrated_recall < naive_recall,
-        "computed recall {calibrated_recall} must stay below the always-cut recall {naive_recall}"
-    );
+    assert!((calibrated_precision - 1.0).abs() < f64::EPSILON);
+    assert!((naive_precision - (2.0 / 7.0)).abs() < 1.0e-12);
+    assert!((calibrated_recall - 0.5).abs() < f64::EPSILON);
+    assert!((naive_recall - 1.0).abs() < f64::EPSILON);
 }
 
 #[test]
