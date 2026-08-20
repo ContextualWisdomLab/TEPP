@@ -1,0 +1,72 @@
+name: Repair PR 159 project-history availability clock
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repair-pr-159-project-history-availability
+  cancel-in-progress: true
+
+jobs:
+  patch-and-verify:
+    if: github.event.pull_request.number == 159 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      REPAIR_BRANCH: feat/lineageweave-project-history-projection
+      REPAIR_BASE_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Checkout the exact PR head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Select pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt clippy
+          rustup default 1.97.1
+
+      - name: Apply the explicit availability-basis contract
+        run: |
+          python3 -m py_compile .github/scripts/fix_159_project_history_availability.py
+          python3 .github/scripts/fix_159_project_history_availability.py
+          cargo fmt --all -- --check
+          git diff --check
+
+      - name: Verify the TEPP API contract
+        run: |
+          cargo test -p tepp_api --all-targets
+          cargo clippy -p tepp_api --all-targets -- -D warnings
+          cargo doc -p tepp_api --no-deps
+          python3 scripts/check_workspace_contract.py
+          python3 scripts/check_docstrings.py
+          python3 scripts/validate_documentation.py
+
+      - name: Commit only the exact-head validated contract
+        shell: bash
+        run: |
+          rm -f .github/workflows/repair-159-project-history-availability.yml
+          rm -f .github/scripts/fix_159_project_history_availability.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/tepp_api/src/project_history.rs crates/tepp_api/tests/lineageweave_project_history_contract.rs
+          git add -u .github/workflows .github/scripts
+          git diff --cached --check
+          git commit -m "fix(api): preserve project-history availability provenance"
+          test -z "$(git status --porcelain)" || {
+            echo 'repair left uncommitted or untracked files' >&2
+            git status --short
+            exit 1
+          }
+          git fetch origin "${REPAIR_BRANCH}"
+          remote_head="$(git rev-parse "origin/${REPAIR_BRANCH}")"
+          if [ "$remote_head" != "$REPAIR_BASE_SHA" ]; then
+            echo "PR head moved from ${REPAIR_BASE_SHA} to ${remote_head}; refusing to publish an unverified contract." >&2
+            exit 1
+          fi
+          git push origin "HEAD:${REPAIR_BRANCH}"
