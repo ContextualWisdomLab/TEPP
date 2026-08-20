@@ -1,7 +1,7 @@
 # TEPP Privacy and Data Governance
 
 **Status:** Accepted target governance baseline; no certification claim.  
-**Last reviewed:** 2026-08-10
+**Last reviewed:** 2026-08-13
 
 ## 1. Objective
 
@@ -52,19 +52,21 @@ LLM use is optional and bounded. The default provider payload is evidence-minimi
 4. treat returned content as untrusted and subject to deterministic verification;
 5. allow local/private provider profiles for deployments that prohibit external disclosure.
 
+`tepp_api::minimize_provider_payload` is the fail-closed adapter for this policy: a time-bounded purpose grant is required, identity mappings cannot ride on a provider offer, and ordinary disclosure logs record purpose and field-class flags without source text. Re-identification uses `tepp_api::disclose_identity_mapping` and is limited to scientific validation with an explicit grant flag.
+
 `NVIDIA_NIM_API_KEY` is a development/test credential boundary, not authorization to send unrestricted production data.
 
 ## 6. Retention, deletion, and legal hold
 
 Retention is policy-driven per data class and purpose. Raw evidence, derived models, caches, provider payloads, exports, and audit records may have different retention periods. Deletion workflows distinguish:
 
-- logical revocation from active analysis;
+- logical revocation and identity tombstones from active analysis (`cache_export_removal` does not drop a document from analysis);
 - removal of mutable caches and exports;
 - deletion/tombstone of identity mappings where legally permitted;
 - immutable audit evidence that records the deletion action without retaining unnecessary raw PII;
 - legal or contractual hold that prevents deletion and records its authority.
 
-Historical model reproducibility cannot silently override an approved deletion obligation. If source deletion makes exact reproduction unavailable, TEPP records that limitation rather than restoring deleted data from an ungoverned copy.
+Historical model reproducibility cannot silently override an approved deletion obligation. If source deletion makes exact reproduction unavailable, TEPP records that limitation rather than restoring deleted data from an ungoverned copy. Migration `0007` (active PR) persists `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` so an active hold blocks completed deletion and a tombstone blocks restore of the same document identity.
 
 ## 7. Tenant and service isolation
 
