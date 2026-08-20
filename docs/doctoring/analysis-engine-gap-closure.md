@@ -1,8 +1,12 @@
-# Product and Technical Gap Baseline
+# Analysis Engine v1 — Buyer Gap Closure
 
 **Review date:** 2026-08-21
 **Active slice:** PR #157 terminal-result contract → stacked analysis execution
 engine for issue #166
+
+The canonical organization-wide buyer-gap register is maintained separately in
+`docs/product-technical-gap-baseline.md`. This document records only the
+analysis-engine slice so it can land without competing with that register.
 
 ## Buyer-visible gap
 
