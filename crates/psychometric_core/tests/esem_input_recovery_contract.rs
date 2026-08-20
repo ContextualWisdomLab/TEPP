@@ -133,6 +133,10 @@ fn raw_proportions_and_invalid_numeric_inputs_fail_closed() {
         Err(PsychometricError::SingularDesign)
     );
     assert_eq!(
+        pearson_correlation(&[1.0, 2.0], &[3.0, 3.0], IndicatorKind::AdditiveLogRatio),
+        Err(PsychometricError::SingularDesign)
+    );
+    assert_eq!(
         posterior_draw_point_estimate_mean(&[]),
         Err(PsychometricError::InvalidNumericInput)
     );

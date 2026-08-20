@@ -134,8 +134,24 @@ mod tests {
     fn valid_kinds_pass_and_zero_right_variance_is_singular() {
         require_valid_indicator(IndicatorKind::IsometricLogRatio).expect("ilr");
         assert_eq!(
+            require_valid_indicator(IndicatorKind::RawProportion),
+            Err(PsychometricError::RawProportionForbidden)
+        );
+        assert_eq!(
             pearson_correlation(&[1.0, 2.0], &[3.0, 3.0], IndicatorKind::LogisticNormal),
             Err(PsychometricError::SingularDesign)
+        );
+        assert_eq!(
+            pearson_correlation(&[2.0, 2.0], &[1.0, 2.0], IndicatorKind::AdditiveLogRatio),
+            Err(PsychometricError::SingularDesign)
+        );
+        assert_eq!(
+            pearson_correlation(
+                &[1.0, 2.0],
+                &[1.0, f64::NAN],
+                IndicatorKind::AdditiveLogRatio
+            ),
+            Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
             pearson_correlation(

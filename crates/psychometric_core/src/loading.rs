@@ -60,5 +60,17 @@ mod tests {
             ordinary_least_squares_slope(&[0.0, f64::MAX], &[0.0, f64::MAX]),
             Err(PsychometricError::InvalidNumericInput)
         );
+        assert_eq!(
+            ordinary_least_squares_slope(&[1.0, 2.0], &[1.0]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            ordinary_least_squares_slope(&[f64::NAN, 2.0], &[1.0, 2.0]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            ordinary_least_squares_slope(&[1.0, 2.0], &[1.0, f64::NAN]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 }
