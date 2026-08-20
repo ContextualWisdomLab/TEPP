@@ -1,12 +1,12 @@
-//! RED contract for TEPP temporal evidence used by LineageWeave Ask surfaces.
+//! Contract tests for TEPP temporal evidence used by `LineageWeave` Ask surfaces.
 
 use std::fmt::Write as _;
 
 use tepp_api::{
     AnalysisRunLiveService, ApiError, LINEAGEWEAVE_CONSUMER_CODE,
-    TEMPORAL_ASSOCIATION_CLAIM_BOUNDARY, TEMPORAL_CONTEXT_CONTRACT_VERSION,
-    TEMPORAL_CONTEXT_PATH, TemporalContextEvent, TemporalContextRequest,
-    TemporalContextResponse, build_temporal_context, lineageweave_temporal_context_exchange,
+    TEMPORAL_ASSOCIATION_CLAIM_BOUNDARY, TEMPORAL_CONTEXT_CONTRACT_VERSION, TEMPORAL_CONTEXT_PATH,
+    TemporalContextEvent, TemporalContextRequest, TemporalContextResponse, build_temporal_context,
+    lineageweave_temporal_context_exchange,
 };
 
 fn event(
@@ -115,7 +115,12 @@ fn temporal_context_orders_events_and_marks_only_candidate_gaps() {
     );
     assert!(response.timeline_events[3].is_subject);
     assert_eq!(response.temporal_relations.len(), 3);
-    assert!(response.temporal_relations.iter().all(|item| item.relation_code == "before"));
+    assert!(
+        response
+            .temporal_relations
+            .iter()
+            .all(|item| item.relation_code == "before")
+    );
     assert!(
         response
             .transition_gap_candidates
@@ -138,15 +143,24 @@ fn temporal_context_orders_events_and_marks_only_candidate_gaps() {
 fn temporal_context_rejects_leakage_duplicates_and_unpublished_consumers() {
     let mut future = request();
     future.events[0].available_time = "2026-09-01T00:00:00Z".into();
-    assert_eq!(build_temporal_context(&future), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        build_temporal_context(&future),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut duplicate = request();
     duplicate.events[1].event_id = duplicate.events[0].event_id.clone();
-    assert_eq!(build_temporal_context(&duplicate), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        build_temporal_context(&duplicate),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut hostile = request();
     hostile.consumer_code = "unpublished-consumer".into();
-    assert_eq!(build_temporal_context(&hostile), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        build_temporal_context(&hostile),
+        Err(ApiError::InvalidWirePayload)
+    );
 }
 
 #[test]
@@ -155,7 +169,10 @@ fn lineageweave_exchange_and_live_listener_return_the_same_context() {
     let exchange = lineageweave_temporal_context_exchange("https://tepp.example.test", &request)
         .expect("exchange");
     assert_eq!(exchange.method, "POST");
-    assert_eq!(exchange.target_url, "https://tepp.example.test/v1/temporal-context");
+    assert_eq!(
+        exchange.target_url,
+        "https://tepp.example.test/v1/temporal-context"
+    );
     assert!(exchange.headers.iter().all(|(name, _)| {
         !name.eq_ignore_ascii_case("authorization") && !name.to_ascii_lowercase().contains("token")
     }));
@@ -165,4 +182,188 @@ fn lineageweave_exchange_and_live_listener_return_the_same_context() {
     assert_eq!(response.status_code, 200);
     let live = TemporalContextResponse::from_json(&response.body).expect("response");
     assert_eq!(live, build_temporal_context(&request).expect("direct"));
+}
+
+fn single_event_response() -> TemporalContextResponse {
+    let mut value = request();
+    value.events.truncate(1);
+    value.subject_post_id = None;
+    build_temporal_context(&value).expect("single event")
+}
+
+fn two_event_response() -> TemporalContextResponse {
+    let mut value = request();
+    value.events.truncate(2);
+    value.subject_post_id = None;
+    build_temporal_context(&value).expect("two events")
+}
+
+#[test]
+fn temporal_context_rejects_invalid_requests() {
+    let mut empty_events = request();
+    empty_events.events.clear();
+    assert_eq!(
+        build_temporal_context(&empty_events),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut too_many_events = request();
+    too_many_events.events = (0..1025)
+        .map(|index| {
+            let mut value = too_many_events.events[0].clone();
+            value.event_id = format!("event-{index}");
+            value
+        })
+        .collect();
+    assert_eq!(
+        build_temporal_context(&too_many_events),
+        Err(ApiError::LimitExceeded)
+    );
+
+    let mut empty_subject = request();
+    empty_subject.subject_post_id = Some(String::new());
+    assert_eq!(
+        build_temporal_context(&empty_subject),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut unknown_subject = request();
+    unknown_subject.subject_post_id = Some("missing-post".into());
+    assert_eq!(
+        build_temporal_context(&unknown_subject),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut empty_project = request();
+    empty_project.events[0].project_reference = Some(" ".into());
+    assert_eq!(
+        build_temporal_context(&empty_project),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut empty_actors = request();
+    empty_actors.events[0].actor_references.clear();
+    assert_eq!(
+        build_temporal_context(&empty_actors),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut no_project = request();
+    no_project.events[0].project_reference = None;
+    assert!(build_temporal_context(&no_project).is_ok());
+}
+
+#[test]
+fn temporal_context_rejects_invalid_response_shapes() {
+    let single_response = single_event_response();
+
+    let mut invalid_claim = single_response.clone();
+    invalid_claim.claim_boundary = "causal".into();
+    assert_eq!(invalid_claim.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut empty_timeline = single_response.clone();
+    empty_timeline.timeline_events.clear();
+    assert_eq!(empty_timeline.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut missing_source = single_response.clone();
+    missing_source.source_post_ids.clear();
+    assert_eq!(missing_source.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let two_response = two_event_response();
+
+    let mut missing_relation = two_response.clone();
+    missing_relation.temporal_relations.clear();
+    assert_eq!(
+        missing_relation.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut missing_gap = two_response.clone();
+    missing_gap.transition_gap_candidates.clear();
+    assert_eq!(missing_gap.to_json(), Err(ApiError::InvalidWirePayload));
+}
+
+#[test]
+fn temporal_context_rejects_invalid_response_fields_and_edges() {
+    let single_response = single_event_response();
+    for invalid in [
+        {
+            let mut value = single_response.clone();
+            value.timeline_events[0].sequence_ordinal = 1;
+            value
+        },
+        {
+            let mut value = single_response.clone();
+            value.timeline_events[0].event_id.clear();
+            value
+        },
+        {
+            let mut value = single_response.clone();
+            value.timeline_events[0].source_post_id.clear();
+            value
+        },
+        {
+            let mut value = single_response.clone();
+            value.timeline_events[0].event_type_code.clear();
+            value
+        },
+        {
+            let mut value = single_response.clone();
+            value.timeline_events[0].event_label.clear();
+            value
+        },
+        {
+            let mut value = single_response.clone();
+            value.timeline_events[0].event_time.clear();
+            value
+        },
+        {
+            let mut value = single_response.clone();
+            value.timeline_events[0].actor_references.clear();
+            value
+        },
+        {
+            let mut value = single_response.clone();
+            value.source_post_ids[0] = "different-post".into();
+            value
+        },
+    ] {
+        assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+    }
+
+    let two_response = two_event_response();
+    for invalid in [
+        {
+            let mut value = two_response.clone();
+            value.temporal_relations[0].from_event_id = "wrong".into();
+            value
+        },
+        {
+            let mut value = two_response.clone();
+            value.temporal_relations[0].to_event_id = "wrong".into();
+            value
+        },
+        {
+            let mut value = two_response.clone();
+            value.temporal_relations[0].relation_code = "after".into();
+            value
+        },
+        {
+            let mut value = two_response.clone();
+            value.transition_gap_candidates[0].from_event_id = "wrong".into();
+            value
+        },
+        {
+            let mut value = two_response.clone();
+            value.transition_gap_candidates[0].to_event_id = "wrong".into();
+            value
+        },
+        {
+            let mut value = two_response.clone();
+            value.transition_gap_candidates[0].evidence_status_code = "causal".into();
+            value
+        },
+    ] {
+        assert_eq!(invalid.to_json(), Err(ApiError::InvalidWirePayload));
+    }
 }

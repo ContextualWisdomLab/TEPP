@@ -1,9 +1,9 @@
 //! Consumer-neutral live analysis-run ingress for modular CWL services.
 //!
 //! This module keeps the Naruon compatibility listener intact while providing
-//! the shared `/v1/analysis-runs` boundary needed by Naruon and LineageWeave.
-//! It accepts transport acknowledgements only; completed psychometric results
-//! remain outside this crate.
+//! shared `/v1/analysis-runs` and cutoff-safe `/v1/temporal-context` boundaries
+//! needed by Naruon and `LineageWeave`. Analysis-run responses remain transport
+//! acknowledgements; completed psychometric results remain outside this crate.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -14,12 +14,13 @@ use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, header_is_credential};
 use crate::{
     AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
     ErrorEnvelope, NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT,
-    NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, requests_are_idempotent_matches,
+    NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, TEMPORAL_CONTEXT_PATH, TemporalContextRequest,
+    build_temporal_context, requests_are_idempotent_matches,
 };
 
 /// Loopback HTTP/1.1 analysis-run service shared by published CWL consumers.
 ///
-/// The service accepts only Naruon and LineageWeave consumer identities. Its
+/// The service accepts only Naruon and `LineageWeave` consumer identities. Its
 /// idempotency namespace includes consumer, tenant, and caller key so one
 /// product cannot replay or conflict with another product's accepted run.
 #[derive(Debug)]
@@ -128,9 +129,14 @@ impl AnalysisRunLiveService {
     fn dispatch_http_request(&mut self, request: &str) -> Result<NaruonLiveResponse, ApiError> {
         let (header_block, body) = split_request(request)?;
         let mut lines = header_block.split("\r\n");
-        require_request_line(lines.next().unwrap_or(""))?;
+        let path = require_request_line(lines.next().unwrap_or(""))?;
         let headers = parse_headers(lines)?;
         let consumer = require_headers(&headers, self.bound_addr)?;
+        if path == TEMPORAL_CONTEXT_PATH {
+            let context_request = TemporalContextRequest::from_json(body)?;
+            let response = build_temporal_context(&context_request)?;
+            return Ok(json_response(200, "OK", response.to_json()?));
+        }
         self.accept_analysis_run(consumer, &headers, body)
     }
 
@@ -253,16 +259,18 @@ fn declared_content_length(header_text: &str) -> Result<usize, ApiError> {
     found.ok_or(ApiError::InvalidWirePayload)
 }
 
-fn require_request_line(line: &str) -> Result<(), ApiError> {
+fn require_request_line(line: &str) -> Result<&str, ApiError> {
     let mut parts = line.split(' ');
-    if parts.next() != Some("POST")
-        || parts.next() != Some(NARUON_ANALYSIS_RUN_PATH)
+    let method = parts.next();
+    let path = parts.next();
+    if method != Some("POST")
+        || !matches!(path, Some(NARUON_ANALYSIS_RUN_PATH | TEMPORAL_CONTEXT_PATH))
         || parts.next() != Some("HTTP/1.1")
         || parts.next().is_some()
     {
         return Err(ApiError::InvalidWirePayload);
     }
-    Ok(())
+    path.ok_or(ApiError::InvalidWirePayload)
 }
 
 fn parse_headers<'a, I>(lines: I) -> Result<HashMap<String, String>, ApiError>
@@ -291,10 +299,10 @@ fn split_header_line(line: &str) -> Result<(&str, &str), ApiError> {
     Ok((name, value.trim()))
 }
 
-fn require_headers<'a>(
-    headers: &'a HashMap<String, String>,
+fn require_headers(
+    headers: &HashMap<String, String>,
     bound_addr: Option<SocketAddr>,
-) -> Result<&'a str, ApiError> {
+) -> Result<&str, ApiError> {
     for name in headers.keys() {
         if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);

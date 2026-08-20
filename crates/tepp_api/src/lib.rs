@@ -5,7 +5,7 @@
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
 //! scientific crates; this crate only defines fail-closed interchange shapes.
-//! Naruon and LineageWeave use the versioned analysis-run contract; Naruon also
+//! Naruon and `LineageWeave` use the versioned analysis-run contract; Naruon also
 //! owns the current purpose-bound export adapter. Loopback listeners prove the
 //! HTTP boundary without claiming production TLS or completed model results.
 
@@ -18,6 +18,7 @@ mod export;
 mod lineageweave_http;
 mod naruon_http;
 mod naruon_live;
+mod temporal_context;
 mod wire;
 
 /// Analysis-run contract version constant.
@@ -55,12 +56,14 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
-/// Published LineageWeave modular-consumer identity.
+/// Published `LineageWeave` modular-consumer identity.
 pub use lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
 /// Published Naruon modular-consumer identity.
 pub use lineageweave_http::NARUON_CONSUMER_CODE;
-/// Build a credential-free LineageWeave analysis-run exchange.
+/// Build a credential-free `LineageWeave` analysis-run exchange.
 pub use lineageweave_http::lineageweave_analysis_run_exchange;
+/// Build a credential-free `LineageWeave` temporal-context exchange.
+pub use lineageweave_http::lineageweave_temporal_context_exchange;
 /// Versioned analysis-run path modular consumers may call.
 pub use naruon_http::NARUON_ANALYSIS_RUN_PATH;
 /// Versioned export path Naruon may call.
@@ -87,3 +90,23 @@ pub use naruon_live::NARUON_LIVE_IO_TIMEOUT;
 pub use naruon_live::NaruonLiveResponse;
 /// Backward-compatible Naruon loopback HTTP/1.1 service.
 pub use naruon_live::NaruonLiveService;
+/// Temporal association claim boundary.
+pub use temporal_context::TEMPORAL_ASSOCIATION_CLAIM_BOUNDARY;
+/// Temporal-context contract version constant.
+pub use temporal_context::TEMPORAL_CONTEXT_CONTRACT_VERSION;
+/// Versioned temporal-context HTTP path.
+pub use temporal_context::TEMPORAL_CONTEXT_PATH;
+/// One opaque event in a temporal-context request.
+pub use temporal_context::TemporalContextEvent;
+/// One adjacent temporal relation.
+pub use temporal_context::TemporalContextRelation;
+/// Temporal-context request.
+pub use temporal_context::TemporalContextRequest;
+/// Temporal-context response.
+pub use temporal_context::TemporalContextResponse;
+/// One ordered event in a temporal-context response.
+pub use temporal_context::TemporalContextTimelineEvent;
+/// One non-causal transition-gap candidate.
+pub use temporal_context::TemporalTransitionGapCandidate;
+/// Build a cutoff-safe, non-causal temporal context.
+pub use temporal_context::build_temporal_context;

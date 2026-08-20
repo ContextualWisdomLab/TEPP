@@ -1,4 +1,4 @@
-//! LineageWeave uses the published asynchronous TEPP analysis-run boundary.
+//! `LineageWeave` uses the published asynchronous TEPP analysis-run boundary.
 
 use std::fmt::Write as _;
 
