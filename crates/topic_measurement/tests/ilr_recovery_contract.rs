@@ -60,8 +60,15 @@ fn equal_shares_are_the_ilr_origin_and_preserve_aitchison_distance() {
 
     let unbalanced = [0.8, 0.2];
     let coordinates = isometric_log_ratio(&unbalanced).expect("pair");
-    let expected = (0.5_f64).sqrt() * 4.0_f64.ln();
-    assert!((coordinates[0] - expected).abs() < 1e-15);
+    let direct_aitchison_distance = (0.5_f64).sqrt()
+        * ((unbalanced[0] / unbalanced[1]).ln() - (halves[0] / halves[1]).ln()).abs();
+    let ilr_euclidean_distance = coordinates
+        .iter()
+        .zip(&origin)
+        .map(|(left, right)| (left - right).powi(2))
+        .sum::<f64>()
+        .sqrt();
+    assert!((ilr_euclidean_distance - direct_aitchison_distance).abs() < 1e-15);
 
     let recovered = from_isometric_log_ratio(&coordinates).expect("inverse");
     assert!(rmse(&unbalanced, &recovered) < 1e-15);

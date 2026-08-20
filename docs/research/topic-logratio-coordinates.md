@@ -4,11 +4,11 @@
 
 This note doctors the first `topic_measurement` production slice (ADR 0012):
 
-1. raw topic proportions are compositional rather than unconstrained Euclidean indicators;
-2. additive log-ratio coordinates implement the reference-dependent logistic-normal map used by correlated topic models;
-3. ALR is full rank but not an orthonormal Aitchison-distance isometry;
-4. sequential Egozcue ILR supplies the orthonormal Aitchison-distance isometry when that Euclidean geometry is the estimand;
-5. max-shifted inverses recover representable extreme coordinates without overflow;
+1. raw topic proportions are compositional rather than unconstrained Euclidean indicators (Aitchison, 1982);
+2. additive log-ratio coordinates implement the reference-dependent logistic-normal map used by correlated topic models (Aitchison & Shen, 1980; Blei & Lafferty, 2007);
+3. ALR is full rank but not an orthonormal Aitchison-distance isometry (Aitchison, 1982);
+4. sequential Egozcue ILR supplies the orthonormal Aitchison-distance isometry when that Euclidean geometry is the estimand (Egozcue et al., 2003);
+5. max-shifted inverses recover representable extreme coordinates without overflow (Aitchison & Shen, 1980);
 6. TF-IDF, BM25, and keyword scores are refused as inferential coordinates.
 
 The temporal STM backend, global topic identity, method-effect model, and K-selection remain accepted-target. No database migration is allocated.
@@ -33,6 +33,6 @@ Aitchison and Shen (1980) define the logistic-normal family via the additive log
 - representable ALR coordinates `(710, 709)` and representable ILR coordinates round-trip through max-shifted inverses without exponential overflow;
 - extremes that would underflow a strictly positive `f64` simplex part fail closed;
 - equal shares map to the ALR and ILR origins;
-- two-part ILR preserves Aitchison distance `√(1/2) ln(0.8/0.2)` for `(0.8, 0.2)`;
+- two-part ILR preserves Aitchison distance `√(1/2) |ln(0.8/0.2) - ln(0.5/0.5)|` between `(0.8, 0.2)` and `(0.5, 0.5)` (Egozcue et al., 2003);
 - zero, negative, non-unit-sum, non-finite, empty, and one-part vectors fail closed;
 - `tfidf`, `bm25`, and `keyword` labels are refused.
