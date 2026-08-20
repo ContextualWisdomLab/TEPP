@@ -9,8 +9,7 @@ pub const ORG_GITHUB_WORKFLOW_CONTRACT_VERSION: u16 = 1;
 /// Organization control-plane repository that may own reusable workflows.
 pub const ORG_GITHUB_WORKFLOW_OWNER: &str = "ContextualWisdomLab/.github";
 
-const ORG_GITHUB_WORKFLOW_PREFIX: &str =
-    "ContextualWisdomLab/.github/.github/workflows/";
+const ORG_GITHUB_WORKFLOW_PREFIX: &str = "ContextualWisdomLab/.github/.github/workflows/";
 
 /// Authority an org reusable workflow may hold.
 ///
@@ -138,9 +137,9 @@ fn require_org_workflow_identity(workflow_ref: &str) -> Result<(), ApiError> {
     if workflow_file.is_empty()
         || workflow_file.contains('/')
         || workflow_file.contains("..")
-        || !workflow_file
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
+        || !workflow_file.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.')
+        })
         || !(workflow_file.ends_with(".yml") || workflow_file.ends_with(".yaml"))
     {
         return Err(ApiError::AuthorizationDenied);

@@ -10,9 +10,8 @@ const PINNED_SHA: &str = "f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae";
 
 #[test]
 fn reusable_workflow_binds_as_ci_review_security_only() {
-    let identity = format!(
-        "ContextualWisdomLab/.github/.github/workflows/security-scan.yml@{PINNED_SHA}"
-    );
+    let identity =
+        format!("ContextualWisdomLab/.github/.github/workflows/security-scan.yml@{PINNED_SHA}");
     let binding = bind_org_github_workflow(&identity).expect("org reusable workflow");
     assert_eq!(
         binding.contract_version(),
