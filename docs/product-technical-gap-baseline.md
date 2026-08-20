@@ -1,154 +1,237 @@
 # Product and Technical Gap Baseline
 
-**Status:** Live delivery baseline
-**Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-20 21:57 KST
-**Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
+**Status:** Live delivery baseline  
+**Product:** Temporal Event Psychometrics Platform (TEPP)  
+**Snapshot:** 2026-08-20 22:10 KST  
+**Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`  
+**Workspace version on protected main:** `0.1.0`
 
 ## Purpose
 
-This document turns the approved product, technical, scientific, security, and
-operability documents into an executable buyer-gap register. It records what a
-buyer can use on protected `main`, what is being delivered on open pull
-requests, and the evidence required before a capability can be described as
-shipped. Re-read the live pull request and check links before making a release
-or customer commitment; the table below is a time-stamped snapshot, not a
-replacement for current-head GitHub evidence.
+This document is the executable buyer-gap register for TEPP. It separates:
 
-The immediate buyer action is to use the priority order and acceptance gates in
-this document to choose which integration or measurement outcome to validate
-next. A capability marked `active-PR` is not available from protected `main`.
+- capabilities a buyer can use from protected `main`;
+- bounded work that exists only on open pull requests;
+- product-completion issues with measurable acceptance evidence; and
+- release claims that remain prohibited.
+
+A planning document, local test, queued check, predecessor-head result, LLM
+judgment, or mergeable branch does not make a capability shipped. Re-read live
+GitHub state before any customer, release, certification, or valuation claim.
+
+## Snapshot facts
+
+| Signal | Snapshot evidence | Delivery implication |
+|---|---:|---|
+| Protected-main SHA | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | All as-built claims are bounded to this commit. |
+| Workspace members | 10 Rust crates | The foundation is modular, but the approved target contains additional semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual boundaries. |
+| Open pull requests | **92** | The queue is itself a release blocker and requires consolidation. |
+| Draft pull requests | **55** | Most queued work is not independently review-ready. |
+| Non-draft pull requests | **37** | A non-draft state is not a qualifying review or required-check result. |
+| Open product issues | **12** | Issue #156 plus the product-completion program #166–#176. |
+| Current package version | `0.1.0` | No supported product release is established by the repository version alone. |
+
+The pull-request counts come from the live GitHub search at this snapshot. The
+full exact-head classification is owned by
+[issue #175](https://github.com/ContextualWisdomLab/TEPP/issues/175); this file
+keeps the buyer-level summary rather than duplicating a 92-row volatile ledger.
 
 ## Authority and derivation
 
-The gap register is derived from these canonical sources:
-
-| Concern | Authority | How it constrains the gap register |
+| Concern | Canonical authority | Constraint |
 |---|---|---|
-| Product outcomes and user decisions | [`docs/product/prd-v0.4-approved.md`](product/prd-v0.4-approved.md) | Defines temporal evidence, relational measurement, scientific users, visual outputs, and release outcomes. |
-| Technical and runtime contracts | [`docs/TRD.md`](TRD.md) | Separates protected-main implementation from accepted-target architecture and requires Rust, temporal eligibility, modular APIs, and realistic validation. |
-| Runtime and service boundaries | [`docs/UML.md`](UML.md), [`ARCHITECTURE.md`](../ARCHITECTURE.md), [`docs/API_CONTRACT.md`](API_CONTRACT.md) | Defines standalone crates, versioned interchange, temporal flows, and no cross-service application-table coupling. |
-| Data authority and persistence | [`docs/ERD.md`](ERD.md), [`docs/TRACEABILITY.md`](TRACEABILITY.md), [`docs/adr/0013-bitemporal-persistence-reproducibility-and-split-authority.md`](adr/0013-bitemporal-persistence-reproducibility-and-split-authority.md) | Requires immutable provenance, six-clock eligibility, relation-aware splits, third-normal-form persistence, and reproducible artifacts. |
-| Scientific and release promotion | [`docs/validation/temporal-event-foundation.md`](validation/temporal-event-foundation.md), [`docs/adr/0014-scientific-claim-promotion-and-release-evidence.md`](adr/0014-scientific-claim-promotion-and-release-evidence.md) | Prevents a design document, simulation, queued check, or LLM judgment from becoming a product claim. |
-| Automation and merge authority | [`docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md`](operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md), [`docs/adr/0015-autonomous-development-review-and-merge-authority.md`](adr/0015-autonomous-development-review-and-merge-authority.md) | Keeps proposal, verification, publication, independent review, and merge authority separate. |
-| Scientific, privacy, and assurance constraints | [`docs/TEST_STRATEGY.md`](TEST_STRATEGY.md), [`docs/PRIVACY_DATA_GOVERNANCE.md`](PRIVACY_DATA_GOVERNANCE.md), [`docs/COMPLIANCE_READINESS.md`](COMPLIANCE_READINESS.md) | Requires recovery/parity tests, purpose-bound identity handling, and CSAP/SOC 2 readiness evidence without false certification claims. |
-| Live delivery state | [TEPP open pull requests](https://github.com/ContextualWisdomLab/TEPP/pulls?q=is%3Apr+is%3Aopen), [TEPP open issues](https://github.com/ContextualWisdomLab/TEPP/issues?q=is%3Aissue+is%3Aopen) | Supplies current-head SHA, base branch, review, check, dependency, and issue evidence. |
+| Product outcomes | [`docs/product/prd-v0.4-approved.md`](product/prd-v0.4-approved.md) | Defines the release product, users, visual surfaces, scientific claims, and eight delivery phases. |
+| Technical/runtime requirements | [`docs/TRD.md`](TRD.md) | Requires independently usable Rust boundaries, CPU `f64` authority, temporal eligibility, realistic validation, and warning-free release evidence. |
+| Architecture and service boundaries | [`ARCHITECTURE.md`](../ARCHITECTURE.md), [`docs/UML.md`](UML.md), [`docs/API_CONTRACT.md`](API_CONTRACT.md) | Separates evidence, measurement, compute, psychometrics, event intelligence, interpretation, artifacts, and visual analytics. |
+| Data authority | [`docs/ERD.md`](ERD.md), [`docs/TRACEABILITY.md`](TRACEABILITY.md), [`docs/adr/0013-bitemporal-persistence-reproducibility-and-split-authority.md`](adr/0013-bitemporal-persistence-reproducibility-and-split-authority.md) | Requires normalized persistence, six-clock eligibility, relation-aware splits, immutable provenance, and reproducible artifacts. |
+| Scientific claim promotion | [`docs/adr/0014-scientific-claim-promotion-and-release-evidence.md`](adr/0014-scientific-claim-promotion-and-release-evidence.md), [`docs/TEST_STRATEGY.md`](TEST_STRATEGY.md) | Requires production-code recovery, uncertainty, parity, exact-head checks, and independent review before promotion. |
+| LLM authority | [`docs/adr/0010-adaptive-llm-orchestration.md`](adr/0010-adaptive-llm-orchestration.md), [`docs/LLM_ORCHESTRATION.md`](LLM_ORCHESTRATION.md) | LLMs may propose and verify interpretations; deterministic/statistical gates remain authoritative. |
+| Privacy/security/assurance | [`docs/PRIVACY_DATA_GOVERNANCE.md`](PRIVACY_DATA_GOVERNANCE.md), [`SECURITY.md`](../SECURITY.md), [`docs/THREAT_MODEL.md`](THREAT_MODEL.md), [`docs/COMPLIANCE_READINESS.md`](COMPLIANCE_READINESS.md) | Preserves legitimate PII utility through purpose-bound access while prohibiting credential/source leakage and unsupported certification claims. |
+| Research | [`docs/research/standards-and-literature.md`](research/standards-and-literature.md) | Method and standards claims require current authoritative sources and APA 7 traceability. |
+| Live delivery | [open PRs](https://github.com/ContextualWisdomLab/TEPP/pulls?q=is%3Apr+is%3Aopen), [open issues](https://github.com/ContextualWisdomLab/TEPP/issues?q=is%3Aissue+is%3Aopen) | Live GitHub state supersedes this time-stamped queue snapshot. |
+
+## Protected-main as-built baseline
+
+Protected `main` contains the following workspace boundaries:
+
+```text
+evidence_core
+temporal_core
+event_core
+relation_graph
+membership_core
+persistence_postgres
+corpus_split
+tepp_simulation
+validation_core
+tepp_api
+```
+
+The traceability ledger records meaningful protected-main implementation in
+immutable evidence, six clocks and interval reasoning, forward transitions,
+event mention/instance separation, weighted multiple membership, cutoff-safe
+splits, validation metrics, simulations, PostgreSQL slices, versioned API/export
+contracts, orchestration routing, privacy authorization, and release-evidence
+generation.
+
+Protected `main` does **not** yet establish the complete approved product. In
+particular, it does not contain the full multilingual semantic pipeline, a
+shared-latent temporal topic estimator, a production longitudinal ESEM/DSEM
+estimator, a calibrated TDT/CHRONOS workflow, a posterior network estimator,
+real accelerator kernels, a production interpretation gateway, the coordinated
+visual workspace, or a supported multi-tenant release.
 
 ## Buyer-gap register
 
-| ID | Buyer-visible gap | Current maturity | Delivery authority | Closure evidence |
+| ID | Buyer-visible gap | Maturity | Delivery authority | Closure evidence |
 |---|---|---|---|---|
-| GAP-001 | A consumer can submit an analysis run and receive a durable receipt, but protected `main` does not yet publish the separate deterministic completed-result contract needed to distinguish `accepted`, `running`, success, and typed terminal failure. | `active-PR` | PR #157; linked issue #156 | Current-head checks and qualifying review; request/result binding, cutoff/snapshot/model/output-profile identity, canonical digest, bounded summary, deterministic retrieval, and fail-closed mismatch tests. |
-| GAP-002 | LineageWeave and other modular consumers cannot yet rely on a protected-main live HTTP consumer boundary for analysis-run submission, temporal evidence context, and cutoff-safe history projection. | `active-PR` | Stacked PRs #107 → #155 → #158/#159 | Merge the stack in base order after current-head review/check evidence; preserve loopback/credential/cutoff/idempotency refusal and live TCP tests. |
-| GAP-003 | The platform foundation has strong temporal, evidence, membership, privacy, event, topic-coordinate, and compute contracts, but a buyer cannot yet run the complete multilingual temporal psychometrics product from protected `main`. | `partial` / `accepted-target` by capability | PRs #48, #50, #51, #91, #100, #106, #110, plus later estimator/service work | Each capability must independently pass realistic scientific recovery, numerical parity, security, documentation, and exact-head merge gates; no aggregate claim is allowed from planning documents. |
-| GAP-004 | Research and operational evidence is discoverable, but there was no single live register mapping buyer outcomes to current PR/issue state, protected-main maturity, and closure evidence. | `active-PR` in this change | This document, linked from the documentation map | The baseline is required by the documentation validator and refreshed whenever the protected head, PR queue, issue queue, or capability maturity changes materially. |
-| GAP-005 | Coordinated visual analytics, accessible exact-value exports, design tokens, Storybook inventory, and Figma interaction contracts are not yet needed for the current headless Rust/API slice, so a buyer cannot yet validate a visual analytics workflow. | `accepted-target` | PRD phase 7 and the visual-analytics roadmap phase | Start a separate UI/product-design PR only after the stable data/API contract exists; that PR's ADR must record the real Figma File ID and Storybook inventory before implementation. |
+| GAP-001 | Submission can produce a durable accepted receipt, but protected `main` lacks the separate deterministic terminal-result lifecycle. | `active-PR` | [#156](https://github.com/ContextualWisdomLab/TEPP/issues/156) / [PR #157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | Exact request/result/snapshot/cutoff/model/profile binding, typed terminal failures, deterministic retrieval, current-head checks, and qualifying review. |
+| GAP-002 | LineageWeave and other modular consumers cannot yet rely on the complete protected-main HTTP evidence/result boundary. | `active-PR stack` | [#107](https://github.com/ContextualWisdomLab/TEPP/pull/107) → [#155](https://github.com/ContextualWisdomLab/TEPP/pull/155) → [#158](https://github.com/ContextualWisdomLab/TEPP/pull/158) / [#159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | Merge in dependency order with live loopback, framing, credential, idempotency, cutoff, tenant, and result-evidence tests. |
+| GAP-003 | A buyer cannot run immutable evidence through estimation, validation, persistence, and terminal artifact retrieval as one product workflow. | `accepted-target` | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | Realistic end-to-end Compose/CLI/API execution, durable idempotent job lifecycle, production scientific metrics, restart/recovery, and reproducibility manifest. |
+| GAP-004 | The central shared-latent temporal/relational topic estimator is absent. | `accepted-target` | [#167](https://github.com/ContextualWisdomLab/TEPP/issues/167) | Rust CPU `f64` fitting, sparse bounded parallelism, posterior artifacts, convergence, true-parameter RMSE/bias/coverage, and real candidate-K fitting. |
+| GAP-005 | Real multilingual documents are not yet transformed into validated exact-span semantic units and versioned shared concepts. | `accepted-target` | [#168](https://github.com/ContextualWisdomLab/TEPP/issues/168) | Unicode/layout/language-tailored processing, unknown-concept review, multilingual calibration/invariance, image-position evidence, and prompt-injection tests. |
+| GAP-006 | Posterior topic measurements cannot yet be fitted through a complete cross-classified longitudinal ESEM/DSEM engine. | `accepted-target` | [#169](https://github.com/ContextualWisdomLab/TEPP/issues/169) | Plausible-value/joint uncertainty, invariance, irregular event time, within/between separation, multiple membership, true-parameter recovery, and causal-claim refusal. |
+| GAP-007 | TDT detection/tracking and CHRONOS schema/forecast/temporal reasoning remain isolated bounded gates rather than one calibrated product workflow. | `accepted-target` | [#170](https://github.com/ContextualWisdomLab/TEPP/issues/170) | Span-grounded mentions, calibrated TDT metrics, schema/forecast hypothesis states, interval consistency, known-truth recovery, persistence, and exports. |
+| GAP-008 | GPU support is policy-only; no production estimator kernel has real hardware parity or declared VRAM evidence. | `accepted-target` | [#171](https://github.com/ContextualWisdomLab/TEPP/issues/171) | Real CUDA/portable backend execution, CPU parity, streamed memory, bounded OOM/fallback, hardware profiles, telemetry, and no skipped-support claim. |
+| GAP-009 | Topic association and cluster outputs lack posterior-valid estimation, uncertainty, edge stability, and consensus communities. | `accepted-target` | [#172](https://github.com/ContextualWisdomLab/TEPP/issues/172) | Valid log-ratio coordinates, interval/stability-bearing edges, repeated Leiden consensus, known-truth network/cluster recovery, and reproducible exports. |
+| GAP-010 | Buyers lack coordinated accessible visual analytics and exact-value export workflows. | `accepted-target` | [#173](https://github.com/ContextualWisdomLab/TEPP/issues/173) | Real Figma File ID in ADR, Storybook/design tokens, ten PRD views, exact-value tables, accessible interaction/print/PDF states, provenance, and source-consistent exports. |
+| GAP-011 | TEPP is not yet an operable multi-tenant service or supported release. | `accepted-target` | [#174](https://github.com/ContextualWisdomLab/TEPP/issues/174) | Durable queue/storage, OIDC/RLS/purpose controls, OpenTelemetry/SLOs, load/recovery, migrations, signed release/SBOM/provenance, assurance evidence, and support policy. |
+| GAP-012 | The 92-PR queue obscures authority, repeatedly stales exact-head evidence, and fragments product boundaries. | `release-blocker` | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | Every PR classified; unique landing vehicles; compatible slices folded; superseded work closed with provenance; scheduler prioritizes consolidation; queue reaches zero before GA. |
+| GAP-013 | Evidence-grounded LLM interpretation is routed but not executed and validated as a production interpreter/verifier port. | `partial` / `accepted-target` | [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176), [PR #69](https://github.com/ContextualWisdomLab/TEPP/pull/69), [PR #165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | Contextual-orchestrator execution, evidence citations, verifier refusals, comparable-budget ablations, provider eligibility/fallback, abstention, live/offline contract tests, and no numerical-authority escalation. |
+| GAP-014 | README/TRD and some PR descriptions lag protected-main and live queue reality. | `partial` | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | Reconcile README, TRD, traceability, ADR maturity, CHANGELOG, preferred-merge declarations, and exact protected-main evidence. |
+| GAP-015 | There was no canonical live product/buyer-gap register tied to documentation validation. | `active-PR` | [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | Merge this document and its validator/map integration after exact-head checks and independent review. |
 
-## Current pull-request queue
+## Product-completion issue register
 
-The following table was read from GitHub at the snapshot time. Check evidence is
-reported qualitatively so a queued run cannot be mistaken for a completed pass.
-An empty review decision means that no qualifying decision was reported by the
-API at snapshot time. These values do not authorize a merge by themselves.
+| Issue | Product vertical | Depends on / constrains |
+|---:|---|---|
+| [#156](https://github.com/ContextualWisdomLab/TEPP/issues/156) | Completed analysis-run result contract | Must land before consumers can call accepted work a measurement result. |
+| [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | Executable end-to-end analysis run | Integrates all scientific/service verticals; cannot substitute placeholders. |
+| [#167](https://github.com/ContextualWisdomLab/TEPP/issues/167) | Shared-latent temporal topic CPU estimator | Numerical foundation for K selection, networks, psychometrics, interpretation, and product E2E. |
+| [#168](https://github.com/ContextualWisdomLab/TEPP/issues/168) | Multilingual semantic units and concept dictionary | Supplies validated span-grounded estimator evidence. |
+| [#169](https://github.com/ContextualWisdomLab/TEPP/issues/169) | Multilevel longitudinal ESEM/DSEM | Consumes posterior topic coordinates and membership/time contracts. |
+| [#170](https://github.com/ContextualWisdomLab/TEPP/issues/170) | TDT/CHRONOS event intelligence | Consumes evidence/time/event contracts and supplies calibrated event artifacts. |
+| [#171](https://github.com/ContextualWisdomLab/TEPP/issues/171) | Real GPU compute and parity | Accelerates production estimators only after CPU authority is stable. |
+| [#172](https://github.com/ContextualWisdomLab/TEPP/issues/172) | Posterior network and consensus clustering | Depends on a real fitted topic posterior. |
+| [#173](https://github.com/ContextualWisdomLab/TEPP/issues/173) | Accessible visual analytics and exports | Starts after stable API/artifact contracts; requires Figma and Storybook evidence. |
+| [#174](https://github.com/ContextualWisdomLab/TEPP/issues/174) | Commercial deployment/release/support | Wraps a scientifically complete product without weakening gates. |
+| [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | PR queue and delivery consolidation | Immediate release-system priority; prevents further unbounded fragmentation. |
+| [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176) | Contextual-orchestrator interpreter/verifier | Consumes validated artifacts and cannot promote scientific truth. |
 
-| PR | Head SHA | Base ref | Base SHA | Merge state | Review decision | Current check evidence | Delivery role |
-|---:|---|---|---|---|---|---|---|
-| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `00ace4a2a1c941a11d6f7a818040db2f81c6d55b` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 21 completed checks passed; 1 remains queued; no completed failure observed | Product/technical gap baseline |
-| [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `855c6c7153c2f66a1c14e842ad700f571592dd35` | `feat/lineageweave-live-consumer-contract` | `0e2910825a042d7fdeb6497a20975b538493c65c` | `UNSTABLE` | none reported | 6 required Checks remain queued; no completed failure observed | LineageWeave cutoff-safe history projection |
-| [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `6d28d23c432288c4dbecbd74a25f093ed9d9ef61` | `feat/lineageweave-live-consumer-contract` | `0e2910825a042d7fdeb6497a20975b538493c65c` | `UNSTABLE` | none reported | 6 required Checks remain queued; no completed failure observed | LineageWeave temporal evidence context |
-| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `0cb9ff6b32afb56849214bbe464ea39004c1e106` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 21 completed checks passed; 1 remains queued; no completed failure observed | Completed analysis-run result contract |
-| [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `0e2910825a042d7fdeb6497a20975b538493c65c` | `cursor/bc-422aba2a-86ab-45e3-9911-95cff5c28a87-5627` | `760ac3b412223c9b269b76eb0653d991a959d727` | `CLEAN` | none reported | 6 completed Checks passed; independent review still required | Modular LineageWeave consumer parent |
-| [144](https://github.com/ContextualWisdomLab/TEPP/pull/144) | `d125515ae73c33de2e7cf900dc0fa3b7deb39614` | `agent/psychometric-posterior-esem-input` | `b1004197ff9b9146de7eec8a585ed25f70aefa25` | `DIRTY` | draft; review required after ready-for-review | no Checks reported for the current draft HEAD | Multilevel event-time psychometric recovery |
-| [116](https://github.com/ContextualWisdomLab/TEPP/pull/116) | `5f9d7bf73552180d73a30ddd889d9c80865c817f` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 19 completed Checks passed; no queued or failed check observed | APA 7 method-paper doctoring |
-| [115](https://github.com/ContextualWisdomLab/TEPP/pull/115) | `2106170a0d7984291e78c68fd68125f217746f3f` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 23 completed Checks passed; 1 remains queued; no completed failure observed | Coverage-authority quality validator |
-| [110](https://github.com/ContextualWisdomLab/TEPP/pull/110) | `c63e1cfce2e3fcddc46e945a54a9af71e4c9d7ab` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 24 completed Checks passed; no queued or failed check observed | Corpus-split leakage-audit manifest |
-| [107](https://github.com/ContextualWisdomLab/TEPP/pull/107) | `07bb21f74f3259168f5e21a0c1bdd25a812fd661` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 16 completed Checks passed; 6 remain queued; no completed failure observed | Loopback Naruon analysis-run service |
-| [106](https://github.com/ContextualWisdomLab/TEPP/pull/106) | `d01892e1783a3b416fbb79966821b4ea804ef2b5` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 24 completed Checks passed; no queued or failed check observed | Privacy audit-event inspection |
-| [100](https://github.com/ContextualWisdomLab/TEPP/pull/100) | `3e928bc0f209c74b941fa99b742d92814f610362` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 24 completed Checks passed; no queued or failed check observed | Live service-TLS bind policy |
-| [91](https://github.com/ContextualWisdomLab/TEPP/pull/91) | `53a5a31f893e24146b4881c7e717021649fbb330` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `CHANGES_REQUESTED` | 24 completed Checks passed; no queued or failed check observed; review changes remain | Derived-artifact sensitivity inheritance |
-| [62](https://github.com/ContextualWisdomLab/TEPP/pull/62) | `1951ab43c90deda0a23106fc2bf8898328c98` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 22 completed Checks passed; 1 remains queued; no completed failure observed | Simulation cutoff eligibility |
-| [61](https://github.com/ContextualWisdomLab/TEPP/pull/61) | `8ebbc04eac07231413a089d7fc6b64b36ed6a61b` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 22 completed Checks passed; 1 remains queued; no completed failure observed | Interval-aware uncertain availability cutoff |
-| [58](https://github.com/ContextualWisdomLab/TEPP/pull/58) | `e98ada4361fd877017394c0ae83d132fabfdd4d3` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 20 completed Checks passed; 1 remains queued; 2 completed coverage checks failed; [branch](https://github.com/ContextualWisdomLab/TEPP/actions/runs/32358361180/job/96392387109) and [line](https://github.com/ContextualWisdomLab/TEPP/actions/runs/32358361180/job/96392387108) coverage failures require triage | Positional embedded image source units |
-| [59](https://github.com/ContextualWisdomLab/TEPP/pull/59) | `43bf6cf0d0a15e105fcfe6309657403d0b9cf76f` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 22 completed Checks passed; 1 remains queued; no completed failure observed | Unicode NFC/NFD canonical identity for split leakage |
-| [57](https://github.com/ContextualWisdomLab/TEPP/pull/57) | `14014b73d8c6015ff99b94f51c9a19f2b078811c` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 21 completed Checks passed; 1 remains queued; no completed failure observed | Exact-head scientific claim promotion gates |
-| [51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | `0ac8055e4f7f8c06f87cdea10d74810074b66cc1` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `CHANGES_REQUESTED` | 21 completed Checks passed; 1 remains queued; no completed failure observed; review changes remain | VRAM budget and CPU fallback types |
-| [50](https://github.com/ContextualWisdomLab/TEPP/pull/50) | `2a29e2496409b5ab411eed5f045f89d52a24abcf` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `CHANGES_REQUESTED` | 21 completed Checks passed; 1 remains queued; no completed failure observed; review changes remain | TDT/CHRONOS transition boundary |
-| [49](https://github.com/ContextualWisdomLab/TEPP/pull/49) | `199ed6c3f7bacf5193bd852a7fe58c13a633d709` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `REVIEW_REQUIRED` | 20 completed Checks passed; 1 remains queued; [Production branch coverage on pinned nightly](https://github.com/ContextualWisdomLab/TEPP/actions/runs/32360371581/job/96398481245) failed | Posterior ESEM input gates and true-parameter RMSE |
-| [48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | `8e88b337e0bb1a44749b0fe48c635e3e3e7535da` | `main` | `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a` | `BLOCKED` | `CHANGES_REQUESTED` | 24 completed Checks passed; no queued or failed check observed; review changes remain | Logistic-normal topic coordinates |
+## Priority pull-request queue
 
-### Merge and review order
+This table is intentionally non-exhaustive. Issue #175 owns the full exact-head
+inventory and classification. The pull request's live page is authoritative
+because its head can change after this file is committed.
 
-1. Process independent current-main PRs by exact-head review and required-check
-   evidence; no stale `CHANGES_REQUESTED` or queued check is sufficient.
-2. Process the LineageWeave stack in dependency order: **#107 → #155 →
-   (#158 and #159)**. Re-fetch each remote head immediately before any commit,
-   push, or merge and preserve remote-agent commits.
-3. Process #157 as the completion of issue #156. Keep the issue open until the
-   PR is actually merged and the protected-main result contract is verified.
-4. After each merge or closure, enumerate the queue again. A clean merge state
-   without a qualifying independent review is not merge-ready.
+| PR | Current delivery role | Required next action |
+|---:|---|---|
+| [#164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | This product/technical gap baseline | Re-run exact-head documentation/repository checks and obtain independent review. |
+| [#165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | Hourly agent routing through contextual-orchestrator | Ensure queue-consolidation policy from #175 prevents unrelated micro-PR growth. |
+| [#157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | Terminal result contract for #156 | Complete exact-head review/check gates; keep #156 open until protected-main verification. |
+| [#107](https://github.com/ContextualWisdomLab/TEPP/pull/107) | Loopback analysis-run service | Review/merge before dependent consumer work. |
+| [#155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | Modular LineageWeave consumer parent | Preserve current stack parent and obtain independent review. |
+| [#158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | Temporal evidence context | Revalidate after its parent lands. |
+| [#159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | Cutoff-safe history projection | Revalidate after its parent lands. |
+| [#48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | Logistic-normal/ILR coordinate slice | Resolve requested changes and fold into the estimator landing plan; do not call it fitting. |
+| [#51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | VRAM budget/fallback policy types | Resolve requested changes; connect only to a real production kernel under #171. |
+| [#53](https://github.com/ContextualWisdomLab/TEPP/pull/53) | Concept/language-profile gates | Integrate into the semantic pipeline authority under #168. |
+| [#67](https://github.com/ContextualWisdomLab/TEPP/pull/67) | Model-selection gates | Rebase/merge only with an explicit path to real candidate fitting under #167. |
+| [#69](https://github.com/ContextualWisdomLab/TEPP/pull/69) | Interpretation grounding/refusal metrics | Fold into the product interpreter/verifier under #176. |
+| [#71](https://github.com/ContextualWisdomLab/TEPP/pull/71) | Compositional geometry/network pair metrics | Fold into the network estimator under #172. |
+| [#119](https://github.com/ContextualWisdomLab/TEPP/pull/119) | Bounded loading/lag recovery slice | Consolidate into the psychometric engine under #169. |
+| [#144](https://github.com/ContextualWisdomLab/TEPP/pull/144) | Draft multilevel event-time scalar recovery stack | Compare exact unique evidence and consolidate rather than land many scalar crates independently. |
 
-## Issue queue and hygiene
+## Delivery sequence
 
-At the snapshot, issue #156 is the only open issue with product acceptance
-criteria. It remains open because PR #157 is not merged. Issues #161 and #162
-were closed as queue-hygiene placeholders: they contained no buyer outcome,
-acceptance criteria, or evidence requirement. Reopen a placeholder only with a
-concrete customer action and verifiable acceptance test.
+The dependency-aware product order is:
 
-## Product and technical delivery specification
+1. **Consolidate delivery authority:** #175 and PR #164.
+2. **Finish live result/consumer contracts:** #156/#157 and #107 → #155 → #158/#159.
+3. **Build validated multilingual evidence:** #168.
+4. **Build the CPU topic estimator:** #167.
+5. **Build event intelligence and posterior networks:** #170 and #172.
+6. **Build the posterior-aware longitudinal psychometric engine:** #169.
+7. **Accelerate real kernels with parity:** #171.
+8. **Complete the durable end-to-end run:** #166.
+9. **Execute and validate interpretation:** #176.
+10. **Design and implement the buyer workspace:** #173.
+11. **Productionize and release:** #174.
 
-The next buyer-facing delivery slice is the completed-result interchange:
+Stacking is appropriate where public contracts make dependencies explicit.
+Stacking is not a reason to leave multiple unexplained implementation authorities
+or stale draft predecessors open.
 
-- Keep the accepted receipt and completed result as separate DTO families.
-- Bind result identity to tenant/workspace, accepted run, immutable snapshot,
-  knowledge cutoff, model contract, output profile, idempotency key, and result
-  digest.
-- Permit only terminal success or typed terminal failure to carry completion
-  metadata; `accepted` and `running` remain non-measurement states.
-- Reject unknown fields, unsupported versions, malformed timestamps/digests,
-  oversized payloads, cross-tenant/snapshot/cutoff/model/profile mismatches,
-  source text, credentials, and direct identity.
-- Keep deterministic/statistical scientific authority outside the LLM; an LLM
-  interpretation can annotate evidence but cannot promote a result to truth.
+## Definition of product complete
 
-This specification is already owned by issue #156 and PR #157. Do not create a
-duplicate implementation while that PR is in the review/check loop.
+TEPP is not complete until one released version proves all of the following on
+the same protected source lineage:
+
+- a documented user can install, authenticate, ingest, run, inspect, export, and
+  recover the product without repository-internal intervention;
+- immutable source evidence, six clocks, relation/membership structure, cutoff,
+  splits, model/config, backend, seeds, and artifacts are reproducible;
+- the shared-latent topic estimator and longitudinal psychometric model recover
+  declared known truth with pre-registered RMSE, bias, coverage, convergence,
+  calibration, and error-rate gates;
+- declared language profiles have span/concept/alignment/invariance evidence;
+- event intelligence, topic networks, and clusters have known-truth and
+  uncertainty/stability evidence;
+- accelerator claims use real hardware and match the CPU scientific reference;
+- LLM interpretation cites allowed evidence, rejects unsupported claims, and
+  abstains when evidence or policy is insufficient;
+- every visual value has an accessible exact-value and provenance path;
+- tenant, purpose, identity, retention, security, migration, backup/restore,
+  observability, capacity, rollback, SBOM, provenance, and support evidence pass;
+- production statement coverage, branch coverage, and public documentation are
+  100% for shipped TEPP code;
+- current-head CI, security, supply-chain, scientific, and independent review
+  gates pass with no unresolved release blocker;
+- version, CHANGELOG, signed artifacts, and release notes match the protected
+  source and make no unsupported certification, causality, language, GPU, or
+  valuation claim;
+- the release-blocking PR and issue queues are zero.
+
+A `200억 달러` bar remains a prioritization heuristic. It is not a valuation
+result and cannot replace buyer adoption, predictive/construct validity,
+operational reliability, proprietary advantage, revenue, retention, or
+independent diligence evidence.
 
 ## Architecture, data, and assurance constraints
 
-- Rust owns production mathematical and psychometric arithmetic; every future
-  estimator needs a CPU `f64` reference, bounded parallel execution, GPU parity,
-  and safe VRAM-to-CPU fallback evidence.
-- Temporal analyses must preserve event, assertion, document, system,
-  availability, and knowledge-cutoff clocks and must reject future-available
-  evidence.
-- Multiple-membership and cross-classified structures remain explicit so a
-  document is not treated as an independent atom when it belongs to several
-  authors, teams, projects, episodes, or roles.
-- Database objects use descriptive two-or-more-word `snake_case` names and
-  normalized ownership/temporal/provenance tables; hot-partition mitigation
-  must be designed with measured access patterns before a physical migration.
-- Purpose-bound authorization, opaque analytical identifiers, protected identity
-  mappings, encryption, retention/deletion, selective disclosure, and audit
-  preserve PII utility without blanket masking.
-- CSAP and SOC 2 are readiness targets only. Certification or attestation needs
-  independent evidence outside this repository.
-- The present slice has no frontend interaction contract. Figma and Storybook
-  are therefore deferred; when visual analytics begins, create the Figma file,
-  record its actual File ID in the owning ADR, and test the shared design tokens
-  and accessible interaction states.
+- Rust owns production mathematical and psychometric arithmetic.
+- CPU `f64` is the numerical reference; parallelism is bounded and GPU work must
+  prove real-hardware parity.
+- Event, assertion, document, system, availability, and knowledge-cutoff clocks
+  remain distinct.
+- Cross-classified and weighted multiple membership prevents atomistic
+  pseudo-replication.
+- Topic proportions remain compositional; valid latent/log-ratio coordinates
+  feed ESEM and network analysis.
+- Database objects use descriptive two-or-more-word `snake_case`, third-normal
+  form where applicable, explicit tenant/temporal/provenance authority, and
+  measured hot-partition mitigation.
+- Documents, web/search results, connector data, and LLM output are untrusted.
+- Purpose-bound access and protected identity mappings preserve PII utility
+  without broadcasting or blanket masking.
+- External products integrate through versioned API/event/artifact contracts,
+  never direct application-table access.
+- CSAP/SOC 2/ISO/NIST alignment is readiness evidence, not certification.
+- Every method/standard decision updates APA 7 doctoring and source-to-test
+  traceability in the same reviewed change.
 
 ## Refresh rule
 
-Refresh this file when a PR head/base changes materially, a review or required
-check changes, an issue opens/closes, a capability crosses a maturity boundary,
-or a buyer-visible gap is added/removed. Use the current protected-main SHA and
-current PR head SHA in every claim. Keep the document small: update the table
-and evidence links rather than creating a second planning register.
+Refresh this file when any of the following changes materially:
 
-## References
+- protected-main SHA or package version;
+- open PR/draft/issue counts;
+- a priority PR head/base/review/check/merge state;
+- an issue or buyer-gap acceptance boundary;
+- a capability's implementation maturity;
+- the dependency/landing order;
+- a release, deprecation, replacement, Figma file, or standards/research basis.
 
-The authoritative APA 7 research register is [`docs/research/standards-and-literature.md`](research/standards-and-literature.md).
-Method-specific sources remain in the linked doctoring documents and ADRs; this
-baseline records delivery implications and does not replace those sources.
+Keep this file buyer-oriented. Store the volatile per-PR classification in the
+artifact required by issue #175, and link it here. Never rewrite an active-PR
+capability as protected-main before merge and exact-head verification.
