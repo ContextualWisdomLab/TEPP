@@ -393,6 +393,21 @@ fn temporal_context_rejects_invalid_response_fields_and_edges() {
 }
 
 #[test]
+fn temporal_context_rejects_equal_timestamp_id_regressions() {
+    let two_response = two_event_response();
+    let mut equal_time = two_response.clone();
+    equal_time.timeline_events[1].event_time = equal_time.timeline_events[0].event_time.clone();
+    assert!(equal_time.to_json().is_ok());
+
+    let mut equal_time_out_of_order = equal_time;
+    equal_time_out_of_order.timeline_events[1].event_id = "event-aaa".into();
+    assert_eq!(
+        equal_time_out_of_order.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
 fn temporal_context_requires_matching_lineageweave_header() {
     let body = request().to_json().expect("request json");
     let response = AnalysisRunLiveService::new()
