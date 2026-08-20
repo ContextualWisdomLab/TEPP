@@ -63,5 +63,12 @@ mod tests {
             ),
             Err(InterpretationError::InvalidSupportPayload)
         );
+        assert_eq!(
+            unsupported_claim_rate(
+                &[ClaimSupport::Unsupported, ClaimSupport::Unsupported],
+                &[ClaimSupport::Supported, ClaimSupport::Unsupported]
+            ),
+            Ok(0.5)
+        );
     }
 }
