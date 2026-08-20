@@ -54,3 +54,11 @@ fn empty_or_mismatched_cluster_payloads_fail_closed() {
         Err(NetworkError::InvalidClusterPayload)
     );
 }
+
+#[test]
+fn pair_metrics_accept_valid_pair_counts_above_u32() {
+    let labels = vec![ClusterLabel::new(0); 92_683];
+
+    assert_eq!(cluster_pair_precision(&labels, &labels), Ok(1.0));
+    assert_eq!(cluster_pair_recall(&labels, &labels), Ok(1.0));
+}

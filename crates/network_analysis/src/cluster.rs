@@ -105,10 +105,10 @@ fn pair_rate(
     if denominator == 0 {
         return Err(NetworkError::InvalidClusterPayload);
     }
-    let numerator = u32::try_from(numerator).map_err(|_| NetworkError::InvalidClusterPayload)?;
-    let denominator =
-        u32::try_from(denominator).map_err(|_| NetworkError::InvalidClusterPayload)?;
-    Ok(f64::from(numerator) / f64::from(denominator))
+    // The public metric is f64 and valid pair counts may exceed u32.
+    #[allow(clippy::cast_precision_loss)]
+    let ratio = numerator as f64 / denominator as f64;
+    Ok(ratio)
 }
 
 #[cfg(test)]
