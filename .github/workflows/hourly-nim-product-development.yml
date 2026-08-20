@@ -43,6 +43,7 @@ jobs:
     timeout-minutes: 55
     permissions:
       contents: read
+      issues: read
       pull-requests: read
     outputs:
       has_changes: ${{ steps.proposal.outputs.has_changes }}
@@ -597,6 +598,7 @@ jobs:
           owner: ContextualWisdomLab
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
+          permission-issues: read
           permission-metadata: read
           permission-pull-requests: write
 

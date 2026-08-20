@@ -52,6 +52,8 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "secrets.NVIDIA_NIM_API_KEY_SUB",
             "secrets.OPENROUTER_API_KEY",
             "secrets.OPENAI_API_KEY",
+            "issues: read",
+            "permission-issues: read",
             "CONTEXTUAL_ORCHESTRATOR_COMMIT",
             "CONTEXTUAL_ORCHESTRATOR_SHA256",
             "run_contextual_orchestrator.py",
