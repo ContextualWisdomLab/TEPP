@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
-from unittest import mock
 
 from scripts import validate_documentation as documentation
 
@@ -29,8 +29,7 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             ),
             [
                 "DOCUMENTATION.md names a superseded draft as the coverage-gate authority",
-                "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
-                "active-PR coverage gate",
+                "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the active-PR coverage gate",
             ],
         )
 
@@ -50,8 +49,7 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             ),
             [
                 "DOCUMENTATION.md names a superseded draft as the coverage-gate authority",
-                "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
-                "active-PR coverage gate",
+                "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the active-PR coverage gate",
             ],
         )
 
@@ -94,8 +92,7 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
             ),
             [
                 "DOCUMENTATION.md names a superseded draft as the coverage-gate authority",
-                "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the "
-                "active-PR coverage gate",
+                "docs/DOCUMENTATION_ASSESSMENT.md names a superseded draft as the active-PR coverage gate",
             ],
         )
 
@@ -505,7 +502,7 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
         """File-backed validation fail-closes when an authority document is absent."""
 
         with tempfile.TemporaryDirectory() as temporary:
-            with mock.patch.object(documentation, "ROOT", Path(temporary)):
+            with unittest.mock.patch.object(documentation, "ROOT", Path(temporary)):
                 with self.assertRaises(AssertionError) as raised:
                     documentation.validate_promotion_authority_pointers()
         self.assertIn("missing promotion-authority documents", str(raised.exception))
@@ -540,7 +537,7 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
                     else "crate-named coverage gate\n",
                     encoding="utf-8",
                 )
-            with mock.patch.object(documentation, "ROOT", root):
+            with unittest.mock.patch.object(documentation, "ROOT", root):
                 with self.assertRaises(AssertionError) as raised:
                     documentation.validate_promotion_authority_pointers()
         self.assertIn("superseded draft", str(raised.exception))
