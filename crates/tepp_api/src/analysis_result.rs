@@ -324,6 +324,7 @@ pub fn require_terminal_binding(
 ) -> Result<(), ApiError> {
     request.validate()?;
     accepted.validate()?;
+    result.validate()?;
     if terminal_result_matches_request(request, result)
         && terminal_result_matches_accepted(accepted, result)
     {

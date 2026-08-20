@@ -314,6 +314,13 @@ fn failed_shape_refuses_measurement_fields_and_invalid_failure_codes() {
 fn every_request_binding_dimension_and_receipt_identity_is_checked() {
     let result = succeeded();
 
+    let mut tampered = result.clone();
+    tampered.failure_code = Some("late_failure".into());
+    assert_eq!(
+        require_terminal_binding(&request(), &accepted(), &tampered),
+        Err(ApiError::InvalidWirePayload)
+    );
+
     for index in 0..6 {
         let mut mismatched = request();
         match index {
