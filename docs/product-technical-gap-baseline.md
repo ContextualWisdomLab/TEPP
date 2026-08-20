@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-20 20:21 KST
+**Snapshot:** 2026-08-20 20:23 KST
 **Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
 
 ## Purpose
@@ -53,7 +53,7 @@ API at snapshot time. These values do not authorize a merge by themselves.
 
 | PR | Head | Base | Merge state | Review decision | Current check evidence | Delivery role |
 |---:|---|---|---|---|---|---|
-| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `cfc4570` | `main` | `BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Product/technical gap baseline |
+| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `36c1845` | `main` | `BLOCKED` | `REVIEW_REQUIRED` | required Checks queued for this refresh; no completed failure observed | Product/technical gap baseline |
 | [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `a18076d` | `feat/lineageweave-live-consumer-contract` | `UNSTABLE` | none reported | required Checks queued for current HEAD; no completed failure observed | LineageWeave cutoff-safe history projection |
 | [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `0073e83` | `feat/lineageweave-live-consumer-contract` | `UNSTABLE` | none reported | required Checks queued for current HEAD; no completed failure observed | LineageWeave temporal evidence context |
 | [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `fb783f5` | `main` | `BLOCKED` | `REVIEW_REQUIRED` | required Checks queued for current HEAD after empty-host coverage fix; no completed failure observed | Completed analysis-run result contract |
