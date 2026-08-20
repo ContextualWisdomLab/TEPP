@@ -70,11 +70,23 @@ pub enum SourceBlockKind {
 
 pub struct SourceBlock {
     block_id: EvidenceId,
-    document_id: EvidenceId,
     block_kind: SourceBlockKind,
     source_span: SourceSpan,
     parent_block_id: Option<EvidenceId>,
     ordinal_index: u32,
+}
+
+impl SourceBlock {
+    pub fn new(
+        block_kind: SourceBlockKind,
+        source_span: SourceSpan,
+        parent: Option<&SourceBlock>,
+        ordinal_index: u32,
+    ) -> Result<Self, EvidenceError>;
+
+    pub fn document_id(&self) -> EvidenceId {
+        self.source_span.document_id()
+    }
 }
 ```
 
@@ -107,6 +119,8 @@ pub struct EmbeddingModelProfile {
     input_role: EmbeddingInputRole,
     metadata_template_version: String,
     verified_at: Timestamp,
+    profile_source_uri: String,
+    profile_source_digest: ContentDigest,
 }
 
 pub trait TokenCounter {
@@ -125,6 +139,23 @@ pub trait TokenCounter {
     ) -> Result<Vec<TokenOffset>, Self::Error>;
 }
 
+pub struct TokenOffset {
+    token_index: u32,
+    payload_byte_start: u32,
+    payload_byte_end: u32,
+    source_scalar_start: Option<u32>,
+    source_scalar_end: Option<u32>,
+    source_span: Option<SourceSpan>,
+}
+
+`TokenOffset` coordinates are UTF-8 byte offsets into the complete rendered
+payload. `payload_byte_start..payload_byte_end` is half-open and must end on
+Unicode-scalar boundaries. Tokens emitted for title, heading, separators, and
+other metadata have no `source_span`; content-slot tokens carry the exact
+source span and Unicode-scalar subrange they represent. The adapter must reject
+non-monotonic, out-of-payload, UTF-8-splitting, or source-inconsistent offsets;
+it may not silently reinterpret payload coordinates as source coordinates.
+
 pub trait AdjacentSimilarity {
     type Error;
 
@@ -133,6 +164,12 @@ pub trait AdjacentSimilarity {
         units: &[MicroUnit],
     ) -> Result<Vec<f64>, Self::Error>;
 }
+
+The `similarities` result contains exactly
+`units.len().saturating_sub(1)` finite scores in document order. Element `i`
+corresponds to the adjacent pair `(units[i], units[i + 1])`. A consumer rejects
+`NaN`, infinity, or any other result length before using a score; it never
+silently pads, truncates, or reorders the provider result.
 
 pub struct SemanticSpanPolicy {
     target_input_tokens: u32,
@@ -235,7 +272,14 @@ micro_units = build_micro_units(source_blocks)
 
 for unit in micro_units:
     if final_payload_tokens(unit) > hard_limit:
+        if current is not empty:
+            emit(current)
+            current = empty
         emit(recursive_split(unit))
+        continue
+
+    if current is empty:
+        current = unit
         continue
 
     candidate = current + unit
@@ -251,7 +295,8 @@ for unit in micro_units:
     else:
         current = candidate
 
-emit(current)
+if current is not empty:
+    emit(current)
 
 for emitted_span:
     assert final_payload_tokens(emitted_span) <= hard_limit

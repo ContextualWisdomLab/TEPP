@@ -13,7 +13,7 @@ Language metadata remains important for measurement invariance, fairness, lexica
 | OpenAI model documentation and the January 2024 embedding-model announcement | `text-embedding-3-large` remains an embeddings model; its full output is up to 3,072 dimensions and the `dimensions` request parameter may shorten the vector | Provider documentation, not a universal vector length or evidence that every shortened dimension has equal retrieval quality |
 | Current OpenAI Python SDK embeddings resource | The documented per-input maximum for embedding models is 8,192 tokens; the complete request also has a separate aggregate-token limit | A mutable SDK/API contract. TEPP stores the source URL, retrieval date, and artifact digest and may choose an operational hard limit below the provider maximum |
 | OpenAI `tiktoken` model mapping and token-counting cookbook | `text-embedding-3-large` maps to `cl100k_base`; `encoding_for_model` is preferred over scattering the encoding name through product code | Tokenization is model/revision profile data. A provider or tokenizer revision requires a new verified profile rather than silently changing an existing one |
-| Unicode Standard Annex #29, Revision 47 | Unicode-safe default grapheme/word/sentence boundary guidance | Default boundaries are not semantic truth and are not sufficient for every script or locale |
+| Unicode Standard Annex #29, Revision 47 | Unicode-safe default grapheme/word/sentence boundary guidance (Unicode Consortium, 2025) | Default boundaries are not semantic truth and are not sufficient for every script or locale |
 | Chen et al. (2024), Dense X Retrieval | Retrieval-unit granularity affects retrieval and QA; proposition-scale units are an empirical alternative to passages | Does not prove one granularity is best for every corpus, language, or embedding model |
 | Günther et al. (2024), Late Chunking | Independent short chunks can lose global context; token-level long-context models can pool contextualized chunk representations | The OpenAI embeddings API does not expose contextual token states/pooling, so TEPP does not claim true late chunking for `text-embedding-3-large` |
 | TEPP approved PRD v0.4 | Exact source spans, multilingual evidence, optional LLM semantic units, hierarchical/relational evidence, no TF-IDF/BM25 inferential weighting | The approved baseline does not by itself prove the new segmentation implementation |
@@ -25,14 +25,14 @@ The model profile distinguishes the provider-documented ceiling from TEPP's oper
 ## Design implications
 
 1. **No language gate.** Missing, mixed, or wrong language metadata cannot cause a different base algorithm.
-2. **No character-count fallback.** Token limits are model/tokenizer facts.
-3. **Count the final payload.** Metadata and separators consume tokens.
-4. **Use hierarchy, not only overlap.** Leaves retrieve precisely; parent and neighbor relations restore context.
-5. **Treat granularity as an empirical parameter.** Compare fixed, paragraph, structural, semantic, and hierarchical alternatives.
-6. **Keep late chunking experimental by model capability.** It requires token-level contextual states and pooling control.
+2. **No character-count fallback.** Token limits are model/tokenizer facts (OpenAI, 2026a, 2026b, 2026c, 2026d).
+3. **Count the final payload.** Metadata and separators consume tokens, so the complete rendered input must be counted (OpenAI, 2026a, 2026b).
+4. **Use hierarchy, not only overlap.** Leaves retrieve precisely; parent and neighbor relations restore context as an explicit TEPP design contract.
+5. **Treat granularity as an empirical parameter.** Compare fixed, paragraph, structural, semantic, and hierarchical alternatives because retrieval quality changes with unit granularity (Chen et al., 2024).
+6. **Keep late chunking experimental by model capability.** It requires token-level contextual states and pooling control (Günther et al., 2024).
 7. **Do not use TF-IDF or BM25 in boundary scoring.** Dense similarity is optional; structure-only remains deterministic.
 8. **Preserve source evidence.** Summaries and embeddings are derived artifacts.
-9. **Version external facts.** Provider limit, tokenizer mapping, dimensions, source URL, retrieval date, and artifact digest belong to an immutable profile.
+9. **Version external facts.** Provider limit, tokenizer mapping, dimensions, source URL, retrieval date, and artifact digest belong to an immutable profile (OpenAI, 2024; OpenAI, 2026a, 2026b, 2026c, 2026d; Unicode Consortium, 2025).
 
 ## APA 7 references
 
@@ -42,12 +42,12 @@ Günther, M., Mohr, I., Williams, D. J., Wang, B., & Xiao, H. (2024). *Late chun
 
 OpenAI. (2024, January 25). *New embedding models and API updates*. https://openai.com/index/new-embedding-models-and-api-updates/
 
-OpenAI. (2026). *Embeddings resource* [Source code]. GitHub. Retrieved August 15, 2026, from https://github.com/openai/openai-python/blob/main/src/openai/resources/embeddings.py
+OpenAI. (2026a). *Embeddings resource* [Source code]. GitHub. Retrieved August 15, 2026, from https://github.com/openai/openai-python/blob/main/src/openai/resources/embeddings.py
 
-OpenAI. (2026). *How to count tokens with tiktoken* [Jupyter Notebook]. OpenAI Cookbook. Retrieved August 15, 2026, from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
+OpenAI. (2026b). *How to count tokens with tiktoken* [Jupyter Notebook]. OpenAI Cookbook. Retrieved August 15, 2026, from https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
 
-OpenAI. (2026). *Model-to-encoding mapping* [Source code]. GitHub. Retrieved August 15, 2026, from https://github.com/openai/tiktoken/blob/main/tiktoken/model.py
+OpenAI. (2026c). *Model-to-encoding mapping* [Source code]. GitHub. Retrieved August 15, 2026, from https://github.com/openai/tiktoken/blob/main/tiktoken/model.py
 
-OpenAI. (2026). *text-embedding-3-large model*. OpenAI API documentation. Retrieved August 15, 2026, from https://developers.openai.com/api/docs/models/text-embedding-3-large
+OpenAI. (2026d). *text-embedding-3-large model*. OpenAI API documentation. Retrieved August 15, 2026, from https://developers.openai.com/api/docs/models/text-embedding-3-large
 
 Unicode Consortium. (2025). *Unicode Standard Annex #29: Unicode text segmentation* (Revision 47, Unicode 17.0.0). https://www.unicode.org/reports/tr29/tr29-47.html

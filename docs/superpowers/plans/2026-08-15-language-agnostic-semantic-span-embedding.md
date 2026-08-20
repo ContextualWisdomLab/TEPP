@@ -94,7 +94,8 @@ git commit -m "docs(evidence): define language-agnostic semantic spans"
 - Consumes: `DocumentRecord`, `SourceSpan`, `EvidenceId`.
 - Produces:
   - `SourceBlockKind`;
-  - `SourceBlock::new(document, kind, span, parent, ordinal)`;
+  - `SourceBlock::new(kind, span, parent, ordinal)`; `document_id` is derived
+    from `SourceSpan::document_id()` and is never stored twice;
   - accessors for block identity, kind, span, parent, ordinal.
 
 - [ ] **Step 1: Write failing exact-block tests**
@@ -115,7 +116,7 @@ Store validated domain fields privately. Do not store a second authoritative tex
 
 - [ ] **Step 4: Add stable typed errors and docstrings**
 
-Add content-redacting errors for cross-document parentage and invalid source-block order.
+Add content-redacting errors for cross-document parentage and invalid source-block order. The constructor accepts an optional parent block, rejects a parent from another document, and adds a mismatch regression test; no redundant block-level document owner is introduced.
 
 - [ ] **Step 5: Run focused and full crate checks**
 
@@ -124,6 +125,8 @@ cargo fmt --all -- --check
 cargo clippy -p evidence_core --all-targets --offline -- -D warnings
 cargo test -p evidence_core --offline
 cargo llvm-cov -p evidence_core --offline --lib --tests --fail-under-lines 100 --fail-under-regions 100
+cargo +nightly-2026-08-01 llvm-cov --branch -p evidence_core --offline --lib --tests --json --summary-only --output-path coverage-branches.json
+python3 scripts/check_coverage.py coverage-branches.json --kind branches
 ```
 
 Expected: all pass at 100%.
@@ -155,6 +158,12 @@ git commit -m "feat(evidence): add typed exact-span source blocks"
   - `TokenOffset`;
   - typed `SemanticPreprocessorError`.
 
+`EmbeddingModelProfile` carries `profile_source_uri` and
+`profile_source_digest` alongside `verified_at` and `tokenizer_digest`. Both
+provenance fields are required in the immutable manifest and wire DTO so a
+model-limit or tokenizer claim can be reproduced without relying on mutable
+provider documentation.
+
 - [ ] **Step 1: Write failing model-profile tests**
 
 Assert:
@@ -169,7 +178,12 @@ Also reject zero limits, zero dimensions, empty provider/model/revision, noncano
 
 - [ ] **Step 2: Write failing fake token-counter tests**
 
-The deterministic fake counter maps Unicode scalar boundaries to token offsets and refuses offsets that split UTF-8.
+The deterministic fake counter maps Unicode scalar boundaries to token offsets
+and refuses offsets that split UTF-8. `TokenOffset` uses half-open UTF-8 byte
+ranges in the complete rendered payload; metadata tokens have no source span,
+while content tokens carry their source-span and Unicode-scalar mapping. Tests
+cover metadata, source offsets, non-monotonic ranges, and UTF-8/code-point
+splits.
 
 - [ ] **Step 3: Run focused tests and confirm RED**
 
@@ -270,7 +284,7 @@ Use the fake token counter to assert the complete metadata-rendered payload at 8
 
 - [ ] **Step 2: Write recursive recovery tests**
 
-Cover child block, sentence/line, punctuation, token-offset fallback, bounded overlap, and an unsplittable invalid-offset case.
+Cover child block, sentence/line, punctuation, token-offset fallback, bounded overlap, and an unsplittable invalid-offset case. Also cover an oversized unit after a non-empty `current` (the current span is emitted before recursive output) and a first unit larger than `preferred_max` but within `hard_limit` (no empty span is emitted).
 
 - [ ] **Step 3: Run focused tests and confirm RED**
 
@@ -284,7 +298,10 @@ Version the template, omit absent metadata, preserve source content, and hash th
 
 - [ ] **Step 5: Implement recursive splitting and typed errors**
 
-Never truncate. Token-offset fallback maps only to valid source boundaries.
+Never truncate. Token-offset fallback maps only to valid source boundaries. The
+packer flushes a non-empty `current` before recursive splitting, initializes a
+first preferred-over-limit unit without emitting an empty span, and emits only
+non-empty spans so document order is preserved.
 
 - [ ] **Step 6: Run quality gates and commit**
 
@@ -312,6 +329,12 @@ git commit -m "feat(semantic): enforce final embedding payload budgets"
   - `BoundaryReason`;
   - packed leaf units.
 
+`AdjacentSimilarity::similarities` returns exactly
+`units.len().saturating_sub(1)` finite scores, ordered for pairs
+`(units[0], units[1])` through `(units[n-2], units[n-1])`. The packer rejects
+`NaN`, infinity, and wrong-length responses instead of padding, truncating, or
+reordering them.
+
 - [ ] **Step 1: Write failing structure-only tests**
 
 Mandatory heading/table/code boundaries split deterministically. Similarity is not required.
@@ -322,7 +345,7 @@ A fake similarity port returns known adjacent scores. Assert a sharp semantic dr
 
 - [ ] **Step 3: Write failing degradation tests**
 
-When similarity returns `Unavailable`, assert packing succeeds in `StructureOnly` mode and records the reason. Invalid scores (`NaN`, infinity, wrong length) fail closed.
+When similarity returns `Unavailable`, assert packing succeeds in `StructureOnly` mode and records the reason. Invalid scores (`NaN`, infinity, wrong length) fail closed. Assert the exact adjacent-pair order and `units.len().saturating_sub(1)` result length.
 
 - [ ] **Step 4: Run focused tests and confirm RED**
 
@@ -353,6 +376,11 @@ git commit -m "feat(semantic): pack spans with explicit fallback"
 - Create: `crates/tepp_api/src/semantic_span.rs`
 - Create: `schemas/semantic-span-manifest-v1.schema.json`
 - Create: `examples/semantic-span-manifest-v1.json`
+- Create: `examples/semantic-span-manifest-v1-voice.json`
+- Create: `examples/semantic-span-manifest-v1-unknown-field.json`
+- Create: `examples/semantic-span-manifest-v1-unsupported-version.json`
+- Create: `examples/semantic-span-manifest-v1-digest-mismatch.json`
+- Modify: `requirements-quality.txt` (pin the `jsonschema` validator and hash)
 - Modify: `crates/tepp_api/src/lib.rs`
 - Test: `crates/tepp_api/tests/semantic_span_wire_contract.rs`
 
@@ -385,12 +413,23 @@ Summaries are optional derived artifacts. They cannot replace source spans or be
 - [ ] **Step 5: Validate schema and run quality gates**
 
 ```bash
+jsonschema --version  # pinned in the quality-tool requirements
+jsonschema -i examples/semantic-span-manifest-v1.json schemas/semantic-span-manifest-v1.schema.json
+jsonschema -i examples/semantic-span-manifest-v1-voice.json schemas/semantic-span-manifest-v1.schema.json
+! jsonschema -i examples/semantic-span-manifest-v1-unknown-field.json schemas/semantic-span-manifest-v1.schema.json
+! jsonschema -i examples/semantic-span-manifest-v1-unsupported-version.json schemas/semantic-span-manifest-v1.schema.json
+! jsonschema -i examples/semantic-span-manifest-v1-digest-mismatch.json schemas/semantic-span-manifest-v1.schema.json
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo nextest run --workspace --all-features
 cargo test --doc --workspace --all-features
 python3 scripts/validate_documentation.py
 ```
+
+The validator version is pinned with its checksum in the repository quality
+requirements, and the positive/negative fixtures run in the exact-head CI
+lane. Rust DTO tests remain necessary but do not replace validation of the
+standalone schema artifact.
 
 - [ ] **Step 6: Commit**
 

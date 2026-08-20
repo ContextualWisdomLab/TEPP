@@ -136,6 +136,12 @@ New production logic requires 100% line and branch coverage, complete public/saf
 - unversioned model-profile requests: 0;
 - production line/branch coverage: 100%;
 - public and safety-contract docstrings: 100%.
+- every scientific evaluation uses a versioned realistic synthetic-truth fixture,
+  records the true parameters and uncertainty method, and publishes a
+  reproducible seed manifest;
+- parameter recovery, temporal ordering, graph recovery, invariance, and
+  CPU/GPU parity gates must meet their fixture-specific pre-registered
+  tolerances; a missing lane is a failed gate, not an omitted metric.
 
 ### Comparative metrics
 
@@ -151,6 +157,23 @@ Against fixed-window and paragraph-only baselines, report:
 - indexing latency and throughput;
 - provider input tokens and cost;
 - vector and relation storage.
+
+Scientific acceptance additionally reports parameter-recovery bias and RMSE,
+nominal interval coverage, temporal-ordering violations, graph precision/
+recall/F1, measurement-invariance decision accuracy, and CPU/GPU parity error.
+Each metric is reported overall and by source structure, script/language
+profile, and mixed-language status with confidence intervals or a documented
+finite-sample uncertainty method. A fixture passes only when all required
+metrics meet its versioned tolerance: ordering has zero backward transition
+edges, invariance recovers every known invariant/non-invariant fixture, and
+parity is within the estimator's declared numerical tolerance against the CPU
+`f64` reference. Recovery and graph thresholds are declared in the fixture
+manifest before execution rather than chosen after observing results.
+
+Claims are promoted only when the hard gates, all required strata, uncertainty
+report, exact-head checks, and independent review pass. Otherwise the result is
+labelled provisional and cannot be used to claim production accuracy,
+cross-language equivalence, or retrieval superiority.
 
 Results SHALL include uncertainty and shall be stratified by source structure, script/language profile, and mixed-language status. Stratification evaluates robustness; it does not select the base algorithm.
 
