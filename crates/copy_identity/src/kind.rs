@@ -86,7 +86,7 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_copy_as_source_identity, refuse_copy_as_transition, CopyKind,
+        CopyKind, identity_recovery_rate, refuse_copy_as_source_identity, refuse_copy_as_transition,
     };
     use crate::CopyIdentityError;
 

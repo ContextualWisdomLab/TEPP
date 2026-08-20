@@ -1,8 +1,8 @@
 //! A template copy is not the source document and not a state transition.
 
 use copy_identity::{
-    identity_recovery_rate, refuse_copy_as_source_identity, refuse_copy_as_transition,
-    CopyIdentityError, CopyKind,
+    CopyIdentityError, CopyKind, identity_recovery_rate, refuse_copy_as_source_identity,
+    refuse_copy_as_transition,
 };
 
 #[test]
