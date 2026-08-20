@@ -84,6 +84,7 @@ fn seed_source_artifact(
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn live_postgres_applies_migrations_and_document_sql() {
     if !live_postgres_requested() {
         // Offline default CI and local unit lanes stay database-free.
