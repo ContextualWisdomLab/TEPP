@@ -36,7 +36,7 @@ Decision status and implementation maturity are separate. ADR `Accepted` means t
 | Compliance/assurance readiness | PRESENT-CURRENT | `docs/COMPLIANCE_READINESS.md`; CSAP/SOC 2/ISO/NIST mappings without certification claims |
 | Test / scientific validation | PRESENT-CURRENT | `docs/TEST_STRATEGY.md`; true-parameter recovery, uncertainty, leakage, invariance, CPU/GPU parity and replacement-lineage evidence rules |
 | Operability / recovery / release | PRESENT-CURRENT | `docs/OPERABILITY.md`; ADR 0014 separates release authority from green CI |
-| LLM orchestration / test-time compute | PRESENT-CURRENT | `docs/LLM_ORCHESTRATION.md` + ADR 0010; Fugu/Conductor/TRINITY motivate tested allocation, not authority |
+| LLM orchestration / test-time compute | PRESENT-CURRENT | `docs/LLM_ORCHESTRATION.md` + ADR 0010 + `tepp_api` router doctoring; Fugu/Conductor/TRINITY motivate tested allocation, not authority |
 | Autonomous development/review/merge authority | PRESENT-CURRENT as design | ADR 0015 separates model proposal, deterministic verification, publication, independent review, and merge/release authority; implementation remains accepted-target |
 | Standards / APA 7 doctoring | PRESENT-CURRENT | research register covers psychometrics/topic/time/event/Unicode/security/AI-governance/orchestration foundations |
 | Traceability | PRESENT-CURRENT | `docs/TRACEABILITY.md` maps requirements, owning ADRs, canonical replacement lineage, and maturity |
