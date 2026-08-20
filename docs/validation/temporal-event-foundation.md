@@ -1,7 +1,7 @@
 # Temporal Event Foundation — validation and release-readiness report
 
 **Status:** Living validation ledger for the Temporal/Event foundation program
-**Last reviewed:** 2026-08-20
+**Last reviewed:** 2026-08-21
 **Authority:** ADR 0014 (claim promotion), ADR 0007 (quality gates), AGENTS.md scientific acceptance
 
 ## Scope
