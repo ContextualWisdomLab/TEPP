@@ -6,6 +6,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `provider_receipt` disclosure receipt: records provider field codes and
+  purpose-bound receipt metadata without persisting source text or source
+  identity (ADR 0009).
 - `intake_authorization` identity gate: documents, serialized records, checkpoints, and LLM outputs cannot be accepted without a purpose-bound grant; size/identity/provenance bounds are not that grant; recovered grant-presence flags match known truth at a higher computed rate than accepting every intake (ADR 0009).
 - `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `tepp_api` adaptive orchestration router (ADR 0010): versioned `direct`/`verify`/`committee`/`conductor`/`abstain` selection from CPU `f64` risk, ambiguity, evidence, and token-budget inputs; recorded stages, recursion, decomposition, access lists, and role-specific reasoning effort; fail-closed document-controlled policy/access/credentials; LLM plans remain proposals under deterministic statistical authority; comparable-budget ablation requires a direct baseline; credential-free contextual-orchestrator binding. Live NIM HTTP remains accepted-target.
