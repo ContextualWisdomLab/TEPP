@@ -333,6 +333,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &TextSegmentRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_text_segment_sql(record)?;
         self.session.execute(&sql)
     }
@@ -726,6 +727,12 @@ mod tests {
             available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
         };
         repo.insert_text_segment(&segment).expect("segment insert");
+        let executed = repo.session().executed();
+        let segment_bind = executed
+            .iter()
+            .rposition(|sql| sql.contains("tepp.current_tenant_record_id"))
+            .expect("text segment insert must bind tenant session");
+        assert!(executed[segment_bind + 1].contains("INSERT INTO text_segment"));
         repo.submit_text_segment_by_id(segment.text_segment_id)
             .expect("segment by id");
         let cutoff = KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff");
