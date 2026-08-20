@@ -1,7 +1,7 @@
 //! Language, episode, template, and opportunity-pool targets are not entities.
 
 use membership_target::{
-    identity_recovery_rate, refuse_collapsed_target, MembershipTargetError, MembershipTargetKind,
+    MembershipTargetError, MembershipTargetKind, identity_recovery_rate, refuse_collapsed_target,
 };
 
 #[test]

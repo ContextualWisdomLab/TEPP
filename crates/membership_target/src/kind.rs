@@ -99,7 +99,7 @@ pub fn identity_recovery_rate(
 
 #[cfg(test)]
 mod tests {
-    use super::{identity_recovery_rate, refuse_collapsed_target, MembershipTargetKind};
+    use super::{MembershipTargetKind, identity_recovery_rate, refuse_collapsed_target};
     use crate::MembershipTargetError;
 
     #[test]

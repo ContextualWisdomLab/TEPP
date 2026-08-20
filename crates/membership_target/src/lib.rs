@@ -11,9 +11,9 @@ mod kind;
 
 /// Fail-closed membership-target errors.
 pub use error::MembershipTargetError;
+/// Closed vocabulary of membership targets.
+pub use kind::MembershipTargetKind;
 /// Fraction of recovered target kinds that match known truth.
 pub use kind::identity_recovery_rate;
 /// Refuse to treat one target kind as another.
 pub use kind::refuse_collapsed_target;
-/// Closed vocabulary of membership targets.
-pub use kind::MembershipTargetKind;
