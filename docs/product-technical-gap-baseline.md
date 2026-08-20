@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-20 20:01 KST
+**Snapshot:** 2026-08-20 20:15 KST
 **Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
 
 ## Purpose
@@ -53,7 +53,7 @@ API at snapshot time. These values do not authorize a merge by themselves.
 
 | PR | Head | Base | Merge state | Review decision | Current check evidence | Delivery role |
 |---:|---|---|---|---|---|---|
-| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `a1ab6ce` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Product/technical gap baseline |
+| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `83eb9bb` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Product/technical gap baseline |
 | [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `586cda5` | `feat/lineageweave-live-consumer-contract` | `MERGEABLE/UNSTABLE` | required | required Checks queued; no completed failure observed | LineageWeave cutoff-safe history projection |
 | [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `99c8d4c` | `feat/lineageweave-live-consumer-contract` | `MERGEABLE/CLEAN` | required | current Checks green; independent review still required | LineageWeave temporal evidence context |
 | [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `f1c94f7` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Completed analysis-run result contract |
@@ -70,6 +70,7 @@ API at snapshot time. These values do not authorize a merge by themselves.
 | [61](https://github.com/ContextualWisdomLab/TEPP/pull/61) | `8ebbc04` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Interval-aware uncertain availability cutoff |
 | [58](https://github.com/ContextualWisdomLab/TEPP/pull/58) | `e98ada4` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Positional embedded image source units |
 | [59](https://github.com/ContextualWisdomLab/TEPP/pull/59) | `43bf6cf` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Unicode NFC/NFD canonical identity for split leakage |
+| [57](https://github.com/ContextualWisdomLab/TEPP/pull/57) | `14014b7` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Exact-head scientific claim promotion gates |
 | [51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | `0111a1a` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | current Checks green; review changes remain | VRAM budget and CPU fallback types |
 | [50](https://github.com/ContextualWisdomLab/TEPP/pull/50) | `2a29e24` | `main` | `MERGEABLE/BLOCKED` | `CHANGES_REQUESTED` | required Checks queued after branch-coverage fix; no completed failure observed on this head | TDT/CHRONOS transition boundary |
 | [49](https://github.com/ContextualWisdomLab/TEPP/pull/49) | `199ed6c` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | required Checks queued; no completed failure observed | Posterior ESEM input gates and true-parameter RMSE |
