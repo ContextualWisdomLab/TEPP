@@ -264,7 +264,7 @@ jobs:
             --report "$report_file" >"$log_file" 2>&1 &
           echo $! >"$RUNNER_TEMP/contextual-orchestrator.pid"
           ready=false
-          for _ in $(seq 1 60); do
+          for _ in $(seq 1 120); do
             if curl --fail --silent --show-error "http://127.0.0.1:${CONTEXTUAL_ORCHESTRATOR_PORT}/healthz" >/dev/null; then
               ready=true
               break
