@@ -124,6 +124,12 @@ mod tests {
             component_root_mean_square_error(&truth, &[]),
             Err(LongitudinalError::InvalidComponentPayload)
         );
+        let valid = [ComponentValue::new(0, 0, ComponentLevel::Between, 0.5)];
+        assert_eq!(component_root_mean_square_error(&truth, &valid), Ok(0.0));
+        assert_eq!(
+            component_root_mean_square_error(&[], &valid),
+            Err(LongitudinalError::InvalidComponentPayload)
+        );
         assert_eq!(
             ComponentValue::new(2, 3, ComponentLevel::Within, 0.1).occasion_index(),
             3
