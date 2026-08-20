@@ -21,4 +21,4 @@ jobs:
       contents: write
       id-token: write
       pull-requests: write
-    uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae
+    uses: ContextualWisdomLab/.github/.github/workflows/pr-review-merge-scheduler.yml@8319ae5beda1b4dcbc9c2b189f38d951c2c61b7a
