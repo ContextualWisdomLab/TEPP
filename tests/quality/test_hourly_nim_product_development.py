@@ -305,7 +305,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         sample = type("SampleModel", (), {"model_id": "model_one", "provider_name": "provider_one"})()
         error = type("SampleError", (), {"provider_name": "provider_two"})()
         fake_package = ModuleType("contextual_orchestrator")
-        fake_package.InMemoryConfigStore = lambda: object()
+        fake_package.InMemoryConfigStore = object
         fake_package.PriceBook = FakePriceBook
         fake_discovery = ModuleType("contextual_orchestrator.model_discovery")
         fake_discovery.agent_from_discovered = lambda model, priority=0: FakeAgent(
