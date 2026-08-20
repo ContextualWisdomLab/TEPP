@@ -21,6 +21,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Test/scientific validation strategy | [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md) |
 | Operability/recovery/release | [`docs/OPERABILITY.md`](docs/OPERABILITY.md) |
 | Requirement/research/evidence traceability | [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) |
+| Product and technical gap baseline | [`docs/product-technical-gap-baseline.md`](docs/product-technical-gap-baseline.md) |
 | Architecture decision index / ownership map | [`docs/adr/README.md`](docs/adr/README.md) |
 | ADR status, maturity, and supersession policy | [`docs/adr/ADR_POLICY.md`](docs/adr/ADR_POLICY.md) |
 | Delivery roadmap | [`docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md`](docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md) |
@@ -37,6 +38,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
+| Analysis engine v1 doctoring | [`docs/doctoring/analysis-engine-v1.md`](docs/doctoring/analysis-engine-v1.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
 ## Maturity vocabulary
