@@ -20,6 +20,11 @@ fn committed_examples_parse_through_live_contracts() {
     assert_eq!(run.contract_version, 1);
     assert_eq!(run.tenant_workspace_id, "tenant-workspace-demo");
 
+    let naruon =
+        AnalysisRunRequest::from_json(&repo_example("naruon_modular_analysis_run_request_v1.json"))
+            .expect("naruon example");
+    assert_eq!(naruon.output_profile, "naruon-consumer-validation-report");
+
     let manifest =
         ReproducibilityManifest::from_json(&repo_example("reproducibility_manifest_v1.json"))
             .expect("manifest example");

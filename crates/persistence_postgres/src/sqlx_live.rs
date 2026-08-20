@@ -5,6 +5,8 @@
 //! for the success path. Unreachable-host failure is still unit-tested.
 
 use crate::PersistenceError;
+use crate::classify_lifecycle_sql_failure;
+use crate::classify_write_conflict;
 use crate::live_pool::{LiveSqlxPool, LiveSqlxPoolOptions};
 use crate::sqlx_gate::LiveSqlxConfig;
 use std::sync::Arc;
@@ -61,6 +63,18 @@ impl SqlxTransport {
         self.runtime
             .block_on(async { sqlx::query(sql).execute(&self.pool).await })
             .map(|_| ())
-            .map_err(|_| PersistenceError::SqlExecutionFailed)
+            .map_err(|error| map_sqlx_error(&error))
     }
+}
+
+fn map_sqlx_error(error: &sqlx::Error) -> PersistenceError {
+    if let Some(lifecycle) = classify_lifecycle_sql_failure(&error.to_string()) {
+        return lifecycle;
+    }
+    error
+        .as_database_error()
+        .and_then(sqlx::error::DatabaseError::code)
+        .as_deref()
+        .and_then(classify_write_conflict)
+        .unwrap_or(PersistenceError::SqlExecutionFailed)
 }
