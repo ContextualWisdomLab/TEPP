@@ -87,7 +87,7 @@ def is_executable_source_line(
         return False
     if text in {"{", "}", "},", ")", ");", "];", "();", "};"}:
         return False
-    if text.startswith('"') or text.startswith("} else"):
+    if _is_standalone_string_literal(text) or text.startswith("} else"):
         return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False
@@ -172,12 +172,54 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
 def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
     """Return whether a line is inside a Rust normal-string continuation."""
     in_string = False
+    in_block_comment = False
     for index, raw in enumerate(lines, start=1):
         if in_string and index == line_number:
             return True
-        quote_count = raw.replace('\\"', "").count('"')
-        if quote_count % 2:
-            in_string = not in_string
+        escaped = False
+        cursor = 0
+        while cursor < len(raw):
+            if in_block_comment:
+                if raw.startswith("*/", cursor):
+                    in_block_comment = False
+                    cursor += 2
+                else:
+                    cursor += 1
+                continue
+            if in_string:
+                character = raw[cursor]
+                if character == '"' and not escaped:
+                    in_string = False
+                if character == "\\":
+                    escaped = not escaped
+                else:
+                    escaped = False
+                cursor += 1
+                continue
+            if raw.startswith("//", cursor):
+                break
+            if raw.startswith("/*", cursor):
+                in_block_comment = True
+                cursor += 2
+                continue
+            if raw[cursor] == '"':
+                in_string = True
+            cursor += 1
+    return False
+
+
+def _is_standalone_string_literal(text: str) -> bool:
+    """Return whether *text* is only a normal string literal and punctuation."""
+    if not text.startswith('"'):
+        return False
+    escaped = False
+    for index, character in enumerate(text[1:], start=1):
+        if character == '"' and not escaped:
+            return text[index + 1 :].strip() in {"", ",", ";"}
+        if character == "\\":
+            escaped = not escaped
+        else:
+            escaped = False
     return False
 
 

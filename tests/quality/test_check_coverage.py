@@ -505,6 +505,48 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(str(source), 5)
             )
 
+    def test_string_scanner_handles_comments_backslash_parity_and_methods(self) -> None:
+        """Quoted comments and escaped delimiters do not corrupt source classification."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            backslash = "\\"
+            source = Path(temporary) / "scanner.rs"
+            source_lines = [
+                "fn query() {",
+                f'    let sql = "SELECT id {backslash}',
+                '        FROM document";',
+                r'    // comment contains one " quote',
+                "    execute(sql);",
+                f'    let even = "ends with two slashes {backslash * 2}";',
+                "    execute(even);",
+                r'    "literal".to_string();',
+                "}",
+            ]
+            source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
+            path = str(source)
+
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 3))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 5))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 7))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 8))
+
+            block_comment = [
+                "/* comment starts",
+                r'   comment has a " quote',
+                "   still comment",
+                "*/",
+                "execute();",
+            ]
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(block_comment, 5)
+            )
+            self.assertTrue(
+                coverage_contract._is_standalone_string_literal(r'"escaped\\",')
+            )
+            self.assertFalse(
+                coverage_contract._is_standalone_string_literal('"unfinished')
+            )
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
