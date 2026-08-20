@@ -42,24 +42,9 @@ fn pair_metrics_recover_known_clusters_and_are_label_invariant() {
     let recall = cluster_pair_recall(&truth, &recovered).expect("recall");
     let scrambled_precision = cluster_pair_precision(&truth, &scrambled).expect("scrambled");
 
-    let expected_precision = {
-        let mut decided_same = 0_u32;
-        let mut decided_and_truth_same = 0_u32;
-        for left in 0..truth.len() {
-            for right in (left + 1)..truth.len() {
-                if recovered[left] == recovered[right] {
-                    decided_same += 1;
-                    if truth[left] == truth[right] {
-                        decided_and_truth_same += 1;
-                    }
-                }
-            }
-        }
-        f64::from(decided_and_truth_same) / f64::from(decided_same)
-    };
-    assert!((precision - expected_precision).abs() < f64::EPSILON);
+    assert!((precision - 1.0).abs() < f64::EPSILON);
     assert!((recall - 1.0).abs() < f64::EPSILON);
-    assert!(precision > scrambled_precision);
+    assert!((scrambled_precision - 0.0).abs() < f64::EPSILON);
 }
 
 #[test]

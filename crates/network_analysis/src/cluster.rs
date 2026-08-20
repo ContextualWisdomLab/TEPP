@@ -1,6 +1,7 @@
 //! Label-invariant pair precision and recall for recovered clusters.
 
 use crate::NetworkError;
+use std::collections::HashMap;
 
 /// An opaque cluster identity used only for equality.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -62,27 +63,51 @@ fn pair_rate(
     if truth.len() < 2 || truth.len() != decided.len() {
         return Err(NetworkError::InvalidClusterPayload);
     }
-    let mut denominator = 0_u32;
-    let mut numerator = 0_u32;
-    for left in 0..truth.len() {
-        for right in (left + 1)..truth.len() {
-            let truth_same = truth[left] == truth[right];
-            let decided_same = decided[left] == decided[right];
-            let counted = match kind {
-                RateKind::Precision => decided_same,
-                RateKind::Recall => truth_same,
-            };
-            if counted {
-                denominator += 1;
-                if truth_same && decided_same {
-                    numerator += 1;
-                }
-            }
-        }
+    let mut truth_counts = HashMap::<ClusterLabel, u64>::new();
+    let mut decided_counts = HashMap::<ClusterLabel, u64>::new();
+    let mut joint_counts = HashMap::<(ClusterLabel, ClusterLabel), u64>::new();
+    let mut truth_pairs = 0_u64;
+    let mut decided_pairs = 0_u64;
+    let mut joint_pairs = 0_u64;
+
+    for (&truth_label, &decided_label) in truth.iter().zip(decided) {
+        let truth_count = truth_counts.entry(truth_label).or_default();
+        truth_pairs = truth_pairs
+            .checked_add(*truth_count)
+            .ok_or(NetworkError::InvalidClusterPayload)?;
+        *truth_count = truth_count
+            .checked_add(1)
+            .ok_or(NetworkError::InvalidClusterPayload)?;
+
+        let decided_count = decided_counts.entry(decided_label).or_default();
+        decided_pairs = decided_pairs
+            .checked_add(*decided_count)
+            .ok_or(NetworkError::InvalidClusterPayload)?;
+        *decided_count = decided_count
+            .checked_add(1)
+            .ok_or(NetworkError::InvalidClusterPayload)?;
+
+        let joint_count = joint_counts
+            .entry((truth_label, decided_label))
+            .or_default();
+        joint_pairs = joint_pairs
+            .checked_add(*joint_count)
+            .ok_or(NetworkError::InvalidClusterPayload)?;
+        *joint_count = joint_count
+            .checked_add(1)
+            .ok_or(NetworkError::InvalidClusterPayload)?;
     }
+
+    let (numerator, denominator) = match kind {
+        RateKind::Precision => (joint_pairs, decided_pairs),
+        RateKind::Recall => (joint_pairs, truth_pairs),
+    };
     if denominator == 0 {
         return Err(NetworkError::InvalidClusterPayload);
     }
+    let numerator = u32::try_from(numerator).map_err(|_| NetworkError::InvalidClusterPayload)?;
+    let denominator =
+        u32::try_from(denominator).map_err(|_| NetworkError::InvalidClusterPayload)?;
     Ok(f64::from(numerator) / f64::from(denominator))
 }
 
