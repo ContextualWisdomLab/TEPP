@@ -86,8 +86,8 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_style_as_stopword_deletion, refuse_style_as_unique_content,
-        StyleKind,
+        StyleKind, identity_recovery_rate, refuse_style_as_stopword_deletion,
+        refuse_style_as_unique_content,
     };
     use crate::StyleSourceError;
 

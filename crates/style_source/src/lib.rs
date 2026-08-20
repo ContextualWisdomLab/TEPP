@@ -12,11 +12,11 @@ mod kind;
 
 /// Fail-closed style-source errors.
 pub use error::StyleSourceError;
+/// Closed vocabulary of style-related token treatments.
+pub use kind::StyleKind;
 /// Fraction of recovered style kinds that match known truth.
 pub use kind::identity_recovery_rate;
 /// Refuse to treat style residue as stopword deletion.
 pub use kind::refuse_style_as_stopword_deletion;
 /// Refuse to treat style residue as unique latent content.
 pub use kind::refuse_style_as_unique_content;
-/// Closed vocabulary of style-related token treatments.
-pub use kind::StyleKind;

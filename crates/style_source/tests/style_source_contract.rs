@@ -1,8 +1,8 @@
 //! House-voice style residue is not unique content and not stopword deletion.
 
 use style_source::{
-    identity_recovery_rate, refuse_style_as_stopword_deletion, refuse_style_as_unique_content,
-    StyleKind, StyleSourceError,
+    StyleKind, StyleSourceError, identity_recovery_rate, refuse_style_as_stopword_deletion,
+    refuse_style_as_unique_content,
 };
 
 #[test]
