@@ -4,9 +4,9 @@
 **Active slice:** PR #157 terminal-result contract → stacked analysis execution
 engine for issue #166
 
-The canonical organization-wide buyer-gap register is maintained separately in
-`docs/product-technical-gap-baseline.md`. This document records only the
-analysis-engine slice so it can land without competing with that register.
+The organization-wide buyer-gap register is maintained by a separate landing
+vehicle. This document records only the analysis-engine slice so it can land
+without competing with that register or requiring another PR to be present.
 
 ## Buyer-visible gap
 
