@@ -53,7 +53,8 @@ The gateway source is downloaded from the pinned
 committed SHA-256. At bootstrap, `scripts/run_contextual_orchestrator.py`
 registers all five provider keys in the orchestrator KV, removes them from its
 environment, discovers every provider model, records secret-free discovery
-evidence, and enables the three lowest-cost discovered candidates. OpenCode
+evidence, excludes endpoint-only and safety-only model identifiers from chat
+routing, and enables the three lowest-cost general-chat candidates. OpenCode
 receives only the gateway bearer token; it never receives a provider key. The
 gateway's `/healthz` and authenticated `/v1/models` responses are checked before
 the agent starts.

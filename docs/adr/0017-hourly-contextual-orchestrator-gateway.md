@@ -22,9 +22,12 @@ The hourly proposal runner starts a pinned, ephemeral
 registers `BYTEZ_API_KEY`, `NVIDIA_NIM_API_KEY`, `NVIDIA_NIM_API_KEY_SUB`,
 `OPENROUTER_API_KEY`, and `OPENAI_API_KEY` in the gateway KV, removes those
 provider values from the gateway environment, and discovers models from all five
-provider entries. The gateway enables the three lowest-cost discovered
-candidates using contextual-orchestrator's existing price-book selector and
-records only secret-free discovery evidence.
+provider entries. The gateway records every discovered provider model, excludes
+endpoint-only and safety-only model identifiers from the chat pool, and enables
+the three lowest-cost general-chat candidates using contextual-orchestrator's
+existing price-book selector. This prevents an embedding or image model from
+being sent to an ordinary chat endpoint while preserving full discovery
+evidence.
 
 OpenCode calls only `http://127.0.0.1:18000/v1` with a separately generated
 loopback bearer token. It receives no provider credential. Liveness and

@@ -307,6 +307,11 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
                 pass
 
         sample = type("SampleModel", (), {"model_id": "model_one", "provider_name": "provider_one"})()
+        embedding = type(
+            "EmbeddingModel",
+            (),
+            {"model_id": "text-embedding-3-small", "provider_name": "provider_one"},
+        )()
         error = type("SampleError", (), {"provider_name": "provider_two"})()
         fake_package = ModuleType("contextual_orchestrator")
         fake_package.InMemoryConfigStore = object
@@ -315,8 +320,8 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         fake_discovery.agent_from_discovered = lambda model, priority=0: FakeAgent(
             model.model_id, priority=priority
         )
-        fake_discovery.discover_all_models = lambda: ([sample], [error])
-        fake_discovery.refresh_price_book = lambda _models, _book: 1
+        fake_discovery.discover_all_models = lambda: ([embedding, sample], [error])
+        fake_discovery.refresh_price_book = lambda models, _book: len(models)
         fake_discovery.select_top_n_cheapest_discovered_agents = lambda models, _book, _limit: models
         fake_modules = {
             "contextual_orchestrator": fake_package,
@@ -326,10 +331,17 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             agents, report = bootstrap._selected_agents()
             self.assertEqual([agent.model for agent in agents], ["model_one"])
             self.assertFalse(agents[0].disabled)
+            self.assertEqual(report["discovered_count"], 2)
+            self.assertEqual(report["chat_candidate_count"], 1)
+            self.assertEqual(report["excluded_non_chat_count"], 1)
             self.assertEqual(report["providers_with_errors"], ["provider_two"])
 
             fake_discovery.discover_all_models = lambda: ([], [])
             with self.assertRaisesRegex(RuntimeError, "providers_with_errors=none"):
+                bootstrap._selected_agents()
+
+            fake_discovery.discover_all_models = lambda: ([embedding], [])
+            with self.assertRaisesRegex(RuntimeError, "no general chat candidates"):
                 bootstrap._selected_agents()
 
     def test_report_gateway_and_main_contract_are_executable_with_seams(self) -> None:
