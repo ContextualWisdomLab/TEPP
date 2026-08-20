@@ -24,6 +24,10 @@ const MEMBERSHIP_UP: &str =
     include_str!("../../../migrations/0006_typed_membership_assignment.up.sql");
 const MEMBERSHIP_DOWN: &str =
     include_str!("../../../migrations/0006_typed_membership_assignment.down.sql");
+const RETENTION_UP: &str =
+    include_str!("../../../migrations/0007_retention_deletion_legal_hold.up.sql");
+const RETENTION_DOWN: &str =
+    include_str!("../../../migrations/0007_retention_deletion_legal_hold.down.sql");
 
 /// Forward and rollback SQL for one migration unit.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -41,10 +45,10 @@ impl MigrationCatalog {
     /// sources are unexpectedly empty.
     pub fn from_embedded() -> Result<Self, MigrationContractError> {
         let up_sql = format!(
-            "{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}\n{TEMPORAL_ORDER_UP}\n{MEMBERSHIP_UP}"
+            "{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}\n{TEMPORAL_ORDER_UP}\n{MEMBERSHIP_UP}\n{RETENTION_UP}"
         );
         let down_sql = format!(
-            "{MEMBERSHIP_DOWN}\n{TEMPORAL_ORDER_DOWN}\n{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}"
+            "{RETENTION_DOWN}\n{MEMBERSHIP_DOWN}\n{TEMPORAL_ORDER_DOWN}\n{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}"
         );
         Self::from_sources(&up_sql, &down_sql)
     }
@@ -119,6 +123,9 @@ pub fn validate_migration_catalog(
     if declares_temporal_interval_ordering(catalog.up_sql()) {
         validate_temporal_interval_ordering(catalog.up_sql())?;
     }
+    if declares_retention_legal_hold(catalog.up_sql()) {
+        validate_retention_legal_hold(catalog.up_sql())?;
+    }
 
     Ok(())
 }
@@ -181,6 +188,47 @@ fn validate_temporal_interval_ordering(up_sql: &str) -> Result<(), MigrationCont
     }
     if !lower.contains("revision_number > 0") {
         return Err(MigrationContractError::MissingTemporalIntervalConstraint);
+    }
+    Ok(())
+}
+
+fn declares_retention_legal_hold(up_sql: &str) -> bool {
+    let lower = up_sql.to_ascii_lowercase();
+    lower.contains("retention_policy")
+        || lower.contains("legal_hold")
+        || lower.contains("evidence_tombstone")
+}
+
+fn validate_retention_legal_hold(up_sql: &str) -> Result<(), MigrationContractError> {
+    let lower = up_sql.to_ascii_lowercase();
+    let required_tables = [
+        "retention_policy",
+        "legal_hold",
+        "deletion_request",
+        "evidence_tombstone",
+    ];
+    for table in required_tables {
+        if !lower.contains(&format!("create table {table}")) {
+            return Err(MigrationContractError::MissingRetentionLegalHold);
+        }
+    }
+    if !lower.contains("create or replace function reject_held_evidence_deletion") {
+        return Err(MigrationContractError::MissingRetentionLegalHold);
+    }
+    if !lower.contains("create or replace function reject_tombstoned_evidence_restore") {
+        return Err(MigrationContractError::MissingRetentionLegalHold);
+    }
+    if !lower.contains("create trigger deletion_request_reject_held_deletion") {
+        return Err(MigrationContractError::MissingRetentionLegalHold);
+    }
+    if !lower.contains("create trigger document_record_reject_tombstone_restore") {
+        return Err(MigrationContractError::MissingRetentionLegalHold);
+    }
+    if !lower.contains("constraint retention_policy_period_positive") {
+        return Err(MigrationContractError::MissingRetentionLegalHold);
+    }
+    if !lower.contains("constraint legal_hold_document_scope_consistent") {
+        return Err(MigrationContractError::MissingRetentionLegalHold);
     }
     Ok(())
 }
@@ -789,6 +837,84 @@ mod tests {
             CONSTRAINT membership_assignment_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
         ";
         assert_eq!(super::validate_temporal_interval_ordering(complete), Ok(()));
+    }
+
+    #[test]
+    fn retention_legal_hold_contract_fails_closed() {
+        assert!(super::declares_retention_legal_hold(
+            "CREATE TABLE retention_policy (retention_policy_id uuid PRIMARY KEY)"
+        ));
+        assert!(super::declares_retention_legal_hold(
+            "CREATE TABLE legal_hold ()"
+        ));
+        assert!(super::declares_retention_legal_hold(
+            "CREATE TABLE evidence_tombstone ()"
+        ));
+        assert!(!super::declares_retention_legal_hold("CREATE TABLE x"));
+
+        let missing_table = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            CREATE TABLE retention_policy (
+                retention_policy_id uuid PRIMARY KEY,
+                tenant_record_id uuid NOT NULL,
+                system_time timestamptz NOT NULL,
+                available_time timestamptz NOT NULL
+            );
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&missing_table),
+            Err(MigrationContractError::MissingRetentionLegalHold)
+        );
+
+        let tables_only = r"
+            CREATE TABLE retention_policy (x int);
+            CREATE TABLE legal_hold (x int);
+            CREATE TABLE deletion_request (x int);
+            CREATE TABLE evidence_tombstone (x int);
+        ";
+        assert_eq!(
+            super::validate_retention_legal_hold(tables_only),
+            Err(MigrationContractError::MissingRetentionLegalHold)
+        );
+        let with_hold_fn =
+            format!("{tables_only} CREATE OR REPLACE FUNCTION reject_held_evidence_deletion()");
+        assert_eq!(
+            super::validate_retention_legal_hold(&with_hold_fn),
+            Err(MigrationContractError::MissingRetentionLegalHold)
+        );
+        let with_restore_fn = format!(
+            "{with_hold_fn} CREATE OR REPLACE FUNCTION reject_tombstoned_evidence_restore()"
+        );
+        assert_eq!(
+            super::validate_retention_legal_hold(&with_restore_fn),
+            Err(MigrationContractError::MissingRetentionLegalHold)
+        );
+        let with_hold_trigger =
+            format!("{with_restore_fn} CREATE TRIGGER deletion_request_reject_held_deletion");
+        assert_eq!(
+            super::validate_retention_legal_hold(&with_hold_trigger),
+            Err(MigrationContractError::MissingRetentionLegalHold)
+        );
+        let with_restore_trigger =
+            format!("{with_hold_trigger} CREATE TRIGGER document_record_reject_tombstone_restore");
+        assert_eq!(
+            super::validate_retention_legal_hold(&with_restore_trigger),
+            Err(MigrationContractError::MissingRetentionLegalHold)
+        );
+        let with_period =
+            format!("{with_restore_trigger} CONSTRAINT retention_policy_period_positive");
+        assert_eq!(
+            super::validate_retention_legal_hold(&with_period),
+            Err(MigrationContractError::MissingRetentionLegalHold)
+        );
+        let complete = format!("{with_period} CONSTRAINT legal_hold_document_scope_consistent");
+        super::validate_retention_legal_hold(&complete).expect("complete 0007 contract");
     }
 
     #[test]
