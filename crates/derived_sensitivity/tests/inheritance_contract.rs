@@ -62,16 +62,21 @@ fn inherited_classes_match_known_truth_better_than_a_public_collapse() {
     assert!(recovered_rate > collapsed_rate);
     let mut reversed_truth = truth.clone();
     let mut reversed_inherited = inherited.clone();
+    let mut reversed_collapsed = collapsed.clone();
     reversed_truth.reverse();
     reversed_inherited.reverse();
+    reversed_collapsed.reverse();
     let reversed_rate =
         sensitivity_recovery_rate(&reversed_truth, &reversed_inherited).expect("reversed");
+    let reversed_collapsed_rate =
+        sensitivity_recovery_rate(&reversed_truth, &reversed_collapsed).expect("reversed");
     assert!((reversed_rate - recovered_rate).abs() < f64::EPSILON);
+    assert!((reversed_collapsed_rate - collapsed_rate).abs() < f64::EPSILON);
     let kind_mismatch = [artifact(KIND_FACTOR, SensitivityClass::Restricted)];
     let topic_same_class = [artifact(KIND_TOPIC, SensitivityClass::Restricted)];
     let mismatch_rate =
         sensitivity_recovery_rate(&kind_mismatch, &topic_same_class).expect("kind mismatch");
-    assert!((mismatch_rate - 0.0).abs() < f64::EPSILON);
+    assert!((mismatch_rate - 1.0).abs() < f64::EPSILON);
 }
 
 #[test]

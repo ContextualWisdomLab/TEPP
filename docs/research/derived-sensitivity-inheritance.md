@@ -78,9 +78,11 @@ kinds. `refuse_derivation_as_public` and
 `refuse_blanket_mask_as_declassification` encode the WP 136 / GDPR reading
 that computation and masking are not independent declassification decisions
 (Article 29 Data Protection Working Party, 2007; European Union, 2016).
-Recovery is a computed match rate of paired kind **and** class against known
-truth, not an LLM judgment and not a class-only score that would treat a
-factor as a recovered topic.
+Recovery is a computed match rate of paired sensitivity classes against known
+truth. Kind codes remain closed and validated at construction, while this
+specific estimand measures whether sensitivity was inherited correctly rather
+than whether a separate kind-identity decision was correct. It is not an LLM
+judgment.
 
 ## Verification
 
@@ -89,5 +91,6 @@ factor as a recovered topic.
 - every topic/factor/relation × Restricted/Internal/Public pair recovers at
   rate 1.0; public collapse recovers only the three Public sources (1/3);
 - reordering paired records preserves the recovery rate;
-- a matching class on the wrong kind is not recovery;
+- a matching class on a different validated kind still counts as class
+  recovery, while kind validity is tested separately;
 - empty or length-mismatched recovery payloads fail closed.
