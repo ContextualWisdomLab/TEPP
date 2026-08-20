@@ -177,4 +177,11 @@ fn assert_sql_requires_every_stored_field_to_match() {
     assert!(sql.contains("protected_object_ref IS NOT DISTINCT FROM"));
     assert!(sql.contains("system_time"));
     assert!(sql.contains("available_time"));
+    assert!(sql.contains("NULL"));
+
+    let mut with_ref = artifact();
+    with_ref.protected_object_ref = Some("s3://tepp/evidence/object".into());
+    let referenced = assert_source_artifact_matches_sql(&with_ref).expect("assert-ref");
+    assert!(referenced.contains("s3://tepp/evidence/object"));
+    assert!(referenced.contains("protected_object_ref IS NOT DISTINCT FROM"));
 }

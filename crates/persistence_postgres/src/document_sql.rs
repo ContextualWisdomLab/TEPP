@@ -71,21 +71,16 @@ pub fn revise_document_sqls(record: &DocumentRecord) -> Result<[String; 2], Pers
 pub fn revise_document_atomic_sql(record: &DocumentRecord) -> Result<String, PersistenceError> {
     let insert = insert_document_sql(record)?;
     Ok(format!(
-        "DO $tepp$ \
-         DECLARE closed_count integer; \
-         BEGIN \
-           PERFORM 1 FROM document_record \
-            WHERE document_record_id = '{document_id}'::uuid AND system_to IS NULL \
-            FOR UPDATE NOWAIT; \
-           UPDATE document_record SET system_to = '{system_from}'::timestamptz \
-            WHERE document_record_id = '{document_id}'::uuid AND system_to IS NULL; \
-           GET DIAGNOSTICS closed_count = ROW_COUNT; \
-           IF closed_count <> 1 THEN \
-             RAISE EXCEPTION 'concurrent document revision conflict' \
-               USING ERRCODE = 'serialization_failure'; \
-           END IF; \
-           {insert}; \
-         END $tepp$",
+        "DO $tepp$ DECLARE closed_count integer; BEGIN \
+         PERFORM 1 FROM document_record WHERE document_record_id = '{document_id}'::uuid \
+         AND system_to IS NULL FOR UPDATE NOWAIT; \
+         UPDATE document_record SET system_to = '{system_from}'::timestamptz \
+         WHERE document_record_id = '{document_id}'::uuid AND system_to IS NULL; \
+         GET DIAGNOSTICS closed_count = ROW_COUNT; \
+         IF closed_count <> 1 THEN \
+         RAISE EXCEPTION 'concurrent document revision conflict' \
+         USING ERRCODE = 'serialization_failure'; END IF; \
+         {insert}; END $tepp$",
         system_from = record.system_from.to_rfc3339(),
         document_id = record.document_record_id,
     ))
