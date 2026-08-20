@@ -54,19 +54,7 @@ fn cited_interpreter_has_lower_unsupported_claim_rate_than_uncited_promotion() {
 
     let cited_rate = unsupported_claim_rate(&truth, &cited).expect("cited");
     let uncited_rate = unsupported_claim_rate(&truth, &uncited_promotion).expect("uncited");
-    let cited_expected = {
-        let mut unsupported_truth = 0_u32;
-        let mut false_support = 0_u32;
-        for (truth_label, decided_label) in truth.iter().zip(cited.iter()) {
-            if *truth_label == ClaimSupport::Unsupported {
-                unsupported_truth += 1;
-                if *decided_label == ClaimSupport::Supported {
-                    false_support += 1;
-                }
-            }
-        }
-        f64::from(false_support) / f64::from(unsupported_truth)
-    };
-    assert!((cited_rate - cited_expected).abs() < f64::EPSILON);
+    assert!((cited_rate - 0.0).abs() < f64::EPSILON);
+    assert!((uncited_rate - 1.0).abs() < f64::EPSILON);
     assert!(cited_rate < uncited_rate);
 }

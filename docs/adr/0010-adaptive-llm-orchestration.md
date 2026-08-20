@@ -1,7 +1,7 @@
 # ADR 0010 — Adaptive LLM orchestration and test-time compute
 
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — `interpretation_gateway` requires cited evidence spans and refuses interpretation-as-estimator or interpretation-as-fact; remaining adaptive routing, ablation, and live orchestrator integration remain accepted-target  
+**Implementation maturity:** partial — `tepp_api` governed router, comparable-budget ablation record, and credential-free contextual-orchestrator binding are implemented-main; the evidence-bounded `interpretation_gateway` is on the active PR; live NIM execution, learned conductor calibration, and production ablation evidence remain accepted-target  
 **Date:** 2026-08-10  
 **Supersedes:** The LLM orchestration-selection/ablation clauses previously co-located in ADR 0006. ADR 0006 remains authoritative for GPU/VRAM and model-credential separation; ADR 0015 governs autonomous repository-write/review/merge authority.
 

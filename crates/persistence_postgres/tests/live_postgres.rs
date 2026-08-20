@@ -7,14 +7,24 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
-    AuditEvent, CorpusSplitManifestRecord, DocumentRecord, LiveDocumentRepository,
-    LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
-    ModelRunRecord, ReproducibilityManifestRecord, SqlSession, apply_sql_batch,
-    assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
-    require_live_sqlx_config, reset_app_runtime_role_sql, set_session_tenant_sql,
+    AuditEvent, CorpusSplitManifestRecord, DeletionRequestRecord, DocumentRecord,
+    EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository, LiveSqlxPoolOptions,
+    MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
+    PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord, SqlSession,
+    apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
+    require_live_sqlx_config, reset_app_runtime_role_sql, select_active_analysis_document_sql,
+    set_session_tenant_sql,
 };
+use std::sync::mpsc;
+use std::sync::{Arc, Barrier};
+use std::thread;
+use std::time::Duration;
 use temporal_core::{AvailableTime, EventTime, SystemTime};
 use uuid::Uuid;
+
+const CONCURRENT_WRITERS: usize = 2;
+/// Wall-clock budget for concurrent proofs; hang rather than block the live job forever.
+const CONCURRENT_PROOF_TIMEOUT: Duration = Duration::from_secs(90);
 
 const LIVE_GATE_ENV: &str = "TEPP_LIVE_POSTGRES";
 
@@ -39,7 +49,7 @@ fn seed_tenant_and_artifact(
     source_artifact_id: Uuid,
     content_digest: &str,
 ) {
-    let (available, _valid, system) = sample_times();
+    let (_available, _valid, system) = sample_times();
     let tenant_sql = format!(
         "INSERT INTO tenant_record (tenant_record_id, tenant_status_code, system_time) \
          VALUES ('{tenant_record_id}'::uuid, 'active', '{system}'::timestamptz)",
@@ -48,7 +58,16 @@ fn seed_tenant_and_artifact(
     repo.session_mut()
         .execute(&tenant_sql)
         .expect("insert tenant_record");
+    seed_source_artifact(repo, tenant_record_id, source_artifact_id, content_digest);
+}
 
+fn seed_source_artifact(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    source_artifact_id: Uuid,
+    content_digest: &str,
+) {
+    let (available, _valid, system) = sample_times();
     let artifact_sql = format!(
         "INSERT INTO source_artifact (\
             source_artifact_id, tenant_record_id, content_sha256, source_size_bytes, \
@@ -66,37 +85,14 @@ fn seed_tenant_and_artifact(
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn live_postgres_applies_migrations_and_document_sql() {
     if !live_postgres_requested() {
         // Offline default CI and local unit lanes stay database-free.
         return;
     }
 
-    let config = require_live_sqlx_config().expect(
-        "DATABASE_URL must be set and valid when TEPP_LIVE_POSTGRES=1 (live Postgres CI gate)",
-    );
-    // Single connection so SET ROLE / tenant GUC session state survives between
-    // SqlSession::execute calls (pool acquire must reuse the same backend session).
-    let options = LiveSqlxPoolOptions::new(1, 5_000).expect("pool options");
-    let pool = open_live_sqlx_pool(&config, options)
-        .expect("live-sqlx pool must open against the CI PostgreSQL service");
-    assert!(pool.is_live());
-
-    let mut repo = LiveDocumentRepository::new(pool);
-    repo.session_mut()
-        .execute("SELECT 1")
-        .expect("SELECT 1 through live transport");
-
-    let catalog = MigrationCatalog::from_embedded().expect("embedded foundation catalog");
-    // Best-effort reset: empty service DBs lack tables/role; re-runs clean residual objects.
-    let _ = apply_sql_batch(repo.session_mut(), catalog.down_sql());
-    let _ = repo
-        .session_mut()
-        .execute("DROP ROLE IF EXISTS tepp_app_runtime");
-    let applied = repo
-        .apply_migrations(&catalog)
-        .expect("foundation+RLS migrations must apply on live PostgreSQL");
-    assert!(applied >= 1);
+    let mut repo = open_migrated_live_repo();
 
     let tenant_record_id = Uuid::now_v7();
     let document_record_id = Uuid::now_v7();
@@ -110,46 +106,15 @@ fn live_postgres_applies_migrations_and_document_sql() {
         &content_digest,
     );
 
-    let (available, valid, system) = sample_times();
-    let record = DocumentRecord {
-        document_record_id,
+    let (available, _valid, system) = sample_times();
+    prove_document_insert_revise_and_audit(
+        &mut repo,
         tenant_record_id,
-        content_digest: content_digest.clone(),
-        available_time: available,
-        valid_from: valid,
-        valid_to: None,
-        system_from: system,
-        system_to: None,
-        revision_number: 1,
-    };
-    repo.insert(&record).expect("insert document_record");
-
-    let mut revised = record.clone();
-    revised.revision_number = 2;
-    revised.system_from = SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later system");
-    revised.content_digest = "cd".repeat(32);
-    repo.revise(&revised).expect("revise document_record");
-
-    repo.submit_as_known_at(
         document_record_id,
-        &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("known_at"),
-    )
-    .expect("as-known-at select");
-    repo.submit_as_valid_at(
-        document_record_id,
-        &EventTime::parse_rfc3339("2026-01-15T00:00:00Z").expect("valid_at"),
-        &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("known_at"),
-    )
-    .expect("as-valid-at select");
-
-    let audit = AuditEvent {
-        audit_event_id: Uuid::now_v7(),
-        tenant_record_id,
-        action_code: "live_postgres_ci".into(),
-        subject_record_id: document_record_id,
-        recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
-    };
-    repo.append_audit(&audit).expect("append audit_event");
+        &content_digest,
+        available,
+        system,
+    );
 
     // Owner inserts a reproducibility manifest for the same tenant, then proves
     // digest lookup SQL remains executable on the live transport.
@@ -177,9 +142,554 @@ fn live_postgres_applies_migrations_and_document_sql() {
 
     exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
+    prove_retention_deletion_legal_hold(
+        &mut repo,
+        tenant_record_id,
+        document_record_id,
+        source_artifact_id,
+        available,
+        system,
+    );
     prove_append_only_immutability(&mut repo, &manifest);
     prove_temporal_interval_ordering(&mut repo, tenant_record_id, source_artifact_id);
+    apply_sql_timeouts(&mut repo, "3s", "30s");
+    prove_concurrent_document_writes(&mut repo);
     prove_tenant_rls_isolation(&mut repo);
+}
+
+fn prove_document_insert_revise_and_audit(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    document_record_id: Uuid,
+    content_digest: &str,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    let valid = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("valid");
+    let record = DocumentRecord {
+        document_record_id,
+        tenant_record_id,
+        content_digest: content_digest.to_owned(),
+        available_time: available,
+        valid_from: valid,
+        valid_to: None,
+        system_from: system,
+        system_to: None,
+        revision_number: 1,
+    };
+    repo.insert(&record).expect("insert document_record");
+    let mut revised = record.clone();
+    revised.revision_number = 2;
+    revised.system_from = SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later system");
+    revised.content_digest = "cd".repeat(32);
+    repo.revise(&revised).expect("revise document_record");
+    repo.submit_as_known_at(
+        document_record_id,
+        &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("known_at"),
+    )
+    .expect("as-known-at select");
+    repo.submit_as_valid_at(
+        document_record_id,
+        &EventTime::parse_rfc3339("2026-01-15T00:00:00Z").expect("valid_at"),
+        &SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("known_at"),
+    )
+    .expect("as-valid-at select");
+    let audit = AuditEvent {
+        audit_event_id: Uuid::now_v7(),
+        tenant_record_id,
+        action_code: "live_postgres_ci".into(),
+        subject_record_id: document_record_id,
+        recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
+    };
+    repo.append_audit(&audit).expect("append audit_event");
+}
+
+fn open_migrated_live_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {
+    let config = require_live_sqlx_config().expect(
+        "DATABASE_URL must be set and valid when TEPP_LIVE_POSTGRES=1 (live Postgres CI gate)",
+    );
+    let options = LiveSqlxPoolOptions::new(1, 5_000).expect("pool options");
+    let pool = open_live_sqlx_pool(&config, options)
+        .expect("live-sqlx pool must open against the CI PostgreSQL service");
+    assert!(pool.is_live());
+    let mut repo = LiveDocumentRepository::new(pool);
+    repo.session_mut()
+        .execute("SELECT 1")
+        .expect("SELECT 1 through live transport");
+    apply_sql_timeouts(&mut repo, "5s", "60s");
+    let catalog = MigrationCatalog::from_embedded().expect("embedded foundation catalog");
+    let _ = apply_sql_batch(repo.session_mut(), catalog.down_sql());
+    let _ = repo
+        .session_mut()
+        .execute("DROP ROLE IF EXISTS tepp_app_runtime");
+    let applied = repo
+        .apply_migrations(&catalog)
+        .expect("foundation+RLS migrations must apply on live PostgreSQL");
+    assert!(applied >= 1);
+    repo.assert_restore_integrity()
+        .expect("empty restored catalog must pass integrity probes");
+    repo
+}
+
+fn apply_sql_timeouts(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    lock_timeout: &str,
+    statement_timeout: &str,
+) {
+    // Fail closed instead of hanging the live job on lock or statement stalls.
+    repo.session_mut()
+        .execute(&format!("SET lock_timeout = '{lock_timeout}'"))
+        .expect("lock_timeout");
+    repo.session_mut()
+        .execute(&format!("SET statement_timeout = '{statement_timeout}'"))
+        .expect("statement_timeout");
+}
+
+fn open_writer_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {
+    let config = require_live_sqlx_config().expect("DATABASE_URL");
+    let options = LiveSqlxPoolOptions::new(1, 5_000).expect("writer pool");
+    let pool = open_live_sqlx_pool(&config, options).expect("writer pool open");
+    let mut repo = LiveDocumentRepository::new(pool);
+    apply_sql_timeouts(&mut repo, "3s", "15s");
+    repo
+}
+
+fn is_closed_write_failure(error: PersistenceError) -> bool {
+    matches!(
+        error,
+        PersistenceError::DuplicateDocumentRecord
+            | PersistenceError::ConcurrentWriteConflict
+            | PersistenceError::SqlExecutionFailed
+    )
+}
+
+fn assert_single_winner(results: Vec<Result<(), PersistenceError>>, context: &str) {
+    let successes = results.iter().filter(|result| result.is_ok()).count();
+    assert_eq!(successes, 1, "{context}: expected exactly one winner");
+    assert!(
+        results
+            .into_iter()
+            .filter_map(Result::err)
+            .all(is_closed_write_failure),
+        "{context}: losers must fail closed"
+    );
+}
+
+fn document_row_guard(document_record_id: Uuid, expected_rows: u64, expected_open: u64) -> String {
+    format!(
+        "DO $tepp$ BEGIN \
+           IF (SELECT COUNT(*) FROM document_record \
+               WHERE document_record_id = '{document_record_id}'::uuid) <> {expected_rows} THEN \
+             RAISE EXCEPTION 'unexpected document_record row count'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM document_record \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND system_to IS NULL) <> {expected_open} THEN \
+             RAISE EXCEPTION 'unexpected open document_record count'; \
+           END IF; \
+         END $tepp$"
+    )
+}
+
+fn sample_document(
+    document_record_id: Uuid,
+    tenant_record_id: Uuid,
+    content_digest: String,
+    revision_number: u64,
+    system: SystemTime,
+) -> DocumentRecord {
+    let (available, valid, _) = sample_times();
+    DocumentRecord {
+        document_record_id,
+        tenant_record_id,
+        content_digest,
+        available_time: available,
+        valid_from: valid,
+        valid_to: None,
+        system_from: system,
+        system_to: None,
+        revision_number,
+    }
+}
+
+fn join_with_timeout<T: Send + 'static>(
+    handle: thread::JoinHandle<T>,
+    budget: Duration,
+    context: &'static str,
+) -> T {
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        let _ = tx.send(handle.join());
+    });
+    match rx.recv_timeout(budget) {
+        Ok(Ok(value)) => value,
+        Ok(Err(panic_payload)) => {
+            panic!("{context}: worker thread panicked: {panic_payload:?}")
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            panic!("{context}: worker exceeded wall-clock budget")
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            panic!("{context}: worker channel disconnected")
+        }
+    }
+}
+
+fn race_identical_writes(
+    record: &DocumentRecord,
+    revise: bool,
+    context: &'static str,
+) -> Vec<Result<(), PersistenceError>> {
+    // Open pools before the barrier so a failed open cannot leave peers waiting forever.
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
+    let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
+    let handles: Vec<_> = writers
+        .into_iter()
+        .map(|mut writer| {
+            let barrier = Arc::clone(&barrier);
+            let record = record.clone();
+            thread::spawn(move || {
+                barrier.wait();
+                if revise {
+                    writer.revise(&record)
+                } else {
+                    writer.insert(&record)
+                }
+            })
+        })
+        .collect();
+    handles
+        .into_iter()
+        .map(|handle| join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, context))
+        .collect()
+}
+
+/// Concurrent first inserts and revises must leave exactly one open version.
+fn prove_concurrent_document_writes(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+) {
+    let tenant_record_id = Uuid::now_v7();
+    let first_document_id = Uuid::now_v7();
+    let first_digest = "a1".repeat(32);
+    seed_tenant_and_artifact(repo, tenant_record_id, first_document_id, &first_digest);
+    let (_, _, system) = sample_times();
+    let first = sample_document(first_document_id, tenant_record_id, first_digest, 1, system);
+    assert_single_winner(
+        race_identical_writes(&first, false, "insert thread"),
+        "concurrent first insert",
+    );
+    repo.session_mut()
+        .execute(&document_row_guard(first_document_id, 1, 1))
+        .expect("exactly one first insert row");
+
+    let revised = sample_document(
+        first_document_id,
+        tenant_record_id,
+        "b2".repeat(32),
+        2,
+        SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later"),
+    );
+    assert_single_winner(
+        race_identical_writes(&revised, true, "revise thread"),
+        "concurrent revise",
+    );
+    repo.session_mut()
+        .execute(&document_row_guard(first_document_id, 2, 1))
+        .expect("closed first version plus one open revision");
+
+    prove_missing_open_row_fails(repo, tenant_record_id);
+    prove_distinct_concurrent_inserts(repo, tenant_record_id, system);
+    prove_concurrent_append_only_reject(first_document_id);
+}
+
+fn prove_missing_open_row_fails(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+) {
+    let missing = sample_document(
+        Uuid::now_v7(),
+        tenant_record_id,
+        "c3".repeat(32),
+        2,
+        SystemTime::parse_rfc3339("2026-03-01T00:00:00Z").expect("missing"),
+    );
+    let missing_error = repo.revise(&missing).expect_err("missing open row");
+    assert!(
+        is_closed_write_failure(missing_error),
+        "revise without an open row must fail closed"
+    );
+}
+
+fn prove_distinct_concurrent_inserts(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    system: SystemTime,
+) {
+    let pairs: Vec<(Uuid, String)> = (0..CONCURRENT_WRITERS)
+        .map(|index| (Uuid::now_v7(), format!("{index:02x}") + &"e5".repeat(31)))
+        .collect();
+    for (document_record_id, digest) in &pairs {
+        seed_source_artifact(repo, tenant_record_id, *document_record_id, digest);
+    }
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
+    let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
+    let handles: Vec<_> = writers
+        .into_iter()
+        .zip(pairs)
+        .map(|(mut writer, (document_record_id, digest))| {
+            let barrier = Arc::clone(&barrier);
+            let record = sample_document(document_record_id, tenant_record_id, digest, 1, system);
+            thread::spawn(move || {
+                barrier.wait();
+                writer.insert(&record)
+            })
+        })
+        .collect();
+    for handle in handles {
+        join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, "distinct insert thread")
+            .expect("independent document inserts must all succeed");
+    }
+}
+
+fn prove_concurrent_append_only_reject(source_artifact_id: Uuid) {
+    let artifact_update = format!(
+        "UPDATE source_artifact SET media_type_code = 'text/hostile' \
+         WHERE source_artifact_id = '{source_artifact_id}'::uuid"
+    );
+    let writers: Vec<_> = (0..CONCURRENT_WRITERS)
+        .map(|_| open_writer_repo())
+        .collect();
+    let barrier = Arc::new(Barrier::new(CONCURRENT_WRITERS));
+    let handles: Vec<_> = writers
+        .into_iter()
+        .map(|mut writer| {
+            let barrier = Arc::clone(&barrier);
+            let sql = artifact_update.clone();
+            thread::spawn(move || {
+                barrier.wait();
+                writer.session_mut().execute(&sql)
+            })
+        })
+        .collect();
+    for handle in handles {
+        assert!(
+            join_with_timeout(handle, CONCURRENT_PROOF_TIMEOUT, "mutation thread").is_err(),
+            "concurrent append-only UPDATE must fail"
+        );
+    }
+}
+
+/// Legal hold blocks completed deletion; tombstones block restore and analysis.
+#[allow(clippy::too_many_lines)]
+fn prove_retention_deletion_legal_hold(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    held_document_id: Uuid,
+    source_artifact_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    let policy = seed_retention_policy(repo, tenant_record_id, available, system);
+    let hold =
+        seed_document_legal_hold(repo, tenant_record_id, held_document_id, available, system);
+    prove_hold_blocks_completed_deletion(repo, &policy, &hold, held_document_id, available, system);
+    prove_tombstone_blocks_restore_and_analysis(
+        repo,
+        tenant_record_id,
+        source_artifact_id,
+        &policy,
+        available,
+        system,
+    );
+}
+
+fn seed_retention_policy(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) -> RetentionPolicyRecord {
+    let policy = RetentionPolicyRecord {
+        retention_policy_id: Uuid::now_v7(),
+        tenant_record_id,
+        data_class_code: "raw_source".into(),
+        processing_purpose_code: "psychometric_analysis".into(),
+        retention_period_days: 365,
+        policy_status_code: "active".into(),
+        authority_citation: "adr-0009".into(),
+        system_time: system,
+        system_to: None,
+        available_time: available,
+    };
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_record_id))
+        .expect("bind tenant session before lifecycle mutations");
+    repo.insert_retention_policy(&policy)
+        .expect("insert retention_policy");
+    policy
+}
+
+fn seed_document_legal_hold(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    held_document_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) -> LegalHoldRecord {
+    let hold = LegalHoldRecord {
+        legal_hold_id: Uuid::now_v7(),
+        tenant_record_id,
+        hold_scope_code: "document".into(),
+        held_document_id: Some(held_document_id),
+        hold_authority_code: "contract".into(),
+        hold_status_code: "active".into(),
+        authority_citation: "hold-authority".into(),
+        system_time: system,
+        system_to: None,
+        available_time: available,
+    };
+    repo.insert_legal_hold(&hold).expect("insert legal_hold");
+    hold
+}
+
+fn prove_hold_blocks_completed_deletion(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    policy: &RetentionPolicyRecord,
+    hold: &LegalHoldRecord,
+    held_document_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    let mut held_completion = DeletionRequestRecord {
+        deletion_request_id: Uuid::now_v7(),
+        tenant_record_id: policy.tenant_record_id,
+        retention_policy_id: policy.retention_policy_id,
+        target_document_id: held_document_id,
+        target_data_class_code: "raw_source".into(),
+        processing_purpose_code: "psychometric_analysis".into(),
+        deletion_kind_code: "identity_tombstone".into(),
+        request_status_code: "completed".into(),
+        legal_hold_id: None,
+        system_time: system,
+        available_time: available,
+    };
+    assert_eq!(
+        repo.insert_completed_deletion_request(
+            &held_completion,
+            policy,
+            std::slice::from_ref(hold)
+        ),
+        Err(PersistenceError::LegalHoldBlocksDeletion),
+        "application layer must refuse completed deletion under an active hold"
+    );
+    assert_eq!(
+        repo.insert_deletion_request(&held_completion, policy),
+        Err(PersistenceError::LegalHoldBlocksDeletion),
+        "database trigger must refuse completed deletion under an active hold"
+    );
+    held_completion.deletion_request_id = Uuid::now_v7();
+    held_completion.request_status_code = "blocked_by_hold".into();
+    held_completion.legal_hold_id = Some(hold.legal_hold_id);
+    repo.insert_deletion_request(&held_completion, policy)
+        .expect("blocked_by_hold request must persist");
+}
+
+fn prove_tombstone_blocks_restore_and_analysis(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    source_artifact_id: Uuid,
+    policy: &RetentionPolicyRecord,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    let unheld_document_id = Uuid::now_v7();
+    let unheld = DocumentRecord {
+        document_record_id: unheld_document_id,
+        tenant_record_id,
+        content_digest: "ef".repeat(32),
+        available_time: available,
+        valid_from: EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("valid"),
+        valid_to: None,
+        system_from: system,
+        system_to: None,
+        revision_number: 1,
+    };
+    repo.session_mut()
+        .execute(&format!(
+            "INSERT INTO document_record (                document_record_id, tenant_record_id, source_artifact_id, content_sha256,                 language_profile_code, assertion_time, document_time, valid_from, valid_to,                 system_from, system_to, available_time, revision_number             ) VALUES (                '{unheld_document_id}'::uuid, '{tenant_record_id}'::uuid,                 '{source_artifact_id}'::uuid, '{digest}', 'und', NULL, NULL,                 '{valid}'::timestamptz, NULL, '{system}'::timestamptz, NULL,                 '{available}'::timestamptz, 1             )",
+            digest = unheld.content_digest,
+            valid = unheld.valid_from.to_rfc3339(),
+            system = system.to_rfc3339(),
+            available = available.to_rfc3339(),
+        ))
+        .expect("insert unheld document_record");
+
+    let completed = DeletionRequestRecord {
+        deletion_request_id: Uuid::now_v7(),
+        tenant_record_id,
+        retention_policy_id: policy.retention_policy_id,
+        target_document_id: unheld_document_id,
+        target_data_class_code: "raw_source".into(),
+        processing_purpose_code: "psychometric_analysis".into(),
+        deletion_kind_code: "identity_tombstone".into(),
+        request_status_code: "completed".into(),
+        legal_hold_id: None,
+        system_time: system,
+        available_time: available,
+    };
+    repo.insert_completed_deletion_request(&completed, policy, &[])
+        .expect("completed deletion without a matching hold");
+
+    let tombstone = EvidenceTombstoneRecord {
+        evidence_tombstone_id: Uuid::now_v7(),
+        tenant_record_id,
+        tombstoned_document_id: unheld_document_id,
+        deletion_request_id: completed.deletion_request_id,
+        evidence_digest: "cd".repeat(32),
+        target_data_class_code: "raw_source".into(),
+        deletion_kind_code: "identity_tombstone".into(),
+        reproduction_status_code: "unavailable".into(),
+        system_time: system,
+        available_time: available,
+    };
+    repo.insert_evidence_tombstone(&tombstone)
+        .expect("insert evidence_tombstone");
+
+    let restore = format!(
+        "INSERT INTO document_record (            document_record_id, tenant_record_id, source_artifact_id, content_sha256,             language_profile_code, assertion_time, document_time, valid_from, valid_to,             system_from, system_to, available_time, revision_number         ) VALUES (            '{unheld_document_id}'::uuid, '{tenant_record_id}'::uuid,             '{source_artifact_id}'::uuid, '{digest}', 'und', NULL, NULL,             '{valid}'::timestamptz, NULL, '2026-03-01T00:00:00Z'::timestamptz, NULL,             '{available}'::timestamptz, 2         )",
+        digest = unheld.content_digest,
+        valid = unheld.valid_from.to_rfc3339(),
+        available = available.to_rfc3339(),
+    );
+    assert!(
+        repo.session_mut().execute(&restore).is_err(),
+        "tombstoned document identities must not be restored"
+    );
+
+    let eligibility = format!(
+        "DO $tepp$ BEGIN            IF EXISTS (             SELECT 1 FROM document_record              WHERE document_record_id = '{unheld_document_id}'::uuid                AND system_to IS NULL                AND NOT EXISTS (                 SELECT 1 FROM evidence_tombstone                  WHERE tombstoned_document_id = document_record.document_record_id                    AND deletion_kind_code IN ('logical_revocation', 'identity_tombstone')               )           ) THEN              RAISE EXCEPTION 'tombstoned document remained analysis-eligible';            END IF;            IF EXISTS (             SELECT 1 FROM evidence_tombstone              WHERE evidence_tombstone_id = '{tombstone}'::uuid                AND reproduction_status_code <> 'unavailable'           ) THEN              RAISE EXCEPTION 'identity tombstone must record unavailable reproduction';            END IF;          END $tepp$",
+        tombstone = tombstone.evidence_tombstone_id,
+    );
+    repo.session_mut()
+        .execute(&eligibility)
+        .expect("tombstoned evidence must be analysis-ineligible");
+    repo.submit_active_analysis_document(unheld_document_id)
+        .expect("active-analysis select must remain executable");
+    let exclusion = format!(
+        "DO $tepp$ BEGIN \
+           IF EXISTS ({select}) THEN \
+             RAISE EXCEPTION 'active-analysis select returned a tombstoned document'; \
+           END IF; \
+         END $tepp$",
+        select = select_active_analysis_document_sql(unheld_document_id),
+    );
+    repo.session_mut()
+        .execute(&exclusion)
+        .expect("active-analysis select must exclude tombstones");
 }
 
 /// Append-only triggers must reject UPDATE/DELETE on identity tables.
