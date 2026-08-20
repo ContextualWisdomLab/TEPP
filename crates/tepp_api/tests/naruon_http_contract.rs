@@ -57,6 +57,7 @@ fn table_access_and_non_https_origins_fail_closed() {
     let run = sample_run();
     for origin in [
         "",
+        "https://",
         "postgres://tepp.example.test/tepp",
         "postgresql://tepp.example.test/tepp",
         "jdbc:postgresql://tepp.example.test/tepp",
