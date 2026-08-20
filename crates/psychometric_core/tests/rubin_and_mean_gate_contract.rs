@@ -53,6 +53,57 @@ fn rubin_t_mean_recovers_true_loading_and_is_not_a_point_estimate_alias() {
 }
 
 #[test]
+fn rubin_t_noisy_truth_reports_bias_rmse_and_interval_coverage() {
+    let true_loading = 0.8_f64;
+    let factors: Vec<f64> = (0..24).map(|index| f64::from(index) - 11.5).collect();
+    let mut recovered = Vec::new();
+    let mut covered = 0_usize;
+
+    for replicate in 0..40 {
+        let mut draws = Vec::new();
+        for draw in 0..8 {
+            let phase = f64::from(replicate) * 0.37 + f64::from(draw) * 0.91;
+            draws.push(
+                factors
+                    .iter()
+                    .enumerate()
+                    .map(|(index, factor)| {
+                        let position =
+                            (f64::from(u32::try_from(index).expect("tiny")) + 1.0) * 0.73 + phase;
+                        0.4 + true_loading * factor
+                            + 0.25 * position.sin()
+                            + 0.12 * (1.7 * position).cos()
+                    })
+                    .collect::<Vec<f64>>(),
+            );
+        }
+
+        let combined =
+            combine_draw_level_ols_loadings(&factors, &draws, IndicatorKind::LogisticNormal)
+                .expect("noisy Rubin draw");
+        assert!(combined.within_variance > 0.0);
+        let half_width = 1.96 * combined.total_variance.sqrt();
+        if (combined.mean_loading - true_loading).abs() <= half_width {
+            covered += 1;
+        }
+        recovered.push(combined.mean_loading);
+    }
+
+    let mean = recovered.iter().sum::<f64>() / recovered.len() as f64;
+    let bias = mean - true_loading;
+    let rmse = (recovered
+        .iter()
+        .map(|estimate| (estimate - true_loading).powi(2))
+        .sum::<f64>()
+        / recovered.len() as f64)
+        .sqrt();
+    let coverage = covered as f64 / recovered.len() as f64;
+    assert!(bias.abs() < 0.01, "loading bias {bias}");
+    assert!(rmse < 0.02, "loading RMSE {rmse}");
+    assert!(coverage >= 0.9, "95% interval coverage {coverage}");
+}
+
+#[test]
 fn metric_status_matches_hash84_metric_and_refuses_latent_means() {
     assert_eq!(
         MeanInvarianceStatus::Metric.as_measurement_invariance_wire_name(),

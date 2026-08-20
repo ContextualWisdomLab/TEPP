@@ -515,7 +515,7 @@ fn discrete_process_noise_recovers_driver_equation_three() {
 fn within_residual_event_time_log_rate_beats_pooled_levels() {
     let true_drift = -0.3_f64;
     let mut rows = Vec::new();
-    for (cluster, person_mean, start) in [(1_u64, 8.0_f64, 1.0_f64), (2, -5.0, 1.4)] {
+    for (cluster, person_mean, start) in [(1_u64, 8.0_f64, 1.0_f64), (2, 5.0, 1.4)] {
         for step in 0..6 {
             let time = f64::from(step);
             rows.push(ClusteredEventScore {

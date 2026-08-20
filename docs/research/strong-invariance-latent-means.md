@@ -13,7 +13,7 @@ This slice does **not** import the unpublished `measurement_invariance` crate on
 - Strict (also equal residual variance) also licenses latent means. Residual invariance is **not** required for those means.
 - Two-observation series have no residual degrees of freedom. OLS residual variance is then identically `0` and is not an estimated residual. Those series cap at strong/scalar and still license means.
 - This is two-group OLS, not MGCFA, not partial invariance, and not alignment optimization.
-- Meredith (1993) names weak/strong/strict are used only as conventional labels. That PDF was not opened (Unpaywall/OpenAlex/Semantic Scholar 2026-08-19T22:15Z: closed; Springer `content/pdf` is HTML 200). Do not cite Meredith equations as having been read. Putnick and Bornstein (2016) cite Meredith for residual invariance as part of *full factorial invariance*; that citation is not a reading of Meredith.
+- The weak/strong/strict labels remain conventional labels here. Meredith (1993) is listed for terminology only; its PDF was not opened. Putnick and Bornstein (2016) cite Meredith for residual invariance as part of *full factorial invariance*; that citation is not a reading of Meredith.
 
 ## Authoritative sources used for the mean gate
 
@@ -22,6 +22,14 @@ Putnick, D. L., & Bornstein, M. H. (2016). Measurement invariance conventions an
 PMC author manuscript (PMC5145197) opened 2026-08-19T22:15Z from https://pmc.ncbi.nlm.nih.gov/articles/PMC5145197/. The NIHMS PDF endpoints returned HTML/500 on this cycle; the PMC HTML full text is the opened copy.
 
 Putnick and Bornstein write that measurement invariance is a prerequisite to comparing group means. Metric invariance is equivalence of item loadings: each item contributes to the latent construct to a similar degree across groups. Scalar invariance is equivalence of item intercepts after metric: “mean differences in the latent construct capture all mean differences in the shared variance of the items.” After those steps, “the researcher is free to compare group means on the latent factors.” Residual invariance “is not a prerequisite for testing mean differences because the residuals are not part of the latent factor” (they cite Vandenberg & Lance, 2000, unread). Configural, metric, and scalar “are required prior to group mean comparisons.” This crate’s `#84` `metric` / `scalar` split follows that terminology. The executable map remains two-group OLS, not their multiple-group CFA.
+
+Steenkamp, J.-B. E. M., & Baumgartner, H. (1998). Assessing measurement invariance in cross-national consumer research. *Journal of Consumer Research, 25*(1), 78–90. https://doi.org/10.1086/209528
+
+The Oxford Academic article page and abstract were opened 2026-08-20. Steenkamp and Baumgartner connect sequential measurement-invariance requirements to when comparisons of construct means are meaningful and illustrate the procedure with multisample factor models. This is the primary source for the gate's comparison-purpose boundary; the implementation remains a narrower two-group OLS contract.
+
+Baumgartner, H., & Steenkamp, J.-B. E. M. (1998). Multi-group latent variable models for varying numbers of items and factors with cross-national and longitudinal applications. *Marketing Letters, 9*, 21–35. https://doi.org/10.1023/A:1007911903032
+
+The Springer Nature article page and abstract were opened 2026-08-20. Its simulation and empirical study concerns estimates of differences between latent means. In this repository, subtracting the two-group model \(y=ν+λ f+e\) under equal loading and intercept gives \((\bar y_c-\bar y_r)/\lambda\); that algebra is an explicit derivation of this OLS slice, not a claim that the source states the same implementation formula.
 
 Opened sources that constrain the surrounding longitudinal/invariance stance:
 
@@ -41,6 +49,8 @@ Per group, \(y=\nu+\lambda f+e\) is fit by OLS. Status is:
 - strict when both groups have residual degrees of freedom and loadings, intercepts, and residual variances match.
 
 The latent-mean difference is \((\bar y_c-\bar y_r)/\lambda\) with \(\lambda\) the midpoint of the two loadings, and only after strong or strict.
+
+The formula follows by subtracting the group means of \(y=\nu+\lambda f+e\) after the equal-loading/equal-intercept restrictions have been accepted; the cited multi-group latent-mean study supplies the comparison target, while this document records the narrower OLS derivation.
 
 ## Verification
 

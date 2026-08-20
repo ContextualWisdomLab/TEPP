@@ -62,8 +62,8 @@ pub fn ordinary_least_squares_fit(
     }
     let intercept = require_finite(outcome_sum / n - slope * (predictor_sum / n))?;
     let mut sse = 0.0_f64;
-    for (&pred, &out) in predictor.iter().zip(outcome) {
-        let residual = out - (intercept + slope * pred);
+    for (&pred, &out) in pred_dev.iter().zip(&out_dev) {
+        let residual = out - slope * pred;
         sse += residual * residual;
     }
     let residual_variance = if n > 2.0 {

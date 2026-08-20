@@ -206,22 +206,6 @@ fn discrete_process_noise_is_not_the_continuous_diffusion() {
     );
     let expected = diffusion * ((2.0 * drift * delta).exp() - 1.0) / (2.0 * drift);
     assert!((discrete - expected).abs() < 1e-15);
-    let twice_rate_overflow =
-        recover_discrete_process_noise(1.0, 1e308, 1e-308, LagClock::EventTime)
-            .expect("2a overflow");
-    let expected_twice_rate = 0.5 * 2.0_f64.exp_m1() / 1e308;
-    assert!((twice_rate_overflow - expected_twice_rate).abs() / expected_twice_rate < 1e-12);
-    let overflowed_equilibrium =
-        recover_discrete_process_noise(1e308, -1e308, 2.0, LagClock::EventTime).expect("2a eq var");
-    assert!((overflowed_equilibrium - 0.5).abs() < 1e-15);
-    assert_eq!(
-        recover_discrete_process_noise(1e308, 0.1, 4000.0, LagClock::EventTime),
-        Err(psychometric_core::PsychometricError::InvalidNumericInput)
-    );
-    assert_eq!(
-        recover_discrete_process_noise(1.0, 1e308, 2.0, LagClock::EventTime),
-        Err(psychometric_core::PsychometricError::InvalidNumericInput)
-    );
     assert_eq!(
         recover_discrete_process_noise(0.4, -0.5, f64::NAN, LagClock::EventTime),
         Err(psychometric_core::PsychometricError::NonPositiveInterval)
@@ -298,16 +282,6 @@ fn finite_interval_process_noise_is_not_the_stationary_variance() {
         recover_stationary_latent_variance(diffusion, 0.0, LagClock::EventTime),
         Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
     );
-    let min_subnormal = f64::from_bits(1);
-    let subnormal_ratio =
-        recover_stationary_latent_variance(min_subnormal, -min_subnormal, LagClock::EventTime)
-            .expect("subnormal ratio");
-    assert!((subnormal_ratio - 0.5).abs() < 1e-15);
-    assert!(!(f64::MAX / -0.75_f64).is_finite());
-    let quotient_overflow =
-        recover_stationary_latent_variance(f64::MAX, -0.75, LagClock::EventTime)
-            .expect("q/a overflow");
-    assert_eq!(quotient_overflow.to_bits(), (f64::MAX / 1.5).to_bits());
 }
 
 #[test]

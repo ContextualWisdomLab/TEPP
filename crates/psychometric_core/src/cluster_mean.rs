@@ -400,6 +400,10 @@ mod tests {
             Err(PsychometricError::InvalidWeight)
         );
         assert_eq!(
+            kish_effective_sample_size(&[f64::MAX, f64::MAX]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
             recover_kish_weighted_slope(&[0.0], &[1.0], &[1.0]),
             Err(PsychometricError::InvalidNumericInput)
         );
@@ -426,6 +430,10 @@ mod tests {
         assert_eq!(
             recover_kish_weighted_slope(&[1.0, 1.0], &[2.0, 3.0], &[1.0, 1.0]),
             Err(PsychometricError::SingularDesign)
+        );
+        assert_eq!(
+            recover_kish_weighted_slope(&[0.0, f64::MAX], &[0.0, f64::MAX], &[1.0, 1.0]),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 }
