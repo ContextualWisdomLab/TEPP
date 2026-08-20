@@ -10,11 +10,7 @@ fn event_time(value: &str) -> EventTime {
     EventTime::parse_rfc3339(value).expect("event time")
 }
 
-fn assignment(
-    member: MemberId,
-    group: GroupId,
-    role: MembershipRole,
-) -> MembershipAssignment {
+fn assignment(member: MemberId, group: GroupId, role: MembershipRole) -> MembershipAssignment {
     MembershipAssignment::new(
         member,
         group,
