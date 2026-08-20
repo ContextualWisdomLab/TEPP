@@ -128,9 +128,7 @@ fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
         || host.contains('/')
         || host.contains('?')
         || host.contains('#')
-        || host
-            .chars()
-            .any(|ch| ch.is_control() || matches!(ch, '\'' | ';' | '\\' | ' '))
+        || host.chars().any(|ch| matches!(ch, '\'' | ';' | '\\' | ' '))
     {
         return Err(ApiError::InvalidWirePayload);
     }
@@ -310,6 +308,30 @@ mod tests {
         assert_eq!(
             naruon_may_claim_tepp_inference("other_method"),
             Err(ApiError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn naruon_export_exchange_covers_both_purpose_gate_arms() {
+        let allowed = crate::authorization::ExportAuthorizationRequest {
+            tenant_workspace_id: "naruon-tenant-workspace-demo".into(),
+            principal_id: "naruon-service".into(),
+            purpose: crate::authorization::AnalyticalPurpose::ModularServiceConsumer,
+            artifact_id: "tepp-export-demo-001".into(),
+            includes_source_text: false,
+        };
+        assert!(
+            super::naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-001")
+                .is_ok()
+        );
+
+        let denied = crate::authorization::ExportAuthorizationRequest {
+            purpose: crate::authorization::AnalyticalPurpose::OperationalMonitoring,
+            ..allowed
+        };
+        assert_eq!(
+            super::naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-002"),
+            Err(ApiError::AuthorizationDenied)
         );
     }
 }
