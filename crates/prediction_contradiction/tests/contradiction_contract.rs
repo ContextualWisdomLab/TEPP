@@ -136,6 +136,17 @@ fn evidence_available_after_cutoff_is_ineligible() {
 }
 
 #[test]
+fn evidence_available_at_cutoff_is_eligible() {
+    let predicted = closed_event_interval(0, 10);
+    let observed = closed_event_interval(0, 10);
+    let boundary = "2026-01-03T00:00:00Z";
+    assert_eq!(
+        refuse_promotion(&predicted, &observed, available(boundary), cutoff(boundary),),
+        Ok(())
+    );
+}
+
+#[test]
 fn half_open_intervals_are_not_allen_inputs() {
     let predicted = TemporalInterval::bounded(
         TemporalBoundary::Included(event_at(0)),
@@ -146,6 +157,27 @@ fn half_open_intervals_are_not_allen_inputs() {
     let observed = closed_event_interval(20, 30);
     assert_eq!(
         intervals_contradict(&predicted, &observed),
+        Err(PredictionContradictionError::InvalidIntervalPayload)
+    );
+
+    let observed_half_open = TemporalInterval::bounded(
+        TemporalBoundary::Included(event_at(20)),
+        TemporalBoundary::Excluded(event_at(30)),
+        TemporalPrecision::Second,
+    )
+    .expect("half-open interval is representable");
+    let (observed_available, knowledge_cutoff) = eligible_clocks();
+    assert_eq!(
+        intervals_contradict(&closed_event_interval(0, 10), &observed_half_open),
+        Err(PredictionContradictionError::InvalidIntervalPayload)
+    );
+    assert_eq!(
+        refuse_promotion(
+            &closed_event_interval(0, 10),
+            &observed_half_open,
+            observed_available,
+            knowledge_cutoff,
+        ),
         Err(PredictionContradictionError::InvalidIntervalPayload)
     );
 }
