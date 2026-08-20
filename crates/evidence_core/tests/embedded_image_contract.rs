@@ -23,6 +23,7 @@ fn data_uri_recovers_exact_span_and_media_type() {
         refuse_base64_image_as_lexical_text(document.text()),
         Err(EvidenceError::EmbeddedImageIsNotLexicalText)
     );
+    refuse_base64_image_as_lexical_text("data:image/png").expect("incomplete image");
     refuse_base64_image_as_lexical_text("Before the figure.").expect("plain text");
 }
 
@@ -38,5 +39,13 @@ fn documents_without_images_and_empty_payloads_fail_closed() {
     assert_eq!(
         refuse_base64_image_as_lexical_text(""),
         Err(EvidenceError::InvalidWirePayload)
+    );
+    let empty_payload = "data:image/png;base64,";
+    let empty_artifact = SourceArtifact::from_bytes(empty_payload.as_bytes()).expect("artifact");
+    let empty_document =
+        DocumentRecord::from_text(empty_artifact.id(), empty_payload).expect("document");
+    assert_eq!(
+        embedded_image_units(&empty_document),
+        Err(EvidenceError::EmptySourceSpan)
     );
 }
