@@ -56,7 +56,7 @@ fn pareto_front_selects_known_truth_k_with_computed_rmse() {
 }
 
 #[test]
-fn empty_or_fully_dominated_sets_abstain() {
+fn empty_candidate_sets_abstain() {
     assert_eq!(
         select_candidate_k(&[]),
         Err(ModelSelectionError::EmptyCandidateSet)

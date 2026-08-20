@@ -14,8 +14,6 @@ pub enum ModelSelectionError {
     EmptyCandidateSet,
     /// An LLM vote was asked to define the numerical optimum.
     LlmVoteIsNotStatisticalAuthority,
-    /// Every statistical candidate was dominated or otherwise inadmissible.
-    NoAdmissibleCandidate,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -25,7 +23,6 @@ impl fmt::Display for ModelSelectionError {
             Self::InvalidDiagnostic => "invalid model-selection diagnostic",
             Self::EmptyCandidateSet => "empty model-selection candidate set",
             Self::LlmVoteIsNotStatisticalAuthority => "llm vote is not statistical authority",
-            Self::NoAdmissibleCandidate => "no admissible model-selection candidate",
         };
         formatter.write_str(message)
     }
@@ -55,10 +52,6 @@ mod tests {
             (
                 ModelSelectionError::LlmVoteIsNotStatisticalAuthority,
                 "llm vote is not statistical authority",
-            ),
-            (
-                ModelSelectionError::NoAdmissibleCandidate,
-                "no admissible model-selection candidate",
             ),
         ] {
             assert_eq!(error.to_string(), message);

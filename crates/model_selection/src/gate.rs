@@ -12,10 +12,8 @@ use crate::{ModelCandidate, ModelSelectionError};
 /// # Errors
 ///
 /// Returns [`ModelSelectionError::EmptyCandidateSet`] when no candidates are
-/// supplied, [`ModelSelectionError::LlmVoteIsNotStatisticalAuthority`] when
-/// every candidate is an LLM vote, or
-/// [`ModelSelectionError::NoAdmissibleCandidate`] when no statistical
-/// candidate survives the Pareto filter.
+/// supplied or [`ModelSelectionError::LlmVoteIsNotStatisticalAuthority`] when
+/// every candidate is an LLM vote.
 pub fn select_candidate_k(candidates: &[ModelCandidate]) -> Result<u32, ModelSelectionError> {
     if candidates.is_empty() {
         return Err(ModelSelectionError::EmptyCandidateSet);
@@ -32,19 +30,11 @@ pub fn select_candidate_k(candidates: &[ModelCandidate]) -> Result<u32, ModelSel
         .copied()
         .filter(|candidate| candidate.is_statistically_supported())
         .collect();
-    if statistical.is_empty() {
-        return Err(ModelSelectionError::NoAdmissibleCandidate);
-    }
-
     let mut front: Vec<ModelCandidate> = statistical
         .iter()
         .copied()
         .filter(|candidate| !statistical.iter().any(|other| other.dominates(*candidate)))
         .collect();
-    if front.is_empty() {
-        return Err(ModelSelectionError::NoAdmissibleCandidate);
-    }
-
     front.sort_by(|left, right| {
         let ll_ord = right
             .held_out_log_likelihood()
