@@ -61,7 +61,10 @@ impl ModelCandidate {
     /// Return whether this candidate carries finite statistical diagnostics.
     #[must_use]
     pub const fn is_statistically_supported(self) -> bool {
-        self.held_out_log_likelihood.is_some() && self.complexity.is_some() && !self.llm_vote_only
+        match (self.held_out_log_likelihood, self.complexity) {
+            (Some(_), Some(_)) => !self.llm_vote_only,
+            _ => false,
+        }
     }
 
     /// Held-out log-likelihood when the candidate is statistically supported.
@@ -85,16 +88,12 @@ impl ModelCandidate {
     /// Return whether `self` Pareto-dominates `other` on likelihood and complexity.
     #[must_use]
     pub fn dominates(self, other: Self) -> bool {
-        let Some(self_ll) = self.held_out_log_likelihood else {
-            return false;
-        };
-        let Some(self_complexity) = self.complexity else {
-            return false;
-        };
-        let Some(other_ll) = other.held_out_log_likelihood else {
-            return false;
-        };
-        let Some(other_complexity) = other.complexity else {
+        let (Some(self_ll), Some(self_complexity), Some(other_ll), Some(other_complexity)) = (
+            self.held_out_log_likelihood,
+            self.complexity,
+            other.held_out_log_likelihood,
+            other.complexity,
+        ) else {
             return false;
         };
         let no_worse = self_ll >= other_ll && self_complexity <= other_complexity;
@@ -132,6 +131,14 @@ mod tests {
         );
         assert_eq!(
             ModelCandidate::statistical(2, -1.0, -0.1),
+            Err(ModelSelectionError::InvalidDiagnostic)
+        );
+        assert_eq!(
+            ModelCandidate::statistical(2, f64::NAN, 1.0),
+            Err(ModelSelectionError::InvalidDiagnostic)
+        );
+        assert_eq!(
+            ModelCandidate::statistical(2, -1.0, f64::INFINITY),
             Err(ModelSelectionError::InvalidDiagnostic)
         );
     }

@@ -6,8 +6,8 @@ use crate::{ModelCandidate, ModelSelectionError};
 ///
 /// LLM-only candidates are ignored as recommenders and never become the
 /// numerical optimum. Among non-dominated statistical candidates the gate
-/// prefers higher held-out log-likelihood, then lower complexity, then
-/// smaller `K`.
+/// prefers higher held-out log-likelihood, then smaller `K`; complexity is
+/// applied while constructing the Pareto front.
 ///
 /// # Errors
 ///
@@ -42,13 +42,6 @@ pub fn select_candidate_k(candidates: &[ModelCandidate]) -> Result<u32, ModelSel
             .unwrap_or(std::cmp::Ordering::Equal);
         if ll_ord != std::cmp::Ordering::Equal {
             return ll_ord;
-        }
-        let complexity_ord = left
-            .complexity()
-            .partial_cmp(&right.complexity())
-            .unwrap_or(std::cmp::Ordering::Equal);
-        if complexity_ord != std::cmp::Ordering::Equal {
-            return complexity_ord;
         }
         left.candidate_k().cmp(&right.candidate_k())
     });
@@ -93,7 +86,16 @@ mod tests {
     fn gate_helpers_cover_local_branches() {
         let a = ModelCandidate::statistical(2, -30.0, 8.0).expect("a");
         let b = ModelCandidate::statistical(4, -30.0, 8.0).expect("b");
+        assert_eq!(
+            select_candidate_k(&[]),
+            Err(ModelSelectionError::EmptyCandidateSet)
+        );
         assert_eq!(select_candidate_k(&[a, b]).expect("tie"), 2);
+        let higher_likelihood = ModelCandidate::statistical(8, -20.0, 9.0).expect("likelihood");
+        assert_eq!(
+            select_candidate_k(&[a, higher_likelihood]).expect("likelihood tie-break"),
+            8
+        );
 
         assert_eq!(
             selected_k_root_mean_square_error(&[], 4),
@@ -106,6 +108,12 @@ mod tests {
         assert_eq!(
             selected_k_root_mean_square_error(&[1], 4),
             Err(ModelSelectionError::InvalidDiagnostic)
+        );
+        assert!(
+            selected_k_root_mean_square_error(&[4], 4)
+                .expect("valid rmse")
+                .abs()
+                < f64::EPSILON
         );
         assert_eq!(
             select_candidate_k(&[ModelCandidate::llm_vote_only(3)]),

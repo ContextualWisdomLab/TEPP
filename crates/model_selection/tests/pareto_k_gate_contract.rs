@@ -22,6 +22,10 @@ fn non_positive_k_and_non_finite_diagnostics_fail_closed() {
         ModelCandidate::statistical(3, -10.0, f64::INFINITY),
         Err(ModelSelectionError::InvalidDiagnostic)
     );
+    assert_eq!(
+        ModelCandidate::statistical(3, -10.0, -0.1),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
 }
 
 #[test]
@@ -53,6 +57,18 @@ fn pareto_front_selects_known_truth_k_with_computed_rmse() {
     };
     assert!((rmse - expected).abs() < f64::EPSILON);
     assert!(rmse < 0.5);
+    assert_eq!(
+        select_candidate_k(&[candidate(2, -30.0, 8.0), candidate(4, -30.0, 8.0)]),
+        Ok(2)
+    );
+    assert_eq!(
+        selected_k_root_mean_square_error(&[], truth_k),
+        Err(ModelSelectionError::EmptyCandidateSet)
+    );
+    assert_eq!(
+        selected_k_root_mean_square_error(&[selected], 1),
+        Err(ModelSelectionError::NonPositiveCandidateK)
+    );
 }
 
 #[test]
