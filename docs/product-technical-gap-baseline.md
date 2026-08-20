@@ -144,8 +144,11 @@ Checks, and branch rules immediately before every mutation.
 The exact-head sweep at this snapshot found no unresolved review threads. It
 also found the current Strix failure on #146 and #148: both reports contained
 `Vulnerabilities 0` and failed only because the local Caido guest bootstrap
-could not connect to `127.0.0.1:48080`; this is tracked for central workflow
-repair in [ContextualWisdomLab/.github#1181](https://github.com/ContextualWisdomLab/.github/pull/1181).
+could not connect to `127.0.0.1:48080`. The superseded leaf repair
+`ContextualWisdomLab/.github#1181` is closed; the canonical owner repair is
+[ContextualWisdomLab/.github#1153](https://github.com/ContextualWisdomLab/.github/pull/1153),
+currently at exact head `a82b8012be5d57f99c1a2b029f08837d4d10d564` with the
+diagnostic-disclosure fix locally verified and hosted Checks still settling.
 PRs #164, #165, and #177 had queued required Checks at this snapshot. These
 observations are evidence, not merge authorization.
 
