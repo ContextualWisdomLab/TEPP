@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-20 20:23 KST
+**Snapshot:** 2026-08-20 20:31 KST
 **Protected-main evidence:** `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`
 
 ## Purpose
@@ -53,10 +53,10 @@ API at snapshot time. These values do not authorize a merge by themselves.
 
 | PR | Head | Base | Merge state | Review decision | Current check evidence | Delivery role |
 |---:|---|---|---|---|---|---|
-| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `36c1845` | `main` | `BLOCKED` | `REVIEW_REQUIRED` | required Checks queued for this refresh; no completed failure observed | Product/technical gap baseline |
+| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `6904b55` | `main` | `BLOCKED` | `REVIEW_REQUIRED` | required Checks queued for this refresh; no completed failure observed | Product/technical gap baseline |
 | [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `a18076d` | `feat/lineageweave-live-consumer-contract` | `UNSTABLE` | none reported | required Checks queued for current HEAD; no completed failure observed | LineageWeave cutoff-safe history projection |
 | [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `0073e83` | `feat/lineageweave-live-consumer-contract` | `UNSTABLE` | none reported | required Checks queued for current HEAD; no completed failure observed | LineageWeave temporal evidence context |
-| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `fb783f5` | `main` | `BLOCKED` | `REVIEW_REQUIRED` | required Checks queued for current HEAD after empty-host coverage fix; no completed failure observed | Completed analysis-run result contract |
+| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `0cb9ff6` | `main` | `BLOCKED` | `REVIEW_REQUIRED` | required Checks queued for current HEAD after empty-host coverage fix; no completed failure observed | Completed analysis-run result contract |
 | [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `0e29108` | `cursor/bc-422aba2a-86ab-45e3-9911-95cff5c28a87-5627` | `CLEAN` | none reported | current Checks green; independent review still required | Modular LineageWeave consumer parent |
 | [144](https://github.com/ContextualWisdomLab/TEPP/pull/144) | `980b62b` | `agent/psychometric-posterior-esem-input` | `MERGEABLE/UNSTABLE` | draft; review required after ready-for-review | required Checks queued; scientific tests pass locally | Multilevel event-time psychometric recovery |
 | [116](https://github.com/ContextualWisdomLab/TEPP/pull/116) | `5f9d7bf` | `main` | `MERGEABLE/BLOCKED` | `REVIEW_REQUIRED` | current Checks green; independent review still required | APA 7 method-paper doctoring |
