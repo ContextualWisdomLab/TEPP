@@ -16,7 +16,7 @@ and exact-head branch rules remain independent controls.
 | GitHub App authentication | A workflow can mint an installation token with explicit repository permissions | Publication token is minted only after non-executing validation |
 | Artifact handoff | Artifact upload/download actions expose immutable IDs and digests | Patch ID, digest, base, size, count, and modes are checked twice |
 | OpenCode | OpenCode is a programmable coding agent with provider configuration | One checksum-pinned binary calls only the loopback gateway |
-| contextual-orchestrator | The pinned gateway discovers configured provider models and routes through its KV credential seam | All five provider keys are registered at bootstrap; OpenCode receives only a loopback token |
+| contextual-orchestrator | The pinned gateway discovers configured provider models, filters general-chat eligibility, and routes through its KV credential seam | All five provider keys are registered at bootstrap; endpoint-only models stay out of chat routing; OpenCode receives only a loopback token |
 | Provider APIs | OpenAI-compatible and provider-specific model-list APIs expose discoverable models | Discovery is attempted for OpenAI, OpenRouter, both NVIDIA NIM keys, and Bytez before selection |
 | SSDF | NIST SP 800-218 recommends protected build environments, review, provenance, and vulnerability response | Fresh verification and ordinary PR governance remain mandatory |
 | AI risk | ISO/IEC 23894:2023 and 42001:2023 require contextual risk treatment and controlled change | Stable no-op reasons, bounded proposals, traceable decisions, and rollback are documented |
