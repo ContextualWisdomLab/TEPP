@@ -28,16 +28,16 @@ Technology, 2015).
 
 ## Verification record
 
-At the active PR head, Rust 1.97.1 verification passed:
+The local preflight for this slice passed with Rust 1.97.1:
 
 - `cargo fmt --all -- --check`;
 - `cargo test -p analysis_engine` — 5 unit tests, 1 crate-contract test, 2
   end-to-end tests, and doctest collection;
 - `cargo clippy -p analysis_engine --all-targets -- -D warnings`.
 
-The source remains `active-PR` until the current protected-head checks and
-qualifying independent reviews pass. This document must not be used as
-implemented-main or release evidence before that merge.
+The protected-hosted exact-head checks and qualifying independent reviews are
+still pending. This document must not be used as implemented-main or release
+evidence before that merge.
 
 ## APA 7th references
 
