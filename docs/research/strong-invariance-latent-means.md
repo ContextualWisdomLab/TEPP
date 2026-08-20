@@ -17,6 +17,14 @@ This slice does **not** import the unpublished `measurement_invariance` crate on
 
 ## Authoritative sources used for the mean gate
 
+Meredith, W. (1993). Measurement invariance, factor analysis and factorial invariance. *Psychometrika, 58*(4), 525–543. https://doi.org/10.1007/BF02294825
+
+The original-paper record and abstract were opened on the Cambridge Core page on 2026-08-21. Meredith defines weak measurement invariance, strong factorial invariance, and strict factorial invariance and relates factorial invariance to group differences. This is the primary source for the hierarchy used by this gate; the implementation deliberately reports the narrower local `strong`/`strict` labels rather than claiming a full multiple-group CFA.
+
+Sörbom, D. (1974). A general method for studying differences in factor means and factor structure between groups. *British Journal of Mathematical and Statistical Psychology, 27*(2), 229–239. https://doi.org/10.1111/j.2044-8317.1974.tb00543.x
+
+The original article record and abstract were opened on the Wiley Online Library page on 2026-08-21. Sörbom's primary model estimates factor means, loadings, and unique variances jointly from group observed means, variances, and covariances while allowing factorial-invariance constraints. It is the direct source for the factor-mean comparison target. The formula implemented here is the scalar two-group OLS reduction obtained by subtracting the observed-mean equation under equal loading and intercept; the source is not being presented as stating this crate-specific OLS formula.
+
 Putnick, D. L., & Bornstein, M. H. (2016). Measurement invariance conventions and reporting: The state of the art and future directions for psychological research. *Developmental Review, 41*, 71–90. https://doi.org/10.1016/j.dr.2016.06.004
 
 PMC author manuscript (PMC5145197) opened 2026-08-19T22:15Z from https://pmc.ncbi.nlm.nih.gov/articles/PMC5145197/. The NIHMS PDF endpoints returned HTML/500 on this cycle; the PMC HTML full text is the opened copy.
@@ -48,7 +56,7 @@ Per group, \(y=\nu+\lambda f+e\) is fit by OLS. Status is:
 - strong when loadings and intercepts match and residual variances differ, or when residual degrees of freedom are absent;
 - strict when both groups have residual degrees of freedom and loadings, intercepts, and residual variances match.
 
-The latent-mean difference is \((\bar y_c-\bar y_r)/\lambda\) with \(\lambda\) the midpoint of the two loadings, and only after strong or strict.
+The latent-mean difference is \((\bar y_c-\bar y_r)/\lambda\) with \(\lambda\) the midpoint of the two loadings, and only after strong or strict. Meredith (1993) supplies the invariance hierarchy and Sörbom (1974) supplies the factor-mean comparison model; the displayed expression is the explicitly stated scalar OLS derivation for this implementation.
 
 The formula follows by subtracting the group means of \(y=\nu+\lambda f+e\) after the equal-loading/equal-intercept restrictions have been accepted; the cited multi-group latent-mean study supplies the comparison target, while this document records the narrower OLS derivation.
 

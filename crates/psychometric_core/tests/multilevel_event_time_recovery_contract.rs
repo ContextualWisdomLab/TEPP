@@ -566,18 +566,13 @@ fn within_residual_event_time_log_rate_beats_pooled_levels() {
             score: person_mean + start,
         });
     }
-    let pooled_rate = recover_event_series_mean_log_rate(&pooled, LagClock::EventTime);
-    match pooled_rate {
-        Ok(rate) => {
-            let pooled_error = rmse(&[true_drift], &[rate]);
-            assert!(
-                within_error < pooled_error,
-                "CWC lag RMSE {within_error} should beat pooled {pooled_error}"
-            );
-        }
-        Err(PsychometricError::InvalidNumericInput | PsychometricError::NonPositiveInterval) => {}
-        Err(other) => panic!("unexpected pooled error {other}"),
-    }
+    let pooled_rate = recover_event_series_mean_log_rate(&pooled, LagClock::EventTime)
+        .expect("pooled positive lag");
+    let pooled_error = rmse(&[true_drift], &[pooled_rate]);
+    assert!(
+        within_error < pooled_error,
+        "CWC lag RMSE {within_error} should beat pooled {pooled_error}"
+    );
     assert!(within_error < 0.25, "CWC lag RMSE {within_error} too large");
 }
 
