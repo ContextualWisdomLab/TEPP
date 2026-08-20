@@ -1,0 +1,58 @@
+name: Clean second accidental placeholder issue
+
+on:
+  push:
+    branches:
+      - automation/advance-lineageweave-stack-20260820
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Close exact accidental placeholder issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          payload = subprocess.check_output(
+              [
+                  "gh", "api", "search/issues",
+                  "--method", "GET",
+                  "--field", f"q=repo:{repo} is:issue is:open in:title placeholder-2",
+              ],
+              text=True,
+          )
+          for item in json.loads(payload).get("items", []):
+              if item.get("title") != "placeholder-2":
+                  continue
+              number = item["number"]
+              issue = json.loads(
+                  subprocess.check_output(
+                      ["gh", "api", f"repos/{repo}/issues/{number}"], text=True
+                  )
+              )
+              if str(issue.get("body") or "").strip() != "placeholder-2":
+                  continue
+              subprocess.run(
+                  [
+                      "gh", "api", f"repos/{repo}/issues/{number}",
+                      "--method", "PATCH",
+                      "--field", "state=closed",
+                      "--field", "title=[closed] accidental connector probe 2",
+                      "--field", "body=Closed immediately after an accidental connector probe; no product work is tracked here.",
+                  ],
+                  check=True,
+              )
+          PY
