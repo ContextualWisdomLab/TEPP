@@ -107,8 +107,8 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_bounds_as_authorization, refuse_intake_without_grant,
-        GrantPresence, IntakeKind,
+        GrantPresence, IntakeKind, identity_recovery_rate, refuse_bounds_as_authorization,
+        refuse_intake_without_grant,
     };
     use crate::IntakeAuthorizationError;
 

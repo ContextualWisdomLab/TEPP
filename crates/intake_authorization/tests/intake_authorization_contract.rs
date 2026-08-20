@@ -1,8 +1,8 @@
 //! Untrusted intake fails closed without a grant; bounds are not authorization.
 
 use intake_authorization::{
-    identity_recovery_rate, refuse_bounds_as_authorization, refuse_intake_without_grant,
-    GrantPresence, IntakeAuthorizationError, IntakeKind,
+    GrantPresence, IntakeAuthorizationError, IntakeKind, identity_recovery_rate,
+    refuse_bounds_as_authorization, refuse_intake_without_grant,
 };
 
 #[test]

@@ -12,13 +12,13 @@ mod intake;
 
 /// Fail-closed intake-authorization errors.
 pub use error::IntakeAuthorizationError;
+/// Whether a purpose-bound grant is present at intake.
+pub use intake::GrantPresence;
+/// Closed vocabulary of untrusted inbound kinds that require a grant.
+pub use intake::IntakeKind;
 /// Fraction of recovered grant-presence flags that match known truth.
 pub use intake::identity_recovery_rate;
 /// Refuse to treat size, identity, or provenance bounds as authorization.
 pub use intake::refuse_bounds_as_authorization;
 /// Refuse untrusted intake that has no purpose-bound grant.
 pub use intake::refuse_intake_without_grant;
-/// Whether a purpose-bound grant is present at intake.
-pub use intake::GrantPresence;
-/// Closed vocabulary of untrusted inbound kinds that require a grant.
-pub use intake::IntakeKind;
