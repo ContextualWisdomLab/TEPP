@@ -14,13 +14,13 @@ Task 12 introduces fail-closed versioned wire contracts in `tepp_api` for standa
 8. corpus-split leakage-audit manifests that report cutoff exclusion counts, relation-component and partition digests, and a canonical digest bound to `corpus_split_manifest` without source text.
 9. purpose-bound provider-payload minimization with expired-grant denial and separately authorized re-identification.
 
-HTTP service routing remains accepted-target. Domain estimation and persistence stay outside this crate except for the `corpus_split` adapter that materialises the leakage-audit DTO.
+A loopback live HTTP/1.1 listener proves analysis-run and export POSTs. Production TLS/`$PORT` routing remains accepted-target. Domain estimation and persistence stay outside this crate except for the `corpus_split` adapter that materialises the leakage-audit DTO.
 
 ## Authoritative sources
 
-Fielding, R. T., & Reschke, J. (Eds.). (2014). *Hypertext Transfer Protocol (HTTP/1.1): Semantics and content* (RFC 7231). IETF. https://doi.org/10.17487/RFC7231
+Fielding, R., Nottingham, M., & Reschke, J. (Eds.). (2022). *HTTP semantics* (RFC 9110). IETF. https://doi.org/10.17487/RFC9110
 
-Nottingham, M. (2022). *HTTP Semantics* (RFC 9110). IETF. https://doi.org/10.17487/RFC9110
+Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). IETF. https://doi.org/10.17487/RFC3339
 
 Sporny, M., Longley, D., Kellogg, G., Lanthaler, M., Champin, P.-A., & Lindström, N. (2020). *JSON-LD 1.1* (W3C Recommendation). World Wide Web Consortium. https://www.w3.org/TR/json-ld11/
 

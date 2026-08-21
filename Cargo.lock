@@ -1271,6 +1271,7 @@ name = "tepp_api"
 version = "0.1.0"
 dependencies = [
  "corpus_split",
+ "jiff",
  "serde",
  "serde_json",
  "sha2",
