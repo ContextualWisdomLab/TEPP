@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `compute_backend` ADR 0006 first slice: VRAM profiles and reserve-aware micro-batching, executable successive OOM retry plans, CPU fallback, compensated `f64` reference arithmetic with scale-aware parity tolerance, grouped adaptation policies, and fail-closed estimand-preserving memory policies.
 - `tepp_api` naruon live loopback HTTP/1.1 listener: `serve_one` installs a read/write deadline, requires a loopback `Host`, refuses `Transfer-Encoding` and NIM/proxy credential headers, parses `knowledge_cutoff` as RFC 3339 and refuses a future cutoff, keys analysis-run idempotency by tenant plus key, and proves both analysis-run and export POSTs over a real `TcpStream`. Not a production TLS/`$PORT` service (ADR 0011).
 - `tepp_api` adaptive orchestration router (ADR 0010): versioned `direct`/`verify`/`committee`/`conductor`/`abstain` selection from CPU `f64` risk, ambiguity, evidence, and token-budget inputs; recorded stages, recursion, decomposition, access lists, and role-specific reasoning effort; fail-closed document-controlled policy/access/credentials; LLM plans remain proposals under deterministic statistical authority; comparable-budget ablation requires a direct baseline; credential-free contextual-orchestrator binding. Live NIM HTTP remains accepted-target.
 - `tepp_api` purpose-bound provider-payload minimization: time-bounded `PurposeGrant` evaluation, fail-closed expired/not-yet-valid/inverted/cross-tenant/impossible-calendar denial, semantic UTC calendar validation, refusal to copy identity mappings into model-provider payloads or ordinary logs, preservation of opaque analytical identifiers and membership roles (no blanket PII mask), a separately authorized scientific re-identification path, and an internally bound FIPS 180-4 SHA-256 audit digest appended through `ReidentificationAuditSink` before disclosure.
@@ -75,6 +76,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- Removed the completed one-shot PR #51 repair job from `docs-quality.yml`; the
+  workflow no longer invokes deleted repair scripts or requests write authority
+  after the executable compute implementation is already present.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.

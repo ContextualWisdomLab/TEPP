@@ -2,11 +2,17 @@ name: Documentation Quality
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
     paths:
       - "**/*.md"
       - "**/*.json"
       - ".github/workflows/**"
       - "scripts/validate_documentation.py"
+      - "crates/compute_backend/**"
   push:
     branches:
       - main
