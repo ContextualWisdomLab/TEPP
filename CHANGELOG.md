@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- Coverage classification preserves the final expression line of multiline Rust `match` guards, keeping the 100% authored-line gate conservative.
 - `tepp_api` fail-closed analysis-result boundaries: status constructors reject
   terminal envelopes that cannot fit the default 64 KiB status limit, and
   standalone terminal results reject knowledge cutoffs in the future.

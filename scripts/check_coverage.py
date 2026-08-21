@@ -99,7 +99,7 @@ def is_executable_source_line(
     # Keep guarded match arms in the authored-line denominator: the guard
     # executes even though the arm label itself is structural.
     if text.endswith("=> {") and " if " not in text:
-        return False
+        return _is_multiline_match_guard(lines, line_number)
     if text.startswith("pub struct ") or text.startswith("struct "):
         return False
     if text.startswith("pub enum ") or text.startswith("enum "):
@@ -109,6 +109,18 @@ def is_executable_source_line(
     if text.endswith(",") and not text.startswith("let ") and not text.startswith("return "):
         return False
     return True
+
+
+def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
+    """Recognize a guard continued onto the lines immediately before an arm."""
+
+    for candidate in reversed(lines[max(0, line_number - 32) : line_number - 1]):
+        stripped = candidate.strip()
+        if "=>" in stripped:
+            return False
+        if stripped.startswith("if ") or stripped.startswith("if("):
+            return True
+    return False
 
 
 def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
