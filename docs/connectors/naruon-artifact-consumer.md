@@ -1,7 +1,7 @@
 # naruon modular consumer contract for TEPP artifacts
 
-**Status:** Partial — versioned DTO plus HTTP interchange on the active PR; live HTTP service remaining  
-**Last reviewed:** 2026-08-13
+**Status:** Partial — versioned DTO, HTTP interchange, and loopback live listener on the active PR; production TLS/`$PORT` remaining
+**Last reviewed:** 2026-08-16
 
 ## Boundary
 
@@ -25,6 +25,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | purpose-bound export auth | `tepp_api` `authorize_export` with `ModularServiceConsumer` | TEPP gate |
 | HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
+| Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
 
 Committed examples live under `examples/`. Schema for analysis-run requests lives under `schemas/analysis_run_request_v1.json`.
 
@@ -39,7 +40,9 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 - knowledge cutoff / availability violations → reject in TEPP domain crates;
 - authorization deny → `authorization_denied` envelope without policy leakage;
 - `postgres` / `jdbc` / `/sql` / `/tables/` or non-`https` origins → reject;
-- review, Copilot, or bearer credential headers → reject;
+- review, Copilot, NIM/NVIDIA, proxy-authorization, or bearer credential headers → reject;
+- non-loopback `Host` or `Transfer-Encoding` on the live listener → reject;
+- non-RFC 3339 or future-dated `knowledge_cutoff` → reject;
 - redefinition of reserved headers (`content-type`, `tepp-consumer`,
   `tepp-contract-version`, `idempotency-key`) via extra headers → reject;
 - export interchange without a nonempty per-export idempotency key → reject;
@@ -47,7 +50,9 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 
 ## Authority sources
 
-Fielding, R. T., & Reschke, J. (Eds.). (2014). *Hypertext Transfer Protocol (HTTP/1.1): Semantics and content* (RFC 7231). IETF. https://doi.org/10.17487/RFC7231
+Fielding, R., Nottingham, M., & Reschke, J. (Eds.). (2022). *HTTP semantics* (RFC 9110). IETF. https://doi.org/10.17487/RFC9110
+
+Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). IETF. https://doi.org/10.17487/RFC3339
 
 ISO/IEC. (2019). *ISO/IEC 27701:2019 Security techniques — Extension to ISO/IEC 27001 and ISO/IEC 27002 for privacy information management — Requirements and guidelines*. International Organization for Standardization.
 

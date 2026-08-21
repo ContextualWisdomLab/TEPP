@@ -1,7 +1,7 @@
 # ADR 0011 — Standalone operation and modular CWL MSA boundary
 
 **Decision status:** Accepted
-**Implementation maturity:** partial — Rust crates are independently usable; naruon HTTP interchange (`POST /v1/analysis-runs` and `/v1/exports`, fail-closed table-access and credential headers) implemented on the active PR (not implemented-main); `service_tls` production rustls bind gates and orchestrator live-port refusal of loopback plaintext are on this PR; remaining live HTTP listeners and production persistence integrations remain accepted-target
+**Implementation maturity:** partial — Rust crates are independently usable; naruon HTTP interchange and loopback live listener (`POST /v1/analysis-runs` and `/v1/exports`, fail-closed table-access, NIM/proxy headers, RFC 3339 cutoff, stream deadline) is implemented-main; `service_tls` production rustls bind gates and orchestrator live-port refusal of loopback plaintext are on this active PR; remaining live HTTP listeners and production persistence integrations remain accepted-target
 **Date:** 2026-08-10
 **Supersedes:** The broad cross-service ownership wording in ADR 0001. ADR 0001 remains authoritative for Rust-first numerical architecture.
 

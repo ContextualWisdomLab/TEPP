@@ -142,6 +142,14 @@ McKay, K. A., & Cooper, D. A. (2019). *Guidelines for the selection, configurati
 
 TEPP uses these sources to require rustls material on non-loopback service binds and to refuse plaintext production ports. They are not deployment or certification evidence.
 
+## HTTP interchange and timestamp authority
+
+Fielding, R., Nottingham, M., & Reschke, J. (Eds.). (2022). *HTTP semantics* (RFC 9110). IETF. https://doi.org/10.17487/RFC9110
+
+Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). IETF. https://doi.org/10.17487/RFC3339
+
+TEPP uses RFC 9110 for live `Host` and `Transfer-Encoding` refusal on the naruon loopback listener, and RFC 3339 via `temporal_core::KnowledgeCutoff` so a buyer cannot submit `"k"` or a future-dated cutoff as an analysis-run clock.
+
 ## Security, accessibility, and software supply chain
 
 World Wide Web Consortium. (2023). *Web content accessibility guidelines (WCAG) 2.2*. https://www.w3.org/TR/WCAG22/
