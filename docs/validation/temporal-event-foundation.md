@@ -20,9 +20,11 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | backup/restore integrity | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event + concurrent-write (#37–#43 implemented-main) + restore integrity probes (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#43 + restore integrity |
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
+| Unicode NFC/NFD identity | `corpus_split` | active-PR | this PR | NFC/NFD co-partition + empty/duplicate refusal | UAX #15 / ADR 0004 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Unicode NFC/NFD identity | `corpus_split` | pending-main (PR #59) | canonical-equivalence links | NFC/NFD co-partition + empty/duplicate refusal | UAX #15; `docs/research/unicode-canonical-identity.md` |
 | Purpose-bound provider payloads | `tepp_api` | implemented-main | provider-payload minimization | expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay | ADR 0009; `docs/research/provider-payload-minimization.md` |
 | Adaptive orchestration router | `tepp_api` | accepted-target | active PR | mode selection, document-control denial, ablation, credential-free bind | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
