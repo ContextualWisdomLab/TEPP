@@ -65,7 +65,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Topic correlation, consensus clustering, TDT, CHRONOS, and evidence-grounded LLM interpretation requirements.
 - APA 7th research traceability, source archive manifests, ADRs, governance, security, and contribution contracts.
 - Hourly centralized PR-maintenance workflow and a documented requirement for a future credential-separated NVIDIA NIM/OpenCode product-development loop.
-- Rust 1.97.1 virtual Cargo workspace with ten explicit modular foundation crates.
+- Rust 1.97.1 virtual Cargo workspace with eleven explicit modular foundation crates.
 - Repository contract, public-rustdoc, line-coverage, and nightly branch-coverage gates.
 - Pinned `cargo-nextest` 0.9.140, `cargo-llvm-cov` 0.8.6, `cargo-deny` 0.19.7, and Coverage.py 7.15.2 quality tooling.
 - Task 1 architecture decision and workspace-foundation validation report.
