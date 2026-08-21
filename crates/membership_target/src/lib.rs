@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![allow(clippy::cast_precision_loss)]
-//! Language, episode, template, and opportunity-pool targets are not entities.
+//! Language, episode, template, department, and opportunity-pool targets are not entities.
 //!
 //! Persistence currently stores only an entity or a project. Those two
 //! columns cannot stand in for the other ADR 0003 membership targets.

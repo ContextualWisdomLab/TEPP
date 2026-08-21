@@ -1,6 +1,6 @@
 [package]
 name = "membership_target"
-description = "Language, episode, template, and opportunity-pool targets are not entities."
+description = "Language, episode, template, department, and opportunity-pool targets are not entities."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
