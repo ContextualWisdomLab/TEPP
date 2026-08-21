@@ -26,7 +26,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
 | report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
-| candidate K statistical/Pareto gates + blinded LLM review | ADR 0012; research | future `model_selection` | accepted-target |
+| candidate K statistical/Pareto gates | ADR 0012; research | `model_selection` statistical/Pareto `K` gate on the active PR; candidate blinding, blinded LLM review, and backend comparison remain accepted-target | active-PR |
 | compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
