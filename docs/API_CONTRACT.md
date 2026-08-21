@@ -118,7 +118,7 @@ Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers mu
 
 ### contextual-orchestrator
 
-TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
+TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. A production live port must pass `service_tls::authorize_orchestrator_live_port` (valid rustls PEM on an `https` bind); loopback plaintext is refused and loopback `https` with valid PEM is authorized as production TLS. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
 
 ### organization `.github`
 
