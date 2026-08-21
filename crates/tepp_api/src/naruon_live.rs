@@ -489,7 +489,7 @@ fn host_implies_table_access(host: &str) -> bool {
         || lowered.chars().any(char::is_control)
 }
 
-fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
+pub(crate) fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
     if let Some(bound) = bound_addr
         && (host == bound.to_string() || host == bound.ip().to_string())
     {

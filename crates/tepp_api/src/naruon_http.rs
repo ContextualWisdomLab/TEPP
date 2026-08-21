@@ -128,6 +128,7 @@ fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
         || host.contains('/')
         || host.contains('?')
         || host.contains('#')
+        || host.chars().any(char::is_control)
         || host.chars().any(|ch| matches!(ch, '\'' | ';' | '\\' | ' '))
     {
         return Err(ApiError::InvalidWirePayload);
