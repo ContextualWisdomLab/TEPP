@@ -286,6 +286,22 @@ pub enum PsychometricError {
     /// Eq. 3 level-change increment. `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`
     /// is not `(1 − e^{a Δt}) m x`.
     LevelChangeExtraProcessIsNotIncrement,
+    /// Driver Eq. 5 of the evolved mean was treated as the Eq. 5
+    /// extra-process observed mean. `τ + λ μ_t` is not
+    /// `τ + λ(μ_t + a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a))`.
+    EvolvedObservedMeanIsNotExtraProcessObservedMean,
+    /// Driver Eq. 5 of the contemporaneous impulse was treated as
+    /// the Eq. 5 extra-process observed mean. `τ + λ(μ_t + m x)` is
+    /// not `τ + λ(μ_t + a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a))`.
+    ImpulseObservedMeanIsNotExtraProcessObservedMean,
+    /// Driver §7.2 extra-process contribution was treated as `E(y_t)`.
+    /// The contribution is not `τ + λ` of the evolved-plus-contribution
+    /// latent mean. The extra process has `LAMBDA` 0 in the printed
+    /// specification.
+    ExtraProcessContributionIsNotObservedMean,
+    /// Driver §7.2 evolved-plus-contribution latent mean was treated
+    /// as `E(y_t)`. Equation 5 maps `E(y_t) = τ + λ` of that mean.
+    ExtraProcessLatentMeanIsNotObservedMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -519,6 +535,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::LevelChangeExtraProcessIsNotIncrement => {
                 "level-change extra-process contribution is not the level-change increment"
+            }
+            Self::EvolvedObservedMeanIsNotExtraProcessObservedMean => {
+                "evolved observed mean is not the extra-process observed mean"
+            }
+            Self::ImpulseObservedMeanIsNotExtraProcessObservedMean => {
+                "contemporaneous-impulse observed mean is not the extra-process observed mean"
+            }
+            Self::ExtraProcessContributionIsNotObservedMean => {
+                "extra-process contribution is not the extra-process observed mean"
+            }
+            Self::ExtraProcessLatentMeanIsNotObservedMean => {
+                "evolved-plus-contribution latent mean is not the extra-process observed mean"
             }
         };
         formatter.write_str(message)
@@ -884,6 +912,22 @@ mod tests {
         assert_eq!(
             PsychometricError::LevelChangeExtraProcessIsNotIncrement.to_string(),
             "level-change extra-process contribution is not the level-change increment"
+        );
+        assert_eq!(
+            PsychometricError::EvolvedObservedMeanIsNotExtraProcessObservedMean.to_string(),
+            "evolved observed mean is not the extra-process observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseObservedMeanIsNotExtraProcessObservedMean.to_string(),
+            "contemporaneous-impulse observed mean is not the extra-process observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ExtraProcessContributionIsNotObservedMean.to_string(),
+            "extra-process contribution is not the extra-process observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ExtraProcessLatentMeanIsNotObservedMean.to_string(),
+            "evolved-plus-contribution latent mean is not the extra-process observed mean"
         );
     }
 }

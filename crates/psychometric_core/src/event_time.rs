@@ -87,7 +87,13 @@
 //! contribution is `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`
 //! (`ε = a` is `a_{ηξ} x Δt e^{a Δt}`). That contribution is not
 //! `κ = −a m x`, not `(1 − e^{a Δt}) m x`, and not the dissipating
-//! Dirac `m x`. `ε ≥ 0` fails closed. The JSS article
+//! Dirac `m x`. `ε ≥ 0` fails closed. Equation 5 of that extra-process
+//! contribution is
+//! `τ + λ(μ_t + a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a))` (the extra
+//! process has `LAMBDA` 0 and is not an observed indicator; `τ + λ μ_t`
+//! is not that observed mean; `τ + λ(μ_t + m x)` is not that observed
+//! mean; the contribution is not `E(y_t)`; the evolved-plus-contribution
+//! latent mean is not `E(y_t)`). The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -1695,6 +1701,195 @@ pub fn refuse_level_change_extra_process_as_increment(
 ) -> Result<f64, PsychometricError> {
     let _ = (extra_process_contribution, level_change_increment);
     Err(PsychometricError::LevelChangeExtraProcessIsNotIncrement)
+}
+
+/// Exact scalar evolved latent mean plus a §7.2 extra-process contribution.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; §7.2, pp. 22–23; JSS
+/// PDF re-opened 2026-08-21T06:12Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write the first two summands as the carried `T0MEANS` and `CINT`
+/// increment. Section 7.2 then drives the original process by the
+/// extra near-zero-drift latent process through the `DRIFT` coupling
+/// `a_{ηξ}`. Form `μ_t` first, then add the extra-process
+/// contribution. A zero contribution is exactly `μ_t`. A zero evolved
+/// mean is exactly the contribution. The first-occasion map
+/// `μ_0 + contribution` is not this composition when the process has
+/// already evolved. The contemporaneous Dirac `μ_t + m x` is not this
+/// composition. The printed specification puts `TDPREDEFFECT` on the
+/// extra process, not on the original process. This is not a Kalman
+/// filter and not ctsem estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_latent_mean`] and
+/// [`recover_level_change_extra_process_contribution`], and returns
+/// [`PsychometricError::InvalidNumericInput`] when the sum overflows.
+#[allow(clippy::too_many_arguments)]
+pub fn recover_discrete_latent_mean_with_extra_process(
+    initial_latent_mean: f64,
+    original_log_rate: f64,
+    continuous_intercept: f64,
+    original_from_extra_drift: f64,
+    time_dependent_predictor: f64,
+    extra_log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let evolved_latent_mean = recover_discrete_latent_mean(
+        initial_latent_mean,
+        original_log_rate,
+        continuous_intercept,
+        event_delta,
+        clock,
+    )?;
+    let contribution = recover_level_change_extra_process_contribution(
+        original_from_extra_drift,
+        time_dependent_predictor,
+        original_log_rate,
+        extra_log_rate,
+        event_delta,
+        clock,
+    )?;
+    if contribution == 0.0 {
+        return Ok(evolved_latent_mean);
+    }
+    if evolved_latent_mean == 0.0 {
+        return Ok(contribution);
+    }
+    require_finite(evolved_latent_mean + contribution)
+}
+
+/// Exact scalar observed mean of a §7.2 extra-process contribution.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 1–3, pp. 4–5;
+/// §7.2, pp. 22–23; JSS PDF re-opened 2026-08-21T06:12Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `y_i(t) = Γ + Λ η_i(t) + ζ_i(t)` with `ζ ~ N(0, Θ)` and
+/// `Γ ~ N(τ, Ψ)`. The expected intercept is `τ`. Section 7.2's
+/// printed extra process has `LAMBDA` 0: it is not an observed
+/// indicator. Original indicators load on the original process after
+/// the `DRIFT` coupling. The latent process at `t` after that
+/// contribution is `μ_t + a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`.
+/// The scalar composition is
+/// `E(y_t) = τ + λ(μ_t + a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a))`.
+/// Form the evolved-plus-contribution latent mean first, then
+/// `τ + λ` of that mean. Table 2 names `τ` `MANIFESTMEANS`. A zero
+/// loading is exactly `τ`. A zero evolved-plus-contribution latent
+/// mean is exactly `τ`. A zero intercept is exactly `λ` of that
+/// latent mean. The evolved observed mean `τ + λ μ_t` is not this
+/// composition when the contribution is nonzero. The contemporaneous
+/// map `τ + λ(μ_t + m x)` is not this composition. `MANIFESTMEANS` is
+/// not `E(y_t)`. The extra-process contribution is not `E(y_t)`. The
+/// evolved-plus-contribution latent mean is not `E(y_t)`. The extra
+/// process itself is not an observed indicator. This is not a Kalman
+/// filter and not ctsem estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_latent_mean_with_extra_process`] and
+/// [`recover_manifest_observed_mean`].
+#[allow(clippy::too_many_arguments)]
+pub fn recover_discrete_observed_mean_with_extra_process(
+    loading: f64,
+    initial_latent_mean: f64,
+    original_log_rate: f64,
+    continuous_intercept: f64,
+    original_from_extra_drift: f64,
+    time_dependent_predictor: f64,
+    extra_log_rate: f64,
+    manifest_mean: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let extra_latent_mean = recover_discrete_latent_mean_with_extra_process(
+        initial_latent_mean,
+        original_log_rate,
+        continuous_intercept,
+        original_from_extra_drift,
+        time_dependent_predictor,
+        extra_log_rate,
+        event_delta,
+        clock,
+    )?;
+    recover_manifest_observed_mean(loading, extra_latent_mean, manifest_mean)
+}
+
+/// Refuse treating the evolved observed mean as the extra-process
+/// observed mean.
+///
+/// Equation 5 of the Eq. 3 evolved mean is `τ + λ μ_t`. Equation 5
+/// of the §7.2 extra-process contribution is
+/// `τ + λ(μ_t + a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a))`. Those
+/// are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::EvolvedObservedMeanIsNotExtraProcessObservedMean`].
+pub fn refuse_evolved_observed_mean_as_extra_process_observed_mean(
+    evolved_observed_mean: f64,
+    extra_process_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (evolved_observed_mean, extra_process_observed_mean);
+    Err(PsychometricError::EvolvedObservedMeanIsNotExtraProcessObservedMean)
+}
+
+/// Refuse treating the contemporaneous-impulse observed mean as the
+/// extra-process observed mean.
+///
+/// Equation 5 of the contemporaneous Dirac is `τ + λ(μ_t + m x)`.
+/// Equation 5 of the §7.2 extra-process contribution is
+/// `τ + λ(μ_t + a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a))`. Those
+/// are not the same map. The printed specification puts
+/// `TDPREDEFFECT` on the extra process, not on the original process.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ImpulseObservedMeanIsNotExtraProcessObservedMean`].
+pub fn refuse_impulse_observed_mean_as_extra_process_observed_mean(
+    impulse_observed_mean: f64,
+    extra_process_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (impulse_observed_mean, extra_process_observed_mean);
+    Err(PsychometricError::ImpulseObservedMeanIsNotExtraProcessObservedMean)
+}
+
+/// Refuse treating the §7.2 extra-process contribution as `E(y_t)`.
+///
+/// The contribution is not `τ + λ` of the evolved-plus-contribution
+/// latent mean. The extra process has `LAMBDA` 0 in the printed
+/// specification.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ExtraProcessContributionIsNotObservedMean`].
+pub fn refuse_extra_process_contribution_as_observed_mean(
+    extra_process_contribution: f64,
+    extra_process_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (extra_process_contribution, extra_process_observed_mean);
+    Err(PsychometricError::ExtraProcessContributionIsNotObservedMean)
+}
+
+/// Refuse treating the evolved-plus-contribution latent mean as
+/// `E(y_t)`.
+///
+/// Equation 5 maps `E(y_t) = τ + λ` of that mean. The latent mean is
+/// not the observed mean.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ExtraProcessLatentMeanIsNotObservedMean`].
+pub fn refuse_extra_process_latent_mean_as_observed_mean(
+    extra_process_latent_mean: f64,
+    extra_process_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (extra_process_latent_mean, extra_process_observed_mean);
+    Err(PsychometricError::ExtraProcessLatentMeanIsNotObservedMean)
 }
 
 /// Exact scalar evolved latent mean plus a contemporaneous impulse.
@@ -3553,12 +3748,13 @@ mod tests {
         map_discrete_lag_across_event_intervals, recover_discrete_constant_predictor_effect,
         recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
         recover_discrete_lag_one, recover_discrete_lagged_latent_covariance,
-        recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
-        recover_discrete_latent_mean_with_impulse_carry,
+        recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
+        recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
         recover_discrete_latent_mean_with_initial_time_dependent_predictor,
         recover_discrete_latent_mean_with_initial_time_independent_predictor,
         recover_discrete_latent_mean_with_time_independent_predictor,
         recover_discrete_latent_variance, recover_discrete_observed_mean,
+        recover_discrete_observed_mean_with_extra_process,
         recover_discrete_observed_mean_with_impulse,
         recover_discrete_observed_mean_with_impulse_carry,
         recover_discrete_observed_mean_with_initial_time_dependent_predictor,
@@ -3582,15 +3778,19 @@ mod tests {
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+        refuse_evolved_observed_mean_as_extra_process_observed_mean,
         refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
         refuse_evolved_observed_mean_as_impulse_observed_mean,
         refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
         refuse_evolved_observed_mean_as_time_independent_observed_mean,
+        refuse_extra_process_contribution_as_observed_mean,
+        refuse_extra_process_latent_mean_as_observed_mean,
         refuse_finite_interval_process_noise_as_stationary_variance,
         refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
         refuse_impulse_carry_observed_mean_as_time_independent_observed_mean,
+        refuse_impulse_observed_mean_as_extra_process_observed_mean,
         refuse_impulse_observed_mean_as_impulse_carry_observed_mean,
         refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_impulse_observed_mean_as_initial_time_independent_observed_mean,
@@ -6153,6 +6353,143 @@ mod tests {
             coupling * predictor * ((extra * 900.0).exp() - (-0.8_f64 * 900.0).exp())
                 / (extra - -0.8);
         assert!((overflow_fallback - overflow_expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn extra_process_observed_mean_recovers_driver_equation_five() {
+        let loading = 2.0_f64;
+        let coupling = 0.4_f64;
+        let predictor = 3.0_f64;
+        let original = -0.5_f64;
+        let extra = -0.05_f64;
+        let delta = 2.0_f64;
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let manifest_mean = 0.5_f64;
+        let recovered = recover_discrete_observed_mean_with_extra_process(
+            loading,
+            initial,
+            original,
+            intercept,
+            coupling,
+            predictor,
+            extra,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-extra-process-mean");
+        let composed = recover_discrete_latent_mean_with_extra_process(
+            initial,
+            original,
+            intercept,
+            coupling,
+            predictor,
+            extra,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("extra-latent");
+        let expected = manifest_mean + loading * composed;
+        assert!((recovered - expected).abs() < 1e-15);
+        let evolved_observed = recover_discrete_observed_mean(
+            loading,
+            initial,
+            original,
+            intercept,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq3-eq5-mean");
+        assert!((evolved_observed - recovered).abs() > 1e-3);
+        let impulse_observed = recover_discrete_observed_mean_with_impulse(
+            loading,
+            initial,
+            original,
+            intercept,
+            coupling,
+            predictor,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-impulse-mean");
+        assert!((impulse_observed - recovered).abs() > 1e-3);
+        let contribution = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            original,
+            extra,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("extra-process");
+        assert_eq!(
+            refuse_evolved_observed_mean_as_extra_process_observed_mean(
+                evolved_observed,
+                recovered
+            ),
+            Err(PsychometricError::EvolvedObservedMeanIsNotExtraProcessObservedMean)
+        );
+        assert_eq!(
+            refuse_impulse_observed_mean_as_extra_process_observed_mean(
+                impulse_observed,
+                recovered
+            ),
+            Err(PsychometricError::ImpulseObservedMeanIsNotExtraProcessObservedMean)
+        );
+        assert_eq!(
+            refuse_extra_process_contribution_as_observed_mean(contribution, recovered),
+            Err(PsychometricError::ExtraProcessContributionIsNotObservedMean)
+        );
+        assert_eq!(
+            refuse_extra_process_latent_mean_as_observed_mean(composed, recovered),
+            Err(PsychometricError::ExtraProcessLatentMeanIsNotObservedMean)
+        );
+    }
+
+    #[test]
+    fn extra_process_observed_mean_zero_loading_is_manifest_mean_and_refuses_clock() {
+        let loading = 2.0_f64;
+        let coupling = 0.4_f64;
+        let predictor = 3.0_f64;
+        let original = -0.5_f64;
+        let extra = -0.05_f64;
+        let delta = 2.0_f64;
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let manifest_mean = 0.5_f64;
+        assert_eq!(
+            recover_discrete_observed_mean_with_extra_process(
+                0.0,
+                initial,
+                original,
+                intercept,
+                coupling,
+                predictor,
+                extra,
+                manifest_mean,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(manifest_mean)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean_with_extra_process(
+                loading,
+                initial,
+                original,
+                intercept,
+                coupling,
+                predictor,
+                extra,
+                manifest_mean,
+                delta,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
     }
 
     #[test]

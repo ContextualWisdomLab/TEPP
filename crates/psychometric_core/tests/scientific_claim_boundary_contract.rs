@@ -5,13 +5,13 @@ use psychometric_core::{
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
-    recover_discrete_latent_mean, recover_discrete_latent_mean_with_impulse,
-    recover_discrete_latent_mean_with_impulse_carry,
+    recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
+    recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
     recover_discrete_latent_mean_with_initial_time_dependent_predictor,
     recover_discrete_latent_mean_with_initial_time_independent_predictor,
     recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
-    recover_discrete_observed_mean, recover_discrete_observed_mean_with_impulse,
-    recover_discrete_observed_mean_with_impulse_carry,
+    recover_discrete_observed_mean, recover_discrete_observed_mean_with_extra_process,
+    recover_discrete_observed_mean_with_impulse, recover_discrete_observed_mean_with_impulse_carry,
     recover_discrete_observed_mean_with_initial_time_dependent_predictor,
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
@@ -30,15 +30,19 @@ use psychometric_core::{
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
+    refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
     refuse_evolved_observed_mean_as_impulse_observed_mean,
     refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
     refuse_evolved_observed_mean_as_time_independent_observed_mean,
+    refuse_extra_process_contribution_as_observed_mean,
+    refuse_extra_process_latent_mean_as_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
     refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
     refuse_impulse_carry_observed_mean_as_time_independent_observed_mean,
+    refuse_impulse_observed_mean_as_extra_process_observed_mean,
     refuse_impulse_observed_mean_as_impulse_carry_observed_mean,
     refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_observed_mean_as_initial_time_independent_observed_mean,
@@ -1811,5 +1815,105 @@ fn extra_process_contribution_is_not_cint_rewrite_increment_or_impulse() {
     assert_eq!(
         refuse_level_change_extra_process_as_increment(recovered, increment),
         Err(psychometric_core::PsychometricError::LevelChangeExtraProcessIsNotIncrement)
+    );
+}
+
+#[test]
+fn extra_process_observed_mean_is_not_evolved_mean_impulse_mean_or_contribution() {
+    let loading = 2.0_f64;
+    let coupling = 0.4_f64;
+    let predictor = 3.0_f64;
+    let original = -0.5_f64;
+    let extra = -0.05_f64;
+    let delta = 2.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let observed = recover_discrete_observed_mean_with_extra_process(
+        loading,
+        initial,
+        original,
+        intercept,
+        coupling,
+        predictor,
+        extra,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-extra-process-mean");
+    let composed = recover_discrete_latent_mean_with_extra_process(
+        initial,
+        original,
+        intercept,
+        coupling,
+        predictor,
+        extra,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("extra-latent");
+    let contribution = recover_level_change_extra_process_contribution(
+        coupling,
+        predictor,
+        original,
+        extra,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("extra-process");
+    let evolved_observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        original,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let impulse_observed = recover_discrete_observed_mean_with_impulse(
+        loading,
+        initial,
+        original,
+        intercept,
+        coupling,
+        predictor,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-impulse-mean");
+    assert!(
+        (observed - evolved_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of §7.2): extra-process E(y_t) is not τ + λ μ_t"
+    );
+    assert!(
+        (observed - impulse_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of §7.2): extra-process E(y_t) is not τ + λ(μ_t + m x)"
+    );
+    assert!(
+        (observed - contribution).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of §7.2): extra-process contribution is not E(y_t)"
+    );
+    assert!(
+        (observed - composed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of §7.2): evolved-plus-contribution latent mean is not E(y_t)"
+    );
+    assert_eq!(
+        refuse_evolved_observed_mean_as_extra_process_observed_mean(evolved_observed, observed),
+        Err(psychometric_core::PsychometricError::EvolvedObservedMeanIsNotExtraProcessObservedMean)
+    );
+    assert_eq!(
+        refuse_impulse_observed_mean_as_extra_process_observed_mean(impulse_observed, observed),
+        Err(psychometric_core::PsychometricError::ImpulseObservedMeanIsNotExtraProcessObservedMean)
+    );
+    assert_eq!(
+        refuse_extra_process_contribution_as_observed_mean(contribution, observed),
+        Err(psychometric_core::PsychometricError::ExtraProcessContributionIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_extra_process_latent_mean_as_observed_mean(composed, observed),
+        Err(psychometric_core::PsychometricError::ExtraProcessLatentMeanIsNotObservedMean)
     );
 }
