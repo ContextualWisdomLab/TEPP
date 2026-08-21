@@ -9,7 +9,6 @@ use crate::classify_lifecycle_sql_failure;
 use crate::classify_write_conflict;
 use crate::live_pool::{LiveSqlxPool, LiveSqlxPoolOptions};
 use crate::sqlx_gate::LiveSqlxConfig;
-use std::sync::Arc;
 
 /// Open a live `SQLx` pool and wrap it as [`LiveSqlxPool`].
 ///
@@ -21,19 +20,24 @@ pub fn open_sqlx_pool(
     config: &LiveSqlxConfig,
     options: LiveSqlxPoolOptions,
 ) -> Result<LiveSqlxPool, PersistenceError> {
-    let transport = SqlxTransport::connect(config, options)?;
-    let shared = Arc::new(transport);
+    let mut transport = SqlxTransport::connect(config, options)?;
     Ok(LiveSqlxPool::from_live_executor(
-        Box::new(move |sql| shared.execute(sql)),
+        Box::new(move |sql| transport.execute(sql)),
         options,
     ))
 }
 
-/// Owned Tokio runtime + `PgPool` pair.
+/// Owned Tokio runtime and one pool-backed connection.
+///
+/// The connection is deliberately acquired once and retained for the lifetime
+/// of the transport. Tenant GUC binding and the following statement must use
+/// the same `PostgreSQL` session; acquiring independently for every statement
+/// could send them to different pool connections and violate row-level
+/// isolation.
 #[derive(Debug)]
 struct SqlxTransport {
     runtime: tokio::runtime::Runtime,
-    pool: sqlx::PgPool,
+    connection: sqlx::pool::PoolConnection<sqlx::Postgres>,
 }
 
 impl SqlxTransport {
@@ -56,12 +60,19 @@ impl SqlxTransport {
                 .await
         });
         let pool = pool.map_err(|_| PersistenceError::SqlExecutionFailed)?;
-        Ok(Self { runtime, pool })
+        let connection = runtime
+            .block_on(async { pool.acquire().await })
+            .map_err(|_| PersistenceError::SqlExecutionFailed)?;
+        Ok(Self {
+            runtime,
+            connection,
+        })
     }
 
-    fn execute(&self, sql: &str) -> Result<(), PersistenceError> {
+    fn execute(&mut self, sql: &str) -> Result<(), PersistenceError> {
+        let connection = &mut self.connection;
         self.runtime
-            .block_on(async { sqlx::query(sql).execute(&self.pool).await })
+            .block_on(async { sqlx::query(sql).execute(&mut **connection).await })
             .map(|_| ())
             .map_err(|error| map_sqlx_error(&error))
     }

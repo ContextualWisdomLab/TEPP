@@ -50,5 +50,5 @@ exactly-one constraints preserve those distinct contexts. Migration
   and rejects both dual-target and dual observed-unit rows when
   `TEPP_LIVE_POSTGRES=1`;
 - entity and project target rows are now inserted through fail-closed
-  SQL helpers rather than raw label interpolation (see
+  SQL helpers that validate labels before rendering INSERT SQL (see
   `docs/research/entity-project-sql.md`).
