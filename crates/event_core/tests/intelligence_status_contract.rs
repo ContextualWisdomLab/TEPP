@@ -4,6 +4,7 @@ use event_core::{
     EventError, EventEvidenceLayer, TdtStoryDecision, admit_state_transition, classify_tdt_story,
     first_story_detection_rates,
 };
+use std::collections::HashSet;
 
 #[test]
 fn only_promoted_transitions_enter_the_state_graph() {
@@ -42,16 +43,14 @@ fn only_promoted_transitions_enter_the_state_graph() {
 fn first_story_detector_recovers_known_stream_with_computed_rates() {
     // Appearance order of news stories: first occurrence is a first story.
     let stream = [10_u64, 20, 10, 30, 20];
-    let mut seen = Vec::new();
+    let mut seen = HashSet::new();
     let mut predicted = Vec::new();
     let mut truth = Vec::new();
     for story in stream {
         let decision = classify_tdt_story(&seen, story);
         predicted.push(matches!(decision, TdtStoryDecision::FirstStory));
         truth.push(!seen.contains(&story));
-        if !seen.contains(&story) {
-            seen.push(story);
-        }
+        seen.insert(story);
     }
     let rates = first_story_detection_rates(&truth, &predicted).expect("rates");
     assert_eq!(rates.hits(), 3);

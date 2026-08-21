@@ -7,7 +7,8 @@ This note doctors the first ADR 0016 production slice in `event_core`:
 1. every event-intelligence output carries an epistemic layer (`observed_mention`, `tdt_detection`, `chronos_prediction`, `temporal_consistency`, `promoted_transition`);
 2. only an independently promoted transition may enter the forward state graph;
 3. CHRONOS predictions are never treated as observed fact;
-4. a first-story detector is scored with miss and false-alarm rates against a known story stream.
+4. the concrete instance-promotion API retains the accepted layer and rejects every non-promoted layer;
+5. a first-story detector is scored with miss and false-alarm rates against a known story stream.
 
 Full TDT tracking/calibration and CHRONOS schema extraction remain accepted-target. No database migration is allocated.
 
@@ -24,6 +25,7 @@ Allan (2002) defines first-story detection as a scored measurement task with mis
 ## Verification
 
 - `admit_state_transition(PromotedTransition)` succeeds;
+- `EventInstance::promote_from_mentions` retains `PromotedTransition` and rejects observed mentions, TDT detections, CHRONOS predictions, and temporal-consistency judgments;
 - TDT/mention/consistency layers return `DetectionIsNotTransition`;
 - CHRONOS predictions return `PredictionIsNotFact`;
 - stream `[10,20,10,30,20]` recovers three first stories with miss rate 0 and false-alarm rate 0;

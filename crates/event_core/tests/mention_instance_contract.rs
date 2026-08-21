@@ -1,8 +1,8 @@
 //! Realistic contracts: mentions are not instances; promotion is explicit.
 
 use event_core::{
-    EventConfidence, EventError, EventInstance, EventMention, EventRegistry, EventRoleKind,
-    refuse_mention_as_instance,
+    EventConfidence, EventError, EventEvidenceLayer, EventInstance, EventMention, EventRegistry,
+    EventRoleKind, refuse_mention_as_instance,
 };
 use evidence_core::{DocumentRecord, EvidenceId, SourceArtifact};
 use temporal_core::EventTime;
@@ -50,6 +50,7 @@ fn registry_requires_supporting_mentions_before_instance_insert() {
         start,
         end,
         EventConfidence::certain().expect("certain"),
+        EventEvidenceLayer::PromotedTransition,
     )
     .expect("instance");
     assert_eq!(
@@ -65,6 +66,7 @@ fn registry_requires_supporting_mentions_before_instance_insert() {
         start,
         end,
         EventConfidence::certain().expect("certain"),
+        EventEvidenceLayer::PromotedTransition,
     )
     .expect("instance");
     instance.assign_role(EventRoleKind::Product, "contract award");
@@ -96,7 +98,8 @@ fn empty_surface_and_empty_mention_sets_fail_closed() {
             Vec::new(),
             start,
             end,
-            EventConfidence::certain().expect("c")
+            EventConfidence::certain().expect("c"),
+            EventEvidenceLayer::PromotedTransition,
         )
         .map(|_| ()),
         Err(EventError::InvalidWirePayload)
@@ -124,6 +127,7 @@ fn accessors_and_duplicate_identity_paths_are_covered() {
         start,
         end,
         EventConfidence::new(0.9).expect("c"),
+        EventEvidenceLayer::PromotedTransition,
     )
     .expect("instance");
     assert!((instance.confidence().value() - 0.9).abs() < f64::EPSILON);
@@ -145,4 +149,48 @@ fn accessors_and_duplicate_identity_paths_are_covered() {
         registry.insert_instance(instance),
         Err(EventError::DuplicateEventIdentity)
     );
+}
+
+#[test]
+fn promotion_rejects_every_non_promoted_evidence_layer() {
+    let evidence_id = document_evidence();
+    let mention = EventMention::new(
+        evidence_id,
+        "contract award announced",
+        EventConfidence::certain().expect("confidence"),
+    )
+    .expect("mention");
+    let start = EventTime::parse_rfc3339("2026-03-01T00:00:00Z").expect("start");
+    let end = EventTime::parse_rfc3339("2026-03-01T23:59:59Z").expect("end");
+
+    for (layer, expected) in [
+        (
+            EventEvidenceLayer::ObservedMention,
+            EventError::DetectionIsNotTransition,
+        ),
+        (
+            EventEvidenceLayer::TdtDetection,
+            EventError::DetectionIsNotTransition,
+        ),
+        (
+            EventEvidenceLayer::ChronosPrediction,
+            EventError::PredictionIsNotFact,
+        ),
+        (
+            EventEvidenceLayer::TemporalConsistency,
+            EventError::DetectionIsNotTransition,
+        ),
+    ] {
+        assert_eq!(
+            EventInstance::promote_from_mentions(
+                vec![mention.mention_id()],
+                start,
+                end,
+                EventConfidence::certain().expect("confidence"),
+                layer,
+            )
+            .map(|_| ()),
+            Err(expected)
+        );
+    }
 }

@@ -1,6 +1,7 @@
 //! Evidence-status gates for TDT detection and CHRONOS prediction.
 
 use crate::EventError;
+use std::{collections::HashSet, hash::BuildHasher};
 
 /// Epistemic layer of an event-intelligence output.
 ///
@@ -68,7 +69,10 @@ pub enum TdtStoryDecision {
 
 /// Classify one candidate against previously seen story identities.
 #[must_use]
-pub fn classify_tdt_story(seen_story_ids: &[u64], candidate_story_id: u64) -> TdtStoryDecision {
+pub fn classify_tdt_story<S: BuildHasher>(
+    seen_story_ids: &HashSet<u64, S>,
+    candidate_story_id: u64,
+) -> TdtStoryDecision {
     if seen_story_ids.contains(&candidate_story_id) {
         TdtStoryDecision::Track
     } else {
@@ -176,14 +180,22 @@ pub fn first_story_detection_rates(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::{
         EventEvidenceLayer, TdtStoryDecision, classify_tdt_story, first_story_detection_rates,
     };
 
     #[test]
     fn zero_denominator_rates_are_zero_and_track_is_not_first() {
-        assert_eq!(classify_tdt_story(&[7], 7), TdtStoryDecision::Track);
-        assert_eq!(classify_tdt_story(&[], 8), TdtStoryDecision::FirstStory);
+        assert_eq!(
+            classify_tdt_story(&HashSet::from([7]), 7),
+            TdtStoryDecision::Track
+        );
+        assert_eq!(
+            classify_tdt_story(&HashSet::new(), 8),
+            TdtStoryDecision::FirstStory
+        );
         assert!(first_story_detection_rates(&[], &[]).is_err());
         assert!(first_story_detection_rates(&[true], &[true, false]).is_err());
         let no_first_story = std::hint::black_box(
