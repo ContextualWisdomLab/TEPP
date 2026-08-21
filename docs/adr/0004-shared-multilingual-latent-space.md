@@ -1,7 +1,7 @@
 # ADR 0004 — Shared multilingual latent semantic space
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** partial — section-boilerplate method source is `section_source` on the active PR; shared-space estimators, language profiles, stopword-deletion and TF-IDF/BM25 inferential-weight refusal remain accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs the complete topic-estimator/backend/global-topic contract built on this multilingual measurement decision.
 

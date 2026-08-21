@@ -22,6 +22,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/section_source
 ```
 
 ## Local verification
