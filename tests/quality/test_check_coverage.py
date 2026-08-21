@@ -323,6 +323,7 @@ class CoverageContractTests(unittest.TestCase):
                 "    executable_statement();",  # 57 executable
                 "pub(crate) fn crate_visible() {",  # 58 visibility-qualified fn
                 "State::Accepted => {",  # 59 match-arm structure
+                "State::Guarded(value) if valid(value) => {",  # 60 guarded arm is executable
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -337,7 +338,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 44, 57}
+            expected_executable = {13, 40, 44, 57, 60}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:

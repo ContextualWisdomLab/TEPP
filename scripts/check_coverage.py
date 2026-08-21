@@ -96,7 +96,9 @@ def is_executable_source_line(
         return False
     if text.startswith("pub(crate) fn "):
         return False
-    if text.endswith("=> {"):
+    # Keep guarded match arms in the authored-line denominator: the guard
+    # executes even though the arm label itself is structural.
+    if text.endswith("=> {") and " if " not in text:
         return False
     if text.startswith("pub struct ") or text.startswith("struct "):
         return False

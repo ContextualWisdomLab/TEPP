@@ -125,6 +125,12 @@ fn review_and_copilot_headers_are_authorization_denied() {
         "x-anthropic-key",
         "x-bytez-api-key",
         "x-openrouter-api-key",
+        "x_api_key",
+        "x-secret",
+        "x-credential",
+        "x_openai",
+        "x_bytez",
+        "x_openrouter",
     ] {
         assert_eq!(
             naruon_analysis_run_exchange_with_headers(
