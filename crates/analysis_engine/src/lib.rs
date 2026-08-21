@@ -25,6 +25,8 @@ pub const ANALYSIS_ARTIFACT_SCHEMA_VERSION: &str = "tepp.temporal_evidence_readi
 pub const ANALYSIS_STATISTIC_COUNT: u64 = 4;
 /// Maximum number of evidence units accepted by one in-memory execution.
 pub const MAX_EVIDENCE_UNITS: usize = 100_000;
+/// Maximum UTF-8 byte length of one snapshot or opaque evidence identifier.
+pub const MAX_ANALYSIS_IDENTIFIER_BYTES: usize = 256;
 
 /// A bounded identity-free evidence unit offered to one analysis run.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -50,7 +52,7 @@ impl AnalysisEvidenceUnit {
         membership_count: u32,
     ) -> Result<Self, AnalysisEngineError> {
         let evidence_id = evidence_id.into();
-        if evidence_id.is_empty() || membership_count == 0 {
+        if !valid_identifier(&evidence_id) || membership_count == 0 {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         Ok(Self {
@@ -106,7 +108,7 @@ impl AnalysisCorpus {
         evidence_units: Vec<AnalysisEvidenceUnit>,
     ) -> Result<Self, AnalysisEngineError> {
         let snapshot_id = snapshot_id.into();
-        if snapshot_id.is_empty() {
+        if !valid_identifier(&snapshot_id) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         if evidence_units.len() > MAX_EVIDENCE_UNITS {
@@ -336,11 +338,18 @@ fn format_digest(digest: impl AsRef<[u8]>) -> String {
     output
 }
 
+fn valid_identifier(value: &str) -> bool {
+    !value.trim().is_empty()
+        && value.len() <= MAX_ANALYSIS_IDENTIFIER_BYTES
+        && !value.chars().any(char::is_control)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
-        AnalysisEngineError, AnalysisEvidenceUnit, MAX_EVIDENCE_UNITS, execute_analysis_run,
+        AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
+        MAX_EVIDENCE_UNITS, execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -461,11 +470,28 @@ mod tests {
             Err(AnalysisEngineError::InvalidEvidence)
         );
         assert_eq!(
+            AnalysisCorpus::new("\n", Vec::new()),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            AnalysisCorpus::new("s".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES + 1), Vec::new()),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
             AnalysisEvidenceUnit::new(
                 "e",
                 EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("event"),
                 AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available"),
                 0,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            AnalysisEvidenceUnit::new(
+                "e".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES + 1),
+                EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("event"),
+                AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available"),
+                1,
             ),
             Err(AnalysisEngineError::InvalidEvidence)
         );
