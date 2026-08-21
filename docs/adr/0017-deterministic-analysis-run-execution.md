@@ -25,6 +25,7 @@ evidence snapshot. It:
 - preserves multiple-membership assignments by summing their counts rather than
   reducing an evidence unit to one group;
 - binds the result to the accepted run and source snapshot;
+- verifies request/receipt idempotency identity before scanning the corpus;
 - emits a canonical SHA-256-digested `AnalysisArtifact` and the versioned
   `AnalysisRunTerminalResult` from `tepp_api`;
 - returns a content-redacted failed terminal result when no evidence is

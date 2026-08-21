@@ -75,3 +75,33 @@ fn snapshot_identity_is_not_inferred_from_customer_payload() {
         Err(AnalysisEngineError::SnapshotMismatch)
     );
 }
+
+#[test]
+fn mismatched_receipt_identity_is_rejected_before_corpus_scan() {
+    let request = AnalysisRunRequest {
+        contract_version: 1,
+        idempotency_key: "request-idempotency".into(),
+        tenant_workspace_id: "workspace".into(),
+        snapshot_id: "snapshot".into(),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        model_contract_version: "model-v1".into(),
+        output_profile: "report".into(),
+    };
+    let accepted =
+        AnalysisRunAccepted::new("run", "accepted", "receipt-idempotency").expect("accepted");
+    let corpus = AnalysisCorpus::new(
+        "snapshot",
+        vec![
+            evidence("duplicate-evidence", "2026-07-01T00:00:00Z", 1),
+            evidence("duplicate-evidence", "2026-07-02T00:00:00Z", 1),
+        ],
+    )
+    .expect("snapshot");
+
+    assert_eq!(
+        execute_analysis_run(&request, &accepted, &corpus, "2026-08-01T00:01:00Z"),
+        Err(AnalysisEngineError::Api(
+            tepp_api::ApiError::InvalidWirePayload
+        ))
+    );
+}

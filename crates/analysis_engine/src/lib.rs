@@ -249,6 +249,7 @@ pub fn execute_analysis_run(
 ) -> Result<AnalysisExecution, AnalysisEngineError> {
     request.to_json()?;
     accepted.to_json()?;
+    require_receipt_identity(request, accepted)?;
     if request.snapshot_id != corpus.snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
@@ -307,7 +308,7 @@ pub fn execute_analysis_run(
             statistic_count: ANALYSIS_STATISTIC_COUNT,
             validation_status: "validated".to_owned(),
         };
-        AnalysisRunTerminalResult::succeeded(
+        let terminal_result = AnalysisRunTerminalResult::succeeded(
             request,
             accepted,
             artifact_id,
@@ -316,12 +317,23 @@ pub fn execute_analysis_run(
             completed_at,
             summary,
         )
-        .map_err(AnalysisEngineError::from)
-        .map(|terminal_result| AnalysisExecution {
+        .map_err(AnalysisEngineError::from)?;
+        Ok(AnalysisExecution {
             artifact: Some(artifact),
             terminal_result,
         })
     })
+}
+
+/// Require the accepted receipt to carry the request's idempotency identity.
+fn require_receipt_identity(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+) -> Result<(), AnalysisEngineError> {
+    if request.idempotency_key != accepted.idempotency_key {
+        return Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload));
+    }
+    Ok(())
 }
 
 fn format_digest(digest: impl AsRef<[u8]>) -> String {
@@ -502,6 +514,27 @@ mod tests {
         assert_eq!(
             execute_analysis_run(&request(), &accepted(), &corpus, "2026-08-03T00:00:00Z"),
             Err(AnalysisEngineError::SnapshotMismatch)
+        );
+        let mismatched_receipt =
+            AnalysisRunAccepted::new("run-1", "accepted", "other-idempotency").expect("receipt");
+        let matching_corpus = AnalysisCorpus::new(
+            "snapshot-1",
+            vec![unit(
+                "evidence-1",
+                "2026-07-01T00:00:00Z",
+                "2026-07-01T00:00:00Z",
+                1,
+            )],
+        )
+        .expect("corpus");
+        assert_eq!(
+            execute_analysis_run(
+                &request(),
+                &mismatched_receipt,
+                &matching_corpus,
+                "2026-08-03T00:00:00Z"
+            ),
+            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
         );
         let duplicate = AnalysisCorpus::new(
             "snapshot-1",

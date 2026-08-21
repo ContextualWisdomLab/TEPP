@@ -321,6 +321,7 @@ class CoverageContractTests(unittest.TestCase):
                 "    }",  # 55
                 "}",  # 56
                 "    executable_statement();",  # 57 executable
+                ")",  # 58 standalone structural close
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)

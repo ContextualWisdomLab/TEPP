@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- Authored Rust coverage classification now ignores standalone structural closing parentheses, preventing formatting-only LCOV rows from appearing as uncovered production behavior.
 - Stacked `analysis_engine` vertical slice (ADR 0017): bounded Rust execution from an accepted analysis run to a cutoff-safe, multiple-membership-aware, SHA-256-digest-bound terminal artifact or redacted no-eligible-evidence result. This is active-PR evidence and does not claim psychometric estimator authority.
 - `tepp_api` request-bound terminal analysis results and typed analysis-run status/read responses: accepted/running states cannot carry measurement evidence, terminal results bind exact request and receipt identities, and succeeded/failed payloads remain digest-bound or content-redacted.
 - `tepp_api` naruon live loopback HTTP/1.1 listener: `serve_one` installs a read/write deadline, requires a loopback `Host`, refuses `Transfer-Encoding` and NIM/proxy credential headers, parses `knowledge_cutoff` as RFC 3339 and refuses a future cutoff, keys analysis-run idempotency by tenant plus key, and proves both analysis-run and export POSTs over a real `TcpStream`. Not a production TLS/`$PORT` service (ADR 0011).
