@@ -123,14 +123,11 @@ class CoverageContractTests(unittest.TestCase):
         payload["data"][0]["files"] = [  # type: ignore[index]
             {
                 "filename": "src/live.rs",
-                "branches": [
-                    [10, 4, 10, 12, 1, 0, 0, 0, 4],
-                    [10, 4, 10, 12, 0, 1, 0, 0, 4],
-                ],
+                "branches": [[10, 4, 10, 12, 1, 0, 0, 0, 4]],
             },
             {
                 "filename": "src/live.rs",
-                "branches": [[10, 4, 10, 12, 0, 0, 0, 0, 4]],
+                "branches": [[10, 4, 10, 12, 0, 1, 0, 0, 4]],
             },
         ]
         with tempfile.TemporaryDirectory() as temporary:
@@ -150,11 +147,28 @@ class CoverageContractTests(unittest.TestCase):
         malformed_reports = (
             ([None], "file record must be an object"),
             ([{"filename": "", "branches": []}], "must contain a filename"),
+            ([{"filename": "src.rs"}], "must contain branches"),
             ([{"filename": "src.rs", "branches": {}}], "branches must be a list"),
             ([{"filename": "src.rs", "branches": [[1, 2]]}], "record is malformed"),
             (
+                [{"filename": "src.rs", "branches": [[True, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1.5, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, True, 0]]}],
+                "counts are invalid",
+            ),
+            (
                 [{"filename": "src.rs", "branches": [[-1, 2, 3, 4, 1, 0]]}],
                 "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, 0.5, 0]]}],
+                "counts are invalid",
             ),
             (
                 [{"filename": "src.rs", "branches": [[1, 2, 3, 4, -1, 0]]}],

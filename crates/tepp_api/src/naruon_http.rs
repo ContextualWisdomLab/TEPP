@@ -128,9 +128,7 @@ pub(crate) fn compose_https_target(origin: &str, path: &str) -> Result<String, A
         || host.contains('/')
         || host.contains('?')
         || host.contains('#')
-        || host
-            .chars()
-            .any(|ch| ch.is_control() || matches!(ch, '\'' | ';' | '\\' | ' '))
+        || host.chars().any(|ch| matches!(ch, '\'' | ';' | '\\' | ' '))
     {
         return Err(ApiError::InvalidWirePayload);
     }
@@ -188,10 +186,10 @@ pub(crate) fn standard_headers(idempotency_key: &str) -> Vec<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        NARUON_TEPP_INFERENCE_METHOD, compose_https_target, naruon_may_claim_tepp_inference,
-        refuse_credential_headers,
+        NARUON_TEPP_INFERENCE_METHOD, compose_https_target, naruon_export_exchange,
+        naruon_may_claim_tepp_inference, refuse_credential_headers,
     };
-    use crate::ApiError;
+    use crate::{AnalyticalPurpose, ApiError, ExportAuthorizationRequest};
 
     #[test]
     fn compose_https_target_accepts_clean_origin_and_rejects_hostile_forms() {
@@ -246,6 +244,11 @@ mod tests {
         );
         assert_eq!(
             compose_https_target("https://ho\u{0001}st", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let c1_control_origin = format!("https://host{}example", char::from_u32(0x80).unwrap());
+        assert_eq!(
+            compose_https_target(&c1_control_origin, "/v1/x"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
@@ -316,6 +319,29 @@ mod tests {
         );
         assert_eq!(
             refuse_credential_headers(&[("x-nvidia-nim-key", "nvapi-x")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+    }
+
+    #[test]
+    fn naruon_export_exchange_covers_unit_test_purpose_gate() {
+        let allowed = ExportAuthorizationRequest {
+            tenant_workspace_id: "tenant-a".into(),
+            principal_id: "naruon-service".into(),
+            purpose: AnalyticalPurpose::ModularServiceConsumer,
+            artifact_id: "artifact-a".into(),
+            includes_source_text: false,
+        };
+        assert!(
+            naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-a").is_ok()
+        );
+
+        let denied = ExportAuthorizationRequest {
+            purpose: AnalyticalPurpose::OperationalMonitoring,
+            ..allowed
+        };
+        assert_eq!(
+            naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-b"),
             Err(ApiError::AuthorizationDenied)
         );
     }

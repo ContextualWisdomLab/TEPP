@@ -38,12 +38,14 @@ def load_totals(path: Path) -> Mapping[str, Any]:
 def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | float]:
     """Merge LLVM branch outcomes by source coordinate across test binaries."""
 
-    outcomes: dict[tuple[str, int, int, int, int], list[int | float]] = {}
+    outcomes: dict[tuple[str, int, int, int, int], list[int]] = {}
     for file_record in files:
         if not isinstance(file_record, Mapping):
             raise ValueError("coverage file record must be an object")
         filename = file_record.get("filename")
-        branches = file_record.get("branches", [])
+        if "branches" not in file_record:
+            raise ValueError("coverage file record must contain branches")
+        branches = file_record["branches"]
         if not isinstance(filename, str) or not filename:
             raise ValueError("coverage file record must contain a filename")
         if not isinstance(branches, list):
@@ -53,12 +55,13 @@ def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | floa
                 raise ValueError("coverage branch record is malformed")
             coordinates = branch[:4]
             counts = branch[4:6]
-            if not all(isinstance(value, int) and value >= 0 for value in coordinates):
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in coordinates
+            ):
                 raise ValueError("coverage branch coordinates are invalid")
             if not all(
-                isinstance(value, (int, float))
-                and not isinstance(value, bool)
-                and value >= 0
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
                 for value in counts
             ):
                 raise ValueError("coverage branch counts are invalid")

@@ -5,9 +5,10 @@
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
 //! scientific crates; this crate only defines fail-closed interchange shapes.
-//! Naruon and `LineageWeave` use the versioned analysis-run contract; Naruon also
-//! owns the current purpose-bound export adapter. Loopback listeners prove the
-//! HTTP boundary without claiming production TLS or completed model results.
+//! naruon HTTP interchange is a versioned `https` POST to analysis-run and
+//! export paths; table-access URLs, review/Copilot/NIM/proxy headers, and
+//! lexical inference claims fail closed. A loopback live listener proves
+//! those POSTs over TCP without claiming production TLS (ADR 0011).
 
 mod analysis_run;
 mod analysis_run_live;
@@ -16,6 +17,7 @@ mod envelope;
 mod error;
 mod export;
 mod lineageweave_http;
+mod live_http;
 mod naruon_http;
 mod naruon_live;
 mod orchestration;
@@ -88,9 +90,9 @@ pub use naruon_live::NARUON_LIVE_HEADER_BYTE_LIMIT;
 pub use naruon_live::NARUON_LIVE_HEADER_COUNT_LIMIT;
 /// Accepted-stream read/write deadline.
 pub use naruon_live::NARUON_LIVE_IO_TIMEOUT;
-/// HTTP/1.1 response from the loopback listener.
+/// HTTP/1.1 response from the naruon live listener.
 pub use naruon_live::NaruonLiveResponse;
-/// Backward-compatible Naruon loopback HTTP/1.1 service.
+/// Loopback live HTTP/1.1 service for naruon POSTs.
 pub use naruon_live::NaruonLiveService;
 /// Comparable-budget ablation record.
 pub use orchestration::BudgetAblationRecord;

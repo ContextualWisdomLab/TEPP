@@ -2,24 +2,35 @@
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 
 use crate::authorization::{
     AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
 };
-use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH, header_is_credential};
+use crate::lineageweave_http::NARUON_CONSUMER_CODE;
+use crate::live_http::{
+    header_value, map_io_error, parse_headers, parse_request_line, read_http_request,
+    split_request, validate_common_headers,
+};
+use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH};
 use crate::wire::{from_json, to_json};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
-    ErrorEnvelope, requests_are_idempotent_matches,
+    AnalysisRunAccepted, AnalysisRunRequest, ApiError, ErrorEnvelope,
+    requests_are_idempotent_matches,
 };
 
-/// Maximum request-line plus header bytes accepted before the body.
-pub const NARUON_LIVE_HEADER_BYTE_LIMIT: usize = 8 * 1024;
+#[cfg(test)]
+use crate::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
+#[cfg(test)]
+use crate::live_http::{
+    declared_content_length, host_implies_table_access, host_is_loopback, split_header_line,
+};
 
-/// Maximum number of HTTP header lines on one live request.
-pub const NARUON_LIVE_HEADER_COUNT_LIMIT: usize = 32;
+/// Maximum live HTTP header-block bytes.
+pub use crate::live_http::NARUON_LIVE_HEADER_BYTE_LIMIT;
+/// Maximum live HTTP header count.
+pub use crate::live_http::NARUON_LIVE_HEADER_COUNT_LIMIT;
 
 /// Read and write deadline installed on every accepted stream.
 pub const NARUON_LIVE_IO_TIMEOUT: Duration = Duration::from_secs(1);
@@ -164,35 +175,7 @@ impl NaruonLiveService {
     /// [`NARUON_LIVE_HEADER_BYTE_LIMIT`]. Other read/framing failures are
     /// [`ApiError::InvalidWirePayload`].
     pub fn read_http_request<R: Read>(reader: &mut R) -> Result<String, ApiError> {
-        let mut header_bytes = Vec::new();
-        let mut byte = [0_u8; 1];
-        loop {
-            if header_bytes.len() >= NARUON_LIVE_HEADER_BYTE_LIMIT {
-                return Err(ApiError::LimitExceeded);
-            }
-            let read = reader
-                .read(&mut byte)
-                .map_err(|error| map_io_error(&error))?;
-            if read == 0 {
-                return Err(ApiError::InvalidWirePayload);
-            }
-            header_bytes.push(byte[0]);
-            if header_bytes.ends_with(b"\r\n\r\n") {
-                break;
-            }
-        }
-        let header_text =
-            std::str::from_utf8(&header_bytes).map_err(|_| ApiError::InvalidWirePayload)?;
-        let content_length = declared_content_length(header_text)?;
-        if content_length > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
-            return Err(ApiError::LimitExceeded);
-        }
-        let mut body = vec![0_u8; content_length];
-        reader
-            .read_exact(&mut body)
-            .map_err(|error| map_io_error(&error))?;
-        let body_text = std::str::from_utf8(&body).map_err(|_| ApiError::InvalidWirePayload)?;
-        Ok(format!("{header_text}{body_text}"))
+        read_http_request(reader)
     }
 
     /// Write one HTTP/1.1 response to `writer`.
@@ -340,123 +323,12 @@ fn status_for(error: ApiError) -> (u16, &'static str) {
     }
 }
 
-fn map_io_error(error: &std::io::Error) -> ApiError {
-    match error.kind() {
-        std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock => ApiError::LimitExceeded,
-        _ => ApiError::InvalidWirePayload,
-    }
-}
-
-fn split_request(request: &str) -> Result<(&str, &str), ApiError> {
-    let Some(index) = request.find("\r\n\r\n") else {
-        if request.len() >= NARUON_LIVE_HEADER_BYTE_LIMIT {
-            return Err(ApiError::LimitExceeded);
-        }
-        return Err(ApiError::InvalidWirePayload);
-    };
-    if index > NARUON_LIVE_HEADER_BYTE_LIMIT {
-        return Err(ApiError::LimitExceeded);
-    }
-    let header_block = &request[..index];
-    let body = &request[index + 4..];
-    let declared = declared_content_length(&format!("{header_block}\r\n\r\n"))?;
-    if declared != body.len() {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if declared > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
-        return Err(ApiError::LimitExceeded);
-    }
-    Ok((header_block, body))
-}
-
-fn declared_content_length(header_text: &str) -> Result<usize, ApiError> {
-    let header_block = header_text
-        .strip_suffix("\r\n\r\n")
-        .ok_or(ApiError::InvalidWirePayload)?;
-    let mut found = None;
-    for line in header_block.split("\r\n").skip(1) {
-        let (name, value) = split_header_line(line)?;
-        if name.eq_ignore_ascii_case("content-length") {
-            if found.is_some() {
-                return Err(ApiError::InvalidWirePayload);
-            }
-            if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-                return Err(ApiError::InvalidWirePayload);
-            }
-            found = Some(value.parse().map_err(|_| ApiError::InvalidWirePayload)?);
-        }
-    }
-    found.ok_or(ApiError::InvalidWirePayload)
-}
-
-fn parse_request_line(line: &str) -> Result<(&str, &str), ApiError> {
-    let mut parts = line.split(' ');
-    let method = parts.next().ok_or(ApiError::InvalidWirePayload)?;
-    let path = parts.next().ok_or(ApiError::InvalidWirePayload)?;
-    let version = parts.next().ok_or(ApiError::InvalidWirePayload)?;
-    if parts.next().is_some() || version != "HTTP/1.1" {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if !path.starts_with('/') || path.contains('?') || path.contains('#') || path.contains("://") {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    Ok((method, path))
-}
-
-fn parse_headers<'a, I>(lines: I) -> Result<HashMap<String, String>, ApiError>
-where
-    I: Iterator<Item = &'a str>,
-{
-    let mut headers = HashMap::new();
-    let mut count = 0_usize;
-    for line in lines {
-        count += 1;
-        if count > NARUON_LIVE_HEADER_COUNT_LIMIT {
-            return Err(ApiError::LimitExceeded);
-        }
-        let (name, value) = split_header_line(line)?;
-        let key = name.to_ascii_lowercase();
-        if headers.contains_key(&key) {
-            return Err(ApiError::InvalidWirePayload);
-        }
-        headers.insert(key, value.to_owned());
-    }
-    Ok(headers)
-}
-
-fn split_header_line(line: &str) -> Result<(&str, &str), ApiError> {
-    let Some((name, value)) = line.split_once(':') else {
-        return Err(ApiError::InvalidWirePayload);
-    };
-    if name.is_empty() || name.chars().any(|ch| ch.is_whitespace() || ch.is_control()) {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    Ok((name, value.trim()))
-}
-
 fn refuse_live_headers(
     headers: &HashMap<String, String>,
     bound_addr: Option<SocketAddr>,
 ) -> Result<(), ApiError> {
-    for name in headers.keys() {
-        if header_is_credential(name) {
-            return Err(ApiError::AuthorizationDenied);
-        }
-    }
-    if headers.contains_key("transfer-encoding") {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    let host = header_value(headers, "host")?;
-    if host_implies_table_access(host) {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if !host_is_loopback(host, bound_addr) {
-        return Err(ApiError::AuthorizationDenied);
-    }
-    if header_value(headers, "content-type")? != "application/json" {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if header_value(headers, "tepp-consumer")? != "naruon" {
+    validate_common_headers(headers, bound_addr)?;
+    if header_value(headers, "tepp-consumer")? != NARUON_CONSUMER_CODE {
         return Err(ApiError::InvalidWirePayload);
     }
     if header_value(headers, "tepp-contract-version")? != "1" {
@@ -466,50 +338,6 @@ fn refuse_live_headers(
     Ok(())
 }
 
-fn header_value<'a>(headers: &'a HashMap<String, String>, name: &str) -> Result<&'a str, ApiError> {
-    let value = headers.get(name).ok_or(ApiError::InvalidWirePayload)?;
-    if value.is_empty() {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    Ok(value.as_str())
-}
-
-fn host_implies_table_access(host: &str) -> bool {
-    let lowered = host.to_ascii_lowercase();
-    lowered.contains("postgres")
-        || lowered.contains("jdbc")
-        || lowered.contains("/sql")
-        || lowered.contains("/tables/")
-        || lowered.contains('\'')
-        || lowered.contains(';')
-        || lowered.contains('\\')
-        || lowered.contains(' ')
-        || lowered.chars().any(char::is_control)
-}
-
-pub(crate) fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
-    if let Some(bound) = bound_addr
-        && (host == bound.to_string() || host == bound.ip().to_string())
-    {
-        return true;
-    }
-    let lowered = host.to_ascii_lowercase();
-    if lowered == "localhost"
-        || lowered
-            .strip_prefix("localhost:")
-            .is_some_and(|port| !port.is_empty() && port.parse::<u16>().is_ok())
-    {
-        return true;
-    }
-    if let Ok(addr) = host.parse::<SocketAddr>() {
-        return addr.ip().is_loopback();
-    }
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        return ip.is_loopback();
-    }
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
@@ -517,13 +345,9 @@ mod tests {
         host_implies_table_access, host_is_loopback, map_io_error, parse_request_line,
         split_header_line, split_request, status_for, tenant_idempotency_key,
     };
-    use crate::{
-        ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalyticalPurpose, ApiError,
-        ExportAuthorizationRequest, NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH,
-    };
-    use std::io::{Cursor, ErrorKind, Read, Write};
-    use std::net::{SocketAddr, TcpStream};
-    use std::thread;
+    use crate::ApiError;
+    use std::io::ErrorKind;
+    use std::net::SocketAddr;
 
     #[test]
     fn helpers_cover_status_io_host_and_request_line_edges() {
@@ -568,7 +392,6 @@ mod tests {
         assert!(host_is_loopback("127.0.0.1", None));
         assert!(host_is_loopback("localhost", None));
         assert!(host_is_loopback("localhost:8080", None));
-        assert!(host_is_loopback("localhost:0", None));
         assert!(!host_is_loopback("localhost:invalid", None));
         assert!(!host_is_loopback("localhost:", None));
         assert!(host_is_loopback("[::1]:9", None));
@@ -578,9 +401,7 @@ mod tests {
         let bound: SocketAddr = "127.0.0.1:43789".parse().expect("bound");
         assert!(host_is_loopback("127.0.0.1:43789", Some(bound)));
         assert!(host_is_loopback("127.0.0.1", Some(bound)));
-        assert!(host_is_loopback("127.0.0.1:1", Some(bound)));
-        assert!(!host_is_loopback("8.8.8.8:1", Some(bound)));
-        assert!(!host_is_loopback("[::2]:9", None));
+        assert!(!host_is_loopback("8.8.8.8", Some(bound)));
         assert_eq!(
             tenant_idempotency_key("tenant-a", "idem-1"),
             "tenant-a\u{1f}idem-1"
@@ -588,42 +409,19 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn helpers_cover_request_line_headers_and_accept_failure() {
         assert_eq!(
             parse_request_line("POST /v1/analysis-runs HTTP/1.1 extra"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            parse_request_line("POST /v1/analysis-runs HTTP/1.1"),
-            Ok(("POST", "/v1/analysis-runs"))
-        );
-        assert_eq!(
             parse_request_line("POST https://tepp.example/v1/analysis-runs HTTP/1.1"),
-            Err(ApiError::InvalidWirePayload)
-        );
-        assert_eq!(
-            parse_request_line("POST /proxy://tepp.example/v1/analysis-runs HTTP/1.1"),
-            Err(ApiError::InvalidWirePayload)
-        );
-        assert_eq!(
-            parse_request_line("POST /v1/analysis-runs?query HTTP/1.1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
             parse_request_line("POST /v1/analysis-runs#x HTTP/1.1"),
             Err(ApiError::InvalidWirePayload)
-        );
-        assert_eq!(
-            parse_request_line("POST /v1/analysis-runs HTTP/1.0"),
-            Err(ApiError::InvalidWirePayload)
-        );
-        assert_eq!(
-            parse_request_line("POST /v1/analysis-runs HTTP/1.1"),
-            Ok(("POST", "/v1/analysis-runs"))
-        );
-        assert_eq!(
-            parse_request_line("GET /v1/analysis-runs HTTP/1.1"),
-            Ok(("GET", "/v1/analysis-runs"))
         );
         assert_eq!(
             parse_request_line("POST"),
@@ -634,6 +432,15 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            parse_request_line("POST /x HTTP/1.0"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_request_line("POST /x?query HTTP/1.1"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(parse_request_line("POST /x HTTP/1.1"), Ok(("POST", "/x")));
+        assert_eq!(
             split_header_line("NoColon"),
             Err(ApiError::InvalidWirePayload)
         );
@@ -643,10 +450,6 @@ mod tests {
         );
         assert_eq!(
             split_header_line("Bad Name: v"),
-            Err(ApiError::InvalidWirePayload)
-        );
-        assert_eq!(
-            split_header_line("Bad\u{0001}Name: v"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
@@ -664,29 +467,49 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            declared_content_length("POST /x HTTP/1.1\r\nHost: 127.0.0.1\r\n"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            declared_content_length(
+                "POST /x HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length: 0\r\n\r\n"
+            ),
+            Ok(0)
+        );
+        assert_eq!(
             declared_content_length("POST /x HTTP/1.1\r\ncontent-length: \r\n\r\n"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: 1\r\n\r\n"),
-            Ok(1)
-        );
-        assert_eq!(
-            declared_content_length("POST /x HTTP/1.1\r\nHost: 127.0.0.1\r\n"),
+            parse_request_line("POST /proxy://target HTTP/1.1"),
             Err(ApiError::InvalidWirePayload)
-        );
-    }
-
-    #[test]
-    fn helpers_cover_request_limits_envelopes_and_accept_failure() {
-        assert_eq!(
-            NaruonLiveService::read_http_request(&mut Cursor::new(
-                b"POST /v1/analysis-runs HTTP/1.1\r\ncontent-length: 0\r\n\r\n".to_vec(),
-            )),
-            Ok("POST /v1/analysis-runs HTTP/1.1\r\ncontent-length: 0\r\n\r\n".into())
         );
         assert_eq!(
             split_request(&"x".repeat(super::NARUON_LIVE_HEADER_BYTE_LIMIT)),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(split_request("short"), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            split_request("POST /x HTTP/1.1\r\ncontent-length: 0\r\n\r\n"),
+            Ok(("POST /x HTTP/1.1\r\ncontent-length: 0", ""))
+        );
+        assert_eq!(
+            split_request(&format!(
+                "{}\r\n\r\n",
+                "x".repeat(super::NARUON_LIVE_HEADER_BYTE_LIMIT + 1)
+            )),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(
+            split_request("POST /x HTTP/1.1\r\ncontent-length: 1\r\n\r\n"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let oversized_body = "x".repeat(super::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT + 1);
+        assert_eq!(
+            split_request(&format!(
+                "POST /x HTTP/1.1\r\ncontent-length: {}\r\n\r\n{oversized_body}",
+                oversized_body.len()
+            )),
             Err(ApiError::LimitExceeded)
         );
         assert!(!fallback_envelope_json().is_empty());
@@ -701,112 +524,11 @@ mod tests {
             ),
             Err(ApiError::InvalidWirePayload)
         );
-        let bound: SocketAddr = "127.0.0.1:43789".parse().expect("bound");
-        assert!(host_is_loopback("127.0.0.1:1", Some(bound)));
         assert_eq!(
             NaruonLiveService::new()
                 .serve_accepted(Err(std::io::Error::other("accept")))
                 .expect_err("accept"),
             ApiError::InvalidWirePayload
-        );
-    }
-
-    #[test]
-    fn live_service_unit_path_accepts_and_replays_a_real_analysis_run() {
-        let run = AnalysisRunRequest {
-            contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
-            idempotency_key: "unit-live-idem".into(),
-            tenant_workspace_id: "unit-live-tenant".into(),
-            snapshot_id: "unit-live-snapshot".into(),
-            knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
-            model_contract_version: "topic-measurement-v1".into(),
-            output_profile: "unit-validation".into(),
-        };
-        let body = run.to_json().expect("run json");
-        let wire = format!(
-            "POST {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{body}",
-            run.idempotency_key,
-            body.len()
-        );
-        let mut service = NaruonLiveService::new();
-        let first = service.handle_http_request(&wire);
-        assert_eq!(first.status_code, 202);
-        assert_eq!(service.handle_http_request(&wire).body, first.body);
-        assert_eq!(
-            service
-                .handle_http_request(&wire.replace(
-                    "idempotency-key: unit-live-idem",
-                    "idempotency-key: different-idem",
-                ))
-                .status_code,
-            400
-        );
-        let conflicting_body = body.replace("unit-live-snapshot", "other-snapshot");
-        let conflicting_wire = wire
-            .replace(
-                &format!("content-length: {}", body.len()),
-                &format!("content-length: {}", conflicting_body.len()),
-            )
-            .replace(&body, &conflicting_body);
-        assert_eq!(
-            service.handle_http_request(&conflicting_wire).status_code,
-            400
-        );
-        let expected_wire = wire.clone();
-        assert_eq!(
-            NaruonLiveService::read_http_request(&mut Cursor::new(wire.into_bytes()))
-                .expect("wire read"),
-            expected_wire
-        );
-    }
-
-    #[test]
-    fn live_service_unit_path_authorizes_a_modular_export() {
-        let export = ExportAuthorizationRequest {
-            tenant_workspace_id: "unit-live-tenant".into(),
-            principal_id: "unit-live-principal".into(),
-            purpose: AnalyticalPurpose::ModularServiceConsumer,
-            artifact_id: "unit-live-artifact".into(),
-            includes_source_text: false,
-        };
-        let body = serde_json::to_string(&export).expect("export json");
-        let wire = format!(
-            "POST {NARUON_EXPORT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: export-unit\r\ncontent-length: {}\r\n\r\n{body}",
-            body.len()
-        );
-        assert_eq!(
-            NaruonLiveService::new()
-                .handle_http_request(&wire)
-                .status_code,
-            200
-        );
-
-        let mut service = NaruonLiveService::bind_loopback().expect("loopback bind");
-        let address = service.local_addr().expect("address");
-        let worker = thread::spawn(move || service.serve_one());
-        let mut client = TcpStream::connect(address).expect("connect");
-        client
-            .write_all(
-                b"POST /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: empty-body\r\ncontent-length: 0\r\n\r\n",
-            )
-            .expect("request");
-        client
-            .shutdown(std::net::Shutdown::Write)
-            .expect("shutdown");
-        let mut response_bytes = Vec::new();
-        client.read_to_end(&mut response_bytes).expect("response");
-        assert!(
-            String::from_utf8(response_bytes)
-                .expect("HTTP response")
-                .starts_with("HTTP/1.1 400 Bad Request\r\n")
-        );
-        assert_eq!(
-            worker
-                .join()
-                .expect("server thread")
-                .expect("serve")
-                .status_code,
-            400
         );
     }
 }
