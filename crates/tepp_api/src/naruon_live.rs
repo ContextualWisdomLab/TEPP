@@ -2,24 +2,35 @@
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 
 use crate::authorization::{
     AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
 };
-use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH, header_is_credential};
+use crate::lineageweave_http::NARUON_CONSUMER_CODE;
+use crate::live_http::{
+    header_value, map_io_error, parse_headers, parse_request_line, read_http_request,
+    split_request, validate_common_headers,
+};
+use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH};
 use crate::wire::{from_json, to_json};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
-    ErrorEnvelope, requests_are_idempotent_matches,
+    AnalysisRunAccepted, AnalysisRunRequest, ApiError, ErrorEnvelope,
+    requests_are_idempotent_matches,
 };
 
-/// Maximum request-line plus header bytes accepted before the body.
-pub const NARUON_LIVE_HEADER_BYTE_LIMIT: usize = 8 * 1024;
+#[cfg(test)]
+use crate::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
+#[cfg(test)]
+use crate::live_http::{
+    declared_content_length, host_implies_table_access, host_is_loopback, split_header_line,
+};
 
-/// Maximum number of HTTP header lines on one live request.
-pub const NARUON_LIVE_HEADER_COUNT_LIMIT: usize = 32;
+/// Maximum live HTTP header-block bytes.
+pub use crate::live_http::NARUON_LIVE_HEADER_BYTE_LIMIT;
+/// Maximum live HTTP header count.
+pub use crate::live_http::NARUON_LIVE_HEADER_COUNT_LIMIT;
 
 /// Read and write deadline installed on every accepted stream.
 pub const NARUON_LIVE_IO_TIMEOUT: Duration = Duration::from_secs(1);
@@ -164,37 +175,7 @@ impl NaruonLiveService {
     /// [`NARUON_LIVE_HEADER_BYTE_LIMIT`]. Other read/framing failures are
     /// [`ApiError::InvalidWirePayload`].
     pub fn read_http_request<R: Read>(reader: &mut R) -> Result<String, ApiError> {
-        let mut header_bytes = Vec::new();
-        let mut byte = [0_u8; 1];
-        loop {
-            if header_bytes.len() >= NARUON_LIVE_HEADER_BYTE_LIMIT {
-                return Err(ApiError::LimitExceeded);
-            }
-            let read = reader
-                .read(&mut byte)
-                .map_err(|error| map_io_error(&error))?;
-            if read == 0 {
-                return Err(ApiError::InvalidWirePayload);
-            }
-            header_bytes.push(byte[0]);
-            if header_bytes.ends_with(b"\r\n\r\n") {
-                break;
-            }
-        }
-        let header_text =
-            std::str::from_utf8(&header_bytes).map_err(|_| ApiError::InvalidWirePayload)?;
-        let content_length = declared_content_length(header_text)?;
-        if content_length > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
-            return Err(ApiError::LimitExceeded);
-        }
-        let mut body = vec![0_u8; content_length];
-        if content_length > 0 {
-            reader
-                .read_exact(&mut body)
-                .map_err(|error| map_io_error(&error))?;
-        }
-        let body_text = std::str::from_utf8(&body).map_err(|_| ApiError::InvalidWirePayload)?;
-        Ok(format!("{header_text}{body_text}"))
+        read_http_request(reader)
     }
 
     /// Write one HTTP/1.1 response to `writer`.
@@ -342,123 +323,12 @@ fn status_for(error: ApiError) -> (u16, &'static str) {
     }
 }
 
-fn map_io_error(error: &std::io::Error) -> ApiError {
-    match error.kind() {
-        std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock => ApiError::LimitExceeded,
-        _ => ApiError::InvalidWirePayload,
-    }
-}
-
-fn split_request(request: &str) -> Result<(&str, &str), ApiError> {
-    let Some(index) = request.find("\r\n\r\n") else {
-        if request.len() >= NARUON_LIVE_HEADER_BYTE_LIMIT {
-            return Err(ApiError::LimitExceeded);
-        }
-        return Err(ApiError::InvalidWirePayload);
-    };
-    if index > NARUON_LIVE_HEADER_BYTE_LIMIT {
-        return Err(ApiError::LimitExceeded);
-    }
-    let header_block = &request[..index];
-    let body = &request[index + 4..];
-    let declared = declared_content_length(&format!("{header_block}\r\n\r\n"))?;
-    if declared != body.len() {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if declared > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
-        return Err(ApiError::LimitExceeded);
-    }
-    Ok((header_block, body))
-}
-
-fn declared_content_length(header_text: &str) -> Result<usize, ApiError> {
-    let header_block = header_text
-        .strip_suffix("\r\n\r\n")
-        .ok_or(ApiError::InvalidWirePayload)?;
-    let mut found = None;
-    for line in header_block.split("\r\n").skip(1) {
-        let (name, value) = split_header_line(line)?;
-        if name.eq_ignore_ascii_case("content-length") {
-            if found.is_some() {
-                return Err(ApiError::InvalidWirePayload);
-            }
-            if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-                return Err(ApiError::InvalidWirePayload);
-            }
-            found = Some(value.parse().map_err(|_| ApiError::InvalidWirePayload)?);
-        }
-    }
-    found.ok_or(ApiError::InvalidWirePayload)
-}
-
-fn parse_request_line(line: &str) -> Result<(&str, &str), ApiError> {
-    let mut parts = line.split(' ');
-    let method = parts.next().ok_or(ApiError::InvalidWirePayload)?;
-    let path = parts.next().ok_or(ApiError::InvalidWirePayload)?;
-    let version = parts.next().ok_or(ApiError::InvalidWirePayload)?;
-    if parts.next().is_some() || version != "HTTP/1.1" {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if !path.starts_with('/') || path.contains('?') || path.contains('#') || path.contains("://") {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    Ok((method, path))
-}
-
-fn parse_headers<'a, I>(lines: I) -> Result<HashMap<String, String>, ApiError>
-where
-    I: Iterator<Item = &'a str>,
-{
-    let mut headers = HashMap::new();
-    let mut count = 0_usize;
-    for line in lines {
-        count += 1;
-        if count > NARUON_LIVE_HEADER_COUNT_LIMIT {
-            return Err(ApiError::LimitExceeded);
-        }
-        let (name, value) = split_header_line(line)?;
-        let key = name.to_ascii_lowercase();
-        if headers.contains_key(&key) {
-            return Err(ApiError::InvalidWirePayload);
-        }
-        headers.insert(key, value.to_owned());
-    }
-    Ok(headers)
-}
-
-fn split_header_line(line: &str) -> Result<(&str, &str), ApiError> {
-    let Some((name, value)) = line.split_once(':') else {
-        return Err(ApiError::InvalidWirePayload);
-    };
-    if name.is_empty() || name.chars().any(|ch| ch.is_whitespace() || ch.is_control()) {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    Ok((name, value.trim()))
-}
-
 fn refuse_live_headers(
     headers: &HashMap<String, String>,
     bound_addr: Option<SocketAddr>,
 ) -> Result<(), ApiError> {
-    for name in headers.keys() {
-        if header_is_credential(name) {
-            return Err(ApiError::AuthorizationDenied);
-        }
-    }
-    if headers.contains_key("transfer-encoding") {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    let host = header_value(headers, "host")?;
-    if host_implies_table_access(host) {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if !host_is_loopback(host, bound_addr) {
-        return Err(ApiError::AuthorizationDenied);
-    }
-    if header_value(headers, "content-type")? != "application/json" {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if header_value(headers, "tepp-consumer")? != "naruon" {
+    validate_common_headers(headers, bound_addr)?;
+    if header_value(headers, "tepp-consumer")? != NARUON_CONSUMER_CODE {
         return Err(ApiError::InvalidWirePayload);
     }
     if header_value(headers, "tepp-contract-version")? != "1" {
@@ -466,50 +336,6 @@ fn refuse_live_headers(
     }
     let _idempotency_key = header_value(headers, "idempotency-key")?;
     Ok(())
-}
-
-fn header_value<'a>(headers: &'a HashMap<String, String>, name: &str) -> Result<&'a str, ApiError> {
-    let value = headers.get(name).ok_or(ApiError::InvalidWirePayload)?;
-    if value.is_empty() {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    Ok(value.as_str())
-}
-
-fn host_implies_table_access(host: &str) -> bool {
-    let lowered = host.to_ascii_lowercase();
-    lowered.contains("postgres")
-        || lowered.contains("jdbc")
-        || lowered.contains("/sql")
-        || lowered.contains("/tables/")
-        || lowered.contains('\'')
-        || lowered.contains(';')
-        || lowered.contains('\\')
-        || lowered.contains(' ')
-        || lowered.chars().any(char::is_control)
-}
-
-pub(crate) fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
-    if let Some(bound) = bound_addr
-        && (host == bound.to_string() || host == bound.ip().to_string())
-    {
-        return true;
-    }
-    let lowered = host.to_ascii_lowercase();
-    if lowered == "localhost"
-        || lowered
-            .strip_prefix("localhost:")
-            .is_some_and(|port| !port.is_empty() && port.parse::<u16>().is_ok())
-    {
-        return true;
-    }
-    if let Ok(addr) = host.parse::<SocketAddr>() {
-        return addr.ip().is_loopback();
-    }
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        return ip.is_loopback();
-    }
-    false
 }
 
 #[cfg(test)]

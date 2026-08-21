@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use tepp_api::{
     ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
-    ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_LIVE_HEADER_BYTE_LIMIT,
-    lineageweave_analysis_run_exchange,
+    ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE,
+    NARUON_LIVE_HEADER_BYTE_LIMIT, lineageweave_analysis_run_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -87,7 +87,7 @@ fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     let run = sample_run();
     let mut service = AnalysisRunLiveService::new();
 
-    let naruon = service.handle_http_request(&http_request("naruon", &run));
+    let naruon = service.handle_http_request(&http_request(NARUON_CONSUMER_CODE, &run));
     let lineageweave = service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &run));
 
     assert_eq!(naruon.status_code, 202);

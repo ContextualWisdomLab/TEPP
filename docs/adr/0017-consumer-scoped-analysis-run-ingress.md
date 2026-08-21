@@ -28,7 +28,7 @@ A retry from the same consumer returns the original accepted run only when the c
 
 Consumer-specific client builders may set only the published consumer identity. They reuse the shared request validation and must not add credentials. The Naruon compatibility listener remains available while new consumers use `AnalysisRunLiveService`.
 
-An HTTP `202 Accepted` response means only that TEPP accepted a durable analysis-run identity for later execution. It is not a completed temporal model, calibrated score, theta estimate, uncertainty statement, or scientific claim.
+An HTTP `202 Accepted` response means only that TEPP accepted an analysis-run identity for later execution. In the current loopback proof the accepted-run registry is in-memory and is not yet durable across restarts; persistence remains separate work. The response is not a completed temporal model, calibrated score, theta estimate, uncertainty statement, or scientific claim.
 
 ## Non-goals
 

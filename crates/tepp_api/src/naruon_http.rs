@@ -128,7 +128,6 @@ fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
         || host.contains('/')
         || host.contains('?')
         || host.contains('#')
-        || host.chars().any(char::is_control)
         || host.chars().any(|ch| matches!(ch, '\'' | ';' | '\\' | ' '))
     {
         return Err(ApiError::InvalidWirePayload);
@@ -245,6 +244,11 @@ mod tests {
         );
         assert_eq!(
             compose_https_target("https://ho\u{0001}st", "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let c1_control_origin = format!("https://host{}example", char::from_u32(0x80).unwrap());
+        assert_eq!(
+            compose_https_target(&c1_control_origin, "/v1/x"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
