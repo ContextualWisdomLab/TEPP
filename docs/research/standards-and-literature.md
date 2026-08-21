@@ -76,7 +76,7 @@ TEPP uses interval and partial-order reasoning, bitemporal availability, leakage
 
 ## Roles, membership, and multilevel structure
 
-Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100201
+Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100202
 
 Language, episode, template, department, and opportunity-pool memberships are crossed classifications. TEPP refuses collapsing those targets into the entity/project pair stored by migration `0006` (Browne et al., 2001).
 

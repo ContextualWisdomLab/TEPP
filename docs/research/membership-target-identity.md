@@ -28,4 +28,4 @@ classification.
 
 Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership
 multiple classification (MMMC) models. *Statistical Modelling, 1*(2),
-103–124. https://doi.org/10.1177/1471082X0100100201
+103–124. https://doi.org/10.1177/1471082X0100100202
