@@ -115,6 +115,10 @@
 //! change in process means given a time-independent predictor;
 //! `a < 0`; not the coefficient `B`, not
 //! `A^{-1}[e^{A Δt} − I] B z`, not `CINT`, and not `M x`),
+//! recovers the Driver §7.2 `addedTIPREDVAR` as `(B / a)² v`
+//! (pp. 20–21; stable between-subject variance accounted for by a
+//! time-independent predictor with variance `v`; not `TRAITVAR`,
+//! not `asymDIFFUSION`, and not `-B z / a`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -165,6 +169,8 @@ pub use event_time::LaggedWithinResidual;
 pub use event_time::map_discrete_lag_across_event_intervals;
 /// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
 pub use event_time::recover_asymptotic_time_independent_predictor_effect;
+/// Exact scalar §7.2 `addedTIPREDVAR` `(B / a)² v`.
+pub use event_time::recover_asymptotic_time_independent_predictor_variance;
 /// Exact scalar discrete effect of a constant event-time predictor.
 pub use event_time::recover_discrete_constant_predictor_effect;
 /// Exact scalar discrete intercept increment `A^{-1}[e^{A Δt} − I] κ`.
@@ -271,6 +277,12 @@ pub use event_time::refuse_asymptotic_time_independent_effect_as_continuous_inte
 pub use event_time::refuse_asymptotic_time_independent_effect_as_discrete_effect;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `M x`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_time_dependent_impulse;
+/// Refuse treating §7.2 `addedTIPREDVAR` as `asymTIPREDEFFECT`.
+pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_effect;
+/// Refuse treating §7.2 `addedTIPREDVAR` as `asymDIFFUSION`.
+pub use event_time::refuse_asymptotic_time_independent_variance_as_stationary_within_subject;
+/// Refuse treating §7.2 `addedTIPREDVAR` as `TRAITVAR`.
+pub use event_time::refuse_asymptotic_time_independent_variance_as_trait_variance;
 /// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
 pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 /// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.

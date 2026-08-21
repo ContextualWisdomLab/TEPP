@@ -56,7 +56,12 @@
 //! means given a unit increase on a time-independent predictor. The
 //! scalar map is `-B z / a` for stable `a < 0`. That total change is
 //! not the coefficient `B`, not the finite-interval increment
-//! `A^{-1}[e^{A Δt} − I] B z`, not `CINT`, and not `M x`. Table 3 (p. 13) names a different matrix
+//! `A^{-1}[e^{A Δt} − I] B z`, not `CINT`, and not `M x`. Section 7.2
+//! then names `addedTIPREDVAR` the stable between-subject variance
+//! accounted for by those predictors. The scalar map is `(B / a)² v`
+//! for predictor variance `v ≥ 0`. That variance is not `TRAITVAR`,
+//! not `asymDIFFUSION`, and not the expected total change `-B z / a`.
+//! Table 3 (p. 13) names a different matrix
 //! `T0TIPREDEFFECT` for time-independent predictors on latents at
 //! `T0`. The scalar first-occasion shift is `t0_b z`. Equation 3's
 //! first summand carries that shift as `e^{A Δt} t0_b z`. That carry
@@ -2652,6 +2657,114 @@ pub fn refuse_asymptotic_time_independent_effect_as_time_dependent_impulse(
     Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse)
 }
 
+/// Exact scalar §7.2 `addedTIPREDVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, §7.2, pp. 20–21; Eq. 3, p. 5;
+/// Table 2, p. 12; JSS PDF opened 2026-08-21T13:08Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `asymTIPREDEFFECT` the expected total change in process means
+/// given a unit increase on a time-independent predictor. The scalar
+/// map is `-B / a` for stable `a < 0`. Section 7.2 then names
+/// `addedTIPREDVAR` the stable between-subject variance accounted for
+/// by those predictors. For predictor variance `v ≥ 0` that variance
+/// is `(-B / a)² v`. Form the unit asymptotic effect first, then
+/// square, then multiply by `v`. A zero coefficient or zero predictor
+/// variance is exactly zero. `v < 0` fails closed. `a ≥ 0` cannot hold
+/// a finite process-mean change and fails closed. `(B / a)² v` is not
+/// `TRAITVAR`, not `asymDIFFUSION`, and not the expected total change
+/// `-B z / a`. This is not a Kalman filter, not a matrix `expm`, and
+/// not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift`]
+/// when the drift is not strictly negative and the variance is nonzero,
+/// and [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, the predictor variance is negative, or the product
+/// overflows.
+pub fn recover_asymptotic_time_independent_predictor_variance(
+    time_independent_effect: f64,
+    predictor_variance: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !time_independent_effect.is_finite()
+        || !predictor_variance.is_finite()
+        || !log_rate.is_finite()
+        || predictor_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if time_independent_effect == 0.0 || predictor_variance == 0.0 {
+        return Ok(0.0);
+    }
+    let unit_effect = recover_asymptotic_time_independent_predictor_effect(
+        time_independent_effect,
+        1.0,
+        log_rate,
+        clock,
+    )?;
+    let squared = require_finite(unit_effect * unit_effect)?;
+    require_finite(squared * predictor_variance)
+}
+
+/// Refuse treating §7.2 `addedTIPREDVAR` as `TRAITVAR`.
+///
+/// `(B / a)² v` is between-subject variance accounted for by a
+/// time-independent predictor. Section 4.3 `TRAITVAR` is a zero-drift
+/// latent process. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentVarianceIsNotTraitVariance`].
+pub fn refuse_asymptotic_time_independent_variance_as_trait_variance(
+    added_predictor_variance: f64,
+    trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (added_predictor_variance, trait_variance);
+    Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotTraitVariance)
+}
+
+/// Refuse treating §7.2 `addedTIPREDVAR` as `asymDIFFUSION`.
+///
+/// `(B / a)² v` is between-subject variance from a time-independent
+/// predictor. `asymDIFFUSION` is the stationary within-subject
+/// variance `-q / (2 a)`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentVarianceIsNotStationaryWithinSubject`].
+pub fn refuse_asymptotic_time_independent_variance_as_stationary_within_subject(
+    added_predictor_variance: f64,
+    stationary_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (added_predictor_variance, stationary_variance);
+    Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotStationaryWithinSubject)
+}
+
+/// Refuse treating §7.2 `addedTIPREDVAR` as `asymTIPREDEFFECT`.
+///
+/// `(B / a)² v` is a variance. `-B z / a` is the expected total
+/// change in process means. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect`].
+pub fn refuse_asymptotic_time_independent_variance_as_asymptotic_effect(
+    added_predictor_variance: f64,
+    asymptotic_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (added_predictor_variance, asymptotic_effect);
+    Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect)
+}
+
 /// Exact scalar observed mean of a time-independent predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 3, p. 5; Table 2,
@@ -4149,6 +4262,7 @@ mod tests {
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals,
         recover_asymptotic_time_independent_predictor_effect,
+        recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
         recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
         recover_discrete_lagged_latent_covariance, recover_discrete_latent_mean,
@@ -4187,6 +4301,9 @@ mod tests {
         refuse_asymptotic_time_independent_effect_as_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_discrete_effect,
         refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
+        refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
+        refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
+        refuse_asymptotic_time_independent_variance_as_trait_variance,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -7236,6 +7353,149 @@ mod tests {
                 1e308,
                 1.0,
                 -1e-308,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn asymptotic_time_independent_variance_recovers_driver_section_seven_point_two() {
+        // Driver et al. (2017, §7.2, p. 21) print LeisureTime
+        // asymTIPREDEFFECT = −1.673. addedTIPREDVAR is the variance of
+        // that mean shift. Reconstruct a from B and the printed total
+        // change; the printed 2.838 is the 2-latent TRAITVAR model, not
+        // this scalar map.
+        let effect = -0.225_f64;
+        let printed_asym = -1.673_f64;
+        let log_rate = -effect / printed_asym;
+        let predictor_variance = 1.0_f64;
+        let recovered = recover_asymptotic_time_independent_predictor_variance(
+            effect,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("addedTIPREDVAR");
+        let expected = printed_asym * printed_asym * predictor_variance;
+        assert!((recovered - expected).abs() < 1e-12);
+        let doubled = recover_asymptotic_time_independent_predictor_variance(
+            effect,
+            2.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("doubled-v");
+        assert!((doubled - 2.0 * expected).abs() < 1e-12);
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                0.0,
+                predictor_variance,
+                0.0,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                effect,
+                0.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn asymptotic_time_independent_variance_is_not_trait_stationary_or_mean_effect() {
+        let effect = -0.225_f64;
+        let log_rate = -0.134_488_942_f64;
+        let predictor_variance = 2.0_f64;
+        let recovered = recover_asymptotic_time_independent_predictor_variance(
+            effect,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("addedTIPREDVAR");
+        let mean_effect = recover_asymptotic_time_independent_predictor_effect(
+            effect,
+            1.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTIPREDEFFECT");
+        let stationary = recover_stationary_latent_variance(0.4, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        let trait_plus = recover_trait_plus_state_latent_variance(0.8, 0.3).expect("trait");
+        assert!((recovered - mean_effect).abs() > 1e-3);
+        assert!((recovered - stationary).abs() > 1e-3);
+        assert!((recovered - trait_plus).abs() > 1e-3);
+        assert_eq!(
+            refuse_asymptotic_time_independent_variance_as_trait_variance(recovered, trait_plus),
+            Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotTraitVariance)
+        );
+        assert_eq!(
+            refuse_asymptotic_time_independent_variance_as_stationary_within_subject(
+                recovered, stationary
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotStationaryWithinSubject)
+        );
+        assert_eq!(
+            refuse_asymptotic_time_independent_variance_as_asymptotic_effect(
+                recovered,
+                mean_effect
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect)
+        );
+    }
+
+    #[test]
+    fn asymptotic_time_independent_variance_invalid_inputs_fail_closed() {
+        let effect = -0.225_f64;
+        let log_rate = -0.134_488_942_f64;
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                effect,
+                1.0,
+                log_rate,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                effect,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                effect,
+                -1.0,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                1e308,
+                1.0,
+                -1e-308,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                1e200,
+                1.0,
+                -1e-200,
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)

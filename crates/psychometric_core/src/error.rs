@@ -341,6 +341,17 @@ pub enum PsychometricError {
     /// Driver §7.2 `asymTIPREDEFFECT` was treated as the contemporaneous
     /// Dirac. `-B z / a` is not `M x`.
     AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse,
+    /// Driver §7.2 `addedTIPREDVAR` was treated as `TRAITVAR`.
+    /// `(B / a)² v` is between-subject variance accounted for by a
+    /// time-independent predictor, not a zero-drift trait process.
+    AsymptoticTimeIndependentVarianceIsNotTraitVariance,
+    /// Driver §7.2 `addedTIPREDVAR` was treated as `asymDIFFUSION`.
+    /// `(B / a)² v` is not the stationary within-subject variance.
+    AsymptoticTimeIndependentVarianceIsNotStationaryWithinSubject,
+    /// Driver §7.2 `addedTIPREDVAR` was treated as `asymTIPREDEFFECT`.
+    /// `(B / a)² v` is a variance, not the expected total change in
+    /// process means.
+    AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -616,6 +627,15 @@ impl fmt::Display for PsychometricError {
             }
             Self::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse => {
                 "asymptotic time-independent predictor effect is not the contemporaneous impulse"
+            }
+            Self::AsymptoticTimeIndependentVarianceIsNotTraitVariance => {
+                "asymptotic time-independent predictor variance is not trait variance"
+            }
+            Self::AsymptoticTimeIndependentVarianceIsNotStationaryWithinSubject => {
+                "asymptotic time-independent predictor variance is not the stationary within-subject variance"
+            }
+            Self::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect => {
+                "asymptotic time-independent predictor variance is not the expected total change in process means"
             }
         };
         formatter.write_str(message)
@@ -1043,6 +1063,19 @@ mod tests {
         assert_eq!(
             PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse.to_string(),
             "asymptotic time-independent predictor effect is not the contemporaneous impulse"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentVarianceIsNotTraitVariance.to_string(),
+            "asymptotic time-independent predictor variance is not trait variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentVarianceIsNotStationaryWithinSubject
+                .to_string(),
+            "asymptotic time-independent predictor variance is not the stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect.to_string(),
+            "asymptotic time-independent predictor variance is not the expected total change in process means"
         );
     }
 }
