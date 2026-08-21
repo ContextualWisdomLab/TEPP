@@ -329,6 +329,10 @@ fn every_record_validation_error_has_a_stable_message() {
             EvidenceError::LayoutOutOfBounds,
             "layout bounds exceed the page geometry",
         ),
+        (
+            EvidenceError::EmbeddedImageIsNotLexicalText,
+            "embedded image is not lexical text",
+        ),
     ];
 
     for (error, expected) in cases {
