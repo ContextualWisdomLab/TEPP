@@ -51,9 +51,10 @@ def is_executable_source_line(
     """Return whether *line_number* in *source_path* is an executable source line.
 
     LLVM LCOV sometimes emits zero-count DA records for documentation comments,
-    attributes, pure structural braces, multi-line signatures, and in-file
-    ``#[cfg(test)]`` modules. Those records are not evidence of uncovered
-    production behavior and are excluded from the authored-line gate.
+    attributes, pure structural braces, multi-line signatures, Rust multiline
+    string continuations, and in-file ``#[cfg(test)]`` modules. Those records
+    are not evidence of uncovered production behavior and are excluded from the
+    authored-line gate.
 
     When *repository_root* is provided, *source_path* must resolve under that
     root (same fail-closed rule as LCOV ``SF:`` loading).
@@ -75,6 +76,8 @@ def is_executable_source_line(
         return False
     if _line_in_cfg_not_feature_block(lines, line_number):
         return False
+    if _line_in_multiline_string_literal(lines, line_number):
+        return False
     text = lines[line_number - 1].strip()
     if not text:
         return False
@@ -82,7 +85,9 @@ def is_executable_source_line(
         return False
     if text.startswith("#[") or text.startswith("#!["):
         return False
-    if text in {"{", "}", "},", ");", "];", "();", "};"}:
+    if text in {"{", "}", "},", ")", ");", "];", "();", "};"}:
+        return False
+    if _is_standalone_string_literal(text) or text.startswith("} else"):
         return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False
@@ -161,6 +166,118 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
             index = cursor + 1
             continue
         index += 1
+    return False
+
+
+def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
+    """Return whether a line is inside a Rust string continuation.
+
+    The scanner tracks normal strings, raw strings, block comments, and character
+    literals so quotes in comments or literal contents cannot change the state of
+    a later source line.
+    """
+
+    in_string = False
+    raw_hashes: int | None = None
+    in_block_comment = False
+    for index, raw in enumerate(lines, start=1):
+        if (in_string or raw_hashes is not None) and index == line_number:
+            return True
+        cursor = 0
+        while cursor < len(raw):
+            if in_block_comment:
+                if raw.startswith("*/", cursor):
+                    in_block_comment = False
+                    cursor += 2
+                else:
+                    cursor += 1
+                continue
+            if raw_hashes is not None:
+                delimiter = '"' + ("#" * raw_hashes)
+                closing = raw.find(delimiter, cursor)
+                if closing == -1:
+                    cursor = len(raw)
+                else:
+                    raw_hashes = None
+                    cursor = closing + len(delimiter)
+                continue
+            if in_string:
+                character = raw[cursor]
+                if character == "\\":
+                    cursor += 2
+                elif character == '"':
+                    in_string = False
+                    cursor += 1
+                else:
+                    cursor += 1
+                continue
+            if raw.startswith("//", cursor):
+                break
+            if raw.startswith("/*", cursor):
+                in_block_comment = True
+                cursor += 2
+                continue
+            raw_start = _raw_string_start(raw, cursor)
+            if raw_start is not None:
+                raw_hashes, cursor = raw_start
+                continue
+            if raw[cursor] == '"':
+                in_string = True
+                cursor += 1
+                continue
+            if raw[cursor] == "'":
+                character_end = _character_literal_end(raw, cursor)
+                if character_end is not None:
+                    cursor = character_end
+                    continue
+            cursor += 1
+    return False
+
+
+def _raw_string_start(line: str, cursor: int) -> tuple[int, int] | None:
+    """Return ``(hash_count, next_cursor)`` for a Rust raw-string opener."""
+
+    if line.startswith("br", cursor):
+        prefix_end = cursor + 2
+    elif line.startswith("r", cursor):
+        prefix_end = cursor + 1
+    else:
+        return None
+    hash_end = prefix_end
+    while hash_end < len(line) and line[hash_end] == "#":
+        hash_end += 1
+    if hash_end < len(line) and line[hash_end] == '"':
+        return hash_end - prefix_end, hash_end + 1
+    return None
+
+
+def _character_literal_end(line: str, cursor: int) -> int | None:
+    """Return the cursor after a one-line Rust character literal, if present."""
+
+    candidate = cursor + 1
+    if candidate >= len(line):
+        return None
+    if line[candidate] == "\\":
+        candidate += 2
+    else:
+        candidate += 1
+    if candidate < len(line) and line[candidate] == "'":
+        return candidate + 1
+    return None
+
+
+def _is_standalone_string_literal(text: str) -> bool:
+    """Return whether *text* is only a normal string literal and punctuation."""
+    if not text.startswith('"'):
+        return False
+    escaped = False
+    for index, character in enumerate(text[1:], start=1):
+        if character == '"' and not escaped:
+            return text[index + 1 :].strip() in {"", ",", ";"}
+        if character == "\\":
+            escaped = not escaped
+        else:
+            escaped = False
     return False
 
 

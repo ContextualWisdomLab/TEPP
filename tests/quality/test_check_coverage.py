@@ -305,22 +305,25 @@ class CoverageContractTests(unittest.TestCase):
                 "})",  # 39
                 "    return value,",  # 40 executable (return keeps it)
                 "    x + 1,",  # 41 trailing comma noise
-                '#[cfg(feature = "live-sqlx")]',  # 42 cfg attr
-                "fn live_path() {",  # 43 fn
-                "    live_body();",  # 44 executable active feature body
-                "}",  # 45 brace
-                '#[cfg(not(feature = "live-sqlx"))]',  # 46 not-feature attr
-                "fn offline_path() {",  # 47 inside not-feature
-                "    offline_body();",  # 48 inside not-feature
-                "}",  # 49 inside not-feature close
-                "#[cfg(test)]",  # 50
-                "mod tests {",  # 51 cfg(test) mod
-                "    #[test]",  # 52 inside test mod
-                "    fn unit() {",  # 53 inside test mod
-                "        assert_eq!(1, 1);",  # 54 inside test mod
-                "    }",  # 55
-                "}",  # 56
-                "    executable_statement();",  # 57 executable
+                '"standalone string literal",',  # 42 string noise
+                "} else {",  # 43 structural branch noise
+                ")",  # 44 structural close noise
+                '#[cfg(feature = "live-sqlx")]',  # 45 cfg attr
+                "fn live_path() {",  # 46 fn
+                "    live_body();",  # 47 executable active feature body
+                "}",  # 48 brace
+                '#[cfg(not(feature = "live-sqlx"))]',  # 49 not-feature attr
+                "fn offline_path() {",  # 50 inside not-feature
+                "    offline_body();",  # 51 inside not-feature
+                "}",  # 52 inside not-feature close
+                "#[cfg(test)]",  # 53
+                "mod tests {",  # 54 cfg(test) mod
+                "    #[test]",  # 55 inside test mod
+                "    fn unit() {",  # 56 inside test mod
+                "        assert_eq!(1, 1);",  # 57 inside test mod
+                "    }",  # 58
+                "}",  # 59
+                "    executable_statement();",  # 60 executable
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -335,7 +338,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 44, 57}
+            expected_executable = {13, 40, 47, 60}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -354,10 +357,10 @@ class CoverageContractTests(unittest.TestCase):
                 "\n".join(
                     [
                         f"SF:{path}",
-                        "DA:57,1",
+                        "DA:60,1",
                         "DA:1,0",
                         "DA:2,0",
-                        "DA:48,0",
+                        "DA:51,0",
                         "end_of_record",
                         "",
                     ]
@@ -427,6 +430,7 @@ class CoverageContractTests(unittest.TestCase):
         self.assertTrue(coverage_contract._line_in_cfg_not_feature_block(lines, 9))
         self.assertFalse(coverage_contract._line_in_cfg_not_feature_block(lines, 1))
         self.assertFalse(coverage_contract._line_in_cfg_not_feature_block(lines, 11))
+
         open_only = [
             '#[cfg(not(feature = "x"))]',
             "fn unfinished()",
@@ -473,6 +477,119 @@ class CoverageContractTests(unittest.TestCase):
         self.assertFalse(
             coverage_contract._line_in_cfg_not_feature_block(unclosed_not_feature, 99)
         )
+
+    def test_multiline_string_continuations_are_not_authored_lines(self) -> None:
+        """Rust multiline string fragments are excluded from authored coverage."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "query.rs"
+            source.write_text(
+                'fn query() {\n'
+                '    let sql = format!("SELECT id \\\n'
+                '        FROM document_record \\\n'
+                '        WHERE tenant_record_id = \'x\'");\n'
+                '    execute(sql);\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 3)
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 4)
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 5)
+            )
+
+    def test_string_scanner_handles_comments_backslash_parity_and_methods(self) -> None:
+        """Quoted comments and escaped delimiters do not corrupt source classification."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            backslash = "\\"
+            source = Path(temporary) / "scanner.rs"
+            source_lines = [
+                "fn query() {",
+                f'    let sql = "SELECT id {backslash}',
+                '        FROM document";',
+                r'    // comment contains one " quote',
+                "    execute(sql);",
+                f'    let even = "ends with two slashes {backslash * 2}";',
+                "    execute(even);",
+                r'    "literal".to_string();',
+                "}",
+            ]
+            source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
+            path = str(source)
+
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 3))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 5))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 7))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 8))
+
+            block_comment = [
+                "/* comment starts",
+                r'   comment has a " quote',
+                "   still comment",
+                "*/",
+                "execute();",
+            ]
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(block_comment, 5)
+            )
+            self.assertTrue(
+                coverage_contract._is_standalone_string_literal(r'"escaped\\",')
+            )
+            self.assertFalse(
+                coverage_contract._is_standalone_string_literal('"unfinished')
+            )
+
+            raw_string = [
+                '    let text = r##"',
+                '        a " quote in raw text',
+                '    "##;',
+                '    execute(text);',
+            ]
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(raw_string, 1)
+            )
+            self.assertTrue(
+                coverage_contract._line_in_multiline_string_literal(raw_string, 2)
+            )
+            self.assertTrue(
+                coverage_contract._line_in_multiline_string_literal(raw_string, 3)
+            )
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(raw_string, 4)
+            )
+
+            byte_raw_string = [
+                '    let bytes = br#"',
+                '        raw bytes',
+                '    "#;',
+            ]
+            self.assertTrue(
+                coverage_contract._line_in_multiline_string_literal(byte_raw_string, 2)
+            )
+
+            character_and_lifetime = [
+                "fn query<'a>() {",
+                "    let quote: char = '\"';",
+                "    execute();",
+                "}",
+            ]
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(
+                    character_and_lifetime, 3
+                )
+            )
+            self.assertIsNone(coverage_contract._character_literal_end("'", 0))
+            self.assertEqual(
+                coverage_contract._character_literal_end(r"'\''", 0), 4
+            )
 
 
 if __name__ == "__main__":  # pragma: no cover

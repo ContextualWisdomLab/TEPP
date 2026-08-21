@@ -1,7 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** partial — logistic-normal additive log-ratio coordinates, sequential Egozcue isometric log-ratio coordinates, and lexical-weight refusal are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; temporal topic identity, backend STM estimator, method-effect model, and K-selection remain accepted-target
 **Date:** 2026-08-12  
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
@@ -25,6 +25,7 @@ For the first production line:
 - stopword deletion is not the default preprocessing rule;
 - TF-IDF and BM25 are not inferential weights for the statistical topic estimator;
 - topic proportions are compositional and downstream network/psychometric analysis uses logistic-normal coordinates or valid orthonormal log-ratio coordinates;
+- ALR is a reference-dependent full-rank logistic-normal map, not an Aitchison-distance isometry; distance-based Euclidean Aitchison geometry uses an orthonormal ILR basis;
 - model selection uses statistical/recovery/stability/alignment/fairness gates and a Pareto-style comparison before any blinded LLM review;
 - the LLM may recommend among statistically admissible candidates but never defines the numerical optimum or bypasses diagnostics.
 
