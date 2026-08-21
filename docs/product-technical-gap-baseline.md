@@ -1,6 +1,6 @@
 # TEPP Product and Technical Gap Baseline
 
-**Snapshot:** 2026-08-21T07:16Z
+**Snapshot:** 2026-08-21T08:31:59Z
 **Purpose:** Turn live delivery evidence into the next bounded customer action.
 **Authority:** The approved PRD, architecture, ADR maturity rules, traceability matrix, and current GitHub evidence. This is a dated operational snapshot, not proof that an open PR is merged or that a target capability is production-ready.
 
@@ -30,6 +30,31 @@ The following live records were refreshed for this snapshot. They are useful for
 | TEPP [#149](https://github.com/ContextualWisdomLab/TEPP/pull/149) | Open, head `6077b9ce7f0961a3e287c4e8afe0faa5a0638b2e`, base `c45be17a9dbce95ef81cee230e9d128abc7160ac`, `BLOCKED`, `REVIEW_REQUIRED`; Strix failure is provider/NIM infrastructure evidence. | Same as #137; the product path remains blocked by evidence and review, not silently accepted. | Follow the same central-root-first sequence and revalidate the exact head rather than reusing predecessor results. |
 
 The current evidence does **not** satisfy the emergency guarded-force-merge criteria: no candidate has a demonstrated six-hour runner/provider deadlock, impossible ruleset transition, or circular control-plane defect that has already passed two independent exact-head reviews and merge-result verification. No protected direct push, force push, fake status, self-approval, test weakening, or ruleset-wide bypass is authorized by this baseline.
+
+### Live open-PR census and merge queue anchors
+
+At the snapshot time, the TEPP repository had **94 open PRs**: 75 non-draft and 19 draft. The table below records the current exact head/base identity for the leverage-first queue anchors; `pending` is the number of non-terminal checks observed in the live check-run query, and `failure` is the number of terminal conclusions other than success/skipped/neutral. These rows are evidence for triage only and must be refreshed before any mutation.
+
+| PR | Exact head | Exact base | State | Pending | Failure | Disposition |
+|---:|---|---|---|---:|---:|---|
+| [179](https://github.com/ContextualWisdomLab/TEPP/pull/179) | `2cb090523ddb` | `c45be17a9dbc` | blocked, review required | 17 | 0 | Normal path; CodeRabbit rate-limit response is not a source verdict, Devin found no issue. |
+| [178](https://github.com/ContextualWisdomLab/TEPP/pull/178) | `a2382c84a1f7` | `63a419e2b96c` | blocked | 1 | 0 | Stacked on #157; verify after the root result. |
+| [177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `273cbed1289b` | `c45be17a9dbc` | blocked | 1 | 0 | Scheduler hardening; normal protected review/check path. |
+| [165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `34083c3f5d66` | `c45be17a9dbc` | blocked | 1 | 0 | Central-orchestrator workflow change; no bypass. |
+| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `38cc7698e508` | `c45be17a9dbc` | blocked | 1 | 0 | Product completion documentation; no qualifying approval. |
+| [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `e5575a054a38` | `cbb3dc0aa657` | dirty | 5 | 0 | Resolve the stack conflict; conflict is not a force-merge reason. |
+| [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `6d28d23c4322` | `0e2910825a04` | dirty | 0 | 0 | Restack and revalidate merge-result tree before review. |
+| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `63a419e2b96c` | `c45be17a9dbc` | blocked | 1 | 0 | Root completed-result contract; process before stacked #178. |
+| [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `5d19407714c2` | `c45be17a9dbc` | blocked | 18 | 0 | Current-head coverage/toolchain repair is normal-path work; no approval yet. |
+| [154](https://github.com/ContextualWisdomLab/TEPP/pull/154) | `aaadb7f906ed` | `7c29e7c971d7` | blocked | 0 | 0 | Branch-coverage refresh; exact-head approval remains required. |
+| [152](https://github.com/ContextualWisdomLab/TEPP/pull/152) | `70a6c6608e39` | `c45be17a9dbc` | blocked | 1 | 0 | Method gate; refresh review and current checks. |
+| [149](https://github.com/ContextualWisdomLab/TEPP/pull/149) | `6077b9ce7f09` | `c45be17a9dbc` | blocked | 1 | 1 | Historical Strix failure has unavailable run logs; classify as external infrastructure until reproduced, not as source success. |
+| [146](https://github.com/ContextualWisdomLab/TEPP/pull/146) | `5419b0f76a73` | `c45be17a9dbc` | blocked | 1 | 0 | Membership boundary; current review/check loop remains open. |
+| [141](https://github.com/ContextualWisdomLab/TEPP/pull/141) | `d558a4b4b351` | `c45be17a9dbc` | blocked | 1 | 0 | Purpose-bound intake; current checks are not yet terminal. |
+| [140](https://github.com/ContextualWisdomLab/TEPP/pull/140) | `4feb427f6f89` | `c45be17a9dbc` | blocked | 1 | 0 | Estimator authority boundary; current checks are not yet terminal. |
+| [110](https://github.com/ContextualWisdomLab/TEPP/pull/110) | `4517b3f00d56` | `c45be17a9dbc` | blocked | 2 | 0 | Scanner/bootstrap issue requires RCA and exact-head rerun. |
+
+The complete inventory is regenerated with `gh api 'repos/ContextualWisdomLab/TEPP/pulls?state=open&per_page=100'`; an anchor row is never a substitute for reviewing the other open PRs. A `dirty`, pending, missing-approval, or infrastructure-failed row remains `WAIT_AND_REMEDIATE` or `REJECT_FORCE_MERGE` until its own current-head evidence changes. The baseline itself is [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179), so its own head is included above and must not be treated as protected-main evidence before merge.
 
 ## Architecture and product contract
 
