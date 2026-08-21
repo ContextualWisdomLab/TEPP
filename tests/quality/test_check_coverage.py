@@ -444,6 +444,42 @@ class CoverageContractTests(unittest.TestCase):
 
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 3))
 
+    def test_long_and_nested_match_guards_are_executable(self) -> None:
+        """Track guard boundaries beyond the old scan window and nested arms."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "complex_guard.rs"
+            long_guard = [
+                "match state {",
+                "    State::Ready(value)",
+                "        if value.is_valid()",
+                *[f"        && value.part_{index}()" for index in range(40)],
+                "        && value.is_fresh() => {",
+                "            consume(value);",
+                "        }",
+                "}",
+            ]
+            source.write_text("\n".join(long_guard) + "\n", encoding="utf-8")
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(
+                    str(source), len(long_guard) - 3
+                )
+            )
+
+            source.write_text(
+                "match state {\n"
+                "    State::Ready(value)\n"
+                "        if match value {\n"
+                "            0 => true,\n"
+                "            _ => false,\n"
+                "        } && value.is_fresh() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 6))
+
     def test_previous_arm_body_does_not_make_next_label_executable(self) -> None:
         """Do not treat an ``if`` inside the preceding arm as a guard."""
 

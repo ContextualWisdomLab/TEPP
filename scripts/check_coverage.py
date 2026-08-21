@@ -116,15 +116,26 @@ def is_executable_source_line(
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""
 
-    for candidate in reversed(lines[max(0, line_number - 32) : line_number - 1]):
+    target_prefix = lines[line_number - 1].strip().partition("=>")[0]
+    brace_depth = target_prefix.count("}") - target_prefix.count("{")
+    guard_found = False
+    boundary_candidate = False
+    for candidate in reversed(lines[: line_number - 1]):
         stripped = candidate.strip()
-        if stripped.startswith("}") or stripped.endswith(("}", "{", ";")):
+        if brace_depth == 0 and "=>" in stripped:
             return False
-        if "=>" in stripped:
-            return False
-        if stripped.startswith("if ") or stripped.startswith("if("):
-            return True
-    return False
+        if brace_depth == 1 and stripped.endswith("=> {"):
+            boundary_candidate = True
+        brace_depth += stripped.count("}") - stripped.count("{")
+        if (
+            (stripped.startswith("if ") or stripped.startswith("if("))
+            and not stripped.endswith(("}", ";"))
+            and brace_depth == 0
+        ):
+            guard_found = True
+        if stripped.startswith("match "):
+            return guard_found and not boundary_candidate
+    return guard_found and not boundary_candidate
 
 
 def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
