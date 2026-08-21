@@ -20,6 +20,12 @@ pub enum EventError {
     UnsupportedWireVersion,
     /// An unknown event-role name was supplied.
     UnknownEventRole,
+    /// A CHRONOS schema prediction was treated as an event instance.
+    SchemaPredictionIsNotEventInstance,
+    /// A CHRONOS schema prediction was treated as a state transition.
+    SchemaPredictionIsNotStateTransition,
+    /// An unknown schema-slot occupancy label was supplied.
+    UnknownSchemaSlotLabel,
 }
 
 impl fmt::Display for EventError {
@@ -32,6 +38,13 @@ impl fmt::Display for EventError {
             Self::InvalidWirePayload => "invalid event wire payload",
             Self::UnsupportedWireVersion => "unsupported event wire version",
             Self::UnknownEventRole => "unknown event role",
+            Self::SchemaPredictionIsNotEventInstance => {
+                "schema prediction is not an event instance"
+            }
+            Self::SchemaPredictionIsNotStateTransition => {
+                "schema prediction is not a state transition"
+            }
+            Self::UnknownSchemaSlotLabel => "unknown schema slot label",
         };
         formatter.write_str(message)
     }
@@ -65,6 +78,18 @@ mod tests {
                 "unsupported event wire version",
             ),
             (EventError::UnknownEventRole, "unknown event role"),
+            (
+                EventError::SchemaPredictionIsNotEventInstance,
+                "schema prediction is not an event instance",
+            ),
+            (
+                EventError::SchemaPredictionIsNotStateTransition,
+                "schema prediction is not a state transition",
+            ),
+            (
+                EventError::UnknownSchemaSlotLabel,
+                "unknown schema slot label",
+            ),
         ] {
             assert_eq!(error.to_string(), message);
         }

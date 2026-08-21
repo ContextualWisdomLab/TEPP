@@ -21,7 +21,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0013](0013-bitemporal-persistence-reproducibility-and-split-authority.md) | Bitemporal persistence, reproducibility manifests, and relation-aware split authority | Accepted | partial | Owns PostgreSQL adapter semantics, immutable run/split manifests, leakage-safe partitions, and recovery identity; optional `live-sqlx` `PgPool`, live PG CI, tenant RLS, and `0006` membership implemented-main; `0007` retention/deletion/legal-hold on the active PR; remaining physical ERD/backup accepted-target. |
 | [0014](0014-scientific-claim-promotion-and-release-evidence.md) | Scientific claim promotion and release evidence authority | Accepted | partial | Separates design, implementation, scientific/product claim, and release authority; repository SBOM/provenance generator implemented, full release bundle remaining. |
 | [0015](0015-autonomous-development-review-and-merge-authority.md) | Autonomous development, review, and merge authority separation | Accepted | active-PR | Separates model proposal, deterministic verification, publication, independent review, and merge/release authority. |
-| [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
+| [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | CHRONOS schema-slot precision/recall in existing `event_core`; remaining TDT/CHRONOS stack remains accepted-target. |
 
 ## Decision ownership summary
 
