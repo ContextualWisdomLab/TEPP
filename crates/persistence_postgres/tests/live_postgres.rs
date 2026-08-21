@@ -12,8 +12,9 @@ use persistence_postgres::{
     MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
     PersistenceError, ProjectRecord, ReproducibilityManifestRecord, RetentionPolicyRecord,
     SqlSession, apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql,
-    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
-    select_active_analysis_document_sql, set_session_tenant_sql,
+    insert_entity_record_sql, insert_project_record_sql, open_live_sqlx_pool,
+    require_live_sqlx_config, reset_app_runtime_role_sql, select_active_analysis_document_sql,
+    set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -886,19 +887,35 @@ fn seed_membership_targets(
         .execute(&set_session_tenant_sql(Uuid::nil()))
         .expect("bind wrong tenant GUC");
     assert!(
-        repo.insert_entity_record(&live_entity(
-            entity_a,
-            tenant_record_id,
-            "author",
-            available,
-            system,
-        ))
-        .is_err(),
-        "wrong tenant GUC must reject entity_record insert under FORCE RLS"
+        repo.session_mut()
+            .execute(
+                &insert_entity_record_sql(&live_entity(
+                    entity_a,
+                    tenant_record_id,
+                    "author",
+                    available,
+                    system,
+                ))
+                .expect("render wrong-tenant entity insert"),
+            )
+            .is_err(),
+        "wrong tenant GUC must reject raw entity_record insert under FORCE RLS"
     );
-    repo.session_mut()
-        .execute(&set_session_tenant_sql(tenant_record_id))
-        .expect("bind membership tenant GUC");
+    assert!(
+        repo.session_mut()
+            .execute(
+                &insert_project_record_sql(&live_project(
+                    project,
+                    tenant_record_id,
+                    "active",
+                    available,
+                    system,
+                ))
+                .expect("render wrong-tenant project insert"),
+            )
+            .is_err(),
+        "wrong tenant GUC must reject raw project_record insert under FORCE RLS"
+    );
     assert_eq!(
         repo.insert_entity_record(&live_entity(
             entity_a,

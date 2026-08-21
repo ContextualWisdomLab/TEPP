@@ -274,6 +274,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// Returns label validation or transport failures.
     pub fn insert_entity_record(&mut self, record: &EntityRecord) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_entity_record_sql(record)?;
         self.session.execute(&sql)
     }
@@ -300,6 +301,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &ProjectRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_project_record_sql(record)?;
         self.session.execute(&sql)
     }
