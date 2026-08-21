@@ -113,7 +113,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 - Required 100% production line and branch coverage and complete public API docstrings.
 - Required true-parameter recovery, RMSE, bias, interval coverage, temporal leakage, graph recovery, invariance, and CPU/GPU parity evidence.
-- Expanded documentation contracts to require the canonical threat/privacy/assurance/API/orchestration/fitness documents, ADR policy, and every numbered ADR 0001–0017 to remain indexed and structurally complete.
+- Expanded documentation contracts to require the canonical threat/privacy/assurance/API/orchestration/fitness documents, ADR policy, and every numbered ADR present in the canonical index to remain indexed and structurally complete.
 - Added deterministic validation that ADR files and the index have identical decision numbers and that every ADR declares valid decision status, implementation maturity, supersession scope, core decision sections, verification, and rollback behavior.
 - Added 100% statement and branch coverage for the repository quality-gate scripts.
 - Made a zero executable-code coverage denominator explicit for the skeleton-only slice rather than treating it as evidence of implemented behavior.
