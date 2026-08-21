@@ -1,6 +1,6 @@
 # TEPP Product and Technical Gap Baseline
 
-**Snapshot:** 2026-08-21T08:54:58Z
+**Snapshot:** 2026-08-21T09:10:22Z
 **Purpose:** Turn live delivery evidence into the next bounded customer action.
 **Authority:** The approved PRD, architecture, ADR maturity rules, traceability matrix, and current GitHub evidence. This is a dated operational snapshot, not proof that an open PR is merged or that a target capability is production-ready.
 
@@ -37,7 +37,7 @@ At the snapshot time, the TEPP repository had **94 open PRs**: 75 non-draft and 
 
 | PR | Exact head | Exact base | State | Pending | Failure | Disposition |
 |---:|---|---|---|---:|---:|---|
-| [179](https://github.com/ContextualWisdomLab/TEPP/pull/179) | `c93051cccd9e` | `c45be17a9dbc` | blocked, review required | 17 | 0 | Normal path; CodeRabbit rate-limit response is not a source verdict, Devin found no issue. |
+| [179](https://github.com/ContextualWisdomLab/TEPP/pull/179) | `26fee5def799` | `c45be17a9dbc` | blocked, review required | 17 | 0 | Normal path; current-head queue anchors and product-gap baseline are documented, but approval and checks remain pending. |
 | [178](https://github.com/ContextualWisdomLab/TEPP/pull/178) | `a2382c84a1f7` | `63a419e2b96c` | blocked | 1 | 0 | Stacked on #157; verify after the root result. |
 | [177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `273cbed1289b` | `c45be17a9dbc` | blocked | 1 | 0 | Scheduler hardening; normal protected review/check path. |
 | [165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `34083c3f5d66` | `c45be17a9dbc` | blocked | 1 | 0 | Central-orchestrator workflow change; no bypass. |
@@ -45,7 +45,8 @@ At the snapshot time, the TEPP repository had **94 open PRs**: 75 non-draft and 
 | [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `e5575a054a38` | `cbb3dc0aa657` | dirty | 5 | 0 | Resolve the stack conflict; conflict is not a force-merge reason. |
 | [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `6d28d23c4322` | `0e2910825a04` | dirty | 0 | 0 | Restack and revalidate merge-result tree before review. |
 | [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `63a419e2b96c` | `c45be17a9dbc` | blocked | 1 | 0 | Root completed-result contract; process before stacked #178. |
-| [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `19ce07498e85` | `c45be17a9dbc` | blocked | 17 | 0 | Current-head coverage/toolchain repair is normal-path work; no approval yet. |
+| [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `6cc00f81b7f1` | `c45be17a9dbc` | blocked | 17 | 0 | Current-head coverage/toolchain repair and regression-test strengthening are normal-path work; approval and checks remain pending. |
+| [131](https://github.com/ContextualWisdomLab/TEPP/pull/131) | `55774ee9ece3` | `c45be17a9dbc` | blocked | 17 | 0 | Membership-target documentation now names department; approval and checks remain pending. |
 | [154](https://github.com/ContextualWisdomLab/TEPP/pull/154) | `aaadb7f906ed` | `7c29e7c971d7` | blocked | 0 | 0 | Branch-coverage refresh; exact-head approval remains required. |
 | [152](https://github.com/ContextualWisdomLab/TEPP/pull/152) | `70a6c6608e39` | `c45be17a9dbc` | blocked | 1 | 0 | Method gate; refresh review and current checks. |
 | [149](https://github.com/ContextualWisdomLab/TEPP/pull/149) | `6077b9ce7f09` | `c45be17a9dbc` | blocked | 1 | 1 | Historical Strix failure has unavailable run logs; classify as external infrastructure until reproduced, not as source success. |
