@@ -406,6 +406,28 @@ class CoverageContractTests(unittest.TestCase):
                 if outside.exists():
                     outside.unlink()
 
+    def test_multiline_guard_arm_is_executable(self) -> None:
+        """Retain the final expression of a multiline Rust match guard."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "multiline_guard.rs"
+            source.write_text(
+                "match state {\n"
+                "    State::Ready(value)\n"
+                "        if value.is_valid()\n"
+                "        && value.is_fresh() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "        _ => {\n"
+                "            ignore(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 4))
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 7))
+
     def test_cfg_test_and_not_feature_block_helpers(self) -> None:
         """cfg(test) modules and cfg(not(feature)) blocks are fully recognized."""
 
