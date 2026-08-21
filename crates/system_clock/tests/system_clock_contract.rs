@@ -40,25 +40,15 @@ fn other_clocks_cannot_stand_in_for_system_time() {
 fn recovered_system_stamps_match_known_truth_better_than_event_stand_in() {
     let recovered = [
         ClockFamily::SystemTime,
-        ClockFamily::SystemTime,
-        ClockFamily::SystemTime,
-    ];
-    let collapsed = [
         ClockFamily::EventTime,
-        ClockFamily::EventTime,
-        ClockFamily::EventTime,
+        ClockFamily::AssertionTime,
+        ClockFamily::DocumentTime,
+        ClockFamily::AvailableTime,
+        ClockFamily::CutoffTime,
     ];
-    let recovered_flags = [
-        stamp_is_system(recovered[0]).expect("r0"),
-        stamp_is_system(recovered[1]).expect("r1"),
-        stamp_is_system(recovered[2]).expect("r2"),
-    ];
-    let collapsed_flags = [
-        stamp_is_system(collapsed[0]).expect("c0"),
-        stamp_is_system(collapsed[1]).expect("c1"),
-        stamp_is_system(collapsed[2]).expect("c2"),
-    ];
-    let truth_flags = [true, true, true];
+    let recovered_flags = recovered.map(|family| stamp_is_system(family).expect("recovered"));
+    let collapsed_flags = [false; 6];
+    let truth_flags = [true, false, false, false, false, false];
     let recovered_rate = identity_recovery_rate(&truth_flags, &recovered_flags).expect("ok");
     let collapsed_rate = identity_recovery_rate(&truth_flags, &collapsed_flags).expect("bad");
     let expected = {

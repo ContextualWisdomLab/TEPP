@@ -4,7 +4,8 @@
 
 `system_clock` keeps system/record time distinct from event, assertion,
 document, availability, and knowledge-cutoff time. Recovery is the
-computed share of system stamps that match known truth.
+computed share of all system/non-system classifications that match known
+truth.
 
 This slice does not persist clocks or recreate `document_clocks`,
 `available_clock`, `cutoff_clock`, `assertion_clock`, or `event_clock`.
