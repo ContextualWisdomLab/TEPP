@@ -1,7 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — `topic_lineage` keeps one P0 identity across active/dormant/reactivated states; remaining TRSL-TM estimator, method effects, and backend interchange remain accepted-target  
 **Date:** 2026-08-12  
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
