@@ -191,6 +191,13 @@ impl CorpusSplitManifest {
                 return Err(ApiError::InvalidWirePayload);
             }
         }
+        if self
+            .governed_link_kinds
+            .windows(2)
+            .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(ApiError::InvalidWirePayload);
+        }
         if self.split_manifest_digest_sha256 != canonical_digest(self) {
             return Err(ApiError::InvalidWirePayload);
         }
@@ -420,6 +427,23 @@ mod tests {
         bad_kind.governed_link_kinds = vec!["tfidf".into()];
         bad_kind.split_manifest_digest_sha256 = canonical_digest(&bad_kind);
         assert_eq!(bad_kind.to_json(), Err(ApiError::InvalidWirePayload));
+
+        let mut noncanonical_kinds = valid_manifest();
+        noncanonical_kinds.governed_link_kinds = vec!["translation".into(), "revision".into()];
+        noncanonical_kinds.split_manifest_digest_sha256 = canonical_digest(&noncanonical_kinds);
+        let payload = serde_json::to_string(&noncanonical_kinds).expect("payload");
+        assert_eq!(
+            CorpusSplitManifest::from_json(&payload),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        noncanonical_kinds.governed_link_kinds = vec!["revision".into(), "revision".into()];
+        noncanonical_kinds.split_manifest_digest_sha256 = canonical_digest(&noncanonical_kinds);
+        let payload = serde_json::to_string(&noncanonical_kinds).expect("duplicate payload");
+        assert_eq!(
+            CorpusSplitManifest::from_json(&payload),
+            Err(ApiError::InvalidWirePayload)
+        );
 
         assert_eq!(
             require_sha256_hex("short"),
