@@ -9,16 +9,20 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
 
-use crate::lineageweave_http::consumer_is_supported;
+use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};
 use crate::live_http::{
-    header_value, map_io_error, parse_headers, parse_request_line, read_http_request,
-    split_request, validate_common_headers,
+    header_value, map_io_error, parse_headers, parse_request_line, read_http_request_with_limit,
+    split_request_with_limit, validate_common_headers,
 };
 use crate::naruon_http::NARUON_ANALYSIS_RUN_PATH;
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, ApiError, ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT,
-    NaruonLiveResponse, requests_are_idempotent_matches,
+    AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
+    ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_PATH,
+    ProjectHistoryProjection, ProjectHistoryRequest, project_history_projection,
+    requests_are_idempotent_matches,
 };
+
+const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
 
 #[cfg(test)]
 use crate::live_http::{declared_content_length, host_implies_table_access, split_header_line};
@@ -35,6 +39,7 @@ pub struct AnalysisRunLiveService {
     next_run_serial: u64,
     next_request_serial: u64,
     accepted_runs: HashMap<String, (AnalysisRunRequest, AnalysisRunAccepted)>,
+    accepted_project_histories: HashMap<String, (ProjectHistoryRequest, ProjectHistoryProjection)>,
 }
 
 impl Default for AnalysisRunLiveService {
@@ -53,6 +58,7 @@ impl AnalysisRunLiveService {
             next_run_serial: 1,
             next_request_serial: 1,
             accepted_runs: HashMap::new(),
+            accepted_project_histories: HashMap::new(),
         }
     }
 
@@ -111,7 +117,8 @@ impl AnalysisRunLiveService {
         stream
             .set_write_timeout(Some(NARUON_LIVE_IO_TIMEOUT))
             .map_err(|error| map_io_error(&error))?;
-        let response = match read_http_request(&mut stream) {
+        let response = match read_http_request_with_limit(&mut stream, MAX_LIVE_REQUEST_BODY_BYTES)
+        {
             Ok(request) => self.handle_http_request(&request),
             Err(error) => self.response_from_error(error),
         };
@@ -132,12 +139,18 @@ impl AnalysisRunLiveService {
     }
 
     fn dispatch_http_request(&mut self, request: &str) -> Result<NaruonLiveResponse, ApiError> {
-        let (header_block, body) = split_request(request)?;
+        let (header_block, body) = split_request_with_limit(request, MAX_LIVE_REQUEST_BODY_BYTES)?;
         let mut lines = header_block.split("\r\n");
-        require_request_line(lines.next().unwrap_or(""))?;
+        let request_line = lines.next().unwrap_or("");
+        require_request_line(request_line)?;
+        let (_, path) = parse_request_line(request_line)?;
         let headers = parse_headers(&mut lines)?;
         let consumer = require_headers(&headers, self.bound_addr)?;
-        self.accept_analysis_run(consumer, &headers, body)
+        match path {
+            NARUON_ANALYSIS_RUN_PATH => self.accept_analysis_run(consumer, &headers, body),
+            PROJECT_HISTORY_PATH => self.accept_project_history(consumer, &headers, body),
+            _ => Err(ApiError::InvalidWirePayload),
+        }
     }
 
     fn accept_analysis_run(
@@ -171,6 +184,40 @@ impl AnalysisRunLiveService {
         Ok(json_response(202, "Accepted", response_body))
     }
 
+    fn accept_project_history(
+        &mut self,
+        consumer: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if consumer != LINEAGEWEAVE_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let request = ProjectHistoryRequest::from_json(body)?;
+        let idempotency_key = header_value(headers, "idempotency-key")?;
+        if idempotency_key != request.idempotency_key {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let replay_key = consumer_tenant_idempotency_key(
+            consumer,
+            &request.tenant_workspace_id,
+            idempotency_key,
+        );
+        if let Some((stored_request, stored_projection)) =
+            self.accepted_project_histories.get(&replay_key)
+        {
+            if stored_request == &request {
+                return Ok(json_response(200, "OK", stored_projection.to_json()?));
+            }
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let projection = project_history_projection(&request)?;
+        let response_body = projection.to_json()?;
+        self.accepted_project_histories
+            .insert(replay_key, (request, projection));
+        Ok(json_response(200, "OK", response_body))
+    }
+
     fn response_from_error(&mut self, error: ApiError) -> NaruonLiveResponse {
         let request_id = format!("analysis-run-live-{}", self.next_request_serial);
         self.next_request_serial += 1;
@@ -185,7 +232,7 @@ impl AnalysisRunLiveService {
 
 fn require_request_line(line: &str) -> Result<(), ApiError> {
     let (method, path) = parse_request_line(line)?;
-    if method != "POST" || path != NARUON_ANALYSIS_RUN_PATH {
+    if method != "POST" || (path != NARUON_ANALYSIS_RUN_PATH && path != PROJECT_HISTORY_PATH) {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(())
@@ -255,9 +302,9 @@ mod tests {
     use super::{
         AnalysisRunLiveService, consumer_tenant_idempotency_key, declared_content_length,
         error_envelope_json, host_implies_table_access, map_io_error, parse_headers,
-        read_http_request, require_request_line, split_header_line, split_request, status_for,
+        require_request_line, split_header_line, status_for,
     };
-    use crate::live_http::host_is_loopback;
+    use crate::live_http::{host_is_loopback, read_http_request, split_request};
     use crate::{
         ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError,
         DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, LINEAGEWEAVE_CONSUMER_CODE,

@@ -1,9 +1,14 @@
 //! `LineageWeave` project-history requests remain cutoff-safe and non-causal.
 
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::thread;
+
 use tepp_api::{
-    ApiError, LINEAGEWEAVE_CONSUMER_CODE, PROJECT_HISTORY_CONTRACT_VERSION, PROJECT_HISTORY_PATH,
-    ProjectHistoryEvent, ProjectHistoryProjection, ProjectHistoryRequest,
-    lineageweave_project_history_exchange, project_history_projection,
+    AnalysisRunLiveService, ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE,
+    PROJECT_HISTORY_CONTRACT_VERSION, PROJECT_HISTORY_PATH, ProjectHistoryEvent,
+    ProjectHistoryProjection, ProjectHistoryRequest, lineageweave_project_history_exchange,
+    project_history_projection,
 };
 
 fn event(
@@ -86,6 +91,13 @@ fn sample_request() -> ProjectHistoryRequest {
             ),
         ],
     }
+}
+
+fn live_request(consumer: &str, body: &str, idempotency_key: &str) -> String {
+    format!(
+        "POST {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: {PROJECT_HISTORY_CONTRACT_VERSION}\r\nidempotency-key: {idempotency_key}\r\ncontent-length: {}\r\n\r\n{body}",
+        body.len()
+    )
 }
 
 fn request_near_the_serialized_byte_limit() -> ProjectHistoryRequest {
@@ -238,6 +250,137 @@ fn request_json_with_explicit_limit_round_trips_a_valid_contract() {
     let parsed = ProjectHistoryRequest::from_json_with_limit(&payload, payload.len() + 1)
         .expect("request with explicit limit");
     assert_eq!(parsed, request);
+}
+
+#[test]
+fn live_project_history_route_is_cutoff_safe_and_idempotent() {
+    let request = sample_request();
+    let body = request.to_json().expect("request json");
+    let mut service = AnalysisRunLiveService::new();
+
+    let first = service.handle_http_request(&live_request(
+        LINEAGEWEAVE_CONSUMER_CODE,
+        &body,
+        &request.idempotency_key,
+    ));
+    assert_eq!(first.status_code, 200);
+    let projection = ProjectHistoryProjection::from_json(&first.body).expect("projection");
+    assert_eq!(projection.project_key, request.project_key);
+    assert_eq!(projection.inference_status, "temporal_association_only");
+
+    let replay = service.handle_http_request(&live_request(
+        LINEAGEWEAVE_CONSUMER_CODE,
+        &body,
+        &request.idempotency_key,
+    ));
+    assert_eq!(replay.status_code, 200);
+    assert_eq!(replay.body, first.body);
+
+    let mut conflict = request.clone();
+    conflict.project_name = "Conflicting project".into();
+    let conflict_body = conflict.to_json().expect("conflicting request json");
+    assert_eq!(
+        service
+            .handle_http_request(&live_request(
+                LINEAGEWEAVE_CONSUMER_CODE,
+                &conflict_body,
+                &conflict.idempotency_key,
+            ))
+            .status_code,
+        400
+    );
+
+    let unknown = body.replacen('{', "{\"unpublished_causal_score\":1,", 1);
+    assert_eq!(
+        service
+            .handle_http_request(&live_request(
+                LINEAGEWEAVE_CONSUMER_CODE,
+                &unknown,
+                &request.idempotency_key,
+            ))
+            .status_code,
+        400
+    );
+
+    let mut unavailable = request.clone();
+    unavailable.events[0].available_at = "2026-08-20T00:00:00Z".into();
+    let unavailable_body = serde_json::to_string(&unavailable).expect("unavailable json");
+    assert_eq!(
+        service
+            .handle_http_request(&live_request(
+                LINEAGEWEAVE_CONSUMER_CODE,
+                &unavailable_body,
+                &unavailable.idempotency_key,
+            ))
+            .status_code,
+        400
+    );
+
+    let mut oversized = request.clone();
+    oversized.project_name = "x".repeat(513);
+    let oversized_body = serde_json::to_string(&oversized).expect("oversized json");
+    assert_eq!(
+        service
+            .handle_http_request(&live_request(
+                LINEAGEWEAVE_CONSUMER_CODE,
+                &oversized_body,
+                &oversized.idempotency_key,
+            ))
+            .status_code,
+        413
+    );
+
+    let credentialed = live_request(LINEAGEWEAVE_CONSUMER_CODE, &body, &request.idempotency_key)
+        .replace(
+            "content-length:",
+            "authorization: Bearer secret\r\ncontent-length:",
+        );
+    let credentialed_response = service.handle_http_request(&credentialed);
+    assert_eq!(credentialed_response.status_code, 403);
+    assert!(!credentialed_response.body.contains("Bearer secret"));
+
+    assert_eq!(
+        service
+            .handle_http_request(&live_request(
+                NARUON_CONSUMER_CODE,
+                &body,
+                &request.idempotency_key,
+            ))
+            .status_code,
+        400
+    );
+
+    let mismatched_header = live_request(
+        LINEAGEWEAVE_CONSUMER_CODE,
+        &body,
+        "different-header-idempotency-key",
+    );
+    assert_eq!(
+        service.handle_http_request(&mismatched_header).status_code,
+        400
+    );
+}
+
+#[test]
+fn live_project_history_route_serves_over_loopback() {
+    let request = sample_request();
+    let body = request.to_json().expect("request json");
+    let mut service = AnalysisRunLiveService::bind_loopback().expect("loopback bind");
+    let address = service.local_addr().expect("loopback address");
+    let worker = thread::spawn(move || service.serve_one());
+    let mut stream = TcpStream::connect(address).expect("connect");
+    stream
+        .write_all(
+            live_request(LINEAGEWEAVE_CONSUMER_CODE, &body, &request.idempotency_key).as_bytes(),
+        )
+        .expect("request");
+    let mut response = String::new();
+    stream.read_to_string(&mut response).expect("response");
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert_eq!(
+        worker.join().expect("join").expect("served").status_code,
+        200
+    );
 }
 
 #[test]

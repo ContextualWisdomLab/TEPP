@@ -6,6 +6,7 @@
 //! sequence into causality or emits a psychometric score.
 
 use std::collections::{BTreeSet, HashSet};
+use std::net::{IpAddr, Ipv6Addr};
 
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -514,26 +515,85 @@ fn combined_finding(
 
 fn compose_https_target(origin: &str) -> Result<String, ApiError> {
     validate_bounded_text(origin, 2048)?;
-    let host = origin
+    let authority = origin
         .strip_prefix("https://")
         .ok_or(ApiError::InvalidWirePayload)?;
-    if host.is_empty()
-        || host.starts_with('/')
-        || host.contains('@')
-        || host.contains('/')
-        || host.contains('?')
-        || host.contains('#')
-        || host
-            .chars()
-            .any(|character| matches!(character, '\'' | ';' | '\\' | ' '))
-    {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    let lowered = host.to_ascii_lowercase();
+    validate_https_authority(authority)?;
+    let lowered = authority.to_ascii_lowercase();
     if lowered.contains("postgres") || lowered.contains("jdbc") {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(format!("{origin}{PROJECT_HISTORY_PATH}"))
+}
+
+fn validate_https_authority(authority: &str) -> Result<(), ApiError> {
+    if authority.is_empty()
+        || authority.contains('@')
+        || authority.contains('/')
+        || authority.contains('?')
+        || authority.contains('#')
+        || authority
+            .chars()
+            .any(|character| matches!(character, '\'' | ';' | '\\' | ' ') || character.is_control())
+    {
+        return Err(ApiError::InvalidWirePayload);
+    }
+
+    if let Some(bracketed) = authority.strip_prefix('[') {
+        let close = bracketed.find(']').ok_or(ApiError::InvalidWirePayload)?;
+        let host = &bracketed[..close];
+        host.parse::<Ipv6Addr>()
+            .map_err(|_| ApiError::InvalidWirePayload)?;
+        let suffix = &bracketed[close + 1..];
+        if suffix.is_empty() {
+            return Ok(());
+        }
+        let port = suffix
+            .strip_prefix(':')
+            .ok_or(ApiError::InvalidWirePayload)?;
+        return validate_https_port(port);
+    }
+
+    if authority.contains(']') || authority.matches(':').count() > 1 {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    let (host, port) = authority
+        .rsplit_once(':')
+        .map_or((authority, None), |(host, port)| (host, Some(port)));
+    validate_https_host(host)?;
+    if let Some(port) = port {
+        validate_https_port(port)?;
+    }
+    Ok(())
+}
+
+fn validate_https_host(host: &str) -> Result<(), ApiError> {
+    if host.is_empty() || host.len() > 253 {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    if host.parse::<IpAddr>().is_ok() {
+        return Ok(());
+    }
+    for label in host.split('.') {
+        if label.is_empty()
+            || label.len() > 63
+            || label.starts_with('-')
+            || label.ends_with('-')
+            || !label
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
+            return Err(ApiError::InvalidWirePayload);
+        }
+    }
+    Ok(())
+}
+
+fn validate_https_port(port: &str) -> Result<(), ApiError> {
+    if port.is_empty() || port.parse::<u16>().map_or(true, |value| value == 0) {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -730,15 +790,26 @@ mod tests {
             build_project_history_exchange("https://example.test", "lineageweave", &request)
                 .is_ok()
         );
+    }
 
+    #[test]
+    fn malformed_https_authorities_are_rejected() {
         for origin in [
             "http://example.test",
             "https://",
+            "https://:",
             "https:///path",
             "https://user@example.test",
             "https://example.test/path",
             "https://example.test?query",
             "https://example.test#fragment",
+            "https://example.test:",
+            "https://example.test:not-a-port",
+            "https://example.test:65536",
+            "https://[::1",
+            "https://[not-ipv6]",
+            "https://::1",
+            "https://example]test",
             "https://example test",
             "https://example'test",
             "https://example;test",
@@ -756,6 +827,31 @@ mod tests {
         assert_eq!(
             compose_https_target("https://example.test").expect("origin"),
             "https://example.test/v1/project-histories"
+        );
+        assert!(compose_https_target("https://example.test:443").is_ok());
+        assert!(compose_https_target("https://127.0.0.1").is_ok());
+        assert!(compose_https_target("https://[::1]").is_ok());
+        assert!(compose_https_target("https://[::1]:443").is_ok());
+        for origin in [
+            "https://-example.test",
+            "https://example-.test",
+            "https://example..test",
+            "https://example_.test",
+        ] {
+            assert_eq!(
+                compose_https_target(origin),
+                Err(ApiError::InvalidWirePayload)
+            );
+        }
+        let long_host = format!("https://{}", "a.".repeat(127) + "a");
+        assert_eq!(
+            compose_https_target(&long_host),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let long_label = format!("https://{}.test", "a".repeat(64));
+        assert_eq!(
+            compose_https_target(&long_label),
+            Err(ApiError::InvalidWirePayload)
         );
     }
 }

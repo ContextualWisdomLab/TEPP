@@ -15,9 +15,17 @@ pub const NARUON_LIVE_HEADER_COUNT_LIMIT: usize = 32;
 
 /// Read one HTTP/1.1 request, including its declared UTF-8 body.
 pub(crate) fn read_http_request<R: Read>(reader: &mut R) -> Result<String, ApiError> {
+    read_http_request_with_limit(reader, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
+}
+
+/// Read one HTTP/1.1 request with a caller-selected body limit.
+pub(crate) fn read_http_request_with_limit<R: Read>(
+    reader: &mut R,
+    maximum_body_bytes: usize,
+) -> Result<String, ApiError> {
     let mut header_bytes = Vec::new();
     let mut byte = [0_u8; 1];
-    loop {
+    while !header_bytes.ends_with(b"\r\n\r\n") {
         if header_bytes.len() >= NARUON_LIVE_HEADER_BYTE_LIMIT {
             return Err(ApiError::LimitExceeded);
         }
@@ -28,14 +36,11 @@ pub(crate) fn read_http_request<R: Read>(reader: &mut R) -> Result<String, ApiEr
             return Err(ApiError::InvalidWirePayload);
         }
         header_bytes.push(byte[0]);
-        if header_bytes.ends_with(b"\r\n\r\n") {
-            break;
-        }
     }
     let header_text =
         std::str::from_utf8(&header_bytes).map_err(|_| ApiError::InvalidWirePayload)?;
     let content_length = declared_content_length(header_text)?;
-    if content_length > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
+    if content_length > maximum_body_bytes {
         return Err(ApiError::LimitExceeded);
     }
     let mut body = vec![0_u8; content_length];
@@ -50,6 +55,14 @@ pub(crate) fn read_http_request<R: Read>(reader: &mut R) -> Result<String, ApiEr
 
 /// Split one complete request into its header block and UTF-8 body.
 pub(crate) fn split_request(request: &str) -> Result<(&str, &str), ApiError> {
+    split_request_with_limit(request, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
+}
+
+/// Split one complete request with a caller-selected body limit.
+pub(crate) fn split_request_with_limit(
+    request: &str,
+    maximum_body_bytes: usize,
+) -> Result<(&str, &str), ApiError> {
     let Some(index) = request.find("\r\n\r\n") else {
         if request.len() >= NARUON_LIVE_HEADER_BYTE_LIMIT {
             return Err(ApiError::LimitExceeded);
@@ -65,7 +78,7 @@ pub(crate) fn split_request(request: &str) -> Result<(&str, &str), ApiError> {
     if declared != body.len() {
         return Err(ApiError::InvalidWirePayload);
     }
-    if declared > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
+    if declared > maximum_body_bytes {
         return Err(ApiError::LimitExceeded);
     }
     Ok((header_block, body))

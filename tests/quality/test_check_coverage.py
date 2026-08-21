@@ -392,6 +392,10 @@ class CoverageContractTests(unittest.TestCase):
                 "        .iter()",  # 62 method-chain continuation
                 "        .collect::<Vec<_>>()",  # 63 method-chain continuation
                 "    });",  # 64 closure call close
+                "(",  # 65 structural call opener
+                ")",  # 66 structural call close
+                "    Ok(())",  # 67 structural unit result
+                "    NaruonLiveResponse {",  # 68 structural struct literal
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)

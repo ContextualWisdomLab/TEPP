@@ -134,8 +134,24 @@ def is_executable_source_line(
         return False
     if text.startswith("#[") or text.startswith("#!["):
         return False
-    if text in {"{", "}", "},", ");", "];", "();", "};", "});"}:
+    if text in {
+        "{",
+        "}",
+        "(",
+        ")",
+        "},",
+        ");",
+        "];",
+        "();",
+        "};",
+        "});",
+        "Ok(())",
+    }:
         return False
+    if text.endswith(" {"):
+        type_name = text[:-2]
+        if type_name and all(character.isalnum() or character in "_:" for character in type_name):
+            return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False
     if text.startswith("mod ") or text.startswith("pub mod "):
