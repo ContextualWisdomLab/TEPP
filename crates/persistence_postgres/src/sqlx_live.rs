@@ -36,7 +36,7 @@ pub fn open_sqlx_pool(
 /// isolation.
 #[derive(Debug)]
 struct SqlxTransport {
-    connection: sqlx::pool::PoolConnection<sqlx::Postgres>,
+    connection: Option<sqlx::pool::PoolConnection<sqlx::Postgres>>,
     runtime: tokio::runtime::Runtime,
 }
 
@@ -64,17 +64,33 @@ impl SqlxTransport {
             .block_on(async { pool.acquire().await })
             .map_err(|_| PersistenceError::SqlExecutionFailed)?;
         Ok(Self {
-            connection,
+            connection: Some(connection),
             runtime,
         })
     }
 
     fn execute(&mut self, sql: &str) -> Result<(), PersistenceError> {
-        let connection = &mut self.connection;
+        let connection = self
+            .connection
+            .as_mut()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
         self.runtime
             .block_on(async { sqlx::query(sql).execute(&mut **connection).await })
             .map(|_| ())
             .map_err(|error| map_sqlx_error(&error))
+    }
+}
+
+impl Drop for SqlxTransport {
+    fn drop(&mut self) {
+        let Some(connection) = self.connection.take() else {
+            return;
+        };
+
+        // SQLx's PoolConnection::Drop spawns a return-to-pool task and therefore
+        // panics without a current Tokio context. Consume it inside the owned
+        // runtime so the live transport can be dropped from a synchronous caller.
+        let _ = self.runtime.block_on(connection.close());
     }
 }
 
