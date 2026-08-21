@@ -5,12 +5,13 @@
 //! distinct, request-bound terminal result with a digest-bound artifact or a
 //! redacted failure code.
 
+use crate::analysis_run::require_rfc3339_knowledge_cutoff;
 use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
 use crate::{AnalysisRunAccepted, AnalysisRunRequest, ApiError};
 use serde::{Deserialize, Serialize};
-use temporal_core::{KnowledgeCutoff, SystemTime};
+use temporal_core::SystemTime;
 
 /// Supported terminal analysis-result contract version.
 pub const ANALYSIS_RESULT_CONTRACT_VERSION: u16 = 1;
@@ -239,8 +240,7 @@ impl AnalysisRunTerminalResult {
         ] {
             require_nonempty(value)?;
         }
-        KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff)
-            .map_err(|_| ApiError::InvalidWirePayload)?;
+        require_rfc3339_knowledge_cutoff(&self.knowledge_cutoff)?;
         SystemTime::parse_rfc3339(&self.completed_at).map_err(|_| ApiError::InvalidWirePayload)?;
 
         match self.run_state {

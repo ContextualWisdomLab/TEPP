@@ -321,6 +321,8 @@ class CoverageContractTests(unittest.TestCase):
                 "    }",  # 55
                 "}",  # 56
                 "    executable_statement();",  # 57 executable
+                "pub(crate) fn crate_visible() {",  # 58 visibility-qualified fn
+                "State::Accepted => {",  # 59 match-arm structure
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)

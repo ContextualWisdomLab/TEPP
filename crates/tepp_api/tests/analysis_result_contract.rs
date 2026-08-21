@@ -125,6 +125,10 @@ fn wire_version_limit_extension_and_time_validation_fail_closed() {
     assert_eq!(value.to_json(), Err(ApiError::InvalidWirePayload));
 
     let mut value = succeeded();
+    value.knowledge_cutoff = "2099-01-01T00:00:00Z".into();
+    assert_eq!(value.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut value = succeeded();
     value.completed_at = "2026-99-99T25:00:00Z".into();
     assert_eq!(value.to_json(), Err(ApiError::InvalidWirePayload));
 
@@ -156,8 +160,25 @@ fn serialization_enforces_default_result_and_status_limits() {
         )),
         Err(ApiError::LimitExceeded)
     );
-    let status = AnalysisRunStatus::accepted(&oversized_accepted).expect("status");
-    assert_eq!(status.to_json(), Err(ApiError::LimitExceeded));
+    assert_eq!(
+        AnalysisRunStatus::accepted(&oversized_accepted),
+        Err(ApiError::LimitExceeded)
+    );
+
+    let mut near_limit_result = succeeded();
+    let initial_size = near_limit_result.to_json().expect("initial result").len();
+    near_limit_result
+        .summary
+        .as_mut()
+        .expect("summary")
+        .analysis_family
+        .push_str(&"x".repeat(DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT - 1 - initial_size));
+    let near_limit_json = near_limit_result.to_json().expect("near-limit result");
+    assert!(near_limit_json.len() < DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT);
+    assert_eq!(
+        AnalysisRunStatus::terminal(&request(), &accepted(), near_limit_result),
+        Err(ApiError::LimitExceeded)
+    );
 }
 
 #[test]
