@@ -1,6 +1,6 @@
 # contextual-orchestrator interpretation port for TEPP
 
-**Status:** Partial modular integration contract — `tepp_api::bind_contextual_orchestrator` is the credential-free binding; live HTTP remains accepted-target.  
+**Status:** Partial modular integration contract — `tepp_api::bind_contextual_orchestrator` is the credential-free binding; live HTTP remains accepted-target.
 **Last reviewed:** 2026-08-13
 
 ## Boundary
