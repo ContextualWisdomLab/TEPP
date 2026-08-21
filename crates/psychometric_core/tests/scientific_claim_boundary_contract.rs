@@ -29,9 +29,9 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_stationary_initial_latent_mean, recover_stationary_latent_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -93,6 +93,10 @@ use psychometric_core::{
     refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance, refuse_process_noise_as_unconditional_variance,
+    refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
+    refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
+    refuse_stationary_initial_latent_mean_as_discrete_mean,
+    refuse_stationary_initial_latent_mean_as_initial_latent_mean,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
     refuse_time_dependent_impulse_as_time_varying_discrete_effect,
@@ -2246,5 +2250,75 @@ fn asymptotic_continuous_intercept_is_not_cint_increment_t0_or_tipred() {
         Err(
             psychometric_core::PsychometricError::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect
         )
+    );
+}
+
+#[test]
+fn stationary_initial_latent_mean_is_not_t0_cint_tipred_or_discrete() {
+    let intercept = 0.3_f64;
+    let log_rate = -0.134_488_942_f64;
+    let recovered = recover_stationary_initial_latent_mean(
+        intercept,
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("stationary T0MEANS");
+    let intercept_only =
+        recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+            .expect("asymCINT");
+    let tipred = recover_asymptotic_time_independent_predictor_effect(
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTIPREDEFFECT");
+    let discrete =
+        recover_discrete_latent_mean(2.823, log_rate, intercept, 1.0, LagClock::EventTime)
+            .expect("μ_t");
+    assert!(
+        (recovered - 2.823).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): constrained T0MEANS is not free T0MEANS"
+    );
+    assert!(
+        (recovered - intercept_only).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): constrained T0MEANS is not asymCINT"
+    );
+    assert!(
+        (recovered - tipred).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): constrained T0MEANS is not asymTIPREDEFFECT"
+    );
+    assert!(
+        (recovered - discrete).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): constrained T0MEANS is not μ_t"
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_mean_as_initial_latent_mean(recovered, 2.823),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentMeanIsNotInitialLatentMean
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept(
+            recovered,
+            intercept_only
+        ),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentMeanIsNotAsymptoticContinuousIntercept
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect(
+            recovered, tipred
+        ),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentMeanIsNotAsymptoticTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_mean_as_discrete_mean(recovered, discrete),
+        Err(psychometric_core::PsychometricError::StationaryInitialLatentMeanIsNotDiscreteMean)
     );
 }

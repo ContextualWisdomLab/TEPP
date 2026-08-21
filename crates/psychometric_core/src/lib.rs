@@ -125,6 +125,13 @@
 //! not `κ`, not `A^{-1}[e^{A Δt} − I] κ`, not `T0MEANS`, and not
 //! `-B z / a`; p. 16 `T0MEANS` stationarity includes TI predictors;
 //! that composition is not this intercept-only map),
+//! recovers the Driver p. 16 stationary `T0MEANS` as
+//! `-κ / a + −B z / a`
+//! (constrained first-occasion mean using `T0MEANSbase` /
+//! `T0MEANSfree`; form the intercept contribution first, then include
+//! the TI extra effect, then add; not free `T0MEANS`, not `asymCINT`
+//! alone, not `asymTIPREDEFFECT` alone, and not the finite-interval
+//! discrete latent mean),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -261,6 +268,8 @@ pub use event_time::recover_manifest_observed_mean;
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
+/// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
+pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
 /// Exact scalar contemporaneous `TDPREDEFFECT` impulse `m x`.
@@ -413,6 +422,14 @@ pub use event_time::refuse_measurement_error_as_observed_variance;
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
+/// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
+pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept;
+/// Refuse treating p. 16 stationary `T0MEANS` as `asymTIPREDEFFECT`.
+pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect;
+/// Refuse treating p. 16 stationary `T0MEANS` as a finite-interval discrete mean.
+pub use event_time::refuse_stationary_initial_latent_mean_as_discrete_mean;
+/// Refuse treating p. 16 stationary `T0MEANS` as free `T0MEANS`.
+pub use event_time::refuse_stationary_initial_latent_mean_as_initial_latent_mean;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
 pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
 /// Refuse treating Driver Eq. 3 impulse as `TIPREDEFFECT`.

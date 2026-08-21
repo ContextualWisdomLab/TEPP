@@ -372,6 +372,22 @@ pub enum PsychometricError {
     /// article notes that a `T0MEANS` stationarity constraint includes
     /// time-independent predictors; that composition is not this map.
     AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect,
+    /// Driver p. 16 stationary `T0MEANS` was treated as free `T0MEANS`.
+    /// `-κ / a + −B z / a` is the constrained first-occasion mean, not
+    /// the free first-occasion latent mean.
+    StationaryInitialLatentMeanIsNotInitialLatentMean,
+    /// Driver p. 16 stationary `T0MEANS` was treated as `asymCINT`.
+    /// The constraint includes time-independent predictors. `-κ / a`
+    /// is not that composition when `B z ≠ 0`.
+    StationaryInitialLatentMeanIsNotAsymptoticContinuousIntercept,
+    /// Driver p. 16 stationary `T0MEANS` was treated as
+    /// `asymTIPREDEFFECT`. The constraint includes the intercept
+    /// contribution. `-B z / a` is not that composition when `κ ≠ 0`.
+    StationaryInitialLatentMeanIsNotAsymptoticTimeIndependentEffect,
+    /// Driver p. 16 stationary `T0MEANS` was treated as a finite-
+    /// interval discrete latent mean. The constrained first-occasion
+    /// mean is not `exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`.
+    StationaryInitialLatentMeanIsNotDiscreteMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -671,6 +687,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect => {
                 "asymptotic continuous intercept is not the asymptotic time-independent predictor effect"
+            }
+            Self::StationaryInitialLatentMeanIsNotInitialLatentMean => {
+                "stationary first-occasion latent mean is not the free first-occasion latent mean"
+            }
+            Self::StationaryInitialLatentMeanIsNotAsymptoticContinuousIntercept => {
+                "stationary first-occasion latent mean is not the asymptotic continuous intercept"
+            }
+            Self::StationaryInitialLatentMeanIsNotAsymptoticTimeIndependentEffect => {
+                "stationary first-occasion latent mean is not the asymptotic time-independent predictor effect"
+            }
+            Self::StationaryInitialLatentMeanIsNotDiscreteMean => {
+                "stationary first-occasion latent mean is not the finite-interval discrete latent mean"
             }
         };
         formatter.write_str(message)
@@ -1132,6 +1160,24 @@ mod tests {
             PsychometricError::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect
                 .to_string(),
             "asymptotic continuous intercept is not the asymptotic time-independent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentMeanIsNotInitialLatentMean.to_string(),
+            "stationary first-occasion latent mean is not the free first-occasion latent mean"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentMeanIsNotAsymptoticContinuousIntercept
+                .to_string(),
+            "stationary first-occasion latent mean is not the asymptotic continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentMeanIsNotAsymptoticTimeIndependentEffect
+                .to_string(),
+            "stationary first-occasion latent mean is not the asymptotic time-independent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentMeanIsNotDiscreteMean.to_string(),
+            "stationary first-occasion latent mean is not the finite-interval discrete latent mean"
         );
     }
 }
