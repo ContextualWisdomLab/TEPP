@@ -1,7 +1,7 @@
 # Temporal Event Foundation — validation and release-readiness report
 
 **Status:** Living validation ledger for the Temporal/Event foundation program  
-**Last reviewed:** 2026-08-12  
+**Last reviewed:** 2026-08-20
 **Authority:** ADR 0014 (claim promotion), ADR 0007 (quality gates), AGENTS.md scientific acceptance
 
 ## Scope
@@ -18,13 +18,14 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
 | Multiple membership | `membership_core` | partial | — | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
-| Bitemporal persistence + live SQL port | `persistence_postgres` | partial | backup/restore integrity | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event + concurrent-write (#37–#43 implemented-main) + restore integrity probes (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#43 + restore integrity |
+| Bitemporal persistence + live SQL port | `persistence_postgres` | partial | — | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` interval and membership contracts + event relation/mention/instance + source-artifact + audit-event + concurrent-write + restore-integrity contracts implemented-main | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 |
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
-| Purpose-bound provider payloads | `tepp_api` | implemented-main | provider-payload minimization | expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay | ADR 0009; `docs/research/provider-payload-minimization.md` |
-| Adaptive orchestration router | `tepp_api` | accepted-target | active PR | mode selection, document-control denial, ablation, credential-free bind | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
+| TDT/CHRONOS evidence-status gates | `event_core` | active-PR | PR #50 | admission + first-story rates | known-stream miss/FA; full tracking/calibration/schema extraction remains future; ADR 0016; `docs/research/event-intelligence-status-gates.md` |
+| Purpose-bound provider payloads | `tepp_api` | implemented-main | — | expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay | ADR 0009; `docs/research/provider-payload-minimization.md` |
+| Adaptive orchestration router | `tepp_api` | partial | — | mode selection, document-control denial, ablation, credential-free bind; live NIM execution remains future | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 
