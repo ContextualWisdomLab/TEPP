@@ -356,24 +356,24 @@ mod tests {
 
     #[test]
     fn naruon_export_exchange_covers_both_purpose_gate_arms() {
-        let allowed = crate::authorization::ExportAuthorizationRequest {
+        let allowed = ExportAuthorizationRequest {
             tenant_workspace_id: "naruon-tenant-workspace-demo".into(),
             principal_id: "naruon-service".into(),
-            purpose: crate::authorization::AnalyticalPurpose::ModularServiceConsumer,
+            purpose: AnalyticalPurpose::ModularServiceConsumer,
             artifact_id: "tepp-export-demo-001".into(),
             includes_source_text: false,
         };
         assert!(
-            super::naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-001")
+            naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-001")
                 .is_ok()
         );
 
-        let denied = crate::authorization::ExportAuthorizationRequest {
-            purpose: crate::authorization::AnalyticalPurpose::OperationalMonitoring,
+        let denied = ExportAuthorizationRequest {
+            purpose: AnalyticalPurpose::OperationalMonitoring,
             ..allowed
         };
         assert_eq!(
-            super::naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-002"),
+            naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-002"),
             Err(ApiError::AuthorizationDenied)
         );
     }
