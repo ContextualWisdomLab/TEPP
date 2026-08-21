@@ -489,7 +489,7 @@ fn host_implies_table_access(host: &str) -> bool {
         || lowered.chars().any(char::is_control)
 }
 
-pub(crate) fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
+fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bool {
     if let Some(bound) = bound_addr
         && (host == bound.to_string() || host == bound.ip().to_string())
     {
@@ -575,6 +575,7 @@ mod tests {
         let bound: SocketAddr = "127.0.0.1:43789".parse().expect("bound");
         assert!(host_is_loopback("127.0.0.1:43789", Some(bound)));
         assert!(host_is_loopback("127.0.0.1", Some(bound)));
+        assert!(!host_is_loopback("8.8.8.8", Some(bound)));
         assert_eq!(
             tenant_idempotency_key("tenant-a", "idem-1"),
             "tenant-a\u{1f}idem-1"
@@ -582,21 +583,14 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn helpers_cover_request_line_headers_and_accept_failure() {
         assert_eq!(
             parse_request_line("POST /v1/analysis-runs HTTP/1.1 extra"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            parse_request_line("POST /v1/analysis-runs HTTP/1.1"),
-            Ok(("POST", "/v1/analysis-runs"))
-        );
-        assert_eq!(
             parse_request_line("POST https://tepp.example/v1/analysis-runs HTTP/1.1"),
-            Err(ApiError::InvalidWirePayload)
-        );
-        assert_eq!(
-            parse_request_line("POST /proxy://tepp.example/v1/analysis-runs HTTP/1.1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
@@ -611,6 +605,15 @@ mod tests {
             parse_request_line("POST /only"),
             Err(ApiError::InvalidWirePayload)
         );
+        assert_eq!(
+            parse_request_line("POST /x HTTP/1.0"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_request_line("POST /x?query HTTP/1.1"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(parse_request_line("POST /x HTTP/1.1"), Ok(("POST", "/x")));
         assert_eq!(
             split_header_line("NoColon"),
             Err(ApiError::InvalidWirePayload)
@@ -638,19 +641,49 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: \r\n\r\n"),
-            Err(ApiError::InvalidWirePayload)
-        );
-        assert_eq!(
-            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: 1\r\n\r\n"),
-            Ok(1)
-        );
-        assert_eq!(
             declared_content_length("POST /x HTTP/1.1\r\nHost: 127.0.0.1\r\n"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            declared_content_length(
+                "POST /x HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-length: 0\r\n\r\n"
+            ),
+            Ok(0)
+        );
+        assert_eq!(
+            declared_content_length("POST /x HTTP/1.1\r\ncontent-length: \r\n\r\n"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_request_line("POST /proxy://target HTTP/1.1"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             split_request(&"x".repeat(super::NARUON_LIVE_HEADER_BYTE_LIMIT)),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(split_request("short"), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            split_request("POST /x HTTP/1.1\r\ncontent-length: 0\r\n\r\n"),
+            Ok(("POST /x HTTP/1.1\r\ncontent-length: 0", ""))
+        );
+        assert_eq!(
+            split_request(&format!(
+                "{}\r\n\r\n",
+                "x".repeat(super::NARUON_LIVE_HEADER_BYTE_LIMIT + 1)
+            )),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(
+            split_request("POST /x HTTP/1.1\r\ncontent-length: 1\r\n\r\n"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let oversized_body = "x".repeat(super::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT + 1);
+        assert_eq!(
+            split_request(&format!(
+                "POST /x HTTP/1.1\r\ncontent-length: {}\r\n\r\n{oversized_body}",
+                oversized_body.len()
+            )),
             Err(ApiError::LimitExceeded)
         );
         assert!(!fallback_envelope_json().is_empty());
@@ -665,8 +698,6 @@ mod tests {
             ),
             Err(ApiError::InvalidWirePayload)
         );
-        let bound: SocketAddr = "127.0.0.1:43789".parse().expect("bound");
-        assert!(host_is_loopback("127.0.0.1:1", Some(bound)));
         assert_eq!(
             NaruonLiveService::new()
                 .serve_accepted(Err(std::io::Error::other("accept")))
