@@ -21,6 +21,18 @@ fail-closed no-op. A dry run may print the task contract without credentials.
 When a PR or issue exists, normal review → repair → exact-head Checks → merge
 governance owns the hour. The scheduler does not create a competing branch.
 
+Current executable queue while drafts remain open:
+
+1. Merge the predicted-versus-observed Allen coverage gate
+   (`prediction_contradiction` / the coverage-authority landing PR). Keep
+   superseded coverage drafts unmerged.
+2. Next buyer-visible slice: naruon live HTTP loopback with stream deadline,
+   RFC 3339 cutoff, loopback `Host`, NIM/proxy header refusal, and export
+   over a real `TcpStream` (this PR). Keep PR #87 unmerged.
+3. After that: `text_segment` SQL on migration `0006` (PR #99), then
+   production TLS bind (PR #100 / #90). Do not open a competing hourly
+   proposal until the open-PR inventory is empty.
+
 ## Required repository configuration
 
 Configure these repository or organization values:
