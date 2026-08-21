@@ -1,7 +1,7 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — `event_core` scores CHRONOS occurrence forecasts with a Brier rule and refuses to promote them as instances; remaining TDT detection, schema extraction, and temporal-consistency reasoning remain accepted-target  
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 temporal semantics and ADR 0003 event ontology/membership.
 

@@ -53,7 +53,7 @@ boundaries above remain the target modular MSA architecture.
 |---|---|
 | `evidence_core` | immutable evidence domain primitives |
 | `temporal_core` | typed clocks, intervals, and temporal reasoning |
-| `event_core` | event instances, mentions, roles, and provenance |
+| `event_core` | event instances, mentions, roles, provenance, and CHRONOS occurrence-prediction calibration |
 | `relation_graph` | typed relations and forward-transition validation |
 | `membership_core` | time-varying cross-classified multiple membership |
 | `persistence_postgres` | PostgreSQL repositories and migrations |
