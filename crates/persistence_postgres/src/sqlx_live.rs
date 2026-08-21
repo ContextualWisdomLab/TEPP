@@ -36,8 +36,8 @@ pub fn open_sqlx_pool(
 /// isolation.
 #[derive(Debug)]
 struct SqlxTransport {
-    runtime: tokio::runtime::Runtime,
     connection: sqlx::pool::PoolConnection<sqlx::Postgres>,
+    runtime: tokio::runtime::Runtime,
 }
 
 impl SqlxTransport {
@@ -64,8 +64,8 @@ impl SqlxTransport {
             .block_on(async { pool.acquire().await })
             .map_err(|_| PersistenceError::SqlExecutionFailed)?;
         Ok(Self {
-            runtime,
             connection,
+            runtime,
         })
     }
 
