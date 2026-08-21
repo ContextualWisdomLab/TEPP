@@ -80,6 +80,10 @@ fn registry_requires_supporting_mentions_before_instance_insert() {
     assert!(registry.mention(mention.mention_id()).is_some());
     let stored = registry.instance(instance.instance_id()).expect("stored");
     assert_eq!(stored.supporting_mentions(), &[mention.mention_id()]);
+    assert_eq!(
+        stored.evidence_layer(),
+        EventEvidenceLayer::PromotedTransition
+    );
     assert_eq!(stored.roles().len(), 2);
     assert!(stored.is_active_at(start));
 }
