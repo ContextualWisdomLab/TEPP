@@ -596,7 +596,12 @@ mod tests {
             }
         };
         request.events = vec![
-            event("award", "contract_awarded", "2026-08-19T08:00:00Z", "actor-1"),
+            event(
+                "award",
+                "contract_awarded",
+                "2026-08-19T08:00:00Z",
+                "actor-1",
+            ),
             event(
                 "specification",
                 "specification_changed",
@@ -617,7 +622,10 @@ mod tests {
         assert_eq!(projection.participant_count, 3);
         assert_eq!(projection.findings.len(), 6);
         let payload = projection.to_json().expect("projection json");
-        assert_eq!(ProjectHistoryProjection::from_json(&payload), Ok(projection));
+        assert_eq!(
+            ProjectHistoryProjection::from_json(&payload),
+            Ok(projection)
+        );
     }
 
     #[test]
