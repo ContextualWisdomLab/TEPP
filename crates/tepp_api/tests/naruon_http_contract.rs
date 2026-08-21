@@ -120,6 +120,42 @@ fn review_and_copilot_headers_are_authorization_denied() {
         ),
         Err(ApiError::AuthorizationDenied)
     );
+    for name in [
+        "x-openai-api-key",
+        "x-anthropic-key",
+        "x-bytez-api-key",
+        "x-openrouter-api-key",
+    ] {
+        assert_eq!(
+            naruon_analysis_run_exchange_with_headers(
+                "https://tepp.example.test",
+                &run,
+                &[(name, "provider-secret")]
+            ),
+            Err(ApiError::AuthorizationDenied),
+            "header={name}"
+        );
+    }
+}
+
+#[test]
+fn malformed_extra_headers_fail_closed_before_forwarding() {
+    let run = sample_run();
+    for (name, value) in [
+        ("", "value"),
+        ("bad name", "value"),
+        ("x-trace", "ok\r\nx-injected: 1"),
+    ] {
+        assert_eq!(
+            naruon_analysis_run_exchange_with_headers(
+                "https://tepp.example.test",
+                &run,
+                &[(name, value)]
+            ),
+            Err(ApiError::InvalidWirePayload),
+            "header={name:?}"
+        );
+    }
 }
 
 #[test]

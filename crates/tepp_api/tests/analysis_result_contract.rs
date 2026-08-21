@@ -27,6 +27,18 @@ fn accepted() -> AnalysisRunAccepted {
     AnalysisRunAccepted::new("run-1", "accepted", "idem-1").expect("accepted")
 }
 
+#[test]
+fn accepted_receipt_rejects_non_accepted_lifecycle_states() {
+    assert_eq!(
+        AnalysisRunAccepted::new("run-1", "running", "idem-1"),
+        Err(ApiError::InvalidWirePayload)
+    );
+    assert_eq!(
+        AnalysisRunAccepted::new("run-1", "failed", "idem-1"),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
 fn summary() -> AnalysisResultSummary {
     AnalysisResultSummary::new("temporal_topic_measurement", 120, 42, "validated").expect("summary")
 }

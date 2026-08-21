@@ -201,7 +201,9 @@ impl AnalysisRunAccepted {
     pub(crate) fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(self.contract_version, ANALYSIS_RUN_CONTRACT_VERSION)?;
         require_nonempty(&self.run_id)?;
-        require_nonempty(&self.run_state)?;
+        if self.run_state != "accepted" {
+            return Err(ApiError::InvalidWirePayload);
+        }
         require_nonempty(&self.idempotency_key)?;
         Ok(())
     }
