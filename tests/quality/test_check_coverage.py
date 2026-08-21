@@ -480,6 +480,21 @@ class CoverageContractTests(unittest.TestCase):
             )
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 6))
 
+            source.write_text(
+                "match state {\n"
+                "    State::Ready(value)\n"
+                "        if match value {\n"
+                "            0 => true,\n"
+                "            _ => false,\n"
+                "        }\n"
+                "        && value.is_fresh() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 7))
+
     def test_previous_arm_body_does_not_make_next_label_executable(self) -> None:
         """Do not treat an ``if`` inside the preceding arm as a guard."""
 
