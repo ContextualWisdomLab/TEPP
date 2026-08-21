@@ -1,4 +1,4 @@
-# Membership target kinds beyond entity/project (doctoring)
+# Membership target kinds beyond entity/project
 
 ## Scope
 
