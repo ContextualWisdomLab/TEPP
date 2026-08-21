@@ -182,7 +182,9 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "cargo deny check",
             'line_coverage="$RUNNER_TEMP/coverage.lcov"',
             'branch_coverage="$RUNNER_TEMP/coverage-branches.json"',
+            "cargo llvm-cov --workspace --all-features --lcov --output-path \"$line_coverage\" --ignore-filename-regex 'sqlx_live\\.rs'",
             'python3 scripts/check_coverage.py "$line_coverage" --kind lines --format lcov',
+            "cargo +nightly-2026-08-21 llvm-cov --branch --workspace --all-features --json --output-path \"$branch_coverage\" --ignore-filename-regex 'sqlx_live\\.rs'",
             'python3 scripts/check_coverage.py "$branch_coverage" --kind branches',
         ):
             self.assertIn(command, verifier)

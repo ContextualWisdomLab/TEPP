@@ -77,7 +77,10 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
-- Removed the temporary PR-155 review-repair workflow and source-fix helper after the bounded repair; subsequent changes use the normal reviewed branch path.
+- Removed the temporary PR-155 review-repair workflows and source-fix helper after the bounded repair; subsequent changes use the normal reviewed branch path.
+- Pinned Rust branch-coverage workflows to `nightly-2026-08-21`, which is newer than the workspace Rust 1.97.1 MSRV and avoids the previous nightly/MSRV mismatch.
+- Applied the documented `sqlx_live.rs` authored-coverage exclusion to the hourly release gate so live-PostgreSQL success-path coverage is not reported as a false source failure.
+- Removed unreachable duplicate Naruon host-control validation because the shared `require_nonempty` boundary already rejects C0/C1 controls; retained a C1 regression case alongside the existing C0 case.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
