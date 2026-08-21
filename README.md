@@ -7,9 +7,11 @@ implemented in Rust.
 ## Current implementation state
 
 This branch establishes the Task 1 Rust workspace and quality-gate foundation.
-The ten bounded crates compile independently but intentionally expose no
-placeholder production APIs. Domain behavior begins in Task 2 with immutable
-evidence identifiers and source records.
+The eleven bounded crates compile independently. `derived_sensitivity` inherits
+source Restricted/Internal classes onto topic, factor, and relation artifacts
+and fails closed on unknown kinds; derivation and blanket PII masking are not
+declassification. Other crates still begin domain behavior in Task 2 with
+immutable evidence identifiers and source records.
 
 ```text
 crates/evidence_core
@@ -22,6 +24,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/derived_sensitivity
 ```
 
 ## Local verification
