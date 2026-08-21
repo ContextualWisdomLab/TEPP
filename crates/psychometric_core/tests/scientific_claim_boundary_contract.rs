@@ -3,7 +3,7 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
-    recover_asymptotic_time_independent_predictor_effect,
+    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
@@ -34,6 +34,10 @@ use psychometric_core::{
     recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
+    refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
+    refuse_asymptotic_continuous_intercept_as_continuous_intercept,
+    refuse_asymptotic_continuous_intercept_as_discrete_increment,
+    refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
     refuse_asymptotic_time_independent_effect_as_coefficient,
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -2180,6 +2184,67 @@ fn asymptotic_time_independent_variance_is_not_trait_stationary_or_mean_effect()
         refuse_asymptotic_time_independent_variance_as_asymptotic_effect(recovered, mean_effect),
         Err(
             psychometric_core::PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect
+        )
+    );
+}
+
+#[test]
+fn asymptotic_continuous_intercept_is_not_cint_increment_t0_or_tipred() {
+    let intercept = 0.3_f64;
+    let log_rate = -0.134_488_942_f64;
+    let recovered =
+        recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+            .expect("asymCINT");
+    let discrete =
+        recover_discrete_continuous_intercept_effect(intercept, log_rate, 1.0, LagClock::EventTime)
+            .expect("dtCINT");
+    let tipred = recover_asymptotic_time_independent_predictor_effect(
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTIPREDEFFECT");
+    assert!(
+        (recovered - intercept).abs() > 1e-3,
+        "Driver et al. (2017, Table 2, p. 12): asymCINT is not CINT"
+    );
+    assert!(
+        (recovered - discrete).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): -κ / a is not A^{{-1}}[e^{{A Δt}} − I] κ"
+    );
+    assert!(
+        (recovered - 2.823).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): -κ / a is not T0MEANS"
+    );
+    assert!(
+        (recovered - tipred).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): -κ / a is not -B z / a"
+    );
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_as_continuous_intercept(recovered, intercept),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticContinuousInterceptIsNotContinuousIntercept
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_as_discrete_increment(recovered, discrete),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticContinuousInterceptIsNotDiscreteIncrement
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_as_initial_latent_mean(recovered, 2.823),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticContinuousInterceptIsNotInitialLatentMean
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect(
+            recovered, tipred
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect
         )
     );
 }

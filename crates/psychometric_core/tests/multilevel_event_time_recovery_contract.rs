@@ -4,7 +4,8 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
-    ordinary_least_squares_slope, recover_asymptotic_time_independent_predictor_effect,
+    ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
+    recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
@@ -38,6 +39,10 @@ use psychometric_core::{
     recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
+    refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
+    refuse_asymptotic_continuous_intercept_as_continuous_intercept,
+    refuse_asymptotic_continuous_intercept_as_discrete_increment,
+    refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
     refuse_asymptotic_time_independent_effect_as_coefficient,
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -4371,6 +4376,84 @@ fn asymptotic_time_independent_variance_refuses_unstable_drift_and_non_event_clo
     );
     assert_eq!(
         recover_asymptotic_time_independent_predictor_variance(0.0, 1.0, 0.0, LagClock::EventTime),
+        Ok(0.0)
+    );
+}
+
+#[test]
+fn asymptotic_continuous_intercept_recovers_driver_table_two() {
+    let printed_effect = -0.225_f64;
+    let printed_asym = -1.673_f64;
+    let log_rate = -printed_effect / printed_asym;
+    let intercept = 0.3_f64;
+    let recovered =
+        recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+            .expect("asymCINT");
+    let expected = intercept / -log_rate;
+    let error = rmse(&[expected], &[recovered]);
+    assert!(
+        error < 1e-12,
+        "Driver Table 2 asymCINT RMSE {error}: got {recovered}"
+    );
+    let discrete =
+        recover_discrete_continuous_intercept_effect(intercept, log_rate, 1.0, LagClock::EventTime)
+            .expect("dtCINT");
+    let tipred = recover_asymptotic_time_independent_predictor_effect(
+        printed_effect,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTIPREDEFFECT");
+    assert!(
+        rmse(&[recovered], &[intercept]) > error,
+        "CINT is not asymCINT"
+    );
+    assert!(rmse(&[recovered], &[discrete]) > error);
+    assert!(rmse(&[recovered], &[2.823]) > error);
+    assert!(rmse(&[recovered], &[tipred]) > error);
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_as_continuous_intercept(recovered, intercept),
+        Err(PsychometricError::AsymptoticContinuousInterceptIsNotContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_as_discrete_increment(recovered, discrete),
+        Err(PsychometricError::AsymptoticContinuousInterceptIsNotDiscreteIncrement)
+    );
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_as_initial_latent_mean(recovered, 2.823),
+        Err(PsychometricError::AsymptoticContinuousInterceptIsNotInitialLatentMean)
+    );
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect(
+            recovered, tipred
+        ),
+        Err(PsychometricError::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect)
+    );
+}
+
+#[test]
+fn asymptotic_continuous_intercept_refuses_unstable_drift_and_non_event_clocks() {
+    let intercept = 0.3_f64;
+    let log_rate = -0.134_488_942_f64;
+    assert_eq!(
+        recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_continuous_intercept(intercept, 0.0, LagClock::EventTime),
+        Err(PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotic_continuous_intercept(intercept, 0.5, LagClock::EventTime),
+        Err(PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotic_continuous_intercept(f64::NAN, log_rate, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_continuous_intercept(0.0, 0.0, LagClock::EventTime),
         Ok(0.0)
     );
 }

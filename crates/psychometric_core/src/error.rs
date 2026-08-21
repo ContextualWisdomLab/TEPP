@@ -352,6 +352,26 @@ pub enum PsychometricError {
     /// `(B / a)² v` is a variance, not the expected total change in
     /// process means.
     AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect,
+    /// Driver Table 2 `asymCINT` was requested for a non-stable drift.
+    /// The expected change in process means for a change in intercept
+    /// is `-κ / a` and requires `a < 0`.
+    AsymptoticContinuousInterceptRequiresStableDrift,
+    /// Driver Table 2 `asymCINT` was treated as `CINT`.
+    /// `-κ / a` is not `κ`.
+    AsymptoticContinuousInterceptIsNotContinuousIntercept,
+    /// Driver Table 2 `asymCINT` was treated as the finite-interval
+    /// discrete intercept increment. `-κ / a` is not
+    /// `A^{-1}[e^{A Δt} − I] κ`.
+    AsymptoticContinuousInterceptIsNotDiscreteIncrement,
+    /// Driver Table 2 `asymCINT` was treated as `T0MEANS`.
+    /// `-κ / a` is not the first-occasion latent mean.
+    AsymptoticContinuousInterceptIsNotInitialLatentMean,
+    /// Driver Table 2 `asymCINT` was treated as `asymTIPREDEFFECT`.
+    /// `-κ / a` is the intercept contribution. `-B z / a` is the
+    /// time-independent predictor contribution. Page 16 of the JSS
+    /// article notes that a `T0MEANS` stationarity constraint includes
+    /// time-independent predictors; that composition is not this map.
+    AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -636,6 +656,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect => {
                 "asymptotic time-independent predictor variance is not the expected total change in process means"
+            }
+            Self::AsymptoticContinuousInterceptRequiresStableDrift => {
+                "asymptotic continuous intercept requires a stable negative drift"
+            }
+            Self::AsymptoticContinuousInterceptIsNotContinuousIntercept => {
+                "asymptotic continuous intercept is not the continuous intercept"
+            }
+            Self::AsymptoticContinuousInterceptIsNotDiscreteIncrement => {
+                "asymptotic continuous intercept is not the finite-interval discrete increment"
+            }
+            Self::AsymptoticContinuousInterceptIsNotInitialLatentMean => {
+                "asymptotic continuous intercept is not the first-occasion latent mean"
+            }
+            Self::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect => {
+                "asymptotic continuous intercept is not the asymptotic time-independent predictor effect"
             }
         };
         formatter.write_str(message)
@@ -1076,6 +1111,27 @@ mod tests {
         assert_eq!(
             PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect.to_string(),
             "asymptotic time-independent predictor variance is not the expected total change in process means"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift.to_string(),
+            "asymptotic continuous intercept requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticContinuousInterceptIsNotContinuousIntercept.to_string(),
+            "asymptotic continuous intercept is not the continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticContinuousInterceptIsNotDiscreteIncrement.to_string(),
+            "asymptotic continuous intercept is not the finite-interval discrete increment"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticContinuousInterceptIsNotInitialLatentMean.to_string(),
+            "asymptotic continuous intercept is not the first-occasion latent mean"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect
+                .to_string(),
+            "asymptotic continuous intercept is not the asymptotic time-independent predictor effect"
         );
     }
 }

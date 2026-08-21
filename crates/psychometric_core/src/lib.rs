@@ -119,6 +119,12 @@
 //! (pp. 20–21; stable between-subject variance accounted for by a
 //! time-independent predictor with variance `v`; not `TRAITVAR`,
 //! not `asymDIFFUSION`, and not `-B z / a`),
+//! recovers the Driver Table 2 `asymCINT` as `-κ / a`
+//! (p. 12; Eq. 3 as `Δt → ∞`; JSS PDF opened 2026-08-21T16:13Z;
+//! expected change in process means for a unit intercept; `a < 0`;
+//! not `κ`, not `A^{-1}[e^{A Δt} − I] κ`, not `T0MEANS`, and not
+//! `-B z / a`; p. 16 `T0MEANS` stationarity includes TI predictors;
+//! that composition is not this intercept-only map),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -167,6 +173,8 @@ pub use event_time::LagClock;
 pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar Table 2 `asymCINT` `-κ / a`.
+pub use event_time::recover_asymptotic_continuous_intercept;
 /// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
 pub use event_time::recover_asymptotic_time_independent_predictor_effect;
 /// Exact scalar §7.2 `addedTIPREDVAR` `(B / a)² v`.
@@ -269,6 +277,14 @@ pub use event_time::recover_within_residual_event_time_log_rate;
 pub use event_time::refuse_after_extra_process_contribution_as_observed_mean;
 /// Refuse treating the evolved-plus-after-contribution latent mean as `E(y_t)`.
 pub use event_time::refuse_after_extra_process_latent_mean_as_observed_mean;
+/// Refuse treating Table 2 `asymCINT` as `asymTIPREDEFFECT`.
+pub use event_time::refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect;
+/// Refuse treating Table 2 `asymCINT` as `CINT`.
+pub use event_time::refuse_asymptotic_continuous_intercept_as_continuous_intercept;
+/// Refuse treating Table 2 `asymCINT` as the finite-interval discrete increment.
+pub use event_time::refuse_asymptotic_continuous_intercept_as_discrete_increment;
+/// Refuse treating Table 2 `asymCINT` as `T0MEANS`.
+pub use event_time::refuse_asymptotic_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT` `B`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_coefficient;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.

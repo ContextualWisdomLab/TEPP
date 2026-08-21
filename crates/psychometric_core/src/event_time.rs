@@ -61,6 +61,15 @@
 //! accounted for by those predictors. The scalar map is `(B / a)² v`
 //! for predictor variance `v ≥ 0`. That variance is not `TRAITVAR`,
 //! not `asymDIFFUSION`, and not the expected total change `-B z / a`.
+//! Table 2 (p. 12) names `asymCINT` the asymptotic (`Δt = ∞`)
+//! expected change in processes for a 1 unit change in intercept
+//! (`CINT`). Equation 3 maps a finite event interval as
+//! `A^{-1}[e^{A Δt} − I] κ`. For stable `a < 0` that `Δt → ∞` limit
+//! is `-κ / a`. A unit intercept is `-1 / a`. That intercept
+//! contribution is not `κ`, not the finite-interval increment, not
+//! `T0MEANS`, and not `asymTIPREDEFFECT` `-B z / a`. Page 16 notes
+//! that a `T0MEANS` stationarity constraint includes time-independent
+//! predictors; that composition is not this intercept-only map.
 //! Table 3 (p. 13) names a different matrix
 //! `T0TIPREDEFFECT` for time-independent predictors on latents at
 //! `T0`. The scalar first-occasion shift is `t0_b z`. Equation 3's
@@ -2765,6 +2774,124 @@ pub fn refuse_asymptotic_time_independent_variance_as_asymptotic_effect(
     Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect)
 }
 
+/// Exact scalar Table 2 `asymCINT`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; Eq. 3, p. 5;
+/// §4.3 / p. 16; JSS PDF opened 2026-08-21T16:13Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `asymCINT` the asymptotic (`Δt = ∞`) expected change in
+/// processes for a 1 unit change in intercept (`CINT`). Table 2 names
+/// `κ` `CINT`. Equation 3 maps a finite event interval as
+/// `A^{-1}[e^{A Δt} − I] κ`. For stable `a < 0` that `Δt → ∞` limit
+/// is `-A^{-1} κ`. The scalar map is `-κ / a`. A unit intercept is
+/// `-1 / a`. Form `κ` first, then divide by `-a`. A zero intercept is
+/// exactly zero. `a ≥ 0` cannot hold a finite process-mean change and
+/// fails closed. `-κ / a` is not `κ`, not the finite-interval
+/// increment `A^{-1}[e^{A Δt} − I] κ`, not `T0MEANS`, and not
+/// `asymTIPREDEFFECT` `-B z / a`. Page 16 notes that a `T0MEANS`
+/// stationarity constraint includes time-independent predictors; that
+/// composition is not this intercept-only map. The printed 2-latent
+/// `CINT` values are not this scalar map. This is not a Kalman filter,
+/// not a matrix `expm`, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift`]
+/// when the drift is not strictly negative and the intercept is
+/// nonzero, and [`PsychometricError::InvalidNumericInput`] when an
+/// input is non-finite or the quotient overflows.
+pub fn recover_asymptotic_continuous_intercept(
+    continuous_intercept: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !continuous_intercept.is_finite() || !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if continuous_intercept == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift);
+    }
+    require_finite(continuous_intercept / -log_rate)
+}
+
+/// Refuse treating Table 2 `asymCINT` as `CINT`.
+///
+/// `-κ / a` is the expected change in process means. Table 2 names
+/// `κ` `CINT`. The intercept is not that total change.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticContinuousInterceptIsNotContinuousIntercept`].
+pub fn refuse_asymptotic_continuous_intercept_as_continuous_intercept(
+    asymptotic_intercept: f64,
+    continuous_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_intercept, continuous_intercept);
+    Err(PsychometricError::AsymptoticContinuousInterceptIsNotContinuousIntercept)
+}
+
+/// Refuse treating Table 2 `asymCINT` as the finite-interval discrete
+/// intercept increment.
+///
+/// `-κ / a` is the `Δt → ∞` limit of `A^{-1}[e^{A Δt} − I] κ` under
+/// stable `a < 0`. A finite event interval is not that limit.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticContinuousInterceptIsNotDiscreteIncrement`].
+pub fn refuse_asymptotic_continuous_intercept_as_discrete_increment(
+    asymptotic_intercept: f64,
+    discrete_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_intercept, discrete_increment);
+    Err(PsychometricError::AsymptoticContinuousInterceptIsNotDiscreteIncrement)
+}
+
+/// Refuse treating Table 2 `asymCINT` as `T0MEANS`.
+///
+/// `-κ / a` is the intercept contribution to the stationary process
+/// mean. Table 2 names `μ_0` `T0MEANS`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticContinuousInterceptIsNotInitialLatentMean`].
+pub fn refuse_asymptotic_continuous_intercept_as_initial_latent_mean(
+    asymptotic_intercept: f64,
+    initial_latent_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_intercept, initial_latent_mean);
+    Err(PsychometricError::AsymptoticContinuousInterceptIsNotInitialLatentMean)
+}
+
+/// Refuse treating Table 2 `asymCINT` as `asymTIPREDEFFECT`.
+///
+/// `-κ / a` is the intercept contribution. `-B z / a` is the
+/// time-independent predictor contribution. Page 16 notes that a
+/// `T0MEANS` stationarity constraint includes time-independent
+/// predictors; that composition is not this intercept-only map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect`].
+pub fn refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect(
+    asymptotic_intercept: f64,
+    asymptotic_time_independent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_intercept, asymptotic_time_independent_effect);
+    Err(PsychometricError::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect)
+}
+
 /// Exact scalar observed mean of a time-independent predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 3, p. 5; Table 2,
@@ -4260,7 +4387,7 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 mod tests {
     use super::{
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals,
+        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -4297,6 +4424,10 @@ mod tests {
         recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
+        refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
+        refuse_asymptotic_continuous_intercept_as_continuous_intercept,
+        refuse_asymptotic_continuous_intercept_as_discrete_increment,
+        refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
         refuse_asymptotic_time_independent_effect_as_coefficient,
         refuse_asymptotic_time_independent_effect_as_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -7498,6 +7629,119 @@ mod tests {
                 -1e-200,
                 LagClock::EventTime
             ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn asymptotic_continuous_intercept_recovers_driver_table_two() {
+        // Driver et al. (2017, Table 2, p. 12; Eq. 3, p. 5; p. 16)
+        // name asymCINT the Δt → ∞ intercept contribution −κ / a.
+        // Reconstruct a from the printed LeisureTime TIPREDEFFECT
+        // −0.225 / asymTIPREDEFFECT −1.673. The printed 2-latent CINT
+        // values are not this scalar map.
+        let printed_effect = -0.225_f64;
+        let printed_asym = -1.673_f64;
+        let log_rate = -printed_effect / printed_asym;
+        let intercept = 0.3_f64;
+        let recovered =
+            recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+                .expect("asymCINT");
+        let expected = intercept / -log_rate;
+        assert!((recovered - expected).abs() < 1e-12);
+        let unit = recover_asymptotic_continuous_intercept(1.0, log_rate, LagClock::EventTime)
+            .expect("unit-asymCINT");
+        assert!((unit - 1.0 / -log_rate).abs() < 1e-12);
+        let synthetic = recover_asymptotic_continuous_intercept(0.3, -0.5, LagClock::EventTime)
+            .expect("synthetic");
+        assert!((synthetic - 0.6).abs() < 1e-15);
+        let large_delta = recover_discrete_continuous_intercept_effect(
+            intercept,
+            log_rate,
+            1e8,
+            LagClock::EventTime,
+        )
+        .expect("large-delta");
+        assert!((recovered - large_delta).abs() < 1e-9);
+        assert_eq!(
+            recover_asymptotic_continuous_intercept(0.0, 0.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_asymptotic_continuous_intercept(0.0, 0.5, LagClock::EventTime),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn asymptotic_continuous_intercept_is_not_cint_increment_t0_or_tipred() {
+        let intercept = 0.3_f64;
+        let log_rate = -0.134_488_942_f64;
+        let recovered =
+            recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+                .expect("asymCINT");
+        let discrete = recover_discrete_continuous_intercept_effect(
+            intercept,
+            log_rate,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("dtCINT");
+        let tipred = recover_asymptotic_time_independent_predictor_effect(
+            -0.225,
+            1.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTIPREDEFFECT");
+        assert!((recovered - intercept).abs() > 1e-3);
+        assert!((recovered - discrete).abs() > 1e-3);
+        assert!((recovered - 2.823).abs() > 1e-3);
+        assert!((recovered - tipred).abs() > 1e-3);
+        assert_eq!(
+            refuse_asymptotic_continuous_intercept_as_continuous_intercept(recovered, intercept),
+            Err(PsychometricError::AsymptoticContinuousInterceptIsNotContinuousIntercept)
+        );
+        assert_eq!(
+            refuse_asymptotic_continuous_intercept_as_discrete_increment(recovered, discrete),
+            Err(PsychometricError::AsymptoticContinuousInterceptIsNotDiscreteIncrement)
+        );
+        assert_eq!(
+            refuse_asymptotic_continuous_intercept_as_initial_latent_mean(recovered, 2.823),
+            Err(PsychometricError::AsymptoticContinuousInterceptIsNotInitialLatentMean)
+        );
+        assert_eq!(
+            refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect(
+                recovered, tipred
+            ),
+            Err(
+                PsychometricError::AsymptoticContinuousInterceptIsNotAsymptoticTimeIndependentEffect
+            )
+        );
+    }
+
+    #[test]
+    fn asymptotic_continuous_intercept_invalid_inputs_fail_closed() {
+        let intercept = 0.3_f64;
+        let log_rate = -0.134_488_942_f64;
+        assert_eq!(
+            recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_asymptotic_continuous_intercept(intercept, 0.0, LagClock::EventTime),
+            Err(PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotic_continuous_intercept(intercept, 0.5, LagClock::EventTime),
+            Err(PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotic_continuous_intercept(f64::NAN, log_rate, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_continuous_intercept(1e308, -1e-308, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
