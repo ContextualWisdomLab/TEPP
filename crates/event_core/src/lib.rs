@@ -4,10 +4,12 @@
 //!
 //! TEPP separates **fallible event mentions** grounded in evidence from
 //! **versioned event instances** used for temporal state, multilevel membership,
-//! and scientific estimation. Mentions never silently become instances.
+//! and scientific estimation. Mentions and first-story detections never
+//! silently become instances.
 
 mod confidence;
 mod error;
+mod first_story;
 mod identifier;
 mod instance;
 mod mention;
@@ -18,6 +20,16 @@ mod role;
 pub use confidence::EventConfidence;
 /// Fail-closed event-ontology errors.
 pub use error::EventError;
+/// First-story versus follow-up detection label.
+pub use first_story::FirstStoryLabel;
+/// Threshold a first-story probability into a detection label.
+pub use first_story::decide_first_story;
+/// False-alarm rate for first-story detections.
+pub use first_story::first_story_false_alarm_rate;
+/// Miss rate for first-story detections.
+pub use first_story::first_story_miss_rate;
+/// Explicit refusal to treat a first-story detection as an instance.
+pub use first_story::refuse_first_story_as_instance;
 /// Opaque event-instance identifier.
 pub use identifier::EventInstanceId;
 /// Opaque event-mention identifier.

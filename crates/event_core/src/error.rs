@@ -20,6 +20,10 @@ pub enum EventError {
     UnsupportedWireVersion,
     /// An unknown event-role name was supplied.
     UnknownEventRole,
+    /// A first-story detection was treated as an event instance.
+    FirstStoryIsNotEventInstance,
+    /// An unknown first-story label name was supplied.
+    UnknownFirstStoryLabel,
 }
 
 impl fmt::Display for EventError {
@@ -32,6 +36,8 @@ impl fmt::Display for EventError {
             Self::InvalidWirePayload => "invalid event wire payload",
             Self::UnsupportedWireVersion => "unsupported event wire version",
             Self::UnknownEventRole => "unknown event role",
+            Self::FirstStoryIsNotEventInstance => "first-story detection is not an event instance",
+            Self::UnknownFirstStoryLabel => "unknown first-story label",
         };
         formatter.write_str(message)
     }
@@ -65,6 +71,14 @@ mod tests {
                 "unsupported event wire version",
             ),
             (EventError::UnknownEventRole, "unknown event role"),
+            (
+                EventError::FirstStoryIsNotEventInstance,
+                "first-story detection is not an event instance",
+            ),
+            (
+                EventError::UnknownFirstStoryLabel,
+                "unknown first-story label",
+            ),
         ] {
             assert_eq!(error.to_string(), message);
         }

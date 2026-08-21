@@ -1,7 +1,7 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — first-story false-alarm/miss rates and detection-versus-instance refusal live in existing `event_core`; remaining TDT segmentation/tracking and CHRONOS schema/prediction layers remain accepted-target  
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 temporal semantics and ADR 0003 event ontology/membership.
 
