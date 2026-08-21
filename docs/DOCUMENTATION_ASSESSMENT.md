@@ -91,9 +91,9 @@ The canonical graph explicitly preserves:
 
 Documentation completeness must not be confused with product completeness.
 
-- **implemented-main:** Rust workspace/quality foundation, immutable evidence/exact-span boundary, typed six-clock/uncertain interval foundation (PR #8), and canonical documentation/ADR authority graph through PR #7/#8.
-- **active-PR:** PR #9 Allen relation algebra and bounded path-consistency reasoner replayed onto protected-main temporal foundation; promote only after exact-head gates and merge.
-- **accepted-target:** Event ontology/graph, multilevel estimators beyond the membership network surface, persistence/splits, multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, TDT/CHRONOS, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority, and production service APIs.
+- **implemented-main:** Rust workspace/quality foundation, immutable evidence/exact-span boundary, typed six-clock/uncertain interval foundation (PR #8), Allen algebra/path-consistency (PR #9), event ontology/membership, and PostgreSQL persistence through restore-integrity probes.
+- **active-PR:** `prediction_contradiction` Allen coverage gate; `refuse_promotion` requires observed coverage before unmatched predicted mass may be authorized for promotion. Drafts #93, #94, #97, #101, #102, #104, #108, #109, #111, and #112 are superseded non-landable lineage. Promote only after exact-head gates and merge.
+- **accepted-target:** Remaining TDT/CHRONOS tasks, multilevel estimators beyond the membership network surface, multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority, and production service APIs.
 - **partial:** selected repository-quality and standalone crate boundaries are implemented, while complete estimator/service/release authorities remain target work.
 - **deployment-owned/external-assurance:** production infrastructure controls, measured SLO/RPO/RTO, CSAP certification, SOC 2 attestation and jurisdiction-specific legal determinations.
 

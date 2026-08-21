@@ -6,10 +6,11 @@ implemented in Rust.
 
 ## Current implementation state
 
-This branch establishes the Task 1 Rust workspace and quality-gate foundation.
-The ten bounded crates compile independently but intentionally expose no
-placeholder production APIs. Domain behavior begins in Task 2 with immutable
-evidence identifiers and source records.
+This branch keeps the Rust workspace quality foundation and the bounded
+foundation crates. Domain crates expose only tested contracts: immutable
+evidence, six-clock temporal values, event mentions/instances, relations,
+membership, persistence, splits, simulation, validation, API DTOs, and the
+predicted-versus-observed promotion gate.
 
 ```text
 crates/evidence_core
@@ -22,6 +23,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/prediction_contradiction
 ```
 
 ## Local verification
