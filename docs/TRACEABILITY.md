@@ -42,7 +42,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | future safe OpenCode/NVIDIA autonomous-development workflow | accepted-target |
 | contextual-orchestrator execution boundary | ADR 0010/0011 | credential-free `bind_contextual_orchestrator` on the active PR; live HTTP remaining | partial |
 | foundation validation / release-readiness ledger | ADR 0014; Test Strategy | PR #24 `docs/validation/temporal-event-foundation.md` on protected main | implemented-main |
-| scientific claim promotion separated from design/implementation/release | ADR 0014; ADR policy | documentation/CI/domain validation/release evidence | partial |
+| scientific claim promotion separated from design/implementation/release | ADR 0014; ADR policy | `validation_core` exact-head promotion gates on this PR; documentation/CI/domain validation remain; full package/image release bundle remaining | partial |
 | CSAP/SOC 2/ISO/NIST assurance readiness | `docs/COMPLIANCE_READINESS.md`; research register | repository controls + future deployment evidence | accepted-target / deployment-owned |
 | threat-model controls and scientific-integrity security | `SECURITY.md`; `docs/THREAT_MODEL.md` | deterministic security/privacy/scientific validation gates | partial |
 | accessible bitemporal/network/drift/invariance views | PRD/UML | future `visual_analytics`; Figma in approved visual phase | accepted-target |

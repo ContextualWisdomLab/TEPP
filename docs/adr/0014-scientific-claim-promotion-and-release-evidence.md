@@ -1,7 +1,7 @@
 # ADR 0014 — Scientific claim promotion and release evidence authority
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — claim/promotion authority documented; repository SBOM/provenance evidence generator and CI validation implemented; full package/image release bundle and scientific claim promotion packages remain accepted-target  
+**Implementation maturity:** partial — claim/promotion authority documented; repository SBOM/provenance evidence generator and CI validation implemented; `validation_core` exact-head promotion gates implemented on this PR; full package/image release bundle remains accepted-target
 **Date:** 2026-08-12  
 **Supersedes:** None; extends ADR 0007 from repository quality tooling to product/scientific claim authority.
 
