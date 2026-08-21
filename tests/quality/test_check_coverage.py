@@ -116,6 +116,56 @@ class CoverageContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "contain totals"):
                 coverage_contract.load_totals(path)
 
+    def test_full_branch_reports_merge_duplicate_instrumented_copies(self) -> None:
+        """A source branch passes when either test binary covers each outcome."""
+
+        payload = self.payload(branch_count=4, branch_covered=2)
+        payload["data"][0]["files"] = [  # type: ignore[index]
+            {
+                "filename": "src/live.rs",
+                "branches": [
+                    [10, 4, 10, 12, 1, 0, 0, 0, 4],
+                    [10, 4, 10, 12, 0, 1, 0, 0, 4],
+                ],
+            },
+            {
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 0, 0, 0, 0, 4]],
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = self.write_report(temporary, payload)
+            self.assertEqual(
+                coverage_contract.load_totals(path)["branches"],
+                {"count": 2, "covered": 2},
+            )
+            self.assertEqual(
+                coverage_contract.validate_report(path, ["branches"]),
+                ["branches coverage: PASS (2/2, 100%)"],
+            )
+
+    def test_full_branch_reports_fail_closed_on_malformed_records(self) -> None:
+        """Malformed branch exports cannot weaken the coverage gate."""
+
+        malformed_reports = (
+            ([None], "file record must be an object"),
+            ([{"filename": "", "branches": []}], "must contain a filename"),
+            ([{"filename": "src.rs", "branches": {}}], "branches must be a list"),
+            ([{"filename": "src.rs", "branches": [[1, 2]]}], "record is malformed"),
+            (
+                [{"filename": "src.rs", "branches": [[-1, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, -1, 0]]}],
+                "counts are invalid",
+            ),
+        )
+        for files, message in malformed_reports:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    coverage_contract.load_union_branch_totals(files)
+
     def test_lcov_authored_line_totals_and_incomplete_detection(self) -> None:
         """LCOV counts unique authored source lines and exposes zero-hit lines."""
 

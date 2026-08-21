@@ -20,7 +20,8 @@ Current protected main exposes Rust library/domain contracts. The active PR adds
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
-| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
+| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | implemented-main |
+| corpus-split leakage-audit manifest | `tepp_api` `CorpusSplitManifest` v1 | naruon, auditors, future UI | active-PR |
 
 ## 3. Versioning
 
