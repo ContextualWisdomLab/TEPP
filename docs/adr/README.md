@@ -24,6 +24,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
 | [0017](0017-consumer-scoped-analysis-run-ingress.md) | Consumer-scoped modular analysis-run ingress | Accepted | active-PR | Narrows ADR 0011 for the closed consumer registry, credential-free exchange, and consumer-qualified idempotency namespace; production TLS remains separate. |
 | [0018](0018-project-history-wire-size-symmetry.md) | Symmetric project-history wire-size enforcement | Accepted | active-PR | Narrows ADR 0008 for request serialization and generated LineageWeave project-history projections. |
+| [0019](0019-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Narrows ADR 0011 for the credential-free bounded project-history API and preserves LineageWeave authorization ownership. |
 
 ## Decision ownership summary
 
@@ -47,6 +48,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **TDT/CHRONOS event intelligence:** ADR 0016;
 - **modular consumer admission / replay identity:** ADR 0017.
 - **project-history wire-size symmetry:** ADR 0018.
+- **LineageWeave project-history service boundary:** ADR 0019.
 
 ## Change and supersession rule
 
