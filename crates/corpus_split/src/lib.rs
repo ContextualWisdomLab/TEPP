@@ -10,6 +10,7 @@
 mod connected_group;
 mod document;
 mod error;
+mod inferential_weight;
 mod rolling_origin;
 mod snapshot;
 mod weights;
@@ -36,6 +37,14 @@ pub use connected_group::build_connected_groups;
 pub use document::CorpusDocument;
 /// Fail-closed corpus-split errors.
 pub use error::CorpusSplitError;
+/// Token-deletion rule that may be proposed before estimation.
+pub use inferential_weight::TokenDeletionRule;
+/// Document or term scoring identity proposed as an estimator input.
+pub use inferential_weight::WeightingScheme;
+/// Refuse global stopword deletion as the default preprocessing rule.
+pub use inferential_weight::refuse_default_stopword_deletion;
+/// Refuse TF-IDF and BM25 as inferential estimator weights.
+pub use inferential_weight::refuse_inferential_retrieval_weight;
 /// Rolling-origin train/test window.
 pub use rolling_origin::RollingOriginWindow;
 /// Build ordered rolling-origin windows.
