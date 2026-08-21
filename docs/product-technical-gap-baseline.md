@@ -1,6 +1,6 @@
 # TEPP Product and Technical Gap Baseline
 
-**Snapshot:** 2026-08-21T09:10:22Z
+**Snapshot:** 2026-08-21T09:33:43Z
 **Purpose:** Turn live delivery evidence into the next bounded customer action.
 **Authority:** The approved PRD, architecture, ADR maturity rules, traceability matrix, and current GitHub evidence. This is a dated operational snapshot, not proof that an open PR is merged or that a target capability is production-ready.
 
@@ -37,14 +37,14 @@ At the snapshot time, the TEPP repository had **94 open PRs**: 75 non-draft and 
 
 | PR | Exact head | Exact base | State | Pending | Failure | Disposition |
 |---:|---|---|---|---:|---:|---|
-| [179](https://github.com/ContextualWisdomLab/TEPP/pull/179) | `26fee5def799` | `c45be17a9dbc` | blocked, review required | 17 | 0 | Normal path; current-head queue anchors and product-gap baseline are documented, but approval and checks remain pending. |
-| [178](https://github.com/ContextualWisdomLab/TEPP/pull/178) | `a2382c84a1f7` | `63a419e2b96c` | blocked | 1 | 0 | Stacked on #157; verify after the root result. |
-| [177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `273cbed1289b` | `c45be17a9dbc` | blocked | 1 | 0 | Scheduler hardening; normal protected review/check path. |
+| [179](https://github.com/ContextualWisdomLab/TEPP/pull/179) | `71f7ffdae0a5` | `c45be17a9dbc` | blocked, review required | 18 | 0 | Normal path; current-head queue anchors and product-gap baseline are documented, but approval and checks remain pending. |
+| [178](https://github.com/ContextualWisdomLab/TEPP/pull/178) | `0622da358d81` | `63a419e2b96c` | unstable | 6 | 0 | Stacked on #157; identifier bounds were added and the new exact-head checks are pending. |
+| [177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `580d45206536` | `c45be17a9dbc` | blocked | 18 | 0 | Scheduler caller now pins a verified central commit rather than a blob; normal protected review/check path remains. |
 | [165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `34083c3f5d66` | `c45be17a9dbc` | blocked | 1 | 0 | Central-orchestrator workflow change; no bypass. |
 | [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `38cc7698e508` | `c45be17a9dbc` | blocked | 1 | 0 | Product completion documentation; no qualifying approval. |
-| [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `e5575a054a38` | `cbb3dc0aa657` | dirty | 5 | 0 | Resolve the stack conflict; conflict is not a force-merge reason. |
+| [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `b2072340f733` | `cbb3dc0aa657` | unstable | 6 | 0 | Self-modifying timeout repair and research-register gaps were fixed in committed code; current checks and approval remain pending. |
 | [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `6d28d23c4322` | `0e2910825a04` | dirty | 0 | 0 | Restack and revalidate merge-result tree before review. |
-| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `63a419e2b96c` | `c45be17a9dbc` | blocked | 1 | 0 | Root completed-result contract; process before stacked #178. |
+| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `7625dc6fc571` | `c45be17a9dbc` | blocked | 18 | 0 | Root completed-result contract now includes receipt-state and provider-header hardening; current checks and approval remain pending before stacked #178. |
 | [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `6cc00f81b7f1` | `c45be17a9dbc` | blocked | 17 | 0 | Current-head coverage/toolchain repair and regression-test strengthening are normal-path work; approval and checks remain pending. |
 | [131](https://github.com/ContextualWisdomLab/TEPP/pull/131) | `55774ee9ece3` | `c45be17a9dbc` | blocked | 17 | 0 | Membership-target documentation now names department; approval and checks remain pending. |
 | [154](https://github.com/ContextualWisdomLab/TEPP/pull/154) | `aaadb7f906ed` | `7c29e7c971d7` | blocked | 0 | 0 | Branch-coverage refresh; exact-head approval remains required. |
