@@ -1,8 +1,8 @@
 # ADR 0017 — Consumer-scoped modular analysis-run ingress
 
-**Decision status:** Accepted  
-**Implementation maturity:** active-PR  
-**Date:** 2026-08-20  
+**Decision status:** Accepted
+**Implementation maturity:** active-PR
+**Date:** 2026-08-20
 **Supersedes:** None; narrows ADR 0011 for shared modular analysis-run ingress and leaves production TLS/deployment authority unchanged.
 
 ## Context
