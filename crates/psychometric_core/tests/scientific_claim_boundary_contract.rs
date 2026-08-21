@@ -6,11 +6,13 @@ use psychometric_core::{
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
+    recover_discrete_latent_mean_with_extra_process_after,
     recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
     recover_discrete_latent_mean_with_initial_time_dependent_predictor,
     recover_discrete_latent_mean_with_initial_time_independent_predictor,
     recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
     recover_discrete_observed_mean, recover_discrete_observed_mean_with_extra_process,
+    recover_discrete_observed_mean_with_extra_process_after,
     recover_discrete_observed_mean_with_impulse, recover_discrete_observed_mean_with_impulse_carry,
     recover_discrete_observed_mean_with_initial_time_dependent_predictor,
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
@@ -22,14 +24,18 @@ use psychometric_core::{
     recover_initial_time_independent_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
     recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
-    recover_loading_point_estimate_mean, recover_manifest_lagged_observed_covariance,
-    recover_manifest_observed_mean, recover_manifest_observed_variance,
-    recover_manifest_trait_plus_state_observed_variance, recover_stationary_latent_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
+    recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
+    recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
+    refuse_after_extra_process_contribution_as_observed_mean,
+    refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
+    refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
     refuse_evolved_observed_mean_as_impulse_observed_mean,
@@ -38,7 +44,9 @@ use psychometric_core::{
     refuse_evolved_observed_mean_as_time_independent_observed_mean,
     refuse_extra_process_contribution_as_observed_mean,
     refuse_extra_process_latent_mean_as_observed_mean,
+    refuse_extra_process_observed_mean_as_after_extra_process_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
     refuse_impulse_carry_observed_mean_as_time_independent_observed_mean,
@@ -1915,5 +1923,141 @@ fn extra_process_observed_mean_is_not_evolved_mean_impulse_mean_or_contribution(
     assert_eq!(
         refuse_extra_process_latent_mean_as_observed_mean(composed, observed),
         Err(psychometric_core::PsychometricError::ExtraProcessLatentMeanIsNotObservedMean)
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn after_extra_process_observed_mean_is_not_t0_extra_evolved_or_impulse_carry() {
+    let loading = 2.0_f64;
+    let coupling = 0.4_f64;
+    let predictor = 3.0_f64;
+    let original = -0.5_f64;
+    let extra = -0.05_f64;
+    let delta = 2.0_f64;
+    let elapsed = 1.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let observed = recover_discrete_observed_mean_with_extra_process_after(
+        loading,
+        initial,
+        original,
+        intercept,
+        coupling,
+        predictor,
+        extra,
+        manifest_mean,
+        delta,
+        elapsed,
+        LagClock::EventTime,
+    )
+    .expect("eq5-after-extra-process-mean");
+    let composed = recover_discrete_latent_mean_with_extra_process_after(
+        initial,
+        original,
+        intercept,
+        coupling,
+        predictor,
+        extra,
+        delta,
+        elapsed,
+        LagClock::EventTime,
+    )
+    .expect("after-extra-latent");
+    let contribution = recover_level_change_extra_process_contribution_after(
+        coupling,
+        predictor,
+        original,
+        extra,
+        delta,
+        elapsed,
+        LagClock::EventTime,
+    )
+    .expect("after-extra-process");
+    let first_occasion = recover_discrete_observed_mean_with_extra_process(
+        loading,
+        initial,
+        original,
+        intercept,
+        coupling,
+        predictor,
+        extra,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0-extra-process-mean");
+    let evolved_observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        original,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let carry_observed = recover_discrete_observed_mean_with_impulse_carry(
+        loading,
+        initial,
+        original,
+        intercept,
+        coupling,
+        predictor,
+        manifest_mean,
+        delta,
+        elapsed,
+        LagClock::EventTime,
+    )
+    .expect("eq5-impulse-carry-mean");
+    assert!(
+        (observed - first_occasion).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): T0TDPREDEFFECT extra E(y_t) is not after-t0 E(y_t)"
+    );
+    assert!(
+        (observed - evolved_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of §7.2 after t0): after-t0 E(y_t) is not τ + λ μ_t"
+    );
+    assert!(
+        (observed - carry_observed).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): e^{{a(t-u)}} m x is not extra-process DRIFT drive"
+    );
+    assert!((observed - contribution).abs() > 1e-3);
+    assert!((observed - composed).abs() > 1e-3);
+    assert_eq!(
+        refuse_extra_process_observed_mean_as_after_extra_process_observed_mean(
+            first_occasion,
+            observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::ExtraProcessObservedMeanIsNotAfterExtraProcessObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_evolved_observed_mean_as_after_extra_process_observed_mean(
+            evolved_observed,
+            observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::EvolvedObservedMeanIsNotAfterExtraProcessObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean(
+            carry_observed,
+            observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::ImpulseCarryObservedMeanIsNotAfterExtraProcessObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_after_extra_process_contribution_as_observed_mean(contribution, observed),
+        Err(psychometric_core::PsychometricError::AfterExtraProcessContributionIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_after_extra_process_latent_mean_as_observed_mean(composed, observed),
+        Err(psychometric_core::PsychometricError::AfterExtraProcessLatentMeanIsNotObservedMean)
     );
 }

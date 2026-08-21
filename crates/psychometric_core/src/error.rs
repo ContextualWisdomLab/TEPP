@@ -302,6 +302,28 @@ pub enum PsychometricError {
     /// Driver §7.2 evolved-plus-contribution latent mean was treated
     /// as `E(y_t)`. Equation 5 maps `E(y_t) = τ + λ` of that mean.
     ExtraProcessLatentMeanIsNotObservedMean,
+    /// Driver Eq. 5 of the first-occasion extra process was treated
+    /// as the Eq. 5 after-t0 extra-process observed mean. `T0TDPREDEFFECT`
+    /// on the extra process uses `Δt = t − t0`. `TDPREDEFFECT` after
+    /// `t0` uses `t − u` with `t0 < u < t`.
+    ExtraProcessObservedMeanIsNotAfterExtraProcessObservedMean,
+    /// Driver Eq. 5 of the evolved mean was treated as the Eq. 5
+    /// after-t0 extra-process observed mean. `τ + λ μ_t` is not
+    /// `τ + λ(μ_t + a_{ηξ} x (e^{ε(t−u)} − e^{a(t−u)}) / (ε − a))`.
+    EvolvedObservedMeanIsNotAfterExtraProcessObservedMean,
+    /// Driver Eq. 5 of the impulse carry was treated as the Eq. 5
+    /// after-t0 extra-process observed mean. `e^{a(t−u)} m x` is a
+    /// Dirac on the original process. Extra-process `TDPREDEFFECT`
+    /// after `t0` drives the original process through `DRIFT`.
+    ImpulseCarryObservedMeanIsNotAfterExtraProcessObservedMean,
+    /// Driver §7.2 after-t0 extra-process contribution was treated
+    /// as `E(y_t)`. The contribution is not `τ + λ` of the
+    /// evolved-plus-after-contribution latent mean.
+    AfterExtraProcessContributionIsNotObservedMean,
+    /// Driver §7.2 evolved-plus-after-contribution latent mean was
+    /// treated as `E(y_t)`. Equation 5 maps `E(y_t) = τ + λ` of
+    /// that mean.
+    AfterExtraProcessLatentMeanIsNotObservedMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -547,6 +569,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ExtraProcessLatentMeanIsNotObservedMean => {
                 "evolved-plus-contribution latent mean is not the extra-process observed mean"
+            }
+            Self::ExtraProcessObservedMeanIsNotAfterExtraProcessObservedMean => {
+                "first-occasion extra-process observed mean is not the after-t0 extra-process observed mean"
+            }
+            Self::EvolvedObservedMeanIsNotAfterExtraProcessObservedMean => {
+                "evolved observed mean is not the after-t0 extra-process observed mean"
+            }
+            Self::ImpulseCarryObservedMeanIsNotAfterExtraProcessObservedMean => {
+                "impulse-carry observed mean is not the after-t0 extra-process observed mean"
+            }
+            Self::AfterExtraProcessContributionIsNotObservedMean => {
+                "after-t0 extra-process contribution is not the after-t0 extra-process observed mean"
+            }
+            Self::AfterExtraProcessLatentMeanIsNotObservedMean => {
+                "evolved-plus-after-contribution latent mean is not the after-t0 extra-process observed mean"
             }
         };
         formatter.write_str(message)
@@ -928,6 +965,28 @@ mod tests {
         assert_eq!(
             PsychometricError::ExtraProcessLatentMeanIsNotObservedMean.to_string(),
             "evolved-plus-contribution latent mean is not the extra-process observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ExtraProcessObservedMeanIsNotAfterExtraProcessObservedMean
+                .to_string(),
+            "first-occasion extra-process observed mean is not the after-t0 extra-process observed mean"
+        );
+        assert_eq!(
+            PsychometricError::EvolvedObservedMeanIsNotAfterExtraProcessObservedMean.to_string(),
+            "evolved observed mean is not the after-t0 extra-process observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseCarryObservedMeanIsNotAfterExtraProcessObservedMean
+                .to_string(),
+            "impulse-carry observed mean is not the after-t0 extra-process observed mean"
+        );
+        assert_eq!(
+            PsychometricError::AfterExtraProcessContributionIsNotObservedMean.to_string(),
+            "after-t0 extra-process contribution is not the after-t0 extra-process observed mean"
+        );
+        assert_eq!(
+            PsychometricError::AfterExtraProcessLatentMeanIsNotObservedMean.to_string(),
+            "evolved-plus-after-contribution latent mean is not the after-t0 extra-process observed mean"
         );
     }
 }

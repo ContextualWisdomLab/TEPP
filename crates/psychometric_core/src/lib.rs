@@ -94,6 +94,22 @@
 //! `τ + λ μ_t` is not that observed mean; `τ + λ(μ_t + m x)` is not
 //! that observed mean; the contribution is not `E(y_t)`; the
 //! evolved-plus-contribution latent mean is not `E(y_t)`),
+//! recovers the Driver §7.2 after-t0 extra-process `TDPREDEFFECT`
+//! contribution as `a_{ηξ} x (e^{ε(t−u)} − e^{a(t−u)}) / (ε − a)`
+//! for `t0 < u < t` (`T0TDPREDEFFECT` uses `Δt = t − t0` for both
+//! the evolution and the extra drive; an impulse at `u = t0` is not
+//! this map; an impulse at `u = t` has not yet driven the original
+//! process; `e^{a(t−u)} m x` is a Dirac on the original process, not
+//! this `DRIFT` drive),
+//! recovers the Driver Eq. 5 of that after-t0 extra-process
+//! contribution as
+//! `τ + λ(μ_t + a_{ηξ} x (e^{ε(t−u)} − e^{a(t−u)}) / (ε − a))`
+//! (JSS PDF re-opened 2026-08-21T06:32Z; the first-occasion
+//! extra-process observed mean is not that observed mean when
+//! `u ≠ t0`; `τ + λ μ_t` is not that observed mean; the impulse-carry
+//! map is not that observed mean; the after-t0 contribution is not
+//! `E(y_t)`; the evolved-plus-after-contribution latent mean is not
+//! `E(y_t)`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -156,6 +172,8 @@ pub use event_time::recover_discrete_lagged_latent_covariance;
 pub use event_time::recover_discrete_latent_mean;
 /// Exact scalar evolved latent mean plus a §7.2 extra-process contribution.
 pub use event_time::recover_discrete_latent_mean_with_extra_process;
+/// Exact scalar evolved latent mean plus a §7.2 extra-process contribution after t0.
+pub use event_time::recover_discrete_latent_mean_with_extra_process_after;
 /// Exact scalar evolved latent mean plus a contemporaneous impulse.
 pub use event_time::recover_discrete_latent_mean_with_impulse;
 /// Exact scalar evolved latent mean plus a within-interval impulse carry.
@@ -172,6 +190,8 @@ pub use event_time::recover_discrete_latent_variance;
 pub use event_time::recover_discrete_observed_mean;
 /// Exact scalar discrete observed mean of a §7.2 extra-process contribution.
 pub use event_time::recover_discrete_observed_mean_with_extra_process;
+/// Exact scalar discrete observed mean of a §7.2 extra-process contribution after t0.
+pub use event_time::recover_discrete_observed_mean_with_extra_process_after;
 /// Exact scalar discrete observed mean of a contemporaneous impulse.
 pub use event_time::recover_discrete_observed_mean_with_impulse;
 /// Exact scalar discrete observed mean of a within-interval impulse carry.
@@ -208,6 +228,8 @@ pub use event_time::recover_level_change_continuous_intercept;
 pub use event_time::recover_level_change_discrete_increment;
 /// Exact scalar §7.2 extra-process contribution `a_{ηξ} x (e^{ε Δt} − e^{a Δt}) / (ε − a)`.
 pub use event_time::recover_level_change_extra_process_contribution;
+/// Exact scalar §7.2 extra-process contribution after t0 on `t − u`.
+pub use event_time::recover_level_change_extra_process_contribution_after;
 /// Exact scalar inverse `a = ln(φ) / Δt`.
 pub use event_time::recover_local_log_rate;
 /// Exact scalar lagged observed-indicator covariance `λ² cov(η) + ψ`.
@@ -230,6 +252,10 @@ pub use event_time::recover_trait_plus_state_lagged_covariance;
 pub use event_time::recover_trait_plus_state_latent_variance;
 /// CWC-then-event-time local log-rate (not DSEM; not raw-process AR drift).
 pub use event_time::recover_within_residual_event_time_log_rate;
+/// Refuse treating the after-t0 extra-process contribution as `E(y_t)`.
+pub use event_time::refuse_after_extra_process_contribution_as_observed_mean;
+/// Refuse treating the evolved-plus-after-contribution latent mean as `E(y_t)`.
+pub use event_time::refuse_after_extra_process_latent_mean_as_observed_mean;
 /// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
 pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 /// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.
@@ -238,6 +264,8 @@ pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating evolved `τ + λ μ_t` as the after-t0 extra-process observed mean.
+pub use event_time::refuse_evolved_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the extra-process observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_extra_process_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the impulse-carry observed mean.
@@ -254,8 +282,12 @@ pub use event_time::refuse_evolved_observed_mean_as_time_independent_observed_me
 pub use event_time::refuse_extra_process_contribution_as_observed_mean;
 /// Refuse treating the evolved-plus-contribution latent mean as `E(y_t)`.
 pub use event_time::refuse_extra_process_latent_mean_as_observed_mean;
+/// Refuse treating the first-occasion extra-process observed mean as the after-t0 extra-process observed mean.
+pub use event_time::refuse_extra_process_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
+/// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the after-t0 extra-process observed mean.
+pub use event_time::refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the first-occasion TD-predictor observed mean.
 pub use event_time::refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the first-occasion TI-predictor observed mean.
