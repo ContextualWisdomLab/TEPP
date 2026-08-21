@@ -78,6 +78,12 @@
 //! effect, then add. That constrained first-occasion mean is not free
 //! `T0MEANS`, not `asymCINT` alone, not `asymTIPREDEFFECT` alone, and
 //! not the finite-interval discrete latent mean.
+//! Equation 5 of that constrained first-occasion mean is
+//! `τ + λ(−κ / a + −B z / a)` (§4.3, pp. 9–10; Eq. 5, p. 5; JSS PDF
+//! re-opened 2026-08-21T20:07Z). Form the stationary latent mean
+//! first, then `τ + λ` of that mean. `τ + λ μ_0` for free `T0MEANS`
+//! is not that composition. `τ + λ(−κ / a)` is not that composition
+//! when `B z ≠ 0`. `τ + λ μ_t` is not that composition.
 //! Table 3 (p. 13) names a different matrix
 //! `T0TIPREDEFFECT` for time-independent predictors on latents at
 //! `T0`. The scalar first-occasion shift is `t0_b z`. Equation 3's
@@ -3020,6 +3026,142 @@ pub fn refuse_stationary_initial_latent_mean_as_discrete_mean(
     Err(PsychometricError::StationaryInitialLatentMeanIsNotDiscreteMean)
 }
 
+/// Exact scalar observed mean of §4.3 stationary `T0MEANS`.
+///
+/// Driver, Oud, and Voelkle (2017, §4.3, pp. 9–10; Eq. 5, p. 5;
+/// Table 2, p. 12; Eq. 3, p. 5; JSS PDF re-opened 2026-08-21T20:07Z
+/// from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// constrain the first-occasion mean to the model-predicted mean
+/// when `stationary` includes `"T0MEANS"`. Equation 5 writes
+/// `y_i(t) = Γ + Λ η_i(t) + ζ_i(t)` with `ζ ~ N(0, Θ)` and
+/// `Γ ~ N(τ, Ψ)`. The constrained latent mean is
+/// `-κ / a + −B z / a`. The scalar composition is
+/// `E(y_0) = τ + λ(−κ / a + −B z / a)`. Form the stationary latent
+/// mean first, then `τ + λ` of that mean. A zero loading is exactly
+/// `τ`. A zero intercept and a zero TI contribution is exactly `τ`.
+/// `τ + λ μ_0` for free `T0MEANS` is not this composition.
+/// `τ + λ(−κ / a)` is not this composition when `B z ≠ 0`.
+/// `τ + λ μ_t` is not this composition. `MANIFESTMEANS` is not
+/// `E(y_0)`. The constrained latent mean is not `E(y_0)`. This is
+/// not a Kalman filter, not a matrix `expm`, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_stationary_initial_latent_mean`] and
+/// [`recover_manifest_observed_mean`].
+#[allow(clippy::too_many_arguments)]
+pub fn recover_stationary_initial_observed_mean(
+    loading: f64,
+    continuous_intercept: f64,
+    time_independent_effect: f64,
+    time_independent_predictor: f64,
+    log_rate: f64,
+    manifest_mean: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let stationary_latent_mean = recover_stationary_initial_latent_mean(
+        continuous_intercept,
+        time_independent_effect,
+        time_independent_predictor,
+        log_rate,
+        clock,
+    )?;
+    recover_manifest_observed_mean(loading, stationary_latent_mean, manifest_mean)
+}
+
+/// Refuse treating §4.3 stationary `T0MEANS` as `E(y_0)`.
+///
+/// `−κ / a + −B z / a` is the constrained latent mean. Equation 5
+/// maps `E(y_0) = τ + λ` of that mean.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StationaryInitialLatentMeanIsNotObservedMean`].
+pub fn refuse_stationary_initial_latent_mean_as_observed_mean(
+    stationary_latent_mean: f64,
+    stationary_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (stationary_latent_mean, stationary_observed_mean);
+    Err(PsychometricError::StationaryInitialLatentMeanIsNotObservedMean)
+}
+
+/// Refuse treating `MANIFESTMEANS` as Eq. 5 of §4.3 stationary
+/// `T0MEANS`.
+///
+/// Table 2 names `τ` `MANIFESTMEANS`. `τ + λ(−κ / a + −B z / a)` is
+/// not `τ` when the loading and constrained mean are nonzero.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StationaryInitialObservedMeanIsNotManifestMeans`].
+pub fn refuse_stationary_initial_observed_mean_as_manifest_means(
+    stationary_observed_mean: f64,
+    manifest_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (stationary_observed_mean, manifest_mean);
+    Err(PsychometricError::StationaryInitialObservedMeanIsNotManifestMeans)
+}
+
+/// Refuse treating evolved `τ + λ μ_t` as Eq. 5 of §4.3 stationary
+/// `T0MEANS`.
+///
+/// A finite-interval evolved observed mean is not the constrained
+/// first-occasion observed mean.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::EvolvedObservedMeanIsNotStationaryInitialObservedMean`].
+pub fn refuse_evolved_observed_mean_as_stationary_initial_observed_mean(
+    evolved_observed_mean: f64,
+    stationary_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (evolved_observed_mean, stationary_observed_mean);
+    Err(PsychometricError::EvolvedObservedMeanIsNotStationaryInitialObservedMean)
+}
+
+/// Refuse treating `τ + λ(−κ / a)` as Eq. 5 of §4.3 stationary
+/// `T0MEANS`.
+///
+/// The constraint includes time-independent predictors.
+/// `τ + λ(−κ / a)` is not that composition when `B z ≠ 0`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticContinuousInterceptObservedMeanIsNotStationaryInitialObservedMean`].
+pub fn refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean(
+    asymptotic_intercept_observed_mean: f64,
+    stationary_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_intercept_observed_mean, stationary_observed_mean);
+    Err(
+        PsychometricError::AsymptoticContinuousInterceptObservedMeanIsNotStationaryInitialObservedMean,
+    )
+}
+
+/// Refuse treating `τ + λ μ_0` as Eq. 5 of §4.3 stationary
+/// `T0MEANS`.
+///
+/// Free first-occasion `T0MEANS` is not the constrained
+/// first-occasion mean.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean`].
+pub fn refuse_initial_observed_mean_as_stationary_initial_observed_mean(
+    initial_observed_mean: f64,
+    stationary_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_observed_mean, stationary_observed_mean);
+    Err(PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean)
+}
+
 /// Exact scalar observed mean of a time-independent predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 3, p. 5; Table 2,
@@ -4547,16 +4689,17 @@ mod tests {
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
         recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-        recover_stationary_initial_latent_mean, recover_stationary_latent_variance,
-        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate,
+        recover_stationary_initial_latent_mean, recover_stationary_initial_observed_mean,
+        recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
+        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
         refuse_asymptotic_continuous_intercept_as_continuous_intercept,
         refuse_asymptotic_continuous_intercept_as_discrete_increment,
         refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
+        refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
         refuse_asymptotic_time_independent_effect_as_coefficient,
         refuse_asymptotic_time_independent_effect_as_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -4573,6 +4716,7 @@ mod tests {
         refuse_evolved_observed_mean_as_impulse_observed_mean,
         refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
+        refuse_evolved_observed_mean_as_stationary_initial_observed_mean,
         refuse_evolved_observed_mean_as_time_independent_observed_mean,
         refuse_extra_process_contribution_as_observed_mean,
         refuse_extra_process_latent_mean_as_observed_mean,
@@ -4589,6 +4733,7 @@ mod tests {
         refuse_impulse_observed_mean_as_time_independent_observed_mean,
         refuse_initial_latent_mean_as_evolved_mean,
         refuse_initial_observed_mean_as_evolved_observed_mean,
+        refuse_initial_observed_mean_as_stationary_initial_observed_mean,
         refuse_initial_time_dependent_carry_as_impulse_carry,
         refuse_initial_time_dependent_carry_as_initial_effect,
         refuse_initial_time_dependent_coefficient_as_initial_effect,
@@ -4621,6 +4766,8 @@ mod tests {
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
         refuse_stationary_initial_latent_mean_as_discrete_mean,
         refuse_stationary_initial_latent_mean_as_initial_latent_mean,
+        refuse_stationary_initial_latent_mean_as_observed_mean,
+        refuse_stationary_initial_observed_mean_as_manifest_means,
         refuse_time_dependent_impulse_as_continuous_intercept,
         refuse_time_dependent_impulse_as_time_independent_effect,
         refuse_time_dependent_impulse_as_time_varying_discrete_effect,
@@ -8028,6 +8175,251 @@ mod tests {
         );
         assert_eq!(
             recover_stationary_initial_latent_mean(1e308, 1e308, 1.0, -1e-308, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn stationary_initial_observed_mean_recovers_driver_equation_five_of_section_four_point_three()
+    {
+        // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
+        // constrain first-occasion means to the model-predicted
+        // mean. Equation 5 maps E(y_0) = τ + λ of that mean.
+        let printed_effect = -0.225_f64;
+        let printed_asym = -1.673_f64;
+        let log_rate = -printed_effect / printed_asym;
+        let intercept = 0.3_f64;
+        let loading = 2.0_f64;
+        let manifest_mean = 0.5_f64;
+        let recovered = recover_stationary_initial_observed_mean(
+            loading,
+            intercept,
+            printed_effect,
+            1.0,
+            log_rate,
+            manifest_mean,
+            LagClock::EventTime,
+        )
+        .expect("eq5-stationary-T0MEANS");
+        let latent = recover_stationary_initial_latent_mean(
+            intercept,
+            printed_effect,
+            1.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("stationary T0MEANS");
+        let expected =
+            recover_manifest_observed_mean(loading, latent, manifest_mean).expect("τ+λμ");
+        assert!((recovered - expected).abs() < 1e-12);
+        let intercept_only =
+            recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+                .expect("asymCINT");
+        let intercept_only_observed =
+            recover_manifest_observed_mean(loading, intercept_only, manifest_mean)
+                .expect("τ+λ(−κ/a)");
+        assert!((recovered - intercept_only_observed).abs() > 1e-3);
+        let free_initial_observed =
+            recover_manifest_observed_mean(loading, 2.823, manifest_mean).expect("τ+λμ_0");
+        assert!((recovered - free_initial_observed).abs() > 1e-3);
+        let evolved_from_free = recover_discrete_observed_mean(
+            loading,
+            2.823,
+            log_rate,
+            intercept,
+            manifest_mean,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("τ+λμ_t");
+        assert!((recovered - evolved_from_free).abs() > 1e-3);
+        assert!((recovered - manifest_mean).abs() > 1e-3);
+        assert!((recovered - latent).abs() > 1e-3);
+        assert_eq!(
+            recover_stationary_initial_observed_mean(
+                0.0,
+                intercept,
+                printed_effect,
+                1.0,
+                log_rate,
+                manifest_mean,
+                LagClock::EventTime,
+            ),
+            Ok(manifest_mean)
+        );
+        assert_eq!(
+            recover_stationary_initial_observed_mean(
+                loading,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                manifest_mean,
+                LagClock::EventTime,
+            ),
+            Ok(manifest_mean)
+        );
+        let evolved_from_stationary =
+            recover_discrete_observed_mean_with_time_independent_predictor(
+                loading,
+                latent,
+                log_rate,
+                intercept,
+                printed_effect,
+                1.0,
+                manifest_mean,
+                2.0,
+                LagClock::EventTime,
+            )
+            .expect("invariance");
+        assert!((evolved_from_stationary - recovered).abs() < 1e-12);
+        let evolved_latent = recover_discrete_latent_mean_with_time_independent_predictor(
+            latent,
+            log_rate,
+            intercept,
+            printed_effect,
+            1.0,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("stationary invariance");
+        assert!((evolved_latent - latent).abs() < 1e-12);
+    }
+
+    #[test]
+    fn stationary_initial_observed_mean_is_not_manifest_latent_evolved_or_free() {
+        let intercept = 0.3_f64;
+        let log_rate = -0.134_488_942_f64;
+        let loading = 2.0_f64;
+        let manifest_mean = 0.5_f64;
+        let recovered = recover_stationary_initial_observed_mean(
+            loading,
+            intercept,
+            -0.225,
+            1.0,
+            log_rate,
+            manifest_mean,
+            LagClock::EventTime,
+        )
+        .expect("eq5-stationary-T0MEANS");
+        let latent = recover_stationary_initial_latent_mean(
+            intercept,
+            -0.225,
+            1.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("stationary T0MEANS");
+        let intercept_only =
+            recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+                .expect("asymCINT");
+        let intercept_only_observed =
+            recover_manifest_observed_mean(loading, intercept_only, manifest_mean)
+                .expect("τ+λ(−κ/a)");
+        let free_initial_observed =
+            recover_manifest_observed_mean(loading, 2.823, manifest_mean).expect("τ+λμ_0");
+        let evolved = recover_discrete_observed_mean(
+            loading,
+            2.823,
+            log_rate,
+            intercept,
+            manifest_mean,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("τ+λμ_t");
+        assert_eq!(
+            refuse_stationary_initial_latent_mean_as_observed_mean(latent, recovered),
+            Err(PsychometricError::StationaryInitialLatentMeanIsNotObservedMean)
+        );
+        assert_eq!(
+            refuse_stationary_initial_observed_mean_as_manifest_means(recovered, manifest_mean),
+            Err(PsychometricError::StationaryInitialObservedMeanIsNotManifestMeans)
+        );
+        assert_eq!(
+            refuse_evolved_observed_mean_as_stationary_initial_observed_mean(evolved, recovered),
+            Err(PsychometricError::EvolvedObservedMeanIsNotStationaryInitialObservedMean)
+        );
+        assert_eq!(
+            refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean(
+                intercept_only_observed,
+                recovered
+            ),
+            Err(
+                PsychometricError::AsymptoticContinuousInterceptObservedMeanIsNotStationaryInitialObservedMean
+            )
+        );
+        assert_eq!(
+            refuse_initial_observed_mean_as_stationary_initial_observed_mean(
+                free_initial_observed,
+                recovered
+            ),
+            Err(PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean)
+        );
+    }
+
+    #[test]
+    fn stationary_initial_observed_mean_invalid_inputs_fail_closed() {
+        let intercept = 0.3_f64;
+        let log_rate = -0.134_488_942_f64;
+        assert_eq!(
+            recover_stationary_initial_observed_mean(
+                2.0,
+                intercept,
+                -0.225,
+                1.0,
+                log_rate,
+                0.5,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_stationary_initial_observed_mean(
+                2.0,
+                intercept,
+                0.0,
+                1.0,
+                0.0,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_stationary_initial_observed_mean(
+                2.0,
+                0.0,
+                -0.225,
+                1.0,
+                0.5,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_stationary_initial_observed_mean(
+                f64::NAN,
+                intercept,
+                -0.225,
+                1.0,
+                log_rate,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_stationary_initial_observed_mean(
+                2.0,
+                1e308,
+                1e308,
+                1.0,
+                -1e-308,
+                0.5,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
     }

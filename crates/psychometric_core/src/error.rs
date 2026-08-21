@@ -388,6 +388,26 @@ pub enum PsychometricError {
     /// interval discrete latent mean. The constrained first-occasion
     /// mean is not `exp(a Δt) μ_0 + (exp(a Δt) − 1)/a κ`.
     StationaryInitialLatentMeanIsNotDiscreteMean,
+    /// Driver Eq. 5 of §4.3 stationary `T0MEANS` was treated as
+    /// `MANIFESTMEANS`. `τ + λ(−κ / a + −B z / a)` is not `τ`.
+    StationaryInitialObservedMeanIsNotManifestMeans,
+    /// Driver §4.3 stationary `T0MEANS` was treated as `E(y_0)`.
+    /// `−κ / a + −B z / a` is the constrained latent mean, not the
+    /// observed-indicator mean.
+    StationaryInitialLatentMeanIsNotObservedMean,
+    /// Driver Eq. 5 of a finite-interval evolved mean was treated as
+    /// Eq. 5 of §4.3 stationary `T0MEANS`. `τ + λ μ_t` is not
+    /// `τ + λ(−κ / a + −B z / a)` when the first occasion is
+    /// constrained.
+    EvolvedObservedMeanIsNotStationaryInitialObservedMean,
+    /// Driver Eq. 5 of `asymCINT` was treated as Eq. 5 of §4.3
+    /// stationary `T0MEANS`. `τ + λ(−κ / a)` is not
+    /// `τ + λ(−κ / a + −B z / a)` when `B z ≠ 0`.
+    AsymptoticContinuousInterceptObservedMeanIsNotStationaryInitialObservedMean,
+    /// Driver Eq. 5 of free `T0MEANS` was treated as Eq. 5 of §4.3
+    /// stationary `T0MEANS`. `τ + λ μ_0` is not
+    /// `τ + λ(−κ / a + −B z / a)`.
+    InitialObservedMeanIsNotStationaryInitialObservedMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -699,6 +719,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::StationaryInitialLatentMeanIsNotDiscreteMean => {
                 "stationary first-occasion latent mean is not the finite-interval discrete latent mean"
+            }
+            Self::StationaryInitialObservedMeanIsNotManifestMeans => {
+                "stationary first-occasion observed mean is not the manifest mean"
+            }
+            Self::StationaryInitialLatentMeanIsNotObservedMean => {
+                "stationary first-occasion latent mean is not the first-occasion observed mean"
+            }
+            Self::EvolvedObservedMeanIsNotStationaryInitialObservedMean => {
+                "evolved observed mean is not the stationary first-occasion observed mean"
+            }
+            Self::AsymptoticContinuousInterceptObservedMeanIsNotStationaryInitialObservedMean => {
+                "asymptotic-intercept observed mean is not the stationary first-occasion observed mean"
+            }
+            Self::InitialObservedMeanIsNotStationaryInitialObservedMean => {
+                "free first-occasion observed mean is not the stationary first-occasion observed mean"
             }
         };
         formatter.write_str(message)
@@ -1178,6 +1213,27 @@ mod tests {
         assert_eq!(
             PsychometricError::StationaryInitialLatentMeanIsNotDiscreteMean.to_string(),
             "stationary first-occasion latent mean is not the finite-interval discrete latent mean"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialObservedMeanIsNotManifestMeans.to_string(),
+            "stationary first-occasion observed mean is not the manifest mean"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentMeanIsNotObservedMean.to_string(),
+            "stationary first-occasion latent mean is not the first-occasion observed mean"
+        );
+        assert_eq!(
+            PsychometricError::EvolvedObservedMeanIsNotStationaryInitialObservedMean.to_string(),
+            "evolved observed mean is not the stationary first-occasion observed mean"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticContinuousInterceptObservedMeanIsNotStationaryInitialObservedMean
+                .to_string(),
+            "asymptotic-intercept observed mean is not the stationary first-occasion observed mean"
+        );
+        assert_eq!(
+            PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean.to_string(),
+            "free first-occasion observed mean is not the stationary first-occasion observed mean"
         );
     }
 }

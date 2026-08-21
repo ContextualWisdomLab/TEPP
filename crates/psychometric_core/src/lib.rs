@@ -125,13 +125,21 @@
 //! not `κ`, not `A^{-1}[e^{A Δt} − I] κ`, not `T0MEANS`, and not
 //! `-B z / a`; p. 16 `T0MEANS` stationarity includes TI predictors;
 //! that composition is not this intercept-only map),
-//! recovers the Driver p. 16 stationary `T0MEANS` as
+//! recovers the Driver p. 16 / §4.3 stationary `T0MEANS` as
 //! `-κ / a + −B z / a`
-//! (constrained first-occasion mean using `T0MEANSbase` /
-//! `T0MEANSfree`; form the intercept contribution first, then include
-//! the TI extra effect, then add; not free `T0MEANS`, not `asymCINT`
-//! alone, not `asymTIPREDEFFECT` alone, and not the finite-interval
-//! discrete latent mean),
+//! (constrained first-occasion mean; form the intercept
+//! contribution first, then include the TI extra effect, then add;
+//! not free `T0MEANS`, not `asymCINT` alone, not
+//! `asymTIPREDEFFECT` alone, and not the finite-interval discrete
+//! latent mean),
+//! recovers the Driver Eq. 5 of that constrained mean as
+//! `τ + λ(−κ / a + −B z / a)`
+//! (§4.3, pp. 9–10; Eq. 5, p. 5; JSS PDF re-opened 2026-08-21T20:07Z;
+//! form the stationary latent mean first, then `τ + λ` of that mean;
+//! `τ + λ μ_0` is not that observed mean; `τ + λ(−κ / a)` is not
+//! that observed mean when `B z ≠ 0`; `τ + λ μ_t` is not that
+//! observed mean; `MANIFESTMEANS` is not `E(y_0)`; the constrained
+//! latent mean is not `E(y_0)`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -270,6 +278,8 @@ pub use event_time::recover_manifest_observed_variance;
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
+/// Exact scalar Eq. 5 of §4.3 stationary `T0MEANS` `τ + λ(−κ / a + −B z / a)`.
+pub use event_time::recover_stationary_initial_observed_mean;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
 /// Exact scalar contemporaneous `TDPREDEFFECT` impulse `m x`.
@@ -294,6 +304,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_as_continuous_interce
 pub use event_time::refuse_asymptotic_continuous_intercept_as_discrete_increment;
 /// Refuse treating Table 2 `asymCINT` as `T0MEANS`.
 pub use event_time::refuse_asymptotic_continuous_intercept_as_initial_latent_mean;
+/// Refuse treating `τ + λ(−κ / a)` as Eq. 5 of §4.3 stationary `T0MEANS`.
+pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT` `B`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_coefficient;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.
@@ -328,6 +340,8 @@ pub use event_time::refuse_evolved_observed_mean_as_impulse_observed_mean;
 pub use event_time::refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating evolved `τ + λ μ_t` as Eq. 5 of §4.3 stationary `T0MEANS`.
+pub use event_time::refuse_evolved_observed_mean_as_stationary_initial_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the time-independent-predictor observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_time_independent_observed_mean;
 /// Refuse treating the §7.2 extra-process contribution as `E(y_t)`.
@@ -360,6 +374,8 @@ pub use event_time::refuse_impulse_observed_mean_as_time_independent_observed_me
 pub use event_time::refuse_initial_latent_mean_as_evolved_mean;
 /// Refuse treating first-occasion `τ + λ μ_0` as `E(y_t)`.
 pub use event_time::refuse_initial_observed_mean_as_evolved_observed_mean;
+/// Refuse treating `τ + λ μ_0` as Eq. 5 of §4.3 stationary `T0MEANS`.
+pub use event_time::refuse_initial_observed_mean_as_stationary_initial_observed_mean;
 /// Refuse treating the Eq. 3 `T0TDPREDEFFECT` carry as the within-interval impulse carry.
 pub use event_time::refuse_initial_time_dependent_carry_as_impulse_carry;
 /// Refuse treating the Eq. 3 `T0TDPREDEFFECT` carry as the first-occasion shift.
@@ -430,6 +446,10 @@ pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_time_ind
 pub use event_time::refuse_stationary_initial_latent_mean_as_discrete_mean;
 /// Refuse treating p. 16 stationary `T0MEANS` as free `T0MEANS`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_initial_latent_mean;
+/// Refuse treating §4.3 stationary `T0MEANS` as `E(y_0)`.
+pub use event_time::refuse_stationary_initial_latent_mean_as_observed_mean;
+/// Refuse treating Eq. 5 of §4.3 stationary `T0MEANS` as `MANIFESTMEANS`.
+pub use event_time::refuse_stationary_initial_observed_mean_as_manifest_means;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
 pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
 /// Refuse treating Driver Eq. 3 impulse as `TIPREDEFFECT`.

@@ -29,15 +29,17 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_initial_latent_mean, recover_stationary_latent_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_observed_mean,
+    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
     refuse_asymptotic_continuous_intercept_as_continuous_intercept,
     refuse_asymptotic_continuous_intercept_as_discrete_increment,
     refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
+    refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
     refuse_asymptotic_time_independent_effect_as_coefficient,
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -54,6 +56,7 @@ use psychometric_core::{
     refuse_evolved_observed_mean_as_impulse_observed_mean,
     refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_evolved_observed_mean_as_stationary_initial_observed_mean,
     refuse_evolved_observed_mean_as_time_independent_observed_mean,
     refuse_extra_process_contribution_as_observed_mean,
     refuse_extra_process_latent_mean_as_observed_mean,
@@ -70,6 +73,7 @@ use psychometric_core::{
     refuse_impulse_observed_mean_as_time_independent_observed_mean,
     refuse_initial_latent_mean_as_evolved_mean,
     refuse_initial_observed_mean_as_evolved_observed_mean,
+    refuse_initial_observed_mean_as_stationary_initial_observed_mean,
     refuse_initial_time_dependent_carry_as_impulse_carry,
     refuse_initial_time_dependent_carry_as_initial_effect,
     refuse_initial_time_dependent_coefficient_as_initial_effect,
@@ -97,6 +101,8 @@ use psychometric_core::{
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
     refuse_stationary_initial_latent_mean_as_discrete_mean,
     refuse_stationary_initial_latent_mean_as_initial_latent_mean,
+    refuse_stationary_initial_latent_mean_as_observed_mean,
+    refuse_stationary_initial_observed_mean_as_manifest_means,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
     refuse_time_dependent_impulse_as_time_varying_discrete_effect,
@@ -2320,5 +2326,100 @@ fn stationary_initial_latent_mean_is_not_t0_cint_tipred_or_discrete() {
     assert_eq!(
         refuse_stationary_initial_latent_mean_as_discrete_mean(recovered, discrete),
         Err(psychometric_core::PsychometricError::StationaryInitialLatentMeanIsNotDiscreteMean)
+    );
+}
+
+#[test]
+fn stationary_initial_observed_mean_is_not_manifest_latent_evolved_or_free() {
+    let intercept = 0.3_f64;
+    let log_rate = -0.134_488_942_f64;
+    let loading = 2.0_f64;
+    let manifest_mean = 0.5_f64;
+    let recovered = recover_stationary_initial_observed_mean(
+        loading,
+        intercept,
+        -0.225,
+        1.0,
+        log_rate,
+        manifest_mean,
+        LagClock::EventTime,
+    )
+    .expect("eq5-stationary-T0MEANS");
+    let latent = recover_stationary_initial_latent_mean(
+        intercept,
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("stationary T0MEANS");
+    let intercept_only =
+        recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+            .expect("asymCINT");
+    let intercept_only_observed =
+        recover_manifest_observed_mean(loading, intercept_only, manifest_mean).expect("τ+λ(−κ/a)");
+    let free_initial_observed =
+        recover_manifest_observed_mean(loading, 2.823, manifest_mean).expect("τ+λμ_0");
+    let evolved = recover_discrete_observed_mean(
+        loading,
+        2.823,
+        log_rate,
+        intercept,
+        manifest_mean,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("τ+λμ_t");
+    assert!(
+        (recovered - manifest_mean).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / Eq. 5): E(y_0) is not MANIFESTMEANS"
+    );
+    assert!(
+        (recovered - latent).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / Eq. 5): E(y_0) is not the constrained latent mean"
+    );
+    assert!(
+        (recovered - intercept_only_observed).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / Eq. 5): E(y_0) is not τ + λ(−κ / a)"
+    );
+    assert!(
+        (recovered - free_initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / Eq. 5): E(y_0) is not τ + λ μ_0"
+    );
+    assert!(
+        (recovered - evolved).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / Eq. 5): E(y_0) is not τ + λ μ_t"
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_mean_as_observed_mean(latent, recovered),
+        Err(psychometric_core::PsychometricError::StationaryInitialLatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_stationary_initial_observed_mean_as_manifest_means(recovered, manifest_mean),
+        Err(psychometric_core::PsychometricError::StationaryInitialObservedMeanIsNotManifestMeans)
+    );
+    assert_eq!(
+        refuse_evolved_observed_mean_as_stationary_initial_observed_mean(evolved, recovered),
+        Err(
+            psychometric_core::PsychometricError::EvolvedObservedMeanIsNotStationaryInitialObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean(
+            intercept_only_observed,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticContinuousInterceptObservedMeanIsNotStationaryInitialObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_initial_observed_mean_as_stationary_initial_observed_mean(
+            free_initial_observed,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean
+        )
     );
 }
