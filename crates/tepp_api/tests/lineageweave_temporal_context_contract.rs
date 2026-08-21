@@ -180,6 +180,12 @@ fn lineageweave_exchange_and_live_listener_return_the_same_context() {
     assert!(exchange.headers.iter().all(|(name, _)| {
         !name.eq_ignore_ascii_case("authorization") && !name.to_ascii_lowercase().contains("token")
     }));
+    assert!(
+        exchange
+            .headers
+            .iter()
+            .all(|(name, _)| !name.eq_ignore_ascii_case("idempotency-key"))
+    );
 
     let mut service = AnalysisRunLiveService::new();
     let response = service.handle_http_request(&http_request(&request.to_json().expect("json")));

@@ -78,6 +78,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- The LineageWeave temporal-context read exchange no longer emits a fabricated
+  `idempotency-key`; that header remains reserved for retryable write/export
+  operations with a caller-owned operation key.
 - Removed the temporary PR-155 review-repair workflows and source-fix helper after the bounded repair; subsequent changes use the normal reviewed branch path.
 - Pinned Rust branch-coverage workflows to `nightly-2026-08-21`, which is newer than the workspace Rust 1.97.1 MSRV and avoids the previous nightly/MSRV mismatch.
 - Applied the documented `sqlx_live.rs` authored-coverage exclusion to the hourly release gate so live-PostgreSQL success-path coverage is not reported as a false source failure.

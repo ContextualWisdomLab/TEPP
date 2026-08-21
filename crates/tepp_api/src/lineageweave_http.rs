@@ -1,9 +1,9 @@
 //! Published modular-consumer identity and `LineageWeave` analysis-run exchange.
 
-use crate::naruon_http::{compose_https_target, standard_headers};
+use crate::naruon_http::compose_https_target;
 use crate::{
-    AnalysisRunRequest, ApiError, NaruonHttpExchange, TEMPORAL_CONTEXT_PATH,
-    TemporalContextRequest, naruon_analysis_run_exchange,
+    AnalysisRunRequest, ApiError, NaruonHttpExchange, TEMPORAL_CONTEXT_CONTRACT_VERSION,
+    TEMPORAL_CONTEXT_PATH, TemporalContextRequest, naruon_analysis_run_exchange,
 };
 
 /// Stable consumer identity used by the Naruon adapter.
@@ -48,12 +48,14 @@ pub fn lineageweave_temporal_context_exchange(
 ) -> Result<NaruonHttpExchange, ApiError> {
     let target_url = compose_https_target(origin, TEMPORAL_CONTEXT_PATH)?;
     let body = request.to_json()?;
-    let mut headers = standard_headers("temporal-context");
-    let consumer_header = headers
-        .iter_mut()
-        .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
-        .ok_or(ApiError::InvalidWirePayload)?;
-    LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
+    let headers = vec![
+        ("content-type".into(), "application/json".into()),
+        ("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()),
+        (
+            "tepp-contract-version".into(),
+            TEMPORAL_CONTEXT_CONTRACT_VERSION.to_string(),
+        ),
+    ];
     Ok(NaruonHttpExchange {
         method: "POST",
         target_url,
