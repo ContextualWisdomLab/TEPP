@@ -157,6 +157,7 @@ pub(crate) fn header_is_credential(name: &str) -> bool {
         || lowered == "x-api-key"
         || lowered.contains("api-key")
         || lowered.contains("api_key")
+        || lowered.contains("apikey")
         || lowered.contains("secret")
         || lowered.contains("credential")
         || lowered.contains("openai")

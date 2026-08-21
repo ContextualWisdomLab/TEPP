@@ -125,6 +125,7 @@ fn review_and_copilot_headers_are_authorization_denied() {
         "x-anthropic-key",
         "x-bytez-api-key",
         "x-openrouter-api-key",
+        "x-apikey",
         "x_api_key",
         "x-secret",
         "x-credential",
