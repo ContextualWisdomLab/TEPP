@@ -10,6 +10,7 @@ mod confidence;
 mod error;
 mod identifier;
 mod instance;
+mod link;
 mod mention;
 mod registry;
 mod role;
@@ -28,6 +29,20 @@ pub use instance::EVENT_INSTANCE_WIRE_SCHEMA_VERSION;
 pub use instance::EventInstance;
 /// Explicit refusal to cast a mention as an instance.
 pub use instance::refuse_mention_as_instance;
+/// TDT same-event versus distinct-event link label.
+pub use link::EventLinkLabel;
+/// Undirected TDT link hypothesis between two mentions.
+pub use link::EventLinkPair;
+/// Threshold a link probability into a detection label.
+pub use link::decide_event_link;
+/// Precision of recovered TDT links against known-truth pairs.
+pub use link::event_link_precision;
+/// Recall of recovered TDT links against known-truth pairs.
+pub use link::event_link_recall;
+/// Explicit refusal to treat a TDT link as an event instance.
+pub use link::refuse_event_link_as_instance;
+/// Explicit refusal to treat a TDT link as a state transition.
+pub use link::refuse_event_link_as_transition;
 /// Fallible textual event mention.
 pub use mention::EventMention;
 /// In-memory registry separating mentions from instances.
