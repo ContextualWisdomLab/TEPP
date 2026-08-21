@@ -7,13 +7,13 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
-    AuditEvent, CorpusSplitManifestRecord, DeletionRequestRecord, DocumentRecord,
-    EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository, LiveSqlxPoolOptions,
-    MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
-    PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord, SqlSession,
-    apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
-    require_live_sqlx_config, reset_app_runtime_role_sql, select_active_analysis_document_sql,
-    set_session_tenant_sql,
+    AuditEvent, AuditSourceInspection, CorpusSplitManifestRecord, DeletionRequestRecord,
+    DocumentRecord, EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository,
+    LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
+    ModelRunRecord, PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord,
+    SqlSession, apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql,
+    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
+    select_active_analysis_document_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -201,7 +201,8 @@ fn prove_document_insert_revise_and_audit(
         subject_record_id: document_record_id,
         recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
     };
-    repo.append_audit(&audit).expect("append audit_event");
+    repo.append_audit(&audit, AuditSourceInspection::CLEAR)
+        .expect("append audit_event");
 }
 
 fn open_migrated_live_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {

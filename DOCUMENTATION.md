@@ -27,6 +27,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Foundation implementation plan | [`docs/superpowers/plans/2026-08-05-temporal-event-foundation.md`](docs/superpowers/plans/2026-08-05-temporal-event-foundation.md) |
 | Foundation validation ledger | [`docs/validation/temporal-event-foundation.md`](docs/validation/temporal-event-foundation.md) |
 | Standards and APA 7 literature | [`docs/research/standards-and-literature.md`](docs/research/standards-and-literature.md) |
+| Operational log / source-separation doctoring | [`docs/research/operational-log-source-separation.md`](docs/research/operational-log-source-separation.md) |
 | Governance | [`GOVERNANCE.md`](GOVERNANCE.md) |
 | Agent development rules | [`AGENTS.md`](AGENTS.md) |
 | Agent context | [`CLAUDE.md`](CLAUDE.md) |
