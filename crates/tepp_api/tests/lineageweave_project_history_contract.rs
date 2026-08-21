@@ -222,6 +222,16 @@ fn generated_projection_rejects_output_that_exceeds_the_wire_limit() {
 }
 
 #[test]
+fn project_history_rejects_unknown_offset_temporal_values() {
+    let mut request = sample_request();
+    request.knowledge_cutoff = "2026-08-19T23:59:59-00:00".into();
+    assert_eq!(
+        project_history_projection(&request),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
 fn request_json_with_explicit_limit_round_trips_a_valid_contract() {
     let request = sample_request();
     let payload = request.to_json().expect("request json");

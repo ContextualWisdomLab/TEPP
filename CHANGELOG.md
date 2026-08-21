@@ -79,6 +79,13 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- `tepp_api` project-history requests and projections now share the strict
+  `temporal_core` RFC 3339 parser and nominal `KnowledgeCutoff` boundary,
+  rejecting unknown offsets and other timestamp forms that the transport
+  parser could otherwise accept.
+- Coverage validation now ignores LLVM rows for multiline call and iterator
+  syntax that have no independently executable source coordinate, while
+  retaining the authored-line 100% gate.
 - Removed the temporary PR-155 review-repair workflows and source-fix helper after the bounded repair; subsequent changes use the normal reviewed branch path.
 - Pinned Rust branch-coverage workflows to `nightly-2026-08-21`, which is newer than the workspace Rust 1.97.1 MSRV and avoids the previous nightly/MSRV mismatch.
 - Applied the documented `sqlx_live.rs` authored-coverage exclusion to the hourly release gate so live-PostgreSQL success-path coverage is not reported as a false source failure.

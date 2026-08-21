@@ -9,6 +9,7 @@ use std::collections::{BTreeSet, HashSet};
 
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
+use temporal_core::{KnowledgeCutoff, TemporalInstant};
 
 use crate::ApiError;
 use crate::wire::{
@@ -170,14 +171,14 @@ impl ProjectHistoryRequest {
         if self.events.is_empty() || self.events.len() > DEFAULT_PROJECT_HISTORY_EVENT_LIMIT {
             return Err(ApiError::LimitExceeded);
         }
-        let cutoff = parse_timestamp(&self.knowledge_cutoff)?;
-        if cutoff > Timestamp::now() {
+        let cutoff = parse_knowledge_cutoff(&self.knowledge_cutoff)?;
+        if cutoff_is_in_future(cutoff)? {
             return Err(ApiError::InvalidWirePayload);
         }
         let mut event_ids = HashSet::with_capacity(self.events.len());
         let mut focus_found = false;
         for event in &self.events {
-            validate_event(event, &cutoff)?;
+            validate_event(event, cutoff.instant())?;
             if !event_ids.insert(event.event_id.as_str()) {
                 return Err(ApiError::InvalidWirePayload);
             }
@@ -235,14 +236,14 @@ impl ProjectHistoryProjection {
         if self.events.len() > DEFAULT_PROJECT_HISTORY_EVENT_LIMIT {
             return Err(ApiError::LimitExceeded);
         }
-        let cutoff = parse_timestamp(&self.knowledge_cutoff)?;
-        if cutoff > Timestamp::now() {
+        let cutoff = parse_knowledge_cutoff(&self.knowledge_cutoff)?;
+        if cutoff_is_in_future(cutoff)? {
             return Err(ApiError::InvalidWirePayload);
         }
         let mut event_ids = HashSet::with_capacity(self.events.len());
         let mut focus_index = None;
         for (index, event) in self.events.iter().enumerate() {
-            validate_event(event, &cutoff)?;
+            validate_event(event, cutoff.instant())?;
             if !event_ids.insert(event.event_id.as_str()) {
                 return Err(ApiError::InvalidWirePayload);
             }
@@ -365,7 +366,7 @@ pub(crate) fn build_project_history_exchange(
     })
 }
 
-fn validate_event(event: &ProjectHistoryEvent, cutoff: &Timestamp) -> Result<(), ApiError> {
+fn validate_event(event: &ProjectHistoryEvent, cutoff: TemporalInstant) -> Result<(), ApiError> {
     validate_bounded_text(&event.event_id, 256)?;
     validate_code(&event.event_type_code)?;
     validate_bounded_text(&event.event_title, 512)?;
@@ -379,7 +380,7 @@ fn validate_event(event: &ProjectHistoryEvent, cutoff: &Timestamp) -> Result<(),
     }
     let occurred_at = parse_timestamp(&event.occurred_at)?;
     let available_at = parse_timestamp(&event.available_at)?;
-    if occurred_at > *cutoff || available_at > *cutoff {
+    if occurred_at > cutoff || available_at > cutoff {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(())
@@ -404,10 +405,18 @@ fn validate_code(value: &str) -> Result<(), ApiError> {
     Ok(())
 }
 
-fn parse_timestamp(value: &str) -> Result<Timestamp, ApiError> {
-    value
-        .parse::<Timestamp>()
-        .map_err(|_| ApiError::InvalidWirePayload)
+fn parse_knowledge_cutoff(value: &str) -> Result<KnowledgeCutoff, ApiError> {
+    KnowledgeCutoff::parse_rfc3339(value).map_err(|_| ApiError::InvalidWirePayload)
+}
+
+fn parse_timestamp(value: &str) -> Result<TemporalInstant, ApiError> {
+    TemporalInstant::parse_rfc3339(value).map_err(|_| ApiError::InvalidWirePayload)
+}
+
+fn cutoff_is_in_future(cutoff: KnowledgeCutoff) -> Result<bool, ApiError> {
+    let now = KnowledgeCutoff::parse_rfc3339(&Timestamp::now().to_string())
+        .map_err(|_| ApiError::InvalidWirePayload)?;
+    Ok(cutoff > now)
 }
 
 fn build_findings(
@@ -569,6 +578,46 @@ mod tests {
         );
         assert!(projection.findings.is_empty());
         assert_eq!(projection.participant_count, 0);
+    }
+
+    #[test]
+    fn projection_counts_memberships_and_emits_explicit_findings() {
+        let mut request = request_with_single_event();
+        let event = |event_id: &str, event_type_code: &str, occurred_at: &str, actor_id: &str| {
+            ProjectHistoryEvent {
+                event_id: event_id.into(),
+                event_type_code: event_type_code.into(),
+                event_title: event_type_code.into(),
+                occurred_at: occurred_at.into(),
+                available_at: occurred_at.into(),
+                source_post_id: format!("post-{event_id}"),
+                evidence_text: "explicit evidence".into(),
+                actor_ids: vec![actor_id.into()],
+            }
+        };
+        request.events = vec![
+            event("award", "contract_awarded", "2026-08-19T08:00:00Z", "actor-1"),
+            event(
+                "specification",
+                "specification_changed",
+                "2026-08-19T09:00:00Z",
+                "actor-1",
+            ),
+            event("delivery", "delivered", "2026-08-19T10:00:00Z", "actor-2"),
+            event(
+                "handoff",
+                "handoff_recorded",
+                "2026-08-19T11:00:00Z",
+                "actor-2",
+            ),
+            event("focus", "voc_received", "2026-08-19T12:00:00Z", "actor-3"),
+            event("rebid", "rebid_started", "2026-08-19T13:00:00Z", "actor-3"),
+        ];
+        let projection = project_history_projection(&request).expect("projection");
+        assert_eq!(projection.participant_count, 3);
+        assert_eq!(projection.findings.len(), 6);
+        let payload = projection.to_json().expect("projection json");
+        assert_eq!(ProjectHistoryProjection::from_json(&payload), Ok(projection));
     }
 
     #[test]
