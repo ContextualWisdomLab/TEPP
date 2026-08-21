@@ -9,7 +9,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Registered the analysis-engine gap-closure doctoring in the canonical documentation map so its product and scientific traceability record is discoverable.
 - Authored Rust coverage classification now ignores standalone structural closing parentheses, preventing formatting-only LCOV rows from appearing as uncovered production behavior.
 - Stacked `analysis_engine` vertical slice (ADR 0017): bounded Rust execution from an accepted analysis run to a cutoff-safe, multiple-membership-aware, SHA-256-digest-bound terminal artifact or redacted no-eligible-evidence result. This is active-PR evidence and does not claim psychometric estimator authority.
-- Coverage classification preserves the final expression line of multiline Rust `match` guards, keeping the 100% authored-line gate conservative.
+- Coverage classification preserves the final expression line of multiline Rust `match` guards while respecting preceding-arm boundaries, keeping the 100% authored-line gate conservative.
 - `tepp_api` fail-closed analysis-result boundaries: status constructors reject
   terminal envelopes that cannot fit the default 64 KiB status limit, and
   standalone terminal results reject knowledge cutoffs in the future.

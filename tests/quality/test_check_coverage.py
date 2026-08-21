@@ -428,6 +428,56 @@ class CoverageContractTests(unittest.TestCase):
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 4))
             self.assertFalse(coverage_contract.is_executable_source_line(str(source), 7))
 
+    def test_previous_arm_body_does_not_make_next_label_executable(self) -> None:
+        """Do not treat an ``if`` inside the preceding arm as a guard."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "previous_arm.rs"
+            source.write_text(
+                "match state {\n"
+                "    State::Previous => {\n"
+                "        if value.is_valid() {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "    }\n"
+                "    State::Current => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 7))
+
+            one_line_previous = Path(temporary) / "one_line_previous.rs"
+            one_line_previous.write_text(
+                "match state {\n"
+                "    State::Previous => value,\n"
+                "    State::Current => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(
+                    str(one_line_previous), 3
+                )
+            )
+
+            first_arm = Path(temporary) / "first_arm.rs"
+            first_arm.write_text(
+                "match state {\n"
+                "    State::Current => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(first_arm), 2)
+            )
+
     def test_cfg_test_and_not_feature_block_helpers(self) -> None:
         """cfg(test) modules and cfg(not(feature)) blocks are fully recognized."""
 
