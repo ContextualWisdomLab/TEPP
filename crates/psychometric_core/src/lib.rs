@@ -110,6 +110,11 @@
 //! map is not that observed mean; the after-t0 contribution is not
 //! `E(y_t)`; the evolved-plus-after-contribution latent mean is not
 //! `E(y_t)`),
+//! recovers the Driver §7.2 `asymTIPREDEFFECT` as `-B z / a`
+//! (pp. 20–21; JSS PDF opened 2026-08-21T13:08Z; expected total
+//! change in process means given a time-independent predictor;
+//! `a < 0`; not the coefficient `B`, not
+//! `A^{-1}[e^{A Δt} − I] B z`, not `CINT`, and not `M x`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -158,6 +163,8 @@ pub use event_time::LagClock;
 pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
+pub use event_time::recover_asymptotic_time_independent_predictor_effect;
 /// Exact scalar discrete effect of a constant event-time predictor.
 pub use event_time::recover_discrete_constant_predictor_effect;
 /// Exact scalar discrete intercept increment `A^{-1}[e^{A Δt} − I] κ`.
@@ -256,6 +263,14 @@ pub use event_time::recover_within_residual_event_time_log_rate;
 pub use event_time::refuse_after_extra_process_contribution_as_observed_mean;
 /// Refuse treating the evolved-plus-after-contribution latent mean as `E(y_t)`.
 pub use event_time::refuse_after_extra_process_latent_mean_as_observed_mean;
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT` `B`.
+pub use event_time::refuse_asymptotic_time_independent_effect_as_coefficient;
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.
+pub use event_time::refuse_asymptotic_time_independent_effect_as_continuous_intercept;
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as the finite-interval discrete increment.
+pub use event_time::refuse_asymptotic_time_independent_effect_as_discrete_effect;
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as `M x`.
+pub use event_time::refuse_asymptotic_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
 pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 /// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.

@@ -51,7 +51,12 @@
 //! the process mean. Equation 3's second summand also
 //! maps the time-independent predictor as `A^{-1}[e^{A Δt} − I] B z`
 //! (Table 2 `TIPREDEFFECT` is `B`, not `κ`, not `M`, and not Voelkle
-//! Eq. 14). Table 3 (p. 13) names a different matrix
+//! Eq. 14). Section 7.2 (pp. 20–21; JSS PDF opened 2026-08-21T13:08Z)
+//! names `asymTIPREDEFFECT` the expected total change in process
+//! means given a unit increase on a time-independent predictor. The
+//! scalar map is `-B z / a` for stable `a < 0`. That total change is
+//! not the coefficient `B`, not the finite-interval increment
+//! `A^{-1}[e^{A Δt} − I] B z`, not `CINT`, and not `M x`. Table 3 (p. 13) names a different matrix
 //! `T0TIPREDEFFECT` for time-independent predictors on latents at
 //! `T0`. The scalar first-occasion shift is `t0_b z`. Equation 3's
 //! first summand carries that shift as `e^{A Δt} t0_b z`. That carry
@@ -2528,6 +2533,125 @@ pub fn refuse_time_independent_coefficient_as_discrete_effect(
     Err(PsychometricError::TimeIndependentCoefficientIsNotDiscreteEffect)
 }
 
+/// Exact scalar §7.2 `asymTIPREDEFFECT`.
+///
+/// Driver, Oud, and Voelkle (2017, §7.2, pp. 20–21; Eq. 3, p. 5;
+/// Table 2, p. 12; JSS PDF opened 2026-08-21T13:08Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `TIPREDEFFECT` the continuous-time coefficient `B`. Equation 3
+/// maps a finite event interval as `A^{-1}[e^{A Δt} − I] B z`. Section
+/// 7.2 then names `asymTIPREDEFFECT` the expected total change in
+/// process means given an increase of 1 on the time-independent
+/// predictor. For stable `a < 0` that total change is `-A^{-1} B`.
+/// The scalar map is `-B z / a`. Form `B z` first, then divide by
+/// `-a`. A zero coefficient or zero predictor is exactly zero.
+/// `a ≥ 0` cannot hold a finite process-mean change and fails closed.
+/// `-B z / a` is not the coefficient `B`, not the finite-interval
+/// increment `A^{-1}[e^{A Δt} − I] B z`, not `CINT`, and not `M x`.
+/// This is not a Kalman filter, not a matrix `expm`, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift`]
+/// when the drift is not strictly negative and the effect is nonzero,
+/// and [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite or `B z` or the quotient overflows.
+pub fn recover_asymptotic_time_independent_predictor_effect(
+    time_independent_effect: f64,
+    time_independent_predictor: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !time_independent_effect.is_finite()
+        || !time_independent_predictor.is_finite()
+        || !log_rate.is_finite()
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if time_independent_effect == 0.0 || time_independent_predictor == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift);
+    }
+    let continuous = require_finite(time_independent_effect * time_independent_predictor)?;
+    require_finite(continuous / -log_rate)
+}
+
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT`.
+///
+/// `-B z / a` is the expected total change in process means. Table 2
+/// names `B` `TIPREDEFFECT`. The coefficient is not that total change.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentEffectIsNotCoefficient`].
+pub fn refuse_asymptotic_time_independent_effect_as_coefficient(
+    asymptotic_effect: f64,
+    time_independent_coefficient: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_effect, time_independent_coefficient);
+    Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotCoefficient)
+}
+
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as the finite-interval
+/// discrete increment.
+///
+/// `-B z / a` is the `Δt → ∞` limit of `A^{-1}[e^{A Δt} − I] B z`
+/// under stable `a < 0`. A finite event interval is not that limit.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentEffectIsNotDiscreteEffect`].
+pub fn refuse_asymptotic_time_independent_effect_as_discrete_effect(
+    asymptotic_effect: f64,
+    time_independent_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_effect, time_independent_increment);
+    Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotDiscreteEffect)
+}
+
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.
+///
+/// `-B z / a` is the expected total change from a time-independent
+/// predictor. Table 2 names `κ` `CINT`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentEffectIsNotContinuousIntercept`].
+pub fn refuse_asymptotic_time_independent_effect_as_continuous_intercept(
+    asymptotic_effect: f64,
+    continuous_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_effect, continuous_intercept);
+    Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotContinuousIntercept)
+}
+
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as `M x`.
+///
+/// The fourth-summand impulse is contemporaneous. The asymptotic
+/// time-independent effect is a new process mean, not a Dirac.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse`].
+pub fn refuse_asymptotic_time_independent_effect_as_time_dependent_impulse(
+    asymptotic_effect: f64,
+    time_dependent_impulse: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_effect, time_dependent_impulse);
+    Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse)
+}
+
 /// Exact scalar observed mean of a time-independent predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 3, p. 5; Table 2,
@@ -4023,10 +4147,12 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 mod tests {
     use super::{
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_discrete_constant_predictor_effect,
-        recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
-        recover_discrete_lag_one, recover_discrete_lagged_latent_covariance,
-        recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
+        map_discrete_lag_across_event_intervals,
+        recover_asymptotic_time_independent_predictor_effect,
+        recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
+        recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
+        recover_discrete_lagged_latent_covariance, recover_discrete_latent_mean,
+        recover_discrete_latent_mean_with_extra_process,
         recover_discrete_latent_mean_with_extra_process_after,
         recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
         recover_discrete_latent_mean_with_initial_time_dependent_predictor,
@@ -4057,6 +4183,10 @@ mod tests {
         recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
+        refuse_asymptotic_time_independent_effect_as_coefficient,
+        refuse_asymptotic_time_independent_effect_as_continuous_intercept,
+        refuse_asymptotic_time_independent_effect_as_discrete_effect,
+        refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -6959,6 +7089,156 @@ mod tests {
                 LagClock::EventTime
             ),
             Ok(0.5)
+        );
+    }
+
+    #[test]
+    fn asymptotic_time_independent_effect_recovers_driver_section_seven_point_two() {
+        // Driver et al. (2017, §7.2, p. 21) print LeisureTime
+        // TIPREDEFFECT = −0.225 and asymTIPREDEFFECT = −1.673 for a
+        // unit increase. Reconstruct a = −B / asym.
+        let effect = -0.225_f64;
+        let predictor = 1.0_f64;
+        let printed_asym = -1.673_f64;
+        let log_rate = -effect / printed_asym;
+        let recovered = recover_asymptotic_time_independent_predictor_effect(
+            effect,
+            predictor,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTIPREDEFFECT");
+        let expected = -(effect * predictor) / log_rate;
+        assert!((recovered - expected).abs() < 1e-15);
+        assert!((recovered - printed_asym).abs() < 1e-12);
+        let happiness = recover_asymptotic_time_independent_predictor_effect(
+            0.549,
+            1.0,
+            -0.549 / 0.219,
+            LagClock::EventTime,
+        )
+        .expect("happiness-asym");
+        assert!((happiness - 0.219).abs() < 1e-12);
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(
+                0.0,
+                predictor,
+                0.0,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(
+                effect,
+                0.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn asymptotic_time_independent_effect_is_not_coefficient_discrete_cint_or_impulse() {
+        let effect = -0.225_f64;
+        let predictor = 2.0_f64;
+        let log_rate = -0.134_488_942_f64;
+        let recovered = recover_asymptotic_time_independent_predictor_effect(
+            effect,
+            predictor,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTIPREDEFFECT");
+        let discrete = recover_discrete_time_independent_predictor_effect(
+            effect,
+            predictor,
+            log_rate,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("discreteTIPREDEFFECT");
+        let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+        assert!((recovered - effect).abs() > 1e-3);
+        assert!((recovered - discrete).abs() > 1e-3);
+        assert!((recovered - impulse).abs() > 1e-3);
+        assert_eq!(
+            refuse_asymptotic_time_independent_effect_as_coefficient(recovered, effect),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotCoefficient)
+        );
+        assert_eq!(
+            refuse_asymptotic_time_independent_effect_as_discrete_effect(recovered, discrete),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotDiscreteEffect)
+        );
+        assert_eq!(
+            refuse_asymptotic_time_independent_effect_as_continuous_intercept(recovered, 0.3),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotContinuousIntercept)
+        );
+        assert_eq!(
+            refuse_asymptotic_time_independent_effect_as_time_dependent_impulse(recovered, impulse),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse)
+        );
+    }
+
+    #[test]
+    fn asymptotic_time_independent_effect_invalid_inputs_fail_closed() {
+        let effect = -0.225_f64;
+        let predictor = 1.0_f64;
+        let log_rate = -0.134_488_942_f64;
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(
+                effect,
+                predictor,
+                log_rate,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(
+                effect,
+                predictor,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(
+                effect,
+                predictor,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(
+                f64::NAN,
+                predictor,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(
+                1e308,
+                2.0,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(
+                1e308,
+                1.0,
+                -1e-308,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 

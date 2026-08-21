@@ -324,6 +324,23 @@ pub enum PsychometricError {
     /// treated as `E(y_t)`. Equation 5 maps `E(y_t) = τ + λ` of
     /// that mean.
     AfterExtraProcessLatentMeanIsNotObservedMean,
+    /// Driver §7.2 `asymTIPREDEFFECT` was requested for a non-stable
+    /// drift. The expected total change in process means is `-B z / a`
+    /// and requires `a < 0`.
+    AsymptoticTimeIndependentEffectRequiresStableDrift,
+    /// Driver §7.2 `asymTIPREDEFFECT` was treated as `TIPREDEFFECT`.
+    /// `-B z / a` is not the coefficient `B`.
+    AsymptoticTimeIndependentEffectIsNotCoefficient,
+    /// Driver §7.2 `asymTIPREDEFFECT` was treated as the finite-interval
+    /// discrete increment. `-B z / a` is not
+    /// `A^{-1}[e^{A Δt} − I] B z`.
+    AsymptoticTimeIndependentEffectIsNotDiscreteEffect,
+    /// Driver §7.2 `asymTIPREDEFFECT` was treated as `CINT`.
+    /// `-B z / a` is not `κ`.
+    AsymptoticTimeIndependentEffectIsNotContinuousIntercept,
+    /// Driver §7.2 `asymTIPREDEFFECT` was treated as the contemporaneous
+    /// Dirac. `-B z / a` is not `M x`.
+    AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse,
 }
 
 impl fmt::Display for PsychometricError {
@@ -584,6 +601,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::AfterExtraProcessLatentMeanIsNotObservedMean => {
                 "evolved-plus-after-contribution latent mean is not the after-t0 extra-process observed mean"
+            }
+            Self::AsymptoticTimeIndependentEffectRequiresStableDrift => {
+                "asymptotic time-independent predictor effect requires a stable negative drift"
+            }
+            Self::AsymptoticTimeIndependentEffectIsNotCoefficient => {
+                "asymptotic time-independent predictor effect is not the TIPREDEFFECT coefficient"
+            }
+            Self::AsymptoticTimeIndependentEffectIsNotDiscreteEffect => {
+                "asymptotic time-independent predictor effect is not the finite-interval discrete increment"
+            }
+            Self::AsymptoticTimeIndependentEffectIsNotContinuousIntercept => {
+                "asymptotic time-independent predictor effect is not the continuous intercept"
+            }
+            Self::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse => {
+                "asymptotic time-independent predictor effect is not the contemporaneous impulse"
             }
         };
         formatter.write_str(message)
@@ -987,6 +1019,30 @@ mod tests {
         assert_eq!(
             PsychometricError::AfterExtraProcessLatentMeanIsNotObservedMean.to_string(),
             "evolved-plus-after-contribution latent mean is not the after-t0 extra-process observed mean"
+        );
+    }
+
+    #[test]
+    fn asymptotic_time_independent_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift.to_string(),
+            "asymptotic time-independent predictor effect requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentEffectIsNotCoefficient.to_string(),
+            "asymptotic time-independent predictor effect is not the TIPREDEFFECT coefficient"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentEffectIsNotDiscreteEffect.to_string(),
+            "asymptotic time-independent predictor effect is not the finite-interval discrete increment"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentEffectIsNotContinuousIntercept.to_string(),
+            "asymptotic time-independent predictor effect is not the continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse.to_string(),
+            "asymptotic time-independent predictor effect is not the contemporaneous impulse"
         );
     }
 }

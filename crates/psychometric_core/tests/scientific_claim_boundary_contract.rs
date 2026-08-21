@@ -3,6 +3,7 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
+    recover_asymptotic_time_independent_predictor_effect,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
@@ -32,6 +33,10 @@ use psychometric_core::{
     recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
+    refuse_asymptotic_time_independent_effect_as_coefficient,
+    refuse_asymptotic_time_independent_effect_as_continuous_intercept,
+    refuse_asymptotic_time_independent_effect_as_discrete_effect,
+    refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
@@ -2059,5 +2064,62 @@ fn after_extra_process_observed_mean_is_not_t0_extra_evolved_or_impulse_carry() 
     assert_eq!(
         refuse_after_extra_process_latent_mean_as_observed_mean(composed, observed),
         Err(psychometric_core::PsychometricError::AfterExtraProcessLatentMeanIsNotObservedMean)
+    );
+}
+
+#[test]
+fn asymptotic_time_independent_effect_is_not_coefficient_discrete_cint_or_impulse() {
+    let effect = -0.225_f64;
+    let predictor = 2.0_f64;
+    let log_rate = -0.134_488_942_f64;
+    let recovered = recover_asymptotic_time_independent_predictor_effect(
+        effect,
+        predictor,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTIPREDEFFECT");
+    let discrete = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        log_rate,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("discreteTIPREDEFFECT");
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+    assert!(
+        (recovered - effect).abs() > 1e-3,
+        "Driver et al. (2017, §7.2, pp. 20–21): asymTIPREDEFFECT is not TIPREDEFFECT B"
+    );
+    assert!(
+        (recovered - discrete).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): -B z / a is not A^{{-1}}[e^{{A Δt}} − I] B z"
+    );
+    assert!(
+        (recovered - impulse).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): -B z / a is not M x"
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_coefficient(recovered, effect),
+        Err(psychometric_core::PsychometricError::AsymptoticTimeIndependentEffectIsNotCoefficient)
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_discrete_effect(recovered, discrete),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentEffectIsNotDiscreteEffect
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_continuous_intercept(recovered, 0.3),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentEffectIsNotContinuousIntercept
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_time_dependent_impulse(recovered, impulse),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse
+        )
     );
 }

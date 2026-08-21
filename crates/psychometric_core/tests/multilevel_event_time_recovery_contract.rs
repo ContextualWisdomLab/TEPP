@@ -4,10 +4,11 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
-    ordinary_least_squares_slope, recover_cluster_mean_within_between_slopes,
-    recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
-    recover_discrete_lag_from_log_rate, recover_discrete_lagged_latent_covariance,
-    recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
+    ordinary_least_squares_slope, recover_asymptotic_time_independent_predictor_effect,
+    recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
+    recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
+    recover_discrete_lagged_latent_covariance, recover_discrete_latent_mean,
+    recover_discrete_latent_mean_with_extra_process,
     recover_discrete_latent_mean_with_extra_process_after,
     recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
     recover_discrete_latent_mean_with_initial_time_dependent_predictor,
@@ -36,6 +37,10 @@ use psychometric_core::{
     recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
+    refuse_asymptotic_time_independent_effect_as_coefficient,
+    refuse_asymptotic_time_independent_effect_as_continuous_intercept,
+    refuse_asymptotic_time_independent_effect_as_discrete_effect,
+    refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -4153,5 +4158,127 @@ fn after_extra_process_observed_mean_refuses_non_interior_interval_and_clock() {
             LagClock::EventTime
         ),
         Ok(0.5)
+    );
+}
+
+#[test]
+fn asymptotic_time_independent_effect_recovers_driver_section_seven_point_two() {
+    // Driver et al. (2017, §7.2, p. 21) print LeisureTime
+    // TIPREDEFFECT = −0.225 and asymTIPREDEFFECT = −1.673 for a unit
+    // increase. Reconstruct a = −B / asym.
+    let effect = -0.225_f64;
+    let predictor = 1.0_f64;
+    let printed_asym = -1.673_f64;
+    let log_rate = -effect / printed_asym;
+    let recovered = recover_asymptotic_time_independent_predictor_effect(
+        effect,
+        predictor,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTIPREDEFFECT");
+    let expected = -(effect * predictor) / log_rate;
+    let error = rmse(&[expected], &[recovered]);
+    assert!(
+        error < 1e-15,
+        "Driver §7.2 asymTIPREDEFFECT RMSE {error}: got {recovered}"
+    );
+    assert!(
+        rmse(&[printed_asym], &[recovered]) < 1e-12,
+        "printed LeisureTime asymTIPREDEFFECT"
+    );
+    let discrete = recover_discrete_time_independent_predictor_effect(
+        effect,
+        predictor,
+        log_rate,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("discreteTIPREDEFFECT");
+    let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("impulse");
+    assert!(
+        rmse(&[recovered], &[effect]) > error,
+        "TIPREDEFFECT B is not asymTIPREDEFFECT"
+    );
+    assert!(
+        rmse(&[recovered], &[discrete]) > error,
+        "A^{{-1}}[e^{{A Δt}} − I] B z is not -B z / a"
+    );
+    assert!(rmse(&[recovered], &[impulse]) > error);
+    let happiness = recover_asymptotic_time_independent_predictor_effect(
+        0.549,
+        1.0,
+        -0.549 / 0.219,
+        LagClock::EventTime,
+    )
+    .expect("happiness-asym");
+    assert!(rmse(&[0.219], &[happiness]) < 1e-12);
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_coefficient(recovered, effect),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotCoefficient)
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_discrete_effect(recovered, discrete),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotDiscreteEffect)
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_continuous_intercept(recovered, 0.3),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_time_dependent_impulse(recovered, impulse),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse)
+    );
+}
+
+#[test]
+fn asymptotic_time_independent_effect_refuses_unstable_drift_and_non_event_clocks() {
+    let effect = -0.225_f64;
+    let predictor = 1.0_f64;
+    let log_rate = -0.134_488_942_f64;
+    assert_eq!(
+        recover_asymptotic_time_independent_predictor_effect(
+            effect,
+            predictor,
+            log_rate,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_time_independent_predictor_effect(
+            effect,
+            predictor,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotic_time_independent_predictor_effect(
+            effect,
+            predictor,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotic_time_independent_predictor_effect(
+            1e308,
+            2.0,
+            log_rate,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_time_independent_predictor_effect(
+            0.0,
+            predictor,
+            0.0,
+            LagClock::EventTime
+        ),
+        Ok(0.0)
     );
 }
