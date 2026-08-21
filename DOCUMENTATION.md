@@ -38,6 +38,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Analysis engine v1 doctoring | [`docs/doctoring/analysis-engine-v1.md`](docs/doctoring/analysis-engine-v1.md) |
+| Analysis engine gap-closure doctoring | [`docs/doctoring/analysis-engine-gap-closure.md`](docs/doctoring/analysis-engine-gap-closure.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
 ## Maturity vocabulary
