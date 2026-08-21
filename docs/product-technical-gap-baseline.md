@@ -1,0 +1,108 @@
+# TEPP Product and Technical Gap Baseline
+
+**Snapshot:** 2026-08-21T09:33:43Z
+**Purpose:** Turn live delivery evidence into the next bounded customer action.
+**Authority:** The approved PRD, architecture, ADR maturity rules, traceability matrix, and current GitHub evidence. This is a dated operational snapshot, not proof that an open PR is merged or that a target capability is production-ready.
+
+## Buyer outcome
+
+TEPP is intended to let a researcher, risk team, auditor, or AI product architect measure multilingual documentary evidence without losing source spans, event chronology, group structure, uncertainty, or the distinction between observed evidence and interpretation. A buyer should be able to import a record, reproduce an as-known-at analysis, inspect why a topic or event changed, compare groups and languages without atomistic fallacy, and export exact evidence for review.
+
+The current buyer promise is therefore conditional: the foundation has strong contracts for immutable evidence, temporal eligibility, typed relations, multiple membership, PostgreSQL isolation, release evidence, and provider-payload privacy. The higher-value estimator, event-intelligence, GPU, visual, and live-orchestration capabilities remain staged by the maturity vocabulary below.
+
+## Maturity vocabulary
+
+- **implemented-main:** protected-main source plus exact-current-head verification and required review/security evidence support the claim.
+- **active-PR:** a reviewed implementation exists on an open PR; it is not a protected-main claim.
+- **partial:** a bounded subset is integrated, while the remaining contract still needs evidence.
+- **accepted-target:** the design is approved, but implementation or scientific promotion evidence is not complete.
+- **external-infra:** the observed failure belongs to a provider, runner, or scanner runtime; it is not silently converted into source success.
+
+## Current delivery evidence
+
+The following live records were refreshed for this snapshot. They are useful for prioritization and are not reusable as future merge evidence after a head or base change.
+
+| Surface | Exact identity and live state | Customer consequence | Next customer action |
+|---|---|---|---|
+| Central control plane, [ContextualWisdomLab/.github#1153](https://github.com/ContextualWisdomLab/.github/pull/1153) | Open, non-draft, base `4c7077b3b061f8d674f0932dfecccfe8ad85f93a`, head `56588e1ff42ceefb2100d982fe725ef0e3a3a81c`; `mergeStateStatus=BLOCKED`; required checks were pending, with a new scheduler run `32457900861` queued at `2026-08-21T07:16Z`; no qualifying independent approval was present. | The Strix provider-fallback and sanitized-artifact fixes cannot yet be treated as central protected-main behavior. | Complete current-head independent review, wait for or repair the exact-head checks, then use a normal protected merge when all policy requirements pass. |
+| TEPP [#110](https://github.com/ContextualWisdomLab/TEPP/pull/110) | Open, head `4517b3f00d56d08a5a9bf47e6b7a681537765127`, base `c45be17a9dbce95ef81cee230e9d128abc7160ac`, `BLOCKED`, `CHANGES_REQUESTED`; Strix rerun is queued after a Caido bootstrap failure on `127.0.0.1:48080`. | A real security gate has not produced a terminal current-head result, and review state still requires source disposition. | Resolve or explicitly close the current review finding, preserve fail-closed scanner behavior, and revalidate the exact head after the runtime rerun. |
+| TEPP [#137](https://github.com/ContextualWisdomLab/TEPP/pull/137) | Open, head `c8b3d494df100e57aab7fdbcdc58a798c874e6c0`, base `c45be17a9dbce95ef81cee230e9d128abc7160ac`, `BLOCKED`, `REVIEW_REQUIRED`; Strix failure is provider/NIM infrastructure evidence. | The change cannot be promoted while the required reviewer and security evidence are absent. | Rebase or restack only when necessary, obtain exact-head independent review, and rerun Strix after the central provider-signal repair is protected. |
+| TEPP [#149](https://github.com/ContextualWisdomLab/TEPP/pull/149) | Open, head `6077b9ce7f0961a3e287c4e8afe0faa5a0638b2e`, base `c45be17a9dbce95ef81cee230e9d128abc7160ac`, `BLOCKED`, `REVIEW_REQUIRED`; Strix failure is provider/NIM infrastructure evidence. | Same as #137; the product path remains blocked by evidence and review, not silently accepted. | Follow the same central-root-first sequence and revalidate the exact head rather than reusing predecessor results. |
+
+The current evidence does **not** satisfy the emergency guarded-force-merge criteria: no candidate has a demonstrated six-hour runner/provider deadlock, impossible ruleset transition, or circular control-plane defect that has already passed two independent exact-head reviews and merge-result verification. No protected direct push, force push, fake status, self-approval, test weakening, or ruleset-wide bypass is authorized by this baseline.
+
+### Live open-PR census and merge queue anchors
+
+At the snapshot time, the TEPP repository had **94 open PRs**: 75 non-draft and 19 draft. The table below records the current exact head/base identity for the leverage-first queue anchors; `pending` is the number of non-terminal checks observed in the live check-run query, and `failure` is the number of terminal conclusions other than success/skipped/neutral. These rows are evidence for triage only and must be refreshed before any mutation.
+
+| PR | Exact head | Exact base | State | Pending | Failure | Disposition |
+|---:|---|---|---|---:|---:|---|
+| [179](https://github.com/ContextualWisdomLab/TEPP/pull/179) | `71f7ffdae0a5` | `c45be17a9dbc` | blocked, review required | 18 | 0 | Normal path; current-head queue anchors and product-gap baseline are documented, but approval and checks remain pending. |
+| [178](https://github.com/ContextualWisdomLab/TEPP/pull/178) | `0622da358d81` | `63a419e2b96c` | unstable | 6 | 0 | Stacked on #157; identifier bounds were added and the new exact-head checks are pending. |
+| [177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `580d45206536` | `c45be17a9dbc` | blocked | 18 | 0 | Scheduler caller now pins a verified central commit rather than a blob; normal protected review/check path remains. |
+| [165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `34083c3f5d66` | `c45be17a9dbc` | blocked | 1 | 0 | Central-orchestrator workflow change; no bypass. |
+| [164](https://github.com/ContextualWisdomLab/TEPP/pull/164) | `38cc7698e508` | `c45be17a9dbc` | blocked | 1 | 0 | Product completion documentation; no qualifying approval. |
+| [159](https://github.com/ContextualWisdomLab/TEPP/pull/159) | `b2072340f733` | `cbb3dc0aa657` | unstable | 6 | 0 | Self-modifying timeout repair and research-register gaps were fixed in committed code; current checks and approval remain pending. |
+| [158](https://github.com/ContextualWisdomLab/TEPP/pull/158) | `6d28d23c4322` | `0e2910825a04` | dirty | 0 | 0 | Restack and revalidate merge-result tree before review. |
+| [157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `7625dc6fc571` | `c45be17a9dbc` | blocked | 18 | 0 | Root completed-result contract now includes receipt-state and provider-header hardening; current checks and approval remain pending before stacked #178. |
+| [155](https://github.com/ContextualWisdomLab/TEPP/pull/155) | `6cc00f81b7f1` | `c45be17a9dbc` | blocked | 17 | 0 | Current-head coverage/toolchain repair and regression-test strengthening are normal-path work; approval and checks remain pending. |
+| [131](https://github.com/ContextualWisdomLab/TEPP/pull/131) | `55774ee9ece3` | `c45be17a9dbc` | blocked | 17 | 0 | Membership-target documentation now names department; approval and checks remain pending. |
+| [154](https://github.com/ContextualWisdomLab/TEPP/pull/154) | `aaadb7f906ed` | `7c29e7c971d7` | blocked | 0 | 0 | Branch-coverage refresh; exact-head approval remains required. |
+| [152](https://github.com/ContextualWisdomLab/TEPP/pull/152) | `70a6c6608e39` | `c45be17a9dbc` | blocked | 1 | 0 | Method gate; refresh review and current checks. |
+| [149](https://github.com/ContextualWisdomLab/TEPP/pull/149) | `6077b9ce7f09` | `c45be17a9dbc` | blocked | 1 | 1 | Historical Strix failure has unavailable run logs; classify as external infrastructure until reproduced, not as source success. |
+| [146](https://github.com/ContextualWisdomLab/TEPP/pull/146) | `5419b0f76a73` | `c45be17a9dbc` | blocked | 1 | 0 | Membership boundary; current review/check loop remains open. |
+| [141](https://github.com/ContextualWisdomLab/TEPP/pull/141) | `d558a4b4b351` | `c45be17a9dbc` | blocked | 1 | 0 | Purpose-bound intake; current checks are not yet terminal. |
+| [140](https://github.com/ContextualWisdomLab/TEPP/pull/140) | `4feb427f6f89` | `c45be17a9dbc` | blocked | 1 | 0 | Estimator authority boundary; current checks are not yet terminal. |
+| [110](https://github.com/ContextualWisdomLab/TEPP/pull/110) | `4517b3f00d56` | `c45be17a9dbc` | blocked | 2 | 0 | Scanner/bootstrap issue requires RCA and exact-head rerun. |
+
+The complete inventory is regenerated with `gh api 'repos/ContextualWisdomLab/TEPP/pulls?state=open&per_page=100'`; an anchor row is never a substitute for reviewing the other open PRs. A `dirty`, pending, missing-approval, or infrastructure-failed row remains `WAIT_AND_REMEDIATE` or `REJECT_FORCE_MERGE` until its own current-head evidence changes. The baseline itself is [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179), so its own head is included above and must not be treated as protected-main evidence before merge.
+
+## Architecture and product contract
+
+The approved product and implementation boundaries are:
+
+| Boundary | Current contract | Maturity signal |
+|---|---|---|
+| Evidence identity | Immutable source bytes, SHA-256 content identity, UUIDv7 record identity, exact byte/scalar spans, and strict versioned wire reconstruction. | `implemented-main`; see [ADR 0008](adr/0008-immutable-evidence-identities-digests-and-spans.md). |
+| Time and leakage | Event/valid, assertion, document, system, availability, and knowledge-cutoff clocks; historical runs reject evidence unavailable at the cutoff. | Foundation is implemented in bounded modules; broader temporal graph and estimator integration remain staged. See [ADR 0002](adr/0002-six-clock-temporal-semantics.md) and [ADR 0013](adr/0013-bitemporal-persistence-reproducibility-and-split-authority.md). |
+| Relational structure | Typed event/document/entity relations, forward-only state transitions, cross-classified and multiple-membership assignments with validity and confidence. | Partial; full production estimators and physical persistence evidence remain target work. See [ADR 0003](adr/0003-relational-event-multiple-membership.md). |
+| Scientific computation | Rust production arithmetic, CPU `f64` reference, fixed-pool multithreading, streamed GPU/VRAM budgeting, safe CPU fallback, and numerical parity. | Quality contracts are implemented; psychometric estimators and real GPU parity remain accepted-target. See [ADR 0001](adr/0001-rust-first-modular-msa.md) and [ADR 0006](adr/0006-vram-gpu-nvidia-orchestration.md). |
+| Persistence and isolation | PostgreSQL migrations, bitemporal records, tenant RLS, append-only evidence/manifests, live SQLx boundary, recovery checks, and two-word `snake_case` object names. | Partial; physical ERD, backup/recovery deployment evidence, and complete buyer runbooks remain. |
+| LLM boundary | Evidence-bounded interpretation, purpose-bound provider payloads, direct/deep orchestration routing, role-specific effort, ablation records, and credential separation. | Partial; live contextual-orchestrator/NIM execution and production ablation evidence remain. See [ADR 0010](adr/0010-adaptive-llm-orchestration.md). |
+| Modular ecosystem | Standalone crates and versioned contracts for `naruon`, `contextual-orchestrator`, and central `.github`; no cross-service application-table coupling. | Partial; live HTTP/service deployment and consumer contract tests remain. See [ADR 0011](adr/0011-standalone-modular-msa-boundary.md). |
+| Visual product | Accessible exact-value visual analytics, Figma interaction contract, Storybook inventory, and reusable design tokens are planned for the visual phase. | Accepted-target; no UI implementation is in the current evidence set. No Figma File ID exists for this phase; create and record one in the visual-design ADR before implementing high-complexity UI. |
+
+## Buyer-visible gap backlog
+
+The order is leverage-weighted: first restore trustworthy delivery evidence, then convert the scientific contracts into a reproducible product workflow, then expose the modular buyer experience.
+
+| Priority | Gap and buyer impact | Evidence boundary | Bounded remediation | Verification artifact | Next customer action |
+|---|---|---|---|---|---|
+| P0 | Central security/review automation does not yet provide a protected-main proof for the newest Strix provider fallback and artifact-sanitization fixes. A buyer cannot rely on the security report chain during provider degradation. | Active [`.github#1153`](https://github.com/ContextualWisdomLab/.github/pull/1153), exact head above; checks pending and approval absent. | Finish the current-head review/check loop; keep provider-only failures fail-closed and publish only sanitized cumulative reports. | Exact-head check URLs, independent review walkthrough, CodeGraph/CodeReviewGraph refresh, protected merge SHA, and post-merge canary. | Review the exact current head and merge normally once the protected requirements are green. |
+| P0 | Scanner runtime outages are not yet isolated into a bounded, observable health contract for every downstream PR. A buyer needs to distinguish a product vulnerability from an unavailable scanner. | TEPP #110 Caido bootstrap failure; TEPP #137/#149 provider failures. | Add or repair the owning central preflight/retry/report classification only where the current failure is reproduced; never turn an unavailable scan into success. | Red/green reproduction, provider/runtime classification fixture, exact-head Strix terminal result, and delayed-run audit. | Use the central root repair first, then rerun each dependent PR at its unchanged or freshly validated head. |
+| P1 | Scientific production evidence is not yet a single buyer-facing acceptance bundle. A buyer needs parameter recovery, RMSE/bias, interval coverage, temporal-order, graph, invariance, and CPU/GPU parity evidence tied to an artifact. | [PRD](product/prd-v0.4-approved.md), [roadmap](roadmaps/2026-08-05-tepp-delivery-roadmap.md), [test strategy](TEST_STRATEGY.md), and [traceability](TRACEABILITY.md) specify the gates; later estimators are accepted-target. | Select one end-to-end synthetic truth scenario spanning delayed evidence, multiple membership, temporal cutoff, multilingual alignment, and estimator recovery; emit a deterministic manifest and machine-readable report. | Reproducible Rust test/report, RMSE/bias/coverage thresholds, relation recovery, no-future proof, and artifact digest. | Choose the first production estimand and require the full recovery report before promoting its maturity. |
+| P1 | PostgreSQL is a strong adapter boundary but deployment recovery and physical-schema evidence are not yet a complete buyer workflow. | [ADR 0013](adr/0013-bitemporal-persistence-reproducibility-and-split-authority.md), [ERD](ERD.md), and traceability mark the remaining persistence evidence as partial/target. | Exercise clean install, upgrade, rollback/compensation, backup restore integrity, tenant RLS, append-only policy, and hot-partition/retention behavior on a real compose PostgreSQL instance. | Migration ledger, catalog naming/3NF audit, rollback transcript, restore digest, RLS cross-tenant denial, and readiness probe. | Validate the deployment profile with the buyer’s retention and recovery objectives before adding more schema. |
+| P1 | LLM interpretation has a documented provider-neutral policy but no protected live contextual-orchestrator acceptance matrix. A buyer cannot compare direct routing with deeper orchestration under a comparable evidence budget. | [ADR 0010](adr/0010-adaptive-llm-orchestration.md), [LLM contract](LLM_ORCHESTRATION.md), and research register; live HTTP remains accepted-target. | Run credential-separated NIM tests through contextual-orchestrator with automatic model discovery, semantic-unit chunking, evidence spans, role-specific reasoning, recursion/decomposition/access-list records, and direct-vs-deep ablation. | Redacted metadata-only run ledger, provider/model capability matrix, unsupported-claim rate, calibration/disagreement report, and exact fixture outputs. | Approve one buyer workflow and its evidence budget only after deterministic/statistical authority remains primary. |
+| P1 | PII protection must preserve authorship, longitudinal identity, roles, and multiple membership without exposing identity mappings to providers or ordinary logs. | [ADR 0009](adr/0009-purpose-bound-pii-governance.md), privacy documentation, and provider minimization are implemented/partial. | Complete purpose-bound grants, opaque analytical identifiers, separately protected re-identification, retention/deletion/legal hold, selective disclosure, and privileged audit controls in the deployment boundary. | Authorization matrix, tenant/purpose/lifetime tests, provider-payload inspection, deletion/hold ledger, and SHA-256 audit digest. | Define the buyer’s lawful purpose and retention class before enabling any privileged re-identification path. |
+| P2 | The visual product gap is still unimplemented: buyers cannot yet inspect temporal/event lineage, drift, memberships, invariance, and leakage with accessible exact-value alternatives. | PRD and roadmap Phase 7; documentation assessment marks Figma/UI as not applicable before stable scientific contracts. | After the first stable end-to-end scientific workflow, create the Figma file, record its File ID in a visual ADR, define tokens/components, add Storybook stories, and build keyboard/screen-reader/no-JavaScript/print states. | Figma File ID, Storybook inventory, token tests, interaction tests, accessibility audit, exact-value table/export, and screenshot/print evidence. | Do not begin high-complexity UI until the scientific interaction contract and real Figma file are approved. |
+| P2 | Ecosystem consumers need executable contract proof, not only markdown, for `naruon` artifacts and contextual-orchestrator interpretation. | [API contract](API_CONTRACT.md), connector docs, ADR 0011, and traceability mark live HTTP as remaining. | Add versioned contract fixtures and consumer/provider integration tests without direct application-table access; publish compatibility and deprecation policy. | Contract/schema tests, standalone service smoke, consumer replay, compatibility matrix, and SBOM/provenance. | Pick one highest-value consumer boundary and validate it independently before adding another connector. |
+
+## Research and standard traceability
+
+Scientific and standards claims in this baseline are inherited from the APA 7th register in [standards-and-literature.md](research/standards-and-literature.md), including the Standards for Educational and Psychological Testing, dynamic/ESEM measurement, temporal and event standards, Unicode/BCP 47, UUID/SHA-256/PROV, NIST privacy and AI-risk guidance, ISO/IEC 27701/42001/23894, AICPA Trust Services Criteria, KISA CSAP guidance, WCAG 2.2, SLSA, and the Fugu/Conductor/TRINITY orchestration research. The baseline does not promote a design reference into an implementation or certification claim.
+
+When a gap adds a new scientific claim, add the primary source and APA 7th entry to the research register in the same reviewed change, then link the affected ADR, PRD, traceability row, test, and release evidence.
+
+## Exact-head refresh protocol
+
+Before using any row for a merge or release decision, refresh the live evidence:
+
+1. Query the open PR’s exact `headRefOid`, `baseRefOid`, draft/state, mergeability, reviews, unresolved threads, labels, and current check runs.
+2. Read every actionable review finding at that exact head and classify source, duplicate, predecessor-head, or infrastructure evidence.
+3. Reproduce source findings with a failing test, patch the root cause, and rerun focused plus complete repository gates.
+4. Build and test the merge-result tree from the exact base and head; discard all evidence if either SHA changes.
+5. Require qualifying independent approval and terminal protected checks. A queued check is not green evidence.
+6. Merge through the normal protected path. Use the emergency guarded-force path only after its documented deadlock classification and every acceptance criterion are independently evidenced; this snapshot records no such candidate.
+7. After merging, monitor delayed checks and post-merge canary results; revert source failures, while preserving infrastructure-only incidents for central control-plane repair.
+
+The hourly development workflow should re-read this baseline, refresh these rows, process the highest-leverage open PR or issue, and update the baseline when evidence or maturity changes. It must never reuse this snapshot as current state without the refresh protocol.
