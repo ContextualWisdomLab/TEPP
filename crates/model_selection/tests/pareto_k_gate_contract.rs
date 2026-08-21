@@ -1,4 +1,4 @@
-//! Statistical/Pareto K gates run before any LLM review and recover known K.
+//! Statistical/Pareto K gates are deterministic and recover known K without LLM authority.
 
 use model_selection::{
     ModelCandidate, ModelSelectionError, select_candidate_k, selected_k_root_mean_square_error,
@@ -6,6 +6,19 @@ use model_selection::{
 
 fn candidate(k: u32, log_likelihood: f64, complexity: f64) -> ModelCandidate {
     ModelCandidate::statistical(k, log_likelihood, complexity).expect("statistical candidate")
+}
+
+fn synthetic_candidates(truth_k: u32, noisy_replication: bool) -> [ModelCandidate; 3] {
+    let true_log_likelihood = if noisy_replication { -20.0 } else { -10.0 };
+    [
+        candidate(truth_k, true_log_likelihood, f64::from(truth_k)),
+        candidate(truth_k - 1, -30.0, f64::from(truth_k - 1)),
+        candidate(
+            truth_k + 1,
+            if noisy_replication { -19.0 } else { -25.0 },
+            f64::from(truth_k + 1),
+        ),
+    ]
 }
 
 #[test]
@@ -69,6 +82,51 @@ fn pareto_front_selects_known_truth_k_with_computed_rmse() {
         selected_k_root_mean_square_error(&[selected], 1),
         Err(ModelSelectionError::NonPositiveCandidateK)
     );
+}
+
+#[test]
+fn repeated_synthetic_truth_recovers_k_with_bounded_error_and_bias() {
+    let truth = [3_u32, 4, 5, 6, 7, 8];
+    let selected: Vec<u32> = truth
+        .iter()
+        .enumerate()
+        .map(|(replication, truth_k)| {
+            select_candidate_k(&synthetic_candidates(*truth_k, replication == 4))
+                .expect("synthetic statistical front")
+        })
+        .collect();
+
+    let matching = truth
+        .iter()
+        .zip(&selected)
+        .filter(|(truth_k, selected_k)| truth_k == selected_k)
+        .count();
+    let sum_squared_error: f64 = truth
+        .iter()
+        .zip(&selected)
+        .map(|(truth_k, selected_k)| {
+            let residual = f64::from(*selected_k) - f64::from(*truth_k);
+            residual * residual
+        })
+        .sum();
+    let bias: f64 = truth
+        .iter()
+        .zip(&selected)
+        .map(|(truth_k, selected_k)| f64::from(*selected_k) - f64::from(*truth_k))
+        .sum::<f64>()
+        / f64::from(u32::try_from(truth.len()).expect("small fixture"));
+
+    assert_eq!(selected, vec![3, 4, 5, 6, 8, 8]);
+    assert_eq!(matching, 5);
+    let replication_count = f64::from(u32::try_from(truth.len()).expect("small fixture"));
+    assert!((sum_squared_error / replication_count).sqrt() < 0.5);
+    assert!((bias - (1.0 / 6.0)).abs() < f64::EPSILON);
+    for (truth_k, selected_k) in truth.iter().zip(&selected) {
+        assert!(
+            selected_k_root_mean_square_error(&[*selected_k], *truth_k).expect("replication RMSE")
+                <= 1.0
+        );
+    }
 }
 
 #[test]

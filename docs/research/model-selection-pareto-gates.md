@@ -18,15 +18,18 @@ the selected `K` against the generating `K`.
 
 - `docs/adr/0012-temporal-relational-shared-latent-topic-measurement.md` —
   model selection uses statistical/recovery/stability/alignment/fairness gates
-  and a Pareto-style comparison before any blinded LLM review; the LLM never
-  defines the numerical optimum.
+  and a Pareto-style comparison before any future blinded LLM review; the LLM
+  never defines the numerical optimum.
 
 ### Supporting model-selection literature
 
-Akaike (1974) and Burnham and Anderson (2002) justify likelihood-and-complexity
-comparison of fitted candidates. Deb et al. (2002) justify non-dominated
-(Pareto) filtering when two objectives are compared simultaneously. These
-sources do **not** authorize an LLM vote as a statistical estimator.
+Akaike (1974) and Burnham and Anderson (2002) provide background for
+likelihood-and-complexity comparison of fitted candidates. Deb et al. (2002)
+provides background for non-dominated (Pareto) filtering when two objectives
+are compared simultaneously. Those sources do not by themselves validate the
+exact TEPP thresholds, acceptance criteria, or orchestration boundary; ADR
+0012 is normative for this repository. They do **not** authorize an LLM vote as
+a statistical estimator.
 
 Akaike, H. (1974). A new look at the statistical model identification. *IEEE
 Transactions on Automatic Control, 19*(6), 716–723.
