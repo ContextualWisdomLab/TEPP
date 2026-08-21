@@ -818,6 +818,26 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
             transport.request("GET", "repos/o/r")
         self.assertEqual(raised.exception.reason, "invalid_path")
 
+    def test_https_transport_hides_raw_network_errors(self) -> None:
+        """Provider transport failures use a stable reason without raw exception text."""
+
+        class _FakeConnection:
+            def request(self, *args: object, **kwargs: object) -> None:
+                raise TimeoutError("provider address and token must not escape")
+
+            def close(self) -> None:
+                return None
+
+        transport = fleet.GithubHttpsTransport("secret-token")
+        with unittest.mock.patch(
+            "http.client.HTTPSConnection", return_value=_FakeConnection()
+        ):
+            with self.assertRaises(fleet.FleetAuditError) as raised:
+                transport.request("GET", "/repos/o/r")
+        self.assertEqual(raised.exception.reason, "upstream_unavailable")
+        self.assertEqual(raised.exception.message, "GitHub API transport failed")
+        self.assertNotIn("provider address", str(raised.exception))
+
     def test_build_transport_uses_standard_token(self) -> None:
         """build_transport reads GITHUB_TOKEN and does not invent a TEPP PAT name."""
 
