@@ -64,6 +64,9 @@ fn table_access_and_non_https_origins_fail_closed() {
         "https://tepp.example.test/sql",
         "https://tepp.example.test/tables/document_record",
         "http://tepp.example.test",
+        "https://tepp.example.test/\u{0001}",
+        "https://tepp.example\u{0001}.test",
+        "https://tepp.example'.test",
         "https://tepp.example.test/v1/analysis-runs'; DROP",
     ] {
         assert_eq!(
@@ -90,6 +93,30 @@ fn review_and_copilot_headers_are_authorization_denied() {
             "https://tepp.example.test",
             &run,
             &[("x-copilot-github-token", "ghs_example")]
+        ),
+        Err(ApiError::AuthorizationDenied)
+    );
+    assert_eq!(
+        naruon_analysis_run_exchange_with_headers(
+            "https://tepp.example.test",
+            &run,
+            &[("x-github-actor", "review-agent")]
+        ),
+        Err(ApiError::AuthorizationDenied)
+    );
+    assert_eq!(
+        naruon_analysis_run_exchange_with_headers(
+            "https://tepp.example.test",
+            &run,
+            &[("Proxy-Authorization", "Basic review-agent")]
+        ),
+        Err(ApiError::AuthorizationDenied)
+    );
+    assert_eq!(
+        naruon_analysis_run_exchange_with_headers(
+            "https://tepp.example.test",
+            &run,
+            &[("x-nvidia-nim-key", "nvapi-example")]
         ),
         Err(ApiError::AuthorizationDenied)
     );

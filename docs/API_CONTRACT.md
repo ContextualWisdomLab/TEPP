@@ -1,13 +1,13 @@
 # TEPP API and Modular Integration Contract
 
 **Status:** Accepted target contract; exact endpoints are introduced only with executable services.  
-**Last reviewed:** 2026-08-13
+**Last reviewed:** 2026-08-16
 
 ## 1. Authority boundary
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts, not a production HTTP service. Endpoint examples below are target interface shapes and must not be presented as deployed behavior until implemented and tested.
+Current protected main exposes Rust library/domain contracts. The active PR adds a loopback HTTP/1.1 listener for naruon analysis-run and export POSTs. That listener is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` remain target interface shapes.
 
 ## 2. Contract families
 

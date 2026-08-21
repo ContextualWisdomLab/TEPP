@@ -26,7 +26,7 @@ pub fn from_json<'de, T: Deserialize<'de>>(payload: &'de str) -> Result<T, ApiEr
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when the value is empty after trim
-/// or contains an ASCII/Unicode control character.
+/// or contains a Unicode control character that could corrupt a wire boundary.
 pub fn require_nonempty(value: &str) -> Result<(), ApiError> {
     if value.trim().is_empty() || value.chars().any(char::is_control) {
         return Err(ApiError::InvalidWirePayload);
@@ -90,6 +90,7 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         require_nonempty("tenant-a").expect("ok");
+        require_nonempty("line one two").expect("spaced text stays valid");
         assert_eq!(require_nonempty("   "), Err(ApiError::InvalidWirePayload));
         assert_eq!(require_nonempty(""), Err(ApiError::InvalidWirePayload));
         assert_eq!(
