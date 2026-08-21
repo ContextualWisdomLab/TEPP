@@ -38,7 +38,7 @@ Future persistent authorization entities must use descriptive multiword `snake_c
 
 ## 4. Identity separation
 
-When the scientific task does not require the direct identity string, TEPP should model with an opaque `entity_record_id` and keep the direct identity mapping in a separately encrypted/authorized store or host-owned identity service. The mapping may not be copied into model artifacts, ordinary logs, LLM prompts, or public exports merely for convenience.
+When the scientific task does not require the direct identity string, TEPP should model with an opaque `entity_record_id` and keep the direct identity mapping in a separately encrypted/authorized store or host-owned identity service. The in-memory `encrypted_mapping` envelope seals source identity so analytical, log, and model-artifact purposes cannot recover plaintext. Persistence of that envelope waits for a later migration. The mapping may not be copied into model artifacts, ordinary logs, LLM prompts, or public exports merely for convenience.
 
 Identity separation must not erase scientifically relevant time-varying memberships. The model may retain that opaque entity A authored document X and belonged to department Y at time T while the direct real-world name remains outside the ordinary compute artifact.
 
