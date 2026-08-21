@@ -17,6 +17,7 @@ mod envelope;
 mod error;
 mod export;
 mod lineageweave_http;
+mod live_http;
 mod naruon_http;
 mod naruon_live;
 mod orchestration;
