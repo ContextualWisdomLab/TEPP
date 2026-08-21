@@ -54,7 +54,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - ADR 0014 separating accepted design, protected-main implementation, scientific/product claim promotion, and release evidence authority.
 - ADR 0015 separating autonomous model proposal, deterministic verification, publication, independent review, and merge/release authority.
 - ADR 0016 separating Event Ontology observation, TDT detection/tracking, CHRONOS schema prediction, symbolic temporal consistency, and promoted transition authority.
-- Verified APA 7 research traceability for ICLR 2026 TRINITY and Conductor, the 2026 Sakana Fugu technical report, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF/GAI Profile, AICPA Trust Services Criteria, and KISA CSAP guidance.
+- Added APA 7 research traceability for ICLR 2026 TRINITY and Conductor, the 2026 Sakana Fugu technical report, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF/GAI Profile, AICPA Trust Services Criteria, and KISA CSAP guidance.
 - Eight-phase delivery roadmap and Temporal/Event Foundation implementation plan.
 - Immutable evidence, six-clock temporal semantics, interval reasoning, event ontology, typed relation graph, and time-varying multiple-membership contracts.
 - Shared-latent multilingual topic measurement architecture with native lexical channels and language-profile validation.
@@ -75,6 +75,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- Added APA 7th method citations (Allen 1983; ISO 24617-1:2012; Hobbs & Pan 2017; Fox & Glas 2001; AERA/APA/NCME 2014; Blei & Lafferty 2006; Roberts et al. 2014, 2019; Chang & Blei 2009; Mimno et al. 2009; Asparouhov & Muthén 2009; Asparouhov et al. 2018; Marsh et al. 2014; Aitchison 1982; Allan 2002; Li et al. 2021; Anagnostopoulos et al. 2013) into ADRs 0002–0005, 0012, and 0016, plus TRACEABILITY/ARCHITECTURE/TRD method rows. Clarified that TRSL-TM is the product contract, STM-style logistic-normal is the reference family, ESEM/DSEM/TDT/CHRONOS remain accepted-target, and merged PRs #8/#9—not superseded drafts #5/#6—are the protected-main temporal lineage.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
