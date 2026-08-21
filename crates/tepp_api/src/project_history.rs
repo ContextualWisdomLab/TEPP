@@ -510,7 +510,7 @@ fn compose_https_target(origin: &str) -> Result<String, ApiError> {
         || host.contains('#')
         || host
             .chars()
-            .any(|character| character.is_control() || matches!(character, '\'' | ';' | '\\' | ' '))
+            .any(|character| matches!(character, '\'' | ';' | '\\' | ' '))
     {
         return Err(ApiError::InvalidWirePayload);
     }
