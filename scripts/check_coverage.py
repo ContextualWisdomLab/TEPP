@@ -123,7 +123,7 @@ def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     for candidate in reversed(lines[: line_number - 1]):
         stripped = candidate.strip()
         if brace_depth == 0 and "=>" in stripped:
-            return False
+            return guard_found and not boundary_candidate
         if brace_depth == 1 and stripped.endswith("=> {"):
             boundary_candidate = True
         brace_depth += stripped.count("}") - stripped.count("{")

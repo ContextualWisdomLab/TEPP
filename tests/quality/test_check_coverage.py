@@ -532,6 +532,22 @@ class CoverageContractTests(unittest.TestCase):
                 )
             )
 
+            second_guard = Path(temporary) / "second_guard.rs"
+            second_guard.write_text(
+                "match state {\n"
+                "    State::First => value,\n"
+                "    State::Ready(value)\n"
+                "        if value.is_valid()\n"
+                "        && value.is_fresh() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(second_guard), 5)
+            )
+
             first_arm = Path(temporary) / "first_arm.rs"
             first_arm.write_text(
                 "match state {\n"
