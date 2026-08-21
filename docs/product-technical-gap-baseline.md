@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-21 11:45 KST
+**Snapshot:** 2026-08-21 13:19 KST
 **Protected-main evidence:** `c45be17a9dbce95ef81cee230e9d128abc7160ac`
 **Workspace version on protected main:** `0.1.0`
 
@@ -49,7 +49,7 @@ Checks, and branch rules immediately before every mutation.
 | #178 | `a2382c84a1f7ccc66718343fe38e0fbfbb8aa0a7` | false | feat(engine): execute cutoff-safe analysis runs |
 | #177 | `273cbed1289beff3896dcd07abec433a2022bc9c` | false | fix(workflow): pin scheduler budget hardening |
 | #165 | `34083c3f5d6637cf1665a29dac45fbf67a74d5dd` | false | feat: route hourly product agents through contextual orchestrator |
-| #164 | `244b9a7cff2ccb6a286d21c367b406ca0ef272e4` | false | docs: define TEPP product completion and technical gap baseline |
+| #164 | `60db9c09e9e253ba8b08199aff8cd1bc5a1b375c` | false | docs: define TEPP product completion and technical gap baseline |
 | #159 | `855c6c7153c2f66a1c14e842ad700f571592dd35` | false | feat(api): project LineageWeave evidence into cutoff-safe histories |
 | #158 | `6d28d23c432288c4dbecbd74a25f093ed9d9ef61` | false | feat(api): expose temporal evidence context for LineageWeave Ask |
 | #157 | `63a419e2b96cef3def7f26bfc0337fece88e83c2` | false | feat(api): publish completed analysis-run result contract |
@@ -118,29 +118,29 @@ Checks, and branch rules immediately before every mutation.
 | #73 | `11cc811a10b80a49e8a8ed6bc60fba3d5c753d28` | false | feat(topic): keep one identity across dormancy and reactivation |
 | #72 | `899656968cc9f68a3d8fc55dddc4fd257fb27050` | false | feat(event): score TDT story segments with WindowDiff and Pk |
 | #71 | `2588f38281b97fa03f552634d307e8b4c908899d` | false | feat(network): refuse raw simplex Euclidean cluster geometry |
-| #70 | `dae7e55dc7bb2135825437a9df9c7aafc957ff42` | false | feat(event): score CHRONOS schema slots with precision and recall |
-| #69 | `e780e1dc905424aa9d843b94d4996a560f2b9970` | false | feat(interpretation): keep LLM claims hypothetical and evidence-cited |
-| #68 | `85c09ec81c66f245f161707d8c50e6aa6939ab7f` | false | feat(event): score TDT tracks with pair precision and switch rate |
-| #67 | `d73517791dc3831545d41baff8f2a955cf5106ab` | false | feat(model): statistical Pareto K gates refuse LLM numerical authority |
-| #66 | `633d41c47164e24366c5f8956d92cdd1173d50ba` | false | feat(event): score TDT mention links with precision and recall |
-| #65 | `928f90500862c983ea17f9fddc7e1f80eb84f0a4` | false | feat(event): score first-story detections with FAR and miss rates |
-| #64 | `22a5955a0ba23a65ee597ff5f630eadb389e7446` | false | feat(event): score mention confidence with a known-truth Brier rule |
-| #63 | `4b64edc92b54cee28c979cddb9a6114ae87b3e2b` | false | feat(corpus): refuse TF-IDF and BM25 as inferential weights |
-| #62 | `1951ab43c90deda0a23117006fc2bf8898328c98` | false | feat(simulation): exclude delayed documents before they are available |
-| #61 | `8ebbc04eac07231413a089d7fc6b64b36ed6a61b` | false | feat(temporal): refuse uncertain availability past knowledge cutoff |
-| #60 | `da47ee32468838ca7d325bb8feb82c8ee471d16a` | false | feat(relation): refuse association and precedence as causation |
-| #59 | `43bf6cf0d0a15e105fcfe6309657403d0b9cf76f` | false | feat(corpus): treat NFC/NFD bodies as split leakage |
-| #58 | `ebd4ebd080227c1faed72b04a24baf64b03b62be` | false | feat(evidence): keep embedded image URIs as positional non-lexical units |
-| #57 | `596f091a80d09d59a6c586f08d28aa1f3c5c5fa9` | false | feat(validation): exact-head claim promotion gates |
+| #70 | `bb29bacc233c1a800550af6a14de1b08ec3744f3` | false | feat(event): score CHRONOS schema slots with precision and recall |
+| #69 | `6f1db2b51203866a322b1b23e7bf05158dcc7f2d` | false | feat(interpretation): keep LLM claims hypothetical and evidence-cited |
+| #68 | `6a98c812ef8e621e1bc1c46a615296b39f0bae33` | false | feat(event): score TDT tracks with pair precision and switch rate |
+| #67 | `191f14b8b775292c163a90b85c4f7df7799964eb` | false | feat(model): statistical Pareto K gates refuse LLM numerical authority |
+| #66 | `380be3f33f798cc8648a9dc9f24b85011f9e0468` | false | feat(event): score TDT mention links with precision and recall |
+| #65 | `54bb76dd3d25ae872d1555b78e42fa80a83b1240` | false | feat(event): score first-story detections with FAR and miss rates |
+| #64 | `c11adce997d4f3e462f50711211af9f051e747b0` | false | feat(event): score mention confidence with a known-truth Brier rule |
+| #63 | `f6e7fd937579e0e89174498967efb882af18e158` | false | feat(corpus): refuse TF-IDF and BM25 as inferential weights |
+| #62 | `7a16e579814ef06517f82fd2b41ebb27568eb960` | false | feat(simulation): exclude delayed documents before they are available |
+| #61 | `c7f094cf17b5d0be0aa9270b2d397da4d2db851d` | false | feat(temporal): refuse uncertain availability past knowledge cutoff |
+| #60 | `40ede67614599ba21495fea024d4493d3af9fbb3` | false | feat(relation): refuse association and precedence as causation |
+| #59 | `b47efdc3cfdcec61f69c4219c49519a160bd5549` | false | feat(corpus): treat NFC/NFD bodies as split leakage |
+| #58 | `05870ce72d97c41ca9bb599965a573450f9d5276` | false | feat(evidence): keep embedded image URIs as positional non-lexical units |
+| #57 | `b76e38393e932873ec2aed682ab539ee61828537` | false | feat(validation): exact-head claim promotion gates |
 | #55 | `345f26a4eadda8aa89e91468918ea1b0455400f3` | false | feat(api): bind org .github workflows as CI/review/security only |
 | #53 | `c07e512e3e1e0b85f8d2390345e1151aae3a1889` | false | feat(concept): language-profile gates with shared-space RMSE |
 | #52 | `725e8c9b3447d78a8bcdfcb02c98c12c5bf2851f` | false | feat(api): orchestrator interchange refuses table access and repo tokens |
-| #51 | `e8a0ee38caf9aefd60999ca74ee9d20eac83d2e0` | false | feat(compute): VRAM budget types with CPU f64 fallback |
-| #50 | `a189b97e536648b856cb38ea2c95270196ce3b52` | false | feat(event): refuse TDT/CHRONOS outputs as state transitions |
+| #51 | `1801501c4d7c5be720d24aba954280fbc9068612` | false | feat(compute): VRAM budget types with CPU f64 fallback |
+| #50 | `314a6db9c3392bfd806b76fed2099898342627fc` | false | feat(event): refuse TDT/CHRONOS outputs as state transitions |
 | #49 | `06c176f9c4f91d793620610380f550f8f2e9458e` | false | feat(psychometric): posterior ESEM input gates with true-parameter RMSE |
-| #48 | `7769df7944d1d5189a26c9dd0ef7d1f46d35e82e` | false | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
+| #48 | `73403994a3fb386126e8276b7ab5160355063341` | false | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
 
-The exact-head register, counts, and protected-main SHA were fetched from the live GitHub API at `2026-08-21 11:45 KST`. Review decisions, required Checks, and mergeability remain volatile; re-read them immediately before every mutation. This snapshot is not merge authorization.
+The exact-head register, counts, and protected-main SHA were fetched from the live GitHub API at `2026-08-21 13:19 KST`. Review decisions, required Checks, and mergeability remain volatile; re-read them immediately before every mutation. This snapshot is not merge authorization.
 
 ## Authority and derivation
 
