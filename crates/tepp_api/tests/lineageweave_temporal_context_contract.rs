@@ -4,9 +4,9 @@ use std::fmt::Write as _;
 
 use tepp_api::{
     AnalysisRunLiveService, ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE,
-    TEMPORAL_ASSOCIATION_CLAIM_BOUNDARY, TEMPORAL_CONTEXT_CONTRACT_VERSION, TEMPORAL_CONTEXT_PATH,
-    TemporalContextEvent, TemporalContextRequest, TemporalContextResponse, build_temporal_context,
-    lineageweave_temporal_context_exchange,
+    NaruonHttpExchange, TEMPORAL_ASSOCIATION_CLAIM_BOUNDARY, TEMPORAL_CONTEXT_CONTRACT_VERSION,
+    TEMPORAL_CONTEXT_PATH, TemporalContextEvent, TemporalContextRequest, TemporalContextResponse,
+    build_temporal_context, lineageweave_temporal_context_exchange,
 };
 
 fn event(
@@ -77,10 +77,6 @@ fn request() -> TemporalContextRequest {
     }
 }
 
-fn http_request(body: &str) -> String {
-    http_request_for_consumer(body, LINEAGEWEAVE_CONSUMER_CODE)
-}
-
 fn http_request_for_consumer(body: &str, consumer: &str) -> String {
     let mut value = format!("POST {TEMPORAL_CONTEXT_PATH} HTTP/1.1\r\n");
     for (name, header_value) in [
@@ -93,6 +89,21 @@ fn http_request_for_consumer(body: &str, consumer: &str) -> String {
         write!(value, "{name}: {header_value}\r\n").expect("header");
     }
     write!(value, "content-length: {}\r\n\r\n{body}", body.len()).expect("body");
+    value
+}
+
+fn http_request_from_exchange(exchange: &NaruonHttpExchange) -> String {
+    let mut value = format!("POST {TEMPORAL_CONTEXT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\n");
+    for (name, header_value) in &exchange.headers {
+        write!(value, "{name}: {header_value}\r\n").expect("header");
+    }
+    write!(
+        value,
+        "content-length: {}\r\n\r\n{}",
+        exchange.body.len(),
+        exchange.body
+    )
+    .expect("body");
     value
 }
 
@@ -188,7 +199,7 @@ fn lineageweave_exchange_and_live_listener_return_the_same_context() {
     );
 
     let mut service = AnalysisRunLiveService::new();
-    let response = service.handle_http_request(&http_request(&request.to_json().expect("json")));
+    let response = service.handle_http_request(&http_request_from_exchange(&exchange));
     assert_eq!(response.status_code, 200);
     let live = TemporalContextResponse::from_json(&response.body).expect("response");
     assert_eq!(live, build_temporal_context(&request).expect("direct"));

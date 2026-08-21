@@ -141,7 +141,8 @@ impl AnalysisRunLiveService {
             return Err(ApiError::InvalidWirePayload);
         }
         let headers = parse_headers(&mut lines)?;
-        let consumer = require_headers(&headers, self.bound_addr)?;
+        let consumer =
+            require_headers(&headers, self.bound_addr, path == NARUON_ANALYSIS_RUN_PATH)?;
         if path == TEMPORAL_CONTEXT_PATH {
             if consumer != crate::lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE {
                 return Err(ApiError::InvalidWirePayload);
@@ -188,17 +189,15 @@ impl AnalysisRunLiveService {
         let request_id = format!("analysis-run-live-{}", self.next_request_serial);
         self.next_request_serial += 1;
         let (status_code, reason_phrase) = status_for(error);
-        json_response(
-            status_code,
-            reason_phrase,
-            error_envelope_json(error, request_id),
-        )
+        let body = error_envelope_json(error, request_id);
+        json_response(status_code, reason_phrase, body)
     }
 }
 
 fn require_headers(
     headers: &HashMap<String, String>,
     bound_addr: Option<SocketAddr>,
+    require_idempotency_key: bool,
 ) -> Result<&str, ApiError> {
     validate_common_headers(headers, bound_addr)?;
     if header_value(headers, "tepp-contract-version")? != "1" {
@@ -208,7 +207,9 @@ fn require_headers(
     if !consumer_is_supported(consumer) {
         return Err(ApiError::InvalidWirePayload);
     }
-    let _idempotency_key = header_value(headers, "idempotency-key")?;
+    if require_idempotency_key {
+        let _idempotency_key = header_value(headers, "idempotency-key")?;
+    }
     Ok(consumer)
 }
 
@@ -251,6 +252,7 @@ fn json_response(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::fmt::Write as _;
     use std::io::{Cursor, Read, Write};
     use std::net::TcpStream;
@@ -260,14 +262,14 @@ mod tests {
     use super::{
         AnalysisRunLiveService, consumer_tenant_idempotency_key, declared_content_length,
         error_envelope_json, host_implies_table_access, map_io_error, parse_headers,
-        read_http_request, split_header_line, split_request, status_for,
+        read_http_request, require_headers, split_header_line, split_request, status_for,
     };
     use crate::live_http::host_is_loopback;
     use crate::{
         ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError,
         DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, LINEAGEWEAVE_CONSUMER_CODE,
         NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
-        NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT,
+        NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, TEMPORAL_CONTEXT_PATH,
     };
 
     fn sample_run() -> AnalysisRunRequest {
@@ -607,6 +609,79 @@ mod tests {
             body.len()
         );
         assert_eq!(service.handle_http_request(&transfer).status_code, 400);
+    }
+
+    #[test]
+    fn temporal_read_headers_and_defensive_write_edges_are_covered() {
+        let run = sample_run();
+        let body = run.to_json().expect("body");
+        let mut service = AnalysisRunLiveService::new();
+
+        for missing_header in ["tepp-contract-version", "tepp-consumer"] {
+            let headers = [
+                ("Host", "127.0.0.1"),
+                ("content-type", "application/json"),
+                ("tepp-consumer", NARUON_CONSUMER_CODE),
+                ("tepp-contract-version", "1"),
+                ("idempotency-key", run.idempotency_key.as_str()),
+            ]
+            .into_iter()
+            .filter(|(name, _)| *name != missing_header)
+            .collect::<Vec<_>>();
+            assert_eq!(
+                service
+                    .handle_http_request(&http_request(&body, &headers))
+                    .status_code,
+                400,
+                "missing={missing_header}"
+            );
+        }
+
+        let temporal_body = r#"{"contract_version":1,"consumer_code":"lineageweave","knowledge_cutoff":"2026-08-20T00:00:00Z","subject_post_id":null,"events":[{"event_id":"event-1","source_post_id":"post-1","event_type_code":"order_awarded","event_label":"Order awarded","event_time":"2026-08-01T09:00:00Z","available_time":"2026-08-01T10:00:00Z","project_reference":null,"actor_references":["actor-1"]}]}"#;
+        let temporal_request = format!(
+            "POST {TEMPORAL_CONTEXT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: lineageweave\r\ntepp-contract-version: 1\r\ncontent-length: {}\r\n\r\n{temporal_body}",
+            temporal_body.len()
+        );
+        assert_eq!(
+            service.handle_http_request(&temporal_request).status_code,
+            200
+        );
+
+        let mut headers = HashMap::from([
+            ("host".to_owned(), "127.0.0.1".to_owned()),
+            ("content-type".to_owned(), "application/json".to_owned()),
+            ("tepp-consumer".to_owned(), NARUON_CONSUMER_CODE.to_owned()),
+            ("tepp-contract-version".to_owned(), "1".to_owned()),
+        ]);
+        assert_eq!(
+            service.accept_analysis_run(NARUON_CONSUMER_CODE, &headers, &body),
+            Err(ApiError::InvalidWirePayload)
+        );
+        headers.insert("idempotency-key".to_owned(), run.idempotency_key.clone());
+        assert_eq!(
+            require_headers(&headers, None, true),
+            Ok(NARUON_CONSUMER_CODE)
+        );
+        headers.insert("tepp-contract-version".to_owned(), "2".to_owned());
+        assert_eq!(
+            require_headers(&headers, None, true),
+            Err(ApiError::InvalidWirePayload)
+        );
+        headers.insert("tepp-contract-version".to_owned(), "1".to_owned());
+        headers.insert("tepp-consumer".to_owned(), "unpublished".to_owned());
+        assert_eq!(
+            require_headers(&headers, None, true),
+            Err(ApiError::InvalidWirePayload)
+        );
+        headers.insert("tepp-consumer".to_owned(), NARUON_CONSUMER_CODE.to_owned());
+        let accepted = service
+            .accept_analysis_run(NARUON_CONSUMER_CODE, &headers, &body)
+            .expect("accepted");
+        assert_eq!(accepted.status_code, 202);
+        let replay = service
+            .accept_analysis_run(NARUON_CONSUMER_CODE, &headers, &body)
+            .expect("replay");
+        assert_eq!(replay.body, accepted.body);
     }
 
     #[test]
