@@ -96,6 +96,8 @@ Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World 
 
 TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
 
+Snodgrass, R. T. (2000). *Developing time-oriented database applications in SQL*. Morgan Kaufmann. Valid vs transaction time informs `available_clock`; availability is a third TEPP clock.
+
 ## Privacy lifecycle, retention, and legal hold
 
 European Union. (2016). *Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data (General Data Protection Regulation)*. Official Journal of the European Union, L 119, 1–88. https://eur-lex.europa.eu/eli/reg/2016/679/oj
