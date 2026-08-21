@@ -4,7 +4,9 @@ use crate::ApiError;
 use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
+use temporal_core::KnowledgeCutoff;
 
 /// Supported analysis-run contract version.
 pub const ANALYSIS_RUN_CONTRACT_VERSION: u16 = 1;
@@ -83,11 +85,27 @@ impl AnalysisRunRequest {
         require_nonempty(&self.idempotency_key)?;
         require_nonempty(&self.tenant_workspace_id)?;
         require_nonempty(&self.snapshot_id)?;
-        require_nonempty(&self.knowledge_cutoff)?;
+        require_rfc3339_knowledge_cutoff(&self.knowledge_cutoff)?;
         require_nonempty(&self.model_contract_version)?;
         require_nonempty(&self.output_profile)?;
         Ok(())
     }
+}
+
+/// Parse `knowledge_cutoff` as a TEPP clock and refuse a cutoff after now.
+///
+/// A buyer cannot claim analysis of evidence that is not yet available. The
+/// request receipt instant is treated as availability of the command itself.
+fn require_rfc3339_knowledge_cutoff(knowledge_cutoff: &str) -> Result<(), ApiError> {
+    require_nonempty(knowledge_cutoff)?;
+    let cutoff = KnowledgeCutoff::parse_rfc3339(knowledge_cutoff)
+        .map_err(|_| ApiError::InvalidWirePayload)?;
+    let receipt = KnowledgeCutoff::parse_rfc3339(&Timestamp::now().to_string())
+        .map_err(|_| ApiError::InvalidWirePayload)?;
+    if cutoff.instant() > receipt.instant() {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    Ok(())
 }
 
 impl AnalysisRunAccepted {
@@ -222,6 +240,32 @@ mod tests {
         bad = request.clone();
         bad.output_profile.clear();
         assert_eq!(bad.to_json(), Err(ApiError::InvalidWirePayload));
+
+        assert_eq!(
+            AnalysisRunRequest::from_json(
+                r#"{"contract_version":1,"idempotency_key":"a\u001fb","tenant_workspace_id":"t","snapshot_id":"s","knowledge_cutoff":"2026-08-01T00:00:00Z","model_contract_version":"m","output_profile":"o"}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            AnalysisRunRequest::from_json(
+                r#"{"contract_version":1,"idempotency_key":"a","tenant_workspace_id":"t\u001fb","snapshot_id":"s","knowledge_cutoff":"2026-08-01T00:00:00Z","model_contract_version":"m","output_profile":"o"}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        assert_eq!(
+            AnalysisRunRequest::from_json(
+                r#"{"contract_version":1,"idempotency_key":"a","tenant_workspace_id":"t","snapshot_id":"s","knowledge_cutoff":"k","model_contract_version":"m","output_profile":"o"}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            AnalysisRunRequest::from_json(
+                r#"{"contract_version":1,"idempotency_key":"a","tenant_workspace_id":"t","snapshot_id":"s","knowledge_cutoff":"2099-01-01T00:00:00Z","model_contract_version":"m","output_profile":"o"}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
 
         let accepted = AnalysisRunAccepted::new("run-1", "accepted", "idem-1").expect("acc");
         let accepted_json = accepted.to_json().expect("aj");
