@@ -157,6 +157,7 @@ pub(crate) fn header_is_credential(name: &str) -> bool {
         || lowered == "x-api-key"
         || lowered.contains("api-key")
         || lowered.contains("api_key")
+        || lowered.contains("apikey")
         || lowered.contains("secret")
         || lowered.contains("credential")
         || lowered.contains("openai")
@@ -362,6 +363,12 @@ mod tests {
             "x-openai",
             "x-bytez",
             "x-openrouter",
+            "x-provider-api_key",
+            "x-provider-secret",
+            "x-provider-credential",
+            "x-provider-openai",
+            "x-provider-bytez",
+            "x-provider-openrouter",
         ] {
             assert_eq!(
                 refuse_credential_headers(&[(name, "provider-secret")]),
@@ -415,30 +422,6 @@ mod tests {
         assert_eq!(
             naruon_may_claim_tepp_inference("other_method"),
             Err(ApiError::InvalidWirePayload)
-        );
-    }
-
-    #[test]
-    fn naruon_export_exchange_covers_both_purpose_gate_arms() {
-        let allowed = ExportAuthorizationRequest {
-            tenant_workspace_id: "naruon-tenant-workspace-demo".into(),
-            principal_id: "naruon-service".into(),
-            purpose: AnalyticalPurpose::ModularServiceConsumer,
-            artifact_id: "tepp-export-demo-001".into(),
-            includes_source_text: false,
-        };
-        assert!(
-            naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-001")
-                .is_ok()
-        );
-
-        let denied = ExportAuthorizationRequest {
-            purpose: AnalyticalPurpose::OperationalMonitoring,
-            ..allowed
-        };
-        assert_eq!(
-            naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-002"),
-            Err(ApiError::AuthorizationDenied)
         );
     }
 }

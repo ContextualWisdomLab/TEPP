@@ -132,7 +132,7 @@ impl AnalysisRunRequest {
 ///
 /// A buyer cannot claim analysis of evidence that is not yet available. The
 /// request receipt instant is treated as availability of the command itself.
-fn require_rfc3339_knowledge_cutoff(knowledge_cutoff: &str) -> Result<(), ApiError> {
+pub(crate) fn require_rfc3339_knowledge_cutoff(knowledge_cutoff: &str) -> Result<(), ApiError> {
     require_nonempty(knowledge_cutoff)?;
     let cutoff = KnowledgeCutoff::parse_rfc3339(knowledge_cutoff)
         .map_err(|_| ApiError::InvalidWirePayload)?;
@@ -293,7 +293,13 @@ impl AnalysisRunStatus {
             terminal_result,
         };
         status.validate()?;
+        status.require_serialized_size()?;
         Ok(status)
+    }
+
+    fn require_serialized_size(&self) -> Result<(), ApiError> {
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
     }
 
     fn validate(&self) -> Result<(), ApiError> {

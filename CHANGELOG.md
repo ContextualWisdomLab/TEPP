@@ -8,6 +8,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 - Authored Rust coverage classification now ignores standalone structural closing parentheses, preventing formatting-only LCOV rows from appearing as uncovered production behavior.
 - Stacked `analysis_engine` vertical slice (ADR 0017): bounded Rust execution from an accepted analysis run to a cutoff-safe, multiple-membership-aware, SHA-256-digest-bound terminal artifact or redacted no-eligible-evidence result. This is active-PR evidence and does not claim psychometric estimator authority.
+- `tepp_api` fail-closed analysis-result boundaries: status constructors reject
+  terminal envelopes that cannot fit the default 64 KiB status limit, and
+  standalone terminal results reject knowledge cutoffs in the future.
 - `tepp_api` request-bound terminal analysis results and typed analysis-run status/read responses: accepted/running states cannot carry measurement evidence, terminal results bind exact request and receipt identities, and succeeded/failed payloads remain digest-bound or content-redacted.
 - `tepp_api` naruon live loopback HTTP/1.1 listener: `serve_one` installs a read/write deadline, requires a loopback `Host`, refuses `Transfer-Encoding` and NIM/proxy credential headers, parses `knowledge_cutoff` as RFC 3339 and refuses a future cutoff, keys analysis-run idempotency by tenant plus key, and proves both analysis-run and export POSTs over a real `TcpStream`. Not a production TLS/`$PORT` service (ADR 0011).
 - `tepp_api` adaptive orchestration router (ADR 0010): versioned `direct`/`verify`/`committee`/`conductor`/`abstain` selection from CPU `f64` risk, ambiguity, evidence, and token-budget inputs; recorded stages, recursion, decomposition, access lists, and role-specific reasoning effort; fail-closed document-controlled policy/access/credentials; LLM plans remain proposals under deterministic statistical authority; comparable-budget ablation requires a direct baseline; credential-free contextual-orchestrator binding. Live NIM HTTP remains accepted-target.
@@ -78,6 +81,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- Rust LCOV quality gating now ignores visibility-qualified function signatures
+  and structural match-arm labels that LLVM reports as zero-hit non-executable
+  lines.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
