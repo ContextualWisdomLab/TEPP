@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-21 10:28 KST
+**Snapshot:** 2026-08-21 11:45 KST
 **Protected-main evidence:** `c45be17a9dbce95ef81cee230e9d128abc7160ac`
 **Workspace version on protected main:** `0.1.0`
 
@@ -47,77 +47,77 @@ Checks, and branch rules immediately before every mutation.
 | PR | Exact current head | Draft | Title |
 |---:|---|:---:|---|
 | #178 | `a2382c84a1f7ccc66718343fe38e0fbfbb8aa0a7` | false | feat(engine): execute cutoff-safe analysis runs |
-| #177 | `8a5dee50d4b0fa2396893ad26fa775f2629e2fcd` | false | fix(workflow): pin scheduler budget hardening |
+| #177 | `273cbed1289beff3896dcd07abec433a2022bc9c` | false | fix(workflow): pin scheduler budget hardening |
 | #165 | `34083c3f5d6637cf1665a29dac45fbf67a74d5dd` | false | feat: route hourly product agents through contextual orchestrator |
-| #164 | `370287a95e0a3491c43b05bc7951c015b3745dc4` | false | docs: define TEPP product completion and technical gap baseline |
+| #164 | `244b9a7cff2ccb6a286d21c367b406ca0ef272e4` | false | docs: define TEPP product completion and technical gap baseline |
 | #159 | `855c6c7153c2f66a1c14e842ad700f571592dd35` | false | feat(api): project LineageWeave evidence into cutoff-safe histories |
 | #158 | `6d28d23c432288c4dbecbd74a25f093ed9d9ef61` | false | feat(api): expose temporal evidence context for LineageWeave Ask |
 | #157 | `63a419e2b96cef3def7f26bfc0337fece88e83c2` | false | feat(api): publish completed analysis-run result contract |
-| #155 | `ffbf50e1756096231867509a6df0511cb496fa05` | false | feat(api): admit LineageWeave as a modular analysis-run consumer |
+| #155 | `4893a7e8401101b0b703df18c4b4ae9cc33ec4d2` | false | feat(api): admit LineageWeave as a modular analysis-run consumer |
 | #154 | `aaadb7f906ed48dfde3c2b71995ce266c592e7a0` | false | ci(rust): refresh branch coverage compiler baseline |
-| #153 | `4a1d4c852701b9518effdbefcc6a0a56afe46385` | false | feat(membership): refuse location as entity identity or language |
-| #152 | `a67d90381d62ccb2a094fca2f722e729761cbd53` | false | feat(method): refuse prompt boilerplate as unique content |
-| #151 | `a35d3290a919f82ade3fcecfa0d6b46b0ecfc7c6` | false | feat(method): refuse corpus-background wording as unique content |
-| #150 | `00deb56a7f0193f0a7b08ba27daa37fc49dd651f` | false | feat(method): refuse non-lexical modality as unique content |
-| #149 | `e0fa6697ec6df1ec641005b7c27a45ae199688a9` | false | feat(method): refuse copied-text residue as unique content |
-| #148 | `020b4466c6ee548cd4fb6df038bdb708981859b0` | false | feat(method): refuse house-voice style as unique content |
-| #147 | `1644d25792ced70246037060370b44d500070238` | true | feat(method): refuse section boilerplate as unique content |
-| #146 | `ecaa8bcbc8a5007f56e14c66806f3deccea525da` | false | feat(membership): refuse episode membership outside the episode |
+| #153 | `e7c871bc2f5e6023002ceeea30217130561842e1` | false | feat(membership): refuse location as entity identity or language |
+| #152 | `70a6c6608e39df757417b2674f0acf27aa09b612` | false | feat(method): refuse prompt boilerplate as unique content |
+| #151 | `f87c812415280681c4243117fbd1302b204e4f68` | false | feat(method): refuse corpus-background wording as unique content |
+| #150 | `f9110e0eec68d823778a433c4ccab3a1beca46f5` | false | feat(method): refuse non-lexical modality as unique content |
+| #149 | `6077b9ce7f0961a3e287c4e8afe0faa5a0638b2e` | false | feat(method): refuse copied-text residue as unique content |
+| #148 | `4c0612fe717a40cebfb9ba1e31daaa7317607c9f` | false | feat(method): refuse house-voice style as unique content |
+| #147 | `08c427f76098adcd5226d1e141d208896bfe58f8` | true | feat(method): refuse section boilerplate as unique content |
+| #146 | `5419b0f76a737faf65d6b0c848c83f2f1336e326` | false | feat(membership): refuse episode membership outside the episode |
 | #145 | `696d56c5816815e22181a03c57a822f974d41706` | false | feat(method): refuse default stopword deletion of report language |
 | #144 | `e0e568da8c44acc1d30a1a2bad6d76810ee9d6e3` | true | feat(psychometric): recover multilevel event-time structure with Rubin T and strong means |
 | #143 | `7d533c6198492f748303869f0795fac5c8764b50` | false | feat(relation): refuse a template copy as the source identity |
 | #142 | `7ca6035c5d8b7c9a7761a0c5f26d1de4215c334b` | true | feat(evidence): refuse untrusted payloads as estimator authority |
-| #141 | `a562adde8375426ac75e1681d85b90d280d5b4ee` | false | feat(privacy): refuse untrusted intake without a grant |
-| #140 | `b321a315367016d2c844ab3056c7f7dc03f8fde8` | false | feat(estimator): refuse a checkpoint as the CPU f64 estimator |
+| #141 | `d558a4b4b3518f4ae09fde6ac828602bb007cdec` | false | feat(privacy): refuse untrusted intake without a grant |
+| #140 | `4feb427f6f895ebb53a151ae7c8483f69a3890f0` | false | feat(estimator): refuse a checkpoint as the CPU f64 estimator |
 | #139 | `43ebbda0d35f9bf227c5764d53d429fff0f08c8c` | false | feat(relation): refuse a summary as the source identity |
 | #138 | `f06879da364e3149aa2caf51158de60926d9846f` | false | feat(relation): refuse reverse input-process-outcome event time |
-| #137 | `87be4ad656fb516887aabef6a79c2f2beffa2524` | false | feat(relation): refuse retrospective reporting as a transition |
+| #137 | `c8b3d494df100e57aab7fdbcdc58a798c874e6c0` | false | feat(relation): refuse retrospective reporting as a transition |
 | #136 | `7825c778f39bb8d1ab9f6fe18c227559f8e78fee` | true | feat(relation): refuse translation edges as state transitions |
-| #135 | `e83196faf6f225787579bd136cfbd4b3ed016e26` | false | feat(evidence): refuse untrusted payloads without identity and bounds |
+| #135 | `1576e7fe5f03eb1a678060091115dfc927518d49` | false | feat(evidence): refuse untrusted payloads without identity and bounds |
 | #134 | `7f4a5df9fd18be203c995f59f1e734f69eba56f9` | true | feat(psychometric): refuse unidentified association as causal language |
-| #133 | `5f910623ada55f78cc85b5b9563dd160e8476a67` | false | feat(relation): refuse inferred status as observed evidence |
+| #133 | `dbe1c1f6f1e27403ee6301f3de220fff1f2d8b40` | false | feat(relation): refuse inferred status as observed evidence |
 | #132 | `fe73209ea3407f0c8cd62fbf10ecea844ac15e50` | true | feat(relation): refuse unobserved pairs as no-relationship |
-| #131 | `e65620b9ba7128804c3fd92807873cb371a6967c` | false | feat(membership): refuse collapsing targets into entity or project |
-| #130 | `e61e331a6880078ce79140cae4e783bce3f78197` | false | feat(relation): refuse support edges as state transitions |
+| #131 | `967b89f266c85ab6c705ea16ad22e77906e5969c` | false | feat(membership): refuse collapsing targets into entity or project |
+| #130 | `edcf89450c3e2eeadf4c7996baabf5e5f1f19ab9` | false | feat(relation): refuse support edges as state transitions |
 | #129 | `8981696f58892a1ace9baeb6224ac55b436b8110` | true | feat(membership): refuse customer-competitor overlap |
-| #128 | `4bcc260868111f21cd6bc5e2af9f4f9122c0cf97` | false | feat(temporal): refuse other clocks as system time |
-| #127 | `080d2e02e1b68d1bbd8c1882b8d49d9266f843f6` | false | feat(temporal): refuse other clocks as event time |
-| #126 | `fb0fc4e9d594a7feaf88cdc925e0fe78c81a0099` | false | feat(temporal): refuse other clocks as assertion time |
-| #125 | `fbba5d62a97e7a1a8bb571aa80c55b6ef43e5a11` | false | feat(temporal): refuse event, system, and available time as cutoff |
-| #124 | `77089cd335d7e7e6969cdfccb74dc2f280695c0a` | false | feat(temporal): refuse event and system time as availability |
-| #123 | `2e918a1c66cdf30acdd22eacd8d4ccdd5ae5fb9f` | false | feat(temporal): refuse document rows that omit assertion or document time |
-| #122 | `b032c855177fee5a470e73280b60a2685f2063fb` | false | feat(temporal): refuse later revisions with earlier system time |
-| #121 | `ead49668d3f2978971d1a144b6dd22225aa0d08a` | false | feat(privacy): seal identity mappings with purpose-bound HMAC |
-| #120 | `f2bc2843b6389243e7fc0dbd562c352dd0bd9046` | false | feat(relation): refuse citation edges as state transitions |
-| #119 | `2ea08a87be3c87d7d8c400addcdf0fd3e8e830d0` | false | feat(psychometric): recover ESEM loadings and refuse reverse DSEM lags |
-| #118 | `97c6363a37aa579abaf3a5622e40d0a2275c7797` | false | feat(event): refuse subevents that escape the parent interval |
-| #117 | `293067ea08b5cce0a4484c73282fed4d43af6991` | false | feat(membership): recover nested ICC and refuse cross-classified collapse |
-| #116 | `5f9d7bf73552180d73a30ddd889d9c80865c817f` | false | docs(adr): wire verified method papers into temporal and psychometric ADRs |
-| #115 | `2106170a0d7984291e78c68fd68125f217746f3f` | false | fix(quality): refuse inverted coverage-authority PR sentences |
-| #114 | `f46a14bb5d04651e47a32ff1e99e431babe179c3` | false | feat(privacy): record provider field codes without source text |
-| #113 | `679eb71f634540475385e11bc452aa4d1cddfa27` | false | feat(persistence): fail-closed entity and project target SQL |
-| #110 | `c63e1cfce2e3fcddc46e945a54a9af71e4c9d7ab` | false | feat(api): export corpus-split leakage-audit manifests |
-| #106 | `d01892e1783a3b416fbb79966821b4ea804ef2b5` | false | fix(privacy): inspect audit_event inserts through try_record |
-| #100 | `3e928bc0f209c74b941fa99b742d92814f610362` | false | test(tls): recover bind decisions from the live policy |
-| #99 | `5dd50ff87bb2a7bd2dd7c94ec5d8f73dfac221bf` | false | feat(persistence): persist exact text_segment byte spans without 0007 |
+| #128 | `872137cc0d68b97ab7d4dc772d160c247e4c51f6` | false | feat(temporal): refuse other clocks as system time |
+| #127 | `bd34a2dda405fab264147f68daa2059dd61c30ca` | false | feat(temporal): refuse other clocks as event time |
+| #126 | `28f7ed69785da71c38439c4241a132ab391a5c6f` | false | feat(temporal): refuse other clocks as assertion time |
+| #125 | `c225f353f27647268d44a9e8156412a1b9de9fc2` | false | feat(temporal): refuse event, system, and available time as cutoff |
+| #124 | `e89b90ce8d2792cb3f1fd61ad7dbd12556855df2` | false | feat(temporal): refuse event and system time as availability |
+| #123 | `78e41907ff95067a8755e3ceb41de5f32299ba6e` | false | feat(temporal): refuse document rows that omit assertion or document time |
+| #122 | `38542fd41196394587e024c7e824c840dcafb32c` | false | feat(temporal): refuse later revisions with earlier system time |
+| #121 | `6da31853ef654a809f882ce34c32049dd9238b67` | false | feat(privacy): seal identity mappings with purpose-bound HMAC |
+| #120 | `34c4c119608b2aa46c84e9bef2b47711740ff9de` | false | feat(relation): refuse citation edges as state transitions |
+| #119 | `47ab763d49b14ab1ba31f4828ad6e3fda274c007` | false | feat(psychometric): recover ESEM loadings and refuse reverse DSEM lags |
+| #118 | `b8f4582f65852b0ac5ba9149de9d5d7783b1c282` | false | feat(event): refuse subevents that escape the parent interval |
+| #117 | `8a5a3fa6d38703e6b83b03ad64959dd01c8f263d` | false | feat(membership): recover nested ICC and refuse cross-classified collapse |
+| #116 | `08d557c2f772e92543e71d27ac41a108fe64a8bb` | false | docs(adr): wire verified method papers into temporal and psychometric ADRs |
+| #115 | `2dbc0fd1d7200100a72990c01008e50ad5f9e641` | false | fix(quality): refuse inverted coverage-authority PR sentences |
+| #114 | `df734d71293bf5bbdd10d28430c15626cdb1220e` | false | feat(privacy): record provider field codes without source text |
+| #113 | `bd800fc62a7cb59339177e34baf3237d6897fce7` | false | feat(persistence): fail-closed entity and project target SQL |
+| #110 | `4517b3f00d56d08a5a9bf47e6b7a681537765127` | false | feat(api): export corpus-split leakage-audit manifests |
+| #106 | `60aef093e4f89638b896864342aa28d3a2d3ece7` | false | fix(privacy): inspect audit_event inserts through try_record |
+| #100 | `b2a885b9b5418c79d5e828d64291c878f5ae5477` | false | test(tls): recover bind decisions from the live policy |
+| #99 | `c4ed064c9e931f1772992526969fb4ae5fcd4537` | false | feat(persistence): persist exact text_segment byte spans without 0007 |
 | #95 | `3c42b3b09e9a0501d7c7a1a42a322e58cba39165` | true | feat(privacy): refuse blanket-masked scientific field grants |
 | #92 | `192e1eab459ea1c7e155d9fafe60d1b5912025f2` | true | feat(orchestrator): serve interpretation POSTs on a loopback HTTP listener |
-| #91 | `53a5a31f893e24146b4881c7e717021649fbb330` | false | feat(privacy): inherit source sensitivity onto derived artifacts |
+| #91 | `808ae6690b35bb58f2152d74c7978e90de6b86a0` | false | feat(privacy): inherit source sensitivity onto derived artifacts |
 | #86 | `47f6216aec217f15a6274d889bc507e59821096f` | true | feat(privacy): replay privileged-access decisions without source identity |
-| #85 | `af3060afdf3a7df2231dd04bfdd59253c83a0637` | false | feat(event): score CHRONOS occurrence forecasts with a Brier rule |
+| #85 | `1ebb40644bb479ed8703f6df1b351f3e19d5fe13` | false | feat(event): score CHRONOS occurrence forecasts with a Brier rule |
 | #84 | `e0ef1f869c46aa20969ce083f9ca31d622c31bb4` | true | feat(invariance): replay shared-meaning gate on current main |
 | #83 | `18200b674cb29d84ab66853f50e1b5dc38096279` | true | docs(evidence): define language-agnostic semantic spans |
 | #82 | `774a01bc63600c0c4703114bb01467fd65e57077` | true | feat(privacy): export identity maps only under re-identification purpose |
 | #81 | `a7769d37ad1f950547f00e05ce2c03e5a2843b43` | true | feat(privacy): bind tenant roles to system-time lifetimes |
 | #80 | `9539417f223bc6067f21e701986a49b7d3a37aba` | true | feat(temporal): space longitudinal lags on event time |
 | #79 | `166e37c2cb540a575c690c813a21123a13d86376` | true | feat(privacy): bind authorization grants to one processing purpose |
-| #78 | `b2662325441354545b34c907fc346ad06f8729d5` | false | feat(longitudinal): keep unit means out of within-unit change |
+| #78 | `b64c6799708ac1f6ac7c84e07fe3ae50750434e1` | false | feat(longitudinal): keep unit means out of within-unit change |
 | #76 | `ccffcab50ff2f1d8c0e6ee80269d0f7ee0075368` | true | feat(event): score TDT topic detections without promoting clusters |
 | #75 | `90cc8b6d4848e4c7718dd4bea74c1aaaab6f3685` | true | feat(method): model template sources without inferential weights |
 | #74 | `0ce7e6a923282d3533cf3b8c0592d5df244049f8` | true | feat(temporal): keep predicted Allen assertions hypothetical |
-| #73 | `054f190af0b39790a28ddaa37a96bf9a386dceeb` | false | feat(topic): keep one identity across dormancy and reactivation |
-| #72 | `ce5c5a706b2b18a36404c30080a7c477258c2fb8` | false | feat(event): score TDT story segments with WindowDiff and Pk |
-| #71 | `90b531e00f32a474bea3e980c02adaac4dfd673a` | false | feat(network): refuse raw simplex Euclidean cluster geometry |
+| #73 | `11cc811a10b80a49e8a8ed6bc60fba3d5c753d28` | false | feat(topic): keep one identity across dormancy and reactivation |
+| #72 | `899656968cc9f68a3d8fc55dddc4fd257fb27050` | false | feat(event): score TDT story segments with WindowDiff and Pk |
+| #71 | `2588f38281b97fa03f552634d307e8b4c908899d` | false | feat(network): refuse raw simplex Euclidean cluster geometry |
 | #70 | `dae7e55dc7bb2135825437a9df9c7aafc957ff42` | false | feat(event): score CHRONOS schema slots with precision and recall |
 | #69 | `e780e1dc905424aa9d843b94d4996a560f2b9970` | false | feat(interpretation): keep LLM claims hypothetical and evidence-cited |
 | #68 | `85c09ec81c66f245f161707d8c50e6aa6939ab7f` | false | feat(event): score TDT tracks with pair precision and switch rate |
@@ -135,12 +135,12 @@ Checks, and branch rules immediately before every mutation.
 | #55 | `345f26a4eadda8aa89e91468918ea1b0455400f3` | false | feat(api): bind org .github workflows as CI/review/security only |
 | #53 | `c07e512e3e1e0b85f8d2390345e1151aae3a1889` | false | feat(concept): language-profile gates with shared-space RMSE |
 | #52 | `725e8c9b3447d78a8bcdfcb02c98c12c5bf2851f` | false | feat(api): orchestrator interchange refuses table access and repo tokens |
-| #51 | `240979b5ee5601a4c6338ea9499baccd8c757bcf` | false | feat(compute): VRAM budget types with CPU f64 fallback |
+| #51 | `e8a0ee38caf9aefd60999ca74ee9d20eac83d2e0` | false | feat(compute): VRAM budget types with CPU f64 fallback |
 | #50 | `a189b97e536648b856cb38ea2c95270196ce3b52` | false | feat(event): refuse TDT/CHRONOS outputs as state transitions |
-| #49 | `b713010705cb09c54d19cdbdd5c7ac89d5f854aa` | false | feat(psychometric): posterior ESEM input gates with true-parameter RMSE |
-| #48 | `45224e55792165fd2d752d9a3bd62b016ec7c970` | false | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
+| #49 | `06c176f9c4f91d793620610380f550f8f2e9458e` | false | feat(psychometric): posterior ESEM input gates with true-parameter RMSE |
+| #48 | `7769df7944d1d5189a26c9dd0ef7d1f46d35e82e` | false | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
 
-The exact-head register, counts, and protected-main SHA were fetched from the live GitHub API at `2026-08-21 10:28 KST`. Review decisions, required Checks, and mergeability remain volatile; re-read them immediately before every mutation. This snapshot is not merge authorization.
+The exact-head register, counts, and protected-main SHA were fetched from the live GitHub API at `2026-08-21 11:45 KST`. Review decisions, required Checks, and mergeability remain volatile; re-read them immediately before every mutation. This snapshot is not merge authorization.
 
 ## Authority and derivation
 
