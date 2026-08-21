@@ -116,7 +116,7 @@ def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
 
     for candidate in reversed(lines[max(0, line_number - 32) : line_number - 1]):
         stripped = candidate.strip()
-        if stripped.startswith("}"):
+        if stripped.startswith("}") or stripped.endswith(("}", "{", ";")):
             return False
         if "=>" in stripped:
             return False

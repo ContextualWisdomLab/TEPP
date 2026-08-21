@@ -477,6 +477,18 @@ class CoverageContractTests(unittest.TestCase):
             self.assertFalse(
                 coverage_contract.is_executable_source_line(str(first_arm), 2)
             )
+            self.assertFalse(
+                coverage_contract._is_multiline_match_guard(  # noqa: SLF001
+                    ["    if value.is_valid() { consume(value); }", "State::Current => {"],
+                    2,
+                )
+            )
+            self.assertFalse(
+                coverage_contract._is_multiline_match_guard(
+                    ["State::Current", "State::Current => {"],
+                    2,
+                )
+            )
 
     def test_cfg_test_and_not_feature_block_helpers(self) -> None:
         """cfg(test) modules and cfg(not(feature)) blocks are fully recognized."""
