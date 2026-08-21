@@ -140,22 +140,34 @@ fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
     Ok(format!("{origin}{path}"))
 }
 
+/// Return whether `name` is a reserved naruon interchange header.
+pub(crate) fn header_is_reserved_standard(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "content-type" | "tepp-consumer" | "tepp-contract-version" | "idempotency-key"
+    )
+}
+
+/// Return whether `name` is a review, model, proxy, or bearer credential header.
+pub(crate) fn header_is_credential(name: &str) -> bool {
+    let lowered = name.to_ascii_lowercase();
+    lowered == "authorization"
+        || lowered == "proxy-authorization"
+        || lowered == "cookie"
+        || lowered == "x-api-key"
+        || lowered.contains("token")
+        || lowered.contains("copilot")
+        || lowered.contains("github")
+        || lowered.contains("nim")
+        || lowered.contains("nvidia")
+}
+
 fn refuse_credential_headers(extra_headers: &[(&str, &str)]) -> Result<(), ApiError> {
     for (name, _) in extra_headers {
-        let lowered = name.to_ascii_lowercase();
-        if matches!(
-            lowered.as_str(),
-            "content-type" | "tepp-consumer" | "tepp-contract-version" | "idempotency-key"
-        ) {
+        if header_is_reserved_standard(name) {
             return Err(ApiError::InvalidWirePayload);
         }
-        if lowered == "authorization"
-            || lowered == "cookie"
-            || lowered == "x-api-key"
-            || lowered.contains("token")
-            || lowered.contains("copilot")
-            || lowered.contains("github")
-        {
+        if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);
         }
     }
@@ -174,10 +186,10 @@ fn standard_headers(idempotency_key: &str) -> Vec<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        NARUON_TEPP_INFERENCE_METHOD, compose_https_target, naruon_may_claim_tepp_inference,
-        refuse_credential_headers,
+        NARUON_TEPP_INFERENCE_METHOD, compose_https_target, naruon_export_exchange,
+        naruon_may_claim_tepp_inference, refuse_credential_headers,
     };
-    use crate::ApiError;
+    use crate::{AnalyticalPurpose, ApiError, ExportAuthorizationRequest};
 
     #[test]
     fn compose_https_target_accepts_clean_origin_and_rejects_hostile_forms() {
@@ -296,6 +308,37 @@ mod tests {
             refuse_credential_headers(&[("x-copilot-session", "t")]),
             Err(ApiError::AuthorizationDenied)
         );
+        assert_eq!(
+            refuse_credential_headers(&[("Proxy-Authorization", "Basic x")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            refuse_credential_headers(&[("x-nvidia-nim-key", "nvapi-x")]),
+            Err(ApiError::AuthorizationDenied)
+        );
+    }
+
+    #[test]
+    fn naruon_export_exchange_covers_unit_test_purpose_gate() {
+        let allowed = ExportAuthorizationRequest {
+            tenant_workspace_id: "tenant-a".into(),
+            principal_id: "naruon-service".into(),
+            purpose: AnalyticalPurpose::ModularServiceConsumer,
+            artifact_id: "artifact-a".into(),
+            includes_source_text: false,
+        };
+        assert!(
+            naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-a").is_ok()
+        );
+
+        let denied = ExportAuthorizationRequest {
+            purpose: AnalyticalPurpose::OperationalMonitoring,
+            ..allowed
+        };
+        assert_eq!(
+            naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-b"),
+            Err(ApiError::AuthorizationDenied)
+        );
     }
 
     #[test]
@@ -313,24 +356,24 @@ mod tests {
 
     #[test]
     fn naruon_export_exchange_covers_both_purpose_gate_arms() {
-        let allowed = crate::authorization::ExportAuthorizationRequest {
+        let allowed = ExportAuthorizationRequest {
             tenant_workspace_id: "naruon-tenant-workspace-demo".into(),
             principal_id: "naruon-service".into(),
-            purpose: crate::authorization::AnalyticalPurpose::ModularServiceConsumer,
+            purpose: AnalyticalPurpose::ModularServiceConsumer,
             artifact_id: "tepp-export-demo-001".into(),
             includes_source_text: false,
         };
         assert!(
-            super::naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-001")
+            naruon_export_exchange("https://tepp.example.test", &allowed, "export-idem-001")
                 .is_ok()
         );
 
-        let denied = crate::authorization::ExportAuthorizationRequest {
-            purpose: crate::authorization::AnalyticalPurpose::OperationalMonitoring,
+        let denied = ExportAuthorizationRequest {
+            purpose: AnalyticalPurpose::OperationalMonitoring,
             ..allowed
         };
         assert_eq!(
-            super::naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-002"),
+            naruon_export_exchange("https://tepp.example.test", &denied, "export-idem-002"),
             Err(ApiError::AuthorizationDenied)
         );
     }
