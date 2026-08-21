@@ -155,7 +155,9 @@ impl ProjectHistoryRequest {
     /// Returns a field-validation or serialization error.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        to_json(self)
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)?;
+        Ok(payload)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
@@ -217,7 +219,9 @@ impl ProjectHistoryProjection {
     /// Returns a validation or serialization error.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        to_json(self)
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)?;
+        Ok(payload)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
@@ -320,7 +324,7 @@ pub fn project_history_projection(
         .last()
         .map(|event| event.occurred_at.clone())
         .ok_or(ApiError::InvalidWirePayload)?;
-    Ok(ProjectHistoryProjection {
+    let projection = ProjectHistoryProjection {
         contract_version: PROJECT_HISTORY_CONTRACT_VERSION,
         project_key: request.project_key.clone(),
         project_name: request.project_name.clone(),
@@ -332,7 +336,9 @@ pub fn project_history_projection(
         inference_status: "temporal_association_only".into(),
         events: ordered,
         findings,
-    })
+    };
+    projection.to_json()?;
+    Ok(projection)
 }
 
 pub(crate) fn build_project_history_exchange(

@@ -88,6 +88,56 @@ fn sample_request() -> ProjectHistoryRequest {
     }
 }
 
+fn request_near_the_serialized_byte_limit() -> ProjectHistoryRequest {
+    fn build(evidence_bytes: usize) -> ProjectHistoryRequest {
+        let events = (0..64)
+            .map(|index| {
+                let month = index / 28 + 1;
+                let day = index % 28 + 1;
+                let occurred_at = format!("2026-{month:02}-{day:02}T09:00:00Z");
+                ProjectHistoryEvent {
+                    event_id: format!("event-{index:03}"),
+                    event_type_code: if index == 63 {
+                        "voc_received".into()
+                    } else {
+                        "note_recorded".into()
+                    },
+                    event_title: format!("Event {index}"),
+                    occurred_at: occurred_at.clone(),
+                    available_at: occurred_at,
+                    source_post_id: format!("post-{index:03}"),
+                    evidence_text: "e".repeat(evidence_bytes),
+                    actor_ids: Vec::new(),
+                }
+            })
+            .collect();
+        ProjectHistoryRequest {
+            contract_version: PROJECT_HISTORY_CONTRACT_VERSION,
+            idempotency_key: "near-limit-request".into(),
+            tenant_workspace_id: "tenant-demo".into(),
+            project_key: "project-demo".into(),
+            project_name: "Project demo".into(),
+            knowledge_cutoff: "2026-08-19T23:59:59Z".into(),
+            focus_event_id: "event-063".into(),
+            events,
+        }
+    }
+
+    let mut low: usize = 0;
+    let mut high: usize = 4096;
+    while low < high {
+        let evidence_bytes = (low + high).div_ceil(2);
+        let request = build(evidence_bytes);
+        let payload = serde_json::to_string(&request).expect("request json");
+        if payload.len() <= tepp_api::DEFAULT_PROJECT_HISTORY_BYTE_LIMIT {
+            low = evidence_bytes;
+        } else {
+            high = evidence_bytes - 1;
+        }
+    }
+    build(low)
+}
+
 #[test]
 fn projection_orders_the_cycle_and_explains_only_explicit_temporal_evidence() {
     let projection = project_history_projection(&sample_request()).expect("projection");
@@ -156,6 +206,18 @@ fn projection_rejects_future_evidence_duplicates_and_unknown_json_fields() {
     assert_eq!(
         ProjectHistoryRequest::from_json(&hostile),
         Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn generated_projection_rejects_output_that_exceeds_the_wire_limit() {
+    let request = request_near_the_serialized_byte_limit();
+    let request_payload = request.to_json().expect("request remains within the limit");
+    assert!(request_payload.len() <= tepp_api::DEFAULT_PROJECT_HISTORY_BYTE_LIMIT);
+
+    assert_eq!(
+        project_history_projection(&request),
+        Err(ApiError::LimitExceeded)
     );
 }
 

@@ -25,6 +25,7 @@ This doctoring record documents the authorities used by TEPP's versioned Lineage
 8. LineageWeave and Naruon use consumer-scoped idempotency namespaces.
 9. No caller credential or cross-service database access is part of the project-history contract.
 10. Loopback HTTP is a local modular boundary; a non-loopback deployment requires HTTPS/TLS at the service edge.
+11. Request serialization, projection serialization, and generated projections all enforce the same 256 KiB wire limit; TEPP never returns a projection that its own response parser must reject.
 
 ## APA 7th references
 
