@@ -22,13 +22,22 @@ or replace `method_effects`, `section_source`, `style_source`,
 
 ### Supporting literature
 
-Liu et al. (2023) is retained as a secondary survey of prompting methods and
-is not used as evidence for the repository's latent-content classification.
-The statement that prompt boilerplate is not unique latent content is a
-normative TEPP measurement contract derived from ADR 0004 and ADR 0012, not a
-universal empirical claim about every prompt or corpus.
+Brown et al. (2020) provide primary evidence that textual prompts and
+demonstrations condition language-model task behavior, while Reynolds and
+McDonell (2021) study prompt programming as a method for directing model
+behavior. Neither study defines TEPP's latent-content labels. The statement
+that prompt boilerplate is not unique latent content is therefore a normative
+TEPP measurement contract derived from ADR 0004 and ADR 0012, not a universal
+empirical claim about every prompt or corpus.
 
-Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, G. (2023).
-Pre-train, prompt, and predict: A systematic survey of prompting methods
-in natural language processing. *ACM Computing Surveys, 55*(9), Article
-195. https://doi.org/10.1145/3560815
+Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D., Dhariwal, P.,
+Neelakantan, A., Shyam, P., Sastry, G., Askell, A., Agarwal, S., Herbert-Voss,
+A., Krueger, G., Henighan, T., Child, R., Ramesh, A., Ziegler, D., Wu, J.,
+Winter, C., … Amodei, D. (2020). Language models are few-shot learners.
+*Advances in Neural Information Processing Systems, 33*, 1877–1901.
+https://papers.neurips.cc/paper/2020/hash/1457c0d6bfcb4967418bfb8ac142f64a-Abstract.html
+
+Reynolds, L., & McDonell, K. (2021). Prompt programming for large language
+models: Beyond the few-shot paradigm. In *Extended abstracts of the 2021 CHI
+conference on human factors in computing systems*. Association for Computing
+Machinery. https://doi.org/10.1145/3411763.3451760
