@@ -356,6 +356,12 @@ mod tests {
             "x-anthropic-key",
             "x-bytez-api-key",
             "x-openrouter-api-key",
+            "x-provider-api_key",
+            "x-provider-secret",
+            "x-provider-credential",
+            "x-provider-openai",
+            "x-provider-bytez",
+            "x-provider-openrouter",
         ] {
             assert_eq!(
                 refuse_credential_headers(&[(name, "provider-secret")]),
