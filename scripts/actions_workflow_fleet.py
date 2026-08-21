@@ -163,15 +163,15 @@ class GithubHttpsTransport:
             try:
                 connection.request(method, path, headers=headers)
                 response = connection.getresponse()
+                body = response.read()
+                response_headers = {
+                    str(key): str(value) for key, value in response.getheaders()
+                }
             except (OSError, http.client.HTTPException):
                 raise FleetAuditError(
                     "upstream_unavailable",
                     "GitHub API transport failed",
                 ) from None
-            body = response.read()
-            response_headers = {
-                str(key): str(value) for key, value in response.getheaders()
-            }
             return HttpResponse(
                 status=int(response.status),
                 headers=response_headers,
