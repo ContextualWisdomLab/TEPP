@@ -198,8 +198,6 @@ pub enum AnalysisEngineError {
     DuplicateEvidence,
     /// Corpus snapshot identity differed from the request snapshot.
     SnapshotMismatch,
-    /// Accepted receipt was not in the canonical accepted state.
-    InvalidAcceptedState,
     /// A bounded integer aggregation overflowed.
     ArithmeticOverflow,
     /// A serialized artifact could not be produced.
@@ -215,7 +213,6 @@ impl fmt::Display for AnalysisEngineError {
             Self::InvalidEvidence => "invalid analysis evidence",
             Self::DuplicateEvidence => "duplicate analysis evidence identity",
             Self::SnapshotMismatch => "analysis snapshot identity mismatch",
-            Self::InvalidAcceptedState => "analysis run was not accepted",
             Self::ArithmeticOverflow => "analysis evidence count overflow",
             Self::SerializationFailure => "analysis artifact serialization failed",
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
@@ -252,9 +249,6 @@ pub fn execute_analysis_run(
 ) -> Result<AnalysisExecution, AnalysisEngineError> {
     request.to_json()?;
     accepted.to_json()?;
-    if accepted.run_state != "accepted" {
-        return Err(AnalysisEngineError::InvalidAcceptedState);
-    }
     if request.snapshot_id != corpus.snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
@@ -509,27 +503,6 @@ mod tests {
             execute_analysis_run(&request(), &accepted(), &corpus, "2026-08-03T00:00:00Z"),
             Err(AnalysisEngineError::SnapshotMismatch)
         );
-        let bad_state =
-            AnalysisRunAccepted::new("run-1", "running", "idem-analysis-1").expect("receipt");
-        let matching_corpus = AnalysisCorpus::new(
-            "snapshot-1",
-            vec![unit(
-                "evidence-1",
-                "2026-07-01T00:00:00Z",
-                "2026-07-01T00:00:00Z",
-                1,
-            )],
-        )
-        .expect("corpus");
-        assert_eq!(
-            execute_analysis_run(
-                &request(),
-                &bad_state,
-                &matching_corpus,
-                "2026-08-03T00:00:00Z"
-            ),
-            Err(AnalysisEngineError::InvalidAcceptedState)
-        );
         let duplicate = AnalysisCorpus::new(
             "snapshot-1",
             vec![
@@ -596,10 +569,6 @@ mod tests {
             (
                 AnalysisEngineError::SnapshotMismatch,
                 "analysis snapshot identity mismatch",
-            ),
-            (
-                AnalysisEngineError::InvalidAcceptedState,
-                "analysis run was not accepted",
             ),
             (
                 AnalysisEngineError::ArithmeticOverflow,

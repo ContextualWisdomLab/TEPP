@@ -58,7 +58,7 @@ semantics before raising the bound.
 
 The stacked PR includes Rust unit and integration tests for cutoff exclusion,
 multiple-membership summation, snapshot binding, duplicate identities, empty
-eligibility, invalid accepted state, and package identity. Run:
+eligibility, receipt validation, and package identity. Run:
 
 ```text
 cargo fmt --all -- --check
