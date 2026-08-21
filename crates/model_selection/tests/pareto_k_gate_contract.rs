@@ -43,7 +43,7 @@ fn non_positive_k_and_non_finite_diagnostics_fail_closed() {
 
 #[test]
 fn llm_vote_cannot_define_the_numerical_optimum() {
-    let only_llm = ModelCandidate::llm_vote_only(5);
+    let only_llm = ModelCandidate::llm_vote_only(5).expect("valid llm candidate");
     assert_eq!(
         select_candidate_k(&[only_llm]),
         Err(ModelSelectionError::LlmVoteIsNotStatisticalAuthority)
@@ -57,7 +57,7 @@ fn pareto_front_selects_known_truth_k_with_computed_rmse() {
         candidate(2, -100.0, 10.0),
         candidate(truth_k, -40.0, 20.0),
         candidate(8, -45.0, 40.0),
-        ModelCandidate::llm_vote_only(6),
+        ModelCandidate::llm_vote_only(6).expect("valid llm candidate"),
     ];
 
     let selected = select_candidate_k(&candidates).expect("admissible statistical front");

@@ -116,7 +116,7 @@ mod tests {
                 < f64::EPSILON
         );
         assert_eq!(
-            select_candidate_k(&[ModelCandidate::llm_vote_only(3)]),
+            select_candidate_k(&[ModelCandidate::llm_vote_only(3).expect("valid llm candidate")]),
             Err(ModelSelectionError::LlmVoteIsNotStatisticalAuthority)
         );
     }

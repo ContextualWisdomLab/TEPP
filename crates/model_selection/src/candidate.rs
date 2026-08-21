@@ -42,14 +42,21 @@ impl ModelCandidate {
     ///
     /// The vote may later recommend among statistically admissible candidates.
     /// It cannot itself define the numerical optimum.
-    #[must_use]
-    pub const fn llm_vote_only(candidate_k: u32) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ModelSelectionError::NonPositiveCandidateK`] when `candidate_k`
+    /// is less than two.
+    pub fn llm_vote_only(candidate_k: u32) -> Result<Self, ModelSelectionError> {
+        if candidate_k < 2 {
+            return Err(ModelSelectionError::NonPositiveCandidateK);
+        }
+        Ok(Self {
             candidate_k,
             held_out_log_likelihood: None,
             complexity: None,
             llm_vote_only: true,
-        }
+        })
     }
 
     /// Return the candidate topic count.
@@ -120,7 +127,7 @@ mod tests {
         assert!(!worse.dominates(better));
         assert!(!better.dominates(better));
 
-        let llm = ModelCandidate::llm_vote_only(3);
+        let llm = ModelCandidate::llm_vote_only(3).expect("valid llm candidate");
         assert!(llm.is_llm_vote_only());
         assert!(!llm.is_statistically_supported());
         assert!(!llm.dominates(better));
@@ -140,6 +147,10 @@ mod tests {
         assert_eq!(
             ModelCandidate::statistical(2, -1.0, f64::INFINITY),
             Err(ModelSelectionError::InvalidDiagnostic)
+        );
+        assert_eq!(
+            ModelCandidate::llm_vote_only(1),
+            Err(ModelSelectionError::NonPositiveCandidateK)
         );
     }
 }
