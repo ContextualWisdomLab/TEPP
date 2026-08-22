@@ -11,6 +11,7 @@ mod authorization;
 mod envelope;
 mod error;
 mod export;
+mod orchestrator_http;
 mod wire;
 
 /// Analysis-run contract version constant.
@@ -46,3 +47,17 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
+/// Maximum orchestrator JSON body size.
+pub use orchestrator_http::MAX_ORCHESTRATOR_BODY_BYTES;
+/// Maximum orchestrator idempotency-key size.
+pub use orchestrator_http::MAX_ORCHESTRATOR_IDEMPOTENCY_KEY_BYTES;
+/// Versioned interpretation-run path.
+pub use orchestrator_http::ORCHESTRATOR_INTERPRETATION_PATH;
+/// Credential-free orchestrator HTTPS exchange.
+pub use orchestrator_http::OrchestratorHttpExchange;
+/// Build an interpretation request for contextual-orchestrator.
+pub use orchestrator_http::orchestrator_interpretation_exchange;
+/// Orchestrator output is never scientific acceptance.
+pub use orchestrator_http::refuse_orchestrator_as_scientific_acceptance;
+/// Refuse repository-write or review-agent secret names.
+pub use orchestrator_http::refuse_repository_write_secret;

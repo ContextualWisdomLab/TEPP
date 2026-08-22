@@ -10,11 +10,7 @@ fn event_time(value: &str) -> EventTime {
     EventTime::parse_rfc3339(value).expect("event time")
 }
 
-fn assignment(
-    member: MemberId,
-    group: GroupId,
-    role: MembershipRole,
-) -> MembershipAssignment {
+fn assignment(member: MemberId, group: GroupId, role: MembershipRole) -> MembershipAssignment {
     MembershipAssignment::new(
         member,
         group,
@@ -78,6 +74,10 @@ fn rows_from_different_members_fail_closed() {
         network
             .estimation_rows_at(second_member, instant)
             .expect("second rows"),
+    );
+    assert_eq!(
+        refuse_atomistic_collapse(&mixed, 0),
+        Err(MembershipError::InvalidWirePayload)
     );
     assert_eq!(
         refuse_atomistic_collapse(&mixed, 2),
