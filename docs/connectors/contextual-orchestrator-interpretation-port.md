@@ -1,6 +1,6 @@
 # contextual-orchestrator interpretation port for TEPP
 
-**Status:** Accepted-target modular integration contract  
+**Status:** Partial modular integration contract — `tepp_api::orchestrator_interpretation_exchange` and `tepp_api::bind_contextual_orchestrator` are the credential-free bindings; live HTTP remains accepted-target.
 **Last reviewed:** 2026-08-13
 
 ## Boundary
@@ -16,12 +16,12 @@ LLM/provider settings are execution policy only. Deterministic scientific gates 
 
 ## Allowed orchestration modes
 
-TEPP may allocate test-time computation between:
+`tepp_api::route_orchestration` selects `direct`, `verify`, `committee`, `conductor`, or `abstain` from TEPP-owned risk, ambiguity, evidence-sufficiency, and token-budget scores. `tepp_api::bind_contextual_orchestrator` may be called only for a non-abstaining plan and never includes credentials or raw source. TEPP may allocate test-time computation between:
 
 1. direct model routing with bounded reasoning effort;
 2. deeper multi-agent workflows with recorded workflow depth, decomposition, access lists, recursion, role-specific reasoning effort, verification/adjudication, and comparable-budget ablations.
 
-These allocations are guided by Fugu, Conductor, and TRINITY research cited in `docs/research/standards-and-literature.md` and `docs/LLM_ORCHESTRATION.md`.
+These allocations are guided by Fugu, Conductor, and TRINITY research cited in `docs/research/standards-and-literature.md` and `docs/LLM_ORCHESTRATION.md`. Documents cannot change policy, access lists, or credentials.
 
 ## Credential separation
 

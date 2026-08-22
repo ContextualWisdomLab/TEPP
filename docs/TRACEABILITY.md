@@ -7,17 +7,17 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 
 | Requirement / decision | Canonical basis | Source/evidence boundary | Maturity |
 |---|---|---|---|
-| immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring | implemented-main |
+| immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring; `persistence_postgres` source-artifact SQL insert/lookup plus idempotent retry (#40 implemented-main) | implemented-main |
 | Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |
 | Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
-| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; full intelligence stack remaining | partial |
-| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; estimation rows + atomistic-collapse refusal on the active PR; multilevel estimators remaining | partial |
+| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
+| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; estimation rows + atomistic-collapse refusal implemented-main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
-| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, tenant RLS (`0002` + session GUC/role helpers), `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` driver, exact-head live PostgreSQL CI with isolation proof, append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006` on active PR); remaining physical ERD/backup remaining | partial |
+| PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` migration contracts, in-memory adapters, live SQL session/document SQL port, tenant RLS (`0002` + session GUC/role helpers), `DATABASE_URL` SQLx gate, optional `live-sqlx` `PgPool` driver, exact-head live PostgreSQL CI with isolation proof, append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006` implemented-main), event-relation/mention/instance SQL (#37–#39 implemented-main), source-artifact SQL (#40 implemented-main), audit-event SQL (#41 implemented-main), concurrent document-write stress (#43 implemented-main), backup/restore integrity revalidation (active PR); remaining physical ERD constraints | partial |
 | known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | `tepp_simulation` on protected main; recovery metrics in `validation_core` | implemented-main |
 | versioned service/API contracts and exports | PRD; API contract; ADR 0011/0013 | `tepp_api` analysis-run/export/JSON-LD/GraphML contracts on protected main (PR #21); HTTP service remaining accepted-target | partial |
 | immutable split/run/reproducibility manifests | ADR 0013; ERD | `tepp_api` reproducibility manifest contract on protected main; `persistence_postgres` append-only SQL insert/lookup for `reproducibility_manifest`, `corpus_split_manifest`, `model_run`, and `model_artifact` (migration `0003`); full physical ERD constraints remaining | partial |
@@ -31,17 +31,17 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
-| evidence-bounded LLM interpretation | ADR 0010/0012; PRD | future `interpretation_gateway` | accepted-target |
-| adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | future contextual-orchestrator integration + ablation evidence | accepted-target |
-| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | future authorization/persistence/export/provider adapters | accepted-target |
-| tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | future service/persistence boundaries | accepted-target |
+| evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router plus future `interpretation_gateway` | partial |
+| adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | `tepp_api::route_orchestration` + ablation record on the active PR; live contextual-orchestrator execution remaining | partial |
+| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `tepp_api` export authorization plus provider-payload minimization / elevated re-identification implemented-main; persistence retention/deletion remaining | partial |
+| tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | `tepp_api` time-bounded `PurposeGrant` + cross-tenant denial implemented-main; persistent `access_grant` storage remaining | partial |
 | standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; future service ports | partial |
-| naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract on protected main; HTTP service remaining | partial |
-| contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `tepp_api` HTTPS interpretation interchange + `docs/connectors/contextual-orchestrator-interpretation-port.md`; live HTTP server/port remaining | partial |
+| naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract on protected main; `tepp_api` HTTP interchange implemented-main; loopback live listener implemented-main; production TLS remaining | partial |
+| contextual-orchestrator interpretation port boundary | ADR 0010/0011; LLM orchestration | `tepp_api` HTTPS interpretation interchange + adaptive `route_orchestration`/`bind_contextual_orchestrator` + `docs/connectors/contextual-orchestrator-interpretation-port.md`; live HTTP server/port remaining | partial |
 | org-central `.github` CI/review/security control plane | ADR 0011/0014/0015; API contract | `docs/connectors/org-github-control-plane.md` + `tepp_api` reusable-workflow bindings; live reusable-workflow dispatch remaining | partial |
 | Actions registry identities bound to protected-main tree (orphan disable) | Operability; GitHub Actions REST | `scripts/actions_workflow_fleet.py` + issue #20 tests/doctoring; live disable remains operator-authorized | active-PR |
 | autonomous model proposal separated from verification/publication/review/merge | ADR 0015 | future safe OpenCode/NVIDIA autonomous-development workflow | accepted-target |
-| contextual-orchestrator execution boundary | ADR 0010/0011 | provider-neutral orchestration port; TEPP retains scientific authority | accepted-target |
+| contextual-orchestrator execution boundary | ADR 0010/0011 | credential-free `bind_contextual_orchestrator` on the active PR; live HTTP remaining | partial |
 | foundation validation / release-readiness ledger | ADR 0014; Test Strategy | PR #24 `docs/validation/temporal-event-foundation.md` on protected main | implemented-main |
 | scientific claim promotion separated from design/implementation/release | ADR 0014; ADR policy | documentation/CI/domain validation/release evidence | partial |
 | CSAP/SOC 2/ISO/NIST assurance readiness | `docs/COMPLIANCE_READINESS.md`; research register | repository controls + future deployment evidence | accepted-target / deployment-owned |
