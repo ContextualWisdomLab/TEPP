@@ -1868,6 +1868,24 @@ fn initial_time_independent_predictor_refuses_overflow_and_non_event_clocks() {
         Err(PsychometricError::EventTimeRequired)
     );
     assert_eq!(
+        recover_initial_time_independent_predictor_carry(0.4, 3.0, 1e308, 2.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_time_independent_predictor_carry(2.0, 0.5, 710.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    let finite_rewrite = recover_initial_time_independent_predictor_carry(
+        1e-308,
+        1.0,
+        700.0,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("t0-ti-log-rewrite");
+    let expected_rewrite = (1e-308_f64.ln() + 700.0).exp();
+    assert!((finite_rewrite - expected_rewrite).abs() / expected_rewrite < 1e-12);
+    assert_eq!(
         recover_discrete_latent_mean_with_initial_time_independent_predictor(
             1e308,
             0.0,
@@ -1998,6 +2016,24 @@ fn initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks() {
         recover_initial_time_dependent_predictor_carry(0.4, 3.0, -0.5, 2.0, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
     );
+    assert_eq!(
+        recover_initial_time_dependent_predictor_carry(0.4, 3.0, 1e308, 2.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_time_dependent_predictor_carry(2.0, 0.5, 710.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    let finite_rewrite = recover_initial_time_dependent_predictor_carry(
+        1e-308,
+        1.0,
+        700.0,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("t0-td-log-rewrite");
+    let expected_rewrite = (1e-308_f64.ln() + 700.0).exp();
+    assert!((finite_rewrite - expected_rewrite).abs() / expected_rewrite < 1e-12);
     assert_eq!(
         recover_discrete_latent_mean_with_initial_time_dependent_predictor(
             1e308,
