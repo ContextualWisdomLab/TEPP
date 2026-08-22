@@ -28,7 +28,7 @@ Decision status and implementation maturity are separate. ADR `Accepted` means t
 | Architecture | PRESENT-CURRENT | root `ARCHITECTURE.md` owns service/crate boundaries and scientific/compute invariants |
 | UML / system flows | PRESENT-CURRENT | `docs/UML.md` covers component, sequence, clock state, relation authority, membership, compute and implementation lineage |
 | ERD / logical data model | PRESENT-CURRENT | `docs/ERD.md` distinguishes current domain objects from planned PostgreSQL entities and preserves uncertain time/membership/provenance |
-| ADR index / core decisions | PRESENT-CURRENT | ADR 0001–0017 cover numerical authority, clocks, event/membership, multilingual semantics, ESEM/DSEM, GPU, quality, evidence, PII, LLM orchestration, MSA, topic measurement, persistence/manifests/splits, claim promotion/release, autonomous-development authority, TDT/CHRONOS boundaries, and consumer-scoped modular ingress |
+| ADR index / core decisions | PRESENT-CURRENT | Numbered ADRs in the canonical index cover numerical authority, clocks, event/membership, multilingual semantics, ESEM/DSEM, GPU, quality, evidence, PII, LLM orchestration, MSA, topic measurement, persistence/manifests/splits, claim promotion/release, autonomous-development authority, TDT/CHRONOS boundaries, and consumer-scoped modular ingress |
 | ADR status/maturity/supersession policy | PRESENT-CURRENT | `docs/adr/ADR_POLICY.md` makes `Accepted` vs implemented/released explicit and requires exact partial-supersession scope |
 | API / modular integration | PRESENT-CURRENT | `docs/API_CONTRACT.md` defines versioning, target async lifecycle, authority and naruon/contextual-orchestrator boundaries |
 | Security | PRESENT-CURRENT | `SECURITY.md` plus `docs/THREAT_MODEL.md` |

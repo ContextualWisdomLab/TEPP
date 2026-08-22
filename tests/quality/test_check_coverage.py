@@ -385,6 +385,17 @@ class CoverageContractTests(unittest.TestCase):
                 "    }",  # 55
                 "}",  # 56
                 "    executable_statement();",  # 57 executable
+                "    append_value(",  # 58 multiline call opener
+                "        value,",  # 59 trailing comma noise
+                "    );",  # 60 call close
+                "    values",  # 61
+                "        .iter()",  # 62 method-chain continuation
+                "        .collect::<Vec<_>>()",  # 63 method-chain continuation
+                "    });",  # 64 closure call close
+                "(",  # 65 structural call opener
+                ")",  # 66 structural call close
+                "    Ok(())",  # 67 structural unit result
+                "    NaruonLiveResponse {",  # 68 structural struct literal
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -399,7 +410,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 44, 57}
+            expected_executable = {13, 40, 44, 57, 61}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:

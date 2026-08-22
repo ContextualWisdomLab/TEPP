@@ -5,10 +5,11 @@
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
 //! scientific crates; this crate only defines fail-closed interchange shapes.
-//! naruon HTTP interchange is a versioned `https` POST to analysis-run and
-//! export paths; table-access URLs, review/Copilot/NIM/proxy headers, and
-//! lexical inference claims fail closed. A loopback live listener proves
-//! those POSTs over TCP without claiming production TLS (ADR 0011).
+//! Naruon and `LineageWeave` use the versioned analysis-run contract; `LineageWeave`
+//! may also request a cutoff-safe project-history projection from explicit
+//! source evidence. Naruon owns the current purpose-bound export adapter.
+//! Loopback listeners prove the HTTP boundary without claiming production TLS,
+//! causality, or completed psychometric model results.
 
 mod analysis_run;
 mod analysis_run_live;
@@ -21,6 +22,7 @@ mod live_http;
 mod naruon_http;
 mod naruon_live;
 mod orchestration;
+mod project_history;
 mod provider_payload;
 mod temporal_context;
 mod wire;
@@ -64,8 +66,10 @@ pub use authorization::require_export_allowed;
 pub use lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
 /// Published Naruon modular-consumer identity.
 pub use lineageweave_http::NARUON_CONSUMER_CODE;
-/// Build a credential-free `LineageWeave` analysis-run exchange.
+/// Build a `LineageWeave` analysis-run exchange without provider credentials.
 pub use lineageweave_http::lineageweave_analysis_run_exchange;
+/// Build a `LineageWeave` project-history exchange without provider credentials.
+pub use lineageweave_http::lineageweave_project_history_exchange;
 /// Build a credential-free `LineageWeave` temporal-context exchange.
 pub use lineageweave_http::lineageweave_temporal_context_exchange;
 /// Versioned analysis-run path modular consumers may call.
@@ -90,9 +94,9 @@ pub use naruon_live::NARUON_LIVE_HEADER_BYTE_LIMIT;
 pub use naruon_live::NARUON_LIVE_HEADER_COUNT_LIMIT;
 /// Accepted-stream read/write deadline.
 pub use naruon_live::NARUON_LIVE_IO_TIMEOUT;
-/// HTTP/1.1 response from the naruon live listener.
+/// HTTP/1.1 response from the loopback listener.
 pub use naruon_live::NaruonLiveResponse;
-/// Loopback live HTTP/1.1 service for naruon POSTs.
+/// Backward-compatible Naruon loopback HTTP/1.1 service.
 pub use naruon_live::NaruonLiveService;
 /// Comparable-budget ablation record.
 pub use orchestration::BudgetAblationRecord;
@@ -130,6 +134,26 @@ pub use orchestration::bind_contextual_orchestrator;
 pub use orchestration::record_budget_ablation;
 /// Route a task onto a versioned orchestration plan.
 pub use orchestration::route_orchestration;
+/// Default maximum serialized project-history request bytes.
+pub use project_history::DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
+/// Default maximum project-history event count.
+pub use project_history::DEFAULT_PROJECT_HISTORY_EVENT_LIMIT;
+/// Supported project-history contract version.
+pub use project_history::PROJECT_HISTORY_CONTRACT_VERSION;
+/// Versioned project-history path.
+pub use project_history::PROJECT_HISTORY_PATH;
+/// Explicit source-grounded project event.
+pub use project_history::ProjectHistoryEvent;
+/// One non-causal temporal finding.
+pub use project_history::ProjectHistoryFinding;
+/// Project-history HTTP exchange.
+pub use project_history::ProjectHistoryHttpExchange;
+/// Deterministic TEPP project-history projection.
+pub use project_history::ProjectHistoryProjection;
+/// Versioned project-history request.
+pub use project_history::ProjectHistoryRequest;
+/// Build a cutoff-safe project-history projection.
+pub use project_history::project_history_projection;
 /// Elevated re-identification result.
 pub use provider_payload::DisclosedIdentityMapping;
 /// Separately protected identity mapping.

@@ -1,9 +1,11 @@
-//! Published modular-consumer identity and `LineageWeave` analysis-run exchange.
+//! Published modular-consumer identity and `LineageWeave` TEPP exchanges.
 
 use crate::naruon_http::compose_https_target;
+use crate::project_history::build_project_history_exchange;
 use crate::{
-    AnalysisRunRequest, ApiError, NaruonHttpExchange, TEMPORAL_CONTEXT_CONTRACT_VERSION,
-    TEMPORAL_CONTEXT_PATH, TemporalContextRequest, naruon_analysis_run_exchange,
+    AnalysisRunRequest, ApiError, NaruonHttpExchange, ProjectHistoryHttpExchange,
+    ProjectHistoryRequest, TEMPORAL_CONTEXT_CONTRACT_VERSION, TEMPORAL_CONTEXT_PATH,
+    TemporalContextRequest, naruon_analysis_run_exchange,
 };
 
 /// Stable consumer identity used by the Naruon adapter.
@@ -12,7 +14,7 @@ pub const NARUON_CONSUMER_CODE: &str = "naruon";
 /// Stable consumer identity used by the `LineageWeave` adapter.
 pub const LINEAGEWEAVE_CONSUMER_CODE: &str = "lineageweave";
 
-/// Build a credential-free `LineageWeave` → TEPP analysis-run exchange.
+/// Build a `LineageWeave` → TEPP analysis-run exchange without provider credentials.
 ///
 /// The function reuses TEPP's existing origin, body, and header validation,
 /// then replaces only the published modular-consumer identity. The accepted
@@ -62,6 +64,22 @@ pub fn lineageweave_temporal_context_exchange(
         headers,
         body,
     })
+}
+
+/// Build a `LineageWeave` → TEPP project-history exchange without credentials.
+///
+/// The request contains only bounded source evidence selected after
+/// `LineageWeave` authorization. TEPP validates the cutoff and returns a
+/// deterministic temporal-association projection, never a causal score.
+///
+/// # Errors
+///
+/// Returns a fail-closed origin, request, version, size, or timestamp error.
+pub fn lineageweave_project_history_exchange(
+    origin: &str,
+    request: &ProjectHistoryRequest,
+) -> Result<ProjectHistoryHttpExchange, ApiError> {
+    build_project_history_exchange(origin, LINEAGEWEAVE_CONSUMER_CODE, request)
 }
 
 /// Return whether a modular analysis-run consumer is published by TEPP.
