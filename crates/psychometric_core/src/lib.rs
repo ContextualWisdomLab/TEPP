@@ -169,6 +169,22 @@
 //! (`Θ` does not enter; contemporaneous `Var(y_0)` is not that
 //! lagged observed covariance; the lagged latent covariance is not
 //! that observed covariance),
+//! recovers the Driver Eq. 3–4 later-occasion variance of that
+//! constrained process as
+//! `trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v`
+//! (JSS PDF re-opened 2026-08-22T23:12Z; form the evolved
+//! within-subject variance first, then include the trait, then
+//! include the TI extra variance, then add; trait and
+//! `addedTIPREDVAR` do not enter `Q_Δt`; under stationarity that
+//! composition equals contemporaneous `T0VAR`; evolving the
+//! constrained total as if it were all state is not that later
+//! map; the lagged covariance omits `Q_Δt` and is not that later
+//! map; `Q_Δt` is not that later map),
+//! recovers the Driver Eq. 5 of that later-occasion variance as
+//! `λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ`
+//! (the lagged observed covariance omits `Q_Δt` and `θ`;
+//! `MANIFESTVAR` is not that later observed variance; the
+//! later-occasion latent variance is not that observed variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -319,6 +335,10 @@ pub use event_time::recover_stationary_lagged_latent_covariance;
 pub use event_time::recover_stationary_lagged_observed_covariance;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
+/// Exact scalar later-occasion variance of §4.3 stationary `T0VAR` `trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v`.
+pub use event_time::recover_stationary_later_latent_variance;
+/// Exact scalar Eq. 5 of later-occasion §4.3 stationary `T0VAR` `λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ`.
+pub use event_time::recover_stationary_later_observed_variance;
 /// Exact scalar contemporaneous `TDPREDEFFECT` impulse `m x`.
 pub use event_time::recover_time_dependent_predictor_impulse;
 /// Exact scalar within-interval `TDPREDEFFECT` carry `e^{A(t−u)} M x`.
@@ -477,6 +497,8 @@ pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 pub use event_time::refuse_measurement_error_as_observed_variance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of lagged §4.3 stationary `T0VAR`.
 pub use event_time::refuse_measurement_error_as_stationary_lagged_observed_covariance;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of later-occasion §4.3 stationary `T0VAR`.
+pub use event_time::refuse_measurement_error_as_stationary_later_observed_variance;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
@@ -515,6 +537,16 @@ pub use event_time::refuse_stationary_lagged_latent_covariance_as_decayed_statio
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_observed_covariance;
 /// Refuse treating lagged §4.3 stationary `T0VAR` as contemporaneous stationary `T0VAR`.
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance;
+/// Refuse treating Eq. 5 of lagged §4.3 stationary `T0VAR` as later-occasion observed variance.
+pub use event_time::refuse_stationary_lagged_observed_covariance_as_stationary_later_observed_variance;
+/// Refuse treating later-occasion §4.3 stationary `T0VAR` as the free discrete evolution of the constrained total.
+pub use event_time::refuse_stationary_later_latent_variance_as_discrete_variance;
+/// Refuse treating later-occasion §4.3 stationary `T0VAR` as lagged covariance.
+pub use event_time::refuse_stationary_later_latent_variance_as_lagged_covariance;
+/// Refuse treating later-occasion §4.3 stationary `T0VAR` as later-occasion observed variance.
+pub use event_time::refuse_stationary_later_latent_variance_as_observed_variance;
+/// Refuse treating later-occasion §4.3 stationary `T0VAR` as finite-interval process noise.
+pub use event_time::refuse_stationary_later_latent_variance_as_process_noise;
 /// Refuse treating Eq. 5 of `asymDIFFUSION` as Eq. 5 of §4.3 stationary `T0VAR`.
 pub use event_time::refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.

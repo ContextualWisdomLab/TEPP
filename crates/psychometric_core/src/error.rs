@@ -480,6 +480,30 @@ pub enum PsychometricError {
     /// `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ` includes `θ`
     /// and is not `λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ`.
     StationaryInitialObservedVarianceIsNotStationaryLaggedObservedCovariance,
+    /// Driver §4.3 later-occasion stationary variance was treated as
+    /// lagged stationary covariance. `e^{2 a Δt} p + Q_Δt` of the
+    /// within-subject state is not `e^{a Δt} p`.
+    StationaryLaterLatentVarianceIsNotLaggedCovariance,
+    /// Driver §4.3 later-occasion stationary variance was treated as
+    /// the free discrete evolution of the constrained total.
+    /// Trait variance and `addedTIPREDVAR` do not enter `Q_Δt`.
+    StationaryLaterLatentVarianceIsNotDiscreteVariance,
+    /// Driver §4.3 later-occasion stationary variance was treated as
+    /// finite-interval process noise. `Q_Δt` is the state residual,
+    /// not `trait + e^{2 a Δt} p + Q_Δt + (B / a)² v`.
+    StationaryLaterLatentVarianceIsNotProcessNoise,
+    /// Driver §4.3 later-occasion stationary variance was treated as
+    /// later-occasion observed variance. Equation 5 maps
+    /// `Var(y_t) = λ²` of that variance plus `θ + ψ`.
+    StationaryLaterLatentVarianceIsNotObservedVariance,
+    /// Driver Eq. 5 measurement error was treated as later-occasion
+    /// stationary observed variance. `θ` is not
+    /// `λ²(trait + e^{2 a Δt} p + Q_Δt + (B / a)² v) + θ + ψ`.
+    MeasurementErrorIsNotStationaryLaterObservedVariance,
+    /// Driver Eq. 5 of lagged §4.3 stationary `T0VAR` was treated as
+    /// later-occasion stationary observed variance. Lagged covariance
+    /// omits `Q_Δt` and `θ`.
+    StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -854,6 +878,24 @@ impl fmt::Display for PsychometricError {
             }
             Self::StationaryInitialObservedVarianceIsNotStationaryLaggedObservedCovariance => {
                 "stationary first-occasion observed variance is not the stationary lagged observed covariance"
+            }
+            Self::StationaryLaterLatentVarianceIsNotLaggedCovariance => {
+                "stationary later-occasion latent variance is not the stationary lagged latent covariance"
+            }
+            Self::StationaryLaterLatentVarianceIsNotDiscreteVariance => {
+                "stationary later-occasion latent variance is not the free discrete latent variance"
+            }
+            Self::StationaryLaterLatentVarianceIsNotProcessNoise => {
+                "stationary later-occasion latent variance is not the finite-interval process noise"
+            }
+            Self::StationaryLaterLatentVarianceIsNotObservedVariance => {
+                "stationary later-occasion latent variance is not the later-occasion observed variance"
+            }
+            Self::MeasurementErrorIsNotStationaryLaterObservedVariance => {
+                "measurement-error variance is not the stationary later-occasion observed variance"
+            }
+            Self::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance => {
+                "stationary lagged observed covariance is not the stationary later-occasion observed variance"
             }
         };
         formatter.write_str(message)
@@ -1440,6 +1482,35 @@ mod tests {
             PsychometricError::StationaryInitialObservedVarianceIsNotStationaryLaggedObservedCovariance
                 .to_string(),
             "stationary first-occasion observed variance is not the stationary lagged observed covariance"
+        );
+    }
+
+    #[test]
+    fn stationary_later_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StationaryLaterLatentVarianceIsNotLaggedCovariance.to_string(),
+            "stationary later-occasion latent variance is not the stationary lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaterLatentVarianceIsNotDiscreteVariance.to_string(),
+            "stationary later-occasion latent variance is not the free discrete latent variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaterLatentVarianceIsNotProcessNoise.to_string(),
+            "stationary later-occasion latent variance is not the finite-interval process noise"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaterLatentVarianceIsNotObservedVariance.to_string(),
+            "stationary later-occasion latent variance is not the later-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotStationaryLaterObservedVariance.to_string(),
+            "measurement-error variance is not the stationary later-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance
+                .to_string(),
+            "stationary lagged observed covariance is not the stationary later-occasion observed variance"
         );
     }
 }
