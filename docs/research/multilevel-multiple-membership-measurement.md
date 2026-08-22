@@ -12,7 +12,7 @@ TEPP documents and events may simultaneously belong to authors, departments, cus
 
 ## Estimator target (future)
 
-Production multilevel estimators (cross-classified / multiple-membership ESEM/DSEM) remain accepted-target in `psychometric_core`. Recovery studies must use realistic synthetic truth with known multilevel structure and report RMSE, bias, and coverage via `validation_core`; those metrics are a non-exhaustive subset of the acceptance contract. ADR 0005 additionally requires posterior-uncertainty propagation, construct-specific model classification, measurement invariance, within/between separation, irregular-time handling, and event-time ordering.
+Production multilevel estimators (cross-classified / multiple-membership ESEM/DSEM) remain accepted-target in `psychometric_core`. The current executable slice recovers two-level CWC OLS, the CWC contextual effect, and Kish-weighted slopes only. Recovery studies must use realistic synthetic truth with known multilevel structure and report RMSE, bias, and coverage via `validation_core`; those metrics are a non-exhaustive subset of the acceptance contract. ADR 0005 additionally requires posterior-uncertainty propagation, construct-specific model classification, measurement invariance, within/between separation, irregular-time handling, and event-time ordering.
 
 ## Authority sources
 
@@ -21,3 +21,7 @@ Raudenbush, S. W., & Bryk, A. S. (2002). *Hierarchical linear models: Applicatio
 Snijders, T. A. B. (2011). Statistical models for social networks. *Annual Review of Sociology, 37*, 131–153. https://doi.org/10.1146/annurev.soc.012809.102709
 
 Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100202
+
+Enders, C. K., & Tofighi, D. (2007). Centering predictor variables in cross-sectional multilevel models: A new look at an old issue. *Psychological Methods, 12*(2), 121–138. https://doi.org/10.1037/1082-989X.12.2.121
+
+Kish, L. (1965). *Survey sampling*. John Wiley & Sons.
