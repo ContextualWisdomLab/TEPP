@@ -10,16 +10,68 @@ from typing import Any, Iterable, Mapping, Sequence
 
 
 def load_totals(path: Path) -> Mapping[str, Any]:
-    """Load the single-report totals mapping from LLVM coverage JSON."""
+    """Load exact totals from LLVM coverage JSON.
+
+    Full LLVM branch exports can contain several instrumented copies of the
+    same source file when unit and integration test binaries are merged. The
+    source-level contract is the union of each branch coordinate's true and
+    false outcomes, so those copies are merged before the branch gate runs.
+    Summary-only reports retain the original LLVM totals fallback.
+    """
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     data = payload.get("data")
     if not isinstance(data, list) or len(data) != 1:
         raise ValueError("coverage JSON must contain exactly one data entry")
-    totals = data[0].get("totals")
+    report = data[0]
+    totals = report.get("totals")
     if not isinstance(totals, Mapping):
         raise ValueError("coverage JSON data entry must contain totals")
-    return totals
+    files = report.get("files")
+    if not isinstance(files, list) or not any(
+        isinstance(record, Mapping) and "branches" in record for record in files
+    ):
+        return totals
+    return {**totals, "branches": load_union_branch_totals(files)}
+
+
+def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | float]:
+    """Merge LLVM branch outcomes by source coordinate across test binaries."""
+
+    outcomes: dict[tuple[str, int, int, int, int], list[int]] = {}
+    for file_record in files:
+        if not isinstance(file_record, Mapping):
+            raise ValueError("coverage file record must be an object")
+        filename = file_record.get("filename")
+        if "branches" not in file_record:
+            raise ValueError("coverage file record must contain branches")
+        branches = file_record["branches"]
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("coverage file record must contain a filename")
+        if not isinstance(branches, list):
+            raise ValueError("coverage branches must be a list")
+        for branch in branches:
+            if not isinstance(branch, list) or len(branch) < 6:
+                raise ValueError("coverage branch record is malformed")
+            coordinates = branch[:4]
+            counts = branch[4:6]
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in coordinates
+            ):
+                raise ValueError("coverage branch coordinates are invalid")
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in counts
+            ):
+                raise ValueError("coverage branch counts are invalid")
+            key = (filename, *coordinates)
+            outcome = outcomes.setdefault(key, [0, 0])
+            outcome[0] += counts[0]
+            outcome[1] += counts[1]
+    count = len(outcomes) * 2
+    covered = sum(outcome > 0 for counts in outcomes.values() for outcome in counts)
+    return {"count": count, "covered": covered}
 
 
 def resolve_repository_source_path(source_path: str, repository_root: Path) -> Path:
@@ -82,8 +134,24 @@ def is_executable_source_line(
         return False
     if text.startswith("#[") or text.startswith("#!["):
         return False
-    if text in {"{", "}", "},", ");", "];", "();", "};"}:
+    if text in {
+        "{",
+        "}",
+        "(",
+        ")",
+        "},",
+        ");",
+        "];",
+        "();",
+        "};",
+        "});",
+        "Ok(())",
+    }:
         return False
+    if text.endswith(" {"):
+        type_name = text[:-2]
+        if type_name and all(character.isalnum() or character in "_:" for character in type_name):
+            return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False
     if text.startswith("mod ") or text.startswith("pub mod "):
@@ -91,6 +159,10 @@ def is_executable_source_line(
     if text.startswith("impl ") or text.startswith("impl<"):
         return False
     if text.startswith(") ->"):
+        return False
+    if text.startswith("."):
+        return False
+    if text.endswith("(") and text[:-1].replace("_", "").replace(":", "").isalnum():
         return False
     if text.startswith("pub fn ") or text.startswith("fn "):
         return False

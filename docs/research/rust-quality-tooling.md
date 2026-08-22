@@ -25,7 +25,7 @@ surface.
 - `cargo-nextest` 0.9.140 runs process-isolated tests without retries.
 - Doctests run separately because nextest does not currently execute doctests.
 - `cargo-llvm-cov` 0.8.6 produces stable line coverage.
-- Branch coverage uses the same tool on `nightly-2026-08-01` because the
+- Branch coverage uses the same tool on `nightly-2026-08-21` because the
   upstream project identifies Rust branch coverage as unstable and
   nightly-only.
 - Coverage thresholds are evaluated from LLVM JSON totals. A nonzero line or
