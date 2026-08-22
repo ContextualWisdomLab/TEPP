@@ -1,6 +1,10 @@
 //! Published modular-consumer identity and `LineageWeave` analysis-run exchange.
 
-use crate::{AnalysisRunRequest, ApiError, NaruonHttpExchange, naruon_analysis_run_exchange};
+use crate::naruon_http::compose_https_target;
+use crate::{
+    AnalysisRunRequest, ApiError, NaruonHttpExchange, TEMPORAL_CONTEXT_CONTRACT_VERSION,
+    TEMPORAL_CONTEXT_PATH, TemporalContextRequest, naruon_analysis_run_exchange,
+};
 
 /// Stable consumer identity used by the Naruon adapter.
 pub const NARUON_CONSUMER_CODE: &str = "naruon";
@@ -30,6 +34,34 @@ pub fn lineageweave_analysis_run_exchange(
         .ok_or(ApiError::InvalidWirePayload)?;
     LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
     Ok(exchange)
+}
+
+/// Build a credential-free `LineageWeave` temporal-context exchange.
+///
+/// # Errors
+///
+/// Returns a fail-closed error for a hostile origin or invalid temporal-context
+/// request.
+pub fn lineageweave_temporal_context_exchange(
+    origin: &str,
+    request: &TemporalContextRequest,
+) -> Result<NaruonHttpExchange, ApiError> {
+    let target_url = compose_https_target(origin, TEMPORAL_CONTEXT_PATH)?;
+    let body = request.to_json()?;
+    let headers = vec![
+        ("content-type".into(), "application/json".into()),
+        ("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()),
+        (
+            "tepp-contract-version".into(),
+            TEMPORAL_CONTEXT_CONTRACT_VERSION.to_string(),
+        ),
+    ];
+    Ok(NaruonHttpExchange {
+        method: "POST",
+        target_url,
+        headers,
+        body,
+    })
 }
 
 /// Return whether a modular analysis-run consumer is published by TEPP.

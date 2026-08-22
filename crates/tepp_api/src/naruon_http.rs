@@ -116,7 +116,7 @@ pub fn naruon_may_claim_tepp_inference(method_code: &str) -> Result<(), ApiError
     }
 }
 
-fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
+pub(crate) fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
     require_nonempty(origin)?;
     if !origin.starts_with("https://") {
         return Err(ApiError::InvalidWirePayload);
@@ -174,7 +174,7 @@ fn refuse_credential_headers(extra_headers: &[(&str, &str)]) -> Result<(), ApiEr
     Ok(())
 }
 
-fn standard_headers(idempotency_key: &str) -> Vec<(String, String)> {
+pub(crate) fn standard_headers(idempotency_key: &str) -> Vec<(String, String)> {
     vec![
         ("content-type".into(), "application/json".into()),
         ("tepp-consumer".into(), "naruon".into()),
