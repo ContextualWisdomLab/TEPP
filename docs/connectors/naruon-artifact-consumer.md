@@ -1,6 +1,6 @@
 # naruon modular consumer contract for TEPP artifacts
 
-**Status:** Partial — versioned DTO, HTTP interchange, and loopback live listener on the active PR; production TLS/`$PORT` remaining  
+**Status:** Partial — versioned DTO and HTTP interchange are implemented-main at protected head `c45be17a9dbce95ef81cee230e9d128abc7160ac`; the loopback live listener is active-PR #157; production TLS/`$PORT` remaining
 **Last reviewed:** 2026-08-16
 
 ## Boundary

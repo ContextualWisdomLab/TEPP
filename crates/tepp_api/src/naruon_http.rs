@@ -155,6 +155,15 @@ pub(crate) fn header_is_credential(name: &str) -> bool {
         || lowered == "proxy-authorization"
         || lowered == "cookie"
         || lowered == "x-api-key"
+        || lowered.contains("api-key")
+        || lowered.contains("api_key")
+        || lowered.contains("apikey")
+        || lowered.contains("secret")
+        || lowered.contains("credential")
+        || lowered.contains("openai")
+        || lowered.contains("anthropic")
+        || lowered.contains("bytez")
+        || lowered.contains("openrouter")
         || lowered.contains("token")
         || lowered.contains("copilot")
         || lowered.contains("github")
@@ -163,7 +172,10 @@ pub(crate) fn header_is_credential(name: &str) -> bool {
 }
 
 fn refuse_credential_headers(extra_headers: &[(&str, &str)]) -> Result<(), ApiError> {
-    for (name, _) in extra_headers {
+    for (name, value) in extra_headers {
+        if !is_http_field_name(name) || value.chars().any(char::is_control) {
+            return Err(ApiError::InvalidWirePayload);
+        }
         if header_is_reserved_standard(name) {
             return Err(ApiError::InvalidWirePayload);
         }
@@ -172,6 +184,30 @@ fn refuse_credential_headers(extra_headers: &[(&str, &str)]) -> Result<(), ApiEr
         }
     }
     Ok(())
+}
+
+fn is_http_field_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric()
+                || matches!(
+                    byte,
+                    b'!' | b'#'
+                        | b'$'
+                        | b'%'
+                        | b'&'
+                        | b'\''
+                        | b'*'
+                        | b'+'
+                        | b'-'
+                        | b'.'
+                        | b'^'
+                        | b'_'
+                        | b'`'
+                        | b'|'
+                        | b'~'
+                )
+        })
 }
 
 fn standard_headers(idempotency_key: &str) -> Vec<(String, String)> {
@@ -316,6 +352,41 @@ mod tests {
             refuse_credential_headers(&[("x-nvidia-nim-key", "nvapi-x")]),
             Err(ApiError::AuthorizationDenied)
         );
+        for name in [
+            "x-openai-api-key",
+            "x-anthropic-key",
+            "x-bytez-api-key",
+            "x-openrouter-api-key",
+            "x-api_key",
+            "x-secret",
+            "x-credential",
+            "x-openai",
+            "x-bytez",
+            "x-openrouter",
+            "x-provider-api_key",
+            "x-provider-secret",
+            "x-provider-credential",
+            "x-provider-openai",
+            "x-provider-bytez",
+            "x-provider-openrouter",
+        ] {
+            assert_eq!(
+                refuse_credential_headers(&[(name, "provider-secret")]),
+                Err(ApiError::AuthorizationDenied),
+                "header={name}"
+            );
+        }
+        for (name, value) in [
+            ("", "value"),
+            ("bad name", "value"),
+            ("x-trace", "ok\r\nx-injected: 1"),
+        ] {
+            assert_eq!(
+                refuse_credential_headers(&[(name, value)]),
+                Err(ApiError::InvalidWirePayload),
+                "header={name:?}"
+            );
+        }
     }
 
     #[test]

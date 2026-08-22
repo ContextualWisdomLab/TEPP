@@ -321,6 +321,10 @@ class CoverageContractTests(unittest.TestCase):
                 "    }",  # 55
                 "}",  # 56
                 "    executable_statement();",  # 57 executable
+                ")",  # 58 standalone structural close
+                "pub(crate) fn crate_visible() {",  # 59 visibility-qualified fn
+                "State::Accepted => {",  # 60 match-arm structure
+                "State::Guarded(value) if valid(value) => {",  # 61 guarded arm is executable
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -335,7 +339,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 44, 57}
+            expected_executable = {13, 40, 44, 57, 61}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -401,6 +405,174 @@ class CoverageContractTests(unittest.TestCase):
             finally:
                 if outside.exists():
                     outside.unlink()
+
+    def test_multiline_guard_arm_is_executable(self) -> None:
+        """Retain the final expression of a multiline Rust match guard."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "multiline_guard.rs"
+            source.write_text(
+                "match state {\n"
+                "    State::Ready(value)\n"
+                "        if value.is_valid()\n"
+                "        && value.is_fresh() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "        _ => {\n"
+                "            ignore(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 4))
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 7))
+
+    def test_guard_after_brace_closing_pattern_is_executable(self) -> None:
+        """Count a guard after a destructuring pattern that closes with a brace."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "destructured_guard.rs"
+            source.write_text(
+                "match state {\n"
+                "    State::Ready { value }\n"
+                "        if value.is_valid() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 3))
+
+    def test_long_and_nested_match_guards_are_executable(self) -> None:
+        """Track guard boundaries beyond the old scan window and nested arms."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "complex_guard.rs"
+            long_guard = [
+                "match state {",
+                "    State::Ready(value)",
+                "        if value.is_valid()",
+                *[f"        && value.part_{index}()" for index in range(40)],
+                "        && value.is_fresh() => {",
+                "            consume(value);",
+                "        }",
+                "}",
+            ]
+            source.write_text("\n".join(long_guard) + "\n", encoding="utf-8")
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(
+                    str(source), len(long_guard) - 3
+                )
+            )
+
+            source.write_text(
+                "match state {\n"
+                "    State::Ready(value)\n"
+                "        if match value {\n"
+                "            0 => true,\n"
+                "            _ => false,\n"
+                "        } && value.is_fresh() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 6))
+
+            source.write_text(
+                "match state {\n"
+                "    State::Ready(value)\n"
+                "        if match value {\n"
+                "            0 => true,\n"
+                "            _ => false,\n"
+                "        }\n"
+                "        && value.is_fresh() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 7))
+
+    def test_previous_arm_body_does_not_make_next_label_executable(self) -> None:
+        """Do not treat an ``if`` inside the preceding arm as a guard."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "previous_arm.rs"
+            source.write_text(
+                "match state {\n"
+                "    State::Previous => {\n"
+                "        if value.is_valid() {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "    }\n"
+                "    State::Current => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 7))
+
+            one_line_previous = Path(temporary) / "one_line_previous.rs"
+            one_line_previous.write_text(
+                "match state {\n"
+                "    State::Previous => value,\n"
+                "    State::Current => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(
+                    str(one_line_previous), 3
+                )
+            )
+
+            second_guard = Path(temporary) / "second_guard.rs"
+            second_guard.write_text(
+                "match state {\n"
+                "    State::First => value,\n"
+                "    State::Ready(value)\n"
+                "        if value.is_valid()\n"
+                "        && value.is_fresh() => {\n"
+                "            consume(value);\n"
+                "        }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(second_guard), 5)
+            )
+
+            first_arm = Path(temporary) / "first_arm.rs"
+            first_arm.write_text(
+                "match state {\n"
+                "    State::Current => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(first_arm), 2)
+            )
+            self.assertFalse(
+                coverage_contract._is_multiline_match_guard(  # noqa: SLF001
+                    ["    if value.is_valid() { consume(value); }", "State::Current => {"],
+                    2,
+                )
+            )
+            self.assertFalse(
+                coverage_contract._is_multiline_match_guard(
+                    ["State::Current", "State::Current => {"],
+                    2,
+                )
+            )
 
     def test_cfg_test_and_not_feature_block_helpers(self) -> None:
         """cfg(test) modules and cfg(not(feature)) blocks are fully recognized."""

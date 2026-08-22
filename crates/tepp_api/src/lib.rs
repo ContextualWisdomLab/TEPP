@@ -10,6 +10,7 @@
 //! lexical inference claims fail closed. A loopback live listener proves
 //! those POSTs over TCP without claiming production TLS (ADR 0011).
 
+mod analysis_result;
 mod analysis_run;
 mod authorization;
 mod envelope;
@@ -21,16 +22,40 @@ mod orchestration;
 mod provider_payload;
 mod wire;
 
+/// Terminal analysis-result contract version constant.
+pub use analysis_result::ANALYSIS_RESULT_CONTRACT_VERSION;
+/// Bounded identity-free terminal result summary.
+pub use analysis_result::AnalysisResultSummary;
+/// Request-bound terminal analysis outcome.
+pub use analysis_result::AnalysisRunTerminalResult;
+/// Canonical terminal analysis-run state.
+pub use analysis_result::AnalysisRunTerminalState;
+/// Default terminal analysis-result payload byte limit.
+pub use analysis_result::DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT;
+/// Require exact terminal result binding to request and accepted receipt.
+pub use analysis_result::require_terminal_binding;
+/// Compare a terminal result with an accepted receipt.
+pub use analysis_result::terminal_result_matches_accepted;
+/// Compare a terminal result with its submitted request.
+pub use analysis_result::terminal_result_matches_request;
 /// Analysis-run contract version constant.
 pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
+/// Analysis-run status/read contract version constant.
+pub use analysis_run::ANALYSIS_RUN_STATUS_CONTRACT_VERSION;
 /// Accepted analysis-run response.
 pub use analysis_run::AnalysisRunAccepted;
 /// Analysis-run create request.
 pub use analysis_run::AnalysisRunRequest;
+/// Typed analysis-run status/read response.
+pub use analysis_run::AnalysisRunStatus;
+/// Analysis-run status/read lifecycle state.
+pub use analysis_run::AnalysisRunStatusState;
 /// Default analysis-run payload byte limit.
 pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 /// Idempotent request equality helper.
 pub use analysis_run::requests_are_idempotent_matches;
+/// Require exact status binding to a request and accepted receipt.
+pub use analysis_run::require_status_binding;
 /// Content-redacting error envelope.
 pub use envelope::ErrorEnvelope;
 /// Fail-closed API errors.
