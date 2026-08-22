@@ -4999,8 +4999,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
+        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
+        recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -5136,7 +5136,8 @@ mod tests {
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
-        refuse_unmatched_time_varying_predictor_interval,
+        refuse_unmatched_time_varying_predictor_interval, ClusteredEventScore, EventOccasion,
+        LagClock, LaggedWithinResidual,
     };
     use crate::error::PsychometricError;
 
@@ -7911,6 +7912,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn after_extra_process_contribution_refuses_non_interior_interval() {
         let coupling = 0.4_f64;
         let predictor = 3.0_f64;
@@ -7971,6 +7973,72 @@ mod tests {
                 LagClock::EventTime
             ),
             Ok(0.5)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution_after(
+                coupling,
+                predictor,
+                original,
+                extra,
+                2.0,
+                1.0,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution_after(
+                coupling,
+                predictor,
+                original,
+                extra,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution_after(
+                coupling,
+                predictor,
+                original,
+                extra,
+                f64::NAN,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_extra_process_after(
+                1.0,
+                original,
+                0.3,
+                coupling,
+                predictor,
+                extra,
+                2.0,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        let evolved = recover_discrete_latent_mean(1.0, original, 0.3, 2.0, LagClock::EventTime)
+            .expect("mu-t");
+        assert_eq!(
+            recover_discrete_latent_mean_with_extra_process_after(
+                1.0,
+                original,
+                0.3,
+                0.0,
+                predictor,
+                extra,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Ok(evolved)
         );
     }
 
@@ -9014,8 +9082,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -11101,11 +11169,43 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+        assert_eq!(
+            recover_initial_time_independent_predictor_carry(
+                f64::NAN,
+                1.0,
+                -0.5,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_carry(
+                1.0,
+                1.0,
+                1e308,
+                10.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_time_independent_predictor(
+                1.0,
+                -0.5,
+                0.3,
+                f64::NAN,
+                1.0,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
+    ) {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -11255,8 +11355,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -11719,6 +11819,38 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_carry(
+                f64::NAN,
+                1.0,
+                -0.5,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_carry(
+                1.0,
+                1.0,
+                1e308,
+                10.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_time_dependent_predictor(
+                1.0,
+                -0.5,
+                0.3,
+                f64::NAN,
+                1.0,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]
@@ -11842,8 +11974,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,
