@@ -4999,8 +4999,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
-        recover_asymptotic_continuous_intercept,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
+        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -5136,8 +5136,7 @@ mod tests {
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
-        refuse_unmatched_time_varying_predictor_interval, ClusteredEventScore, EventOccasion,
-        LagClock, LaggedWithinResidual,
+        refuse_unmatched_time_varying_predictor_interval,
     };
     use crate::error::PsychometricError;
 
@@ -7590,6 +7589,99 @@ mod tests {
     }
 
     #[test]
+    fn nonfinite_short_circuit_operands_of_fail_closed_guards_execute() {
+        let event = LagClock::EventTime;
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(2.0, f64::NAN, 0.0),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_manifest_lagged_observed_covariance(2.0, 0.4, f64::NAN),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_continuous_intercept_effect(0.3, -0.5, f64::NAN, event),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(0.4, 3.0, -0.5, -1e-6, f64::NAN, event),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(0.4, f64::NAN, -0.5, -1e-6, 2.0, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(0.4, 3.0, f64::NAN, -1e-6, 2.0, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution(0.4, 3.0, -0.5, f64::NAN, 2.0, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_level_change_extra_process_contribution_after(
+                0.4,
+                3.0,
+                -0.5,
+                -0.05,
+                2.0,
+                f64::NAN,
+                event
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_independent_predictor_effect(0.2, 1.0, -0.5, f64::NAN, event),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_independent_predictor_effect(0.2, f64::NAN, -0.5, 2.0, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(0.2, f64::NAN, -0.5, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_effect(0.2, 1.0, f64::NAN, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(f64::NAN, 1.0, -0.5, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(0.2, f64::NAN, -0.5, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(0.2, 1.0, f64::NAN, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_continuous_intercept(0.3, f64::NAN, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_predictor_carry(0.4, 3.0, -0.5, f64::NAN, event),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_carry(0.4, 3.0, -0.5, f64::NAN, event),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(0.4, 3.0, -0.5, f64::NAN, 1.0, event),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_time_dependent_predictor_impulse_carry(0.4, 3.0, -0.5, 2.0, f64::NAN, event),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+    }
+
+    #[test]
     fn extra_process_contribution_underflow_and_overflow_paths() {
         let coupling = 0.4_f64;
         let predictor = 3.0_f64;
@@ -9082,8 +9174,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -11204,8 +11296,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
-    ) {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
+     {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -11355,8 +11447,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
-    ) {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
+     {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -11974,8 +12066,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
-    ) {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
+     {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,

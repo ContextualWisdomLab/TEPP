@@ -47,13 +47,17 @@ impl MeanInvarianceStatus {
     }
 
     /// `#84` `measurement_invariance` wire name without importing that crate.
+    ///
+    /// `#84` defines only `configural`, `metric`, and `scalar`. Local
+    /// [`Self::Strict`] has no `#84` wire name; use [`Self::as_str`] for the
+    /// Meredith-style local label.
     #[must_use]
-    pub const fn as_measurement_invariance_wire_name(self) -> &'static str {
+    pub const fn as_measurement_invariance_wire_name(self) -> Option<&'static str> {
         match self {
-            Self::Configural => "configural",
-            Self::Metric => "metric",
-            Self::Strong => "scalar",
-            Self::Strict => "strict",
+            Self::Configural => Some("configural"),
+            Self::Metric => Some("metric"),
+            Self::Strong => Some("scalar"),
+            Self::Strict => None,
         }
     }
 
@@ -223,20 +227,24 @@ mod tests {
     fn hash84_metric_wire_name_does_not_license_latent_means() {
         assert_eq!(
             MeanInvarianceStatus::Metric.as_measurement_invariance_wire_name(),
-            "metric"
+            Some("metric")
         );
         assert!(MeanInvarianceStatus::Metric.licenses_shared_metric_meaning());
         assert!(!MeanInvarianceStatus::Metric.licenses_latent_mean_comparison());
         assert_eq!(MeanInvarianceStatus::Metric.as_str(), "metric");
         assert_eq!(MeanInvarianceStatus::Configural.as_str(), "configural");
         assert_eq!(MeanInvarianceStatus::Strict.as_str(), "strict");
+        assert_eq!(
+            MeanInvarianceStatus::Strict.as_measurement_invariance_wire_name(),
+            None
+        );
     }
 
     #[test]
     fn hash84_scalar_wire_name_is_strong_and_licenses_means() {
         assert_eq!(
             MeanInvarianceStatus::Strong.as_measurement_invariance_wire_name(),
-            "scalar"
+            Some("scalar")
         );
         assert!(MeanInvarianceStatus::Strong.licenses_shared_metric_meaning());
         assert!(MeanInvarianceStatus::Strong.licenses_latent_mean_comparison());
@@ -244,14 +252,28 @@ mod tests {
         assert!(MeanInvarianceStatus::Strict.licenses_latent_mean_comparison());
         assert_eq!(
             MeanInvarianceStatus::Strict.as_measurement_invariance_wire_name(),
-            "strict"
+            None
         );
         assert!(!MeanInvarianceStatus::Configural.licenses_shared_metric_meaning());
         assert!(!MeanInvarianceStatus::Configural.licenses_latent_mean_comparison());
         assert_eq!(
             MeanInvarianceStatus::Configural.as_measurement_invariance_wire_name(),
-            "configural"
+            Some("configural")
         );
+        // `#84` InvarianceLevel::from_wire_name recognizes only these three.
+        let hash84_wire_names = ["configural", "metric", "scalar"];
+        for status in [
+            MeanInvarianceStatus::Configural,
+            MeanInvarianceStatus::Metric,
+            MeanInvarianceStatus::Strong,
+        ] {
+            let wire = status
+                .as_measurement_invariance_wire_name()
+                .expect("configural/metric/strong map onto #84");
+            assert!(hash84_wire_names.contains(&wire));
+        }
+        assert!(!hash84_wire_names.contains(&MeanInvarianceStatus::Strict.as_str()));
+        assert!(!hash84_wire_names.contains(&"strict"));
     }
 
     #[test]

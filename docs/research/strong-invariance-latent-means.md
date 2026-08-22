@@ -4,7 +4,7 @@
 
 Adds a two-group OLS classification of configural / metric / strong / strict status and recovers \((\bar y_c-\bar y_r)/\lambda\) only when strong or strict holds. The boolean `compare_latent_means` helper is unchanged.
 
-This slice does **not** import the unpublished `measurement_invariance` crate on `#84`. Claim-boundary tests use that crate's wire names (`configural`, `metric`, `scalar`) as documented strings only.
+This slice does **not** import the unpublished `measurement_invariance` crate on `#84`. Claim-boundary tests use that crate's wire names (`configural`, `metric`, `scalar`) as documented strings only. Local `strict` is Meredith-style residual invariance; `#84` has no such wire name, so `as_measurement_invariance_wire_name` returns `None` for `Strict` and `as_str` keeps `"strict"`.
 
 ## Claim boundary
 
@@ -65,4 +65,4 @@ The formula follows by subtracting the group means of \(y=\nu+\lambda f+e\) afte
 - strong/strict series recover a known mean difference with computed RMSE;
 - metric-only (equal loading, shifted intercept) and configural series return `StrongInvarianceRequired`;
 - two-observation series with matching loading and intercept classify as strong, not strict, and still recover the known mean difference;
-- `#84` wire-name tests: `metric` licenses shared metric meaning and refuses means; `scalar` is strong and licenses means.
+- `#84` wire-name tests: `metric` licenses shared metric meaning and refuses means; `scalar` is strong and licenses means; local `strict` is not a `#84` wire name.

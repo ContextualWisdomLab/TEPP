@@ -104,10 +104,35 @@ fn rubin_t_noisy_truth_reports_bias_rmse_and_interval_coverage() {
 }
 
 #[test]
+fn hash84_wire_map_excludes_local_strict() {
+    assert_eq!(MeanInvarianceStatus::Strict.as_str(), "strict");
+    assert_eq!(
+        MeanInvarianceStatus::Strict.as_measurement_invariance_wire_name(),
+        None
+    );
+    assert!(MeanInvarianceStatus::Strict.licenses_latent_mean_comparison());
+    assert!(MeanInvarianceStatus::Strict.licenses_shared_metric_meaning());
+    let hash84_wire_names = ["configural", "metric", "scalar"];
+    assert_eq!(
+        MeanInvarianceStatus::Configural.as_measurement_invariance_wire_name(),
+        Some("configural")
+    );
+    assert_eq!(
+        MeanInvarianceStatus::Metric.as_measurement_invariance_wire_name(),
+        Some("metric")
+    );
+    assert_eq!(
+        MeanInvarianceStatus::Strong.as_measurement_invariance_wire_name(),
+        Some("scalar")
+    );
+    assert!(!hash84_wire_names.contains(&"strict"));
+}
+
+#[test]
 fn metric_status_matches_hash84_metric_and_refuses_latent_means() {
     assert_eq!(
         MeanInvarianceStatus::Metric.as_measurement_invariance_wire_name(),
-        "metric"
+        Some("metric")
     );
     assert!(MeanInvarianceStatus::Metric.licenses_shared_metric_meaning());
     assert!(!MeanInvarianceStatus::Metric.licenses_latent_mean_comparison());
@@ -147,7 +172,7 @@ fn metric_status_matches_hash84_metric_and_refuses_latent_means() {
 fn strong_status_matches_hash84_scalar_and_recovers_mean_difference() {
     assert_eq!(
         MeanInvarianceStatus::Strong.as_measurement_invariance_wire_name(),
-        "scalar"
+        Some("scalar")
     );
     assert!(MeanInvarianceStatus::Strong.licenses_latent_mean_comparison());
 
@@ -194,7 +219,7 @@ fn two_observation_series_cap_at_strong_scalar_and_still_license_means() {
     assert_eq!(classified.status, MeanInvarianceStatus::Strong);
     assert_eq!(
         classified.status.as_measurement_invariance_wire_name(),
-        "scalar"
+        Some("scalar")
     );
     assert_eq!(
         classified.reference_residual_variance.to_bits(),
