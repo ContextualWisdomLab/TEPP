@@ -43,6 +43,11 @@ flowchart LR
 
 Every boundary must be independently usable and expose versioned contracts for integration with organization repositories, `naruon`, and `contextual-orchestrator`.
 
+The `analysis_engine` vertical slice is intentionally separate from `tepp_api`:
+the API owns wire contracts while the engine owns deterministic execution. It
+does not replace the future topic or psychometric estimators and does not read
+another service's application tables.
+
 ## Implemented foundation topology
 
 Task 1 materializes the first storage-independent workspace boundaries. The
@@ -60,7 +65,8 @@ boundaries above remain the target modular MSA architecture.
 | `corpus_split` | cutoff-safe, relation-aware partitioning |
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
-| `tepp_api` | versioned DTO, schema, and export contracts |
+| `tepp_api` | versioned DTO, schema, terminal-result, and export contracts |
+| `analysis_engine` | bounded cutoff-safe temporal evidence readiness execution and digest-bound terminal artifacts |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

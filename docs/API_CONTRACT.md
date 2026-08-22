@@ -1,7 +1,7 @@
 # TEPP API and Modular Integration Contract
 
 **Status:** Accepted target contract; exact endpoints are introduced only with executable services.  
-**Last reviewed:** 2026-08-16
+**Last reviewed:** 2026-08-21
 
 ## 1. Authority boundary
 
@@ -21,6 +21,7 @@ Current protected main exposes Rust library/domain contracts. The active PR adds
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
 | analysis-run request/accepted/status/terminal-result contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR #157 |
+| cutoff-safe analysis-run readiness execution | `analysis_engine` bounded Rust crate | `tepp_api`, future HTTP/service adapters | active-PR #178 stacked on #157 |
 
 ## 3. Versioning
 
@@ -57,6 +58,13 @@ terminal status contains exactly one request-bound
 snapshot, cutoff, model, profile, and idempotency bindings before treating the
 run as measurement evidence. The Rust DTO is available before the future HTTP
 service is deployed.
+
+The stacked `analysis_engine` slice provides the first executable service-side
+path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
+evidence unavailable at the historical cutoff, preserves multiple-membership
+counts, and emits a digest-bound terminal result or a redacted failure. It is
+not a substitute for the approved topic or psychometric estimators and remains
+active-PR evidence until its exact-head checks and protected merge pass.
 
 ## 5. Analysis request authority
 

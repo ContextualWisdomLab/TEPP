@@ -82,7 +82,7 @@ def is_executable_source_line(
         return False
     if text.startswith("#[") or text.startswith("#!["):
         return False
-    if text in {"{", "}", "},", ");", "];", "();", "};"}:
+    if text in {"{", "}", "},", ")", ");", "];", "();", "};"}:
         return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False

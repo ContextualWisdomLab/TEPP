@@ -6,10 +6,9 @@ implemented in Rust.
 
 ## Current implementation state
 
-This branch establishes the Task 1 Rust workspace and quality-gate foundation.
-The ten bounded crates compile independently but intentionally expose no
-placeholder production APIs. Domain behavior begins in Task 2 with immutable
-evidence identifiers and source records.
+This branch establishes the Rust workspace and quality-gate foundation. The
+eleven bounded crates compile independently; domain behavior includes immutable
+evidence records and the active stacked cutoff-safe analysis execution slice.
 
 ```text
 crates/evidence_core
@@ -22,6 +21,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/analysis_engine
 ```
 
 ## Local verification
@@ -56,3 +56,7 @@ this skeleton-only slice; it must never conceal uncovered production behavior.
 
 No release, production-readiness, GPU, database, or statistical-recovery claim is
 made by this foundation slice.
+
+The active stacked analysis-engine slice adds a bounded executable readiness path
+from an accepted run to a digest-bound terminal artifact. It is not yet
+implemented-main and does not replace scientific estimator contracts.
