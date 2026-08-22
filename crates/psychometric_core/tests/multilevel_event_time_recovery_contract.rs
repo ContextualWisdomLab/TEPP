@@ -34,10 +34,11 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_initial_latent_mean, recover_stationary_initial_observed_mean,
-    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_latent_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -109,6 +110,11 @@ use psychometric_core::{
     refuse_stationary_initial_latent_mean_as_discrete_mean,
     refuse_stationary_initial_latent_mean_as_initial_latent_mean,
     refuse_stationary_initial_latent_mean_as_observed_mean,
+    refuse_stationary_initial_latent_variance_as_asymptotic_time_independent_variance,
+    refuse_stationary_initial_latent_variance_as_discrete_variance,
+    refuse_stationary_initial_latent_variance_as_initial_latent_variance,
+    refuse_stationary_initial_latent_variance_as_stationary_within_subject,
+    refuse_stationary_initial_latent_variance_as_trait_variance,
     refuse_stationary_initial_observed_mean_as_manifest_means,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
@@ -4697,5 +4703,157 @@ fn stationary_initial_observed_mean_refuses_unstable_drift_and_non_event_clocks(
     assert_eq!(
         recover_stationary_initial_observed_mean(2.0, 0.0, 0.0, 1.0, 0.0, 0.5, LagClock::EventTime),
         Ok(0.5)
+    );
+}
+
+#[test]
+fn stationary_initial_latent_variance_recovers_driver_section_four_point_three() {
+    let printed_effect = -0.225_f64;
+    let printed_asym = -1.673_f64;
+    let log_rate = -printed_effect / printed_asym;
+    let trait_variance = 1.0_f64;
+    let diffusion = 0.4_f64;
+    let predictor_variance = 1.0_f64;
+    let recovered = recover_stationary_initial_latent_variance(
+        trait_variance,
+        diffusion,
+        printed_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("stationary T0VAR");
+    let state = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let trait_plus_state =
+        recover_trait_plus_state_latent_variance(trait_variance, state).expect("trait+state");
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        printed_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let expected = trait_plus_state + added;
+    let error = rmse(&[expected], &[recovered]);
+    assert!(
+        error < 1e-12,
+        "Driver §4.3 stationary T0VAR RMSE {error}: got {recovered}"
+    );
+    let discrete =
+        recover_discrete_latent_variance(recovered, diffusion, log_rate, 1.0, LagClock::EventTime)
+            .expect("Var(η_t)");
+    let free_t0 = 2.0_f64;
+    assert!(rmse(&[recovered], &[free_t0]) > error);
+    assert!(rmse(&[recovered], &[state]) > error);
+    assert!(rmse(&[recovered], &[trait_variance]) > error);
+    assert!(rmse(&[recovered], &[added]) > error);
+    assert!(rmse(&[recovered], &[discrete]) > error);
+    assert!(rmse(&[recovered], &[2.838]) > error);
+    assert_eq!(
+        recover_stationary_initial_latent_variance(
+            0.0,
+            0.0,
+            0.0,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        ),
+        Ok(0.0)
+    );
+    assert_eq!(
+        recover_stationary_initial_latent_variance(
+            trait_variance,
+            0.0,
+            0.0,
+            predictor_variance,
+            0.0,
+            LagClock::EventTime,
+        ),
+        Ok(trait_variance)
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_initial_latent_variance(recovered, free_t0),
+        Err(PsychometricError::StationaryInitialLatentVarianceIsNotInitialLatentVariance)
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_stationary_within_subject(recovered, state),
+        Err(PsychometricError::StationaryInitialLatentVarianceIsNotStationaryWithinSubject)
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_trait_variance(recovered, trait_variance),
+        Err(PsychometricError::StationaryInitialLatentVarianceIsNotTraitVariance)
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_asymptotic_time_independent_variance(
+            recovered, added
+        ),
+        Err(
+            PsychometricError::StationaryInitialLatentVarianceIsNotAsymptoticTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_discrete_variance(recovered, discrete),
+        Err(PsychometricError::StationaryInitialLatentVarianceIsNotDiscreteVariance)
+    );
+}
+
+#[test]
+fn stationary_initial_latent_variance_refuses_unstable_drift_and_non_event_clocks() {
+    assert_eq!(
+        recover_stationary_initial_latent_variance(
+            1.0,
+            0.4,
+            -0.225,
+            1.0,
+            -0.13,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_stationary_initial_latent_variance(0.0, 0.4, 0.0, 1.0, 0.0, LagClock::EventTime),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_stationary_initial_latent_variance(0.0, 0.0, -0.225, 1.0, 0.5, LagClock::EventTime),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_stationary_initial_latent_variance(0.0, 0.0, 0.0, 1.0, 0.0, LagClock::EventTime),
+        Ok(0.0)
+    );
+    assert_eq!(
+        recover_stationary_initial_latent_variance(
+            f64::NAN,
+            0.4,
+            0.0,
+            0.0,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_stationary_initial_latent_variance(
+            f64::MAX,
+            f64::MAX,
+            0.0,
+            0.0,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_stationary_initial_latent_variance(
+            f64::MAX,
+            0.0,
+            1.0,
+            f64::MAX,
+            -1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }

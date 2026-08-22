@@ -140,6 +140,14 @@
 //! that observed mean when `B z ≠ 0`; `τ + λ μ_t` is not that
 //! observed mean; `MANIFESTMEANS` is not `E(y_0)`; the constrained
 //! latent mean is not `E(y_0)`),
+//! recovers the Driver §4.3 / p. 16 stationary `T0VAR` as
+//! `trait + −q / (2 a) + (B / a)² v`
+//! (JSS PDF re-opened 2026-08-22T03:07Z; constrained first-occasion
+//! variance; form the within-subject contribution first, then
+//! include the trait, then include the TI extra variance, then add;
+//! not free `T0VAR`, not `asymDIFFUSION` alone, not `TRAITVAR`
+//! alone, not `addedTIPREDVAR` alone, and not the finite-interval
+//! discrete latent variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -278,6 +286,8 @@ pub use event_time::recover_manifest_observed_variance;
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
+/// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
+pub use event_time::recover_stationary_initial_latent_variance;
 /// Exact scalar Eq. 5 of §4.3 stationary `T0MEANS` `τ + λ(−κ / a + −B z / a)`.
 pub use event_time::recover_stationary_initial_observed_mean;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
@@ -448,6 +458,16 @@ pub use event_time::refuse_stationary_initial_latent_mean_as_discrete_mean;
 pub use event_time::refuse_stationary_initial_latent_mean_as_initial_latent_mean;
 /// Refuse treating §4.3 stationary `T0MEANS` as `E(y_0)`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_observed_mean;
+/// Refuse treating §4.3 / p. 16 stationary `T0VAR` as `addedTIPREDVAR`.
+pub use event_time::refuse_stationary_initial_latent_variance_as_asymptotic_time_independent_variance;
+/// Refuse treating §4.3 / p. 16 stationary `T0VAR` as a finite-interval discrete variance.
+pub use event_time::refuse_stationary_initial_latent_variance_as_discrete_variance;
+/// Refuse treating §4.3 / p. 16 stationary `T0VAR` as free `T0VAR`.
+pub use event_time::refuse_stationary_initial_latent_variance_as_initial_latent_variance;
+/// Refuse treating §4.3 / p. 16 stationary `T0VAR` as `asymDIFFUSION`.
+pub use event_time::refuse_stationary_initial_latent_variance_as_stationary_within_subject;
+/// Refuse treating §4.3 / p. 16 stationary `T0VAR` as `TRAITVAR`.
+pub use event_time::refuse_stationary_initial_latent_variance_as_trait_variance;
 /// Refuse treating Eq. 5 of §4.3 stationary `T0MEANS` as `MANIFESTMEANS`.
 pub use event_time::refuse_stationary_initial_observed_mean_as_manifest_means;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.

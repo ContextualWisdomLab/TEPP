@@ -29,10 +29,10 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_stationary_initial_latent_mean, recover_stationary_initial_observed_mean,
-    recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_latent_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -102,6 +102,11 @@ use psychometric_core::{
     refuse_stationary_initial_latent_mean_as_discrete_mean,
     refuse_stationary_initial_latent_mean_as_initial_latent_mean,
     refuse_stationary_initial_latent_mean_as_observed_mean,
+    refuse_stationary_initial_latent_variance_as_asymptotic_time_independent_variance,
+    refuse_stationary_initial_latent_variance_as_discrete_variance,
+    refuse_stationary_initial_latent_variance_as_initial_latent_variance,
+    refuse_stationary_initial_latent_variance_as_stationary_within_subject,
+    refuse_stationary_initial_latent_variance_as_trait_variance,
     refuse_stationary_initial_observed_mean_as_manifest_means,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
@@ -2420,6 +2425,90 @@ fn stationary_initial_observed_mean_is_not_manifest_latent_evolved_or_free() {
         ),
         Err(
             psychometric_core::PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean
+        )
+    );
+}
+
+#[test]
+fn stationary_initial_latent_variance_is_not_t0_state_trait_tipred_or_discrete() {
+    let trait_variance = 1.0_f64;
+    let diffusion = 0.4_f64;
+    let log_rate = -0.134_488_942_f64;
+    let recovered = recover_stationary_initial_latent_variance(
+        trait_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("stationary T0VAR");
+    let state = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let discrete =
+        recover_discrete_latent_variance(recovered, diffusion, log_rate, 1.0, LagClock::EventTime)
+            .expect("Var(η_t)");
+    assert!(
+        (recovered - 2.0).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / p. 16): constrained T0VAR is not free T0VAR"
+    );
+    assert!(
+        (recovered - state).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / p. 16): constrained T0VAR is not asymDIFFUSION"
+    );
+    assert!(
+        (recovered - trait_variance).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / p. 16): constrained T0VAR is not TRAITVAR"
+    );
+    assert!(
+        (recovered - added).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / p. 16): constrained T0VAR is not addedTIPREDVAR"
+    );
+    assert!(
+        (recovered - discrete).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 / p. 16): constrained T0VAR is not Var(η_t)"
+    );
+    assert!(
+        (recovered - 2.838).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): printed 2-latent addedTIPREDVAR is not this scalar map"
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_initial_latent_variance(recovered, 2.0),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentVarianceIsNotInitialLatentVariance
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_stationary_within_subject(recovered, state),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentVarianceIsNotStationaryWithinSubject
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_trait_variance(recovered, trait_variance),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentVarianceIsNotTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_asymptotic_time_independent_variance(
+            recovered, added
+        ),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentVarianceIsNotAsymptoticTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_discrete_variance(recovered, discrete),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentVarianceIsNotDiscreteVariance
         )
     );
 }

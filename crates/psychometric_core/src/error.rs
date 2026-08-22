@@ -408,6 +408,30 @@ pub enum PsychometricError {
     /// stationary `T0MEANS`. `τ + λ μ_0` is not
     /// `τ + λ(−κ / a + −B z / a)`.
     InitialObservedMeanIsNotStationaryInitialObservedMean,
+    /// Driver §4.3 / p. 16 stationary `T0VAR` was treated as free
+    /// `T0VAR`. `trait + −q / (2 a) + (B / a)² v` is the constrained
+    /// first-occasion variance, not the free first-occasion latent
+    /// variance.
+    StationaryInitialLatentVarianceIsNotInitialLatentVariance,
+    /// Driver §4.3 / p. 16 stationary `T0VAR` was treated as
+    /// `asymDIFFUSION`. The constraint includes trait variance and
+    /// time-independent predictor variance. `-q / (2 a)` is not that
+    /// composition when `TRAITVAR` or `addedTIPREDVAR` is nonzero.
+    StationaryInitialLatentVarianceIsNotStationaryWithinSubject,
+    /// Driver §4.3 / p. 16 stationary `T0VAR` was treated as
+    /// `TRAITVAR`. The constraint includes the within-subject
+    /// process variance and time-independent predictor variance.
+    StationaryInitialLatentVarianceIsNotTraitVariance,
+    /// Driver §4.3 / p. 16 stationary `T0VAR` was treated as
+    /// `addedTIPREDVAR`. The constraint includes trait variance and
+    /// `asymDIFFUSION`. `(B / a)² v` is not that composition when
+    /// those contributions are nonzero.
+    StationaryInitialLatentVarianceIsNotAsymptoticTimeIndependentVariance,
+    /// Driver §4.3 / p. 16 stationary `T0VAR` was treated as a
+    /// finite-interval discrete latent variance.
+    /// `exp(2 a Δt) p + Q_Δt` is not the constrained first-occasion
+    /// variance.
+    StationaryInitialLatentVarianceIsNotDiscreteVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -734,6 +758,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialObservedMeanIsNotStationaryInitialObservedMean => {
                 "free first-occasion observed mean is not the stationary first-occasion observed mean"
+            }
+            Self::StationaryInitialLatentVarianceIsNotInitialLatentVariance => {
+                "stationary first-occasion latent variance is not the free first-occasion latent variance"
+            }
+            Self::StationaryInitialLatentVarianceIsNotStationaryWithinSubject => {
+                "stationary first-occasion latent variance is not the asymptotic within-subject variance"
+            }
+            Self::StationaryInitialLatentVarianceIsNotTraitVariance => {
+                "stationary first-occasion latent variance is not the trait variance"
+            }
+            Self::StationaryInitialLatentVarianceIsNotAsymptoticTimeIndependentVariance => {
+                "stationary first-occasion latent variance is not the asymptotic time-independent predictor variance"
+            }
+            Self::StationaryInitialLatentVarianceIsNotDiscreteVariance => {
+                "stationary first-occasion latent variance is not the finite-interval discrete latent variance"
             }
         };
         formatter.write_str(message)
@@ -1234,6 +1273,33 @@ mod tests {
         assert_eq!(
             PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean.to_string(),
             "free first-occasion observed mean is not the stationary first-occasion observed mean"
+        );
+    }
+
+    #[test]
+    fn stationary_initial_latent_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentVarianceIsNotInitialLatentVariance
+                .to_string(),
+            "stationary first-occasion latent variance is not the free first-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentVarianceIsNotStationaryWithinSubject
+                .to_string(),
+            "stationary first-occasion latent variance is not the asymptotic within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentVarianceIsNotTraitVariance.to_string(),
+            "stationary first-occasion latent variance is not the trait variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentVarianceIsNotAsymptoticTimeIndependentVariance
+                .to_string(),
+            "stationary first-occasion latent variance is not the asymptotic time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentVarianceIsNotDiscreteVariance.to_string(),
+            "stationary first-occasion latent variance is not the finite-interval discrete latent variance"
         );
     }
 }
