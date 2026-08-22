@@ -148,6 +148,14 @@
 //! not free `T0VAR`, not `asymDIFFUSION` alone, not `TRAITVAR`
 //! alone, not `addedTIPREDVAR` alone, and not the finite-interval
 //! discrete latent variance),
+//! recovers the Driver Eq. 5 of that constrained variance as
+//! `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ`
+//! (§4.3, pp. 9–10; Eq. 5, p. 5; Table 2, p. 12; JSS PDF re-opened
+//! 2026-08-22T03:20Z; form the stationary latent variance first,
+//! then `λ² p + θ + ψ`; `λ² p_0` is not that observed variance;
+//! `λ²(−q / (2 a)) + θ` is not that observed variance when
+//! `TRAITVAR` or `addedTIPREDVAR` is nonzero; `MANIFESTVAR` is not
+//! `Var(y_0)`; the constrained latent variance is not `Var(y_0)`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -290,6 +298,8 @@ pub use event_time::recover_stationary_initial_latent_mean;
 pub use event_time::recover_stationary_initial_latent_variance;
 /// Exact scalar Eq. 5 of §4.3 stationary `T0MEANS` `τ + λ(−κ / a + −B z / a)`.
 pub use event_time::recover_stationary_initial_observed_mean;
+/// Exact scalar Eq. 5 of §4.3 stationary `T0VAR` `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ`.
+pub use event_time::recover_stationary_initial_observed_variance;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
 /// Exact scalar contemporaneous `TDPREDEFFECT` impulse `m x`.
@@ -354,6 +364,8 @@ pub use event_time::refuse_evolved_observed_mean_as_initial_time_independent_obs
 pub use event_time::refuse_evolved_observed_mean_as_stationary_initial_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the time-independent-predictor observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_time_independent_observed_mean;
+/// Refuse treating evolved `λ² Var(η_t) + θ` as Eq. 5 of §4.3 stationary `T0VAR`.
+pub use event_time::refuse_evolved_observed_variance_as_stationary_initial_observed_variance;
 /// Refuse treating the §7.2 extra-process contribution as `E(y_t)`.
 pub use event_time::refuse_extra_process_contribution_as_observed_mean;
 /// Refuse treating the evolved-plus-contribution latent mean as `E(y_t)`.
@@ -386,6 +398,8 @@ pub use event_time::refuse_initial_latent_mean_as_evolved_mean;
 pub use event_time::refuse_initial_observed_mean_as_evolved_observed_mean;
 /// Refuse treating `τ + λ μ_0` as Eq. 5 of §4.3 stationary `T0MEANS`.
 pub use event_time::refuse_initial_observed_mean_as_stationary_initial_observed_mean;
+/// Refuse treating `λ² p_0 + θ` as Eq. 5 of §4.3 stationary `T0VAR`.
+pub use event_time::refuse_initial_observed_variance_as_stationary_initial_observed_variance;
 /// Refuse treating the Eq. 3 `T0TDPREDEFFECT` carry as the within-interval impulse carry.
 pub use event_time::refuse_initial_time_dependent_carry_as_impulse_carry;
 /// Refuse treating the Eq. 3 `T0TDPREDEFFECT` carry as the first-occasion shift.
@@ -464,12 +478,18 @@ pub use event_time::refuse_stationary_initial_latent_variance_as_asymptotic_time
 pub use event_time::refuse_stationary_initial_latent_variance_as_discrete_variance;
 /// Refuse treating §4.3 / p. 16 stationary `T0VAR` as free `T0VAR`.
 pub use event_time::refuse_stationary_initial_latent_variance_as_initial_latent_variance;
+/// Refuse treating §4.3 stationary `T0VAR` as `Var(y_0)`.
+pub use event_time::refuse_stationary_initial_latent_variance_as_observed_variance;
 /// Refuse treating §4.3 / p. 16 stationary `T0VAR` as `asymDIFFUSION`.
 pub use event_time::refuse_stationary_initial_latent_variance_as_stationary_within_subject;
 /// Refuse treating §4.3 / p. 16 stationary `T0VAR` as `TRAITVAR`.
 pub use event_time::refuse_stationary_initial_latent_variance_as_trait_variance;
 /// Refuse treating Eq. 5 of §4.3 stationary `T0MEANS` as `MANIFESTMEANS`.
 pub use event_time::refuse_stationary_initial_observed_mean_as_manifest_means;
+/// Refuse treating Eq. 5 of §4.3 stationary `T0VAR` as `MANIFESTVAR`.
+pub use event_time::refuse_stationary_initial_observed_variance_as_measurement_error;
+/// Refuse treating Eq. 5 of `asymDIFFUSION` as Eq. 5 of §4.3 stationary `T0VAR`.
+pub use event_time::refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
 pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
 /// Refuse treating Driver Eq. 3 impulse as `TIPREDEFFECT`.
