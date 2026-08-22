@@ -52,6 +52,10 @@ fn one_document_emits_three_estimation_rows_and_refuses_collapse() {
     assert!(rmse < 1e-15, "weight recovery RMSE {rmse}");
     let multiplicity = network.active_group_multiplicity(document, as_of);
     refuse_atomistic_collapse(&rows, multiplicity).expect("keep all rows");
+    assert_eq!(
+        refuse_atomistic_collapse(&rows, 0),
+        Err(MembershipError::InvalidWirePayload)
+    );
 
     let collapsed = vec![rows[0]];
     assert_eq!(

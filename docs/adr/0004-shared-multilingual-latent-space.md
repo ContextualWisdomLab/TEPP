@@ -1,7 +1,7 @@
 # ADR 0004 — Shared multilingual latent semantic space
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** partial — language-profile status, shared concept identity, exact-span semantic units, translation/stopword/TF-IDF-BM25 refusal, invariance-gated cross-language means, and CPU `f64` coordinate RMSE are implemented on the active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; language-tailored segmentation/morphology, concept-dictionary persistence, and full invariance/fairness validation packages remain accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs the complete topic-estimator/backend/global-topic contract built on this multilingual measurement decision.
 

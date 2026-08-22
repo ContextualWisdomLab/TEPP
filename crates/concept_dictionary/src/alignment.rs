@@ -1,0 +1,132 @@
+//! CPU `f64` concept-coordinate alignment and invariance gates.
+
+use crate::error::ConceptError;
+
+/// Measurement-invariance evidence for a cross-language comparison.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum InvarianceLevel {
+    /// No invariance evidence.
+    None,
+    /// Configural invariance only.
+    Configural,
+    /// Metric invariance.
+    Metric,
+    /// Scalar invariance.
+    Scalar,
+    /// Partial invariance sufficient for the claimed comparison.
+    Partial,
+}
+
+impl InvarianceLevel {
+    /// Stable wire name for the invariance level.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Configural => "configural",
+            Self::Metric => "metric",
+            Self::Scalar => "scalar",
+            Self::Partial => "partial",
+        }
+    }
+
+    /// Return whether latent-mean comparison is admissible.
+    #[must_use]
+    pub const fn admits_mean_comparison(self) -> bool {
+        matches!(self, Self::Scalar | Self::Partial)
+    }
+}
+
+/// Permit a cross-language mean comparison only with scalar or partial
+/// invariance evidence (Meredith, 1993; Vandenberg & Lance, 2000).
+///
+/// # Errors
+///
+/// Returns [`ConceptError::InvarianceRequired`] when the invariance level is
+/// insufficient for a mean comparison.
+pub const fn compare_cross_language_means(level: InvarianceLevel) -> Result<(), ConceptError> {
+    if level.admits_mean_comparison() {
+        Ok(())
+    } else {
+        Err(ConceptError::InvarianceRequired)
+    }
+}
+
+/// Root-mean-square error between two concept-coordinate vectors on CPU `f64`.
+///
+/// A scaled sum-of-squares accumulator avoids intermediate overflow when the
+/// final RMSE remains representable. A residual whose subtraction itself cannot
+/// be represented fails closed rather than returning a non-finite metric.
+///
+/// # Errors
+///
+/// Returns [`ConceptError::InvalidNumericInput`] for empty, unequal-length, or
+/// non-finite vectors, or an unrepresentable residual. The scaled accumulator
+/// keeps the normalized sum of squares at or below one, so finite residuals
+/// produce a finite RMSE without a second unreachable result branch.
+#[allow(clippy::cast_precision_loss)]
+pub fn concept_coordinate_rmse(left: &[f64], right: &[f64]) -> Result<f64, ConceptError> {
+    if left.is_empty() || left.len() != right.len() {
+        return Err(ConceptError::InvalidNumericInput);
+    }
+
+    let mut scale = 0.0_f64;
+    let mut scaled_sum_squares = 1.0_f64;
+    for (left_value, right_value) in left.iter().zip(right) {
+        if !left_value.is_finite() || !right_value.is_finite() {
+            return Err(ConceptError::InvalidNumericInput);
+        }
+        let residual = left_value - right_value;
+        if !residual.is_finite() {
+            return Err(ConceptError::InvalidNumericInput);
+        }
+        let magnitude = residual.abs();
+        if magnitude == 0.0 {
+            continue;
+        }
+        if scale < magnitude {
+            let ratio = scale / magnitude;
+            scaled_sum_squares = 1.0 + scaled_sum_squares * ratio * ratio;
+            scale = magnitude;
+        } else {
+            let ratio = magnitude / scale;
+            scaled_sum_squares += ratio * ratio;
+        }
+    }
+
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    Ok(scale * (scaled_sum_squares / left.len() as f64).sqrt())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{InvarianceLevel, compare_cross_language_means, concept_coordinate_rmse};
+    use crate::error::ConceptError;
+
+    #[test]
+    fn invariance_wire_names_and_identity_rmse() {
+        assert_eq!(InvarianceLevel::None.as_str(), "none");
+        assert_eq!(InvarianceLevel::Configural.as_str(), "configural");
+        assert_eq!(InvarianceLevel::Metric.as_str(), "metric");
+        assert_eq!(InvarianceLevel::Scalar.as_str(), "scalar");
+        assert_eq!(InvarianceLevel::Partial.as_str(), "partial");
+        compare_cross_language_means(InvarianceLevel::Scalar).expect("scalar");
+        assert_eq!(
+            compare_cross_language_means(InvarianceLevel::Metric),
+            Err(ConceptError::InvarianceRequired)
+        );
+        let error = concept_coordinate_rmse(&[1.0, 2.0], &[1.0, 2.0]).expect("identity");
+        assert!(error < 1e-12);
+    }
+
+    #[test]
+    fn finite_maximum_coordinates_keep_the_scaled_rmse_finite() {
+        let error = concept_coordinate_rmse(&[f64::MAX, f64::MAX], &[0.0, 0.0])
+            .expect("scaled maximum coordinates");
+        assert!(error.is_finite());
+        assert_eq!(error.to_bits(), f64::MAX.to_bits());
+    }
+}
