@@ -25,7 +25,8 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Versioned API/export contracts | `tepp_api` | implemented-main | — | unknown-field/version/limit tests | Task 12 / PR #21; HTTP service remaining |
 | Multiple-membership estimation rows | `membership_core` | active-PR | rows + collapse refusal | 3-row RMSE + collapse deny | ADR 0003; `docs/research/membership-estimation-rows.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
-| contextual-orchestrator HTTPS interchange | `tepp_api` | active-PR | interpretation POST builder | table-access + secret refusal | ADR 0011; `docs/research/orchestrator-http-interchange.md` |
+| contextual-orchestrator HTTPS interchange | `tepp_api` | implemented-main | interpretation POST builder | table-access + secret refusal | ADR 0011; `docs/research/orchestrator-http-interchange.md` |
+| Org `.github` control-plane binding | `tepp_api` | implemented-main | reusable-workflow binding | reusable-workflow identity + scientific-claim refusal | ADR 0011; live reusable-workflow dispatch remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 
 

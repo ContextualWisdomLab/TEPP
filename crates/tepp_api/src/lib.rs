@@ -12,6 +12,7 @@ mod envelope;
 mod error;
 mod export;
 mod orchestrator_http;
+mod org_github;
 mod wire;
 
 /// Analysis-run contract version constant.
@@ -61,3 +62,19 @@ pub use orchestrator_http::orchestrator_interpretation_exchange;
 pub use orchestrator_http::refuse_orchestrator_as_scientific_acceptance;
 /// Refuse repository-write or review-agent secret names.
 pub use orchestrator_http::refuse_repository_write_secret;
+/// Org reusable-workflow contract version.
+pub use org_github::ORG_GITHUB_WORKFLOW_CONTRACT_VERSION;
+/// Organization control-plane repository identity.
+pub use org_github::ORG_GITHUB_WORKFLOW_OWNER;
+/// Fail-closed org reusable-workflow binding.
+pub use org_github::OrgGithubWorkflowBinding;
+/// Authority an org reusable workflow may hold.
+pub use org_github::OrgWorkflowAuthority;
+/// Bind an org reusable workflow as CI/review/security only.
+pub use org_github::bind_org_github_workflow;
+/// Check conclusions never promote scientific claims.
+pub use org_github::refuse_check_conclusion_as_scientific_claim;
+/// Refuse Copilot, GitHub, or review-agent secret names.
+pub use org_github::refuse_org_workflow_secret;
+/// Org workflows never receive application-table access.
+pub use org_github::refuse_org_workflow_table_access;

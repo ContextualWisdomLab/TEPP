@@ -242,6 +242,9 @@ mod tests {
         assert!(network.active_memberships_for(other, during).is_empty());
         let active = network.active_memberships_for(member, during);
         assert_eq!(active.len(), 1);
+        assert_eq!(network.active_group_multiplicity(member, during), 1);
+        let active_weights = network.active_weight_by_role(member, during);
+        assert_eq!(active_weights.get(&MembershipRole::Template), Some(&1.0));
         assert_eq!(
             active[0].validity().certainty(),
             temporal_core::TemporalCertainty::Bounded
@@ -252,7 +255,46 @@ mod tests {
         assert!(network.active_weight_by_role(other, during).is_empty());
         let rows = network.estimation_rows_at(member, during).expect("one row");
         assert_eq!(rows.len(), 1);
+        assert_eq!(
+            network.estimation_rows_at(other, during),
+            Err(MembershipError::InvalidWirePayload)
+        );
+        assert_eq!(
+            network.insert(active[0]),
+            Err(MembershipError::DuplicateMembershipAssignment)
+        );
+        network
+            .insert(
+                MembershipAssignment::new(
+                    other,
+                    GroupId::new(),
+                    MembershipRole::Project,
+                    MembershipWeight::full().expect("full"),
+                    start,
+                    end,
+                )
+                .expect("other assignment"),
+            )
+            .expect("other insert");
         super::refuse_atomistic_collapse(&rows, 1).expect("single membership");
+        assert_eq!(
+            super::refuse_atomistic_collapse(&[], 1),
+            Err(MembershipError::InvalidWirePayload)
+        );
+        assert_eq!(
+            super::refuse_atomistic_collapse(&rows, 2),
+            Err(MembershipError::AtomisticCollapseRefused)
+        );
+        let mut mixed_rows = rows.clone();
+        mixed_rows.extend(
+            network
+                .estimation_rows_at(other, during)
+                .expect("other row"),
+        );
+        assert_eq!(
+            super::refuse_atomistic_collapse(&mixed_rows, 2),
+            Err(MembershipError::InvalidWirePayload)
+        );
         assert_eq!(rows[0].member_id(), member);
         assert_eq!(rows[0].group_id(), group);
         assert_eq!(rows[0].role(), MembershipRole::Template);
