@@ -21,7 +21,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
-crates/psychometric_core  # construct/input gates; not a full ESEM/DSEM estimator
+crates/psychometric_core  # input gates, CWC/event-time/contextual, irregular residual lag, Rubin T, strong means, Driver Eq. 3 TDPRED/TIPRED maps including Eq. 5 of TIPREDEFFECT; not a full ESEM/DSEM estimator
 ```
 
 ## Local verification
