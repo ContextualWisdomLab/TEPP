@@ -36,6 +36,7 @@ use psychometric_core::{
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
     recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
     recover_stationary_latent_variance, recover_time_dependent_predictor_impulse,
     recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
     recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
@@ -105,6 +106,7 @@ use psychometric_core::{
     refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
+    refuse_measurement_error_as_stationary_lagged_observed_covariance,
     refuse_pooled_discrete_lag_across_unequal_intervals,
     refuse_process_noise_as_unconditional_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
@@ -120,6 +122,10 @@ use psychometric_core::{
     refuse_stationary_initial_latent_variance_as_trait_variance,
     refuse_stationary_initial_observed_mean_as_manifest_means,
     refuse_stationary_initial_observed_variance_as_measurement_error,
+    refuse_stationary_initial_observed_variance_as_stationary_lagged_observed_covariance,
+    refuse_stationary_lagged_latent_covariance_as_decayed_stationary_variance,
+    refuse_stationary_lagged_latent_covariance_as_observed_covariance,
+    refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance,
     refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
@@ -134,6 +140,7 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
 };
@@ -5033,5 +5040,360 @@ fn stationary_initial_observed_variance_refuses_unstable_drift_and_non_event_clo
             LagClock::EventTime
         ),
         Ok(0.6)
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn stationary_lagged_latent_covariance_recovers_driver_section_four_point_three() {
+    let printed_effect = -0.225_f64;
+    let printed_asym = -1.673_f64;
+    let log_rate = -printed_effect / printed_asym;
+    let trait_variance = 1.0_f64;
+    let diffusion = 0.4_f64;
+    let predictor_variance = 1.0_f64;
+    let event_delta = 1.0_f64;
+    let recovered = recover_stationary_lagged_latent_covariance(
+        trait_variance,
+        diffusion,
+        printed_effect,
+        predictor_variance,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("stationary lagged T0VAR");
+    let state = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let trait_plus_state = recover_trait_plus_state_lagged_covariance(
+        trait_variance,
+        state,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("trait+state lagged");
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        printed_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let expected = trait_plus_state + added;
+    let error = rmse(&[expected], &[recovered]);
+    assert!(
+        error < 1e-12,
+        "Driver §4.3 lagged stationary T0VAR RMSE {error}: got {recovered}"
+    );
+    let contemporaneous = recover_stationary_initial_latent_variance(
+        trait_variance,
+        diffusion,
+        printed_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("stationary T0VAR");
+    let decayed = recover_discrete_lagged_latent_covariance(
+        contemporaneous,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("e^{aΔt} p_stat");
+    assert!(rmse(&[recovered], &[contemporaneous]) > error);
+    assert!(rmse(&[recovered], &[decayed]) > error);
+    assert!(rmse(&[recovered], &[trait_plus_state]) > error);
+    assert_eq!(
+        recover_stationary_lagged_latent_covariance(
+            0.0,
+            0.0,
+            0.0,
+            predictor_variance,
+            log_rate,
+            event_delta,
+            LagClock::EventTime,
+        ),
+        Ok(0.0)
+    );
+    assert_eq!(
+        recover_stationary_lagged_latent_covariance(
+            trait_variance,
+            0.0,
+            0.0,
+            predictor_variance,
+            0.0,
+            event_delta,
+            LagClock::EventTime,
+        ),
+        Ok(trait_variance)
+    );
+    let far = recover_stationary_lagged_latent_covariance(
+        trait_variance,
+        diffusion,
+        printed_effect,
+        predictor_variance,
+        log_rate,
+        1e8,
+        LagClock::EventTime,
+    )
+    .expect("Δt→∞");
+    assert!(rmse(&[far], &[trait_variance + added]) < 1e-12);
+    assert_eq!(
+        refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance(
+            recovered,
+            contemporaneous
+        ),
+        Err(
+            PsychometricError::StationaryLaggedLatentCovarianceIsNotStationaryInitialLatentVariance
+        )
+    );
+    assert_eq!(
+        refuse_stationary_lagged_latent_covariance_as_decayed_stationary_variance(
+            recovered, decayed
+        ),
+        Err(PsychometricError::StationaryLaggedLatentCovarianceIsNotDecayedStationaryVariance)
+    );
+    assert_eq!(
+        refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance(
+            trait_plus_state,
+            recovered
+        ),
+        Err(PsychometricError::TraitPlusStateLaggedCovarianceIsNotStationaryLaggedLatentCovariance)
+    );
+}
+
+#[test]
+fn stationary_lagged_latent_covariance_refuses_unstable_drift_and_non_event_clocks() {
+    assert_eq!(
+        recover_stationary_lagged_latent_covariance(
+            1.0,
+            0.4,
+            -0.225,
+            1.0,
+            -0.13,
+            1.0,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_stationary_lagged_latent_covariance(
+            1.0,
+            0.4,
+            -0.225,
+            1.0,
+            -0.13,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_stationary_lagged_latent_covariance(
+            0.0,
+            0.4,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_stationary_lagged_latent_covariance(
+            0.0,
+            0.0,
+            -0.225,
+            1.0,
+            0.5,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_stationary_lagged_latent_covariance(
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Ok(0.0)
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
+{
+    let printed_effect = -0.225_f64;
+    let printed_asym = -1.673_f64;
+    let log_rate = -printed_effect / printed_asym;
+    let trait_variance = 1.0_f64;
+    let diffusion = 0.4_f64;
+    let loading = 2.0_f64;
+    let measurement_error = 0.5_f64;
+    let manifest_trait = 0.1_f64;
+    let event_delta = 1.0_f64;
+    let recovered = recover_stationary_lagged_observed_covariance(
+        loading,
+        trait_variance,
+        diffusion,
+        printed_effect,
+        1.0,
+        log_rate,
+        event_delta,
+        manifest_trait,
+        LagClock::EventTime,
+    )
+    .expect("eq5-lagged-stationary-T0VAR");
+    let latent = recover_stationary_lagged_latent_covariance(
+        trait_variance,
+        diffusion,
+        printed_effect,
+        1.0,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("stationary lagged T0VAR");
+    let expected = recover_manifest_lagged_observed_covariance(loading, latent, manifest_trait)
+        .expect("λ²c+ψ");
+    let error = rmse(&[expected], &[recovered]);
+    assert!(
+        error < 1e-12,
+        "Driver §4.3 Eq. 5 of lagged stationary T0VAR RMSE {error}: got {recovered}"
+    );
+    let contemporaneous = recover_stationary_initial_observed_variance(
+        loading,
+        trait_variance,
+        diffusion,
+        printed_effect,
+        1.0,
+        log_rate,
+        measurement_error,
+        manifest_trait,
+        LagClock::EventTime,
+    )
+    .expect("eq5-stationary-T0VAR");
+    assert!(
+        rmse(&[recovered], &[measurement_error]) > error,
+        "MANIFESTVAR is not lagged cov(y)"
+    );
+    assert!(rmse(&[recovered], &[latent]) > error);
+    assert!(rmse(&[recovered], &[contemporaneous]) > error);
+    assert_eq!(
+        recover_stationary_lagged_observed_covariance(
+            0.0,
+            trait_variance,
+            diffusion,
+            printed_effect,
+            1.0,
+            log_rate,
+            event_delta,
+            manifest_trait,
+            LagClock::EventTime,
+        ),
+        Ok(manifest_trait)
+    );
+    assert_eq!(
+        refuse_stationary_lagged_latent_covariance_as_observed_covariance(latent, recovered),
+        Err(PsychometricError::StationaryLaggedLatentCovarianceIsNotObservedCovariance)
+    );
+    assert_eq!(
+        refuse_measurement_error_as_stationary_lagged_observed_covariance(
+            measurement_error,
+            recovered
+        ),
+        Err(PsychometricError::MeasurementErrorIsNotStationaryLaggedObservedCovariance)
+    );
+    assert_eq!(
+        refuse_stationary_initial_observed_variance_as_stationary_lagged_observed_covariance(
+            contemporaneous,
+            recovered
+        ),
+        Err(
+            PsychometricError::StationaryInitialObservedVarianceIsNotStationaryLaggedObservedCovariance
+        )
+    );
+}
+
+#[test]
+fn stationary_lagged_observed_covariance_refuses_unstable_drift_and_non_event_clocks() {
+    assert_eq!(
+        recover_stationary_lagged_observed_covariance(
+            2.0,
+            1.0,
+            0.4,
+            -0.225,
+            1.0,
+            -0.13,
+            1.0,
+            0.1,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_stationary_lagged_observed_covariance(
+            2.0,
+            1.0,
+            0.4,
+            -0.225,
+            1.0,
+            -0.13,
+            0.0,
+            0.1,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_stationary_lagged_observed_covariance(
+            2.0,
+            0.0,
+            0.4,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_stationary_lagged_observed_covariance(
+            2.0,
+            0.0,
+            0.0,
+            -0.225,
+            1.0,
+            0.5,
+            1.0,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_stationary_lagged_observed_covariance(
+            2.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            0.1,
+            LagClock::EventTime
+        ),
+        Ok(0.1)
     );
 }

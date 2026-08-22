@@ -156,6 +156,19 @@
 //! `λ²(−q / (2 a)) + θ` is not that observed variance when
 //! `TRAITVAR` or `addedTIPREDVAR` is nonzero; `MANIFESTVAR` is not
 //! `Var(y_0)`; the constrained latent variance is not `Var(y_0)`),
+//! recovers the Driver Eq. 3–4 lagged covariance of that constrained
+//! process as `trait + e^{a Δt}(−q / (2 a)) + (B / a)² v`
+//! (JSS PDF re-opened 2026-08-22T19:13Z; form the lagged
+//! within-subject covariance first, then include the trait, then
+//! include the TI extra variance, then add; trait and
+//! `addedTIPREDVAR` do not decay with `e^{a Δt}`; contemporaneous
+//! `T0VAR` is not that lagged map; decaying the constrained total
+//! as if it were all state is not that lagged map),
+//! recovers the Driver Eq. 5 of that lagged covariance as
+//! `λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ`
+//! (`Θ` does not enter; contemporaneous `Var(y_0)` is not that
+//! lagged observed covariance; the lagged latent covariance is not
+//! that observed covariance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -300,6 +313,10 @@ pub use event_time::recover_stationary_initial_latent_variance;
 pub use event_time::recover_stationary_initial_observed_mean;
 /// Exact scalar Eq. 5 of §4.3 stationary `T0VAR` `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ`.
 pub use event_time::recover_stationary_initial_observed_variance;
+/// Exact scalar lagged covariance of §4.3 stationary `T0VAR` `trait + e^{a Δt}(−q / (2 a)) + (B / a)² v`.
+pub use event_time::recover_stationary_lagged_latent_covariance;
+/// Exact scalar Eq. 5 of lagged §4.3 stationary `T0VAR` `λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ`.
+pub use event_time::recover_stationary_lagged_observed_covariance;
 /// Exact scalar stationary within-subject variance `-q / (2 a)`.
 pub use event_time::recover_stationary_latent_variance;
 /// Exact scalar contemporaneous `TDPREDEFFECT` impulse `m x`.
@@ -458,6 +475,8 @@ pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
 pub use event_time::refuse_measurement_error_as_observed_variance;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of lagged §4.3 stationary `T0VAR`.
+pub use event_time::refuse_measurement_error_as_stationary_lagged_observed_covariance;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
@@ -488,6 +507,14 @@ pub use event_time::refuse_stationary_initial_latent_variance_as_trait_variance;
 pub use event_time::refuse_stationary_initial_observed_mean_as_manifest_means;
 /// Refuse treating Eq. 5 of §4.3 stationary `T0VAR` as `MANIFESTVAR`.
 pub use event_time::refuse_stationary_initial_observed_variance_as_measurement_error;
+/// Refuse treating Eq. 5 of contemporaneous §4.3 stationary `T0VAR` as lagged observed covariance.
+pub use event_time::refuse_stationary_initial_observed_variance_as_stationary_lagged_observed_covariance;
+/// Refuse treating lagged §4.3 stationary `T0VAR` as decayed total stationary variance.
+pub use event_time::refuse_stationary_lagged_latent_covariance_as_decayed_stationary_variance;
+/// Refuse treating lagged §4.3 stationary `T0VAR` as lagged observed covariance.
+pub use event_time::refuse_stationary_lagged_latent_covariance_as_observed_covariance;
+/// Refuse treating lagged §4.3 stationary `T0VAR` as contemporaneous stationary `T0VAR`.
+pub use event_time::refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance;
 /// Refuse treating Eq. 5 of `asymDIFFUSION` as Eq. 5 of §4.3 stationary `T0VAR`.
 pub use event_time::refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
@@ -516,6 +543,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
+pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating Driver §4.3 trait variance as process noise.
 pub use event_time::refuse_trait_variance_as_process_noise;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.

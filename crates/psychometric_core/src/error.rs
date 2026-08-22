@@ -454,6 +454,32 @@ pub enum PsychometricError {
     /// stationary `T0VAR`. `λ² p_0 + θ` is not
     /// `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ`.
     InitialObservedVarianceIsNotStationaryInitialObservedVariance,
+    /// Driver §4.3 lagged stationary covariance was treated as
+    /// contemporaneous stationary `T0VAR`.
+    /// `trait + e^{a Δt}(−q / (2 a)) + (B / a)² v` is not
+    /// `trait + −q / (2 a) + (B / a)² v` at a strictly positive lag.
+    StationaryLaggedLatentCovarianceIsNotStationaryInitialLatentVariance,
+    /// Driver §4.3 lagged stationary covariance was treated as the
+    /// decayed total `e^{a Δt}(trait + −q / (2 a) + (B / a)² v)`.
+    /// Trait variance and `addedTIPREDVAR` do not decay.
+    StationaryLaggedLatentCovarianceIsNotDecayedStationaryVariance,
+    /// Driver §4.3 trait-plus-state lagged covariance was treated as
+    /// lagged stationary `T0VAR`. `trait + e^{a Δt} p` is not that
+    /// composition when `addedTIPREDVAR` is nonzero.
+    TraitPlusStateLaggedCovarianceIsNotStationaryLaggedLatentCovariance,
+    /// Driver §4.3 lagged stationary covariance was treated as
+    /// lagged observed covariance. Equation 5 maps
+    /// `cov(y_t, y_{t-1}) = λ²` of that covariance plus `ψ`.
+    StationaryLaggedLatentCovarianceIsNotObservedCovariance,
+    /// Driver Eq. 5 measurement error was treated as lagged
+    /// stationary observed covariance. Independent `ε_t` does not
+    /// enter `cov(y_t, y_{t-1})`.
+    MeasurementErrorIsNotStationaryLaggedObservedCovariance,
+    /// Driver Eq. 5 of contemporaneous stationary `T0VAR` was treated
+    /// as lagged stationary observed covariance.
+    /// `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ` includes `θ`
+    /// and is not `λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ`.
+    StationaryInitialObservedVarianceIsNotStationaryLaggedObservedCovariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -810,6 +836,24 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialObservedVarianceIsNotStationaryInitialObservedVariance => {
                 "free first-occasion observed variance is not the stationary first-occasion observed variance"
+            }
+            Self::StationaryLaggedLatentCovarianceIsNotStationaryInitialLatentVariance => {
+                "stationary lagged latent covariance is not the stationary first-occasion latent variance"
+            }
+            Self::StationaryLaggedLatentCovarianceIsNotDecayedStationaryVariance => {
+                "stationary lagged latent covariance is not the decayed stationary variance"
+            }
+            Self::TraitPlusStateLaggedCovarianceIsNotStationaryLaggedLatentCovariance => {
+                "trait-plus-state lagged covariance is not the stationary lagged latent covariance"
+            }
+            Self::StationaryLaggedLatentCovarianceIsNotObservedCovariance => {
+                "stationary lagged latent covariance is not the lagged observed covariance"
+            }
+            Self::MeasurementErrorIsNotStationaryLaggedObservedCovariance => {
+                "measurement-error variance is not the stationary lagged observed covariance"
+            }
+            Self::StationaryInitialObservedVarianceIsNotStationaryLaggedObservedCovariance => {
+                "stationary first-occasion observed variance is not the stationary lagged observed covariance"
             }
         };
         formatter.write_str(message)
@@ -1364,6 +1408,38 @@ mod tests {
             PsychometricError::InitialObservedVarianceIsNotStationaryInitialObservedVariance
                 .to_string(),
             "free first-occasion observed variance is not the stationary first-occasion observed variance"
+        );
+    }
+
+    #[test]
+    fn stationary_lagged_covariance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StationaryLaggedLatentCovarianceIsNotStationaryInitialLatentVariance
+                .to_string(),
+            "stationary lagged latent covariance is not the stationary first-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaggedLatentCovarianceIsNotDecayedStationaryVariance
+                .to_string(),
+            "stationary lagged latent covariance is not the decayed stationary variance"
+        );
+        assert_eq!(
+            PsychometricError::TraitPlusStateLaggedCovarianceIsNotStationaryLaggedLatentCovariance
+                .to_string(),
+            "trait-plus-state lagged covariance is not the stationary lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaggedLatentCovarianceIsNotObservedCovariance.to_string(),
+            "stationary lagged latent covariance is not the lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotStationaryLaggedObservedCovariance.to_string(),
+            "measurement-error variance is not the stationary lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialObservedVarianceIsNotStationaryLaggedObservedCovariance
+                .to_string(),
+            "stationary first-occasion observed variance is not the stationary lagged observed covariance"
         );
     }
 }
