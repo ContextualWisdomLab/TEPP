@@ -717,6 +717,22 @@ pub enum PsychometricError {
     /// `q / (trait + p + added)` was treated as p. 16 `DIFFUSIONstd`.
     /// Footnote 4 uses only `asymDIFFUSION`, not `TRAITVAR`.
     TraitContaminatedContinuousDiffusionIsNotStandardisedContinuousDiffusion,
+    /// Driver p. 16 `DRIFTstd` was requested with a non-positive
+    /// within-subject variance. Footnote 4 standardises `DRIFT` using
+    /// only strictly positive `asymDIFFUSION`.
+    StandardisedContinuousDriftRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 unstandardised `DRIFT` `a` was treated as
+    /// `DRIFTstd`. Unstandardised `a` is defined for growing or
+    /// zero-diffusion processes; standardised `DRIFT` is not.
+    UnstandardisedContinuousDriftIsNotStandardisedContinuousDrift,
+    /// Driver p. 16 `discreteDRIFTstd` `e^{a Δt}` was treated as
+    /// `DRIFTstd`. The discrete auto-effect is not the continuous
+    /// log-rate.
+    StandardisedDiscreteDriftIsNotStandardisedContinuousDrift,
+    /// Driver §7.1 trait-contaminated continuous drift
+    /// `a p / (trait + p + added)` was treated as p. 16 `DRIFTstd`.
+    /// Footnote 4 uses only `asymDIFFUSION`, not `TRAITVAR`.
+    TraitContaminatedContinuousDriftIsNotStandardisedContinuousDrift,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1268,6 +1284,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::TraitContaminatedContinuousDiffusionIsNotStandardisedContinuousDiffusion => {
                 "trait-contaminated continuous DIFFUSION is not standardised continuous DIFFUSION"
+            }
+            Self::StandardisedContinuousDriftRequiresPositiveWithinSubjectVariance => {
+                "standardised continuous DRIFT requires strictly positive within-subject variance"
+            }
+            Self::UnstandardisedContinuousDriftIsNotStandardisedContinuousDrift => {
+                "unstandardised continuous DRIFT is not standardised continuous DRIFT"
+            }
+            Self::StandardisedDiscreteDriftIsNotStandardisedContinuousDrift => {
+                "standardised discrete DRIFT is not standardised continuous DRIFT"
+            }
+            Self::TraitContaminatedContinuousDriftIsNotStandardisedContinuousDrift => {
+                "trait-contaminated continuous DRIFT is not standardised continuous DRIFT"
             }
         };
         formatter.write_str(message)
@@ -2174,6 +2202,30 @@ mod tests {
             PsychometricError::TraitContaminatedContinuousDiffusionIsNotStandardisedContinuousDiffusion
                 .to_string(),
             "trait-contaminated continuous DIFFUSION is not standardised continuous DIFFUSION"
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_drift_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedContinuousDriftRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised continuous DRIFT requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousDriftIsNotStandardisedContinuousDrift
+                .to_string(),
+            "unstandardised continuous DRIFT is not standardised continuous DRIFT"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteDriftIsNotStandardisedContinuousDrift
+                .to_string(),
+            "standardised discrete DRIFT is not standardised continuous DRIFT"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedContinuousDriftIsNotStandardisedContinuousDrift
+                .to_string(),
+            "trait-contaminated continuous DRIFT is not standardised continuous DRIFT"
         );
     }
 }
