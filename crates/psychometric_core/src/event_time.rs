@@ -310,7 +310,16 @@
 //! re-opened 2026-08-23T22:28Z). The scalar map is `ψ / ψ = 1`.
 //! Unstandardised `MANIFESTTRAITVAR` is not `MANIFESTTRAITVARstd`.
 //! `TRAITVARstd` is not `MANIFESTTRAITVARstd` even when both equal 1.
-//! `MANIFESTVAR` is not `MANIFESTTRAITVARstd`. The JSS article
+//! `MANIFESTVAR` is not `MANIFESTTRAITVARstd`. Page 16
+//! `MANIFESTVARstd` is the correlation form
+//! `solve(sqrt(diag(MANIFESTVAR) + ridging)) %&% MANIFESTVAR` after
+//! strictly positive `MANIFESTVAR` (2017-era `summary.ctsemFit.R`
+//! forms it whenever `verbose = TRUE`; unlike `TRAITVARstd` the
+//! 2017-era source adds ridging; default ridge is 0; JSS PDF
+//! re-opened 2026-08-23T22:40Z). The scalar map is `θ / θ = 1`.
+//! Unstandardised `MANIFESTVAR` is not `MANIFESTVARstd`.
+//! `MANIFESTTRAITVARstd` is not `MANIFESTVARstd` even when both
+//! equal 1. `Var(y)` is not `MANIFESTVARstd`. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -2096,6 +2105,136 @@ pub fn refuse_measurement_error_as_standardised_manifest_trait_variance(
         standardised_manifest_trait_variance,
     );
     Err(PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance)
+}
+
+/// Exact scalar p. 16 `MANIFESTVARstd` after strictly positive
+/// `MANIFESTVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; Eq. 5, p. 5;
+/// p. 16; footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-23T22:40Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `MANIFESTVAR` `Θ` the residual covariance of the
+/// indicators. Equation 5 writes `ζ ~ N(0, Θ)`. Page 16 prints
+/// standardised matrices with the suffix `std` when appropriate.
+/// The 2017-era `summary.ctsemFit.R` forms `MANIFESTVARstd` whenever
+/// `verbose = TRUE`, as
+/// `solve(sqrt(diag(MANIFESTVAR) + ridging)) %&% MANIFESTVAR`.
+/// `OpenMx` `%&%` is the quadratic form `t(A) %*% B %*% A`. Unlike
+/// `TRAITVARstd`, that formation adds
+/// `diag(c(ridging), n.manifest)`. The default `ridging = FALSE`
+/// adds 0, not `0.0001`; that ridge is a numerical hack and is not
+/// this exact map. The 2017-era source assigns
+/// `dimnames(MANIFESTVARstd)` to `latentNames`; the matrix is
+/// `n.manifest × n.manifest`. That assignment is a source bug and
+/// is not this exact map. The scalar correlation is `θ / θ = 1`
+/// after strictly positive `MANIFESTVAR`. Form strictly positive
+/// `θ` first, then `1 / √θ`, then `(1 / √θ) θ (1 / √θ)`.
+/// Unstandardised `MANIFESTVAR` is defined for a zero residual;
+/// standardised `MANIFESTVAR` is not. Zero `θ` makes
+/// `solve(sqrt(0))` fail in the 2017-era source and fails closed
+/// here. Unlike `TRAITVAR` / `MANIFESTTRAITVAR`, that source does
+/// not skip forming `MANIFESTVARstd` when `θ = 0`; the quadratic
+/// still fails. Measurement-error variance is an event-time
+/// structural quantity, so a non-event clock fails closed.
+/// `MANIFESTVAR` does not require stable `a < 0`. Distinct
+/// positive `θ` recover the same 1. `MANIFESTTRAITVARstd`
+/// `ψ / ψ = 1` recovers the same number and remains a distinct
+/// named quantity. Equation 5 `λ² Var(η) + θ` is `Var(y)`, not
+/// this correlation. This is not a Kalman filter, not a matrix
+/// `expm`, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance`]
+/// when `MANIFESTVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the variance is
+/// non-finite, negative, or the quadratic form overflows.
+pub fn recover_standardised_manifest_variance(
+    measurement_error_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !measurement_error_variance.is_finite() || measurement_error_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if measurement_error_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance,
+        );
+    }
+    let process_sd = measurement_error_variance.sqrt();
+    let inverse_sd = require_finite(1.0 / process_sd)?;
+    let scaled = require_finite(inverse_sd * measurement_error_variance)?;
+    require_finite(scaled * inverse_sd)
+}
+
+/// Refuse treating unstandardised `MANIFESTVAR` as p. 16
+/// `MANIFESTVARstd`.
+///
+/// Unstandardised `Θ` is defined for a zero residual. Footnote 4
+/// `MANIFESTVARstd` requires strictly positive `MANIFESTVAR`. Equal
+/// numbers when `θ = 1` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_unstandardised_manifest_variance_as_standardised_manifest_variance(
+    unstandardised_manifest_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_manifest_variance,
+        standardised_manifest_variance,
+    );
+    Err(PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance)
+}
+
+/// Refuse treating p. 16 `MANIFESTTRAITVARstd` as p. 16
+/// `MANIFESTVARstd`.
+///
+/// Both scalar correlations equal 1 after strictly positive
+/// variances. `MANIFESTTRAITVARstd` standardises indicator-level
+/// trait variance `Ψ_τ`. `MANIFESTVARstd` standardises
+/// contemporaneous measurement error `Θ`. Equal numbers remain
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance(
+    standardised_manifest_trait_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_manifest_trait_variance,
+        standardised_manifest_variance,
+    );
+    Err(PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance)
+}
+
+/// Refuse treating Driver Eq. 5 `Var(y)` as p. 16 `MANIFESTVARstd`.
+///
+/// `λ² Var(η) + θ` is the observed-indicator variance. Table 2
+/// names `MANIFESTVAR` `Θ`, not `Var(y)`. The correlation form of
+/// `Θ` is not that observed variance.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_observed_variance_as_standardised_manifest_variance(
+    observed_indicator_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (observed_indicator_variance, standardised_manifest_variance);
+    Err(PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance)
 }
 
 /// Exact scalar 2017-era `addedT0TIPREDVAR` after a first-occasion
@@ -9351,14 +9490,15 @@ mod tests {
         recover_standardised_initial_latent_variance,
         recover_standardised_initial_time_dependent_predictor_effect,
         recover_standardised_initial_time_independent_predictor_effect,
-        recover_standardised_manifest_trait_variance, recover_standardised_trait_variance,
-        recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
-        recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
-        recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
-        recover_stationary_latent_variance, recover_stationary_later_latent_variance,
-        recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
-        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
-        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+        recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
+        recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
+        recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
+        recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
+        recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
+        recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
+        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+        recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -9450,6 +9590,7 @@ mod tests {
         refuse_measurement_error_as_standardised_manifest_trait_variance,
         refuse_measurement_error_as_stationary_lagged_observed_covariance,
         refuse_measurement_error_as_stationary_later_observed_variance,
+        refuse_observed_variance_as_standardised_manifest_variance,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_predetermined_initial_latent_variance_as_initial_latent_variance,
         refuse_predetermined_initial_latent_variance_as_lagged_latent_covariance,
@@ -9497,6 +9638,7 @@ mod tests {
         refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
         refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance,
         refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
+        refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
         refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -9563,6 +9705,7 @@ mod tests {
         refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
+        refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance, ClusteredEventScore,
         EventOccasion, LagClock, LaggedWithinResidual,
     };
@@ -22330,6 +22473,72 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_manifest_trait_variance(f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_variance_recovers_driver_table_two_after_positive_theta() {
+        // Driver et al. (2017, Table 2 MANIFESTVAR Θ; Eq. 5 p.5;
+        // p. 16 MANIFESTVARstd; 2017-era summary.ctsemFit.R):
+        // form strictly positive Θ, then (1/√θ) θ (1/√θ) = 1.
+        // Default ridging = FALSE adds 0.
+        let measurement_error = 0.4_f64;
+        let recovered =
+            recover_standardised_manifest_variance(measurement_error, LagClock::EventTime)
+                .expect("MANIFESTVARstd");
+        assert!((recovered - 1.0).abs() < 1e-15);
+        let larger_theta = recover_standardised_manifest_variance(1.6, LagClock::EventTime)
+            .expect("MANIFESTVARstd θ=1.6");
+        assert_eq!(larger_theta.to_bits(), recovered.to_bits());
+        let manifest_trait_std =
+            recover_standardised_manifest_trait_variance(measurement_error, LagClock::EventTime)
+                .expect("MANIFESTTRAITVARstd");
+        assert_eq!(manifest_trait_std.to_bits(), recovered.to_bits());
+        let observed =
+            recover_manifest_observed_variance(2.0, 0.4, measurement_error).expect("Var(y)");
+        assert_eq!(
+            refuse_unstandardised_manifest_variance_as_standardised_manifest_variance(
+                measurement_error,
+                recovered
+            ),
+            Err(PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance)
+        );
+        assert_eq!(
+            refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance(
+                manifest_trait_std,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance
+            )
+        );
+        assert_eq!(
+            refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
+            Err(PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance)
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_variance_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_manifest_variance(0.0, LagClock::EventTime),
+            Err(PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance)
+        );
+        assert_eq!(
+            recover_standardised_manifest_variance(0.4, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_manifest_variance(-0.4, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_variance(f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_variance(f64::INFINITY, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
