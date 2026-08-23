@@ -2,10 +2,8 @@
 #![allow(clippy::cast_precision_loss)]
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
-    LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
-    ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
-    recover_asymptotic_time_independent_observed_variance,
+    map_discrete_lag_across_event_intervals, ordinary_least_squares_slope,
+    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_observed_variance,
     recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
@@ -53,13 +51,14 @@ use psychometric_core::{
     recover_standardised_initial_latent_variance,
     recover_standardised_initial_time_dependent_predictor_effect,
     recover_standardised_initial_time_independent_predictor_effect,
-    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
-    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
-    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
-    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
-    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
+    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
+    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
+    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
+    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -128,6 +127,7 @@ use psychometric_core::{
     refuse_initial_time_independent_variance_as_initial_latent_variance,
     refuse_initial_time_independent_variance_as_standardised_initial_latent_variance,
     refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect,
+    refuse_initial_time_independent_variance_as_standardised_trait_variance,
     refuse_initial_time_independent_variance_as_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
@@ -190,6 +190,7 @@ use psychometric_core::{
     refuse_standardised_discrete_time_dependent_effect_as_standardised_continuous_time_dependent_effect,
     refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
     refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect,
+    refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
     refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance,
     refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
@@ -256,6 +257,9 @@ use psychometric_core::{
     refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
     refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
     refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
+    refuse_unstandardised_trait_variance_as_standardised_trait_variance, ClusteredEventScore,
+    ClusteredScore, EventOccasion, IndicatorKind, LagClock, LaggedWithinResidual,
+    PsychometricError,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -2308,8 +2312,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_is_not_impulse
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry()
- {
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry(
+) {
     let loading = 2.0_f64;
     let drift = -0.5_f64;
     let delta = 2.0_f64;
@@ -2463,8 +2467,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_zero_loading_i
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks()
- {
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks(
+) {
     assert_eq!(
         recover_discrete_observed_mean_with_initial_time_independent_predictor(
             1e308,
@@ -3395,8 +3399,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_is_not_impulse_o
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_process_impulse_and_carry()
- {
+fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_process_impulse_and_carry(
+) {
     let loading = 2.0_f64;
     let drift = -0.5_f64;
     let delta = 2.0_f64;
@@ -3569,8 +3573,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_zero_loading_is_
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks()
- {
+fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks(
+) {
     assert_eq!(
         recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             1e308,
@@ -6552,8 +6556,8 @@ fn predetermined_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_gro
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn predetermined_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
- {
+fn predetermined_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
+) {
     let printed_effect = -0.225_f64;
     let printed_asym = -1.673_f64;
     let log_rate = -printed_effect / printed_asym;
@@ -6946,8 +6950,8 @@ fn predetermined_initial_latent_variance_refuses_non_event_clocks_and_keeps_unst
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn predetermined_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
- {
+fn predetermined_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+) {
     let printed_effect = -0.225_f64;
     let printed_asym = -1.673_f64;
     let log_rate = -printed_effect / printed_asym;
@@ -7317,8 +7321,8 @@ fn predetermined_later_lagged_latent_covariance_recovers_driver_section_four_poi
 }
 
 #[test]
-fn predetermined_later_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_growing_processes()
- {
+fn predetermined_later_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_growing_processes(
+) {
     assert_eq!(
         recover_predetermined_later_lagged_latent_covariance(
             1.0,
@@ -7406,8 +7410,8 @@ fn predetermined_later_lagged_latent_covariance_refuses_non_event_clocks_and_kee
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn predetermined_later_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
- {
+fn predetermined_later_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
+) {
     let printed_effect = -0.225_f64;
     let printed_asym = -1.673_f64;
     let log_rate = -printed_effect / printed_asym;
@@ -7554,8 +7558,8 @@ fn predetermined_later_lagged_observed_covariance_recovers_driver_equation_five_
 }
 
 #[test]
-fn predetermined_later_lagged_observed_covariance_refuses_non_event_clocks_and_keeps_growing_processes()
- {
+fn predetermined_later_lagged_observed_covariance_refuses_non_event_clocks_and_keeps_growing_processes(
+) {
     assert_eq!(
         recover_predetermined_later_lagged_observed_covariance(
             2.0,
@@ -7884,8 +7888,8 @@ fn predetermined_later_start_later_latent_variance_recovers_driver_section_four_
 }
 
 #[test]
-fn predetermined_later_start_later_latent_variance_refuses_non_event_clocks_and_keeps_growing_processes()
- {
+fn predetermined_later_start_later_latent_variance_refuses_non_event_clocks_and_keeps_growing_processes(
+) {
     assert_eq!(
         recover_predetermined_later_start_later_latent_variance(
             1.0,
@@ -7973,8 +7977,8 @@ fn predetermined_later_start_later_latent_variance_refuses_non_event_clocks_and_
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn predetermined_later_start_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
- {
+fn predetermined_later_start_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+) {
     let printed_effect = -0.225_f64;
     let printed_asym = -1.673_f64;
     let log_rate = -printed_effect / printed_asym;
@@ -8131,8 +8135,8 @@ fn predetermined_later_start_later_observed_variance_recovers_driver_equation_fi
 }
 
 #[test]
-fn predetermined_later_start_later_observed_variance_refuses_non_event_clocks_and_keeps_growing_processes()
- {
+fn predetermined_later_start_later_observed_variance_refuses_non_event_clocks_and_keeps_growing_processes(
+) {
     assert_eq!(
         recover_predetermined_later_start_later_observed_variance(
             2.0,
@@ -8273,8 +8277,8 @@ fn standardised_discrete_drift_recovers_driver_page_sixteen_footnote_four() {
 }
 
 #[test]
-fn standardised_discrete_drift_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion()
- {
+fn standardised_discrete_drift_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion(
+) {
     assert_eq!(
         recover_standardised_discrete_drift(0.4, -0.5, 1.0, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
@@ -8358,8 +8362,8 @@ fn standardised_discrete_diffusion_recovers_driver_page_sixteen_footnote_four() 
 }
 
 #[test]
-fn standardised_discrete_diffusion_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion()
- {
+fn standardised_discrete_diffusion_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion(
+) {
     assert_eq!(
         recover_standardised_discrete_diffusion(0.4, -0.5, 1.0, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
@@ -8437,8 +8441,8 @@ fn standardised_continuous_diffusion_recovers_driver_page_sixteen_footnote_four(
 }
 
 #[test]
-fn standardised_continuous_diffusion_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion()
- {
+fn standardised_continuous_diffusion_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion(
+) {
     assert_eq!(
         recover_standardised_continuous_diffusion(0.4, -0.5, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
@@ -8504,8 +8508,8 @@ fn standardised_continuous_drift_recovers_driver_page_sixteen_footnote_four() {
 }
 
 #[test]
-fn standardised_continuous_drift_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion()
- {
+fn standardised_continuous_drift_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion(
+) {
     assert_eq!(
         recover_standardised_continuous_drift(0.4, -0.5, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
@@ -8595,8 +8599,8 @@ fn standardised_asymptotic_time_independent_effect_recovers_driver_page_sixteen_
 }
 
 #[test]
-fn standardised_asymptotic_time_independent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances()
- {
+fn standardised_asymptotic_time_independent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances(
+) {
     assert_eq!(
         recover_standardised_asymptotic_time_independent_predictor_effect(
             0.3,
@@ -8726,8 +8730,8 @@ fn standardised_continuous_time_independent_effect_recovers_driver_page_sixteen_
 }
 
 #[test]
-fn standardised_continuous_time_independent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances()
- {
+fn standardised_continuous_time_independent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances(
+) {
     assert_eq!(
         recover_standardised_continuous_time_independent_predictor_effect(
             0.3,
@@ -8857,8 +8861,8 @@ fn standardised_continuous_time_dependent_effect_recovers_driver_page_sixteen_fo
 }
 
 #[test]
-fn standardised_continuous_time_dependent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances()
- {
+fn standardised_continuous_time_dependent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances(
+) {
     assert_eq!(
         recover_standardised_continuous_time_dependent_predictor_effect(
             0.3,
@@ -8983,8 +8987,8 @@ fn standardised_initial_time_dependent_effect_recovers_driver_table_three_footno
 }
 
 #[test]
-fn standardised_initial_time_dependent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances()
- {
+fn standardised_initial_time_dependent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances(
+) {
     assert_eq!(
         recover_standardised_initial_time_dependent_predictor_effect(
             0.3,
@@ -9095,6 +9099,63 @@ fn standardised_initial_latent_variance_refuses_non_event_clocks_and_does_not_ke
 }
 
 #[test]
+fn standardised_trait_variance_recovers_driver_table_two_correlation() {
+    let trait_variance = 1.6_f64;
+    let recovered = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)
+        .expect("TRAITVARstd");
+    assert!((recovered - 1.0).abs() < 1e-15);
+    let larger_trait = recover_standardised_trait_variance(6.4, LagClock::EventTime)
+        .expect("TRAITVARstd trait=6.4");
+    assert_eq!(larger_trait.to_bits(), recovered.to_bits());
+    let t0var_std =
+        recover_standardised_initial_latent_variance(trait_variance, LagClock::EventTime)
+            .expect("T0VARstd");
+    assert_eq!(t0var_std.to_bits(), recovered.to_bits());
+    let extra = recover_initial_time_independent_predictor_variance(0.3, 4.0, LagClock::EventTime)
+        .expect("addedT0TIPREDVAR");
+    let extra_error = (extra - 1.0).abs();
+    let recovered_error = (recovered - 1.0).abs();
+    assert!(
+        recovered_error < extra_error,
+        "Driver et al. (2017, 2017-era addedT0TIPREDVAR): extra RMSE {extra_error} must exceed TRAITVARstd RMSE {recovered_error}"
+    );
+    let unstandardised_error = (trait_variance - 1.0).abs();
+    assert!(
+        recovered_error < unstandardised_error,
+        "Driver et al. (2017, Table 2): unstandardised TRAITVAR RMSE {unstandardised_error} must exceed TRAITVARstd RMSE {recovered_error}"
+    );
+    assert_eq!(
+        refuse_unstandardised_trait_variance_as_standardised_trait_variance(
+            trait_variance,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance)
+    );
+    assert_eq!(
+        refuse_standardised_initial_latent_variance_as_standardised_trait_variance(
+            t0var_std, recovered
+        ),
+        Err(PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance)
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_standardised_trait_variance(extra, recovered),
+        Err(PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance)
+    );
+}
+
+#[test]
+fn standardised_trait_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
+    assert_eq!(
+        recover_standardised_trait_variance(1.6, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_trait_variance(0.0, LagClock::EventTime),
+        Err(PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance)
+    );
+}
+
+#[test]
 fn standardised_initial_time_independent_effect_recovers_driver_table_three_footnote_four() {
     let initial_variance = 1.6_f64;
     let coefficient = 0.3_f64;
@@ -9173,8 +9234,8 @@ fn standardised_initial_time_independent_effect_recovers_driver_table_three_foot
 }
 
 #[test]
-fn standardised_initial_time_independent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances()
- {
+fn standardised_initial_time_independent_effect_refuses_non_event_clocks_and_does_not_keep_zero_variances(
+) {
     assert_eq!(
         recover_standardised_initial_time_independent_predictor_effect(
             0.3,
