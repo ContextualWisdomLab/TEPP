@@ -83,8 +83,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
-- Refreshed the live gap-baseline inventory to the 2026-08-23T13:31:34Z GitHub
-  snapshot (95 open PRs / 26 drafts / 12 issues; protected-main
+- Refreshed the live gap-baseline inventory to the 2026-08-23T13:57:34Z GitHub
+  snapshot (96 open PRs / 27 drafts / 12 issues; protected-main)
   `c45be17a9dbce95ef81cee230e9d128abc7160ac`), binding each buyer-gap current
   head SHA to that exact-head register, naming PR #164 as the single register
   authority after closing duplicate PR #179, and recording that stacked-merged
