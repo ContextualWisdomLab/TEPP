@@ -302,6 +302,16 @@
 //! later-start lagged observed covariance omits `Q_s` and `θ` and is
 //! not that observed variance; stationary later observed variance is
 //! not that observed variance when `p_0` is free),
+//! recovers the Driver p. 16 `discreteDRIFTstd` as `e^{a Δt}` after
+//! forming strictly positive `asymDIFFUSION` `−q / (2 a)`
+//! (JSS PDF re-opened 2026-08-23T11:40Z; footnote 4 standardises
+//! `DRIFT` using only within-subject variance, not the total;
+//! unstandardised `e^{a Δt}` is defined for growing `a ≥ 0` and for
+//! zero diffusion, and is not `discreteDRIFTstd`; zero
+//! `asymDIFFUSION` fails closed; the §7.1 trait-plus-state
+//! autocorrelation `(trait + e^{a Δt} p + added) / (trait + p + added)`
+//! uses `TRAITVAR` and is not `discreteDRIFTstd`; `TRAITVAR` is not
+//! the standardisation variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -458,6 +468,8 @@ pub use event_time::recover_predetermined_later_observed_variance;
 pub use event_time::recover_predetermined_later_start_later_latent_variance;
 /// Exact scalar Eq. 5 of later-start later-occasion §4.3 predetermined `T0VAR` `λ²(trait + e^{2 a s}(e^{2 a u} p_0 + Q_u) + Q_s + (B / a)² v) + θ + ψ`.
 pub use event_time::recover_predetermined_later_start_later_observed_variance;
+/// Exact scalar p. 16 `discreteDRIFTstd` `e^{a Δt}` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_discrete_drift;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
@@ -794,14 +806,20 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating Driver §7.1 trait-plus-state autocorrelation as p. 16 `discreteDRIFTstd`.
+pub use event_time::refuse_trait_plus_state_autocorrelation_as_standardised_discrete_drift;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating Driver §4.3 trait variance as process noise.
 pub use event_time::refuse_trait_variance_as_process_noise;
+/// Refuse treating Driver §4.3 trait variance as the p. 16 footnote 4 standardisation variance.
+pub use event_time::refuse_trait_variance_as_standardisation_variance;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.
 pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 /// Refuse a time-varying predictor whose sampling and constancy intervals differ.
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
+/// Refuse treating unstandardised `discreteDRIFT` as p. 16 `discreteDRIFTstd`.
+pub use event_time::refuse_unstandardised_discrete_drift_as_standardised_discrete_drift;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.

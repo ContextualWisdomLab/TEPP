@@ -668,6 +668,22 @@ pub enum PsychometricError {
     /// predetermined `T0VAR`. Stationary later variance uses
     /// `−q / (2 a)`, not free `p_0`.
     StationaryLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance,
+    /// Driver p. 16 `discreteDRIFTstd` was requested with a non-positive
+    /// within-subject variance. Footnote 4 standardises `DRIFT` using
+    /// only strictly positive `asymDIFFUSION`.
+    StandardisedDiscreteDriftRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 unstandardised `discreteDRIFT` `e^{a Δt}` was treated
+    /// as `discreteDRIFTstd`. Unstandardised `e^{a Δt}` is defined for
+    /// growing or zero-diffusion processes; standardised `DRIFT` is not.
+    UnstandardisedDiscreteDriftIsNotStandardisedDiscreteDrift,
+    /// Driver §7.1 trait-plus-state autocorrelation was treated as
+    /// p. 16 `discreteDRIFTstd`. Footnote 4 uses only `asymDIFFUSION`,
+    /// not `TRAITVAR`.
+    TraitPlusStateAutocorrelationIsNotStandardisedDiscreteDrift,
+    /// Driver §4.3 / §7.1 trait variance was treated as the p. 16
+    /// footnote 4 standardisation variance. `TRAITVAR` is not
+    /// `asymDIFFUSION`.
+    TraitVarianceIsNotStandardisationVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1183,6 +1199,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::StationaryLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance => {
                 "stationary later-occasion observed variance is not the predetermined later-start later-occasion observed variance"
+            }
+            Self::StandardisedDiscreteDriftRequiresPositiveWithinSubjectVariance => {
+                "standardised discrete DRIFT requires strictly positive within-subject variance"
+            }
+            Self::UnstandardisedDiscreteDriftIsNotStandardisedDiscreteDrift => {
+                "unstandardised discrete DRIFT is not standardised discrete DRIFT"
+            }
+            Self::TraitPlusStateAutocorrelationIsNotStandardisedDiscreteDrift => {
+                "trait-plus-state autocorrelation is not standardised discrete DRIFT"
+            }
+            Self::TraitVarianceIsNotStandardisationVariance => {
+                "trait variance is not the standardisation variance"
             }
         };
         formatter.write_str(message)
@@ -2018,6 +2046,29 @@ mod tests {
             PsychometricError::StationaryLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance
                 .to_string(),
             "stationary later-occasion observed variance is not the predetermined later-start later-occasion observed variance"
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_drift_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteDriftRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised discrete DRIFT requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDiscreteDriftIsNotStandardisedDiscreteDrift
+                .to_string(),
+            "unstandardised discrete DRIFT is not standardised discrete DRIFT"
+        );
+        assert_eq!(
+            PsychometricError::TraitPlusStateAutocorrelationIsNotStandardisedDiscreteDrift
+                .to_string(),
+            "trait-plus-state autocorrelation is not standardised discrete DRIFT"
+        );
+        assert_eq!(
+            PsychometricError::TraitVarianceIsNotStandardisationVariance.to_string(),
+            "trait variance is not the standardisation variance"
         );
     }
 }
