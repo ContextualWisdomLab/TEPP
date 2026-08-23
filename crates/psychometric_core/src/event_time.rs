@@ -6596,10 +6596,13 @@ mod tests {
                 Err(PsychometricError::EventTimeRequired)
             );
             assert!(!clock.admits_structural_lag());
-            assert!(!clock.as_str().is_empty());
+            assert!(!std::hint::black_box(clock).as_str().is_empty());
         }
         assert!(LagClock::EventTime.admits_structural_lag());
-        assert_eq!(LagClock::EventTime.as_str(), "event_time");
+        assert_eq!(
+            std::hint::black_box(LagClock::EventTime).as_str(),
+            "event_time"
+        );
         assert_eq!(
             refuse_difference_quotient_as_local_rate(1.0, 0.5, 1.0),
             Err(PsychometricError::DifferenceQuotientForbidden)
@@ -7698,6 +7701,18 @@ mod tests {
         );
         assert_eq!(
             recover_discrete_latent_mean_with_impulse(
+                1.0,
+                -0.5,
+                0.3,
+                1e308,
+                2.0,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_impulse(
                 1e308,
                 0.0,
                 0.0,
@@ -8184,6 +8199,10 @@ mod tests {
         assert_eq!(
             recover_discrete_time_independent_predictor_effect(0.2, 1.0, -0.5, f64::NAN, event),
             Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_time_independent_predictor_effect(0.2, 1.0, f64::NAN, 2.0, event),
+            Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
             recover_discrete_time_independent_predictor_effect(0.2, f64::NAN, -0.5, 2.0, event),
@@ -8995,6 +9014,15 @@ mod tests {
         assert_eq!(
             recover_asymptotic_time_independent_predictor_variance(
                 1e308,
+                1.0,
+                -1e-308,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                1.0,
                 1.0,
                 -1e-308,
                 LagClock::EventTime

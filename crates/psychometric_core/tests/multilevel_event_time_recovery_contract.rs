@@ -1398,6 +1398,18 @@ fn time_dependent_impulse_refuses_overflow_and_non_event_clocks() {
     );
     assert_eq!(
         recover_discrete_latent_mean_with_impulse(
+            1.0,
+            -0.5,
+            0.3,
+            1e308,
+            2.0,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_latent_mean_with_impulse(
             1e308,
             0.0,
             0.0,
@@ -1731,6 +1743,16 @@ fn time_independent_predictor_refuses_overflow_and_non_event_clocks() {
             1e308,
             2.0,
             -0.5,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_time_independent_predictor_effect(
+            0.4,
+            3.0,
+            f64::NAN,
             2.0,
             LagClock::EventTime
         ),
@@ -4448,6 +4470,15 @@ fn asymptotic_time_independent_variance_refuses_unstable_drift_and_non_event_clo
     assert_eq!(
         recover_asymptotic_time_independent_predictor_variance(0.0, 1.0, 0.0, LagClock::EventTime),
         Ok(0.0)
+    );
+    assert_eq!(
+        recover_asymptotic_time_independent_predictor_variance(
+            1.0,
+            1.0,
+            -1e-308,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }
 
