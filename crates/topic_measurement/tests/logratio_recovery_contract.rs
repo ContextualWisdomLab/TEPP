@@ -113,6 +113,11 @@ fn invalid_compositions_and_lexical_weights_fail_closed() {
         "inverse must not return a zero simplex part after underflow"
     );
     assert_eq!(
+        from_additive_log_ratio(&[0.0, 0.0, 0.0, -744.0]),
+        Err(TopicMeasurementError::InvalidLogRatioDimension),
+        "normalization must not underflow a nonzero weight to a zero simplex part"
+    );
+    assert_eq!(
         additive_log_ratio(&[f64::MAX, f64::MAX]),
         Err(TopicMeasurementError::InvalidComposition),
         "overflowing finite parts must fail closed because compensated mass is non-finite"

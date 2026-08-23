@@ -49,23 +49,16 @@ pub fn from_additive_log_ratio(coordinates: &[f64]) -> Result<Vec<f64>, TopicMea
     if reference_weight == 0.0 {
         return Err(TopicMeasurementError::InvalidLogRatioDimension);
     }
-    let mut shifted_weights = Vec::with_capacity(coordinates.len());
-    let mut denominator = reference_weight;
+    let mut shifted_weights = Vec::with_capacity(coordinates.len() + 1);
     for &value in coordinates {
         let weight = (value - maximum).exp();
         if weight == 0.0 {
             return Err(TopicMeasurementError::InvalidLogRatioDimension);
         }
-        denominator += weight;
         shifted_weights.push(weight);
     }
-
-    let mut simplex = Vec::with_capacity(coordinates.len() + 1);
-    for weight in shifted_weights {
-        simplex.push(weight / denominator);
-    }
-    simplex.push(reference_weight / denominator);
-    Ok(simplex)
+    shifted_weights.push(reference_weight);
+    normalize_positive_weights(shifted_weights)
 }
 
 /// Map a strictly positive unit simplex vector to isometric log-ratio coordinates.
@@ -141,16 +134,26 @@ pub fn from_isometric_log_ratio(coordinates: &[f64]) -> Result<Vec<f64>, TopicMe
     }
 
     let mut weights = Vec::with_capacity(dimension);
-    let mut denominator = 0.0_f64;
     for &value in &centered_logs {
         let weight = (value - maximum).exp();
         if weight == 0.0 {
             return Err(TopicMeasurementError::InvalidLogRatioDimension);
         }
-        denominator += weight;
         weights.push(weight);
     }
-    Ok(weights.iter().map(|weight| weight / denominator).collect())
+    normalize_positive_weights(weights)
+}
+
+fn normalize_positive_weights(weights: Vec<f64>) -> Result<Vec<f64>, TopicMeasurementError> {
+    let denominator: f64 = weights.iter().sum();
+    let simplex: Vec<f64> = weights
+        .into_iter()
+        .map(|weight| weight / denominator)
+        .collect();
+    if simplex.iter().any(|part| *part <= 0.0) {
+        return Err(TopicMeasurementError::InvalidLogRatioDimension);
+    }
+    Ok(simplex)
 }
 
 /// Aitchison distance between two strictly positive unit simplex vectors.

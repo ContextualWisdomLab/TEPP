@@ -146,6 +146,17 @@ fn large_finite_ilr_coordinates_round_trip_or_fail_closed() {
         Err(TopicMeasurementError::InvalidLogRatioDimension),
         "overflowing CLR reconstruction must fail closed"
     );
+    let gap = 745.0_f64;
+    let division_underflow = [
+        (3.0_f64 / 4.0).sqrt() * gap / 3.0,
+        (2.0_f64 / 3.0).sqrt() * gap / 2.0,
+        (1.0_f64 / 2.0).sqrt() * gap,
+    ];
+    assert_eq!(
+        from_isometric_log_ratio(&division_underflow),
+        Err(TopicMeasurementError::InvalidLogRatioDimension),
+        "normalization must not underflow a nonzero weight to a zero simplex part"
+    );
 }
 
 #[test]

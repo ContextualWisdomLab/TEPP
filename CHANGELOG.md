@@ -94,6 +94,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- ALR and ILR inverse normalization now fails closed when division would turn
+  a representable subnormal weight into a zero simplex part; runtime images
+  are pinned to the reviewed multi-platform Rust and Debian OCI digests.
 - The LineageWeave temporal-context read exchange no longer emits a fabricated
   `idempotency-key`; that header remains reserved for retryable write/export
   operations with a caller-owned operation key.
