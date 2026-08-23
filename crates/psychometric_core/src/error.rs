@@ -626,6 +626,48 @@ pub enum PsychometricError {
     /// as later-start lagged observed covariance. Later variance
     /// includes `Q_Δt` and `θ`.
     PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance,
+    /// Driver §4.3 later-start later-occasion variance of predetermined
+    /// `T0VAR` was treated as later-occasion variance at the later
+    /// start. Later-start later-occasion variance adds `Q_s`.
+    PredeterminedLaterStartLaterLatentVarianceIsNotLaterLatentVariance,
+    /// Driver §4.3 later-start later-occasion variance of predetermined
+    /// `T0VAR` was treated as later-start lagged covariance. Lagged
+    /// covariance is `e^{a s}` of the later state and omits `Q_s`.
+    PredeterminedLaterStartLaterLatentVarianceIsNotLaterLaggedCovariance,
+    /// Driver §4.3 later-start later-occasion variance of predetermined
+    /// `T0VAR` was treated as later-occasion stationary `T0VAR`. Free
+    /// `T0VAR` is not `−q / (2 a)`.
+    PredeterminedLaterStartLaterLatentVarianceIsNotStationaryLaterLatentVariance,
+    /// Driver §4.3 later-start later-occasion variance of predetermined
+    /// `T0VAR` was treated as the evolved later total. Trait variance
+    /// and `addedTIPREDVAR` do not enter `Q_s`.
+    PredeterminedLaterStartLaterLatentVarianceIsNotDecayedLaterTotal,
+    /// Driver §4.3 later-start later-occasion variance of predetermined
+    /// `T0VAR` was treated as later-occasion variance over the lag
+    /// interval alone. Ignoring `startoffset` omits `e^{2 a s} Q_u`.
+    PredeterminedLaterStartLaterLatentVarianceIsNotLagIntervalLaterLatentVariance,
+    /// Driver §4.3 later-start later-occasion variance of predetermined
+    /// `T0VAR` was treated as later-start later-occasion observed
+    /// variance. Equation 5 maps `Var(y) = λ²` of that variance plus
+    /// `θ + ψ`.
+    PredeterminedLaterStartLaterLatentVarianceIsNotObservedVariance,
+    /// Driver Eq. 5 measurement error was treated as later-start
+    /// later-occasion observed variance of predetermined `T0VAR`. `θ`
+    /// is not `λ²(trait + e^{2 a s}(e^{2 a u} p_0 + Q_u) + Q_s + (B / a)² v) + θ + ψ`.
+    MeasurementErrorIsNotPredeterminedLaterStartLaterObservedVariance,
+    /// Driver Eq. 5 of predetermined later-occasion `T0VAR` was treated
+    /// as later-start later-occasion observed variance. Later-occasion
+    /// variance at `u` omits `Q_s`.
+    PredeterminedLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance,
+    /// Driver Eq. 5 of later-start lagged predetermined `T0VAR` was
+    /// treated as later-start later-occasion observed variance. Lagged
+    /// covariance omits `Q_s` and `θ`.
+    PredeterminedLaterLaggedObservedCovarianceIsNotPredeterminedLaterStartLaterObservedVariance,
+    /// Driver Eq. 5 of later-occasion §4.3 stationary `T0VAR` was
+    /// treated as later-start later-occasion observed variance of
+    /// predetermined `T0VAR`. Stationary later variance uses
+    /// `−q / (2 a)`, not free `p_0`.
+    StationaryLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1111,6 +1153,36 @@ impl fmt::Display for PsychometricError {
             }
             Self::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance => {
                 "predetermined later-occasion observed variance is not the predetermined later-start lagged observed covariance"
+            }
+            Self::PredeterminedLaterStartLaterLatentVarianceIsNotLaterLatentVariance => {
+                "predetermined later-start later-occasion latent variance is not the predetermined later-occasion latent variance"
+            }
+            Self::PredeterminedLaterStartLaterLatentVarianceIsNotLaterLaggedCovariance => {
+                "predetermined later-start later-occasion latent variance is not the predetermined later-start lagged latent covariance"
+            }
+            Self::PredeterminedLaterStartLaterLatentVarianceIsNotStationaryLaterLatentVariance => {
+                "predetermined later-start later-occasion latent variance is not the stationary later-occasion latent variance"
+            }
+            Self::PredeterminedLaterStartLaterLatentVarianceIsNotDecayedLaterTotal => {
+                "predetermined later-start later-occasion latent variance is not the evolved later-occasion total"
+            }
+            Self::PredeterminedLaterStartLaterLatentVarianceIsNotLagIntervalLaterLatentVariance => {
+                "predetermined later-start later-occasion latent variance is not the lag-interval later-occasion latent variance"
+            }
+            Self::PredeterminedLaterStartLaterLatentVarianceIsNotObservedVariance => {
+                "predetermined later-start later-occasion latent variance is not the predetermined later-start later-occasion observed variance"
+            }
+            Self::MeasurementErrorIsNotPredeterminedLaterStartLaterObservedVariance => {
+                "measurement-error variance is not the predetermined later-start later-occasion observed variance"
+            }
+            Self::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance => {
+                "predetermined later-occasion observed variance is not the predetermined later-start later-occasion observed variance"
+            }
+            Self::PredeterminedLaterLaggedObservedCovarianceIsNotPredeterminedLaterStartLaterObservedVariance => {
+                "predetermined later-start lagged observed covariance is not the predetermined later-start later-occasion observed variance"
+            }
+            Self::StationaryLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance => {
+                "stationary later-occasion observed variance is not the predetermined later-start later-occasion observed variance"
             }
         };
         formatter.write_str(message)
@@ -1892,6 +1964,60 @@ mod tests {
             PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance
                 .to_string(),
             "predetermined later-occasion observed variance is not the predetermined later-start lagged observed covariance"
+        );
+    }
+
+    #[test]
+    fn predetermined_later_start_later_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLaterLatentVariance
+                .to_string(),
+            "predetermined later-start later-occasion latent variance is not the predetermined later-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLaterLaggedCovariance
+                .to_string(),
+            "predetermined later-start later-occasion latent variance is not the predetermined later-start lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotStationaryLaterLatentVariance
+                .to_string(),
+            "predetermined later-start later-occasion latent variance is not the stationary later-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotDecayedLaterTotal
+                .to_string(),
+            "predetermined later-start later-occasion latent variance is not the evolved later-occasion total"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLagIntervalLaterLatentVariance
+                .to_string(),
+            "predetermined later-start later-occasion latent variance is not the lag-interval later-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotObservedVariance
+                .to_string(),
+            "predetermined later-start later-occasion latent variance is not the predetermined later-start later-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotPredeterminedLaterStartLaterObservedVariance
+                .to_string(),
+            "measurement-error variance is not the predetermined later-start later-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance
+                .to_string(),
+            "predetermined later-occasion observed variance is not the predetermined later-start later-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLaggedObservedCovarianceIsNotPredeterminedLaterStartLaterObservedVariance
+                .to_string(),
+            "predetermined later-start lagged observed covariance is not the predetermined later-start later-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance
+                .to_string(),
+            "stationary later-occasion observed variance is not the predetermined later-start later-occasion observed variance"
         );
     }
 }
