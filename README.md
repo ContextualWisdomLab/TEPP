@@ -7,12 +7,13 @@ implemented in Rust.
 ## Current implementation state
 
 This branch establishes the Task 1 Rust workspace and quality-gate foundation.
-The ten bounded crates compile independently but intentionally expose no
+The eleven bounded crates compile independently but intentionally expose no
 placeholder production APIs. Domain behavior begins in Task 2 with immutable
 evidence identifiers and source records.
 
 ```text
 crates/evidence_core
+crates/semantic_core
 crates/temporal_core
 crates/event_core
 crates/relation_graph

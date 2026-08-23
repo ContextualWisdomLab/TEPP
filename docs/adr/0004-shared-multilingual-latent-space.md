@@ -3,7 +3,7 @@
 **Decision status:** Accepted  
 **Implementation maturity:** accepted-target  
 **Date:** 2026-08-05  
-**Supersedes:** None. ADR 0012 governs the complete topic-estimator/backend/global-topic contract built on this multilingual measurement decision.
+**Supersedes:** None. ADR 0012 governs the complete topic-estimator/backend/global-topic contract built on this multilingual measurement decision. ADR 0020 owns the first span-grounded unit-identity slice as an active-PR; it is not shared-latent estimation.
 
 ## Context
 
