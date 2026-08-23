@@ -155,6 +155,9 @@ pub(crate) fn header_is_credential(name: &str) -> bool {
         || lowered == "proxy-authorization"
         || lowered == "cookie"
         || lowered == "x-api-key"
+        || lowered.contains("api-key")
+        || lowered.contains("api_key")
+        || lowered.contains("apikey")
         || lowered.contains("token")
         || lowered.contains("copilot")
         || lowered.contains("github")
@@ -296,6 +299,13 @@ mod tests {
             refuse_credential_headers(&[("x-api-key", "k")]),
             Err(ApiError::AuthorizationDenied)
         );
+        for name in ["x-apikey", "x-api_key", "X-ApiKey"] {
+            assert_eq!(
+                refuse_credential_headers(&[(name, "k")]),
+                Err(ApiError::AuthorizationDenied),
+                "header={name}"
+            );
+        }
         assert_eq!(
             refuse_credential_headers(&[("x-github-token", "t")]),
             Err(ApiError::AuthorizationDenied)
