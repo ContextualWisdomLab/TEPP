@@ -30,7 +30,7 @@ def valid_baseline(*, count: int = 1, extra: str = "") -> str:
         "| PR | Exact current head | Draft | Base | Title |\n"
         "|---:|---|:---:|---|---|\n"
         f"| #164 | `{VALID_HEAD}` | false | main | docs |\n\n"
-        "## Buyer-gap register\n\n"
+        "## Operator-gap register\n\n"
         "| ID | Closure evidence |\n"
         "|---|---|\n"
         "| GAP-015 | Merge after independent review. |\n"

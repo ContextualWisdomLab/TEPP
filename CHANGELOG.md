@@ -6,12 +6,12 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
-- Live `docs/product-technical-gap-baseline.md` mapping buyer-visible gaps to
+- Live `docs/product-technical-gap-baseline.md` mapping operator-visible gaps to
   protected-main maturity, exact current PR/issue state, stacked delivery order,
   and closure evidence; placeholder-only issues #161 and #162 were closed as
   queue hygiene. The documentation validator requires a dated UTC snapshot, a
   40-character protected-main SHA, an exact-head inventory matching the declared
-  open-PR count, and buyer-gap closure evidence, and it rejects affirmative
+  open-PR count, and operator-gap closure evidence, and it rejects affirmative
   queued-Checks-as-implemented-main claims even when wrapped across a line
   break, while accepting explicit negation.
 - `tepp_api` naruon live loopback HTTP/1.1 listener: `serve_one` installs a read/write deadline, requires a loopback `Host`, refuses `Transfer-Encoding` and NIM/proxy credential headers, parses `knowledge_cutoff` as RFC 3339 and refuses a future cutoff, keys analysis-run idempotency by tenant plus key, and proves both analysis-run and export POSTs over a real `TcpStream`. Not a production TLS/`$PORT` service (ADR 0011).
@@ -85,7 +85,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 - Refreshed the live gap-baseline inventory to the 2026-08-23T13:57:34Z GitHub
   snapshot (96 open PRs / 27 drafts / 12 issues; protected-main)
-  `c45be17a9dbce95ef81cee230e9d128abc7160ac`), binding each buyer-gap current
+  `c45be17a9dbce95ef81cee230e9d128abc7160ac`), binding each operator-gap current
   head SHA to that exact-head register, naming PR #164 as the single register
   authority after closing duplicate PR #179, and recording that stacked-merged
   heads are not implemented-main.

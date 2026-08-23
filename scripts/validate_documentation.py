@@ -173,7 +173,7 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     if PROTECTED_MAIN_SHA.search(text) is None:
         failures.append("gap baseline lacks a 40-character protected-main SHA")
     if "Closure evidence" not in text:
-        failures.append("gap baseline lacks buyer-gap closure evidence")
+        failures.append("gap baseline lacks operator-gap closure evidence")
     if "Exact current head" not in text:
         failures.append("gap baseline lacks an exact-head open-PR inventory")
     if any(
