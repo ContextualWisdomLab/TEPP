@@ -70,9 +70,12 @@ service is deployed.
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
 evidence unavailable at the historical cutoff, preserves multiple-membership
-counts, and emits a digest-bound terminal result or a redacted failure. It is
-not a substitute for the approved topic or psychometric estimators and remains
-active product-branch evidence until its exact-head checks and protected merge pass.
+counts, and emits a digest-bound terminal result or a redacted failure. For the
+`trsl_topic_lineage_v1` profile it invokes the ADR-0012 `topic_measurement`
+reference estimator and publishes validated fitted associations and counts in
+`tepp.trsl_topic_lineage.v1`; it does not infer causality or replace production
+`K` selection. This remains active product-branch evidence until its exact-head
+checks and protected merge pass.
 
 ## 5. Analysis request authority
 

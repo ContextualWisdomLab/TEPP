@@ -14,6 +14,7 @@ GPU performance, HTTP deployment, certification, or customer-wide scale.
 | Multiple membership | `membership_count` is summed for every eligible unit | Inspect inclusive counts without atomistic single-group collapse |
 | Terminal completion | `AnalysisRunTerminalResult` is built from the accepted request and receipt | Poll one stable terminal contract instead of treating acceptance as completion |
 | Artifact integrity | Canonical JSON and SHA-256 digest | Verify that a downloaded result matches the published artifact identity |
+| Fitted topic lineage | `topic_measurement` reference fit projected as `tepp.trsl_topic_lineage.v1` | Read predecessor/successor-aware connectable-post and lineage counts without treating association as causation |
 | Privacy boundary | Artifact contains opaque IDs, counts, and times only | Keep identity mapping in the authorized source boundary |
 
 ## Scientific and standards basis
@@ -31,9 +32,11 @@ Technology, 2015).
 The local preflight for this slice passed with Rust 1.97.1:
 
 - `cargo fmt --all -- --check`;
-- `cargo test -p analysis_engine` — 5 unit tests, 1 crate-contract test, 2
-  end-to-end tests, and doctest collection;
+- `cargo test -p analysis_engine` — 8 unit tests, 1 crate-contract test, 3
+  readiness integration tests, 2 topic-lineage integration tests, and doctest
+  collection;
 - `cargo clippy -p analysis_engine --all-targets -- -D warnings`.
+- exact authored coverage — 148/148 lines and 74/74 branches.
 
 The protected-hosted exact-head checks and qualifying independent reviews are
 still pending. This document must not be used as implemented-main or release

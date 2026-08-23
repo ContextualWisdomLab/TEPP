@@ -37,6 +37,17 @@ The engine is deterministic, synchronous, bounded to `100_000` evidence units,
 and CPU-only. Scientific estimators and their Rust CPU `f64`/GPU parity
 contracts remain separate boundaries under ADR 0001 and ADR 0006.
 
+For the `trsl_topic_lineage_v1` output profile, the engine may invoke the
+ADR-0012 `topic_measurement` CPU `f64` reference estimator through its validated
+`ReferenceTopicInput`. The engine does not reimplement or reinterpret the
+estimator. It binds the request snapshot and cutoff, then emits a canonical
+`tepp.trsl_topic_lineage.v1` artifact containing only the selected seed,
+iteration/objective evidence, topic count, evidence count, fitted
+predecessor/successor topic edges, connectable-post count, and lineage count.
+The artifact is bounded, digest-bound, and self-validating; invalid or
+non-converged estimation returns no partial artifact. Production selection of
+`K` remains governed by ADR 0012 and `model_selection`, outside this executor.
+
 ## Alternatives considered
 
 1. Keep the API as contracts only — rejected because an accepted run would not
@@ -55,6 +66,10 @@ measurement. The initial linear scan is intentionally simple; a production
 large-corpus adapter must stream snapshots and preserve the same artifact
 semantics before raising the bound.
 
+LineageWeave may consume the topic-lineage artifact as completed model evidence
+beside, but never inside, the project-history temporal-association claim. The
+two contracts keep separate schema identities and inference-status copy.
+
 ## Verification
 
 The stacked PR includes Rust unit and integration tests for cutoff exclusion,
@@ -66,6 +81,11 @@ cargo fmt --all -- --check
 cargo test -p analysis_engine
 cargo clippy -p analysis_engine --all-targets -- -D warnings
 ```
+
+The topic-lineage execution contract additionally verifies a synthetic
+known-topic corpus, exact request/snapshot/cutoff binding, canonical artifact
+round-trip and digest stability, predecessor/successor count consistency, and
+fail-closed tamper/non-convergence paths.
 
 The supporting research and APA 7th citations are recorded in
 `docs/doctoring/analysis-engine-v1.md` and the standards register.
