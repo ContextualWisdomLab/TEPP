@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PRODUCT_TECHNICAL_GAP_BASELINE = "docs/product-technical-gap-baseline.md"
 
 REQUIRED_FILES = (
     "DOCUMENTATION.md",
@@ -41,7 +42,7 @@ REQUIRED_FILES = (
     "docs/adr/0015-autonomous-development-review-and-merge-authority.md",
     "docs/adr/0016-tdt-chronos-event-intelligence-boundary.md",
     "docs/product/prd-v0.4-approved.md",
-    "docs/product-technical-gap-baseline.md",
+    PRODUCT_TECHNICAL_GAP_BASELINE,
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
     "docs/superpowers/plans/2026-08-05-temporal-event-foundation.md",
     "docs/research/standards-and-literature.md",
@@ -58,6 +59,24 @@ ACTION_REFERENCE = re.compile(r"uses:\s*[^\s@]+@([^\s#]+)")
 FULL_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 MARKDOWN_LINK = re.compile(
     r'(?<!!)\[[^]\n]+\]\((?P<target>[^)\s]+)(?:\s+"[^"]*")?\)'
+)
+PROTECTED_MAIN_SHA = re.compile(
+    r"\*\*Protected-main evidence:\*\*\s*`(?P<sha>[0-9a-f]{40})`"
+)
+SNAPSHOT_STAMP = re.compile(
+    r"\*\*Snapshot:\*\*\s*(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"
+)
+INVENTORY_ROW = re.compile(
+    r"^\|\s*#(?P<number>\d+)\s*\|\s*`(?P<sha>[0-9a-f]{40})`\s*\|\s*"
+    r"(?P<draft>true|false)\s*\|",
+    re.MULTILINE,
+)
+OPEN_PR_COUNT = re.compile(
+    r"\|\s*Open pull requests\s*\|\s*\*\*(?P<count>\d+)\*\*"
+)
+QUEUED_CHECKS_AS_SHIPPED = re.compile(
+    r"queued Checks[^\n]{0,80}implemented-main",
+    re.IGNORECASE,
 )
 ADR_TABLE_ROW = re.compile(r"^\|\s*\[(?P<number>\d{4})\]", re.MULTILINE)
 ADR_FILE_NAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
@@ -80,7 +99,7 @@ ADR_REQUIRED_HEADINGS = (
 
 CANONICAL_LINKS = (
     "docs/product/prd-v0.4-approved.md",
-    "docs/product-technical-gap-baseline.md",
+    PRODUCT_TECHNICAL_GAP_BASELINE,
     "docs/DOCUMENTATION_ASSESSMENT.md",
     "docs/TRD.md",
     "ARCHITECTURE.md",
@@ -113,18 +132,18 @@ def markdown_files() -> list[Path]:
     return sorted(path for path in ROOT.rglob("*.md") if ".git" not in path.parts)
 
 
-def validate_required_files() -> None:
+def validate_required_files(root: Path = ROOT) -> None:
     """Require the approved governance, product, and technical documentation baseline."""
 
-    missing = [path for path in REQUIRED_FILES if not (ROOT / path).is_file()]
+    missing = [path for path in REQUIRED_FILES if not (root / path).is_file()]
     if missing:
         raise AssertionError(f"missing required documentation: {missing}")
 
 
-def validate_documentation_map() -> None:
+def validate_documentation_map(root: Path = ROOT) -> None:
     """Require cross-cutting canonical documents to be discoverable from the root map."""
 
-    documentation = (ROOT / "DOCUMENTATION.md").read_text(encoding="utf-8")
+    documentation = (root / "DOCUMENTATION.md").read_text(encoding="utf-8")
     link_targets = {
         match.group("target") for match in MARKDOWN_LINK.finditer(documentation)
     }
@@ -133,6 +152,42 @@ def validate_documentation_map() -> None:
         raise AssertionError(
             f"canonical documentation map is missing links: {missing_links}"
         )
+
+
+def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
+    """Require a dated live gap register that does not promote queued Checks."""
+
+    path = root / PRODUCT_TECHNICAL_GAP_BASELINE
+    if not path.is_file():
+        raise AssertionError(
+            f"missing required documentation: ['{PRODUCT_TECHNICAL_GAP_BASELINE}']"
+        )
+    text = path.read_text(encoding="utf-8")
+    failures: list[str] = []
+    if SNAPSHOT_STAMP.search(text) is None:
+        failures.append("gap baseline lacks a dated UTC snapshot stamp")
+    if PROTECTED_MAIN_SHA.search(text) is None:
+        failures.append("gap baseline lacks a 40-character protected-main SHA")
+    if "Closure evidence" not in text:
+        failures.append("gap baseline lacks buyer-gap closure evidence")
+    if "Exact current head" not in text:
+        failures.append("gap baseline lacks an exact-head open-PR inventory")
+    if QUEUED_CHECKS_AS_SHIPPED.search(text) is not None:
+        failures.append("gap baseline treats queued Checks as implemented-main")
+    inventory = list(INVENTORY_ROW.finditer(text))
+    if not inventory:
+        failures.append("gap baseline open-PR inventory has no exact-head rows")
+    count_match = OPEN_PR_COUNT.search(text)
+    if count_match is None:
+        failures.append("gap baseline lacks an open pull-request count")
+    elif count_match.group("count") != str(len(inventory)):
+        failures.append(
+            "gap baseline open-PR count "
+            f"{count_match.group('count')} does not match inventory "
+            f"{len(inventory)}"
+        )
+    if failures:
+        raise AssertionError("\n".join(failures))
 
 
 def validate_adr_graph() -> None:
@@ -237,6 +292,7 @@ def main() -> None:
 
     validate_required_files()
     validate_documentation_map()
+    validate_product_technical_gap_baseline()
     validate_adr_graph()
     validate_markdown()
     validate_workflows()

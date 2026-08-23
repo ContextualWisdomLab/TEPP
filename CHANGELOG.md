@@ -9,7 +9,10 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Live `docs/product-technical-gap-baseline.md` mapping buyer-visible gaps to
   protected-main maturity, exact current PR/issue state, stacked delivery order,
   and closure evidence; placeholder-only issues #161 and #162 were closed as
-  queue hygiene.
+  queue hygiene. The documentation validator requires a dated UTC snapshot, a
+  40-character protected-main SHA, an exact-head inventory matching the declared
+  open-PR count, and buyer-gap closure evidence, and it rejects prose that
+  treats queued Checks as implemented-main.
 - `tepp_api` naruon live loopback HTTP/1.1 listener: `serve_one` installs a read/write deadline, requires a loopback `Host`, refuses `Transfer-Encoding` and NIM/proxy credential headers, parses `knowledge_cutoff` as RFC 3339 and refuses a future cutoff, keys analysis-run idempotency by tenant plus key, and proves both analysis-run and export POSTs over a real `TcpStream`. Not a production TLS/`$PORT` service (ADR 0011).
 - `tepp_api` adaptive orchestration router (ADR 0010): versioned `direct`/`verify`/`committee`/`conductor`/`abstain` selection from CPU `f64` risk, ambiguity, evidence, and token-budget inputs; recorded stages, recursion, decomposition, access lists, and role-specific reasoning effort; fail-closed document-controlled policy/access/credentials; LLM plans remain proposals under deterministic statistical authority; comparable-budget ablation requires a direct baseline; credential-free contextual-orchestrator binding. Live NIM HTTP remains accepted-target.
 - `tepp_api` purpose-bound provider-payload minimization: time-bounded `PurposeGrant` evaluation, fail-closed expired/not-yet-valid/inverted/cross-tenant/impossible-calendar denial, semantic UTC calendar validation, refusal to copy identity mappings into model-provider payloads or ordinary logs, preservation of opaque analytical identifiers and membership roles (no blanket PII mask), a separately authorized scientific re-identification path, and an internally bound FIPS 180-4 SHA-256 audit digest appended through `ReidentificationAuditSink` before disclosure.
@@ -79,6 +82,11 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- Refreshed the live gap-baseline inventory to the 2026-08-23T12:27:12Z GitHub
+  snapshot (94 open PRs / 24 drafts / 12 issues; protected-main
+  `c45be17a9dbce95ef81cee230e9d128abc7160ac`), naming PR #164 as the single
+  register authority and recording that stacked-merged heads are not
+  implemented-main.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
