@@ -13,5 +13,15 @@ keywords.workspace = true
 categories.workspace = true
 publish = false
 
+[dependencies]
+corpus_split = { path = "../corpus_split" }
+membership_core = { path = "../membership_core" }
+relation_graph = { path = "../relation_graph" }
+temporal_core = { path = "../temporal_core" }
+uuid.workspace = true
+
+[dev-dependencies]
+validation_core = { path = "../validation_core" }
+
 [lints]
 workspace = true

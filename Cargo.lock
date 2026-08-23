@@ -1378,14 +1378,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "topic_measurement"
-version = "0.1.0"
-
-[[package]]
 name = "topic_lineage"
 version = "0.1.0"
 dependencies = [
  "uuid",
+]
+
+[[package]]
+name = "topic_measurement"
+version = "0.1.0"
+dependencies = [
+ "corpus_split",
+ "membership_core",
+ "relation_graph",
+ "temporal_core",
+ "uuid",
+ "validation_core",
 ]
 
 [[package]]

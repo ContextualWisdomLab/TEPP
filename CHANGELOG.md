@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `topic_measurement` bounded deterministic CPU `f64` TRSL-TM reference estimator: canonical CSR/CSC inputs, cutoff-safe documents, standardized event time, weighted multiple memberships, prevalence covariates, explicit predecessor/successor regularization, multi-seed generalized EM, diagonal Laplace uncertainty, and fitted topic-lineage counts with known-truth RMSE plus exact line/branch coverage (ADR 0012; no persistence or accelerated-backend claim).
 - `topic_measurement` logistic-normal additive log-ratio and sequential Egozcue isometric log-ratio coordinates: fail-closed simplex validation, max-shifted stable ALR/ILR inverses with true-parameter RMSE, Aitchison-distance ILR isometry, and refusal of TF-IDF/BM25/keyword scores as inferential topic coordinates (ADR 0012 first production slice; no new migration).
 - Coverage contract now excludes Rust multiline string continuation records emitted by LLVM LCOV, keeping the 100% authored-line gate focused on executable production lines.
 - Coverage source classification now scans Rust normal/raw/byte strings, comments, and character literals with escape-aware state, preserving executable string method calls and ignoring quoted comments.
