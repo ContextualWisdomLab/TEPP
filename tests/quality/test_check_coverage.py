@@ -590,6 +590,21 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract._line_in_multiline_string_literal(byte_raw_string, 2)
             )
 
+            closing_with_code = [
+                '    let text = "first',
+                '    second"; execute(text);',
+            ]
+            closing_with_comment = [
+                '    let text = "first',
+                '    second"; // no executable suffix',
+            ]
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(closing_with_code, 2)
+            )
+            self.assertTrue(
+                coverage_contract._line_in_multiline_string_literal(closing_with_comment, 2)
+            )
+
             character_and_lifetime = [
                 "fn query<'a>() {",
                 "    let quote: char = '\"';",
