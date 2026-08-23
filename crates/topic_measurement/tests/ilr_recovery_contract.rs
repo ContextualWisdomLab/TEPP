@@ -107,18 +107,18 @@ fn pairwise_ilr_euclidean_recovers_aitchison_distance_away_from_the_origin() {
 
     let three_left = [2.0 / 6.0, 3.0 / 6.0, 1.0 / 6.0];
     let three_right = [1.0 / 6.0, 1.0 / 6.0, 4.0 / 6.0];
-    let three_left_ilr = isometric_log_ratio(&three_left).expect("three left");
-    let three_right_ilr = isometric_log_ratio(&three_right).expect("three right");
-    let three_ilr = euclidean(&three_left_ilr, &three_right_ilr);
+    let isometric_left = isometric_log_ratio(&three_left).expect("three left");
+    let isometric_right = isometric_log_ratio(&three_right).expect("three right");
+    let three_ilr = euclidean(&isometric_left, &isometric_right);
     let three_distance = aitchison_distance(&three_left, &three_right).expect("three");
     assert!(
         (three_ilr - three_distance).abs() < 1e-15,
         "three-part ILR Euclidean {three_ilr} must equal Aitchison {three_distance}"
     );
 
-    let three_left_alr = additive_log_ratio(&three_left).expect("alr left");
-    let three_right_alr = additive_log_ratio(&three_right).expect("alr right");
-    let alr_euclidean = euclidean(&three_left_alr, &three_right_alr);
+    let additive_left = additive_log_ratio(&three_left).expect("alr left");
+    let additive_right = additive_log_ratio(&three_right).expect("alr right");
+    let alr_euclidean = euclidean(&additive_left, &additive_right);
     assert!(
         (alr_euclidean - three_distance).abs() > 1e-6,
         "ALR Euclidean must not be treated as Aitchison distance"
