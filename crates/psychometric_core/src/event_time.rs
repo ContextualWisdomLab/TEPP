@@ -301,8 +301,16 @@
 //! when `TRAITVAR != 0`; JSS PDF re-opened 2026-08-23T22:21Z). The
 //! scalar map is `trait / trait = 1`. Unstandardised `TRAITVAR` is
 //! not `TRAITVARstd`. `T0VARstd` is not `TRAITVARstd` even when
-//! both equal 1. `addedT0TIPREDVAR` is not `TRAITVARstd`. The
-//! JSS article
+//! both equal 1. `addedT0TIPREDVAR` is not `TRAITVARstd`. Page 16
+//! `MANIFESTTRAITVARstd` is the correlation form
+//! `solve(sqrt(diag(MANIFESTTRAITVAR))) %&% MANIFESTTRAITVAR` after
+//! strictly positive `MANIFESTTRAITVAR` (2017-era
+//! `summary.ctsemFit.R` forms it only when `MANIFESTTRAITVAR != 0`;
+//! unlike `TRAITVARstd` the 2017-era source adds ridging; JSS PDF
+//! re-opened 2026-08-23T22:28Z). The scalar map is `ψ / ψ = 1`.
+//! Unstandardised `MANIFESTTRAITVAR` is not `MANIFESTTRAITVARstd`.
+//! `TRAITVARstd` is not `MANIFESTTRAITVARstd` even when both equal 1.
+//! `MANIFESTVAR` is not `MANIFESTTRAITVARstd`. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -1953,6 +1961,141 @@ pub fn refuse_initial_time_independent_variance_as_standardised_trait_variance(
 ) -> Result<f64, PsychometricError> {
     let _ = (initial_predictor_variance, standardised_trait_variance);
     Err(PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance)
+}
+
+/// Exact scalar p. 16 `MANIFESTTRAITVARstd` after strictly positive
+/// `MANIFESTTRAITVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; §7.1, p. 19;
+/// p. 16; footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-23T22:28Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `MANIFESTTRAITVAR` `Ψ_τ` the additional time-invariant
+/// variance-covariance on the measurement level. Table 2 sets it
+/// `NULL` when there is no manifest trait. Section 7.1 names
+/// manifest traits stable individual differences in indicator
+/// levels, distinct from process-level `TRAITVAR` `φ_ξ`. Page 16
+/// prints standardised matrices with the suffix `std` when
+/// appropriate. The 2017-era `summary.ctsemFit.R` forms
+/// `MANIFESTTRAITVARstd` only when `MANIFESTTRAITVAR != 0`, as
+/// `solve(sqrt(diag(MANIFESTTRAITVAR) + ridging)) %&%
+/// MANIFESTTRAITVAR` when `verbose = TRUE`. `OpenMx` `%&%` is the
+/// quadratic form `t(A) %*% B %*% A`. Unlike `TRAITVARstd`, that
+/// formation adds `diag(c(ridging), n.manifest)`. The default
+/// `ridging = FALSE` adds 0, not `0.0001`; that ridge is a
+/// numerical hack and is not this exact map. The scalar
+/// correlation is `ψ / ψ = 1` after strictly positive
+/// `MANIFESTTRAITVAR`. Form strictly positive `ψ` first, then
+/// `1 / √ψ`, then `(1 / √ψ) ψ (1 / √ψ)`. Unstandardised
+/// `MANIFESTTRAITVAR` is defined for a zero trait; standardised
+/// `MANIFESTTRAITVAR` is not. Zero `MANIFESTTRAITVAR` skips
+/// forming `MANIFESTTRAITVARstd` in the 2017-era source and fails
+/// closed here. Indicator-level trait variance is an event-time
+/// structural quantity, so a non-event clock fails closed.
+/// `MANIFESTTRAITVAR` does not require stable `a < 0`. Distinct
+/// positive `ψ` recover the same 1. `TRAITVARstd`
+/// `trait / trait = 1` recovers the same number and remains a
+/// distinct named quantity. `MANIFESTVAR` `θ` is measurement
+/// error, not this correlation. This is not a Kalman filter, not a
+/// matrix `expm`, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance`]
+/// when `MANIFESTTRAITVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the variance is
+/// non-finite, negative, or the quadratic form overflows.
+pub fn recover_standardised_manifest_trait_variance(
+    manifest_trait_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !manifest_trait_variance.is_finite() || manifest_trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if manifest_trait_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance,
+        );
+    }
+    let process_sd = manifest_trait_variance.sqrt();
+    let inverse_sd = require_finite(1.0 / process_sd)?;
+    let scaled = require_finite(inverse_sd * manifest_trait_variance)?;
+    require_finite(scaled * inverse_sd)
+}
+
+/// Refuse treating unstandardised `MANIFESTTRAITVAR` as p. 16
+/// `MANIFESTTRAITVARstd`.
+///
+/// Unstandardised `Ψ_τ` is defined for a zero manifest trait.
+/// Footnote 4 `MANIFESTTRAITVARstd` requires strictly positive
+/// `MANIFESTTRAITVAR`. Equal numbers when `ψ = 1` are still
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedManifestTraitVarianceIsNotStandardisedManifestTraitVariance`].
+pub fn refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance(
+    unstandardised_manifest_trait_variance: f64,
+    standardised_manifest_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_manifest_trait_variance,
+        standardised_manifest_trait_variance,
+    );
+    Err(
+        PsychometricError::UnstandardisedManifestTraitVarianceIsNotStandardisedManifestTraitVariance,
+    )
+}
+
+/// Refuse treating p. 16 `TRAITVARstd` as p. 16 `MANIFESTTRAITVARstd`.
+///
+/// Both scalar correlations equal 1 after strictly positive
+/// variances. `TRAITVARstd` standardises process-level `TRAITVAR`.
+/// `MANIFESTTRAITVARstd` standardises indicator-level
+/// `MANIFESTTRAITVAR`. Equal numbers remain distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedTraitVarianceIsNotStandardisedManifestTraitVariance`].
+pub fn refuse_standardised_trait_variance_as_standardised_manifest_trait_variance(
+    standardised_trait_variance: f64,
+    standardised_manifest_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_trait_variance,
+        standardised_manifest_trait_variance,
+    );
+    Err(PsychometricError::StandardisedTraitVarianceIsNotStandardisedManifestTraitVariance)
+}
+
+/// Refuse treating Table 2 `MANIFESTVAR` `Θ` as p. 16
+/// `MANIFESTTRAITVARstd`.
+///
+/// `θ` is contemporaneous measurement error. `MANIFESTTRAITVARstd`
+/// is the correlation form of indicator-level trait variance.
+/// Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance`].
+pub fn refuse_measurement_error_as_standardised_manifest_trait_variance(
+    measurement_error_variance: f64,
+    standardised_manifest_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        measurement_error_variance,
+        standardised_manifest_trait_variance,
+    );
+    Err(PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance)
 }
 
 /// Exact scalar 2017-era `addedT0TIPREDVAR` after a first-occasion
@@ -9208,14 +9351,14 @@ mod tests {
         recover_standardised_initial_latent_variance,
         recover_standardised_initial_time_dependent_predictor_effect,
         recover_standardised_initial_time_independent_predictor_effect,
-        recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-        recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-        recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-        recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-        recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate,
+        recover_standardised_manifest_trait_variance, recover_standardised_trait_variance,
+        recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+        recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+        recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+        recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+        recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -9304,6 +9447,7 @@ mod tests {
         refuse_measurement_error_as_predetermined_later_lagged_observed_covariance,
         refuse_measurement_error_as_predetermined_later_observed_variance,
         refuse_measurement_error_as_predetermined_later_start_later_observed_variance,
+        refuse_measurement_error_as_standardised_manifest_trait_variance,
         refuse_measurement_error_as_stationary_lagged_observed_covariance,
         refuse_measurement_error_as_stationary_later_observed_variance,
         refuse_pooled_discrete_lag_across_unequal_intervals,
@@ -9353,6 +9497,7 @@ mod tests {
         refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
         refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance,
         refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
+        refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
         refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -9417,6 +9562,7 @@ mod tests {
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
+        refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance, ClusteredEventScore,
         EventOccasion, LagClock, LaggedWithinResidual,
     };
@@ -22120,6 +22266,70 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_trait_variance(f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_trait_variance_recovers_driver_table_two_after_positive_psi() {
+        // Driver et al. (2017, Table 2 MANIFESTTRAITVAR; §7.1 p.19;
+        // p. 16 MANIFESTTRAITVARstd; 2017-era summary.ctsemFit.R):
+        // form strictly positive Ψ_τ, then (1/√ψ) ψ (1/√ψ) = 1.
+        // Default ridging = FALSE adds 0.
+        let manifest_trait = 1.6_f64;
+        let recovered =
+            recover_standardised_manifest_trait_variance(manifest_trait, LagClock::EventTime)
+                .expect("MANIFESTTRAITVARstd");
+        assert!((recovered - 1.0).abs() < 1e-15);
+        let larger_psi = recover_standardised_manifest_trait_variance(6.4, LagClock::EventTime)
+            .expect("MANIFESTTRAITVARstd ψ=6.4");
+        assert_eq!(larger_psi.to_bits(), recovered.to_bits());
+        let trait_std = recover_standardised_trait_variance(manifest_trait, LagClock::EventTime)
+            .expect("TRAITVARstd");
+        assert_eq!(trait_std.to_bits(), recovered.to_bits());
+        assert_eq!(
+            refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance(
+                manifest_trait,
+                recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedManifestTraitVarianceIsNotStandardisedManifestTraitVariance
+            )
+        );
+        assert_eq!(
+            refuse_standardised_trait_variance_as_standardised_manifest_trait_variance(
+                trait_std, recovered
+            ),
+            Err(PsychometricError::StandardisedTraitVarianceIsNotStandardisedManifestTraitVariance)
+        );
+        assert_eq!(
+            refuse_measurement_error_as_standardised_manifest_trait_variance(0.4, recovered),
+            Err(PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance)
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_trait_variance_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_manifest_trait_variance(0.0, LagClock::EventTime),
+            Err(
+                PsychometricError::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_manifest_trait_variance(1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_manifest_trait_variance(-1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_trait_variance(f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_trait_variance(f64::INFINITY, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
