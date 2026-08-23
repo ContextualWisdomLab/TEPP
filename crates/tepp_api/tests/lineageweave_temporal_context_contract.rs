@@ -275,6 +275,17 @@ fn temporal_context_rejects_invalid_requests() {
 }
 
 #[test]
+fn temporal_context_serialization_enforces_the_shared_wire_limit() {
+    let mut oversized_request = request();
+    oversized_request.events[0].event_label = "x".repeat(64 * 1024);
+    assert_eq!(oversized_request.to_json(), Err(ApiError::LimitExceeded));
+
+    let mut oversized_response = single_event_response();
+    oversized_response.timeline_events[0].event_label = "x".repeat(64 * 1024);
+    assert_eq!(oversized_response.to_json(), Err(ApiError::LimitExceeded));
+}
+
+#[test]
 fn temporal_context_rejects_invalid_response_shapes() {
     let single_response = single_event_response();
 

@@ -156,7 +156,9 @@ impl TemporalContextRequest {
     /// Returns a fail-closed validation or serialization error.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        to_json(self)
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_TEMPORAL_CONTEXT_BYTE_LIMIT)?;
+        Ok(payload)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
@@ -233,7 +235,9 @@ impl TemporalContextResponse {
     /// Returns a fail-closed validation or serialization error.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        to_json(self)
+        let payload = to_json(self)?;
+        require_byte_limit(&payload, DEFAULT_TEMPORAL_CONTEXT_BYTE_LIMIT)?;
+        Ok(payload)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
