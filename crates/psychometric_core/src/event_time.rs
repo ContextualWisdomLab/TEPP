@@ -765,9 +765,8 @@ pub fn recover_discrete_latent_variance(
     if auto_effect_square.is_finite() {
         return require_finite(auto_effect_square * prior_variance + process_noise);
     }
-    if !increment_argument.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
+    // `e^{2 a Δt}` overflow of a finite `2 a Δt` is the log-space rewrite.
+    // A non-finite argument also fails closed through `require_finite`.
     let carried = require_finite((prior_variance.ln() + increment_argument).exp())?;
     require_finite(carried + process_noise)
 }
