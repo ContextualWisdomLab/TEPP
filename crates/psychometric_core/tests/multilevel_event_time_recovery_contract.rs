@@ -5,6 +5,7 @@ use psychometric_core::{
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
     ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
+    recover_asymptotic_time_independent_observed_variance,
     recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
@@ -67,6 +68,10 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
     refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
+    refuse_asymptotic_time_independent_observed_variance_as_asymptotic_time_independent_variance,
+    refuse_asymptotic_time_independent_observed_variance_as_initial_time_independent_observed_variance,
+    refuse_asymptotic_time_independent_observed_variance_as_measurement_error,
+    refuse_asymptotic_time_independent_observed_variance_as_stationary_observed_variance,
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
@@ -8968,15 +8973,14 @@ fn initial_time_independent_observed_variance_recovers_driver_eq5_of_added_t0_ti
     )
     .expect("eq5 addedT0TIPREDVAR");
     assert!((recovered - loading * loading * extra).abs() < 1e-15);
-    let asymptotic_extra = recover_asymptotic_time_independent_predictor_variance(
+    let asymptotic_observed = recover_asymptotic_time_independent_observed_variance(
+        loading,
         coefficient,
         predictor_variance,
         -0.5,
         LagClock::EventTime,
     )
-    .expect("addedTIPREDVAR");
-    let asymptotic_observed =
-        recover_manifest_observed_variance(loading, asymptotic_extra, 0.0).expect("λ² (B/a)² v");
+    .expect("λ² (B/a)² v");
     assert!((asymptotic_observed - recovered).abs() > 1e-3);
     let initial_observed =
         recover_manifest_observed_variance(loading, 1.6, 0.1).expect("λ² p_0 + θ");
@@ -9026,5 +9030,114 @@ fn initial_time_independent_observed_variance_refuses_non_event_clocks_and_negat
     assert_eq!(
         recover_initial_time_independent_observed_variance(2.0, 0.3, -0.1, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn asymptotic_time_independent_observed_variance_recovers_driver_eq5_of_added_tipred_var() {
+    let loading = 2.0_f64;
+    let coefficient = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let log_rate = -0.5_f64;
+    let extra = recover_asymptotic_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let recovered = recover_asymptotic_time_independent_observed_variance(
+        loading,
+        coefficient,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("eq5 addedTIPREDVAR");
+    assert!((recovered - loading * loading * extra).abs() < 1e-15);
+    let initial_observed = recover_initial_time_independent_observed_variance(
+        loading,
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("eq5 addedT0TIPREDVAR");
+    assert!((initial_observed - recovered).abs() > 1e-3);
+    let stationary_observed =
+        recover_manifest_observed_variance(loading, 1.6, 0.1).expect("λ² p + θ");
+    assert!((stationary_observed - recovered).abs() > 1e-3);
+    assert_eq!(
+        recover_asymptotic_time_independent_observed_variance(
+            0.0,
+            0.3,
+            4.0,
+            -0.5,
+            LagClock::EventTime
+        )
+        .expect("zero loading")
+        .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_observed_variance_as_asymptotic_time_independent_variance(
+            recovered, extra
+        ),
+        Err(
+            PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotAsymptoticTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_observed_variance_as_initial_time_independent_observed_variance(
+            recovered,
+            initial_observed
+        ),
+        Err(
+            PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotInitialTimeIndependentObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_observed_variance_as_stationary_observed_variance(
+            recovered,
+            stationary_observed
+        ),
+        Err(PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotStationaryObservedVariance)
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_observed_variance_as_measurement_error(recovered, 0.1),
+        Err(PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotMeasurementError)
+    );
+}
+
+#[test]
+fn asymptotic_time_independent_observed_variance_refuses_non_event_clocks_and_unstable_drift() {
+    assert_eq!(
+        recover_asymptotic_time_independent_observed_variance(
+            2.0,
+            0.3,
+            4.0,
+            -0.5,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_time_independent_observed_variance(
+            2.0,
+            0.3,
+            -0.1,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_time_independent_observed_variance(
+            2.0,
+            0.3,
+            4.0,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
 }
