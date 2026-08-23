@@ -282,8 +282,8 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
     raw_hashes: int | None = None
     block_comment_depth = 0
     for index, raw in enumerate(lines, start=1):
-        if (in_string or raw_hashes is not None) and index == line_number:
-            return True
+        target_continuation = (in_string or raw_hashes is not None) and index == line_number
+        target_closing_cursor: int | None = None
         cursor = 0
         while cursor < len(raw):
             if block_comment_depth > 0:
@@ -304,6 +304,8 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                 else:
                     raw_hashes = None
                     cursor = closing + len(delimiter)
+                    if target_continuation and target_closing_cursor is None:
+                        target_closing_cursor = cursor
                 continue
             if in_string:
                 character = raw[cursor]
@@ -312,6 +314,8 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                 elif character == '"':
                     in_string = False
                     cursor += 1
+                    if target_continuation and target_closing_cursor is None:
+                        target_closing_cursor = cursor
                 else:
                     cursor += 1
                 continue
@@ -335,6 +339,11 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                     cursor = character_end
                     continue
             cursor += 1
+        if target_continuation:
+            if target_closing_cursor is None:
+                return True
+            suffix = raw[target_closing_cursor:].strip().lstrip(",;)]}").lstrip()
+            return not suffix or suffix.startswith(("//", "/*"))
     return False
 
 
