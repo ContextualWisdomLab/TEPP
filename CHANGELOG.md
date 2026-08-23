@@ -6,7 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
-- `topic_measurement` logistic-normal additive log-ratio and sequential Egozcue isometric log-ratio coordinates: fail-closed simplex validation, max-shifted stable ALR/ILR inverses with true-parameter RMSE, pairwise CLR Aitchison distance recovered by ILR Euclidean isometry away from the equal-share origin, and refusal of TF-IDF/BM25/keyword scores as inferential topic coordinates (ADR 0012 first production slice; no new migration).
+- `topic_measurement` logistic-normal additive log-ratio and sequential Egozcue isometric log-ratio coordinates: fail-closed simplex validation, max-shifted stable ALR/ILR inverses with true-parameter RMSE, pairwise CLR Aitchison distance recovered by ILR Euclidean isometry for valid composition pairs, and refusal of TF-IDF/BM25/keyword scores as inferential topic coordinates (ADR 0012 first production slice; no new migration).
 - Coverage contract now excludes Rust multiline string continuation records emitted by LLVM LCOV, keeping the 100% authored-line gate focused on executable production lines.
 - Coverage source classification now scans Rust normal/raw/byte strings, comments, and character literals with escape-aware state, preserving executable string method calls and ignoring quoted comments.
 - `tepp_api` naruon live loopback HTTP/1.1 listener: `serve_one` installs a read/write deadline, requires a loopback `Host`, refuses `Transfer-Encoding` and NIM/proxy credential headers, parses `knowledge_cutoff` as RFC 3339 and refuses a future cutoff, keys analysis-run idempotency by tenant plus key, and proves both analysis-run and export POSTs over a real `TcpStream`. Not a production TLS/`$PORT` service (ADR 0011).
