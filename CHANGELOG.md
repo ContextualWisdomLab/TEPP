@@ -82,11 +82,11 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
-- Refreshed the live gap-baseline inventory to the 2026-08-23T12:27:12Z GitHub
-  snapshot (94 open PRs / 24 drafts / 12 issues; protected-main
+- Refreshed the live gap-baseline inventory to the 2026-08-23T12:39:45Z GitHub
+  snapshot (93 open PRs / 24 drafts / 12 issues; protected-main
   `c45be17a9dbce95ef81cee230e9d128abc7160ac`), naming PR #164 as the single
-  register authority and recording that stacked-merged heads are not
-  implemented-main.
+  register authority after closing duplicate PR #179, and recording that
+  stacked-merged heads are not implemented-main.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
