@@ -443,6 +443,23 @@
 //! `m · √v / √(trait + p + added)` uses `TRAITVAR` and is
 //! not `TDPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
+//! recovers the Driver Table 3 / p. 16 `T0TDPREDEFFECTstd` as
+//! `t0_m · √v / √p_0` after forming strictly positive free `T0VAR`
+//! and strictly positive time-dependent predictor variance
+//! (JSS PDF re-opened 2026-08-23T21:34Z; footnote 4 standardises
+//! using only the relevant variance, not the total; the affecting
+//! variance is TD predictor variance `v`, not `TIPREDVAR`; the
+//! affected variance is free first-occasion `T0VAR` `p_0`, not
+//! `asymDIFFUSION`; unstandardised `t0_m` is defined for a zero
+//! coefficient and for zero predictor variance, and is not
+//! `T0TDPREDEFFECTstd`; zero `p_0` or zero `v` fails closed; `T0`
+//! is event time, so a non-event clock fails closed; free `T0VAR`
+//! does not require stable `a < 0`; `m · √v / √(-q / (2 a))` is
+//! not `T0TDPREDEFFECTstd`; `t0_b · √v / √p_0` is not
+//! `T0TDPREDEFFECTstd` even when `t0_m = t0_b`;
+//! `t0_m · √v / √(trait + p_0 + added)` uses `TRAITVAR` and is
+//! not `T0TDPREDEFFECTstd`; `TRAITVAR` is not the standardisation
+//! variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -619,6 +636,8 @@ pub use event_time::recover_standardised_continuous_time_independent_predictor_e
 pub use event_time::recover_standardised_discrete_diffusion;
 /// Exact scalar p. 16 `discreteDRIFTstd` `e^{a Δt}` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_discrete_drift;
+/// Exact scalar Table 3 / p. 16 `T0TDPREDEFFECTstd` `t0_m · √v / √p_0` after strictly positive free `T0VAR` and `v`.
+pub use event_time::recover_standardised_initial_time_dependent_predictor_effect;
 /// Exact scalar Table 3 / p. 16 `T0TIPREDEFFECTstd` `t0_b · √v / √p_0` after strictly positive free `T0VAR` and `v`.
 pub use event_time::recover_standardised_initial_time_independent_predictor_effect;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
@@ -905,6 +924,8 @@ pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_st
 pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating continuous `DIFFUSION` standardisation `−2 a` as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
+/// Refuse treating p. 16 `TDPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
+pub use event_time::refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating p. 16 `TIPREDEFFECTstd` as p. 16 `TDPREDEFFECTstd`.
 pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating p. 16 `TIPREDEFFECTstd` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
@@ -919,6 +940,8 @@ pub use event_time::refuse_standardised_discrete_time_dependent_effect_as_standa
 pub use event_time::refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
 /// Refuse treating a finite-interval standardised `TIPREDEFFECT` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect;
+/// Refuse treating Table 3 / p. 16 `T0TIPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
+pub use event_time::refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymTIPREDEFFECT`.
@@ -1011,6 +1034,8 @@ pub use event_time::refuse_trait_contaminated_continuous_drift_as_standardised_c
 pub use event_time::refuse_trait_contaminated_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated continuous TI effect as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect;
+/// Refuse treating Driver §7.1 trait-contaminated first-occasion TD effect as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
+pub use event_time::refuse_trait_contaminated_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated first-occasion TI effect as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
 pub use event_time::refuse_trait_contaminated_initial_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated process noise as p. 16 `discreteDIFFUSIONstd`.
@@ -1041,6 +1066,8 @@ pub use event_time::refuse_unstandardised_continuous_time_independent_effect_as_
 pub use event_time::refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating unstandardised `discreteDRIFT` as p. 16 `discreteDRIFTstd`.
 pub use event_time::refuse_unstandardised_discrete_drift_as_standardised_discrete_drift;
+/// Refuse treating unstandardised `T0TDPREDEFFECT` `t0_m` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
+pub use event_time::refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating unstandardised `T0TIPREDEFFECT` `t0_b` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Indicator coordinate kind.
