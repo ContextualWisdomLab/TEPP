@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-23T16:52:27Z
+**Snapshot:** 2026-08-23T17:59:26Z
 **Protected-main evidence:** `c45be17a9dbce95ef81cee230e9d128abc7160ac`
 **Workspace version on protected main:** `0.1.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). Duplicate [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179) was closed at 2026-08-23T12:39:22Z and is not a second protected-main register.
@@ -26,8 +26,8 @@ GitHub state before any customer, release, certification, or valuation claim.
 |---|---:|---|
 | Protected-main SHA | `c45be17a9dbce95ef81cee230e9d128abc7160ac` | All as-built claims are bounded to this commit. |
 | Workspace members | 10 Rust crates | The foundation is modular, but the approved target contains additional semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual boundaries. |
-| Open pull requests | **99** | The queue is itself a release blocker and requires consolidation. |
-| Draft pull requests | **30** | Most queued work is not independently review-ready. |
+| Open pull requests | **101** | The queue is itself a release blocker and requires consolidation. |
+| Draft pull requests | **32** | Most queued work is not independently review-ready. |
 | Non-draft pull requests | **69** | A non-draft state is not a qualifying review or required-check result. |
 | Open product issues | **12** | Issue #156 plus the product-completion program #166–#176. |
 | Duplicate gap-baseline PRs | **#164** (authority); **#179** closed as superseded | Only one live register remains; queued Checks on #164 are not protected-main evidence. |
@@ -37,7 +37,7 @@ The pull-request counts come from the live GitHub search at this snapshot. The
 full exact-head classification is owned by
 [issue #175](https://github.com/ContextualWisdomLab/TEPP/issues/175); this file
 keeps the operator-level summary while the exact-head register below records the
-current 99-row volatile queue. Passing or queued Checks on an open PR never
+current 101-row volatile queue. Passing or queued Checks on an open PR never
 promote that PR to implemented-main.
 
 ## Current open pull-request evidence
@@ -49,6 +49,8 @@ Checks, and branch rules immediately before every mutation.
 
 | PR | Exact current head | Draft | Base | Title |
 |---:|---|:---:|---|---|
+| #196 | `1cb91b43002765bf5b855be51e55cb29db41a599` | true | agent/psychometric-standardised-continuous-tipred-effect | feat(psychometric): recover Driver Table 3 T0TIPREDEFFECTstd after positive T0VAR |
+| #195 | `cf275b25611953bd405550f96df257c77df01751` | true | agent/psychometric-standardised-continuous-tipred-effect | feat(psychometric): recover Driver p.16 CINTstd after positive asymDIFFUSION |
 | #194 | `471b115e891be11fb41eb75a5cc3073258ab0f34` | true | agent/psychometric-standardised-asymptotic-tipred-effect | feat(psychometric): recover Driver p.16 TIPREDEFFECTstd after positive variances |
 | #193 | `6235a3fc6fd6899f85f74aed71053bd50529c34c` | true | agent/psychometric-standardised-asymptotic-tipred-effect | feat(psychometric): recover Driver p.16 finite-interval TIPREDEFFECTstd after positive variances |
 | #192 | `1690c7b65693cf27c8f1730150d67084594aef07` | true | agent/psychometric-standardised-continuous-drift | feat(psychometric): recover Driver p.16 asymTIPREDEFFECTstd after positive variances |
@@ -64,7 +66,7 @@ Checks, and branch rules immediately before every mutation.
 | #180 | `fa169e8e41f13d3bae6aff242db68ebf8281e112` | false | main | fix(transport): hide raw provider exception details |
 | #177 | `580d45206536bf2f7deba327ffafb96a69ba7260` | false | main | fix(workflow): pin scheduler budget hardening |
 | #165 | `34083c3f5d6637cf1665a29dac45fbf67a74d5dd` | false | main | feat: route hourly product agents through contextual orchestrator |
-| #164 | `2676a5bf8d2367e9750565d3dae36027a67cedc5` | false | main | docs: define TEPP product completion and technical gap baseline |
+| #164 | `bde2281b7acbf4c46405316ee0930f753930db40` | false | main | docs: define TEPP product completion and technical gap baseline |
 | #157 | `7402745cfb0c27964f286c38a2efd7042c2320ff` | false | main | feat(api): publish completed analysis-run result contract |
 | #155 | `02c009c16e6a9c6fee3237224ed6a17cbc4169e1` | false | main | feat(api): admit LineageWeave as a modular analysis-run consumer |
 | #154 | `a7a1bdf96a6759f11aed9284b73319ed94b82fd2` | false | main | ci(rust): refresh branch coverage compiler baseline |
@@ -146,10 +148,10 @@ Checks, and branch rules immediately before every mutation.
 | #57 | `b76e38393e932873ec2aed682ab539ee61828537` | false | main | feat(validation): exact-head claim promotion gates |
 | #51 | `1801501c4d7c5be720d24aba954280fbc9068612` | false | main | feat(compute): VRAM budget types with CPU f64 fallback |
 | #50 | `d4cd08341e8dca8475542cf9f3b46a1f5bae5ea3` | false | main | feat(event): refuse TDT/CHRONOS outputs as state transitions |
-| #49 | `1e3e2eb04c8a63bacf50684f2cb9aad60cd93d2e` | false | main | feat(psychometric): posterior ESEM input gates with true-parameter RMSE |
-| #48 | `b3dc7dab36e94728af7bea45a7eb3a065b616db5` | false | main | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
+| #49 | `dd6cf43e5edfe1d9a7e344cac5352bfb55480e8a` | false | main | feat(psychometric): posterior ESEM input gates with true-parameter RMSE |
+| #48 | `6110d3660607ba46b312b4d76f048f1bcc4f3bc5` | false | main | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
 
-The exact-head register, counts, and protected-main SHA were fetched from the live GitHub REST API at `2026-08-23T16:52:27Z`. Review decisions, required Checks, and mergeability remain volatile; re-read them immediately before every mutation. This snapshot is not merge authorization and does not treat queued or passing Checks as shipped protected-main behavior.
+The exact-head register, counts, and protected-main SHA were fetched from the live GitHub REST API at `2026-08-23T17:59:26Z`. Review decisions, required Checks, and mergeability remain volatile; re-read them immediately before every mutation. This snapshot is not merge authorization and does not treat queued or passing Checks as shipped protected-main behavior.
 
 ## Authority and derivation
 
@@ -205,7 +207,7 @@ visual workspace, or a supported multi-tenant release.
 | GAP-003A | Immutable evidence cannot yet be submitted to a durable validation run that produces operator-usable scientific acceptance evidence. | `accepted-target` | product-completion | `c45be17` (validation metrics are library-level only) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | `—` (issue program; no current implementation PR) | Compose/CLI/API execution must bind immutable evidence, cutoffs, model configuration, validation metrics, and reproducibility manifests to one idempotent run. |
 | GAP-003B | Scientific result artifacts cannot yet be persisted, restarted, and recovered as one supported operator workflow. | `accepted-target` | product-completion | `c45be17` (persistence contracts lack E2E recovery) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | `—` (issue program; no current implementation PR) | Durable storage, migration/rollback, restart/recovery, artifact digest verification, and terminal retrieval must pass against a real Compose deployment. |
 | GAP-003C | The persistence slice classifies concurrent-write SQLSTATEs, but has no measured hot-partition detection, routing, or mitigation for tenant/result workloads. | `accepted-target` | product-completion | `c45be17` (conflict classification only; no measured partition control) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | `—` (issue program; no current implementation PR) | A real Compose/PostgreSQL workload identifies hot keys and partition skew, applies bounded tenant/time or result routing without weakening 3NF or temporal authority, and proves conflict rate, latency, recovery, and migration/rollback behavior under load. |
-| GAP-004 | The central shared-latent temporal/relational topic estimator is absent. | `accepted-target` | product vertical | `c45be17` (no production estimator) | [#167](https://github.com/ContextualWisdomLab/TEPP/issues/167) / [PR #48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | `b3dc7dab36e9` | Rust CPU `f64` fitting, sparse bounded parallelism, posterior artifacts, convergence, true-parameter RMSE/bias/coverage, and real candidate-K fitting. |
+| GAP-004 | The central shared-latent temporal/relational topic estimator is absent. | `accepted-target` | product vertical | `c45be17` (no production estimator) | [#167](https://github.com/ContextualWisdomLab/TEPP/issues/167) / [PR #48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | `6110d3660607` | Rust CPU `f64` fitting, sparse bounded parallelism, posterior artifacts, convergence, true-parameter RMSE/bias/coverage, and real candidate-K fitting. |
 | GAP-005 | Real multilingual documents are not yet transformed into validated exact-span semantic units and versioned shared concepts. | `accepted-target` | product vertical | `c45be17` (evidence spans exist without full semantic pipeline) | [#168](https://github.com/ContextualWisdomLab/TEPP/issues/168) | `—` (PR #53 merged only onto a non-main maintenance branch and is not implemented-main) | Unicode/layout/language-tailored processing, unknown-concept review, multilingual calibration/invariance, image-position evidence, and prompt-injection tests. |
 | GAP-006 | Posterior topic measurements cannot yet be fitted through a complete cross-classified longitudinal ESEM/DSEM engine. | `accepted-target` | product vertical | `c45be17` (temporal and membership primitives only) | [#169](https://github.com/ContextualWisdomLab/TEPP/issues/169) / [PR #119](https://github.com/ContextualWisdomLab/TEPP/pull/119) | `47ab763d49b1` | Plausible-value/joint uncertainty, invariance, irregular event time, within/between separation, multiple membership, true-parameter recovery, and causal-claim refusal. |
 | GAP-007 | TDT detection/tracking and CHRONOS schema/forecast/temporal reasoning remain isolated bounded gates rather than one calibrated product workflow. | `accepted-target` | product vertical | `c45be17` (event/time primitives only) | [#170](https://github.com/ContextualWisdomLab/TEPP/issues/170) / [PR #70](https://github.com/ContextualWisdomLab/TEPP/pull/70) | `7a1f33aa68c1` | Span-grounded mentions, calibrated TDT metrics, schema/forecast hypothesis states, interval consistency, known-truth recovery, persistence, and exports. |
@@ -213,10 +215,10 @@ visual workspace, or a supported multi-tenant release.
 | GAP-009 | Topic association and cluster outputs lack posterior-valid estimation, uncertainty, edge stability, and consensus communities. | `accepted-target` | product vertical | `c45be17` (network primitives only) | [#172](https://github.com/ContextualWisdomLab/TEPP/issues/172) / [PR #71](https://github.com/ContextualWisdomLab/TEPP/pull/71) | `2588f38281b9` | Valid log-ratio coordinates, interval/stability-bearing edges, repeated Leiden consensus, known-truth network/cluster recovery, and reproducible exports. |
 | GAP-010 | Operators lack coordinated accessible visual analytics and exact-value export workflows. | `accepted-target` | product vertical | `c45be17` (no visual workspace) | [#173](https://github.com/ContextualWisdomLab/TEPP/issues/173) | `—` (Figma work not started) | Real Figma File ID in ADR, Storybook/design tokens, ten PRD views, exact-value tables, accessible interaction/print/PDF states, provenance, and source-consistent exports. |
 | GAP-011 | TEPP is not yet an operable multi-tenant service or supported release. | `accepted-target` | product vertical | `c45be17` (library contracts only) | [#174](https://github.com/ContextualWisdomLab/TEPP/issues/174) | `—` (issue program; no current implementation PR) | Durable queue/storage, OIDC/RLS/purpose controls, OpenTelemetry/SLOs, load/recovery, migrations, signed release/SBOM/provenance, assurance evidence, and support policy. |
-| GAP-012 | The 99-PR queue obscures authority, repeatedly stales exact-head evidence, and fragments product boundaries. | `partial` | release blocker | `c45be17` (protected-main truth) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (live queue program) | Every PR classified; unique landing vehicles; compatible slices folded; superseded work closed with provenance; scheduler prioritizes consolidation; queue reaches zero before GA. |
+| GAP-012 | The 101-PR queue obscures authority, repeatedly stales exact-head evidence, and fragments product boundaries. | `partial` | release blocker | `c45be17` (protected-main truth) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (live queue program) | Every PR classified; unique landing vehicles; compatible slices folded; superseded work closed with provenance; scheduler prioritizes consolidation; queue reaches zero before GA. |
 | GAP-013 | Evidence-grounded LLM interpretation is routed but not executed and validated as a production interpreter/verifier port. | `partial` | active integration | `c45be17` (routing and refusal contracts only) | [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176), [PR #69](https://github.com/ContextualWisdomLab/TEPP/pull/69), [PR #165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `8e4a3ca9cc80` / `34083c3f5d66` | Contextual-orchestrator execution, evidence citations, verifier refusals, comparable-budget ablations, provider eligibility/fallback, abstention, live/offline contract tests, and no numerical-authority escalation. |
 | GAP-014 | README/TRD and some PR descriptions lag protected-main and live queue reality. | `partial` | documentation drift | `c45be17` (documentation is not fully synchronized) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (queue-consolidation work) | Reconcile README, TRD, traceability, ADR maturity, CHANGELOG, preferred-merge declarations, and exact protected-main evidence. |
-| GAP-015 | There was no canonical live product/operator-gap register tied to documentation validation. | `active-PR` | landing vehicle | `c45be17` (no live gap register) | [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) (authority); closed [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179) is not a second register | `2676a5bf8d23` | Merge this document and its validator/map/quality-test integration after exact-head checks and independent review. Passing Checks on #164 are not implemented-main. |
+| GAP-015 | There was no canonical live product/operator-gap register tied to documentation validation. | `active-PR` | landing vehicle | `c45be17` (no live gap register) | [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) (authority); closed [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179) is not a second register | `bde2281b7acb` | Merge this document and its validator/map/quality-test integration after exact-head checks and independent review. Passing Checks on #164 are not implemented-main. |
 | GAP-016 | Hourly PR maintenance used an older central scheduler revision whose per-repository sweep budgets could amplify the queued review workload. | `active-PR` | operability hardening | `c45be17` (caller pin before central budget hardening) | [PR #177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `580d45206536` | The change pins a verified central revision immutably; closure still requires exact-head hosted Checks, resolved threads, and independent review. |
 | GAP-017 | Accepted analysis runs have a terminal DTO, and cutoff-safe execution exists only on the #157 head after stacked PR #178 merged into that branch. | `active-PR` | product vertical | `c45be17` (accepted receipt only) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) / [PR #157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `7402745cfb0c` | Exact availability cutoff, snapshot binding, multiple-membership preservation, digest integrity, redacted no-eligible failure, and realistic end-to-end tests on protected main. Closed stacked PR #178 is not implemented-main. |
 
@@ -259,7 +261,7 @@ because its head can change after this file is committed.
 | [#69](https://github.com/ContextualWisdomLab/TEPP/pull/69) | Interpretation grounding/refusal metrics | Fold into the product interpreter/verifier under #176. |
 | [#71](https://github.com/ContextualWisdomLab/TEPP/pull/71) | Compositional geometry/network pair metrics | Fold into the network estimator under #172. |
 | [#119](https://github.com/ContextualWisdomLab/TEPP/pull/119) | Bounded loading/lag recovery slice | Consolidate into the psychometric engine under #169. |
-| [#181](https://github.com/ContextualWisdomLab/TEPP/pull/181)–[#190](https://github.com/ContextualWisdomLab/TEPP/pull/190), [#192](https://github.com/ContextualWisdomLab/TEPP/pull/192)–[#194](https://github.com/ContextualWisdomLab/TEPP/pull/194) | Draft stacked psychometric T0VAR/drift/standardised recoveries | Keep stacked; do not promote drafts or predecessor heads as protected-main. Closed stacked #191 landed on #48 only. |
+| [#181](https://github.com/ContextualWisdomLab/TEPP/pull/181)–[#190](https://github.com/ContextualWisdomLab/TEPP/pull/190), [#192](https://github.com/ContextualWisdomLab/TEPP/pull/192)–[#196](https://github.com/ContextualWisdomLab/TEPP/pull/196) | Draft stacked psychometric T0VAR/drift/standardised recoveries | Keep stacked; do not promote drafts or predecessor heads as protected-main. Closed stacked #191 landed on #48 only. |
 
 ## Delivery sequence
 
