@@ -865,6 +865,38 @@ pub enum PsychometricError {
     /// treated as `MANIFESTVAR` `θ`. Measurement error is not extra
     /// observed TI variance.
     AsymptoticTimeIndependentObservedVarianceIsNotMeasurementError,
+    /// Driver p. 16 `TDPREDEFFECTstd` was requested with a
+    /// non-positive within-subject variance. Footnote 4 standardises
+    /// the affected process using only strictly positive
+    /// `asymDIFFUSION`.
+    StandardisedContinuousTimeDependentEffectRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 `TDPREDEFFECTstd` was requested with a
+    /// non-positive predictor variance. Footnote 4 standardises the
+    /// affecting predictor using only strictly positive TD predictor
+    /// variance.
+    StandardisedContinuousTimeDependentEffectRequiresPositivePredictorVariance,
+    /// Driver Table 2 unstandardised `TDPREDEFFECT` `M` was treated
+    /// as p. 16 `TDPREDEFFECTstd`. Unstandardised `M` is defined for
+    /// a zero coefficient or zero predictor variance; standardised
+    /// `TDPREDEFFECT` is not.
+    UnstandardisedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect,
+    /// Driver p. 16 `TIPREDEFFECTstd` `B · √v / √(-q / (2 a))` was
+    /// treated as p. 16 `TDPREDEFFECTstd`. Table 2 names `M`
+    /// `TDPREDEFFECT` and `B` `TIPREDEFFECT`. Equal numbers when
+    /// `M = B` and the predictor variances match are still distinct
+    /// named quantities.
+    StandardisedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeDependentEffect,
+    /// Driver finite-interval standardised `TDPREDEFFECT`
+    /// `A^{-1}[e^{A Δt} − I] M · √v / √p` was treated as p. 16
+    /// `TDPREDEFFECTstd`. That intercept-style discrete map depends
+    /// on the event interval; the continuous Dirac coefficient does
+    /// not.
+    StandardisedDiscreteTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect,
+    /// Driver §7.1 trait-contaminated continuous TD effect
+    /// `m · √v / √(trait + p + added)` was treated as p. 16
+    /// `TDPREDEFFECTstd`. Footnote 4 uses only `asymDIFFUSION`,
+    /// not `TRAITVAR`.
+    TraitContaminatedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1515,6 +1547,24 @@ impl fmt::Display for PsychometricError {
             }
             Self::AsymptoticTimeIndependentObservedVarianceIsNotMeasurementError => {
                 "asymptotic time-independent observed variance is not measurement-error variance"
+            }
+            Self::StandardisedContinuousTimeDependentEffectRequiresPositiveWithinSubjectVariance => {
+                "standardised continuous time-dependent predictor effect requires strictly positive within-subject variance"
+            }
+            Self::StandardisedContinuousTimeDependentEffectRequiresPositivePredictorVariance => {
+                "standardised continuous time-dependent predictor effect requires strictly positive predictor variance"
+            }
+            Self::UnstandardisedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect => {
+                "unstandardised continuous time-dependent predictor effect is not standardised continuous time-dependent predictor effect"
+            }
+            Self::StandardisedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeDependentEffect => {
+                "standardised continuous time-independent predictor effect is not standardised continuous time-dependent predictor effect"
+            }
+            Self::StandardisedDiscreteTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect => {
+                "standardised discrete time-dependent predictor effect is not standardised continuous time-dependent predictor effect"
+            }
+            Self::TraitContaminatedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect => {
+                "trait-contaminated continuous time-dependent predictor effect is not standardised continuous time-dependent predictor effect"
             }
         };
         formatter.write_str(message)
@@ -2612,6 +2662,40 @@ mod tests {
             PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotMeasurementError
                 .to_string(),
             "asymptotic time-independent observed variance is not measurement-error variance"
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_time_dependent_effect_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised continuous time-dependent predictor effect requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositivePredictorVariance
+                .to_string(),
+            "standardised continuous time-dependent predictor effect requires strictly positive predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect
+                .to_string(),
+            "unstandardised continuous time-dependent predictor effect is not standardised continuous time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeDependentEffect
+                .to_string(),
+            "standardised continuous time-independent predictor effect is not standardised continuous time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect
+                .to_string(),
+            "standardised discrete time-dependent predictor effect is not standardised continuous time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect
+                .to_string(),
+            "trait-contaminated continuous time-dependent predictor effect is not standardised continuous time-dependent predictor effect"
         );
     }
 }

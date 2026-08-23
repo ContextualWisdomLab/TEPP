@@ -995,16 +995,6 @@ pub fn recover_standardised_asymptotic_time_independent_predictor_effect(
     )?;
     let process_sd = within.sqrt();
     let predictor_sd = predictor_variance.sqrt();
-    if process_sd == 0.0 {
-        return Err(
-            PsychometricError::StandardisedAsymptoticTimeIndependentEffectRequiresPositiveWithinSubjectVariance,
-        );
-    }
-    if predictor_sd == 0.0 {
-        return Err(
-            PsychometricError::StandardisedAsymptoticTimeIndependentEffectRequiresPositivePredictorVariance,
-        );
-    }
     let ratio = require_finite(predictor_sd / process_sd)?;
     require_finite(unit_effect * ratio)
 }
@@ -1230,6 +1220,166 @@ pub fn refuse_trait_contaminated_continuous_time_independent_effect_as_standardi
         standardised_continuous_effect,
     );
     Err(PsychometricError::TraitContaminatedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeIndependentEffect)
+}
+
+/// Exact scalar p. 16 `TDPREDEFFECTstd` after strictly positive
+/// `asymDIFFUSION` and strictly positive predictor variance.
+///
+/// Driver, Oud, and Voelkle (2017, p. 16; §7.2, pp. 20–21; Eq. 3,
+/// p. 5; Table 2, p. 12; footnote 4; JSS PDF re-opened
+/// 2026-08-23T21:10Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// print continuous-time parameters and, when appropriate,
+/// standardised matrices with the suffix `std`. Table 2 names `M`
+/// `TDPREDEFFECT`. Footnote 4: standardisations use only the
+/// relevant variance, not the total. The affecting variance is
+/// time-dependent predictor variance `v`. The affected variance is
+/// within-subject `asymDIFFUSION` `-q / (2 a)`, because the process
+/// dynamics are individual, or average individual, temporal
+/// dynamics. Form strictly positive `asymDIFFUSION` first, then
+/// strictly positive `v`, then `m · √v / √(-q / (2 a))`.
+/// Unstandardised `M` is defined for a zero coefficient and for
+/// zero predictor variance; standardised `TDPREDEFFECT` is not.
+/// Zero `asymDIFFUSION` or zero `v` has no positive SD and fails
+/// closed. `TIPREDEFFECTstd` `B · √v / √(-q / (2 a))` is a
+/// different named matrix even when `M = B` and the predictor
+/// variances match. The finite-interval intercept-style
+/// standardisation `A^{-1}[e^{A Δt} − I] M · √v / √p` depends on
+/// the event interval and is not this continuous Dirac coefficient.
+/// Section 7.1 warns that omitting trait variance confounds
+/// between- and within-person information.
+/// `m · √v / √(trait + p + added)` uses the total, not
+/// `asymDIFFUSION`, and is not this map when `TRAITVAR` is nonzero.
+/// `TRAITVAR` is not the standardisation variance. This is not a
+/// Kalman filter, not a matrix `expm`, not DSEM, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_stationary_latent_variance`]. Returns
+/// [`PsychometricError::EventTimeRequired`] for any non-event clock,
+/// [`PsychometricError::StationaryVarianceRequiresStableDrift`] when
+/// the log-rate is not strictly negative,
+/// [`PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositiveWithinSubjectVariance`]
+/// when `asymDIFFUSION` is zero,
+/// [`PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositivePredictorVariance`]
+/// when predictor variance is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, predictor variance is negative, or the product
+/// overflows.
+pub fn recover_standardised_continuous_time_dependent_predictor_effect(
+    time_dependent_effect: f64,
+    predictor_variance: f64,
+    continuous_diffusion: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let within = recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?;
+    if within == 0.0 {
+        return Err(
+            PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositiveWithinSubjectVariance,
+        );
+    }
+    if !predictor_variance.is_finite() || predictor_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if predictor_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositivePredictorVariance,
+        );
+    }
+    let coefficient = require_finite(time_dependent_effect)?;
+    let process_sd = within.sqrt();
+    let predictor_sd = predictor_variance.sqrt();
+    let ratio = require_finite(predictor_sd / process_sd)?;
+    require_finite(coefficient * ratio)
+}
+
+/// Refuse treating unstandardised `TDPREDEFFECT` as p. 16
+/// `TDPREDEFFECTstd`.
+///
+/// `M` is defined for a zero coefficient and for zero predictor
+/// variance. Footnote 4 `TDPREDEFFECTstd` requires strictly
+/// positive `asymDIFFUSION` and strictly positive `v`. Equal
+/// numbers when `v = p` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect`].
+pub fn refuse_unstandardised_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect(
+    unstandardised_continuous_effect: f64,
+    standardised_continuous_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_continuous_effect,
+        standardised_continuous_effect,
+    );
+    Err(PsychometricError::UnstandardisedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect)
+}
+
+/// Refuse treating p. 16 `TIPREDEFFECTstd` as p. 16
+/// `TDPREDEFFECTstd`.
+///
+/// `B · √v / √(-q / (2 a))` standardises Table 2 `TIPREDEFFECT`.
+/// Footnote 4 `TDPREDEFFECTstd` is `m · √v / √(-q / (2 a))`. Equal
+/// numbers when `M = B` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeDependentEffect`].
+pub fn refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect(
+    standardised_continuous_time_independent_effect: f64,
+    standardised_continuous_time_dependent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_continuous_time_independent_effect,
+        standardised_continuous_time_dependent_effect,
+    );
+    Err(PsychometricError::StandardisedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeDependentEffect)
+}
+
+/// Refuse treating a finite-interval standardised `TDPREDEFFECT`
+/// as p. 16 `TDPREDEFFECTstd`.
+///
+/// `A^{-1}[e^{A Δt} − I] M · √v / √p` treats the Dirac coefficient
+/// as an intercept-style integrated effect and depends on the event
+/// interval. Footnote 4 `TDPREDEFFECTstd` is
+/// `m · √v / √(-q / (2 a))`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedDiscreteTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect`].
+pub fn refuse_standardised_discrete_time_dependent_effect_as_standardised_continuous_time_dependent_effect(
+    standardised_discrete_effect: f64,
+    standardised_continuous_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_discrete_effect, standardised_continuous_effect);
+    Err(PsychometricError::StandardisedDiscreteTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect)
+}
+
+/// Refuse treating Driver §7.1 trait-contaminated continuous
+/// time-dependent predictor effect as p. 16 `TDPREDEFFECTstd`.
+///
+/// `m · √v / √(trait + p + added)` mixes between-subject
+/// `TRAITVAR` into the affected SD. Footnote 4 standardises using
+/// only `asymDIFFUSION`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TraitContaminatedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect`].
+pub fn refuse_trait_contaminated_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect(
+    trait_contaminated_continuous_effect: f64,
+    standardised_continuous_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        trait_contaminated_continuous_effect,
+        standardised_continuous_effect,
+    );
+    Err(PsychometricError::TraitContaminatedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect)
 }
 
 /// Exact scalar Table 3 / p. 16 `T0TIPREDEFFECTstd` after strictly
@@ -8635,6 +8785,7 @@ mod tests {
         recover_predetermined_later_start_later_observed_variance,
         recover_standardised_asymptotic_time_independent_predictor_effect,
         recover_standardised_continuous_diffusion, recover_standardised_continuous_drift,
+        recover_standardised_continuous_time_dependent_predictor_effect,
         recover_standardised_continuous_time_independent_predictor_effect,
         recover_standardised_discrete_diffusion, recover_standardised_discrete_drift,
         recover_standardised_initial_time_independent_predictor_effect,
@@ -8769,9 +8920,11 @@ mod tests {
         refuse_standardised_asymptotic_time_independent_effect_as_standardised_continuous_time_independent_effect,
         refuse_standardised_asymptotic_time_independent_effect_as_standardised_initial_time_independent_effect,
         refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
+        refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect,
         refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_independent_effect,
         refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion,
         refuse_standardised_discrete_drift_as_standardised_continuous_drift,
+        refuse_standardised_discrete_time_dependent_effect_as_standardised_continuous_time_dependent_effect,
         refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
         refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
@@ -8818,6 +8971,7 @@ mod tests {
         refuse_trait_contaminated_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
         refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion,
         refuse_trait_contaminated_continuous_drift_as_standardised_continuous_drift,
+        refuse_trait_contaminated_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect,
         refuse_trait_contaminated_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect,
         refuse_trait_contaminated_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
         refuse_trait_contaminated_process_noise_as_standardised_discrete_diffusion,
@@ -8829,6 +8983,7 @@ mod tests {
         refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
         refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion,
         refuse_unstandardised_continuous_drift_as_standardised_continuous_drift,
+        refuse_unstandardised_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect,
         refuse_unstandardised_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect,
         refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion,
         refuse_unstandardised_discrete_drift_as_standardised_discrete_drift,
@@ -20981,6 +21136,213 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_continuous_time_independent_predictor_effect(
+                4.0,
+                1e308,
+                1e-308,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_time_dependent_effect_recovers_driver_page_sixteen_after_positive_variances()
+     {
+        // Driver et al. (2017, p. 16 TDPREDEFFECTstd; Table 2; footnote 4):
+        // form strictly positive asymDIFFUSION = −q / (2 a) and
+        // strictly positive v, then m · √v / √p.
+        let diffusion = 0.4_f64;
+        let log_rate = -0.5_f64;
+        let coefficient = 0.3_f64;
+        let predictor_variance = 1.0_f64;
+        let recovered = recover_standardised_continuous_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("TDPREDEFFECTstd");
+        let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        assert!(within > 0.0);
+        let expected = coefficient * predictor_variance.sqrt() / within.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let larger_q = recover_standardised_continuous_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            2.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("TDPREDEFFECTstd q=2");
+        assert!((larger_q - recovered).abs() > 1e-3);
+        assert!(larger_q.abs() < recovered.abs());
+        let tipred = recover_standardised_continuous_time_independent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("TIPREDEFFECTstd");
+        assert_eq!(tipred.to_bits(), recovered.to_bits());
+        let discrete_increment = recover_discrete_time_independent_predictor_effect(
+            coefficient,
+            1.0,
+            log_rate,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("intercept-style discrete TDPREDEFFECT");
+        let discrete_std = discrete_increment * predictor_variance.sqrt() / within.sqrt();
+        assert!((discrete_std - recovered).abs() > 1e-3);
+        let trait_variance = 1.0_f64;
+        let total = recover_trait_plus_state_latent_variance(trait_variance, within)
+            .expect("trait+state var");
+        let contaminated = coefficient * predictor_variance.sqrt() / total.sqrt();
+        assert!((contaminated - recovered).abs() > 1e-3);
+        let zero = recover_standardised_continuous_time_dependent_predictor_effect(
+            0.0,
+            predictor_variance,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("zero coefficient");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(
+            refuse_unstandardised_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect(
+                coefficient,
+                recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect(
+                tipred,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeDependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_standardised_discrete_time_dependent_effect_as_standardised_continuous_time_dependent_effect(
+                discrete_std,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedDiscreteTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_trait_contaminated_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect(
+                contaminated,
+                recovered
+            ),
+            Err(
+                PsychometricError::TraitContaminatedContinuousTimeDependentEffectIsNotStandardisedContinuousTimeDependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_trait_variance_as_standardisation_variance(trait_variance, within),
+            Err(PsychometricError::TraitVarianceIsNotStandardisationVariance)
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_time_dependent_effect_fails_closed_when_unstandardised_is_defined() {
+        let log_rate = -0.5_f64;
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                0.3,
+                1.0,
+                0.0,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositiveWithinSubjectVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                0.3,
+                0.0,
+                0.4,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositivePredictorVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                0.3,
+                1.0,
+                0.4,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                0.3,
+                1.0,
+                0.4,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                0.3,
+                1.0,
+                0.4,
+                log_rate,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                0.3,
+                -0.1,
+                0.4,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                0.3,
+                f64::NAN,
+                0.4,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                f64::NAN,
+                1.0,
+                0.4,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
                 4.0,
                 1e308,
                 1e-308,
