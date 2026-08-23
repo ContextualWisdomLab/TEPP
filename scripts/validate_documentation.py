@@ -75,7 +75,11 @@ OPEN_PR_COUNT = re.compile(
     r"\|\s*Open pull requests\s*\|\s*\*\*(?P<count>\d+)\*\*"
 )
 QUEUED_CHECKS_AS_SHIPPED = re.compile(
-    r"queued Checks[^\n]{0,80}implemented-main",
+    r"queued Checks.{0,80}implemented-main",
+    re.IGNORECASE | re.DOTALL,
+)
+QUEUED_CHECKS_NEGATION = re.compile(
+    r"\b(?:never|not|do not|does not|cannot|must not)\b",
     re.IGNORECASE,
 )
 ADR_TABLE_ROW = re.compile(r"^\|\s*\[(?P<number>\d{4})\]", re.MULTILINE)
@@ -172,7 +176,10 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
         failures.append("gap baseline lacks buyer-gap closure evidence")
     if "Exact current head" not in text:
         failures.append("gap baseline lacks an exact-head open-PR inventory")
-    if QUEUED_CHECKS_AS_SHIPPED.search(text) is not None:
+    if any(
+        QUEUED_CHECKS_NEGATION.search(match.group(0)) is None
+        for match in QUEUED_CHECKS_AS_SHIPPED.finditer(text)
+    ):
         failures.append("gap baseline treats queued Checks as implemented-main")
     inventory = list(INVENTORY_ROW.finditer(text))
     if not inventory:

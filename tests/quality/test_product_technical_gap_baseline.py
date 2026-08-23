@@ -136,6 +136,42 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             ):
                 docs.validate_product_technical_gap_baseline(root)
 
+    def test_negated_queued_checks_wording_is_accepted(self) -> None:
+        """Correct one-line negation must not be treated as a promotion claim."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline(
+                    extra=(
+                        "\nPassing or queued Checks on an open PR never "
+                        "promote that PR to implemented-main.\n"
+                    )
+                ),
+                encoding="utf-8",
+            )
+            docs.validate_product_technical_gap_baseline(root)
+
+    def test_wrapped_queued_checks_promotion_still_fails(self) -> None:
+        """A wrapped affirmative claim must not evade the promotion guard."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline(
+                    extra="\nqueued Checks on this PR are\nimplemented-main.\n"
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "queued Checks as implemented-main"
+            ):
+                docs.validate_product_technical_gap_baseline(root)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
