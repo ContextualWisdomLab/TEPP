@@ -7,12 +7,18 @@ use tepp_api::AnalysisRunLiveService;
 const DEFAULT_BIND_ADDR: &str = "127.0.0.1:18081";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bind_addr = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| DEFAULT_BIND_ADDR.to_owned())
+    let mut arguments = std::env::args().skip(1);
+    let bind_addr = arguments
+        .next()
+        .unwrap_or(DEFAULT_BIND_ADDR.to_owned())
         .parse::<SocketAddr>()?;
+    let request_limit = arguments
+        .next()
+        .map(|value| value.parse::<usize>())
+        .transpose()?
+        .unwrap_or(usize::MAX);
     let mut service = AnalysisRunLiveService::bind(bind_addr)?;
-    loop {
-        service.serve_one()?;
-    }
+    println!("{}", service.local_addr()?);
+    (0..request_limit).try_for_each(|_| service.serve_one().map(|_| ()))?;
+    Ok(())
 }
