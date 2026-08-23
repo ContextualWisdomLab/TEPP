@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import io
 import json
 import os
@@ -821,14 +822,81 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
     def test_https_transport_hides_raw_network_errors(self) -> None:
         """Provider transport failures use a stable reason without raw exception text."""
 
+        cases: tuple[tuple[str, BaseException], ...] = (
+            ("request", OSError("provider request and token must not escape")),
+            (
+                "request",
+                http.client.HTTPException("provider request http must not escape"),
+            ),
+            ("getresponse", OSError("provider response and token must not escape")),
+            (
+                "getresponse",
+                http.client.HTTPException("provider response http must not escape"),
+            ),
+            ("getheaders", OSError("provider headers and token must not escape")),
+            (
+                "getheaders",
+                http.client.HTTPException("provider headers http must not escape"),
+            ),
+            ("read", TimeoutError("provider body and token must not escape")),
+            ("read", http.client.IncompleteRead(b"partial")),
+        )
+        for stage, error in cases:
+            with self.subTest(stage=stage, error_type=type(error).__name__):
+                closed = {"called": False}
+
+                class _FakeResponse:
+                    def read(self) -> bytes:
+                        if stage == "read":
+                            raise error
+                        return b'{"ok":true}'
+
+                    def getheaders(self) -> list[tuple[str, str]]:
+                        if stage == "getheaders":
+                            raise error
+                        return []
+
+                class _FakeConnection:
+                    def request(self, *args: object, **kwargs: object) -> None:
+                        if stage == "request":
+                            raise error
+
+                    def getresponse(self) -> _FakeResponse:
+                        if stage == "getresponse":
+                            raise error
+                        return _FakeResponse()
+
+                    def close(self) -> None:
+                        closed["called"] = True
+
+                transport = fleet.GithubHttpsTransport("secret-token")
+                with unittest.mock.patch(
+                    "http.client.HTTPSConnection", return_value=_FakeConnection()
+                ):
+                    with self.assertRaises(fleet.FleetAuditError) as raised:
+                        transport.request("GET", "/repos/o/r")
+                self.assertEqual(raised.exception.reason, "upstream_unavailable")
+                self.assertEqual(
+                    raised.exception.message, "GitHub API transport failed"
+                )
+                self.assertNotIn(str(error), str(raised.exception))
+                self.assertTrue(closed["called"])
+
+    def test_https_transport_hides_close_errors_without_overwriting_request_errors(
+        self,
+    ) -> None:
+        """Close-path OSError maps to the stable reason and cannot replace it."""
+
         class _FakeResponse:
+            status = 200
+
             def read(self) -> bytes:
-                raise TimeoutError("provider body and token must not escape")
+                return b'{"ok":true}'
 
             def getheaders(self) -> list[tuple[str, str]]:
-                return []
+                return [("Content-Type", "application/json")]
 
-        class _FakeConnection:
+        class _CloseFails:
             def request(self, *args: object, **kwargs: object) -> None:
                 return None
 
@@ -836,17 +904,32 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
                 return _FakeResponse()
 
             def close(self) -> None:
-                return None
+                raise OSError("provider close and token must not escape")
+
+        class _RequestAndCloseFail:
+            def request(self, *args: object, **kwargs: object) -> None:
+                raise OSError("provider request and token must not escape")
+
+            def getresponse(self) -> _FakeResponse:
+                raise AssertionError("getresponse must not run after request failure")
+
+            def close(self) -> None:
+                raise OSError("provider close and token must not escape")
 
         transport = fleet.GithubHttpsTransport("secret-token")
-        with unittest.mock.patch(
-            "http.client.HTTPSConnection", return_value=_FakeConnection()
-        ):
-            with self.assertRaises(fleet.FleetAuditError) as raised:
-                transport.request("GET", "/repos/o/r")
-        self.assertEqual(raised.exception.reason, "upstream_unavailable")
-        self.assertEqual(raised.exception.message, "GitHub API transport failed")
-        self.assertNotIn("provider body", str(raised.exception))
+        for connection in (_CloseFails(), _RequestAndCloseFail()):
+            with self.subTest(connection=type(connection).__name__):
+                with unittest.mock.patch(
+                    "http.client.HTTPSConnection", return_value=connection
+                ):
+                    with self.assertRaises(fleet.FleetAuditError) as raised:
+                        transport.request("GET", "/repos/o/r")
+                self.assertEqual(raised.exception.reason, "upstream_unavailable")
+                self.assertEqual(
+                    raised.exception.message, "GitHub API transport failed"
+                )
+                self.assertNotIn("provider close", str(raised.exception))
+                self.assertNotIn("provider request", str(raised.exception))
 
     def test_build_transport_uses_standard_token(self) -> None:
         """build_transport reads GITHUB_TOKEN and does not invent a TEPP PAT name."""

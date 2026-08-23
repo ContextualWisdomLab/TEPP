@@ -299,7 +299,7 @@ mod tests {
             refuse_credential_headers(&[("x-api-key", "k")]),
             Err(ApiError::AuthorizationDenied)
         );
-        for name in ["x-apikey", "x-api_key", "X-ApiKey"] {
+        for name in ["x-apikey", "x-api_key", "X-ApiKey", "x-vendor-api-key"] {
             assert_eq!(
                 refuse_credential_headers(&[(name, "k")]),
                 Err(ApiError::AuthorizationDenied),

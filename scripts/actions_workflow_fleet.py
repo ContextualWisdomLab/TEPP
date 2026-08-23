@@ -159,6 +159,7 @@ class GithubHttpsTransport:
             timeout=60,
             context=ssl.create_default_context(),
         )
+        request_error: FleetAuditError | None = None
         try:
             try:
                 connection.request(method, path, headers=headers)
@@ -168,17 +169,25 @@ class GithubHttpsTransport:
                     str(key): str(value) for key, value in response.getheaders()
                 }
             except (OSError, http.client.HTTPException):
-                raise FleetAuditError(
+                request_error = FleetAuditError(
                     "upstream_unavailable",
                     "GitHub API transport failed",
-                ) from None
+                )
+                raise request_error from None
             return HttpResponse(
                 status=int(response.status),
                 headers=response_headers,
                 body=body,
             )
         finally:
-            connection.close()
+            try:
+                connection.close()
+            except OSError:
+                if request_error is None:
+                    raise FleetAuditError(
+                        "upstream_unavailable",
+                        "GitHub API transport failed",
+                    ) from None
 
 
 def _utc_now() -> str:

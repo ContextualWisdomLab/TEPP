@@ -81,7 +81,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Security
 
-- Naruon interchange refuses `x-apikey` / `x-api_key` credential-header aliases, not only `x-api-key`.
+- Naruon interchange refuses `x-apikey`, `x-api_key`, and hyphenated `api-key` credential-header aliases, not only `x-api-key`.
+- GitHub HTTPS fleet transport maps request, response, and close-path network exceptions to `upstream_unavailable` without leaking raw provider exception text.
 - Disabled-state classification and live disable confirmation now accept GitHub's official `disabled_manually`, `disabled_fork`, `disabled_inactivity`, and `deleted` registry states so orphan bootstrap/repair identities can be retired without name-only heuristics.
 - Prohibited `COPILOT_GITHUB_TOKEN` and reserved `NVIDIA_NIM_API_KEY` for approved LLM test and development workflows.
 - Defined purpose-bound PII access, opaque analytical identifiers, separately protected identity mapping, selective model-provider disclosure, retention/deletion, and privileged audit controls instead of destructive blanket masking.
