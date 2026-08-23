@@ -184,8 +184,13 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             'branch_coverage="$RUNNER_TEMP/coverage-branches.json"',
             'python3 scripts/check_coverage.py "$line_coverage" --kind lines --format lcov',
             'python3 scripts/check_coverage.py "$branch_coverage" --kind branches',
+            'cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --output-path "$branch_coverage"',
         ):
             self.assertIn(command, verifier)
+        self.assertNotIn(
+            "--json --summary-only --output-path \"$branch_coverage\"",
+            verifier,
+        )
 
     def test_parser_accepts_unicode_and_owner_only_outputs(self) -> None:
         """Parse realistic Korean metadata and protect trusted output files."""

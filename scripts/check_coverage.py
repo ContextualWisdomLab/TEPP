@@ -10,7 +10,13 @@ from typing import Any, Iterable, Mapping, Sequence
 
 
 def load_totals(path: Path) -> Mapping[str, Any]:
-    """Load the single-report totals mapping from LLVM coverage JSON."""
+    """Load LLVM coverage totals, unique-folding branch arms when arrays exist.
+
+    ``totals.branches`` can disagree with ``files[].branches`` after max-folding
+    instantiations. The 100% contract is unique True/False arms, matching the
+    LCOV authored-line gate. Summary-only reports without branch arrays keep
+    the totals mapping and fail closed on that summary.
+    """
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     data = payload.get("data")
@@ -19,7 +25,85 @@ def load_totals(path: Path) -> Mapping[str, Any]:
     totals = data[0].get("totals")
     if not isinstance(totals, Mapping):
         raise ValueError("coverage JSON data entry must contain totals")
-    return totals
+    folded = fold_unique_branch_totals(data[0].get("files"))
+    if folded is None:
+        return totals
+    merged = dict(totals)
+    merged["branches"] = folded
+    return merged
+
+
+def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int, int]:
+    """Return ``(site, true_count, false_count)`` from one LLVM branch tuple.
+
+    LLVM export writes
+    ``[lineStart, colStart, lineEnd, colEnd, trueCount, falseCount, fileId,
+    expandedFileId, kind]``.
+    """
+
+    if not isinstance(record, list) or len(record) != 9:
+        raise ValueError("coverage JSON branch record must contain nine values")
+    line_start, column_start, line_end, column_end, true_count, false_count = record[:6]
+    coordinates = (line_start, column_start, line_end, column_end)
+    if any(not isinstance(value, int) or isinstance(value, bool) for value in coordinates):
+        raise ValueError("coverage JSON branch coordinates must be integers")
+    if (
+        not isinstance(true_count, int)
+        or isinstance(true_count, bool)
+        or not isinstance(false_count, int)
+        or isinstance(false_count, bool)
+        or true_count < 0
+        or false_count < 0
+    ):
+        raise ValueError("coverage JSON branch counts must be non-negative integers")
+    return coordinates, true_count, false_count
+
+
+def fold_unique_branch_totals(files: object) -> dict[str, int] | None:
+    """Return unique-site True/False arm totals, or None when arrays are absent.
+
+    Instantiations of the same ``(filename, start, end)`` site max-fold. One
+    LLVM JSON total that is not in that unique set is not an uncovered
+    production arm. Empty ``branches`` lists are instrumentation-absent and
+    leave the caller on summary totals.
+    """
+
+    if not isinstance(files, list):
+        return None
+    sites: dict[tuple[str, int, int, int, int], tuple[int, int]] = {}
+    saw_records = False
+    for file_entry in files:
+        if not isinstance(file_entry, Mapping):
+            raise ValueError("coverage JSON file entry must be an object")
+        records = file_entry.get("branches")
+        if records is None:
+            continue
+        if not isinstance(records, list):
+            raise ValueError("coverage JSON branches must be a list")
+        if not records:
+            continue
+        filename = file_entry.get("filename")
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("coverage JSON file entry must contain a filename")
+        for record in records:
+            site, true_count, false_count = _parse_branch_record(record)
+            saw_records = True
+            key = (filename, *site)
+            previous = sites.get(key, (0, 0))
+            sites[key] = (
+                max(previous[0], true_count),
+                max(previous[1], false_count),
+            )
+    if not saw_records:
+        return None
+    count = len(sites) * 2
+    covered = 0
+    for true_count, false_count in sites.values():
+        if true_count > 0:
+            covered += 1
+        if false_count > 0:
+            covered += 1
+    return {"count": count, "covered": covered}
 
 
 def resolve_repository_source_path(source_path: str, repository_root: Path) -> Path:

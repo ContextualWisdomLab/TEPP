@@ -28,6 +28,14 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         self.assertIn("steps.line-report.outcome == 'success'", workflow)
         self.assertIn("id: branch-report", workflow)
         self.assertIn(
+            "cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --output-path coverage-branches.json",
+            workflow,
+        )
+        self.assertNotIn(
+            "cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json",
+            workflow,
+        )
+        self.assertIn(
             "cargo +nightly-2026-08-01 llvm-cov report --branch --text --show-missing-lines",
             workflow,
         )
