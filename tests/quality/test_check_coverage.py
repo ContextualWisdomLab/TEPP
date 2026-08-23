@@ -847,11 +847,20 @@ class CoverageContractTests(unittest.TestCase):
                 '    let text = "first',
                 '    second"; // no executable suffix',
             ]
+            closing_with_block_comment_and_code = [
+                '    let text = "first',
+                '    second"; /* note */ execute(text);',
+            ]
             self.assertFalse(
                 coverage_contract._line_in_multiline_string_literal(closing_with_code, 2)
             )
             self.assertTrue(
                 coverage_contract._line_in_multiline_string_literal(closing_with_comment, 2)
+            )
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(
+                    closing_with_block_comment_and_code, 2
+                )
             )
 
             character_and_lifetime = [
