@@ -460,6 +460,23 @@
 //! `t0_m · √v / √(trait + p_0 + added)` uses `TRAITVAR` and is
 //! not `T0TDPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
+//! recovers the scalar analog of 2017-era `addedT0TIPREDVAR` for
+//! the first-occasion TD coefficient as `t0_m² v` (JSS PDF
+//! re-opened 2026-08-23T22:13Z; 2017-era `summary.ctsemFit.R` forms
+//! `addedT0TIPREDVAR` as
+//! `T0TIPREDEFFECT %*% TIPREDVAR %*% t(T0TIPREDEFFECT)` and comments
+//! out `TDPREDVAR`; it does not form `addedT0TDPREDVAR`; Table 2
+//! names `T0TDPREDCOV` the first-occasion covariance, not this
+//! extra; Table 3 names `T0TIPREDEFFECT`, not a TD first-occasion
+//! effect matrix; form `t0_m` first, then square, then multiply by
+//! `v`; a zero coefficient or zero predictor variance is exactly
+//! zero; `v < 0` fails closed; `T0` is event time, so a non-event
+//! clock fails closed; free `t0_m` does not require stable
+//! `a < 0`; `t0_b² v` is `addedT0TIPREDVAR` and is not this extra
+//! even when `t0_m = t0_b`; `t0_m · √v / √p_0` is
+//! `T0TDPREDEFFECTstd` and is not this variance; `T0TDPREDCOV` is
+//! the covariance, not `t0_m² v`; free `T0VAR` is not this extra;
+//! `TRAITVAR` is not this extra),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -574,6 +591,8 @@ pub use event_time::recover_event_time_discrete_lag_and_log_rate;
 pub use event_time::recover_initial_time_dependent_predictor_carry;
 /// Exact scalar first-occasion `T0TDPREDEFFECT` shift `t0_m x0`.
 pub use event_time::recover_initial_time_dependent_predictor_effect;
+/// Exact scalar analog of 2017-era `addedT0TIPREDVAR` for the first-occasion TD coefficient `t0_m² v`.
+pub use event_time::recover_initial_time_dependent_predictor_variance;
 /// Exact scalar Eq. 5 of 2017-era `addedT0TIPREDVAR` `λ² t0_b² v`.
 pub use event_time::recover_initial_time_independent_observed_variance;
 /// Exact scalar carried first-occasion `T0TIPREDEFFECT` `e^{A Δt} t0_b z`.
@@ -778,6 +797,16 @@ pub use event_time::refuse_initial_time_dependent_effect_as_continuous_intercept
 pub use event_time::refuse_initial_time_dependent_effect_as_initial_time_independent_effect;
 /// Refuse treating the Table 3 first-occasion TD shift as the Eq. 3 process increment.
 pub use event_time::refuse_initial_time_dependent_effect_as_process_increment;
+/// Refuse treating the first-occasion TD extra as free first-occasion `T0VAR`.
+pub use event_time::refuse_initial_time_dependent_variance_as_initial_latent_variance;
+/// Refuse treating the first-occasion TD extra as Table 2 `T0TDPREDCOV`.
+pub use event_time::refuse_initial_time_dependent_variance_as_initial_time_dependent_covariance;
+/// Refuse treating the first-occasion TD extra as 2017-era `addedT0TIPREDVAR`.
+pub use event_time::refuse_initial_time_dependent_variance_as_initial_time_independent_variance;
+/// Refuse treating the first-occasion TD extra as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
+pub use event_time::refuse_initial_time_dependent_variance_as_standardised_initial_time_dependent_effect;
+/// Refuse treating the first-occasion TD extra as `TRAITVAR`.
+pub use event_time::refuse_initial_time_dependent_variance_as_trait_variance;
 /// Refuse treating the Eq. 3 `T0TIPREDEFFECT` carry as the first-occasion shift.
 pub use event_time::refuse_initial_time_independent_carry_as_initial_effect;
 /// Refuse treating Driver Table 3 `T0TIPREDEFFECT` as the first-occasion shift.

@@ -928,6 +928,33 @@ pub enum PsychometricError {
     /// / p. 16 `T0TDPREDEFFECTstd`. Footnote 4 uses only free
     /// `T0VAR`, not `TRAITVAR`.
     TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect,
+    /// The scalar analog of 2017-era `addedT0TIPREDVAR` for the
+    /// first-occasion TD coefficient `t0_m² v` was treated as
+    /// 2017-era `addedT0TIPREDVAR` `t0_b² v`. Table 3 names
+    /// `T0TIPREDEFFECT`. Equal numbers when `t0_m = t0_b` are still
+    /// distinct named quantities.
+    InitialTimeDependentVarianceIsNotInitialTimeIndependentVariance,
+    /// The scalar analog of 2017-era `addedT0TIPREDVAR` for the
+    /// first-occasion TD coefficient `t0_m² v` was treated as
+    /// Table 3 / p. 16 `T0TDPREDEFFECTstd`. The extra first-occasion
+    /// variance is not the standardised coefficient.
+    InitialTimeDependentVarianceIsNotStandardisedInitialTimeDependentEffect,
+    /// The scalar analog of 2017-era `addedT0TIPREDVAR` for the
+    /// first-occasion TD coefficient `t0_m² v` was treated as
+    /// Table 2 `T0TDPREDCOV`. `T0TDPREDCOV` is the covariance
+    /// between latents at `T0` and time-dependent predictors, not
+    /// the extra variance `t0_m² v`.
+    InitialTimeDependentVarianceIsNotInitialTimeDependentCovariance,
+    /// The scalar analog of 2017-era `addedT0TIPREDVAR` for the
+    /// first-occasion TD coefficient `t0_m² v` was treated as free
+    /// first-occasion `T0VAR`. `p_0` is the first-occasion state,
+    /// not the extra TD variance.
+    InitialTimeDependentVarianceIsNotInitialLatentVariance,
+    /// The scalar analog of 2017-era `addedT0TIPREDVAR` for the
+    /// first-occasion TD coefficient `t0_m² v` was treated as
+    /// `TRAITVAR`. Section 4.3 `TRAITVAR` is a zero-drift latent
+    /// process, not first-occasion TD extra variance.
+    InitialTimeDependentVarianceIsNotTraitVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1614,6 +1641,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect => {
                 "trait-contaminated initial time-dependent predictor effect is not standardised initial time-dependent predictor effect"
+            }
+            Self::InitialTimeDependentVarianceIsNotInitialTimeIndependentVariance => {
+                "initial time-dependent predictor variance is not initial time-independent predictor variance"
+            }
+            Self::InitialTimeDependentVarianceIsNotStandardisedInitialTimeDependentEffect => {
+                "initial time-dependent predictor variance is not standardised initial time-dependent predictor effect"
+            }
+            Self::InitialTimeDependentVarianceIsNotInitialTimeDependentCovariance => {
+                "initial time-dependent predictor variance is not initial time-dependent predictor covariance"
+            }
+            Self::InitialTimeDependentVarianceIsNotInitialLatentVariance => {
+                "initial time-dependent predictor variance is not initial latent variance"
+            }
+            Self::InitialTimeDependentVarianceIsNotTraitVariance => {
+                "initial time-dependent predictor variance is not trait variance"
             }
         };
         formatter.write_str(message)
@@ -2779,6 +2821,33 @@ mod tests {
             PsychometricError::TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
                 .to_string(),
             "trait-contaminated initial time-dependent predictor effect is not standardised initial time-dependent predictor effect"
+        );
+    }
+
+    #[test]
+    fn initial_time_dependent_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::InitialTimeDependentVarianceIsNotInitialTimeIndependentVariance
+                .to_string(),
+            "initial time-dependent predictor variance is not initial time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentVarianceIsNotStandardisedInitialTimeDependentEffect
+                .to_string(),
+            "initial time-dependent predictor variance is not standardised initial time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentVarianceIsNotInitialTimeDependentCovariance
+                .to_string(),
+            "initial time-dependent predictor variance is not initial time-dependent predictor covariance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentVarianceIsNotInitialLatentVariance.to_string(),
+            "initial time-dependent predictor variance is not initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentVarianceIsNotTraitVariance.to_string(),
+            "initial time-dependent predictor variance is not trait variance"
         );
     }
 }
