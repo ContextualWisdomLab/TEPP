@@ -464,10 +464,8 @@ pub fn recover_discrete_constant_predictor_effect(
         // grows).
         return require_finite(outcome_on_predictor * (increment / predictor_log_rate));
     }
-    // expm1 overflowed. z → +∞ diverges (unstable auto-effect).
-    if !increment_argument.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
+    // expm1 overflowed. Finite z uses the log-space rewrite; a
+    // non-finite argument also fails closed through `require_finite`.
     // Finite z, overflowed expm1. (a_yx/a_xx)(exp(z) − 1) =
     // sign(a_yx/a_xx) exp(ln|a_yx| + z − ln|a_xx|) − a_yx/a_xx.
     // The subtracted scale must itself be finite: if a_yx/a_xx overflows,
@@ -639,11 +637,8 @@ pub fn recover_discrete_process_noise(
         // expm1(−∞) is −1, so this path also keeps −0.5 q / a.
         return require_finite(0.5 * continuous_diffusion * (increment / log_rate));
     }
-    // expm1 overflowed. z → +∞ diverges (unstable auto-effect).
-    // z → −∞ is already handled above because expm1(−∞) is finite.
-    if !increment_argument.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
+    // expm1 overflowed. Finite z uses the log-space rewrite; a
+    // non-finite argument also fails closed through `require_finite`.
     // Finite z, overflowed expm1. (q / (2 a))(exp(z) − 1) =
     // sign(q / a) exp(ln|q| + z − ln|a| − ln 2) − 0.5 q / a.
     // Driver Eq. 3 (JSS PDF re-opened 2026-08-18T03:07Z, p. 4):
