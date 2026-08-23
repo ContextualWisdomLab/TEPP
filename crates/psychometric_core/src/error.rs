@@ -955,6 +955,24 @@ pub enum PsychometricError {
     /// `TRAITVAR`. Section 4.3 `TRAITVAR` is a zero-drift latent
     /// process, not first-occasion TD extra variance.
     InitialTimeDependentVarianceIsNotTraitVariance,
+    /// Driver Eq. 5 of the analog first-occasion TD extra
+    /// `λ² t0_m² v` was treated as the latent extra `t0_m² v`. The
+    /// observed extra is not the latent extra.
+    InitialTimeDependentObservedVarianceIsNotInitialTimeDependentVariance,
+    /// Driver Eq. 5 of the analog first-occasion TD extra
+    /// `λ² t0_m² v` was treated as first-occasion observed variance
+    /// `λ² p_0 + θ`. The extra is not the full first-occasion
+    /// `Var(y_0)`.
+    InitialTimeDependentObservedVarianceIsNotInitialObservedVariance,
+    /// Driver Eq. 5 of the analog first-occasion TD extra
+    /// `λ² t0_m² v` was treated as Eq. 5 of `addedT0TIPREDVAR`
+    /// `λ² t0_b² v`. Equal numbers when `t0_m = t0_b` are still
+    /// distinct named quantities.
+    InitialTimeDependentObservedVarianceIsNotInitialTimeIndependentObservedVariance,
+    /// Driver Eq. 5 of the analog first-occasion TD extra
+    /// `λ² t0_m² v` was treated as `MANIFESTVAR` `θ`. Measurement
+    /// error is not extra observed TD variance.
+    InitialTimeDependentObservedVarianceIsNotMeasurementError,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1656,6 +1674,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialTimeDependentVarianceIsNotTraitVariance => {
                 "initial time-dependent predictor variance is not trait variance"
+            }
+            Self::InitialTimeDependentObservedVarianceIsNotInitialTimeDependentVariance => {
+                "initial time-dependent observed predictor variance is not initial time-dependent predictor variance"
+            }
+            Self::InitialTimeDependentObservedVarianceIsNotInitialObservedVariance => {
+                "initial time-dependent observed predictor variance is not initial observed variance"
+            }
+            Self::InitialTimeDependentObservedVarianceIsNotInitialTimeIndependentObservedVariance => {
+                "initial time-dependent observed predictor variance is not initial time-independent observed predictor variance"
+            }
+            Self::InitialTimeDependentObservedVarianceIsNotMeasurementError => {
+                "initial time-dependent observed predictor variance is not measurement error"
             }
         };
         formatter.write_str(message)
@@ -2848,6 +2878,30 @@ mod tests {
         assert_eq!(
             PsychometricError::InitialTimeDependentVarianceIsNotTraitVariance.to_string(),
             "initial time-dependent predictor variance is not trait variance"
+        );
+    }
+
+    #[test]
+    fn initial_time_dependent_observed_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::InitialTimeDependentObservedVarianceIsNotInitialTimeDependentVariance
+                .to_string(),
+            "initial time-dependent observed predictor variance is not initial time-dependent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentObservedVarianceIsNotInitialObservedVariance
+                .to_string(),
+            "initial time-dependent observed predictor variance is not initial observed variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentObservedVarianceIsNotInitialTimeIndependentObservedVariance
+                .to_string(),
+            "initial time-dependent observed predictor variance is not initial time-independent observed predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentObservedVarianceIsNotMeasurementError
+                .to_string(),
+            "initial time-dependent observed predictor variance is not measurement error"
         );
     }
 }
