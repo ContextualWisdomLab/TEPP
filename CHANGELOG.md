@@ -85,14 +85,14 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
-- Refreshed the live gap-baseline inventory to the 2026-08-23T20:57:00Z GitHub
-  snapshot (106 open PRs / 36 drafts / 12 issues; protected-main
+- Refreshed the live gap-baseline inventory to the 2026-08-23T21:46:37Z GitHub
+  snapshot (109 open PRs / 39 drafts / 12 issues; protected-main
   `c45be17a9dbce95ef81cee230e9d128abc7160ac`), binding each operator-gap current
-  head SHA to that exact-head register, including #201 `5344729219a3` as the
-  GAP-005 first span-unit slice (not implemented-main), #49 `dd6cf43e5edf`
-  unique-fold nightly green, and #164 `627f5950f8d1` as the predecessor register
-  head. Duplicate PR #179 remains closed. Stacked-merged heads and queued Checks
-  are not implemented-main.
+  head SHA to that exact-head register, including #201 `6afd650667e1` (RFC 5646
+  cited once; first GAP-005 slice, not implemented-main), stacked drafts
+  #202–#204, and #164 `ff2e645b1785` as the predecessor register head. Duplicate
+  PR #179 remains closed. Stacked-merged heads and queued Checks are not
+  implemented-main.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
