@@ -78,9 +78,9 @@ QUEUED_CHECKS_AS_SHIPPED = re.compile(
     r"queued Checks.{0,80}implemented-main",
     re.IGNORECASE | re.DOTALL,
 )
-QUEUED_CHECKS_NEGATION = re.compile(
-    r"\b(?:never|not|do not|does not|cannot|must not)\b",
-    re.IGNORECASE,
+QUEUED_CHECKS_PROMOTION_DENIAL = re.compile(
+    r"\b(?:never|do not|does not|cannot|must not)\b.{0,40}\b(?:promote|treat|make|mean)\b",
+    re.IGNORECASE | re.DOTALL,
 )
 ADR_TABLE_ROW = re.compile(r"^\|\s*\[(?P<number>\d{4})\]", re.MULTILINE)
 ADR_FILE_NAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
@@ -177,7 +177,7 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     if "Exact current head" not in text:
         failures.append("gap baseline lacks an exact-head open-PR inventory")
     if any(
-        QUEUED_CHECKS_NEGATION.search(match.group(0)) is None
+        QUEUED_CHECKS_PROMOTION_DENIAL.search(match.group(0)) is None
         for match in QUEUED_CHECKS_AS_SHIPPED.finditer(text)
     ):
         failures.append("gap baseline treats queued Checks as implemented-main")

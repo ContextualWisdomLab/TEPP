@@ -172,6 +172,27 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             ):
                 docs.validate_product_technical_gap_baseline(root)
 
+    def test_unrelated_negation_does_not_license_implemented_main(self) -> None:
+        """A `not` that does not deny promotion must not pass the guard."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline(
+                    extra=(
+                        "\nqueued Checks are not required; "
+                        "this PR is implemented-main.\n"
+                    )
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "queued Checks as implemented-main"
+            ):
+                docs.validate_product_technical_gap_baseline(root)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
