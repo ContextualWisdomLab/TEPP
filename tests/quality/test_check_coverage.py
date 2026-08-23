@@ -540,6 +540,21 @@ class CoverageContractTests(unittest.TestCase):
             self.assertFalse(
                 coverage_contract._line_in_multiline_string_literal(block_comment, 5)
             )
+            nested_block = [
+                "/* outer",
+                "   /* inner */",
+                r'   still outer with " quote',
+                "*/",
+                "execute();",
+            ]
+            nested_path = Path(temporary) / "nested.rs"
+            nested_path.write_text("\n".join(nested_block) + "\n", encoding="utf-8")
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string_literal(nested_block, 5)
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(nested_path), 5)
+            )
             self.assertTrue(
                 coverage_contract._is_standalone_string_literal(r'"escaped\\",')
             )
