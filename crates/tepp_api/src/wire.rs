@@ -2,6 +2,28 @@
 
 use crate::ApiError;
 use serde::{Deserialize, Serialize};
+use std::io::{self, Write};
+
+struct LimitedWriter {
+    bytes: Vec<u8>,
+    maximum_bytes: usize,
+    limit_exceeded: bool,
+}
+
+impl Write for LimitedWriter {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        if self.bytes.len().saturating_add(buffer.len()) > self.maximum_bytes {
+            self.limit_exceeded = true;
+            return Err(io::Error::other("JSON byte limit exceeded"));
+        }
+        self.bytes.extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 /// Serialize a wire DTO to canonical JSON.
 ///
@@ -10,6 +32,31 @@ use serde::{Deserialize, Serialize};
 /// Returns [`ApiError::InvalidWirePayload`] when serialization fails.
 pub fn to_json<T: Serialize>(value: &T) -> Result<String, ApiError> {
     serde_json::to_string(value).map_err(|_| ApiError::InvalidWirePayload)
+}
+
+/// Serialize a wire DTO without buffering more than `maximum_bytes`.
+///
+/// # Errors
+///
+/// Returns [`ApiError::LimitExceeded`] when serialization crosses the limit,
+/// or [`ApiError::InvalidWirePayload`] for another serialization failure.
+pub fn to_json_with_limit<T: Serialize>(
+    value: &T,
+    maximum_bytes: usize,
+) -> Result<String, ApiError> {
+    let mut writer = LimitedWriter {
+        bytes: Vec::with_capacity(maximum_bytes.min(4096)),
+        maximum_bytes,
+        limit_exceeded: false,
+    };
+    if serde_json::to_writer(&mut writer, value).is_err() {
+        return Err(if writer.limit_exceeded {
+            ApiError::LimitExceeded
+        } else {
+            ApiError::InvalidWirePayload
+        });
+    }
+    String::from_utf8(writer.bytes).map_err(|_| ApiError::InvalidWirePayload)
 }
 
 /// Deserialize a strict wire DTO from JSON text.
@@ -63,6 +110,7 @@ pub fn require_contract_version(version: u16, expected: u16) -> Result<(), ApiEr
 mod tests {
     use super::{
         from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
+        to_json_with_limit,
     };
     use crate::ApiError;
     use serde::Serialize;
@@ -86,6 +134,12 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            to_json_with_limit(&SerializationFailure, 8),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(to_json_with_limit(&"abc", 5), Ok("\"abc\"".into()));
+        assert_eq!(to_json_with_limit(&"abc", 4), Err(ApiError::LimitExceeded));
+        assert_eq!(
             from_json::<u8>("not-json"),
             Err(ApiError::InvalidWirePayload)
         );
@@ -94,7 +148,7 @@ mod tests {
         assert_eq!(require_nonempty("   "), Err(ApiError::InvalidWirePayload));
         assert_eq!(require_nonempty(""), Err(ApiError::InvalidWirePayload));
         assert_eq!(
-            require_nonempty("topic\u{1f}unit"),
+            require_nonempty("tenant\u{1f}workspace"),
             Err(ApiError::InvalidWirePayload)
         );
         require_byte_limit("abc", 3).expect("ok");

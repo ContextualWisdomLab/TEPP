@@ -13,6 +13,14 @@ pub enum TopicMeasurementError {
     InvalidLogRatioDimension,
     /// TF-IDF, BM25, or keyword scores were offered as inferential coordinates.
     LexicalWeightForbidden,
+    /// A sparse matrix violated its compressed-storage contract.
+    InvalidSparseMatrix,
+    /// A reference-estimator input or configuration violated its scientific contract.
+    InvalidModelInput,
+    /// The estimator produced a non-finite intermediate and failed closed.
+    NonFiniteEstimate,
+    /// No seeded initialization converged within the bounded iteration budget.
+    DidNotConverge,
 }
 
 impl fmt::Display for TopicMeasurementError {
@@ -21,6 +29,10 @@ impl fmt::Display for TopicMeasurementError {
             Self::InvalidComposition => "invalid compositional topic vector",
             Self::InvalidLogRatioDimension => "invalid log-ratio dimension",
             Self::LexicalWeightForbidden => "lexical inferential weights are forbidden",
+            Self::InvalidSparseMatrix => "invalid sparse matrix",
+            Self::InvalidModelInput => "invalid topic model input",
+            Self::NonFiniteEstimate => "non-finite topic estimate",
+            Self::DidNotConverge => "topic estimator did not converge",
         };
         formatter.write_str(message)
     }
@@ -45,6 +57,22 @@ mod tests {
         assert_eq!(
             TopicMeasurementError::LexicalWeightForbidden.to_string(),
             "lexical inferential weights are forbidden"
+        );
+        assert_eq!(
+            TopicMeasurementError::InvalidSparseMatrix.to_string(),
+            "invalid sparse matrix"
+        );
+        assert_eq!(
+            TopicMeasurementError::InvalidModelInput.to_string(),
+            "invalid topic model input"
+        );
+        assert_eq!(
+            TopicMeasurementError::NonFiniteEstimate.to_string(),
+            "non-finite topic estimate"
+        );
+        assert_eq!(
+            TopicMeasurementError::DidNotConverge.to_string(),
+            "topic estimator did not converge"
         );
     }
 }

@@ -24,6 +24,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
+name = "analysis_engine"
+version = "0.1.0"
+dependencies = [
+ "corpus_split",
+ "membership_core",
+ "relation_graph",
+ "serde",
+ "serde_json",
+ "sha2",
+ "temporal_core",
+ "tepp_api",
+ "topic_measurement",
+ "uuid",
+]
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -734,6 +750,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "model_selection"
+version = "0.1.0"
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1374,8 +1394,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "topic_lineage"
+version = "0.1.0"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "topic_measurement"
 version = "0.1.0"
+dependencies = [
+ "corpus_split",
+ "membership_core",
+ "relation_graph",
+ "temporal_core",
+ "uuid",
+ "validation_core",
+]
 
 [[package]]
 name = "tracing"

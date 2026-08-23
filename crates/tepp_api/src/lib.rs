@@ -5,32 +5,65 @@
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
 //! scientific crates; this crate only defines fail-closed interchange shapes.
-//! naruon HTTP interchange is a versioned `https` POST to analysis-run and
-//! export paths; table-access URLs, review/Copilot/NIM/proxy headers, and
-//! lexical inference claims fail closed. A loopback live listener proves
-//! those POSTs over TCP without claiming production TLS (ADR 0011).
+//! Naruon and `LineageWeave` use the versioned analysis-run contract; `LineageWeave`
+//! may also request a cutoff-safe project-history projection from explicit
+//! source evidence. Naruon owns the current purpose-bound export adapter.
+//! Loopback listeners prove the HTTP boundary without claiming production TLS,
+//! causality, or completed psychometric model results.
 
+mod analysis_result;
 mod analysis_run;
+mod analysis_run_live;
 mod authorization;
 mod envelope;
 mod error;
 mod export;
+mod lineageweave_http;
+mod live_http;
 mod naruon_http;
 mod naruon_live;
 mod orchestration;
+mod project_history;
 mod provider_payload;
+mod temporal_context;
 mod wire;
 
+/// Terminal analysis-result contract version constant.
+pub use analysis_result::ANALYSIS_RESULT_CONTRACT_VERSION;
+/// Bounded identity-free terminal result summary.
+pub use analysis_result::AnalysisResultSummary;
+/// Request-bound terminal analysis outcome.
+pub use analysis_result::AnalysisRunTerminalResult;
+/// Canonical terminal analysis-run state.
+pub use analysis_result::AnalysisRunTerminalState;
+/// Default terminal analysis-result payload byte limit.
+pub use analysis_result::DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT;
+/// Require exact terminal result binding to request and accepted receipt.
+pub use analysis_result::require_terminal_binding;
+/// Compare a terminal result with an accepted receipt.
+pub use analysis_result::terminal_result_matches_accepted;
+/// Compare a terminal result with its submitted request.
+pub use analysis_result::terminal_result_matches_request;
 /// Analysis-run contract version constant.
 pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
+/// Analysis-run status/read contract version constant.
+pub use analysis_run::ANALYSIS_RUN_STATUS_CONTRACT_VERSION;
 /// Accepted analysis-run response.
 pub use analysis_run::AnalysisRunAccepted;
 /// Analysis-run create request.
 pub use analysis_run::AnalysisRunRequest;
+/// Typed analysis-run status/read response.
+pub use analysis_run::AnalysisRunStatus;
+/// Analysis-run status/read lifecycle state.
+pub use analysis_run::AnalysisRunStatusState;
 /// Default analysis-run payload byte limit.
 pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 /// Idempotent request equality helper.
 pub use analysis_run::requests_are_idempotent_matches;
+/// Require exact status binding to a request and accepted receipt.
+pub use analysis_run::require_status_binding;
+/// Consumer-neutral loopback analysis-run service.
+pub use analysis_run_live::AnalysisRunLiveService;
 /// Content-redacting error envelope.
 pub use envelope::ErrorEnvelope;
 /// Fail-closed API errors.
@@ -54,19 +87,29 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
-/// Versioned analysis-run path naruon may call.
+/// Published `LineageWeave` modular-consumer identity.
+pub use lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
+/// Published Naruon modular-consumer identity.
+pub use lineageweave_http::NARUON_CONSUMER_CODE;
+/// Build a `LineageWeave` analysis-run exchange without provider credentials.
+pub use lineageweave_http::lineageweave_analysis_run_exchange;
+/// Build a `LineageWeave` project-history exchange without provider credentials.
+pub use lineageweave_http::lineageweave_project_history_exchange;
+/// Build a credential-free `LineageWeave` temporal-context exchange.
+pub use lineageweave_http::lineageweave_temporal_context_exchange;
+/// Versioned analysis-run path modular consumers may call.
 pub use naruon_http::NARUON_ANALYSIS_RUN_PATH;
-/// Versioned export path naruon may call.
+/// Versioned export path Naruon may call.
 pub use naruon_http::NARUON_EXPORT_PATH;
-/// Allowed TEPP inference method code naruon may claim.
+/// Allowed TEPP inference method code Naruon may claim.
 pub use naruon_http::NARUON_TEPP_INFERENCE_METHOD;
-/// Fail-closed HTTP exchange naruon may send to TEPP.
+/// Fail-closed HTTP exchange a modular consumer may send to TEPP.
 pub use naruon_http::NaruonHttpExchange;
-/// Build a naruon analysis-run create exchange.
+/// Build a Naruon analysis-run create exchange.
 pub use naruon_http::naruon_analysis_run_exchange;
-/// Build an analysis-run exchange and refuse credential headers.
+/// Build a Naruon analysis-run exchange and refuse credential headers.
 pub use naruon_http::naruon_analysis_run_exchange_with_headers;
-/// Build a naruon export-authorization exchange.
+/// Build a Naruon export-authorization exchange.
 pub use naruon_http::naruon_export_exchange;
 /// Refuse lexical heuristics as TEPP inference claims.
 pub use naruon_http::naruon_may_claim_tepp_inference;
@@ -76,9 +119,9 @@ pub use naruon_live::NARUON_LIVE_HEADER_BYTE_LIMIT;
 pub use naruon_live::NARUON_LIVE_HEADER_COUNT_LIMIT;
 /// Accepted-stream read/write deadline.
 pub use naruon_live::NARUON_LIVE_IO_TIMEOUT;
-/// HTTP/1.1 response from the naruon live listener.
+/// HTTP/1.1 response from the loopback listener.
 pub use naruon_live::NaruonLiveResponse;
-/// Loopback live HTTP/1.1 service for naruon POSTs.
+/// Backward-compatible Naruon loopback HTTP/1.1 service.
 pub use naruon_live::NaruonLiveService;
 /// Comparable-budget ablation record.
 pub use orchestration::BudgetAblationRecord;
@@ -116,6 +159,26 @@ pub use orchestration::bind_contextual_orchestrator;
 pub use orchestration::record_budget_ablation;
 /// Route a task onto a versioned orchestration plan.
 pub use orchestration::route_orchestration;
+/// Default maximum serialized project-history request bytes.
+pub use project_history::DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
+/// Default maximum project-history event count.
+pub use project_history::DEFAULT_PROJECT_HISTORY_EVENT_LIMIT;
+/// Supported project-history contract version.
+pub use project_history::PROJECT_HISTORY_CONTRACT_VERSION;
+/// Versioned project-history path.
+pub use project_history::PROJECT_HISTORY_PATH;
+/// Explicit source-grounded project event.
+pub use project_history::ProjectHistoryEvent;
+/// One non-causal temporal finding.
+pub use project_history::ProjectHistoryFinding;
+/// Project-history HTTP exchange.
+pub use project_history::ProjectHistoryHttpExchange;
+/// Deterministic TEPP project-history projection.
+pub use project_history::ProjectHistoryProjection;
+/// Versioned project-history request.
+pub use project_history::ProjectHistoryRequest;
+/// Build a cutoff-safe project-history projection.
+pub use project_history::project_history_projection;
 /// Elevated re-identification result.
 pub use provider_payload::DisclosedIdentityMapping;
 /// Separately protected identity mapping.
@@ -138,3 +201,23 @@ pub use provider_payload::ReidentificationAuditSink;
 pub use provider_payload::disclose_identity_mapping;
 /// Minimize evidence for a model provider.
 pub use provider_payload::minimize_provider_payload;
+/// Temporal association claim boundary.
+pub use temporal_context::TEMPORAL_ASSOCIATION_CLAIM_BOUNDARY;
+/// Temporal-context contract version constant.
+pub use temporal_context::TEMPORAL_CONTEXT_CONTRACT_VERSION;
+/// Versioned temporal-context HTTP path.
+pub use temporal_context::TEMPORAL_CONTEXT_PATH;
+/// One opaque event in a temporal-context request.
+pub use temporal_context::TemporalContextEvent;
+/// One adjacent temporal relation.
+pub use temporal_context::TemporalContextRelation;
+/// Temporal-context request.
+pub use temporal_context::TemporalContextRequest;
+/// Temporal-context response.
+pub use temporal_context::TemporalContextResponse;
+/// One ordered event in a temporal-context response.
+pub use temporal_context::TemporalContextTimelineEvent;
+/// One non-causal transition-gap candidate.
+pub use temporal_context::TemporalTransitionGapCandidate;
+/// Build a cutoff-safe, non-causal temporal context.
+pub use temporal_context::build_temporal_context;

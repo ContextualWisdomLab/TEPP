@@ -6,15 +6,31 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `topic_measurement` bounded deterministic CPU `f64` TRSL-TM reference estimator: canonical CSR/CSC inputs, cutoff-safe documents, standardized event time, weighted multiple memberships, prevalence covariates, explicit predecessor/successor regularization, multi-seed generalized EM, diagonal Laplace uncertainty, and fitted topic-lineage counts with known-truth RMSE plus exact line/branch coverage (ADR 0012; no persistence or accelerated-backend claim).
 - `topic_measurement` logistic-normal additive log-ratio and sequential Egozcue isometric log-ratio coordinates: fail-closed simplex validation, max-shifted stable ALR/ILR inverses with true-parameter RMSE, pairwise CLR Aitchison distance recovered by ILR Euclidean isometry for valid composition pairs, and refusal of TF-IDF/BM25/keyword scores as inferential topic coordinates (ADR 0012 first production slice; no new migration).
 - Coverage contract now excludes Rust multiline string continuation records emitted by LLVM LCOV, keeping the 100% authored-line gate focused on executable production lines.
 - Coverage source classification now scans Rust normal/raw/byte strings, comments, and character literals with escape-aware state, preserving executable string method calls and ignoring quoted comments.
+- `model_selection` candidate-`K` gates: statistical candidates require `K >= 2` and finite held-out log-likelihood/complexity, a Pareto front excludes dominated alternatives, LLM votes cannot define the numerical optimum, and selected `K` recovers known truth with computed RMSE.
+- `topic_lineage` global P0 topic identity: activity may become dormant or reactivated without minting a new identity, and recovered identities match known truth at a higher computed rate than mint-on-reactivate replacements.
+- `tepp_api` LineageWeave temporal-context contract (v1): cutoff-safe event eligibility, deterministic event-time ordering, explicit non-causal association/gap boundaries, HTTPS interchange construction, and loopback listener handling at `POST /v1/temporal-context`; read-only context requests no longer require the write-only idempotency header, and no causal inference or completed-result service is included.
+- `tepp_api` LineageWeave consumer-scoped analysis-run ingress: versioned, credential-free requests use a published consumer identity and isolate idempotency by consumer, tenant workspace, and opaque caller key; the one-shot restack workflow is removed after the protected-main merge is verified.
+- ADR 0017 records the consumer-scoped analysis-run ingress, its in-memory loopback maturity, and the persistence boundary required before production use.
+- ADR 0019 records the credential-free bounded LineageWeave project-history service boundary and keeps source authorization with LineageWeave while TEPP owns temporal validation and deterministic projection.
+- `tepp_api` project-history wire-size symmetry (ADR 0018): request and projection serialization enforce the shared 256 KiB limit, and generated projections fail closed before returning when their deterministic response would exceed it.
+- Registered the analysis-engine gap-closure doctoring in the canonical documentation map so its product and scientific traceability record is discoverable.
+- Authored Rust coverage classification now ignores standalone structural closing parentheses, preventing formatting-only LCOV rows from appearing as uncovered production behavior.
+- `analysis_engine` vertical slice (ADR 0020): bounded Rust execution from an accepted analysis run to either a cutoff-safe readiness result or a validated `tepp.trsl_topic_lineage.v1` artifact from the ADR-0012 estimator. Topic artifacts preserve fitted predecessor/successor edges, connectable-post and lineage counts, request/snapshot/cutoff bindings, SHA-256 identity, and fail-closed non-convergence/tamper behavior with exact line/branch coverage. This remains active-PR evidence and does not claim causal or psychometric authority.
+- Coverage classification preserves the final expression line of multiline Rust `match` guards while respecting preceding-arm boundaries, keeping the 100% authored-line gate conservative.
+- `tepp_api` fail-closed analysis-result boundaries: status constructors reject
+  terminal envelopes that cannot fit the default 64 KiB status limit, and
+  standalone terminal results reject knowledge cutoffs in the future.
+- `tepp_api` request-bound terminal analysis results and typed analysis-run status/read responses: accepted/running states cannot carry measurement evidence, terminal results bind exact request and receipt identities, and succeeded/failed payloads remain digest-bound or content-redacted.
 - `tepp_api` naruon live loopback HTTP/1.1 listener: `serve_one` installs a read/write deadline, requires a loopback `Host`, refuses `Transfer-Encoding` and NIM/proxy credential headers, parses `knowledge_cutoff` as RFC 3339 and refuses a future cutoff, keys analysis-run idempotency by tenant plus key, and proves both analysis-run and export POSTs over a real `TcpStream`. Not a production TLS/`$PORT` service (ADR 0011).
 - `tepp_api` adaptive orchestration router (ADR 0010): versioned `direct`/`verify`/`committee`/`conductor`/`abstain` selection from CPU `f64` risk, ambiguity, evidence, and token-budget inputs; recorded stages, recursion, decomposition, access lists, and role-specific reasoning effort; fail-closed document-controlled policy/access/credentials; LLM plans remain proposals under deterministic statistical authority; comparable-budget ablation requires a direct baseline; credential-free contextual-orchestrator binding. Live NIM HTTP remains accepted-target.
 - `tepp_api` purpose-bound provider-payload minimization: time-bounded `PurposeGrant` evaluation, fail-closed expired/not-yet-valid/inverted/cross-tenant/impossible-calendar denial, semantic UTC calendar validation, refusal to copy identity mappings into model-provider payloads or ordinary logs, preservation of opaque analytical identifiers and membership roles (no blanket PII mask), a separately authorized scientific re-identification path, and an internally bound FIPS 180-4 SHA-256 audit digest appended through `ReidentificationAuditSink` before disclosure.
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
-- `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).
+- `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, provider-specific API-key/secret and review/Copilot credential headers, malformed extra HTTP fields, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).
 - `persistence_postgres` audit-event SQL contracts: append-only insert that refuses empty, oversized, or hostile `action_code` values before SQL is rendered.
 - `persistence_postgres` event-instance SQL contracts: bitemporal insert and as-known-at lookup that refuse inverted valid/system windows and hostile type/lifecycle labels before SQL is rendered.
 - `persistence_postgres` event-mention SQL contracts: mention identity cannot equal the instance it supports; confidence must be finite and in `(0, 1]`.
@@ -78,6 +94,23 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- The LineageWeave temporal-context read exchange no longer emits a fabricated
+  `idempotency-key`; that header remains reserved for retryable write/export
+  operations with a caller-owned operation key.
+- `tepp_api` project-history requests and projections now share the strict
+  `temporal_core` RFC 3339 parser and nominal `KnowledgeCutoff` boundary,
+  rejecting unknown offsets and other timestamp forms that the transport
+  parser could otherwise accept.
+- Coverage validation now ignores LLVM rows for multiline call and iterator
+  syntax that have no independently executable source coordinate, while
+  retaining the authored-line 100% gate.
+- Removed the temporary PR-155 review-repair workflows and source-fix helper after the bounded repair; subsequent changes use the normal reviewed branch path.
+- Pinned Rust branch-coverage workflows to `nightly-2026-08-21`, which is newer than the workspace Rust 1.97.1 MSRV and avoids the previous nightly/MSRV mismatch.
+- Applied the documented `sqlx_live.rs` authored-coverage exclusion to the hourly release gate so live-PostgreSQL success-path coverage is not reported as a false source failure.
+- Removed unreachable duplicate Naruon host-control validation because the shared `require_nonempty` boundary already rejects C0/C1 controls; retained a C1 regression case alongside the existing C0 case.
+- Rust LCOV quality gating now ignores visibility-qualified function signatures
+  and structural match-arm labels that LLVM reports as zero-hit non-executable
+  lines.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
@@ -101,7 +134,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 - Required 100% production line and branch coverage and complete public API docstrings.
 - Required true-parameter recovery, RMSE, bias, interval coverage, temporal leakage, graph recovery, invariance, and CPU/GPU parity evidence.
-- Expanded documentation contracts to require the canonical threat/privacy/assurance/API/orchestration/fitness documents, ADR policy, and every numbered ADR 0001–0016 to remain indexed and structurally complete.
+- Expanded documentation contracts to require the canonical threat/privacy/assurance/API/orchestration/fitness documents, ADR policy, and every numbered ADR present in the canonical index to remain indexed and structurally complete.
 - Added deterministic validation that ADR files and the index have identical decision numbers and that every ADR declares valid decision status, implementation maturity, supersession scope, core decision sections, verification, and rollback behavior.
 - Added 100% statement and branch coverage for the repository quality-gate scripts.
 - Made a zero executable-code coverage denominator explicit for the skeleton-only slice rather than treating it as evidence of implemented behavior.

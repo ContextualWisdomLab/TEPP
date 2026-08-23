@@ -24,7 +24,7 @@ class DocstringContractTests(unittest.TestCase):
 
         sources = docstrings.rust_sources(REPOSITORY_ROOT)
         crate_roots = sorted(REPOSITORY_ROOT.glob("crates/*/src/lib.rs"))
-        self.assertEqual(len(crate_roots), 11)
+        self.assertEqual(len(crate_roots), 14)
         self.assertTrue(set(crate_roots).issubset(sources))
         self.assertGreaterEqual(len(sources), len(crate_roots))
         self.assertEqual(docstrings.validate_repository(REPOSITORY_ROOT), [])

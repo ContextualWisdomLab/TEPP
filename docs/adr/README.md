@@ -17,11 +17,15 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0009](0009-purpose-bound-pii-governance.md) | Purpose-bound PII governance without blanket masking | Accepted | partial | Persistence retention/deletion/legal-hold (`0007`) is implemented-main; provider-payload minimization remains on the active PR until exact-head checks, review, and protected-main integration; deployment evidence remains accepted-target. |
 | [0010](0010-adaptive-llm-orchestration.md) | Adaptive LLM orchestration and test-time compute | Accepted | partial | `tepp_api` router/ablation/orchestrator binding remain on the active PR until exact-head checks, review, and protected-main integration; live NIM execution and production ablation evidence remain accepted-target. |
 | [0011](0011-standalone-modular-msa-boundary.md) | Standalone operation and modular CWL MSA boundary | Accepted | partial | Owns cross-service persistence/credential/API authority; no direct cross-service application-table coupling. |
-| [0012](0012-temporal-relational-shared-latent-topic-measurement.md) | Temporal Relational Shared-Latent Topic Measurement (TRSL-TM) | Accepted | partial | Logistic-normal ALR, sequential Egozcue ILR, and lexical-weight refusal are on the active PR; temporal topic identity, STM backend, method effects, and K-selection remain accepted-target. |
+| [0012](0012-temporal-relational-shared-latent-topic-measurement.md) | Temporal Relational Shared-Latent Topic Measurement (TRSL-TM) | Accepted | partial | Logistic-normal ALR/ILR, lexical-weight refusal, statistical/Pareto candidate-`K` gates, and active/dormant/reactivated identity are on the active product branch; the estimator, method effects, and backend interchange remain accepted-target. |
 | [0013](0013-bitemporal-persistence-reproducibility-and-split-authority.md) | Bitemporal persistence, reproducibility manifests, and relation-aware split authority | Accepted | partial | Owns PostgreSQL adapter semantics, immutable run/split manifests, leakage-safe partitions, and recovery identity; optional `live-sqlx` `PgPool`, live PG CI, tenant RLS, and `0006` membership implemented-main; backup/restore integrity revalidation implemented-main; `0007` retention/deletion/legal-hold implemented-main; remaining physical ERD/backup accepted-target. |
 | [0014](0014-scientific-claim-promotion-and-release-evidence.md) | Scientific claim promotion and release evidence authority | Accepted | partial | Separates design, implementation, scientific/product claim, and release authority; repository SBOM/provenance generator implemented, full release bundle remaining. |
 | [0015](0015-autonomous-development-review-and-merge-authority.md) | Autonomous development, review, and merge authority separation | Accepted | active-PR | Separates model proposal, deterministic verification, publication, independent review, and merge/release authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
+| [0017](0017-consumer-scoped-analysis-run-ingress.md) | Consumer-scoped modular analysis-run ingress | Accepted | active-PR | Narrows ADR 0011 for the closed consumer registry, credential-free exchange, and consumer-qualified idempotency namespace; production TLS remains separate. |
+| [0018](0018-project-history-wire-size-symmetry.md) | Symmetric project-history wire-size enforcement | Accepted | active-PR | Narrows ADR 0008 for request serialization and generated LineageWeave project-history projections. |
+| [0019](0019-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Narrows ADR 0011 for the credential-free bounded project-history API and preserves LineageWeave authorization ownership. |
+| [0020](0020-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
 
 ## Decision ownership summary
 
@@ -42,7 +46,11 @@ Use the narrowest owning ADR when decisions overlap:
 - **persistence / manifests / leakage-safe split:** ADR 0013;
 - **claim maturity / release evidence:** ADR 0014;
 - **autonomous development/review/merge authority:** ADR 0015;
-- **TDT/CHRONOS event intelligence:** ADR 0016.
+- **TDT/CHRONOS event intelligence:** ADR 0016;
+- **modular consumer admission / replay identity:** ADR 0017;
+- **project-history wire-size symmetry:** ADR 0018;
+- **LineageWeave project-history service boundary:** ADR 0019;
+- **accepted-run execution and terminal artifact production:** ADR 0020.
 
 ## Change and supersession rule
 
