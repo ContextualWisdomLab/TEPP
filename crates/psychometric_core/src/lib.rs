@@ -346,6 +346,20 @@
 //! closed; the discrete standardisation `e^{a Δt}` is not
 //! `DRIFTstd`; `a p / (trait + p + added)` uses `TRAITVAR` and is
 //! not `DRIFTstd`; `TRAITVAR` is not the standardisation variance),
+//! recovers the Driver p. 16 `asymTIPREDEFFECTstd` as
+//! `(-B / a) · √v / √(-q / (2 a))` after forming strictly positive
+//! `asymDIFFUSION` and strictly positive predictor variance
+//! (JSS PDF re-opened 2026-08-23T14:25Z; footnote 4 standardises
+//! using only the relevant variance, not the total; the affecting
+//! variance is `TIPREDVAR` `v`; the affected variance is
+//! `asymDIFFUSION`; unstandardised `-B / a` is defined for a zero
+//! coefficient and for zero predictor variance, and is not
+//! `asymTIPREDEFFECTstd`; zero `asymDIFFUSION` or zero `v` fails
+//! closed; the finite-interval standardisation
+//! `A^{-1}[e^{A Δt} − I] B · √v / √p` is not `asymTIPREDEFFECTstd`;
+//! `(-B / a) · √v / √(trait + p + added)` uses `TRAITVAR` and is
+//! not `asymTIPREDEFFECTstd`; `TRAITVAR` is not the standardisation
+//! variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -502,6 +516,8 @@ pub use event_time::recover_predetermined_later_observed_variance;
 pub use event_time::recover_predetermined_later_start_later_latent_variance;
 /// Exact scalar Eq. 5 of later-start later-occasion §4.3 predetermined `T0VAR` `λ²(trait + e^{2 a s}(e^{2 a u} p_0 + Q_u) + Q_s + (B / a)² v) + θ + ψ`.
 pub use event_time::recover_predetermined_later_start_later_observed_variance;
+/// Exact scalar p. 16 `asymTIPREDEFFECTstd` `(-B / a) · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
+pub use event_time::recover_standardised_asymptotic_time_independent_predictor_effect;
 /// Exact scalar p. 16 `DIFFUSIONstd` `q / (−q / (2 a)) = −2 a` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_continuous_diffusion;
 /// Exact scalar p. 16 `DRIFTstd` after strictly positive `asymDIFFUSION`.
@@ -770,6 +786,8 @@ pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_dis
 pub use event_time::refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating p. 16 `discreteDRIFTstd` `e^{a Δt}` as p. 16 `DRIFTstd`.
 pub use event_time::refuse_standardised_discrete_drift_as_standardised_continuous_drift;
+/// Refuse treating a finite-interval standardised `TIPREDEFFECT` as p. 16 `asymTIPREDEFFECTstd`.
+pub use event_time::refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymTIPREDEFFECT`.
@@ -852,6 +870,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating Driver §7.1 trait-contaminated asymptotic TI effect as p. 16 `asymTIPREDEFFECTstd`.
+pub use event_time::refuse_trait_contaminated_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated continuous diffusion as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating Driver §7.1 trait-contaminated continuous drift as p. 16 `DRIFTstd`.
@@ -870,6 +890,8 @@ pub use event_time::refuse_trait_variance_as_standardisation_variance;
 pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 /// Refuse a time-varying predictor whose sampling and constancy intervals differ.
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
+/// Refuse treating unstandardised `asymTIPREDEFFECT` `-B / a` as p. 16 `asymTIPREDEFFECTstd`.
+pub use event_time::refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
 /// Refuse treating unstandardised `DIFFUSION` as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating unstandardised `DRIFT` as p. 16 `DRIFTstd`.
