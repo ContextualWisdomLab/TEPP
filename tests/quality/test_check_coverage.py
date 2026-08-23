@@ -116,6 +116,70 @@ class CoverageContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "contain totals"):
                 coverage_contract.load_totals(path)
 
+    def test_full_branch_reports_merge_duplicate_instrumented_copies(self) -> None:
+        """A source branch passes when either test binary covers each outcome."""
+
+        payload = self.payload(branch_count=4, branch_covered=2)
+        payload["data"][0]["files"] = [  # type: ignore[index]
+            {
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 1, 0, 0, 0, 4]],
+            },
+            {
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 0, 1, 0, 0, 4]],
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = self.write_report(temporary, payload)
+            self.assertEqual(
+                coverage_contract.load_totals(path)["branches"],
+                {"count": 2, "covered": 2},
+            )
+            self.assertEqual(
+                coverage_contract.validate_report(path, ["branches"]),
+                ["branches coverage: PASS (2/2, 100%)"],
+            )
+
+    def test_full_branch_reports_fail_closed_on_malformed_records(self) -> None:
+        """Malformed branch exports cannot weaken the coverage gate."""
+
+        malformed_reports = (
+            ([None], "file record must be an object"),
+            ([{"filename": "", "branches": []}], "must contain a filename"),
+            ([{"filename": "src.rs"}], "must contain branches"),
+            ([{"filename": "src.rs", "branches": {}}], "branches must be a list"),
+            ([{"filename": "src.rs", "branches": [[1, 2]]}], "record is malformed"),
+            (
+                [{"filename": "src.rs", "branches": [[True, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1.5, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, True, 0]]}],
+                "counts are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[-1, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, 0.5, 0]]}],
+                "counts are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, -1, 0]]}],
+                "counts are invalid",
+            ),
+        )
+        for files, message in malformed_reports:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    coverage_contract.load_union_branch_totals(files)
+
     def test_lcov_authored_line_totals_and_incomplete_detection(self) -> None:
         """LCOV counts unique authored source lines and exposes zero-hit lines."""
 
@@ -324,6 +388,17 @@ class CoverageContractTests(unittest.TestCase):
                 "    }",  # 58
                 "}",  # 59
                 "    executable_statement();",  # 60 executable
+                "    append_value(",  # 61 multiline call opener
+                "        value,",  # 62 trailing comma noise
+                "    );",  # 63 call close
+                "    values",  # 64
+                "        .iter()",  # 65 method-chain continuation
+                "        .collect::<Vec<_>>()",  # 66 method-chain continuation
+                "    });",  # 67 closure call close
+                "(",  # 68 structural call opener
+                ")",  # 69 structural call close
+                "    Ok(())",  # 70 structural unit result
+                "    NaruonLiveResponse {",  # 71 structural struct literal
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -338,7 +413,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 47, 60}
+            expected_executable = {13, 40, 47, 60, 61, 64, 65, 66}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -358,6 +433,9 @@ class CoverageContractTests(unittest.TestCase):
                     [
                         f"SF:{path}",
                         "DA:60,1",
+                        "DA:61,0",
+                        "DA:65,0",
+                        "DA:66,0",
                         "DA:1,0",
                         "DA:2,0",
                         "DA:51,0",
@@ -370,7 +448,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.load_lcov_line_totals(
                     lcov, repository_root=Path(temporary)
                 ),
-                {"lines": {"count": 1, "covered": 1}},
+                {"lines": {"count": 4, "covered": 1}},
             )
 
     def test_lcov_rejects_source_paths_outside_repository(self) -> None:
