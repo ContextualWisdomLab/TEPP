@@ -2,8 +2,8 @@
 #![allow(clippy::cast_precision_loss)]
 
 use topic_measurement::{
-    additive_log_ratio, aitchison_distance, from_isometric_log_ratio, isometric_log_ratio,
-    TopicMeasurementError,
+    TopicMeasurementError, additive_log_ratio, aitchison_distance, from_isometric_log_ratio,
+    isometric_log_ratio,
 };
 
 fn euclidean(left: &[f64], right: &[f64]) -> f64 {
@@ -128,9 +128,11 @@ fn pairwise_ilr_euclidean_recovers_aitchison_distance_away_from_the_origin() {
 #[test]
 fn large_finite_ilr_coordinates_round_trip_or_fail_closed() {
     let representable = from_isometric_log_ratio(&[40.0]).expect("representable");
-    assert!(representable
-        .iter()
-        .all(|part| part.is_finite() && *part > 0.0));
+    assert!(
+        representable
+            .iter()
+            .all(|part| part.is_finite() && *part > 0.0)
+    );
     let recovered = isometric_log_ratio(&representable).expect("forward");
     assert!(rmse(&[40.0], &recovered) < 1e-12);
 
