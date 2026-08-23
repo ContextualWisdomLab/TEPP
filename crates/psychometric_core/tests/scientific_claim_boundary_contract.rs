@@ -42,6 +42,7 @@ use psychometric_core::{
     recover_predetermined_later_start_later_latent_variance,
     recover_predetermined_later_start_later_observed_variance,
     recover_standardised_asymptotic_time_independent_predictor_effect,
+    recover_standardised_asymptotic_time_independent_predictor_variance,
     recover_standardised_continuous_diffusion, recover_standardised_continuous_drift,
     recover_standardised_continuous_time_independent_predictor_effect,
     recover_standardised_discrete_diffusion, recover_standardised_discrete_drift,
@@ -67,6 +68,7 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_observed_variance_as_asymptotic_time_independent_variance,
     refuse_asymptotic_time_independent_observed_variance_as_initial_time_independent_observed_variance,
     refuse_asymptotic_time_independent_observed_variance_as_measurement_error,
+    refuse_asymptotic_time_independent_observed_variance_as_standardised_asymptotic_time_independent_variance,
     refuse_asymptotic_time_independent_observed_variance_as_stationary_observed_variance,
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
@@ -119,6 +121,7 @@ use psychometric_core::{
     refuse_initial_time_independent_observed_variance_as_measurement_error,
     refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance,
     refuse_initial_time_independent_variance_as_initial_latent_variance,
+    refuse_initial_time_independent_variance_as_standardised_asymptotic_time_independent_variance,
     refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect,
     refuse_initial_time_independent_variance_as_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
@@ -230,6 +233,7 @@ use psychometric_core::{
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_standardisation_variance,
     refuse_trait_variance_as_stationary_within_subject,
     refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
+    refuse_unstandardised_asymptotic_time_independent_variance_as_standardised_asymptotic_time_independent_variance,
     refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion,
     refuse_unstandardised_continuous_drift_as_standardised_continuous_drift,
     refuse_unstandardised_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect,
@@ -5157,5 +5161,128 @@ fn asymptotic_time_independent_observed_variance_is_not_latent_extra_or_measurem
         Err(
             psychometric_core::PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotMeasurementError
         )
+    );
+}
+
+#[allow(clippy::too_many_lines)]
+#[test]
+fn standardised_asymptotic_time_independent_variance_is_not_unstandardised_or_observed_extra() {
+    let coefficient = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let log_rate = -0.5_f64;
+    let extra = recover_asymptotic_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let recovered = recover_standardised_asymptotic_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVARstd");
+    assert!(
+        (recovered - 1.0).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era addedTIPREDVARstd): extra/extra is 1 after strictly positive extra"
+    );
+    assert!(
+        (extra - recovered).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era addedTIPREDVARstd): unstandardised extra is not the correlation"
+    );
+    let doubled = recover_standardised_asymptotic_time_independent_predictor_variance(
+        coefficient,
+        8.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("doubled v");
+    assert_eq!(
+        doubled.to_bits(),
+        recovered.to_bits(),
+        "Driver et al. (2017, 2017-era addedTIPREDVARstd): doubling v keeps extra/extra = 1"
+    );
+    let observed = recover_asymptotic_time_independent_observed_variance(
+        2.0,
+        coefficient,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("eq5 addedTIPREDVAR");
+    assert!(
+        (observed - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): observed extra is not addedTIPREDVARstd"
+    );
+    let initial_extra = recover_initial_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TIPREDVAR");
+    assert!(
+        (initial_extra - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Table 3): addedT0TIPREDVAR is not addedTIPREDVARstd"
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_variance(
+            coefficient,
+            predictor_variance,
+            log_rate,
+            LagClock::SystemTime
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_variance(
+            coefficient,
+            predictor_variance,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift
+        )
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_variance(
+            0.0,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedAsymptoticTimeIndependentVarianceRequiresPositiveExtraVariance
+        )
+    );
+    assert_eq!(
+        refuse_unstandardised_asymptotic_time_independent_variance_as_standardised_asymptotic_time_independent_variance(
+            extra, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_observed_variance_as_standardised_asymptotic_time_independent_variance(
+            observed, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotStandardisedAsymptoticTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_standardised_asymptotic_time_independent_variance(
+            initial_extra, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedAsymptoticTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_trait_variance_as_standardisation_variance(1.0, extra),
+        Err(psychometric_core::PsychometricError::TraitVarianceIsNotStandardisationVariance)
     );
 }
