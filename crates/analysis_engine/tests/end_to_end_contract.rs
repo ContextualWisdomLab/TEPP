@@ -54,6 +54,39 @@ fn production_shape_run_excludes_future_available_evidence() {
 }
 
 #[test]
+fn evidence_available_exactly_at_cutoff_is_eligible_and_keeps_membership() {
+    let request = AnalysisRunRequest {
+        contract_version: 1,
+        idempotency_key: "boundary-run-2026-08-01".into(),
+        tenant_workspace_id: "workspace-opaque-1".into(),
+        snapshot_id: "snapshot-boundary-2026-08-01".into(),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        model_contract_version: "temporal-evidence-v1".into(),
+        output_profile: "validation-report".into(),
+    };
+    let accepted =
+        AnalysisRunAccepted::new("run-boundary-1", "accepted", "boundary-run-2026-08-01")
+            .expect("accepted");
+    let corpus = AnalysisCorpus::new(
+        "snapshot-boundary-2026-08-01",
+        vec![
+            evidence("invoice-on-cutoff", "2026-08-01T00:00:00Z", 3),
+            evidence("later-correction", "2026-08-01T00:00:01Z", 4),
+        ],
+    )
+    .expect("snapshot");
+    let execution = execute_analysis_run(&request, &accepted, &corpus, "2026-08-01T00:01:00Z")
+        .expect("execute");
+    assert_eq!(
+        execution.terminal_result.run_state,
+        AnalysisRunTerminalState::Succeeded
+    );
+    let artifact = execution.artifact.expect("artifact");
+    assert_eq!(artifact.eligible_evidence_count, 1);
+    assert_eq!(artifact.eligible_membership_count, 3);
+}
+
+#[test]
 fn snapshot_identity_is_not_inferred_from_customer_payload() {
     let request = AnalysisRunRequest {
         contract_version: 1,
