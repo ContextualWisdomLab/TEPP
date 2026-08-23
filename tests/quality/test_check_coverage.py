@@ -410,7 +410,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 44, 57, 61}
+            expected_executable = {13, 40, 44, 57, 58, 61, 62, 63}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -430,6 +430,9 @@ class CoverageContractTests(unittest.TestCase):
                     [
                         f"SF:{path}",
                         "DA:57,1",
+                        "DA:58,0",
+                        "DA:62,0",
+                        "DA:63,0",
                         "DA:1,0",
                         "DA:2,0",
                         "DA:48,0",
@@ -442,7 +445,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.load_lcov_line_totals(
                     lcov, repository_root=Path(temporary)
                 ),
-                {"lines": {"count": 1, "covered": 1}},
+                {"lines": {"count": 4, "covered": 1}},
             )
 
     def test_lcov_rejects_source_paths_outside_repository(self) -> None:

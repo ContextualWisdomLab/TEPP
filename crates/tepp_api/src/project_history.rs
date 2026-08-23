@@ -14,7 +14,7 @@ use temporal_core::{KnowledgeCutoff, TemporalInstant};
 
 use crate::ApiError;
 use crate::wire::{
-    from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
+    from_json, require_byte_limit, require_contract_version, require_nonempty, to_json_with_limit,
 };
 
 /// Supported project-history request and response contract version.
@@ -157,9 +157,7 @@ impl ProjectHistoryRequest {
     /// Returns a field-validation or serialization error.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        let payload = to_json(self)?;
-        require_byte_limit(&payload, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)?;
-        Ok(payload)
+        to_json_with_limit(self, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
@@ -221,9 +219,7 @@ impl ProjectHistoryProjection {
     /// Returns a validation or serialization error.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        let payload = to_json(self)?;
-        require_byte_limit(&payload, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)?;
-        Ok(payload)
+        to_json_with_limit(self, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
@@ -379,9 +375,9 @@ fn validate_event(event: &ProjectHistoryEvent, cutoff: TemporalInstant) -> Resul
     for actor_id in &event.actor_ids {
         validate_bounded_text(actor_id, 256)?;
     }
-    let occurred_at = parse_timestamp(&event.occurred_at)?;
+    parse_timestamp(&event.occurred_at)?;
     let available_at = parse_timestamp(&event.available_at)?;
-    if occurred_at > cutoff || available_at > cutoff {
+    if available_at > cutoff {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(())
@@ -731,10 +727,7 @@ mod tests {
 
         let mut occurred_after_cutoff = request_with_single_event();
         occurred_after_cutoff.events[0].occurred_at = "2026-08-20T00:00:00Z".into();
-        assert_eq!(
-            project_history_projection(&occurred_after_cutoff),
-            Err(ApiError::InvalidWirePayload)
-        );
+        assert!(project_history_projection(&occurred_after_cutoff).is_ok());
 
         let mut available_after_cutoff = request_with_single_event();
         available_after_cutoff.events[0].available_at = "2026-08-20T00:00:00Z".into();

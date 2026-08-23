@@ -3,7 +3,7 @@
 use crate::ApiError;
 use crate::lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
 use crate::wire::{
-    from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
+    from_json, require_byte_limit, require_contract_version, require_nonempty, to_json_with_limit,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -156,9 +156,7 @@ impl TemporalContextRequest {
     /// Returns a fail-closed validation or serialization error.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        let payload = to_json(self)?;
-        require_byte_limit(&payload, DEFAULT_TEMPORAL_CONTEXT_BYTE_LIMIT)?;
-        Ok(payload)
+        to_json_with_limit(self, DEFAULT_TEMPORAL_CONTEXT_BYTE_LIMIT)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
@@ -235,9 +233,7 @@ impl TemporalContextResponse {
     /// Returns a fail-closed validation or serialization error.
     pub fn to_json(&self) -> Result<String, ApiError> {
         self.validate()?;
-        let payload = to_json(self)?;
-        require_byte_limit(&payload, DEFAULT_TEMPORAL_CONTEXT_BYTE_LIMIT)?;
-        Ok(payload)
+        to_json_with_limit(self, DEFAULT_TEMPORAL_CONTEXT_BYTE_LIMIT)
     }
 
     fn validate(&self) -> Result<(), ApiError> {

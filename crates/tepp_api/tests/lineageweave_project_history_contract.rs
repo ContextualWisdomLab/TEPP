@@ -206,6 +206,10 @@ fn projection_rejects_future_evidence_duplicates_and_unknown_json_fields() {
         Err(ApiError::InvalidWirePayload)
     );
 
+    let mut known_future_occurrence = sample_request();
+    known_future_occurrence.events[0].occurred_at = "2026-08-20T00:00:00Z".into();
+    assert!(project_history_projection(&known_future_occurrence).is_ok());
+
     let mut duplicate = sample_request();
     duplicate.events[1].event_id = duplicate.events[0].event_id.clone();
     assert_eq!(

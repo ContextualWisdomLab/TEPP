@@ -160,10 +160,6 @@ def is_executable_source_line(
         return False
     if text.startswith(") ->"):
         return False
-    if text.startswith("."):
-        return False
-    if text.endswith("(") and text[:-1].replace("_", "").replace(":", "").isalnum():
-        return False
     if text.startswith("pub fn ") or text.startswith("fn "):
         return False
     if text.startswith("pub struct ") or text.startswith("struct "):
