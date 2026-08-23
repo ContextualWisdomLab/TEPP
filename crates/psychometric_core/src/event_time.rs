@@ -182,6 +182,33 @@
 //! `Q_Δt` and `θ` and is not that lagged observed covariance.
 //! Stationary lagged observed covariance is not that observed
 //! covariance when `p_0` is free.
+//! The first-occasion variance of §4.3 predetermined `T0VAR` is
+//! `trait + p_0 + (B / a)² v` (JSS PDF re-opened 2026-08-23T10:03Z).
+//! Form the free first-occasion state variance first, then include
+//! the trait, then include the TI extra variance, then add. Setting
+//! `p_0 = −q / (2 a)` recovers the stationary first-occasion map.
+//! Equation 5 of that first-occasion variance is
+//! `λ²(trait + p_0 + (B / a)² v) + θ + ψ`.
+//! The later-start lagged covariance of §4.3 predetermined `T0VAR`
+//! is `trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v` (Eq. 3–4
+//! of §4.3 later start / `startoffset`; JSS PDF re-opened
+//! 2026-08-23T10:27Z). Form the later-start within-subject variance
+//! first, then lag that state, then include the trait, then include
+//! the TI extra variance, then add. Trait variance and
+//! `addedTIPREDVAR` do not decay with `e^{a s}`. First-occasion
+//! lagged covariance omits `e^{a s} Q_u`. Later-occasion variance
+//! does not lag that later state. Setting `p_0 = −q / (2 a)`
+//! recovers the stationary lagged map. As `u → 0+` the composition
+//! approaches first-occasion lagged covariance. As `s → 0+` the
+//! composition approaches later-occasion variance at `u`. Equation 5
+//! of that later-start lagged covariance is
+//! `λ²(trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v) + ψ`.
+//! Independent `ε_t` does not enter. `θ` is not that lagged observed
+//! covariance. The later-start lagged latent covariance is not that
+//! observed covariance. First-occasion lagged observed covariance
+//! omits `e^{a s} Q_u`. Predetermined later observed variance
+//! includes `Q_u` and `θ`. Stationary lagged observed covariance is
+//! not that observed covariance when `p_0` is free.
 //! Table 3 (p. 13) names a different matrix
 //! `T0TIPREDEFFECT` for time-independent predictors on latents at
 //! `T0`. The scalar first-occasion shift is `t0_b z`. Equation 3's
@@ -4942,6 +4969,364 @@ pub fn refuse_predetermined_later_observed_variance_as_predetermined_initial_obs
     )
 }
 
+/// Exact scalar later-start lagged covariance of §4.3 predetermined
+/// `T0VAR`.
+///
+/// Driver, Oud, and Voelkle (2017, §4.3, pp. 9–10; Eq. 3–4, pp. 4–5;
+/// Table 2, p. 12; p. 16; §7.2, pp. 20–21; JSS PDF re-opened
+/// 2026-08-23T10:27Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// treat the first time point as predetermined when no assumptions
+/// are made about the process prior to the initial time point. Free
+/// `T0VAR` `p_0` is then estimated. Section 4.3 notes that the process
+/// gradually transitions from the initial variances toward the
+/// stationary variances, and that the initial time point need not
+/// reflect the first measurement occasion (`startoffset`). Equation 3
+/// writes `η(t) = exp(A Δt) η(t0) + … +` the stochastic integral.
+/// Equation 4 writes `cov(η_t, η_{t-1}) = A_Δt cov(η_{t-1})`. After a
+/// later start `u` the within-subject state variance is
+/// `e^{2 a u} p_0 + Q_u`. Lagging that later start over `s` is
+/// `e^{a s}(e^{2 a u} p_0 + Q_u)`. Trait variance and
+/// `addedTIPREDVAR` are time-invariant between-subject; they do not
+/// decay with `e^{a s}`. The lagged composition is
+/// `trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v`. Form the
+/// later-start within-subject variance first, then lag that state,
+/// then include the trait, then include the TI extra variance, then
+/// add. A zero trait, a zero initial variance, a zero diffusion, and
+/// a zero TI contribution is exactly zero. A zero initial variance, a
+/// zero diffusion, and a zero TI contribution is exactly the trait.
+/// Setting `p_0 = −q / (2 a)` recovers the stationary lagged map.
+/// Stationary lagged covariance uses `−q / (2 a)` in place of `p_0`
+/// and is not this map when `p_0` is free. First-occasion lagged
+/// covariance `trait + e^{a s} p_0 + (B / a)² v` omits `e^{a s} Q_u`
+/// and is not this map when `u > 0`. Later-occasion variance includes
+/// `Q_u` without lagging that later state and is not this map.
+/// Evolving the later total as if it were all state (`e^{a s}` of
+/// `trait + e^{2 a u} p_0 + Q_u + (B / a)² v`) is not this map. As
+/// `u → 0+` the composition approaches first-occasion lagged
+/// covariance. As `s → 0+` the composition approaches later-occasion
+/// variance at `u`. As `s → ∞` with stable `a < 0` the state term
+/// vanishes. `a ≥ 0` cannot hold a finite TI extra variance when that
+/// contribution is nonzero and fails closed. Nonzero diffusion with
+/// `a ≥ 0` is a growing process and is kept. Both intervals must be
+/// event time and strictly positive. This is not a Kalman filter, not
+/// a matrix `expm`, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_latent_variance`],
+/// [`recover_trait_plus_state_lagged_covariance`], and
+/// [`recover_asymptotic_time_independent_predictor_variance`].
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::NonPositiveInterval`] when `start_delta` or
+/// `lag_delta` is not strictly positive,
+/// [`PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift`]
+/// when the TI contribution is nonzero and the drift is not
+/// strictly negative, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, a variance is negative, or a product or sum
+/// overflows.
+#[allow(clippy::too_many_arguments)]
+pub fn recover_predetermined_later_lagged_latent_covariance(
+    trait_variance: f64,
+    initial_latent_variance: f64,
+    continuous_diffusion: f64,
+    time_independent_effect: f64,
+    predictor_variance: f64,
+    log_rate: f64,
+    start_delta: f64,
+    lag_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    let later_state = recover_discrete_latent_variance(
+        initial_latent_variance,
+        continuous_diffusion,
+        log_rate,
+        start_delta,
+        clock,
+    )?;
+    let trait_plus_lagged = recover_trait_plus_state_lagged_covariance(
+        trait_variance,
+        later_state,
+        log_rate,
+        lag_delta,
+        clock,
+    )?;
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        clock,
+    )?;
+    require_finite(trait_plus_lagged + added)
+}
+
+/// Refuse treating later-start lagged covariance as first-occasion
+/// lagged covariance of predetermined `T0VAR`.
+///
+/// `e^{a s}(e^{2 a u} p_0 + Q_u)` includes `e^{a s} Q_u`.
+/// `e^{a s} p_0` omits that process-noise carry.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotPredeterminedLaggedCovariance`].
+pub fn refuse_predetermined_later_lagged_latent_covariance_as_predetermined_lagged_covariance(
+    predetermined_later_lagged_covariance: f64,
+    predetermined_lagged_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        predetermined_later_lagged_covariance,
+        predetermined_lagged_covariance,
+    );
+    Err(
+        PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotPredeterminedLaggedCovariance,
+    )
+}
+
+/// Refuse treating later-start lagged covariance as later-occasion
+/// variance of predetermined `T0VAR`.
+///
+/// Later-occasion variance is `e^{2 a u} p_0 + Q_u` of the
+/// within-subject state. Later-start lag is `e^{a s}` of that state.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotLaterLatentVariance`].
+pub fn refuse_predetermined_later_lagged_latent_covariance_as_later_latent_variance(
+    predetermined_later_lagged_covariance: f64,
+    predetermined_later_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        predetermined_later_lagged_covariance,
+        predetermined_later_variance,
+    );
+    Err(PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotLaterLatentVariance)
+}
+
+/// Refuse treating later-start lagged covariance as lagged
+/// stationary `T0VAR`.
+///
+/// `trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v` uses free
+/// `T0VAR`. `trait + e^{a s}(−q / (2 a)) + (B / a)² v` uses the
+/// stationary within-subject variance.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotStationaryLaggedCovariance`].
+pub fn refuse_predetermined_later_lagged_latent_covariance_as_stationary_lagged_covariance(
+    predetermined_later_lagged_covariance: f64,
+    stationary_lagged_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        predetermined_later_lagged_covariance,
+        stationary_lagged_covariance,
+    );
+    Err(PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotStationaryLaggedCovariance)
+}
+
+/// Refuse treating later-start lagged covariance as the decayed
+/// later total.
+///
+/// Evolving `trait + e^{2 a u} p_0 + Q_u + (B / a)² v` as if it
+/// were all state yields `e^{a s}` of that total. Trait variance
+/// and `addedTIPREDVAR` do not decay.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotDecayedLaterTotal`].
+pub fn refuse_predetermined_later_lagged_latent_covariance_as_decayed_later_total(
+    predetermined_later_lagged_covariance: f64,
+    decayed_later_total: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (predetermined_later_lagged_covariance, decayed_later_total);
+    Err(PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotDecayedLaterTotal)
+}
+
+/// Exact scalar Eq. 5 of later-start lagged §4.3 predetermined
+/// `T0VAR`.
+///
+/// Driver, Oud, and Voelkle (2017, §4.3, pp. 9–10; Eq. 5, p. 5;
+/// Eq. 3–4, pp. 4–5; Table 2, p. 12; p. 16; §7.2, pp. 20–21; JSS PDF
+/// re-opened 2026-08-23T10:27Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `y_i(t) = Γ + Λ η_i(t) + ζ_i(t)` with `ζ ~ N(0, Θ)` and
+/// `Γ ~ N(τ, Ψ)`. Independent `ε_t` does not enter
+/// `cov(y_t, y_{t-s})`. The later-start lagged latent covariance is
+/// `trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v`. The scalar
+/// composition is
+/// `cov(y_{t0+u+s}, y_{t0+u}) = λ²(trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v) + ψ`.
+/// Form the later-start lagged latent covariance first, then
+/// `λ² c + ψ`. A zero loading is exactly `ψ`. A zero trait, a zero
+/// initial variance, a zero diffusion, and a zero TI contribution is
+/// exactly `ψ`. Setting `p_0 = −q / (2 a)` recovers the stationary
+/// lagged observed covariance. The stationary lagged observed
+/// covariance is not this composition when `p_0` is free.
+/// `MANIFESTVAR` `θ` is not this composition. The later-start lagged
+/// latent covariance is not this observed covariance. First-occasion
+/// lagged observed covariance omits `e^{a s} Q_u` and is not this
+/// composition when `u > 0`. Predetermined later observed variance
+/// includes `Q_u` and `θ` and is not this composition. `TRAITVAR` is
+/// latent and is scaled by `λ²`; `MANIFESTTRAITVAR` is not. This is
+/// not a Kalman filter, not a matrix `expm`, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_predetermined_later_lagged_latent_covariance`]
+/// and [`recover_manifest_lagged_observed_covariance`].
+#[allow(clippy::too_many_arguments)]
+pub fn recover_predetermined_later_lagged_observed_covariance(
+    loading: f64,
+    trait_variance: f64,
+    initial_latent_variance: f64,
+    continuous_diffusion: f64,
+    time_independent_effect: f64,
+    predictor_variance: f64,
+    log_rate: f64,
+    start_delta: f64,
+    lag_delta: f64,
+    manifest_trait_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let lagged_latent = recover_predetermined_later_lagged_latent_covariance(
+        trait_variance,
+        initial_latent_variance,
+        continuous_diffusion,
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        start_delta,
+        lag_delta,
+        clock,
+    )?;
+    recover_manifest_lagged_observed_covariance(loading, lagged_latent, manifest_trait_variance)
+}
+
+/// Refuse treating later-start lagged covariance as later-start
+/// lagged observed covariance.
+///
+/// `trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v` is the
+/// later-start lagged latent covariance. Equation 5 maps
+/// `cov(y_{t0+u+s}, y_{t0+u}) = λ²` of that covariance plus `ψ`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotObservedCovariance`].
+pub fn refuse_predetermined_later_lagged_latent_covariance_as_observed_covariance(
+    predetermined_later_lagged_latent_covariance: f64,
+    predetermined_later_lagged_observed_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        predetermined_later_lagged_latent_covariance,
+        predetermined_later_lagged_observed_covariance,
+    );
+    Err(PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotObservedCovariance)
+}
+
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of later-start lagged
+/// predetermined `T0VAR`.
+///
+/// Table 2 names `θ` `MANIFESTVAR`. Independent `ε_t` does not
+/// enter `cov(y_t, y_{t-s})`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::MeasurementErrorIsNotPredeterminedLaterLaggedObservedCovariance`].
+pub fn refuse_measurement_error_as_predetermined_later_lagged_observed_covariance(
+    measurement_error_variance: f64,
+    predetermined_later_lagged_observed_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        measurement_error_variance,
+        predetermined_later_lagged_observed_covariance,
+    );
+    Err(PsychometricError::MeasurementErrorIsNotPredeterminedLaterLaggedObservedCovariance)
+}
+
+/// Refuse treating Eq. 5 of first-occasion lagged predetermined
+/// `T0VAR` as later-start lagged observed covariance.
+///
+/// `λ²(trait + e^{a s} p_0 + (B / a)² v) + ψ` omits `e^{a s} Q_u`.
+/// `λ²(trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v) + ψ`
+/// includes it.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::PredeterminedLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance`].
+pub fn refuse_predetermined_lagged_observed_covariance_as_predetermined_later_lagged_observed_covariance(
+    predetermined_lagged_observed_covariance: f64,
+    predetermined_later_lagged_observed_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        predetermined_lagged_observed_covariance,
+        predetermined_later_lagged_observed_covariance,
+    );
+    Err(
+        PsychometricError::PredeterminedLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance,
+    )
+}
+
+/// Refuse treating Eq. 5 of lagged §4.3 stationary `T0VAR` as
+/// later-start lagged observed covariance of predetermined `T0VAR`.
+///
+/// `λ²(trait + e^{a s}(−q / (2 a)) + (B / a)² v) + ψ` uses the
+/// stationary within-subject variance.
+/// `λ²(trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v) + ψ` is
+/// not that map when `p_0` is free.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StationaryLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance`].
+pub fn refuse_stationary_lagged_observed_covariance_as_predetermined_later_lagged_observed_covariance(
+    stationary_lagged_observed_covariance: f64,
+    predetermined_later_lagged_observed_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        stationary_lagged_observed_covariance,
+        predetermined_later_lagged_observed_covariance,
+    );
+    Err(
+        PsychometricError::StationaryLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance,
+    )
+}
+
+/// Refuse treating Eq. 5 of predetermined later-occasion `T0VAR` as
+/// later-start lagged observed covariance.
+///
+/// `λ²(trait + e^{2 a u} p_0 + Q_u + (B / a)² v) + θ + ψ` includes
+/// `Q_u` and `θ`.
+/// `λ²(trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v) + ψ`
+/// lags the later state and omits `θ`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance`].
+pub fn refuse_predetermined_later_observed_variance_as_predetermined_later_lagged_observed_covariance(
+    predetermined_later_observed_variance: f64,
+    predetermined_later_lagged_observed_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        predetermined_later_observed_variance,
+        predetermined_later_lagged_observed_covariance,
+    );
+    Err(
+        PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance,
+    )
+}
+
 /// Exact scalar observed mean of a time-independent predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 3, p. 5; Table 2,
@@ -6473,6 +6858,8 @@ mod tests {
         recover_predetermined_initial_observed_variance,
         recover_predetermined_lagged_latent_covariance,
         recover_predetermined_lagged_observed_covariance,
+        recover_predetermined_later_lagged_latent_covariance,
+        recover_predetermined_later_lagged_observed_covariance,
         recover_predetermined_later_latent_variance, recover_predetermined_later_observed_variance,
         recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
         recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
@@ -6552,6 +6939,7 @@ mod tests {
         refuse_measurement_error_as_observed_variance,
         refuse_measurement_error_as_predetermined_initial_observed_variance,
         refuse_measurement_error_as_predetermined_lagged_observed_covariance,
+        refuse_measurement_error_as_predetermined_later_lagged_observed_covariance,
         refuse_measurement_error_as_predetermined_later_observed_variance,
         refuse_measurement_error_as_stationary_lagged_observed_covariance,
         refuse_measurement_error_as_stationary_later_observed_variance,
@@ -6566,12 +6954,19 @@ mod tests {
         refuse_predetermined_lagged_latent_covariance_as_later_latent_variance,
         refuse_predetermined_lagged_latent_covariance_as_observed_covariance,
         refuse_predetermined_lagged_latent_covariance_as_stationary_lagged_covariance,
+        refuse_predetermined_lagged_observed_covariance_as_predetermined_later_lagged_observed_covariance,
+        refuse_predetermined_later_lagged_latent_covariance_as_decayed_later_total,
+        refuse_predetermined_later_lagged_latent_covariance_as_later_latent_variance,
+        refuse_predetermined_later_lagged_latent_covariance_as_observed_covariance,
+        refuse_predetermined_later_lagged_latent_covariance_as_predetermined_lagged_covariance,
+        refuse_predetermined_later_lagged_latent_covariance_as_stationary_lagged_covariance,
         refuse_predetermined_later_latent_variance_as_discrete_variance,
         refuse_predetermined_later_latent_variance_as_initial_latent_variance,
         refuse_predetermined_later_latent_variance_as_observed_variance,
         refuse_predetermined_later_latent_variance_as_stationary_later_latent_variance,
         refuse_predetermined_later_observed_variance_as_predetermined_initial_observed_variance,
         refuse_predetermined_later_observed_variance_as_predetermined_lagged_observed_covariance,
+        refuse_predetermined_later_observed_variance_as_predetermined_later_lagged_observed_covariance,
         refuse_process_noise_as_unconditional_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -6592,6 +6987,7 @@ mod tests {
         refuse_stationary_lagged_latent_covariance_as_observed_covariance,
         refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance,
         refuse_stationary_lagged_observed_covariance_as_predetermined_lagged_observed_covariance,
+        refuse_stationary_lagged_observed_covariance_as_predetermined_later_lagged_observed_covariance,
         refuse_stationary_lagged_observed_covariance_as_stationary_later_observed_variance,
         refuse_stationary_later_latent_variance_as_discrete_variance,
         refuse_stationary_later_latent_variance_as_lagged_covariance,
@@ -16672,6 +17068,594 @@ mod tests {
                 0.0,
                 -0.5,
                 0.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn predetermined_later_lagged_latent_covariance_recovers_driver_equation_four_after_startoffset()
+     {
+        // Driver et al. (2017, §4.3 startoffset; Eq. 4):
+        // cov = trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v.
+        let printed_effect = -0.225_f64;
+        let printed_asym = -1.673_f64;
+        let log_rate = -printed_effect / printed_asym;
+        let trait_variance = 1.0_f64;
+        let initial_latent_variance = 2.0_f64;
+        let diffusion = 0.4_f64;
+        let predictor_variance = 1.0_f64;
+        let start_delta = 2.0_f64;
+        let lag_delta = 1.0_f64;
+        let recovered = recover_predetermined_later_lagged_latent_covariance(
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            printed_effect,
+            predictor_variance,
+            log_rate,
+            start_delta,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("predetermined later-start lagged T0VAR");
+        let later_state = recover_discrete_latent_variance(
+            initial_latent_variance,
+            diffusion,
+            log_rate,
+            start_delta,
+            LagClock::EventTime,
+        )
+        .expect("later state");
+        let added = recover_asymptotic_time_independent_predictor_variance(
+            printed_effect,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("addedTIPREDVAR");
+        let expected = recover_trait_plus_state_lagged_covariance(
+            trait_variance,
+            later_state,
+            log_rate,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("trait + e^{as} later-state")
+            + added;
+        assert!((recovered - expected).abs() < 1e-12);
+        let first_lagged = recover_predetermined_lagged_latent_covariance(
+            trait_variance,
+            initial_latent_variance,
+            printed_effect,
+            predictor_variance,
+            log_rate,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("first-occasion lagged");
+        assert!((recovered - first_lagged).abs() > 1e-3);
+        let later = recover_predetermined_later_latent_variance(
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            printed_effect,
+            predictor_variance,
+            log_rate,
+            start_delta,
+            LagClock::EventTime,
+        )
+        .expect("later variance");
+        assert!((recovered - later).abs() > 1e-3);
+        let stationary_lagged = recover_stationary_lagged_latent_covariance(
+            trait_variance,
+            diffusion,
+            printed_effect,
+            predictor_variance,
+            log_rate,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("stationary lagged");
+        assert!((recovered - stationary_lagged).abs() > 1e-3);
+        let decayed_later = later * lag_delta.mul_add(log_rate, 0.0).exp();
+        assert!((recovered - decayed_later).abs() > 1e-3);
+        let state = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        let from_stationary_start = recover_predetermined_later_lagged_latent_covariance(
+            trait_variance,
+            state,
+            diffusion,
+            printed_effect,
+            predictor_variance,
+            log_rate,
+            start_delta,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("p_0=−q/(2a)");
+        assert!((from_stationary_start - stationary_lagged).abs() < 1e-12);
+        let near_first = recover_predetermined_later_lagged_latent_covariance(
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            printed_effect,
+            predictor_variance,
+            log_rate,
+            1e-12,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("u→0+");
+        assert!((near_first - first_lagged).abs() < 1e-9);
+        let near_later = recover_predetermined_later_lagged_latent_covariance(
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            printed_effect,
+            predictor_variance,
+            log_rate,
+            start_delta,
+            1e-12,
+            LagClock::EventTime,
+        )
+        .expect("s→0+");
+        assert!((near_later - later).abs() < 1e-9);
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                predictor_variance,
+                0.0,
+                start_delta,
+                lag_delta,
+                LagClock::EventTime
+            ),
+            Ok(0.0)
+        );
+        let trait_only = recover_predetermined_later_lagged_latent_covariance(
+            trait_variance,
+            0.0,
+            0.0,
+            0.0,
+            predictor_variance,
+            0.0,
+            start_delta,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("trait-only later-start lagged");
+        assert!((trait_only - trait_variance).abs() < 1e-15);
+    }
+
+    #[test]
+    fn predetermined_later_lagged_latent_covariance_is_not_first_later_or_stationary() {
+        let trait_variance = 1.0_f64;
+        let initial_latent_variance = 2.0_f64;
+        let diffusion = 0.4_f64;
+        let log_rate = -0.134_488_942_f64;
+        let start_delta = 2.0_f64;
+        let lag_delta = 1.0_f64;
+        let recovered = recover_predetermined_later_lagged_latent_covariance(
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            -0.225,
+            1.0,
+            log_rate,
+            start_delta,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("predetermined later-start lagged T0VAR");
+        let first_lagged = recover_predetermined_lagged_latent_covariance(
+            trait_variance,
+            initial_latent_variance,
+            -0.225,
+            1.0,
+            log_rate,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("first-occasion lagged");
+        let later = recover_predetermined_later_latent_variance(
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            -0.225,
+            1.0,
+            log_rate,
+            start_delta,
+            LagClock::EventTime,
+        )
+        .expect("later variance");
+        let stationary_lagged = recover_stationary_lagged_latent_covariance(
+            trait_variance,
+            diffusion,
+            -0.225,
+            1.0,
+            log_rate,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("stationary lagged");
+        let decayed_later = later * lag_delta.mul_add(log_rate, 0.0).exp();
+        assert_eq!(
+            refuse_predetermined_later_lagged_latent_covariance_as_predetermined_lagged_covariance(
+                recovered, first_lagged
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotPredeterminedLaggedCovariance
+            )
+        );
+        assert_eq!(
+            refuse_predetermined_later_lagged_latent_covariance_as_later_latent_variance(
+                recovered, later
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotLaterLatentVariance
+            )
+        );
+        assert_eq!(
+            refuse_predetermined_later_lagged_latent_covariance_as_stationary_lagged_covariance(
+                recovered,
+                stationary_lagged
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotStationaryLaggedCovariance
+            )
+        );
+        assert_eq!(
+            refuse_predetermined_later_lagged_latent_covariance_as_decayed_later_total(
+                recovered,
+                decayed_later
+            ),
+            Err(PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotDecayedLaterTotal)
+        );
+    }
+
+    #[test]
+    fn predetermined_later_lagged_latent_covariance_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                1.0,
+                2.0,
+                0.4,
+                -0.225,
+                1.0,
+                -0.13,
+                2.0,
+                1.0,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                1.0,
+                2.0,
+                0.4,
+                -0.225,
+                1.0,
+                -0.13,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                1.0,
+                2.0,
+                0.4,
+                -0.225,
+                1.0,
+                -0.13,
+                2.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                0.0,
+                0.0,
+                0.0,
+                -0.225,
+                1.0,
+                0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+        );
+        let growing = recover_predetermined_later_lagged_latent_covariance(
+            0.0,
+            2.0,
+            0.4,
+            0.0,
+            0.0,
+            0.5,
+            1.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("growing a>0");
+        assert!(growing.is_finite() && growing > 2.0);
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                f64::NAN,
+                2.0,
+                0.4,
+                0.0,
+                0.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                f64::MAX,
+                f64::MAX,
+                0.0,
+                0.0,
+                0.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn predetermined_later_lagged_observed_covariance_recovers_driver_equation_five() {
+        // Driver et al. (2017, Eq. 5 of later-start lagged T0VAR):
+        // λ²(trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v) + ψ.
+        let printed_effect = -0.225_f64;
+        let printed_asym = -1.673_f64;
+        let log_rate = -printed_effect / printed_asym;
+        let trait_variance = 1.0_f64;
+        let initial_latent_variance = 2.0_f64;
+        let diffusion = 0.4_f64;
+        let loading = 2.0_f64;
+        let measurement_error = 0.5_f64;
+        let manifest_trait = 0.1_f64;
+        let start_delta = 2.0_f64;
+        let lag_delta = 1.0_f64;
+        let recovered = recover_predetermined_later_lagged_observed_covariance(
+            loading,
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            printed_effect,
+            1.0,
+            log_rate,
+            start_delta,
+            lag_delta,
+            manifest_trait,
+            LagClock::EventTime,
+        )
+        .expect("eq5-later-start-lagged-predetermined-T0VAR");
+        let latent = recover_predetermined_later_lagged_latent_covariance(
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            printed_effect,
+            1.0,
+            log_rate,
+            start_delta,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("later-start lagged T0VAR");
+        let expected = recover_manifest_lagged_observed_covariance(loading, latent, manifest_trait)
+            .expect("λ²c+ψ");
+        assert!((recovered - expected).abs() < 1e-12);
+        let first_lagged = recover_predetermined_lagged_observed_covariance(
+            loading,
+            trait_variance,
+            initial_latent_variance,
+            printed_effect,
+            1.0,
+            log_rate,
+            lag_delta,
+            manifest_trait,
+            LagClock::EventTime,
+        )
+        .expect("eq5-first-lagged");
+        assert!((recovered - first_lagged).abs() > 1e-3);
+        let later = recover_predetermined_later_observed_variance(
+            loading,
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
+            printed_effect,
+            1.0,
+            log_rate,
+            start_delta,
+            measurement_error,
+            manifest_trait,
+            LagClock::EventTime,
+        )
+        .expect("eq5-later");
+        assert!((recovered - later).abs() > 1e-3);
+        let stationary = recover_stationary_lagged_observed_covariance(
+            loading,
+            trait_variance,
+            diffusion,
+            printed_effect,
+            1.0,
+            log_rate,
+            lag_delta,
+            manifest_trait,
+            LagClock::EventTime,
+        )
+        .expect("eq5-stationary-lagged");
+        assert!((recovered - stationary).abs() > 1e-3);
+        assert!((recovered - measurement_error).abs() > 1e-3);
+        assert!((recovered - latent).abs() > 1e-3);
+        assert_eq!(
+            recover_predetermined_later_lagged_observed_covariance(
+                0.0,
+                trait_variance,
+                initial_latent_variance,
+                diffusion,
+                printed_effect,
+                1.0,
+                log_rate,
+                start_delta,
+                lag_delta,
+                manifest_trait,
+                LagClock::EventTime,
+            ),
+            Ok(manifest_trait)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_observed_covariance(
+                loading,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                start_delta,
+                lag_delta,
+                0.0,
+                LagClock::EventTime,
+            ),
+            Ok(0.0)
+        );
+        assert_eq!(
+            refuse_predetermined_later_lagged_latent_covariance_as_observed_covariance(
+                latent, recovered
+            ),
+            Err(PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotObservedCovariance)
+        );
+        assert_eq!(
+            refuse_measurement_error_as_predetermined_later_lagged_observed_covariance(
+                measurement_error,
+                recovered
+            ),
+            Err(PsychometricError::MeasurementErrorIsNotPredeterminedLaterLaggedObservedCovariance)
+        );
+        assert_eq!(
+            refuse_predetermined_lagged_observed_covariance_as_predetermined_later_lagged_observed_covariance(
+                first_lagged, recovered
+            ),
+            Err(
+                PsychometricError::PredeterminedLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance
+            )
+        );
+        assert_eq!(
+            refuse_stationary_lagged_observed_covariance_as_predetermined_later_lagged_observed_covariance(
+                stationary, recovered
+            ),
+            Err(
+                PsychometricError::StationaryLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance
+            )
+        );
+        assert_eq!(
+            refuse_predetermined_later_observed_variance_as_predetermined_later_lagged_observed_covariance(
+                later, recovered
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance
+            )
+        );
+    }
+
+    #[test]
+    fn predetermined_later_lagged_observed_covariance_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_predetermined_later_lagged_observed_covariance(
+                2.0,
+                1.0,
+                2.0,
+                0.4,
+                -0.225,
+                1.0,
+                -0.13,
+                2.0,
+                1.0,
+                0.1,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_observed_covariance(
+                2.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.225,
+                1.0,
+                0.5,
+                2.0,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_observed_covariance(
+                2.0,
+                1.0,
+                2.0,
+                0.4,
+                0.0,
+                1.0,
+                -0.5,
+                0.0,
+                1.0,
+                0.1,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_observed_covariance(
+                2.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                2.0,
+                1.0,
+                0.1,
+                LagClock::EventTime
+            ),
+            Ok(0.1)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_observed_covariance(
+                2.0,
+                f64::NAN,
+                2.0,
+                0.4,
+                0.0,
+                0.0,
+                -0.5,
+                2.0,
+                1.0,
                 0.0,
                 LagClock::EventTime
             ),
