@@ -85,7 +85,8 @@ fn global_stopword_deletion_is_not_the_default_rule() {
 #[test]
 fn group_normalized_mass_recovers_true_shares_with_lower_rmse_than_tfidf() {
     let truth = [0.40_f64, 0.10, 0.30, 0.20];
-    let observation_mass = [4.0_f64, 1.0, 3.0, 2.0];
+    // Independent synthetic observation counts; not a scalar of `truth`.
+    let observation_mass = [41.0_f64, 9.0, 32.0, 18.0];
     let documents: [&[&str]; 4] = [
         &["report", "report", "report", "event"],
         &["report", "unique"],
@@ -119,6 +120,10 @@ fn group_normalized_mass_recovers_true_shares_with_lower_rmse_than_tfidf() {
     let tfidf_recovered = l1_normalize(&tf_idf_document_scores(&documents));
     let ess_rmse = computed_rmse(&truth, &ess_recovered);
     let tfidf_rmse = computed_rmse(&truth, &tfidf_recovered);
+    assert!(
+        ess_rmse < 0.05,
+        "independent observation mass must recover true shares; RMSE {ess_rmse}"
+    );
     assert!(
         ess_rmse < tfidf_rmse,
         "computed ESS RMSE {ess_rmse} must be below TF-IDF surrogate RMSE {tfidf_rmse}"
