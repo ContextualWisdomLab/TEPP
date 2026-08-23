@@ -1716,14 +1716,10 @@ pub fn recover_level_change_extra_process_contribution(
         return Err(PsychometricError::LevelChangeExtraProcessRequiresNegativeDrift);
     }
     let coupling = require_finite(original_from_extra_drift * time_dependent_predictor)?;
-    let extra_argument = extra_log_rate * event_delta;
-    let extra_lag = if extra_argument == 0.0 {
-        1.0
-    } else {
-        extra_argument.exp()
-    };
+    // `e^{ε Δt}` with `ε < 0`; `exp(0) = 1` after product underflow.
+    let extra_lag = (extra_log_rate * event_delta).exp();
     let original_argument = original_log_rate * event_delta;
-    let original_lag = if original_log_rate == 0.0 || original_argument == 0.0 {
+    let original_lag = if original_log_rate == 0.0 {
         1.0
     } else {
         let lag = original_argument.exp();
@@ -8306,7 +8302,17 @@ mod tests {
             LagClock::EventTime,
         )
         .expect("extra-argument-zero");
-        assert!(extra_argument_zero.is_finite());
+        let extra_zero_delta = 1e-320_f64;
+        let extra_zero_rate = -f64::from_bits(1);
+        let extra_zero_expected = coupling
+            * predictor
+            * (original * extra_zero_delta).exp()
+            * ((extra_zero_rate - original) * extra_zero_delta).exp_m1()
+            / (extra_zero_rate - original);
+        assert!(
+            (extra_argument_zero - extra_zero_expected).abs() <= 16.0 * f64::from_bits(1),
+            "recovered={extra_argument_zero:.e} expected={extra_zero_expected:.e}"
+        );
         let extra_argument_zero_after = recover_level_change_extra_process_contribution_after(
             coupling,
             predictor,
@@ -8317,7 +8323,10 @@ mod tests {
             LagClock::EventTime,
         )
         .expect("after-extra-argument-zero");
-        assert!(extra_argument_zero_after.is_finite());
+        assert!(
+            (extra_argument_zero_after - extra_zero_expected).abs() <= 16.0 * f64::from_bits(1),
+            "after recovered={extra_argument_zero_after:.e} expected={extra_zero_expected:.e}"
+        );
         assert!((extra_argument_zero - extra_argument_zero_after).abs() < 1e-30);
     }
 
