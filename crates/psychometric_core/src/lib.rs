@@ -376,6 +376,21 @@
 //! `B · √v / √(trait + p + added)` uses `TRAITVAR` and is
 //! not `TIPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
+//! recovers the Driver p. 16 `CINTstd` as
+//! `κ / √(-q / (2 a))` after forming strictly positive
+//! `asymDIFFUSION`
+//! (JSS PDF re-opened 2026-08-23T17:10Z; footnote 4 standardises
+//! using only the relevant variance, not the total; `CINT` is the
+//! process intercept of individual, or average individual, dynamics,
+//! so the relevant variance is `asymDIFFUSION`; unstandardised `κ`
+//! is defined for growing `a ≥ 0` and for zero diffusion, and is
+//! not `CINTstd`; zero `asymDIFFUSION` fails closed; the asymptotic
+//! standardisation `(-κ / a) / √p` is not `CINTstd`; the
+//! finite-interval standardisation
+//! `A^{-1}[e^{A Δt} − I] κ / √p` is not `CINTstd`;
+//! `κ / √(trait + p + added)` uses `TRAITVAR` and is
+//! not `CINTstd`; `TRAITVAR` is not the standardisation
+//! variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -538,6 +553,8 @@ pub use event_time::recover_standardised_asymptotic_time_independent_predictor_e
 pub use event_time::recover_standardised_continuous_diffusion;
 /// Exact scalar p. 16 `DRIFTstd` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_continuous_drift;
+/// Exact scalar p. 16 `CINTstd` `κ / √(-q / (2 a))` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `TIPREDEFFECTstd` `B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_continuous_time_independent_predictor_effect;
 /// Exact scalar p. 16 `discreteDIFFUSIONstd` `Q_Δt / (−q / (2 a))` after strictly positive `asymDIFFUSION`.
@@ -798,10 +815,14 @@ pub use event_time::refuse_predetermined_later_start_later_latent_variance_as_ob
 pub use event_time::refuse_predetermined_later_start_later_latent_variance_as_stationary_later_latent_variance;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
+/// Refuse treating p. 16 `asymCINTstd` as p. 16 `CINTstd`.
+pub use event_time::refuse_standardised_asymptotic_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `asymTIPREDEFFECTstd` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_standardised_continuous_time_independent_effect;
 /// Refuse treating continuous `DIFFUSION` standardisation `−2 a` as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
+/// Refuse treating a finite-interval standardised `CINT` as p. 16 `CINTstd`.
+pub use event_time::refuse_standardised_discrete_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `discreteDIFFUSIONstd` `1 − exp(2 a Δt)` as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating p. 16 `discreteDRIFTstd` `e^{a Δt}` as p. 16 `DRIFTstd`.
@@ -898,6 +919,8 @@ pub use event_time::refuse_trait_contaminated_asymptotic_time_independent_effect
 pub use event_time::refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating Driver §7.1 trait-contaminated continuous drift as p. 16 `DRIFTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_drift_as_standardised_continuous_drift;
+/// Refuse treating Driver §7.1 trait-contaminated continuous intercept as p. 16 `CINTstd`.
+pub use event_time::refuse_trait_contaminated_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating Driver §7.1 trait-contaminated continuous TI effect as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated process noise as p. 16 `discreteDIFFUSIONstd`.
@@ -920,6 +943,8 @@ pub use event_time::refuse_unstandardised_asymptotic_time_independent_effect_as_
 pub use event_time::refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating unstandardised `DRIFT` as p. 16 `DRIFTstd`.
 pub use event_time::refuse_unstandardised_continuous_drift_as_standardised_continuous_drift;
+/// Refuse treating unstandardised `CINT` `κ` as p. 16 `CINTstd`.
+pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `TIPREDEFFECT` `B` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect;
 /// Refuse treating unstandardised `discreteDIFFUSION` as p. 16 `discreteDIFFUSIONstd`.
