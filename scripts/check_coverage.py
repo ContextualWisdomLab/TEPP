@@ -179,15 +179,18 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
 
     in_string = False
     raw_hashes: int | None = None
-    in_block_comment = False
+    block_comment_depth = 0
     for index, raw in enumerate(lines, start=1):
         if (in_string or raw_hashes is not None) and index == line_number:
             return True
         cursor = 0
         while cursor < len(raw):
-            if in_block_comment:
-                if raw.startswith("*/", cursor):
-                    in_block_comment = False
+            if block_comment_depth > 0:
+                if raw.startswith("/*", cursor):
+                    block_comment_depth += 1
+                    cursor += 2
+                elif raw.startswith("*/", cursor):
+                    block_comment_depth -= 1
                     cursor += 2
                 else:
                     cursor += 1
@@ -214,7 +217,7 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
             if raw.startswith("//", cursor):
                 break
             if raw.startswith("/*", cursor):
-                in_block_comment = True
+                block_comment_depth += 1
                 cursor += 2
                 continue
             raw_start = _raw_string_start(raw, cursor)

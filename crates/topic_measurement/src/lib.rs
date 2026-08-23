@@ -6,7 +6,8 @@
 //! indicators. ALR supplies a reference-dependent full-rank logistic-normal map
 //! for regression and psychometric interfaces; it is not an orthonormal
 //! Aitchison-distance isometry. Distance-based Aitchison geometry uses the
-//! sequential Egozcue ILR basis. TF-IDF, BM25, and keyword scores remain
+//! sequential Egozcue ILR basis, whose pairwise Euclidean distance recovers
+//! CLR Aitchison distance. TF-IDF, BM25, and keyword scores remain
 //! forbidden inferential coordinates.
 
 mod coordinates;
@@ -17,6 +18,8 @@ mod sparse;
 
 /// Additive log-ratio map from a simplex vector.
 pub use coordinates::additive_log_ratio;
+/// Aitchison distance between two simplex vectors.
+pub use coordinates::aitchison_distance;
 /// Inverse additive log-ratio map back to the simplex.
 pub use coordinates::from_additive_log_ratio;
 /// Inverse isometric log-ratio map back to the simplex.

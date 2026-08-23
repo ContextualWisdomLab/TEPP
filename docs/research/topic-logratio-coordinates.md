@@ -33,6 +33,6 @@ Aitchison and Shen (1980) define the logistic-normal family via the additive log
 - representable ALR coordinates `(710, 709)` and representable ILR coordinates round-trip through max-shifted inverses without exponential overflow;
 - extremes that would underflow a strictly positive `f64` simplex part fail closed;
 - equal shares map to the ALR and ILR origins;
-- two-part ILR preserves Aitchison distance `√(1/2) |ln(0.8/0.2) - ln(0.5/0.5)|` between `(0.8, 0.2)` and `(0.5, 0.5)` (Egozcue et al., 2003);
+- two-part ILR preserves Aitchison distance `√(1/2) |ln(0.8/0.2) - ln(0.5/0.5)|` between `(0.8, 0.2)` and `(0.5, 0.5)`, and pairwise ILR Euclidean distance recovers CLR Aitchison distance between two non-origin compositions (Egozcue et al., 2003);
 - zero, negative, non-unit-sum, non-finite, empty, and one-part vectors fail closed;
 - `tfidf`, `bm25`, and `keyword` labels are refused.
