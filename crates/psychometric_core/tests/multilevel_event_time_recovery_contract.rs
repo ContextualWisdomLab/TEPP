@@ -3832,6 +3832,16 @@ fn extra_process_contribution_refuses_nonnegative_extra_drift_clock_and_overflow
         ),
         Ok(0.0)
     );
+    let overflow_fallback = recover_level_change_extra_process_contribution(
+        0.4,
+        3.0,
+        -0.8,
+        -0.000_001,
+        900.0,
+        LagClock::EventTime,
+    )
+    .expect("expm1-overflow-fallback");
+    assert!(overflow_fallback.is_finite());
 }
 
 #[test]

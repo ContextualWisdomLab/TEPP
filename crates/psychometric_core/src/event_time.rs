@@ -709,10 +709,8 @@ pub fn recover_discrete_lagged_latent_covariance(
         // +0 underflow is a vanishing lagged covariance.
         return require_finite(auto_effect * prior_variance);
     }
-    if !drift_interval.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
-    // Finite a Δt, overflowed exp. exp(a Δt) p = exp(ln p + a Δt).
+    // Overflow of a finite `a Δt` is the log-space rewrite.
+    // A non-finite argument also fails closed through `require_finite`.
     require_finite((prior_variance.ln() + drift_interval).exp())
 }
 
@@ -1733,13 +1731,13 @@ pub fn recover_level_change_extra_process_contribution(
         return require_finite(coupling * event_delta * original_lag);
     }
     let increment = gap_argument.exp_m1();
-    if increment.is_finite() {
-        if original_lag == 0.0 {
-            return require_finite(coupling * extra_lag / rate_gap);
-        }
-        return require_finite(coupling * original_lag * (increment / rate_gap));
+    if !increment.is_finite() {
+        return require_finite(coupling * (extra_lag - original_lag) / rate_gap);
     }
-    require_finite(coupling * (extra_lag - original_lag) / rate_gap)
+    if original_lag == 0.0 {
+        return require_finite(coupling * extra_lag / rate_gap);
+    }
+    require_finite(coupling * original_lag * (increment / rate_gap))
 }
 
 /// Refuse treating the §7.2 extra-process contribution as the
@@ -4237,10 +4235,8 @@ pub fn recover_initial_time_independent_predictor_carry(
         // +0 underflow is a vanishing carry of the T0 shift.
         return require_finite(auto_effect * initial_shift);
     }
-    if !drift_interval.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
-    // Finite a Δt, overflowed exp.
+    // Overflow of a finite `a Δt` is the log-space rewrite.
+    // A non-finite argument also fails closed through `require_finite`.
     // e^{a Δt} t0_b z = sign(t0_b z) exp(ln|t0_b z| + a Δt).
     require_finite(initial_shift.signum() * (initial_shift.abs().ln() + drift_interval).exp())
 }
@@ -4620,10 +4616,8 @@ pub fn recover_initial_time_dependent_predictor_carry(
         // +0 underflow is a vanishing carry of the T0 TD shift.
         return require_finite(auto_effect * initial_shift);
     }
-    if !drift_interval.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
-    // Finite a Δt, overflowed exp.
+    // Overflow of a finite `a Δt` is the log-space rewrite.
+    // A non-finite argument also fails closed through `require_finite`.
     // e^{a Δt} t0_m x0 = sign(t0_m x0) exp(ln|t0_m x0| + a Δt).
     require_finite(initial_shift.signum() * (initial_shift.abs().ln() + drift_interval).exp())
 }
@@ -5037,10 +5031,8 @@ pub fn recover_time_dependent_predictor_impulse_carry(
         // +0 underflow is vanishing dissipation (§7.2).
         return require_finite(auto_effect * impulse);
     }
-    if !drift_interval.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
-    // Finite a(t−u), overflowed exp.
+    // Overflow of a finite `a(t−u)` is the log-space rewrite.
+    // A non-finite argument also fails closed through `require_finite`.
     // e^{a(t−u)} m x = sign(m x) exp(ln|m x| + a(t−u)).
     require_finite(impulse.signum() * (impulse.abs().ln() + drift_interval).exp())
 }
@@ -5490,13 +5482,15 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
     let mut start_sum = 0.0_f64;
     let mut start_count = 0.0_f64;
     for &(earlier, later, delta) in pairs {
-        if earlier != 0.0 {
-            let discrete_lag = later / earlier;
-            if discrete_lag.is_finite() && discrete_lag > 0.0 {
-                start_sum += discrete_lag.ln() / delta;
-                start_count += 1.0;
-            }
+        if earlier == 0.0 {
+            continue;
         }
+        let discrete_lag = later / earlier;
+        if !discrete_lag.is_finite() || discrete_lag <= 0.0 {
+            continue;
+        }
+        start_sum += discrete_lag.ln() / delta;
+        start_count += 1.0;
     }
     if start_count <= 0.0 {
         return Err(PsychometricError::InvalidNumericInput);
@@ -6989,6 +6983,13 @@ mod tests {
         let skipped_start =
             fit_scalar_log_rate(&[(1e-320, 1.0, 1.0), (1.0, 0.5, 1.0)]).expect("skip inf ratio");
         assert!(skipped_start.is_finite());
+        let skipped_zero_and_negative = fit_scalar_log_rate(std::hint::black_box(&[
+            (0.0, 1.0, 1.0),
+            (1.0, -1.0, 1.0),
+            (1.0, 0.5, 1.0),
+        ]))
+        .expect("skip zero and negative lags");
+        assert!(skipped_zero_and_negative.is_finite());
         assert_eq!(
             fit_scalar_log_rate(&[(1e154, 1e154, 1.0)]),
             Err(PsychometricError::InvalidNumericInput)
@@ -8299,11 +8300,11 @@ mod tests {
         let vanished_finite_expected = coupling * predictor * (-92.0_f64).exp() / (-92.0 - -800.0);
         assert!((vanished_finite_increment - vanished_finite_expected).abs() < 1e-15);
         let overflow_fallback = recover_level_change_extra_process_contribution(
-            coupling,
-            predictor,
-            -0.8,
-            extra,
-            900.0,
+            std::hint::black_box(coupling),
+            std::hint::black_box(predictor),
+            std::hint::black_box(-0.8),
+            std::hint::black_box(extra),
+            std::hint::black_box(900.0),
             LagClock::EventTime,
         )
         .expect("expm1-overflow-fallback");
