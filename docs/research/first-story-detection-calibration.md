@@ -27,4 +27,5 @@ Allan et al. (1998) and Allan (2002) define first-story detection as a *new-even
 - `refuse_first_story_as_instance` always returns `FirstStoryIsNotEventInstance`;
 - `decide_first_story` uses an inclusive probability threshold;
 - `first_story_false_alarm_rate` and `first_story_miss_rate` fail closed on empty, mismatched, or single-class streams;
-- computed RMSE of known first-story targets is lower under calibrated probabilities than under an always-first detector.
+- computed RMSE of known first-story targets is lower under calibrated probabilities than under an always-first detector;
+- a mixed stream with one false alarm and one miss recovers FAR `0.5` and miss `0.5` with residual RMSE below `1e-15`.

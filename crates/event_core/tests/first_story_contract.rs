@@ -58,6 +58,35 @@ fn false_alarm_and_miss_rates_are_computed_from_known_truth() {
         "computed FAR {calibrated_far} must be below always-first FAR {naive_far}"
     );
     assert!(calibrated_miss <= naive_miss);
+    assert!(
+        calibrated_far.abs() < 1e-15 && calibrated_miss.abs() < 1e-15,
+        "calibrated stream must recover FAR 0 and miss 0; far={calibrated_far} miss={calibrated_miss}"
+    );
+}
+
+#[test]
+fn mixed_detection_errors_recover_half_far_and_half_miss() {
+    let truth = [
+        FirstStoryLabel::FirstStory,
+        FirstStoryLabel::FollowUp,
+        FirstStoryLabel::FollowUp,
+        FirstStoryLabel::FirstStory,
+    ];
+    let decided = [
+        FirstStoryLabel::FirstStory,
+        FirstStoryLabel::FirstStory,
+        FirstStoryLabel::FollowUp,
+        FirstStoryLabel::FollowUp,
+    ];
+    let far = first_story_false_alarm_rate(&truth, &decided).expect("far");
+    let miss = first_story_miss_rate(&truth, &decided).expect("miss");
+    let recovered = [far, miss];
+    let truth_rates = [0.5_f64, 0.5];
+    let rmse = computed_rmse(&truth_rates, &recovered);
+    assert!(
+        rmse < 1e-15,
+        "known-truth FAR/miss RMSE {rmse} (far={far} miss={miss})"
+    );
 }
 
 #[test]
