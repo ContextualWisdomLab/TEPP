@@ -153,6 +153,41 @@ pub fn from_isometric_log_ratio(coordinates: &[f64]) -> Result<Vec<f64>, TopicMe
     Ok(weights.iter().map(|weight| weight / denominator).collect())
 }
 
+/// Aitchison distance between two strictly positive unit simplex vectors.
+///
+/// The distance is the Euclidean norm of the clr residual
+/// `clr(x) − clr(y)`. Sequential ILR is an isometry for this distance, so
+/// `‖ilr(x) − ilr(y)‖` must recover the same value. A single ILR vector
+/// norm is only the distance from the equal-share origin.
+///
+/// # Errors
+///
+/// Returns [`TopicMeasurementError::InvalidComposition`] when the vectors
+/// have unequal length or fail simplex validation.
+pub fn aitchison_distance(left: &[f64], right: &[f64]) -> Result<f64, TopicMeasurementError> {
+    if left.len() != right.len() {
+        return Err(TopicMeasurementError::InvalidComposition);
+    }
+    require_composition(left)?;
+    require_composition(right)?;
+    #[allow(clippy::cast_precision_loss)]
+    let parts = left.len() as f64;
+    let mut left_log_sum = 0.0_f64;
+    let mut right_log_sum = 0.0_f64;
+    for index in 0..left.len() {
+        left_log_sum += left[index].ln();
+        right_log_sum += right[index].ln();
+    }
+    let left_mean = left_log_sum / parts;
+    let right_mean = right_log_sum / parts;
+    let mut square_sum = 0.0_f64;
+    for index in 0..left.len() {
+        let residual = (left[index].ln() - left_mean) - (right[index].ln() - right_mean);
+        square_sum += residual * residual;
+    }
+    Ok(square_sum.sqrt())
+}
+
 fn require_composition(proportions: &[f64]) -> Result<f64, TopicMeasurementError> {
     if proportions.len() < 2 {
         return Err(TopicMeasurementError::InvalidComposition);
@@ -181,7 +216,8 @@ fn require_composition(proportions: &[f64]) -> Result<f64, TopicMeasurementError
 #[cfg(test)]
 mod tests {
     use super::{
-        additive_log_ratio, from_additive_log_ratio, from_isometric_log_ratio, isometric_log_ratio,
+        additive_log_ratio, aitchison_distance, from_additive_log_ratio, from_isometric_log_ratio,
+        isometric_log_ratio,
     };
     use crate::error::TopicMeasurementError;
 
@@ -218,5 +254,18 @@ mod tests {
         assert!((three[1] - (0.5_f64).sqrt() * 3.0_f64.ln()).abs() < 1e-15);
         let recovered_three = from_isometric_log_ratio(&three).expect("ilr three inverse");
         assert!((recovered_three.iter().sum::<f64>() - 1.0).abs() < 1e-15);
+        assert!(aitchison_distance(&[0.5, 0.5], &[0.5, 0.5]).expect("self") < 1e-15);
+        assert_eq!(
+            aitchison_distance(&[0.5, 0.5], &[1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0]),
+            Err(TopicMeasurementError::InvalidComposition)
+        );
+        assert_eq!(
+            aitchison_distance(&[0.0, 1.0], &[0.5, 0.5]),
+            Err(TopicMeasurementError::InvalidComposition)
+        );
+        assert_eq!(
+            aitchison_distance(&[0.5, 0.5], &[0.0, 1.0]),
+            Err(TopicMeasurementError::InvalidComposition)
+        );
     }
 }
