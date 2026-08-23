@@ -100,7 +100,10 @@ fn rubin_t_noisy_truth_reports_bias_rmse_and_interval_coverage() {
     let coverage = covered as f64 / recovered.len() as f64;
     assert!(bias.abs() < 0.01, "loading bias {bias}");
     assert!(rmse < 0.02, "loading RMSE {rmse}");
-    assert!(coverage >= 0.9, "95% interval coverage {coverage}");
+    assert!(
+        coverage >= 0.95,
+        "95% interval coverage {coverage} must meet the constructed 1.96 gate"
+    );
 }
 
 #[test]

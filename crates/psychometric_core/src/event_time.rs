@@ -8297,6 +8297,28 @@ mod tests {
             coupling * predictor * ((extra * 900.0).exp() - (-0.8_f64 * 900.0).exp())
                 / (extra - -0.8);
         assert!((overflow_fallback - overflow_expected).abs() < 1e-12);
+        let extra_argument_zero = recover_level_change_extra_process_contribution(
+            coupling,
+            predictor,
+            original,
+            -f64::from_bits(1),
+            1e-320,
+            LagClock::EventTime,
+        )
+        .expect("extra-argument-zero");
+        assert!(extra_argument_zero.is_finite());
+        let extra_argument_zero_after = recover_level_change_extra_process_contribution_after(
+            coupling,
+            predictor,
+            original,
+            -f64::from_bits(1),
+            1.0,
+            1e-320,
+            LagClock::EventTime,
+        )
+        .expect("after-extra-argument-zero");
+        assert!(extra_argument_zero_after.is_finite());
+        assert!((extra_argument_zero - extra_argument_zero_after).abs() < 1e-30);
     }
 
     #[test]
