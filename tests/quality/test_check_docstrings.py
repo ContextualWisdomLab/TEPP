@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 from scripts import check_docstrings as docstrings
+from scripts.check_workspace_contract import EXPECTED_CRATES
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -24,7 +25,10 @@ class DocstringContractTests(unittest.TestCase):
 
         sources = docstrings.rust_sources(REPOSITORY_ROOT)
         crate_roots = sorted(REPOSITORY_ROOT.glob("crates/*/src/lib.rs"))
-        self.assertEqual(len(crate_roots), 10)
+        self.assertEqual(
+            sorted(path.parent.parent.name for path in crate_roots),
+            sorted(EXPECTED_CRATES),
+        )
         self.assertTrue(set(crate_roots).issubset(sources))
         self.assertGreaterEqual(len(sources), len(crate_roots))
         self.assertEqual(docstrings.validate_repository(REPOSITORY_ROOT), [])
