@@ -1,18 +1,17 @@
-# ADR 0018 — Symmetric project-history wire-size enforcement
+# ADR 0018 — Symmetric LineageWeave wire-size enforcement
 
 **Decision status:** Accepted  
 **Implementation maturity:** active-PR  
 **Date:** 2026-08-21  
-**Supersedes:** None; narrows ADR 0008 for the project-history DTO boundary.
+**Supersedes:** None; narrows ADR 0008 for the project-history and temporal-context DTO boundaries.
 
 ## Context
 
-The LineageWeave project-history request and response use the same 256 KiB
-wire-size ceiling when parsing JSON. A request can be valid and close to that
-ceiling while its deterministic projection adds spans, participant metadata,
-and findings. Without an output guard, TEPP can construct a projection that its
-own response parser rejects, leaving callers with an internally inconsistent
-success path.
+The LineageWeave project-history and temporal-context request/response pairs
+use symmetric wire-size ceilings when parsing JSON. A request can be valid and
+close to its ceiling while its deterministic projection adds response
+metadata. Without output guards, TEPP can construct a response that its own
+parser rejects, leaving callers with an internally inconsistent success path.
 
 ## Decision
 
@@ -21,6 +20,10 @@ enforce `DEFAULT_PROJECT_HISTORY_BYTE_LIMIT`. The
 `project_history_projection` builder serializes and validates the generated
 projection before returning it. A projection that cannot be represented by the
 published wire contract fails closed with `ApiError::LimitExceeded`.
+
+`TemporalContextRequest::to_json` and `TemporalContextResponse::to_json`
+likewise enforce `DEFAULT_TEMPORAL_CONTEXT_BYTE_LIMIT`. The live adapter cannot
+return a success body that the published response parser rejects.
 
 ## Alternatives considered
 
@@ -49,10 +52,10 @@ silently changing temporal associations or findings.
 
 ## Verification
 
-The contract test constructs a request at the request ceiling whose generated
-projection exceeds the response ceiling and asserts `LimitExceeded`. Existing
-round-trip, unknown-field, cutoff, ordering, and finding-invariant tests remain
-required.
+Contract tests construct project-history and temporal-context payloads whose
+serialized forms exceed their response ceilings and assert `LimitExceeded`.
+Existing round-trip, unknown-field, cutoff, ordering, and finding-invariant
+tests remain required.
 
 ## Rollback
 
