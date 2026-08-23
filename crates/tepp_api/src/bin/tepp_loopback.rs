@@ -19,6 +19,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or(usize::MAX);
     let mut service = AnalysisRunLiveService::bind(bind_addr)?;
     println!("{}", service.local_addr()?);
-    (0..request_limit).try_for_each(|_| service.serve_one().map(|_| ()))?;
+    (0..request_limit).for_each(|_| drop(service.serve_one()));
     Ok(())
 }
