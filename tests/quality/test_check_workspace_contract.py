@@ -38,6 +38,14 @@ class WorkspaceContractTests(unittest.TestCase):
         """The committed workspace satisfies every repository contract."""
 
         self.assertEqual(contract.validate_workspace(REPOSITORY_ROOT), [])
+
+    def test_standards_register_cites_rfc_5646_once(self) -> None:
+        """The APA register must not duplicate Phillips & Davis RFC 5646."""
+
+        text = (
+            REPOSITORY_ROOT / "docs" / "research" / "standards-and-literature.md"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(text.count("RFC 5646"), 1)
         self.assertEqual(
             contract.expected_member_paths(),
             [f"crates/{name}" for name in contract.EXPECTED_CRATES],
