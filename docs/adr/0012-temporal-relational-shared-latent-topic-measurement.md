@@ -1,7 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — logistic-normal ALR/ILR coordinates, lexical-weight refusal, and `model_selection` statistical/Pareto candidate-`K` gates are implemented on the active product branch; the TRSL-TM estimator, global topic activity identity, method effects, and backend interchange remain accepted-target until implemented and protected-main integrated
+**Implementation maturity:** partial — logistic-normal ALR/ILR coordinates, lexical-weight refusal, statistical/Pareto candidate-`K` gates, and stable active/dormant/reactivated topic identity are implemented on the active product branch; the TRSL-TM estimator, method effects, and backend interchange remain accepted-target until implemented and protected-main integrated
 **Date:** 2026-08-12  
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 

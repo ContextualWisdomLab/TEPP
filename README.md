@@ -7,7 +7,7 @@ implemented in Rust.
 ## Current implementation state
 
 This branch establishes the Task 1 Rust workspace and quality-gate foundation.
-The twelve bounded crates compile independently. Domain crates expose only
+The thirteen bounded crates compile independently. Domain crates expose only
 validated production APIs; placeholder surfaces are prohibited.
 
 ```text
@@ -23,6 +23,7 @@ crates/validation_core
 crates/tepp_api
 crates/topic_measurement
 crates/model_selection
+crates/topic_lineage
 ```
 
 ## Local verification

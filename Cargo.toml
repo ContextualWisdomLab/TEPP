@@ -13,6 +13,7 @@ members = [
     "crates/tepp_api",
     "crates/topic_measurement",
     "crates/model_selection",
+    "crates/topic_lineage",
 ]
 default-members = [
     "crates/evidence_core",
@@ -27,6 +28,7 @@ default-members = [
     "crates/tepp_api",
     "crates/topic_measurement",
     "crates/model_selection",
+    "crates/topic_lineage",
 ]
 
 [workspace.package]

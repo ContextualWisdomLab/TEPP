@@ -63,6 +63,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_api` | versioned DTO, schema, and export contracts |
 | `topic_measurement` | logistic-normal ALR and sequential Egozcue ILR topic coordinates |
 | `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
+| `topic_lineage` | global topic identity across active/dormant/reactivated states |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests
