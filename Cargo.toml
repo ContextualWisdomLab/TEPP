@@ -14,6 +14,7 @@ members = [
     "crates/topic_measurement",
     "crates/model_selection",
     "crates/topic_lineage",
+    "crates/analysis_engine",
 ]
 default-members = [
     "crates/evidence_core",
@@ -29,6 +30,7 @@ default-members = [
     "crates/topic_measurement",
     "crates/model_selection",
     "crates/topic_lineage",
+    "crates/analysis_engine",
 ]
 
 [workspace.package]

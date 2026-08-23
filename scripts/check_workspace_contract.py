@@ -26,6 +26,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "topic_measurement",
     "model_selection",
     "topic_lineage",
+    "analysis_engine",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (

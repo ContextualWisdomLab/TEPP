@@ -148,7 +148,7 @@ mod tests {
         assert_eq!(require_nonempty("   "), Err(ApiError::InvalidWirePayload));
         assert_eq!(require_nonempty(""), Err(ApiError::InvalidWirePayload));
         assert_eq!(
-            require_nonempty("topic\u{1f}unit"),
+            require_nonempty("tenant\u{1f}workspace"),
             Err(ApiError::InvalidWirePayload)
         );
         require_byte_limit("abc", 3).expect("ok");

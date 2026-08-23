@@ -1,7 +1,7 @@
 # TEPP API and Modular Integration Contract
 
 **Status:** Accepted target contract; exact endpoints are introduced only with executable services.  
-**Last reviewed:** 2026-08-16
+**Last reviewed:** 2026-08-21
 
 ## 1. Authority boundary
 
@@ -20,8 +20,9 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
-| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
+| analysis-run request/accepted/status/terminal-result contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active product branch |
 | temporal-context ordering contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
+| cutoff-safe analysis-run readiness execution | `analysis_engine` bounded Rust crate | `tepp_api`, future HTTP/service adapters | active product branch |
 
 ## 3. Versioning
 
@@ -57,6 +58,21 @@ only events whose availability time is at or before `knowledge_cutoff`, orders
 them by event time and opaque event ID, and emits adjacent forward temporal
 associations plus `candidate_not_causal` transition gaps. It does not infer
 causality, mutate TEPP state, or return a completed psychometric result.
+
+The typed status/read contract returns `accepted`, `running`, `succeeded`, or
+`failed`. Accepted and running statuses contain no measurement result. A
+terminal status contains exactly one request-bound
+`AnalysisRunTerminalResult`; consumers must validate its request, receipt,
+snapshot, cutoff, model, profile, and idempotency bindings before treating the
+run as measurement evidence. The Rust DTO is available before the future HTTP
+service is deployed.
+
+The stacked `analysis_engine` slice provides the first executable service-side
+path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
+evidence unavailable at the historical cutoff, preserves multiple-membership
+counts, and emits a digest-bound terminal result or a redacted failure. It is
+not a substitute for the approved topic or psychometric estimators and remains
+active product-branch evidence until its exact-head checks and protected merge pass.
 
 ## 5. Analysis request authority
 

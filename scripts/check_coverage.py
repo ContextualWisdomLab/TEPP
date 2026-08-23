@@ -167,6 +167,14 @@ def is_executable_source_line(
         return False
     if text.startswith("pub fn ") or text.startswith("fn "):
         return False
+    if text.startswith("pub(crate) fn "):
+        return False
+    # Keep guarded match arms in the authored-line denominator: the guard
+    # executes even though the arm label itself is structural.
+    if text.endswith("=> {") and " if " not in text:
+        if text.startswith("if ") or text.startswith("if("):
+            return True
+        return _is_multiline_match_guard(lines, line_number)
     if text.startswith("pub struct ") or text.startswith("struct "):
         return False
     if text.startswith("pub enum ") or text.startswith("enum "):
@@ -176,6 +184,31 @@ def is_executable_source_line(
     if text.endswith(",") and not text.startswith("let ") and not text.startswith("return "):
         return False
     return True
+
+
+def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
+    """Recognize a guard continued onto the lines immediately before an arm."""
+
+    target_prefix = lines[line_number - 1].strip().partition("=>")[0]
+    brace_depth = target_prefix.count("}") - target_prefix.count("{")
+    guard_found = False
+    boundary_candidate = False
+    for candidate in reversed(lines[: line_number - 1]):
+        stripped = candidate.strip()
+        if brace_depth == 0 and "=>" in stripped:
+            return guard_found and not boundary_candidate
+        if brace_depth == 1 and stripped.endswith("=> {"):
+            boundary_candidate = True
+        brace_depth += stripped.count("}") - stripped.count("{")
+        if (
+            (stripped.startswith("if ") or stripped.startswith("if("))
+            and not stripped.endswith(("}", ";"))
+            and brace_depth == 0
+        ):
+            guard_found = True
+        if stripped.startswith("match "):
+            return guard_found and not boundary_candidate
+    return guard_found and not boundary_candidate
 
 
 def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
