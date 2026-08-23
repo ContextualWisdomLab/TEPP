@@ -527,6 +527,36 @@ pub enum PsychometricError {
     /// as predetermined later-occasion observed variance. Stationary
     /// later variance uses `−q / (2 a)`, not free `p_0`.
     StationaryLaterObservedVarianceIsNotPredeterminedLaterObservedVariance,
+    /// Driver §4.3 predetermined lagged covariance was treated as lagged
+    /// stationary `T0VAR`. Free `T0VAR` is not `−q / (2 a)`.
+    PredeterminedLaggedLatentCovarianceIsNotStationaryLaggedCovariance,
+    /// Driver §4.3 predetermined lagged covariance was treated as
+    /// predetermined later-occasion variance. Lagged covariance omits
+    /// `Q_Δt` and uses `e^{a Δt} p_0`, not `e^{2 a Δt} p_0`.
+    PredeterminedLaggedLatentCovarianceIsNotLaterLatentVariance,
+    /// Driver §4.3 predetermined lagged covariance was treated as the
+    /// decayed total `e^{a Δt}(trait + p_0 + (B / a)² v)`. Trait
+    /// variance and `addedTIPREDVAR` do not decay.
+    PredeterminedLaggedLatentCovarianceIsNotDecayedTotal,
+    /// Driver §4.3 predetermined lagged covariance was treated as free
+    /// first-occasion `T0VAR`. `e^{a Δt} p_0` is not `p_0`.
+    PredeterminedLaggedLatentCovarianceIsNotInitialLatentVariance,
+    /// Driver §4.3 predetermined lagged covariance was treated as
+    /// predetermined lagged observed covariance. Equation 5 maps
+    /// `cov(y_t, y_{t-1}) = λ²` of that covariance plus `ψ`.
+    PredeterminedLaggedLatentCovarianceIsNotObservedCovariance,
+    /// Driver Eq. 5 measurement error was treated as predetermined
+    /// lagged observed covariance. Independent `ε_t` does not enter
+    /// `cov(y_t, y_{t-1})`.
+    MeasurementErrorIsNotPredeterminedLaggedObservedCovariance,
+    /// Driver Eq. 5 of predetermined later-occasion `T0VAR` was treated
+    /// as predetermined lagged observed covariance. Later variance
+    /// includes `Q_Δt` and `θ`.
+    PredeterminedLaterObservedVarianceIsNotPredeterminedLaggedObservedCovariance,
+    /// Driver Eq. 5 of lagged §4.3 stationary `T0VAR` was treated as
+    /// predetermined lagged observed covariance. Stationary lagged
+    /// covariance uses `−q / (2 a)`, not free `p_0`.
+    StationaryLaggedObservedCovarianceIsNotPredeterminedLaggedObservedCovariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -937,6 +967,30 @@ impl fmt::Display for PsychometricError {
             }
             Self::StationaryLaterObservedVarianceIsNotPredeterminedLaterObservedVariance => {
                 "stationary later-occasion observed variance is not the predetermined later-occasion observed variance"
+            }
+            Self::PredeterminedLaggedLatentCovarianceIsNotStationaryLaggedCovariance => {
+                "predetermined lagged latent covariance is not the stationary lagged latent covariance"
+            }
+            Self::PredeterminedLaggedLatentCovarianceIsNotLaterLatentVariance => {
+                "predetermined lagged latent covariance is not the predetermined later-occasion latent variance"
+            }
+            Self::PredeterminedLaggedLatentCovarianceIsNotDecayedTotal => {
+                "predetermined lagged latent covariance is not the decayed predetermined total"
+            }
+            Self::PredeterminedLaggedLatentCovarianceIsNotInitialLatentVariance => {
+                "predetermined lagged latent covariance is not the free first-occasion latent variance"
+            }
+            Self::PredeterminedLaggedLatentCovarianceIsNotObservedCovariance => {
+                "predetermined lagged latent covariance is not the predetermined lagged observed covariance"
+            }
+            Self::MeasurementErrorIsNotPredeterminedLaggedObservedCovariance => {
+                "measurement-error variance is not the predetermined lagged observed covariance"
+            }
+            Self::PredeterminedLaterObservedVarianceIsNotPredeterminedLaggedObservedCovariance => {
+                "predetermined later-occasion observed variance is not the predetermined lagged observed covariance"
+            }
+            Self::StationaryLaggedObservedCovarianceIsNotPredeterminedLaggedObservedCovariance => {
+                "stationary lagged observed covariance is not the predetermined lagged observed covariance"
             }
         };
         formatter.write_str(message)
@@ -1583,6 +1637,49 @@ mod tests {
             PsychometricError::StationaryLaterObservedVarianceIsNotPredeterminedLaterObservedVariance
                 .to_string(),
             "stationary later-occasion observed variance is not the predetermined later-occasion observed variance"
+        );
+    }
+
+    #[test]
+    fn predetermined_lagged_covariance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::PredeterminedLaggedLatentCovarianceIsNotStationaryLaggedCovariance
+                .to_string(),
+            "predetermined lagged latent covariance is not the stationary lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaggedLatentCovarianceIsNotLaterLatentVariance
+                .to_string(),
+            "predetermined lagged latent covariance is not the predetermined later-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaggedLatentCovarianceIsNotDecayedTotal.to_string(),
+            "predetermined lagged latent covariance is not the decayed predetermined total"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaggedLatentCovarianceIsNotInitialLatentVariance
+                .to_string(),
+            "predetermined lagged latent covariance is not the free first-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaggedLatentCovarianceIsNotObservedCovariance
+                .to_string(),
+            "predetermined lagged latent covariance is not the predetermined lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotPredeterminedLaggedObservedCovariance
+                .to_string(),
+            "measurement-error variance is not the predetermined lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaggedObservedCovariance
+                .to_string(),
+            "predetermined later-occasion observed variance is not the predetermined lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaggedObservedCovarianceIsNotPredeterminedLaggedObservedCovariance
+                .to_string(),
+            "stationary lagged observed covariance is not the predetermined lagged observed covariance"
         );
     }
 }
