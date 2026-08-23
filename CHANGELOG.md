@@ -85,11 +85,11 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
-- Refreshed the live gap-baseline inventory to the 2026-08-23T18:48:36Z GitHub
-  snapshot (103 open PRs / 34 drafts / 12 issues; protected-main
+- Refreshed the live gap-baseline inventory to the 2026-08-23T19:48:22Z GitHub
+  snapshot (105 open PRs / 36 drafts / 12 issues; protected-main
   `c45be17a9dbce95ef81cee230e9d128abc7160ac`), binding each operator-gap current
-  head SHA to that exact-head register, including stacked drafts #197/#198,
-  #49 `dd6cf43e5edf` (unique-fold nightly green), and #164 `cbceb6fee095` as the
+  head SHA to that exact-head register, including stacked drafts #199/#200,
+  #49 `dd6cf43e5edf` (unique-fold nightly green), and #164 `7b222b0901b1` as the
   predecessor register head. Duplicate PR #179 remains closed. Stacked-merged
   heads and queued Checks are not implemented-main.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
