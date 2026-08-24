@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `corpus_split` Unicode canonical identity: NFC/NFD-equivalent bodies produce `CanonicalEquivalent` leakage links and cannot occupy independent partitions; empty bodies and duplicate document identities fail closed (ADR 0004/0008/0013; PR #59).
 - `semantic_core` binds exact `evidence_core` source spans as semantic units. Language profiles are `unresolved` or a primary ISO 639 subtag with an IANA-registered ISO 3166-1 alpha-2 or UN M.49 region (RFC 5646; IANA File-Date 2026-08-08); private-use and unknown regions fail closed. Unresolved metadata keeps the caller-supplied Korean `측정` span and does not retokenize. `SemanticIdentity::from_language_tag` fails closed. Korean and English report sentences remain distinct units. Not concept alignment, not invariance, not a topic estimator (ADR 0020; issue #168). The APA register cites RFC 5646 once, in the Unicode/language-tags section; the slice-specific note remains `docs/research/span-grounded-semantic-units.md`.
 - `corpus_background` identity gate: corpus-level background wording is not unique latent content or a state transition; recovery tests distinguish background evidence from unique content.
 - `modality_source` identity gate: non-lexical modality is not unique lexical content or a state transition; recovery tests keep modality evidence distinct from unique content.
