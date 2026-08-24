@@ -55,8 +55,9 @@ impl VramController {
     /// # Errors
     ///
     /// Returns a fail-closed [`ComputeBackendError`] when the caller requests a
-    /// forbidden memory adaptation, mixed-precision finals, or an overflowing
-    /// peak prediction.
+    /// forbidden memory adaptation or mixed-precision finals. An overflowing
+    /// peak prediction is treated as unable to fit and falls back to the CPU
+    /// reference plan.
     pub fn plan(&self, request: &WorkloadRequest) -> Result<MicroBatchPlan, ComputeBackendError> {
         Self::validate_request(request)?;
 
