@@ -38,7 +38,7 @@ Future persistent authorization entities must use descriptive multiword `snake_c
 
 ## 4. Identity separation
 
-When the scientific task does not require the direct identity string, TEPP should model with an opaque `entity_record_id` and keep the direct identity mapping in a separately encrypted/authorized store or host-owned identity service. The mapping may not be copied into model artifacts, ordinary logs, LLM prompts, or public exports merely for convenience.
+When the scientific task does not require the direct identity string, TEPP should model with an opaque `entity_record_id` and keep the direct identity mapping in a separately encrypted/authorized store or host-owned identity service. The in-memory `encrypted_mapping` envelope seals source identity so analytical, log, and model-artifact purposes cannot recover plaintext. Persistence of that envelope waits for a later migration. The mapping may not be copied into model artifacts, ordinary logs, LLM prompts, or public exports merely for convenience.
 
 Identity separation must not erase scientifically relevant time-varying memberships. The model may retain that opaque entity A authored document X and belonged to department Y at time T while the direct real-world name remains outside the ordinary compute artifact.
 
@@ -66,7 +66,7 @@ Retention is policy-driven per data class and purpose. Raw evidence, derived mod
 - immutable audit evidence that records the deletion action without retaining unnecessary raw PII;
 - legal or contractual hold that prevents deletion and records its authority.
 
-Historical model reproducibility cannot silently override an approved deletion obligation. If source deletion makes exact reproduction unavailable, TEPP records that limitation rather than restoring deleted data from an ungoverned copy. Migration `0007` (active PR) persists `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` so an active hold blocks completed deletion and a tombstone blocks restore of the same document identity.
+Historical model reproducibility cannot silently override an approved deletion obligation. If source deletion makes exact reproduction unavailable, TEPP records that limitation rather than restoring deleted data from an ungoverned copy. Migration `0007` (implemented-main via PR #45) persists `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` so an active hold blocks completed deletion and a tombstone blocks restore of the same document identity.
 
 ## 7. Tenant and service isolation
 

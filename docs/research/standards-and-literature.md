@@ -107,6 +107,12 @@ Davis, K., Peabody, B., & Leach, P. (2024). *Universally unique identifier (UUID
 
 National Institute of Standards and Technology. (2015). *Secure Hash Standard (SHS)* (FIPS PUB 180-4). https://doi.org/10.6028/NIST.FIPS.180-4
 
+Dworkin, M. (2007). *Recommendation for block cipher modes of operation: Galois/Counter mode (GCM) and GMAC* (NIST Special Publication 800-38D). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-38D
+
+Krawczyk, H., Bellare, M., & Canetti, R. (1997). *HMAC: Keyed-hashing for message authentication* (RFC 2104). RFC Editor. https://doi.org/10.17487/RFC2104
+
+Nystrom, M. (2005). *Identifiers and Test Vectors for HMAC-SHA-224, HMAC-SHA-256, HMAC-SHA-384, and HMAC-SHA-512* (RFC 4231). RFC Editor. https://doi.org/10.17487/RFC4231
+
 Yergeau, F. (2003). *UTF-8, a transformation format of ISO 10646* (RFC 3629). RFC Editor. https://doi.org/10.17487/RFC3629
 
 Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology*. World Wide Web Consortium. https://www.w3.org/TR/prov-o/
@@ -117,7 +123,7 @@ National Academies of Sciences, Engineering, and Medicine. (2019). *Reproducibil
 
 Peng, R. D. (2011). Reproducible research in computational science. *Science, 334*(6060), 1226–1227. https://doi.org/10.1126/science.1213847
 
-TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. A model checkpoint is a derived run artifact whose digest verifies bytes (National Institute of Standards and Technology, 2015); it does not become the CPU `f64` estimator or a scientific claim (Peng, 2011; National Academies of Sciences, Engineering, and Medicine, 2019).
+TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. `encrypted_mapping` uses AES-256-GCM authenticated encryption with an operating-system-generated nonce and identifier-bound associated data (Dworkin, 2007); HMAC-SHA-256 remains a key-material normalization primitive (Krawczyk et al., 1997; Nystrom, 2005). A model checkpoint is a derived run artifact whose digest verifies bytes (National Institute of Standards and Technology, 2015); it does not become the CPU `f64` estimator or a scientific claim (Peng, 2011; National Academies of Sciences, Engineering, and Medicine, 2019). These constructions are not a CSAP or SOC 2 certification claim and do not persist mappings.
 
 ## Privacy and operational log/source separation
 
