@@ -16,7 +16,11 @@ Fox, J.-P., & Glas, C. A. W. (2001). Bayesian estimation of a multilevel IRT mod
 
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. `psychometric_fit` recovers those cross-loadings and event-time lagged paths on a CPU `f64` OLS path; see `docs/research/esem-dsem-fit.md`.
+Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100202
+
+Jones, K. (1991). Specifying and estimating multi-level models for geographical research. *Transactions of the Institute of British Geographers, 16*(2), 148–160. https://doi.org/10.2307/622612
+
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Location and market assignments remain multiple-membership classifications; they are not permanent entity identity and not language channels (Browne et al., 2001; Jones, 1991).
 
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 
@@ -32,11 +36,19 @@ Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for stru
 
 Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082. https://doi.org/10.1111/ajps.12103
 
+Chemudugunta, C., Smyth, P., & Steyvers, M. (2007). Modeling general and specific aspects of documents with a probabilistic topic model. In B. Schölkopf, J. Platt, & T. Hoffman (Eds.), *Advances in Neural Information Processing Systems 19* (pp. 241–248). MIT Press.
+
 Bianchi, F., Terragni, S., Hovy, D., Nozza, D., & Fersini, E. (2021). Cross-lingual contextualized topic models with zero-shot learning. In *Proceedings of the 16th Conference of the European Chapter of the Association for Computational Linguistics* (pp. 1676–1683). Association for Computational Linguistics. https://doi.org/10.18653/v1/2021.eacl-main.143
 
 Nguyen, T. P., Minh, N. V., Nguyen, T., Van, L. N., Nguyen, D. A., Sang, D. V., & Le, T. (2025). XTRA: Cross-lingual topic modeling with topic and representation alignments. In *Findings of the Association for Computational Linguistics: EMNLP 2025*. Association for Computational Linguistics.
 
-TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. `topic_lineage` keeps one global topic identity when activity becomes dormant or reactivated.
+Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D., Dhariwal, P., Neelakantan, A., Shyam, P., Sastry, G., Askell, A., Agarwal, S., Herbert-Voss, A., Krueger, G., Henighan, T., Child, R., Ramesh, A., Ziegler, D., Wu, J., Winter, C., … Amodei, D. (2020). Language models are few-shot learners. *Advances in Neural Information Processing Systems, 33*, 1877–1901. https://papers.neurips.cc/paper/2020/hash/1457c0d6bfcb4967418bfb8ac142f64a-Abstract.html
+
+Reynolds, L., & McDonell, K. (2021). Prompt programming for large language models: Beyond the few-shot paradigm. In *Extended abstracts of the 2021 CHI conference on human factors in computing systems*. Association for Computing Machinery. https://doi.org/10.1145/3411763.3451760
+
+Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, G. (2023). Pre-train, prompt, and predict: A systematic survey of prompting methods in natural language processing. *ACM Computing Surveys, 55*(9), Article 195. https://doi.org/10.1145/3560815
+
+TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Brown et al. (2020) and Reynolds and McDonell (2021) provide primary research context for prompts as task-conditioning and prompt-programming mechanisms; they do not define TEPP's latent-content labels. As a normative ADR 0004/0012 contract, instruction and prompt boilerplate is therefore modeled as explicit method structure, not unique latent content and not a stopword deletion. Liu et al. (2023) is secondary survey background only and is not evidence for that repository-specific classification.
 
 ## Topic-model evaluation and LLM judges
 
@@ -123,9 +135,7 @@ Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology
 
 Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
 
-TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. A summary is a PROV derivation of the source document, not a state transition and not a reuse of the source identity (Moreau & Missier, 2013).
-
-International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011). Data minimization informs `provider_receipt`; it is not a certification claim.
+TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. A template or pasted copy is a PROV derivation of the source document, not a reuse of the source identity and not a state transition (Moreau & Missier, 2013).
 
 ## Privacy lifecycle, retention, and legal hold
 
