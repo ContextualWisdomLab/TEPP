@@ -1,6 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted  
+**Implementation maturity:** accepted-target — prompt-versus-unique-content identity in `prompt_source` on the active PR; estimator-side method model remains accepted-target  
 **Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; estimator-side method model remains accepted-target  
 **Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; estimator-side method model remains accepted-target  
 **Implementation maturity:** accepted-target — copied-versus-unique-content identity in `copied_text` on the active PR; estimator-side method model remains accepted-target  
