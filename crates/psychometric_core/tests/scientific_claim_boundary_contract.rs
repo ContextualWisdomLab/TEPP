@@ -5078,6 +5078,34 @@ fn initial_time_dependent_predictor_variance_is_not_covariance_or_added_t0_tipre
         recover_initial_time_dependent_predictor_variance(0.3, -0.1, LagClock::EventTime),
         Err(psychometric_core::PsychometricError::InvalidNumericInput)
     );
+}
+
+#[test]
+fn initial_time_dependent_variance_refusal_boundaries_stay_distinct() {
+    // Refusals must separate addedT0TDPREDVAR from neighbouring Table 2/3
+    // quantities even when every numeric value coincides.
+    let coefficient = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let recovered = recover_initial_time_dependent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TDPREDVAR analog");
+    let ti_extra = recover_initial_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TIPREDVAR");
+    let standardised = recover_standardised_initial_time_dependent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        1.6,
+        LagClock::EventTime,
+    )
+    .expect("T0TDPREDEFFECTstd");
+    let covariance = coefficient * predictor_variance;
     assert_eq!(
         refuse_initial_time_dependent_variance_as_initial_time_independent_variance(
             recovered, ti_extra

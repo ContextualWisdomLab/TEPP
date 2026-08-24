@@ -21209,6 +21209,33 @@ mod tests {
     }
 
     #[test]
+    fn standardised_asymptotic_effect_propagates_non_finite_coefficient() {
+        // The wrapper validates variance inputs only; coefficient finiteness is
+        // owned by the delegated unstandardised recovery and must propagate.
+        let log_rate = -0.5_f64;
+        assert_eq!(
+            recover_standardised_asymptotic_time_independent_predictor_effect(
+                f64::NAN,
+                1.0,
+                0.4,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_time_independent_predictor_effect(
+                f64::INFINITY,
+                1.0,
+                0.4,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
     fn standardised_asymptotic_time_independent_effect_fails_closed_when_unstandardised_is_defined()
     {
         let log_rate = -0.5_f64;
