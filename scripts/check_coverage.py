@@ -163,26 +163,87 @@ def is_executable_source_line(
         return False
     if text.startswith(") ->"):
         return False
-    if text.startswith((
-        "pub fn ",
-        "pub const fn ",
-        "pub(crate) fn ",
-        "pub(crate) const fn ",
-        "const fn ",
-        "fn ",
-    )):
-        return False
+    if text.startswith(
+        (
+            "pub fn ",
+            "pub const fn ",
+            "pub(crate) fn ",
+            "pub(crate) const fn ",
+            "const fn ",
+            "fn ",
+        )
+    ):
+        if "{" not in text or "}" not in text:
+            return False
+        body = text[text.find("{") + 1 : text.rfind("}")].strip()
+        return bool(body)
     if text.startswith("pub struct ") or text.startswith("struct "):
         return False
     if text.startswith("pub enum ") or text.startswith("enum "):
         return False
-    if text.startswith("Ok(Self") or text in {")}", "})", "})"}:
+    if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
     if text in {"} else {", "else {", "));"} or text.startswith((".", "||", "&&")):
         return False
-    if text.endswith(",") and not text.startswith("let ") and not text.startswith("return "):
+    if (
+        text.endswith(",")
+        and not text.startswith("let ")
+        and not text.startswith("return ")
+        and _is_structural_comma_continuation(lines, line_number, text)
+    ):
         return False
     return True
+
+
+def _is_structural_comma_continuation(
+    lines: list[str], line_number: int, text: str
+) -> bool:
+    """Return whether a comma-terminated line is proven to be structural.
+
+    A comma can terminate a declaration field, enum variant, function
+    parameter, or ordinary call argument. Operators, calls, and assignments
+    remain executable because their expressions can perform observable work.
+    """
+
+    if any(character in text for character in "()=+-*/%<>!&|?"):
+        return False
+    previous = ""
+    for candidate in reversed(lines[: line_number - 1]):
+        if candidate.strip():
+            previous = candidate.strip()
+            break
+    if previous.endswith("(") and "let " not in previous and "=" not in previous:
+        return True
+
+    declaration_depth = 0
+    function_parenthesis_depth = 0
+    for candidate in lines[: line_number - 1]:
+        stripped = candidate.strip()
+        if declaration_depth:
+            declaration_depth += candidate.count("{") - candidate.count("}")
+            if declaration_depth <= 0:
+                declaration_depth = 0
+            continue
+        if stripped.startswith(
+            (
+                "struct ",
+                "pub struct ",
+                "pub(crate) struct ",
+                "enum ",
+                "pub enum ",
+                "pub(crate) enum ",
+            )
+        ) and "{" in candidate:
+            declaration_depth = candidate.count("{") - candidate.count("}")
+            continue
+        if function_parenthesis_depth:
+            function_parenthesis_depth += candidate.count("(") - candidate.count(")")
+            if function_parenthesis_depth <= 0:
+                function_parenthesis_depth = 0
+            continue
+        if "fn " in stripped and "(" in candidate:
+            function_parenthesis_depth = candidate.count("(") - candidate.count(")")
+    return declaration_depth > 0 or function_parenthesis_depth > 0
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
@@ -196,9 +257,10 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
     """
 
     in_string = False
+    block_comment_depth = 0
     raw_hashes: int | None = None
     for index, line in enumerate(lines, start=1):
-        if index == line_number and in_string:
+        if index == line_number and (in_string or block_comment_depth > 0):
             return True
         stripped = line.strip()
         started_literal = False
@@ -224,6 +286,20 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 else:
                     escaped = False
                 position += 1
+                continue
+            if block_comment_depth:
+                if line.startswith("/*", position):
+                    block_comment_depth += 1
+                    position += 2
+                elif line.startswith("*/", position):
+                    block_comment_depth -= 1
+                    position += 2
+                else:
+                    position += 1
+                continue
+            if line.startswith("/*", position):
+                block_comment_depth = 1
+                position += 2
                 continue
             if line.startswith("//", position):
                 break
@@ -265,6 +341,8 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 started_literal = True
             position += 1
         if index == line_number:
+            if block_comment_depth > 0 or stripped.startswith("/*") and stripped.endswith("*/"):
+                return True
             return in_string and started_literal and stripped.startswith(
                 ('"', "r\"", "r#", "br\"", "br#")
             )
