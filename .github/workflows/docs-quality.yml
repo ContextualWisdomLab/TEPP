@@ -23,6 +23,7 @@ on:
       - ".github/workflows/**"
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
+      - "crates/compute_backend/**"
   workflow_dispatch:
 
 permissions:

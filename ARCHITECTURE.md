@@ -53,6 +53,7 @@ boundaries above remain the target modular MSA architecture.
 |---|---|
 | `evidence_core` | immutable evidence domain primitives |
 | `semantic_core` | span-grounded semantic units; language is not identity |
+| `location_membership` | location is not entity identity and not a language channel |
 | `temporal_core` | typed clocks, intervals, and temporal reasoning |
 | `event_core` | event instances, mentions, roles, provenance, and CHRONOS occurrence-prediction calibration |
 | `relation_graph` | typed relations and forward-transition validation |
@@ -99,28 +100,11 @@ boundaries above remain the target modular MSA architecture.
 | `interpretation_gateway` | evidence-bounded LLM interpretations; not estimators or observed facts |
 | `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
+| `compute_backend` | VRAM-budgeted streamed planning, executable OOM retry plans, and a compensated CPU `f64` reference |
+| `episode_membership` | episode membership cannot escape the episode event-time interval |
 
 Foundation crates expose only tested contracts. Empty façades are not public
 APIs.
-| `compute_backend` | VRAM-budgeted streamed planning, executable OOM retry plans, and a compensated CPU `f64` reference |
-| `cutoff_clock` | knowledge cutoff cannot be replaced by event, system, or availability time |
-| `assertion_clock` | assertion time cannot be replaced by event, system, document, or available time |
-| `event_clock` | event time cannot be replaced by assertion, system, document, or available time |
-| `system_clock` | system time cannot be replaced by event, assertion, document, available, or cutoff time |
-| `support_edge` | support, contradiction, summary, and outcome_of edges are not state transitions |
-| `inferred_status` | inferred relations cannot be promoted to observed evidence or transitions |
-| `payload_bound` | untrusted documents, records, checkpoints, and LLM outputs fail closed without identity, provenance, size, and depth |
-| `outcome_order` | input-process-outcome edges cannot move backward in event time |
-| `summarizes_edge` | a summary is not a state transition and not the source document |
-| `intake_authorization` | untrusted intake fails closed without a grant; bounds are not authorization |
-| `copy_identity` | a template copy is not the source document and not a state transition |
-| `stopword_deletion` | default stopword deletion is not a valid method for repeated report language |
-| `episode_membership` | episode membership cannot escape the episode event-time interval |
-| `style_source` | house-voice style residue is not unique latent content and not stopword deletion |
-| `modality_source` | non-lexical modality is not unique latent content and not stopword deletion |
-| `corpus_background` | corpus-background wording is not unique latent content and not stopword deletion |
-| `prompt_source` | prompt boilerplate is not unique latent content and not stopword deletion |
-| `location_membership` | location is not entity identity and not a language channel |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

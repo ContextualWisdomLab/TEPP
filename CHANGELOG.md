@@ -218,8 +218,6 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
   workflow no longer invokes deleted repair scripts or requests write authority
   after the executable compute implementation is already present.
 - `persistence_postgres` entity and project target inserts now bind their tenant session context before rendering SQL, keeping `FORCE ROW LEVEL SECURITY` behavior consistent with every other tenant-scoped write; live coverage still proves raw wrong-tenant rejection.
- PR #179 remains closed. Stacked-merged heads and queued Checks are not
- implemented-main.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.

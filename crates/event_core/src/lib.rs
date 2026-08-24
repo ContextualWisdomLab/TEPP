@@ -6,13 +6,10 @@
 //! **versioned event instances** used for temporal state, multilevel membership,
 //! and scientific estimation. Mentions never silently become instances. TDT
 //! detections and CHRONOS predictions remain measurement or hypothesis
-//! artifacts until independently promoted.
-//! track assignments remain measurement evidence and cannot promote an instance.
-//! and scientific estimation. Mentions and CHRONOS schema-slot predictions
-//! never silently become instances.
-//! and scientific estimation. Mentions and TDT story segmentations never
-//! and scientific estimation. Mentions and CHRONOS occurrence forecasts never
-//! silently become instances.
+//! artifacts until independently promoted. Track assignments, story
+//! segmentations, CHRONOS schema-slot predictions, and occurrence forecasts
+//! remain measurement or hypothesis artifacts and cannot promote an instance
+//! without an explicit evidence-backed promotion gate.
 
 mod confidence;
 mod error;
