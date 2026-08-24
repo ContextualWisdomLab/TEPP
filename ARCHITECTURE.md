@@ -140,7 +140,7 @@ Repository contract scripts independently verify the approved crate set,
 workspace inheritance, action SHA pinning, absence of LLM credentials from
 ordinary CI, and complete Rust documentation.
 
-Stable Rust 1.97.1 is the compile, lint, test, and line-coverage reference.
+Stable Rust 1.98.0 is the compile, lint, test, and line-coverage reference.
 Branch coverage runs in a pinned nightly lane because LLVM branch coverage
 remains unstable in Rust. `cargo-nextest` runs tests without retries, while
 doctests remain a separate `cargo test --doc` gate. `cargo-deny` enforces

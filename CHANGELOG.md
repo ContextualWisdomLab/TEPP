@@ -168,7 +168,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
   syntax that have no independently executable source coordinate, while
   retaining the authored-line 100% gate.
 - Removed the temporary PR-155 review-repair workflows and source-fix helper after the bounded repair; subsequent changes use the normal reviewed branch path.
-- Pinned Rust branch-coverage workflows to `nightly-2026-08-21`, which is newer than the workspace Rust 1.97.1 MSRV and avoids the previous nightly/MSRV mismatch.
+- Pinned Rust branch-coverage workflows to `nightly-2026-08-21`, which is newer than the workspace Rust 1.98.0 MSRV and avoids the previous nightly/MSRV mismatch.
 - Applied the documented `sqlx_live.rs` authored-coverage exclusion to the hourly release gate so live-PostgreSQL success-path coverage is not reported as a false source failure.
 - Removed unreachable duplicate Naruon host-control validation because the shared `require_nonempty` boundary already rejects C0/C1 controls; retained a C1 regression case alongside the existing C0 case.
 - Kept one maturity row per capability in the traceability matrix while recording the active provider-receipt evidence without duplicating or downgrading existing capabilities.
