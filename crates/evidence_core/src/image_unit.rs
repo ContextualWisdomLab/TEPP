@@ -144,6 +144,7 @@ fn is_image_media_type_token(media_type: &str) -> bool {
     let Some(subtype) = media_type.strip_prefix("image/") else {
         return false;
     };
+    let subtype = subtype.split(';').next().unwrap_or("");
     !subtype.is_empty()
         && subtype
             .bytes()

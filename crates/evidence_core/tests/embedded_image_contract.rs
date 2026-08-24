@@ -28,6 +28,10 @@ fn data_uri_recovers_exact_span_and_media_type() {
     refuse_base64_image_as_lexical_text("data:image/gif y").expect("incomplete image marker");
     refuse_base64_image_as_lexical_text("문서: data:image/png 형식;base64, 설명")
         .expect("ordinary prose");
+    assert_eq!(
+        refuse_base64_image_as_lexical_text("data:image/png;version=1;base64,AAAA"),
+        Err(EvidenceError::EmbeddedImageIsNotLexicalText)
+    );
 }
 
 #[test]
