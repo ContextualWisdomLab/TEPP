@@ -37,6 +37,7 @@ members = [
     "crates/support_edge",
     "crates/inferred_status",
     "crates/payload_bound",
+    "crates/outcome_order",
 ]
 default-members = [
     "crates/evidence_core",
@@ -75,6 +76,7 @@ default-members = [
     "crates/support_edge",
     "crates/inferred_status",
     "crates/payload_bound",
+    "crates/outcome_order",
 ]
 
 [workspace.package]

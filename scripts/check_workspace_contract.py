@@ -49,6 +49,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "support_edge",
     "inferred_status",
     "payload_bound",
+    "outcome_order",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
