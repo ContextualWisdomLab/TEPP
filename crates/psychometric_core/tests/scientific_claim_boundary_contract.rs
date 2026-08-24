@@ -3202,9 +3202,8 @@ fn predetermined_lagged_latent_covariance_is_not_stationary_later_or_decayed() {
         LagClock::EventTime,
     )
     .expect("addedTIPREDVAR");
-    let expected = trait_variance
-        + initial_latent_variance * (log_rate * event_delta).exp()
-        + added;
+    let expected =
+        trait_variance + initial_latent_variance * (log_rate * event_delta).exp() + added;
     assert!((recovered - expected).abs() < 1e-12);
     let decayed_total = recover_discrete_lagged_latent_covariance(
         trait_variance + initial_latent_variance + added,
