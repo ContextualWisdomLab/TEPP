@@ -196,6 +196,14 @@ name = "compute_backend"
 version = "0.1.0"
 
 [[package]]
+name = "copy_identity"
+version = "0.1.0"
+
+[[package]]
+name = "corpus_background"
+version = "0.1.0"
+
+[[package]]
 name = "corpus_split"
 version = "0.1.0"
 dependencies = [
@@ -382,6 +390,10 @@ dependencies = [
  "getrandom 0.4.3",
  "sha2",
 ]
+
+[[package]]
+name = "episode_membership"
+version = "0.1.0"
 
 [[package]]
 name = "equivalent"
@@ -751,6 +763,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "inferred_status"
+version = "0.1.0"
+
+[[package]]
 name = "inout"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -758,6 +774,10 @@ checksum = "4250ce6452e92010fdf7268ccc5d14faa80bb12fc741938534c58f16804e03c7"
 dependencies = [
  "hybrid-array",
 ]
+
+[[package]]
+name = "intake_authorization"
+version = "0.1.0"
 
 [[package]]
 name = "interpretation_gateway"
@@ -924,6 +944,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "modality_source"
+version = "0.1.0"
+
+[[package]]
 name = "model_selection"
 version = "0.1.0"
 
@@ -957,6 +981,10 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "operational_log"
+version = "0.1.0"
+
+[[package]]
+name = "outcome_order"
 version = "0.1.0"
 
 [[package]]
@@ -1080,6 +1108,10 @@ checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "prompt_source"
+version = "0.1.0"
 
 [[package]]
 name = "provider_receipt"
@@ -1466,6 +1498,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "style_source"
+version = "0.1.0"
+
+[[package]]
 name = "subevent_containment"
 version = "0.1.0"
 
@@ -1474,6 +1510,10 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "summarizes_edge"
+version = "0.1.0"
 
 [[package]]
 name = "support_edge"
