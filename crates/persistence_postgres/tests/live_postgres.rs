@@ -11,15 +11,15 @@ use persistence_postgres::{
     EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository, LiveSqlxPoolOptions,
     MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
     PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord, SqlSession,
-    apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
-    require_live_sqlx_config, reset_app_runtime_role_sql, select_active_analysis_document_sql,
-    set_session_tenant_sql,
+    TextSegmentRecord, apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql,
+    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
+    select_active_analysis_document_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
-use temporal_core::{AvailableTime, EventTime, SystemTime};
+use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff, SystemTime};
 use uuid::Uuid;
 
 const CONCURRENT_WRITERS: usize = 2;
@@ -142,6 +142,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
 
     exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
+    prove_text_segment_known_span(&mut repo, tenant_record_id, available, system);
     prove_retention_deletion_legal_hold(
         &mut repo,
         tenant_record_id,
@@ -975,6 +976,79 @@ fn exercise_typed_membership_assignments(
     );
 }
 
+fn prove_text_segment_known_span(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    const DOCUMENT_UTF8: &str = "hello world";
+    assert_eq!(DOCUMENT_UTF8.len(), 11);
+    assert_eq!(&DOCUMENT_UTF8.as_bytes()[0..5], b"hello");
+    let document_record_id = Uuid::now_v7();
+    let hello = Uuid::now_v7();
+    let world = Uuid::now_v7();
+    let later = AvailableTime::parse_rfc3339("2026-06-01T00:00:00Z").expect("later");
+    repo.insert_text_segment(&TextSegmentRecord {
+        text_segment_id: hello,
+        tenant_record_id,
+        document_record_id,
+        start_byte: 0,
+        end_byte: 5,
+        system_time: system,
+        available_time: available,
+    })
+    .expect("insert known hello span");
+    repo.insert_text_segment(&TextSegmentRecord {
+        text_segment_id: world,
+        tenant_record_id,
+        document_record_id,
+        start_byte: 6,
+        end_byte: 11,
+        system_time: system,
+        available_time: later,
+    })
+    .expect("insert later world span");
+    let inverted = TextSegmentRecord {
+        text_segment_id: Uuid::now_v7(),
+        tenant_record_id,
+        document_record_id,
+        start_byte: 5,
+        end_byte: 0,
+        system_time: system,
+        available_time: available,
+    };
+    assert_eq!(
+        repo.insert_text_segment(&inverted),
+        Err(PersistenceError::InvalidTextSegment)
+    );
+    let cutoff = KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff");
+    repo.submit_text_segment_by_id(hello)
+        .expect("select text_segment by id");
+    repo.submit_text_segments_for_document_as_of(document_record_id, &cutoff)
+        .expect("select cutoff-eligible text_segment rows");
+    let recovery = format!(
+        "DO $tepp_text_segment$ BEGIN \
+           IF (SELECT start_byte FROM text_segment \
+               WHERE text_segment_id = '{hello}'::uuid) <> 0 THEN \
+             RAISE EXCEPTION 'hello start_byte did not recover'; \
+           END IF; \
+           IF (SELECT end_byte FROM text_segment \
+               WHERE text_segment_id = '{hello}'::uuid) <> 5 THEN \
+             RAISE EXCEPTION 'hello end_byte did not recover'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM text_segment \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND available_time <= '2026-02-01T00:00:00Z'::timestamptz) <> 1 THEN \
+             RAISE EXCEPTION 'cutoff must keep only the available hello span'; \
+           END IF; \
+         END $tepp_text_segment$"
+    );
+    repo.session_mut()
+        .execute(&recovery)
+        .expect("known hello span and cutoff eligibility must recover");
+}
+
 fn prove_persisted_membership_rows(
     repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
     document_record_id: Uuid,
@@ -1041,20 +1115,16 @@ fn prove_membership_exactly_one_rejections(
     );
 
     let text_segment_id = Uuid::now_v7();
-    repo.session_mut()
-        .execute(&format!(
-            "INSERT INTO text_segment (\
-                text_segment_id, tenant_record_id, document_record_id, \
-                start_byte, end_byte, system_time, available_time\
-             ) VALUES (\
-                '{text_segment_id}'::uuid, '{tenant_record_id}'::uuid, \
-                '{document_record_id}'::uuid, 0, 8, \
-                '{system}'::timestamptz, '{available}'::timestamptz\
-             )",
-            system = system.to_rfc3339(),
-            available = available.to_rfc3339(),
-        ))
-        .expect("insert text_segment");
+    repo.insert_text_segment(&TextSegmentRecord {
+        text_segment_id,
+        tenant_record_id,
+        document_record_id,
+        start_byte: 0,
+        end_byte: 8,
+        system_time: system,
+        available_time: available,
+    })
+    .expect("insert text_segment");
     let dual_unit = format!(
         "INSERT INTO membership_assignment (\
             membership_assignment_id, tenant_record_id, document_record_id, \
