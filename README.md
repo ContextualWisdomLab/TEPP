@@ -6,12 +6,15 @@ implemented in Rust.
 
 ## Current implementation state
 
-This branch establishes the Rust workspace and quality-gate foundation. The
-eleven bounded crates compile independently; domain behavior includes immutable
-evidence records and the active stacked cutoff-safe analysis execution slice.
+This branch preserves the protected-main Rust workspace and quality-gate
+foundation, and adds the independently usable `analysis_engine` vertical slice.
+The engine executes bounded cutoff-safe readiness work and emits a
+digest-bound terminal artifact or a redacted no-eligible-evidence result. It is
+active-PR evidence, not a psychometric estimator or a release claim.
 
 ```text
 crates/evidence_core
+crates/semantic_core
 crates/temporal_core
 crates/event_core
 crates/relation_graph
@@ -22,6 +25,43 @@ crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
 crates/analysis_engine
+crates/prompt_source
+crates/corpus_background
+crates/modality_source
+crates/copied_text
+crates/style_source
+crates/stopword_deletion
+crates/copy_identity
+crates/provider_receipt
+crates/intake_authorization
+crates/summarizes_edge
+crates/outcome_order
+crates/retrospective_edge
+crates/payload_bound
+crates/inferred_status
+crates/support_edge
+crates/system_clock
+crates/event_clock
+crates/assertion_clock
+crates/cutoff_clock
+crates/available_clock
+crates/document_clocks
+crates/revision_order
+crates/encrypted_mapping
+crates/citation_edge
+crates/psychometric_fit
+crates/subevent_containment
+crates/prediction_contradiction
+crates/provider_receipt
+crates/operational_log
+crates/service_tls
+crates/derived_sensitivity
+crates/longitudinal_core
+crates/topic_lineage
+crates/network_analysis
+crates/interpretation_gateway
+crates/model_selection
+crates/checkpoint_authority
 ```
 
 ## Local verification
@@ -56,7 +96,3 @@ this skeleton-only slice; it must never conceal uncovered production behavior.
 
 No release, production-readiness, GPU, database, or statistical-recovery claim is
 made by this foundation slice.
-
-The active stacked analysis-engine slice adds a bounded executable readiness path
-from an accepted run to a digest-bound terminal artifact. It is not yet
-implemented-main and does not replace scientific estimator contracts.

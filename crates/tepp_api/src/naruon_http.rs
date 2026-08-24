@@ -116,7 +116,7 @@ pub fn naruon_may_claim_tepp_inference(method_code: &str) -> Result<(), ApiError
     }
 }
 
-fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
+pub(crate) fn compose_https_target(origin: &str, path: &str) -> Result<String, ApiError> {
     require_nonempty(origin)?;
     if !origin.starts_with("https://") {
         return Err(ApiError::InvalidWirePayload);
@@ -210,7 +210,7 @@ fn is_http_field_name(name: &str) -> bool {
         })
 }
 
-fn standard_headers(idempotency_key: &str) -> Vec<(String, String)> {
+pub(crate) fn standard_headers(idempotency_key: &str) -> Vec<(String, String)> {
     vec![
         ("content-type".into(), "application/json".into()),
         ("tepp-consumer".into(), "naruon".into()),
@@ -282,6 +282,11 @@ mod tests {
             compose_https_target("https://ho\u{0001}st", "/v1/x"),
             Err(ApiError::InvalidWirePayload)
         );
+        let c1_control_origin = format!("https://host{}example", char::from_u32(0x80).unwrap());
+        assert_eq!(
+            compose_https_target(&c1_control_origin, "/v1/x"),
+            Err(ApiError::InvalidWirePayload)
+        );
         assert_eq!(
             compose_https_target("https://db.postgres.example", "/v1/x"),
             Err(ApiError::InvalidWirePayload)
@@ -332,6 +337,13 @@ mod tests {
             refuse_credential_headers(&[("x-api-key", "k")]),
             Err(ApiError::AuthorizationDenied)
         );
+        for name in ["x-apikey", "x-api_key", "X-ApiKey", "x-vendor-api-key"] {
+            assert_eq!(
+                refuse_credential_headers(&[(name, "k")]),
+                Err(ApiError::AuthorizationDenied),
+                "header={name}"
+            );
+        }
         assert_eq!(
             refuse_credential_headers(&[("x-github-token", "t")]),
             Err(ApiError::AuthorizationDenied)
