@@ -42,6 +42,8 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/available_clock
+crates/document_clocks
 crates/revision_order
 crates/encrypted_mapping
 crates/citation_edge

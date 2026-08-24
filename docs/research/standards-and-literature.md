@@ -163,6 +163,10 @@ Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communicat
 
 Snodgrass, R. T. (2000). *Developing time-oriented database applications in SQL*. Morgan Kaufmann. Transaction/system time informs `revision_order`; a later recorded revision cannot precede an earlier one.
 
+Jensen, C. S., & Snodgrass, R. T. (1996). Semantics of time-varying information. *Information Systems, 21*(4), 311–352. https://doi.org/10.1016/0306-4379(96)00017-8 Valid time versus transaction/system time informs `document_clocks`; assertion time and document time remain additional TEPP clocks and cannot be omitted or replaced by event or system time.
+
+Snodgrass, R. T. (2000). *Developing time-oriented database applications in SQL*. Morgan Kaufmann. Valid vs transaction time informs `available_clock`; availability is a third TEPP clock.
+
 ## Privacy lifecycle, retention, and legal hold
 
 European Union. (2016). *Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data (General Data Protection Regulation)*. Official Journal of the European Union, L 119, 1–88. https://eur-lex.europa.eu/eli/reg/2016/679/oj

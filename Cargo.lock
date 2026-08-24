@@ -39,6 +39,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
+name = "available_clock"
+version = "0.1.0"
+
+[[package]]
 name = "backtrace"
 version = "0.3.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -235,6 +239,10 @@ dependencies = [
  "quote",
  "syn 3.0.3",
 ]
+
+[[package]]
+name = "document_clocks"
+version = "0.1.0"
 
 [[package]]
 name = "dotenvy"
@@ -979,6 +987,10 @@ dependencies = [
  "temporal_core",
  "uuid",
 ]
+
+[[package]]
+name = "revision_order"
+version = "0.1.0"
 
 [[package]]
 name = "ring"
