@@ -31,9 +31,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | longitudinal within/between decomposition | ADR 0005 | `longitudinal_core` decomposition, component RMSE, and known-truth recovery on the active PR | active-PR |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core`; invariance and ESEM/DSEM fit remain accepted-target | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
-| TDT detection/tracking | ADR 0016; Allan (2002) | future `event_intelligence` | accepted-target |
-| neural event-schema induction and prediction | ADR 0016; Li et al. (2021) | future `event_intelligence` | accepted-target |
-| symbolic qualitative temporal consistency | ADR 0016; Anagnostopoulos et al. (2013) | future `event_intelligence` | accepted-target |
+| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
+| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `provider_receipt` field-code disclosure audit on the active PR; persistence/live HTTP remaining | active-PR |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router plus future `interpretation_gateway` | partial |
 | adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | `tepp_api::route_orchestration` and ablation records implemented-main; live contextual-orchestrator execution remaining | partial |
 | purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | provider-payload minimization, elevated re-identification, retention/deletion, and legal hold implemented-main; `operational_log::try_record` and inspected `audit_event` inserts active-PR; live HTTP/provider adapters remaining | active-PR |

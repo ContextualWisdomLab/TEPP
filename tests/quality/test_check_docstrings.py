@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from scripts import check_workspace_contract as contract
 from scripts import check_docstrings as docstrings
 from scripts import check_workspace_contract as contract
 from scripts import check_workspace_contract as workspace_contract

@@ -33,6 +33,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/provider_receipt
 crates/operational_log
 crates/service_tls
 crates/derived_sensitivity
