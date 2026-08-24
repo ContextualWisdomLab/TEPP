@@ -4,6 +4,9 @@
 **Implementation maturity:** partial — claim/promotion authority documented; repository SBOM/provenance evidence generator and CI validation implemented; checkpoint-versus-estimator refusal is `checkpoint_authority` on the active PR; full package/image release bundle and scientific claim promotion packages remain accepted-target  
 **Implementation maturity:** partial — claim/promotion authority documented; repository SBOM/provenance evidence generator and CI validation implemented; `validation_core` exact-head promotion gates implemented on this PR; full package/image release bundle remains accepted-target
 **Date:** 2026-08-12  
+**Decision status:** Accepted
+**Implementation maturity:** partial — claim/promotion authority documented; repository SBOM/provenance evidence generator and CI validation implemented; checkpoint-versus-estimator refusal is `checkpoint_authority` on the active PR; full package/image release bundle and scientific claim promotion packages remain accepted-target
+**Date:** 2026-08-12
 **Supersedes:** None; extends ADR 0007 from repository quality tooling to product/scientific claim authority.
 
 ## Context

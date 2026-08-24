@@ -6,6 +6,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `revision_order` system-time gate: a higher document revision number cannot carry earlier or equal system time; recovered order flags match known truth at a higher computed rate than accepting every pair (ADR 0002/0013).
+- `encrypted_mapping` purpose-bound AES-256-GCM envelope: source identities are sealed with an operating-system-generated nonce and analytical/key identifiers as authenticated associated data, with a 1 MiB resource bound, so analytical, log, and model-artifact purposes cannot recover plaintext; recovered identities match known truth at a higher computed rate than collapsing every mapping to one name. Persistence and KMS wait for a later migration (ADR 0009).
 - `citation_edge` provenance gate: citation, translation, revision, and retrospective-report edges may point to the past but cannot become input-process-outcome transitions; recovered kinds match known truth at a higher computed rate than collapsing every edge to citation (ADR 0002/0003).
 - `psychometric_fit` CPU `f64` ESEM/DSEM fit: exploratory OLS recovers known cross-loadings from admitted log-ratio or logistic-normal coordinates with computed RMSE below a zero-loading collapse; reverse or zero event-time lagged paths fail closed; a good global fit cannot reclassify formative or network constructs as reflective (ADR 0005). No new migration number (`#45` still owns `0007`).
 - `subevent_containment` parent-window gate: a half-open subevent interval that starts before or ends after its parent cannot attach; recovered containment flags match known truth at a higher computed rate than accepting every child (ADR 0003).

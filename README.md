@@ -18,6 +18,10 @@ and component RMSE APIs; the remaining crates expose no placeholder production
 APIs, and domain behavior for them begins in Task 2 with immutable evidence
 identifiers and source records.
 This branch establishes the Task 1 Rust workspace and quality-gate foundation.
+The eleven bounded crates compile independently; Task 1 includes the
+implemented `encrypted_mapping` crate with AES-256-GCM sealing and
+purpose-bound opening, while the remaining domain behavior begins in Task 2
+with immutable evidence identifiers and source records.
 The eleven bounded crates compile independently. `derived_sensitivity` inherits
 source Restricted/Internal classes onto topic, factor, and relation artifacts
 and fails closed on unknown kinds; derivation and blanket PII masking are not
@@ -38,6 +42,8 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/revision_order
+crates/encrypted_mapping
 crates/citation_edge
 crates/psychometric_fit
 crates/subevent_containment
