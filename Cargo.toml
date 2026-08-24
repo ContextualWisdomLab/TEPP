@@ -36,6 +36,7 @@ members = [
     "crates/system_clock",
     "crates/support_edge",
     "crates/inferred_status",
+    "crates/payload_bound",
 ]
 default-members = [
     "crates/evidence_core",
@@ -73,6 +74,7 @@ default-members = [
     "crates/system_clock",
     "crates/support_edge",
     "crates/inferred_status",
+    "crates/payload_bound",
 ]
 
 [workspace.package]

@@ -48,6 +48,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "system_clock",
     "support_edge",
     "inferred_status",
+    "payload_bound",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (

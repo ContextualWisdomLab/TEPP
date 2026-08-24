@@ -66,6 +66,7 @@ crates/event_clock
 crates/system_clock
 crates/support_edge
 crates/inferred_status
+crates/payload_bound
 ```
 
 ## Local verification

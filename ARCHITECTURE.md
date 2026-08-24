@@ -89,6 +89,7 @@ APIs.
 | `system_clock` | system time cannot be replaced by event, assertion, document, available, or cutoff time |
 | `support_edge` | support, contradiction, summary, and outcome_of edges are not state transitions |
 | `inferred_status` | inferred relations cannot be promoted to observed evidence or transitions |
+| `payload_bound` | untrusted documents, records, checkpoints, and LLM outputs fail closed without identity, provenance, size, and depth |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests
