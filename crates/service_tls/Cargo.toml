@@ -1,0 +1,20 @@
+[package]
+name = "service_tls"
+description = "Production TLS bind gates that refuse plaintext service ports."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+rustls = { workspace = true }
+
+[lints]
+workspace = true
