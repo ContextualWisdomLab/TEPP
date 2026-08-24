@@ -1,6 +1,6 @@
 [package]
 name = "validation_core"
-description = "Recovery, calibration, graph, and Monte Carlo validation metrics."
+description = "Recovery, calibration, graph, Monte Carlo, and exact-head claim-promotion metrics."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

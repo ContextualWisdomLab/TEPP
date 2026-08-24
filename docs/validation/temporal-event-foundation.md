@@ -26,6 +26,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Mention-confidence Brier score | `event_core` | active-PR | calibration vs binary truth | perfect 0 / half 0.25 RMSE | ADR 0003; `docs/research/mention-confidence-brier.md` |
 | Checkpoint is not the estimator | `checkpoint_authority` | accepted-target | active PR | refuse checkpoint-as-estimator + unvalidated artifact + recovery vs estimator collapse | ADR 0001/0014 |
+| Scientific claim promotion gates | `validation_core` | active-PR | this PR | exact-head SHA + computed RMSE SE gate | ADR 0014; full release bundle remaining |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
 | Predicted-vs-observed contradiction | `prediction_contradiction` | active-PR | this PR | `refuse_promotion` requires observed coverage; `refuse_contradiction_or_adjacency` is not promotion authority; cutoff eligibility; label agreement is not RMSE recovery | ADR 0016 |
 | Provider-disclosure receipts | `provider_receipt` | active-PR | this PR | recovered field-code rate vs collapsed set | ADR 0009 |

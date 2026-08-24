@@ -59,7 +59,7 @@ boundaries above remain the target modular MSA architecture.
 | `persistence_postgres` | PostgreSQL repositories and migrations |
 | `corpus_split` | cutoff-safe, relation-aware partitioning |
 | `tepp_simulation` | known-truth temporal/event data generation |
-| `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
+| `validation_core` | RMSE, bias, coverage, graph, Monte Carlo, and exact-head claim-promotion metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
 | `prediction_contradiction` | Allen promotion gate: `before`/`after` stay contradictory; `meets`/`met_by` stay unsupported; coverage is required before unmatched predicted mass may be authorized for promotion |
 | `provider_receipt` | provider-disclosure field-code receipts; source text and identity are not disclosable |
