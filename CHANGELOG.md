@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `style_source` identity gate: house-voice style residue is not unique latent content and is not erased by a stopword list; recovery tests distinguish style from unique content.
 - `stopword_deletion` method gate: a default or global stopword list cannot erase repeated report language; recovery tests distinguish deliberate method treatment from stopword deletion.
 - `copy_identity` identity gate: a template or pasted copy cannot reuse the source document identity or become a state transition; recovery tests distinguish copy kinds from source identity.
 - `intake_authorization` identity gate: documents, serialized records, checkpoints, and LLM outputs require a purpose-bound grant in addition to identity, provenance, size, and depth validation; recovery tests reject ungranted intake.
