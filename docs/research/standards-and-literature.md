@@ -16,7 +16,11 @@ Fox, J.-P., & Glas, C. A. W. (2001). Bayesian estimation of a multilevel IRT mod
 
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. `psychometric_fit` recovers those cross-loadings and event-time lagged paths on a CPU `f64` OLS path; see `docs/research/esem-dsem-fit.md`.
+Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100202
+
+Jones, K. (1991). Specifying and estimating multi-level models for geographical research. *Transactions of the Institute of British Geographers, 16*(2), 148–160. https://doi.org/10.2307/622612
+
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Location and market assignments remain multiple-membership classifications; they are not permanent entity identity and not language channels (Browne et al., 2001; Jones, 1991).
 
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 
