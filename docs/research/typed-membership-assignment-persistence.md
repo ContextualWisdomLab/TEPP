@@ -49,3 +49,6 @@ exactly-one constraints preserve those distinct contexts. Migration
   membership for the same document, asserts those three rows persist,
   and rejects both dual-target and dual observed-unit rows when
   `TEPP_LIVE_POSTGRES=1`.
+- segment-level membership now inserts the observed `text_segment`
+  through the typed adapter rather than ad-hoc SQL. See
+  `docs/research/text-segment-sql.md`.

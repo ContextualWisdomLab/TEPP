@@ -1,0 +1,17 @@
+{
+  "contract_version": 1,
+  "manifest_id": "split-demo-001",
+  "knowledge_cutoff": "2026-03-01T00:00:00Z",
+  "split_policy_version": "relation-aware-v1",
+  "relation_component_digest": "fd9a572d53983a7ff1f3622b7a026abaf5e131f30d87ba63e30e7b8879a389b0",
+  "train_partition_digest": "78d68721debb423cf880232869a63e2522c3dd6187159cbeb15b3ee7e15925f8",
+  "validation_partition_digest": "8b1ae42fc4b17726106d647de9f43a6f33bf1df273310924b03e789769904c9c",
+  "test_partition_digest": "65be554fa6188b181a91caf7ca837eaaa8be5f79dc9a2b9daecb50ac3ed8066f",
+  "included_document_count": 4,
+  "excluded_unavailable_at_cutoff_count": 1,
+  "connected_group_count": 3,
+  "governed_link_kinds": [
+    "translation"
+  ],
+  "split_manifest_digest_sha256": "5804e1ebe12e004be9e2b39f548dd29ae867c1054f7c8841118122b7096a62e2"
+}
