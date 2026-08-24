@@ -68,8 +68,8 @@ crates/network_analysis
 crates/interpretation_gateway
 crates/model_selection
 crates/checkpoint_authority
-crates/episode_membership
 crates/compute_backend
+crates/episode_membership
 ```
 
 ## Local verification
