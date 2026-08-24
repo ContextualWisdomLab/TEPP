@@ -580,6 +580,28 @@ class CoverageContractTests(unittest.TestCase):
             self.assertFalse(coverage_contract.is_executable_source_line(path, 9))
             self.assertFalse(coverage_contract.is_executable_source_line(path, 11))
 
+    def test_multiline_scanner_ignores_comments_char_literals_and_raw_strings(self) -> None:
+        """Quote-like text cannot hide executable lines from the authored-line gate."""
+
+        lines = [
+            "fn escaped_quotes() {",
+            '    let value = source.replace(\'"\', "&quot;"); // a " comment',
+            "    executable_after_char_literal();",
+            '    let raw = r##"payload " quoted"##;',
+            "    raw_continuation_is_data",
+            "    let lifetime = 'a; let multiline = r#\"first",
+            "second\"#;",
+            "    executable_after_raw_string();",
+            "}",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "quotes.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path = str(source)
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 3))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 8))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 7))
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

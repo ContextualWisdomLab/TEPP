@@ -190,26 +190,84 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
 
     LLVM assigns one line location to a multi-line SQL or JSON literal, while
     LCOV can still emit zero-count records for its continuation lines. Those
-    bytes are data, not independently executable Rust statements.
+    bytes are data, not independently executable Rust statements. Rust comments,
+    character literals, and raw-string delimiters are ignored while finding the
+    literal so embedded quote characters cannot hide later production lines.
     """
 
     in_string = False
+    raw_hashes: int | None = None
     for index, line in enumerate(lines, start=1):
-        if index == line_number:
-            if in_string:
-                return True
-            quote_count = sum(
-                character == '"' and (position == 0 or line[position - 1] != "\\")
-                for position, character in enumerate(line)
-            )
-            return quote_count == 1 and line.strip().startswith('"')
+        if index == line_number and in_string:
+            return True
+        stripped = line.strip()
+        started_literal = False
         escaped = False
-        for character in line:
-            if character == '"' and not escaped:
-                in_string = not in_string
-            escaped = character == "\\" and not escaped
-            if character != "\\":
-                escaped = False
+        position = 0
+        while position < len(line):
+            if raw_hashes is not None:
+                if line[position] == '"' and line[position + 1 :].startswith(
+                    "#" * raw_hashes
+                ):
+                    position += raw_hashes + 1
+                    raw_hashes = None
+                    in_string = False
+                else:
+                    position += 1
+                continue
+            if in_string:
+                character = line[position]
+                if character == '"' and not escaped:
+                    in_string = False
+                elif character == "\\" and not escaped:
+                    escaped = True
+                else:
+                    escaped = False
+                position += 1
+                continue
+            if line.startswith("//", position):
+                break
+            if line[position] == "'":
+                char_start = position
+                position += 1
+                char_escaped = False
+                closed_char = False
+                while position < len(line):
+                    character = line[position]
+                    position += 1
+                    if character == "'" and not char_escaped:
+                        closed_char = True
+                        break
+                    char_escaped = character == "\\" and not char_escaped
+                    if character != "\\":
+                        char_escaped = False
+                if not closed_char:
+                    position = char_start + 1
+                continue
+            raw_prefix = None
+            for prefix in ("br", "r"):
+                if line.startswith(prefix, position):
+                    cursor = position + len(prefix)
+                    while cursor < len(line) and line[cursor] == "#":
+                        cursor += 1
+                    if cursor < len(line) and line[cursor] == '"':
+                        raw_prefix = (len(prefix), cursor - position - len(prefix))
+                        break
+            if raw_prefix is not None:
+                prefix_length, hash_count = raw_prefix
+                raw_hashes = hash_count
+                in_string = True
+                started_literal = True
+                position += prefix_length + hash_count + 1
+                continue
+            if line[position] == '"':
+                in_string = True
+                started_literal = True
+            position += 1
+        if index == line_number:
+            return in_string and started_literal and stripped.startswith(
+                ('"', "r\"", "r#", "br\"", "br#")
+            )
     return False
 
 
