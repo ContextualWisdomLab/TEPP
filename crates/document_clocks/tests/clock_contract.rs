@@ -2,8 +2,7 @@
 
 use document_clocks::{
     ClockFamily, DocumentClockError, DocumentClockInstant, DocumentClockRow,
-    clock_completeness_recovery_rate, clocks_are_complete,
-    refuse_omitted_assertion_or_document_time,
+    clock_completeness_recovery_rate, clocks_are_complete, validate_complete_document_clock_row,
 };
 
 fn instant(family: ClockFamily, seconds: i64) -> DocumentClockInstant {
@@ -25,7 +24,7 @@ fn complete_row() -> DocumentClockRow {
 fn omitted_assertion_or_document_time_fails_closed() {
     let complete = complete_row();
     assert!(clocks_are_complete(&complete).expect("complete"));
-    refuse_omitted_assertion_or_document_time(&complete).expect("ok");
+    validate_complete_document_clock_row(&complete).expect("ok");
     assert_eq!(
         DocumentClockRow::new(
             Some(instant(ClockFamily::EventTime, 10)),
@@ -47,7 +46,7 @@ fn omitted_assertion_or_document_time_fails_closed() {
         Err(DocumentClockError::OmittedAssertionOrDocumentTime)
     );
     assert_eq!(
-        refuse_omitted_assertion_or_document_time_from_options(
+        validate_complete_document_clock_row_from_options(
             Some(instant(ClockFamily::EventTime, 10)),
             None,
             None,
@@ -149,7 +148,7 @@ fn empty_or_mismatched_recovery_slices_fail_closed() {
     );
 }
 
-fn refuse_omitted_assertion_or_document_time_from_options(
+fn validate_complete_document_clock_row_from_options(
     event_time: Option<DocumentClockInstant>,
     assertion_time: Option<DocumentClockInstant>,
     document_time: Option<DocumentClockInstant>,
@@ -163,5 +162,5 @@ fn refuse_omitted_assertion_or_document_time_from_options(
         system_time,
         available_time,
     )?;
-    refuse_omitted_assertion_or_document_time(&row)
+    validate_complete_document_clock_row(&row)
 }

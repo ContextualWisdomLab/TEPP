@@ -19,7 +19,7 @@ pub use clocks::DocumentClockRow;
 pub use clocks::clock_completeness_recovery_rate;
 /// Return whether a document row carries every required clock family.
 pub use clocks::clocks_are_complete;
-/// Refuse a document row that omits assertion time or document time.
-pub use clocks::refuse_omitted_assertion_or_document_time;
+/// Validate that a constructed document row retains every required clock.
+pub use clocks::validate_complete_document_clock_row;
 /// Fail-closed document-clock errors.
 pub use error::DocumentClockError;

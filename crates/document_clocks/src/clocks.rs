@@ -156,12 +156,15 @@ pub fn clocks_are_complete(row: &DocumentClockRow) -> Result<bool, DocumentClock
     Ok(true)
 }
 
-/// Refuse a document row that omitted assertion time or document time.
+/// Validate that a constructed document row retains every required clock.
+///
+/// This validator receives a constructed row, so omission is rejected by
+/// [`DocumentClockRow::new`] before a row can reach this function.
 ///
 /// # Errors
 ///
 /// Returns the same family-mismatch error as [`clocks_are_complete`].
-pub fn refuse_omitted_assertion_or_document_time(
+pub fn validate_complete_document_clock_row(
     row: &DocumentClockRow,
 ) -> Result<(), DocumentClockError> {
     clocks_are_complete(row).map(|_| ())
@@ -193,7 +196,7 @@ pub fn clock_completeness_recovery_rate(
 mod tests {
     use super::{
         ClockFamily, DocumentClockInstant, DocumentClockRow, clock_completeness_recovery_rate,
-        clocks_are_complete, refuse_omitted_assertion_or_document_time,
+        clocks_are_complete, validate_complete_document_clock_row,
     };
     use crate::DocumentClockError;
 
@@ -220,7 +223,7 @@ mod tests {
         assert_eq!(row.system_time().epoch_seconds(), 4);
         assert_eq!(row.available_time().epoch_seconds(), 5);
         assert!(clocks_are_complete(&row).expect("complete"));
-        refuse_omitted_assertion_or_document_time(&row).expect("ok");
+        validate_complete_document_clock_row(&row).expect("ok");
     }
 
     #[test]
