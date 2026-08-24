@@ -1,0 +1,22 @@
+[package]
+name = "encrypted_mapping"
+description = "Purpose-bound encrypted identity mappings without plaintext persistence."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+aes-gcm.workspace = true
+getrandom.workspace = true
+sha2.workspace = true
