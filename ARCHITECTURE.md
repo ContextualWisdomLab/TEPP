@@ -61,6 +61,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `derived_sensitivity` | derived topic/factor/relation outputs inherit source sensitivity |
 | `longitudinal_core` | active-PR: within/between decomposition; refuse between-as-within; component RMSE |
 | `topic_lineage` | global topic identity across active/dormant/reactivated states |
 | `network_analysis` | compositional cluster-pair gates; raw simplex is not Euclidean |

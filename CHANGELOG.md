@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `derived_sensitivity` inheritance: topic, factor, and relation artifacts keep the source sensitivity class; unknown kind codes fail closed on both `inherit_sensitivity` and `DerivedArtifact::try_new`; derivation and blanket PII masking cannot declassify to public; paired kind-and-class recovery matches known 3×3 synthetic truth at a higher computed rate than a public collapse (ADR 0009; GDPR Art. 4(1)/Recital 26; WP 136).
 - `longitudinal_core` within/between decomposition: unit means stay between-unit components, occasion residuals stay within-unit change, and recovered components match known truth with lower computed RMSE than a grand-mean pooled collapse.
 - `topic_lineage` global P0 topic identity: activity may become dormant or reactivated without minting a new identity, and recovered identities match known truth at a higher computed rate than mint-on-reactivate replacements.
 - `interpretation_gateway` evidence-bounded LLM interpretations: proposals must cite at least one evidence span, remain hypothetical, cannot become estimator results or observed facts, and a cited interpreter records a lower computed unsupported-claim rate than uncited promotion.
@@ -99,6 +100,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- Grounded `derived_sensitivity` doctoring on GDPR Article 4(1)/Recital 26 and WP29 Opinion 4/2007 (WP 136) as read from the official texts, and replaced the withdrawn ISO/IEC 29100:2011 use-limitation overclaim with the current 29100:2024 catalogue edition without quoting unread clause text.
 - Added APA 7th method citations (Allen 1983; ISO 24617-1:2012; Hobbs & Pan 2017; Fox & Glas 2001; AERA/APA/NCME 2014; Blei & Lafferty 2006; Roberts et al. 2014, 2019; Chang & Blei 2009; Mimno et al. 2009; Asparouhov & Muthén 2009; Asparouhov et al. 2018; Marsh et al. 2014; Aitchison 1982; Allan 2002; Li et al. 2021; Anagnostopoulos et al. 2013) into ADRs 0002–0005, 0012, and 0016, plus TRACEABILITY/ARCHITECTURE/TRD method rows. Clarified that TRSL-TM is the product contract, STM-style logistic-normal is the reference family, ESEM/DSEM/TDT/CHRONOS remain accepted-target, and merged PRs #8/#9—not superseded drafts #5/#6—are the protected-main temporal lineage.
 - Refreshed the live gap-baseline inventory to the 2026-08-24T05:41:54Z GitHub
   snapshot (118 open PRs / 48 drafts / 12 issues; protected-main
