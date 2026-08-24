@@ -86,6 +86,11 @@ Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reaso
 Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434. `temporal_core` owns the thirteen elementary relations and composition; `prediction_contradiction` uses `before`/`after` as contradiction, `meets`/`met_by` as unsupported adjacency, and `during`/`starts`/`finishes`/`equals` as the only coverage relations that can authorize promotion.
 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers.
+Chambers, N., & Jurafsky, D. (2009). Unsupervised learning of narrative schemas and their participants. In *Proceedings of the Joint Conference of the 47th Annual Meeting of the ACL and the 4th International Joint Conference on Natural Language Processing of the AFNLP* (pp. 602–610). Association for Computational Linguistics.
+
+Doddington, G., Mitchell, A., Przybocki, M., Ramshaw, L., Strassel, S., & Weischedel, R. (2004). The Automatic Content Extraction (ACE) program—Tasks, data, and evaluation. In *Proceedings of the Fourth International Conference on Language Resources and Evaluation (LREC’04)* (pp. 837–840). European Language Resources Association.
+
+TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks (Allan, 2002), qualitative temporal reasoning (Anagnostopoulos et al., 2013), and separate neural/symbolic event-schema and narrative participant-slot layers (Chambers & Jurafsky, 2009). Under [ADR 0016](../adr/0016-tdt-chronos-event-intelligence-boundary.md), predicted schema-slot fills stay hypothetical until independently promoted; this is a TEPP policy boundary, not a literature result.
 
 ## Unicode, language tags, and multilingual structure
 

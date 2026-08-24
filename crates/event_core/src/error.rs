@@ -30,6 +30,12 @@ pub enum EventError {
     EventTrackIsNotStateTransition,
     /// An unknown event-track label was supplied.
     UnknownEventTrackLabel,
+    /// A CHRONOS schema prediction was treated as an event instance.
+    SchemaPredictionIsNotEventInstance,
+    /// A CHRONOS schema prediction was treated as a state transition.
+    SchemaPredictionIsNotStateTransition,
+    /// An unknown schema-slot occupancy label was supplied.
+    UnknownSchemaSlotLabel,
 }
 
 impl fmt::Display for EventError {
@@ -47,6 +53,13 @@ impl fmt::Display for EventError {
             Self::EventTrackIsNotEventInstance => "event track is not an event instance",
             Self::EventTrackIsNotStateTransition => "event track is not a state transition",
             Self::UnknownEventTrackLabel => "unknown event track label",
+            Self::SchemaPredictionIsNotEventInstance => {
+                "schema prediction is not an event instance"
+            }
+            Self::SchemaPredictionIsNotStateTransition => {
+                "schema prediction is not a state transition"
+            }
+            Self::UnknownSchemaSlotLabel => "unknown schema slot label",
         };
         formatter.write_str(message)
     }
@@ -97,6 +110,16 @@ mod tests {
             (
                 EventError::UnknownEventTrackLabel,
                 "unknown event track label",
+                EventError::SchemaPredictionIsNotEventInstance,
+                "schema prediction is not an event instance",
+            ),
+            (
+                EventError::SchemaPredictionIsNotStateTransition,
+                "schema prediction is not a state transition",
+            ),
+            (
+                EventError::UnknownSchemaSlotLabel,
+                "unknown schema slot label",
             ),
         ] {
             assert_eq!(error.to_string(), message);

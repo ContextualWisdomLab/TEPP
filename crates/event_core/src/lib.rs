@@ -8,6 +8,8 @@
 //! detections and CHRONOS predictions remain measurement or hypothesis
 //! artifacts until independently promoted.
 //! track assignments remain measurement evidence and cannot promote an instance.
+//! and scientific estimation. Mentions and CHRONOS schema-slot predictions
+//! never silently become instances.
 
 mod confidence;
 mod error;
@@ -18,6 +20,7 @@ mod mention;
 mod registry;
 mod role;
 mod track;
+mod schema;
 
 /// Finite confidence on the closed unit interval.
 pub use confidence::EventConfidence;
@@ -71,3 +74,19 @@ pub use track::tracking_identity_switch_rate;
 pub use track::tracking_pair_precision;
 /// Recall of recovered same-track mention pairs against known truth.
 pub use track::tracking_pair_recall;
+/// Opaque CHRONOS schema-prediction identity.
+pub use schema::SchemaPredictionId;
+/// Predicted or observed filler for one schema slot.
+pub use schema::SchemaSlotAssignment;
+/// Filled-versus-empty occupancy label.
+pub use schema::SchemaSlotLabel;
+/// Threshold a slot-occupancy probability into a fill label.
+pub use schema::decide_schema_slot;
+/// Explicit refusal to treat a schema prediction as an instance.
+pub use schema::refuse_schema_prediction_as_instance;
+/// Explicit refusal to treat a schema prediction as a state transition.
+pub use schema::refuse_schema_prediction_as_transition;
+/// Precision of recovered filled slots against known truth.
+pub use schema::schema_slot_precision;
+/// Recall of recovered filled slots against known truth.
+pub use schema::schema_slot_recall;
