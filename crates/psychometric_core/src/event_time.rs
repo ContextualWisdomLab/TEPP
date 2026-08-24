@@ -2535,8 +2535,10 @@ pub fn refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffu
 /// is not strictly positive,
 /// [`PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveWithinSubjectVariance`]
 /// when `asymDIFFUSION` is zero, and
-/// [`PsychometricError::InvalidNumericInput`] when an input is
-/// non-finite, negative, or the ratio overflows.
+/// [`PsychometricError::InvalidNumericInput`] when the diffusion or
+/// log-rate is non-finite/invalid, an input is non-finite, or the
+/// mapped ratio overflows. Negative intercepts remain valid signed
+/// effects.
 pub fn recover_standardised_discrete_continuous_intercept(
     continuous_intercept: f64,
     continuous_diffusion: f64,

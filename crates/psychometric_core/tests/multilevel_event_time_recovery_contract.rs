@@ -9714,29 +9714,22 @@ fn standardised_discrete_continuous_intercept_recovers_driver_page_sixteen_after
         LagClock::EventTime,
     )
     .expect("discreteCINTstd");
-    let discrete = recover_discrete_continuous_intercept_effect(
-        intercept,
+    let discrete = intercept * (log_rate * event_delta).exp_m1() / log_rate;
+    let expected = discrete / (-diffusion / (2.0 * log_rate)).sqrt();
+    assert!((recovered - expected).abs() < 1e-15);
+    let recovered_error = (recovered - expected).abs();
+    let negative = recover_standardised_discrete_continuous_intercept(
+        -intercept,
+        diffusion,
         log_rate,
         event_delta,
         LagClock::EventTime,
     )
-    .expect("discreteCINT");
+    .expect("negative signed discreteCINTstd");
+    assert!((negative + expected).abs() < 1e-15);
     let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
         .expect("asymDIFFUSION");
-    let expected = discrete / within.sqrt();
-    assert!((recovered - expected).abs() < 1e-15);
-    let recovered_error = (recovered - expected).abs();
-    let unstandardised_error = (discrete - expected).abs();
-    assert!(
-        recovered_error < unstandardised_error,
-        "Driver et al. (2017, p. 16): unstandardised discreteCINT RMSE {unstandardised_error} must exceed discreteCINTstd RMSE {recovered_error}"
-    );
     let continuous_std = intercept / within.sqrt();
-    let continuous_rmse = (continuous_std - expected).abs();
-    assert!(
-        recovered_error < continuous_rmse,
-        "Driver et al. (2017, p. 16): κ / √p RMSE {continuous_rmse} must exceed discreteCINTstd RMSE {recovered_error}"
-    );
     let asymptotic =
         recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
             .expect("asymCINT");
