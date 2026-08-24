@@ -219,6 +219,7 @@ name = "corpus_split"
 version = "0.1.0"
 dependencies = [
  "temporal_core",
+ "unicode-normalization",
  "uuid",
 ]
 
