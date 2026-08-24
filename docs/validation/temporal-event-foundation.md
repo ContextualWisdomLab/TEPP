@@ -15,6 +15,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Immutable evidence + spans | `evidence_core` | implemented-main | — | unit + wire + coverage | Task 2 |
 | Six-clock temporal | `temporal_core` | implemented-main | — | unit + wire | Task 3 / PR #8 |
 | Interval-aware cutoff eligibility | `temporal_core` | active-PR | this PR | unknown/open-ended fail-closed + computed latest-instant agreement | ADR 0002 |
+| Knowledge-cutoff identity | `cutoff_clock` | active-PR | this PR | recovered cutoff flags vs availability-time stand-in | ADR 0002 |
 | Six-clock temporal | `temporal_core` | implemented-main | `document_clocks` omitted assertion/document time | unit + wire | Task 3 / PR #8; document-row clocks on this PR |
 | Knowledge-cutoff identity | `cutoff_clock` | active-PR | this PR | recovered cutoff flags vs availability-time stand-in | ADR 0002 |
 | Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
@@ -28,6 +29,11 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Multiple membership | `membership_core` | partial | — | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Episode membership containment | `episode_membership` | accepted-target | active PR | refuse membership outside episode + recovery vs accept-all | ADR 0003 |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
+| Input-process-outcome event-time order | `outcome_order` | accepted-target | active PR | refuse reverse/uncertain IPO order + outcome_of-is-not-transition + recovery vs input collapse | ADR 0002/0003 |
+| Retrospective reporting identity | `retrospective_edge` | accepted-target | active PR | refuse retrospective-as-transition/translation + recovery vs forward collapse | ADR 0002/0003 |
+| Inferred-versus-observed promotion | `inferred_status` | accepted-target | active PR | refuse inferred-as-observed/transition + recovery vs observed collapse | ADR 0003 |
+| Evidential-vs-transition gate | `support_edge` | active-PR | this PR | recovered kind rate vs support collapse | ADR 0002/0003 |
+| Bitemporal persistence + live SQL port | `persistence_postgres` | partial | backup/restore integrity | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event + concurrent-write (#37–#43 implemented-main) + restore integrity probes (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#43 + restore integrity |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | backup/restore integrity | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event + concurrent-write (#37–#43 implemented-main) + restore integrity probes (#44 implemented-main) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 + restore integrity |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | typed `text_segment` SQL | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event + concurrent-write + restore integrity (#37–#44 implemented-main) + typed `text_segment` insert/cutoff lookup (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 + text-segment SQL |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | — | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` interval and membership contracts + event relation/mention/instance + source-artifact + audit-event + concurrent-write + restore-integrity contracts implemented-main | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 |
@@ -46,6 +52,10 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Scientific claim promotion gates | `validation_core` | active-PR | this PR | exact-head SHA + computed RMSE SE gate | ADR 0014; full release bundle remaining |
 | Causal-identification gate | `relation_graph` | active-PR | association ≠ cause | LeadsTo/References denied | ADR 0003; `docs/research/causal-identification-gate.md` |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Untrusted payload identity/provenance/size/depth | `payload_bound` | accepted-target | active PR | refuse missing identity/provenance and oversize/over-deep payloads + recovery vs accept-all | AGENTS.md untrusted-boundary |
+| System-clock identity | `system_clock` | active-PR | this PR | recovered system flags vs event-time stand-in | ADR 0002 |
+| Event-clock identity | `event_clock` | active-PR | this PR | recovered event flags vs assertion-time stand-in | ADR 0002 |
+| Assertion-clock identity | `assertion_clock` | active-PR | this PR | recovered assertion flags vs event-time stand-in | ADR 0002 |
 | Availability-clock identity | `available_clock` | active-PR | this PR | recovered availability flags vs system-time stand-in | ADR 0002 |
 | Revision system-time order | `revision_order` | active-PR | this PR | order-flag recovery vs accept-all | ADR 0002/0013 |
 | Provenance-vs-transition gate | `citation_edge` | active-PR | this PR | recovered kind rate vs citation collapse | ADR 0002/0003 |

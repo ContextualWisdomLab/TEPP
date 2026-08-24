@@ -61,6 +61,15 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, Monte Carlo, and exact-head claim-promotion metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `outcome_order` | input-process-outcome edges cannot move backward in event time |
+| `retrospective_edge` | retrospective reporting cannot become a transition or a translation |
+| `payload_bound` | untrusted documents, records, checkpoints, and LLM outputs fail closed without identity, provenance, size, and depth |
+| `inferred_status` | inferred relations cannot be promoted to observed evidence or transitions |
+| `support_edge` | support, contradiction, summary, and outcome_of edges are not state transitions |
+| `system_clock` | system time cannot be replaced by event, assertion, document, available, or cutoff time |
+| `event_clock` | event time cannot be replaced by assertion, system, document, or available time |
+| `assertion_clock` | assertion time cannot be replaced by event, system, document, or available time |
+| `cutoff_clock` | knowledge cutoff cannot be replaced by event, system, or availability time |
 | `available_clock` | availability time cannot be replaced by event or system time |
 | `document_clocks` | document rows must carry assertion time and document time |
 | `revision_order` | later document revisions must have later system time |

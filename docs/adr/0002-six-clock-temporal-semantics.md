@@ -1,6 +1,13 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
 **Decision status:** Accepted  
+**Implementation maturity:** partial — typed clocks/intervals are implemented-main (PR #8); input-process-outcome event-time order is `outcome_order` on the active PR; remaining clock-identity and split enforcement stay accepted-target  
+**Implementation maturity:** partial — typed clocks/intervals implemented-main via `temporal_core`; retrospective-reporting identity in `retrospective_edge` on the active PR; downstream transition/split enforcement remains accepted-target  
+**Implementation maturity:** active-PR — evidential-vs-transition gate in `support_edge` on the active PR; remaining graph/split enforcement stays accepted-target  
+**Implementation maturity:** active-PR — system-clock identity in `system_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
+**Implementation maturity:** active-PR — event-clock identity in `event_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
+**Implementation maturity:** active-PR — assertion-clock identity in `assertion_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
+**Implementation maturity:** active-PR — knowledge-cutoff identity in `cutoff_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — availability-clock identity in `available_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — typed clocks/intervals are implemented-main; `document_clocks` refuses omitted assertion time and document time on this PR; downstream transition/split enforcement remains accepted-target  
 **Implementation maturity:** active-PR — provenance-vs-transition gate in `citation_edge` on the active PR; remaining graph/split enforcement stays accepted-target  

@@ -35,6 +35,14 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `inferred_status` inferred-versus-observed identity on the active PR; multilevel estimators remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `episode_membership` containment on the active PR; multilevel estimators remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `location_membership` location-versus-entity/language identity on the active PR; multilevel estimators remaining | partial |
+| immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring; `persistence_postgres` source-artifact SQL insert/lookup plus idempotent retry (#40 implemented-main); `payload_bound` inbound identity/provenance/size/depth on the active PR | partial |
+| Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
+| Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
+| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; `system_clock` system-vs-other-clock identity on the active PR | active-PR |
+| Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
+| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `outcome_order` IPO event-time order on the active PR | partial |
+| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
+| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `inferred_status` inferred-versus-observed identity on the active PR; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | interval-aware historical eligibility (`available_time` fully ≤ cutoff) | ADR 0002 | `temporal_core` `evaluate_historical_eligibility` on the active PR; unknown/open-ended availability fails closed | active-PR |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
