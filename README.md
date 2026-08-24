@@ -44,6 +44,8 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/stopword_deletion
+crates/copy_identity
 crates/provider_receipt
 crates/intake_authorization
 crates/summarizes_edge

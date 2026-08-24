@@ -61,6 +61,8 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `stopword_deletion` | default stopword deletion is not a valid method for repeated report language |
+| `copy_identity` | a template copy is not the source document and not a state transition |
 | `intake_authorization` | untrusted intake fails closed without a grant; bounds are not authorization |
 | `summarizes_edge` | a summary is not a state transition and not the source document |
 | `outcome_order` | input-process-outcome edges cannot move backward in event time |

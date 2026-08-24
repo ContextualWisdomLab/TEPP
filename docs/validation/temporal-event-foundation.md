@@ -27,7 +27,6 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Typed membership targets beyond entity/project | `membership_target` | active-PR | PR #131 | refuse collapse + recovery vs entity stand-in for language, episode, template, department, and opportunity pool | ADR 0003 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | entity/project target SQL on PR #131 | migration contracts + recording transport + session-affine optional PgPool + live CI + tenant RLS + `0005`/`0006` interval/membership contracts + event relation/mention/instance + source-artifact + audit-event + concurrent-write + restore integrity + typed `text_segment` SQL (#37–#44 implemented-main) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 + entity/project SQL |
 
-
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
@@ -65,6 +64,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Adaptive orchestration router | `tepp_api` | partial | — | mode selection, document-control denial, ablation, credential-free bind; live NIM execution remains future | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
+| Default stopword deletion refusal | `stopword_deletion` | accepted-target | active PR | refuse default/global stopword lists + recovery vs stopword collapse | ADR 0004/0012 |
 
 
 ## Scientific acceptance checklist (foundation)
