@@ -358,6 +358,10 @@ fn handle_http_refuses_credential_headers_and_reserved_overrides() {
         ),
         ("cookie", "a=b", 403, "authorization_denied"),
         ("x-api-key", "k", 403, "authorization_denied"),
+        ("x-apikey", "k", 403, "authorization_denied"),
+        ("x-api_key", "k", 403, "authorization_denied"),
+        ("X-ApiKey", "k", 403, "authorization_denied"),
+        ("x-vendor-api-key", "k", 403, "authorization_denied"),
         ("x-github-token", "t", 403, "authorization_denied"),
         ("x-copilot-session", "s", 403, "authorization_denied"),
         (

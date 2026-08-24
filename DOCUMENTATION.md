@@ -5,6 +5,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Area | Canonical document |
 |---|---|
 | Approved product requirements | [`docs/product/prd-v0.4-approved.md`](docs/product/prd-v0.4-approved.md) |
+| Live product and technical gap baseline | [`docs/product-technical-gap-baseline.md`](docs/product-technical-gap-baseline.md) |
 | Whole-conversation documentation fitness | [`docs/DOCUMENTATION_ASSESSMENT.md`](docs/DOCUMENTATION_ASSESSMENT.md) |
 | Technical requirements | [`docs/TRD.md`](docs/TRD.md) |
 | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
@@ -33,6 +34,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Hourly NIM product-development operations | [`docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md`](docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md) |
 | Actions workflow fleet audit | [`docs/operations/ACTIONS_WORKFLOW_FLEET.md`](docs/operations/ACTIONS_WORKFLOW_FLEET.md) |
 | Actions fleet research doctoring | [`docs/research/actions-workflow-fleet.md`](docs/research/actions-workflow-fleet.md) |
+| Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
@@ -59,4 +61,4 @@ The documentation graph is **design-sufficient** when a reviewer can reconstruct
 
 It is **protected-main-sufficient** only after the canonical documents are integrated on protected `main`, remain semantically current with live code, and their required exact-head documentation/security/review gates pass. An active documentation PR can therefore be design-sufficient while the protected branch remains documentation-insufficient.
 
-At the time of this review, immutable evidence records/exact spans, the Rust workspace quality foundation, and typed six-clock values/uncertain intervals (PR #8) are implemented-main. PR #9 is the active-PR that replays Task 4 Allen interval algebra and bounded path-consistency reasoner work onto that protected-main temporal foundation. Superseded PRs #5 and #6 remain historical lineage only. Event ontology, PostgreSQL persistence, shared-latent topic estimation, GPU kernels, TDT/CHRONOS intelligence, longitudinal ESEM/DSEM, visual analytics, production HTTP services, and deployment assurance remain later accepted-target or deployment-owned work.
+As of 2026-08-19, protected `main` at `7c29e7c971d7940e1fb3def1ed3aae2d1bc8ad4a`, immutable evidence records/exact spans, the Rust workspace quality foundation, typed six-clock values/uncertain intervals (merged PR #8), and Allen interval algebra/bounded path-consistency (merged PR #9) are implemented-main. Superseded PRs #5 and #6 remain historical lineage only and are not current-product claims. Shared-latent topic estimation, GPU kernels, TDT/CHRONOS intelligence, longitudinal ESEM/DSEM, visual analytics, production HTTP services, and deployment assurance remain later accepted-target or deployment-owned work unless a [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) row records a narrower implemented-main or partial subset. Unmerged or draft PRs are not implemented-main claims.
