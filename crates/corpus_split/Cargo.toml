@@ -15,6 +15,7 @@ publish = false
 
 [dependencies]
 temporal_core = { path = "../temporal_core", version = "0.1.0" }
+unicode-normalization = "=0.1.25"
 uuid.workspace = true
 
 [dev-dependencies]

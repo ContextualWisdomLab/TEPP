@@ -25,7 +25,7 @@ The persistence layer must provide:
 - tenant isolation and least-privilege access, with row-level policy where the deployment model requires it;
 - idempotent writes, concurrency controls, migration/rollback evidence, backup/restore, retention/deletion/legal-hold behavior, and integrity revalidation after recovery.
 
-A relation-aware split groups revisions, translations, copied/template-derived variants, shared event episodes, or other governed dependency components whenever separation would create leakage. `available_time <= knowledge_cutoff` remains mandatory for every historical partition.
+A relation-aware split groups revisions, translations, copied/template-derived variants, canonically equivalent Unicode bodies, shared event episodes, or other governed dependency components whenever separation would create leakage. `available_time <= knowledge_cutoff` remains mandatory for every historical partition. The active PR #59 adds NFC-based canonical identity and `CanonicalEquivalent` leakage links; this is not an implemented-main claim until protected-main evidence is complete.
 
 ## Alternatives considered
 
