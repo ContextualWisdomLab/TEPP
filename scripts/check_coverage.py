@@ -82,7 +82,7 @@ def is_executable_source_line(
         return False
     if text.startswith("#[") or text.startswith("#!["):
         return False
-    if text in {"{", "}", "},", ")", ");", "];", "();", "};"}:
+    if text in {"{", "}", "},", ");", "];", "();", "};"}:
         return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False
@@ -119,14 +119,32 @@ def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     target_prefix = lines[line_number - 1].strip().partition("=>")[0]
     brace_depth = target_prefix.count("}") - target_prefix.count("{")
     guard_found = False
-    boundary_candidate = False
+    inside_block = False
+    nested_arrow_seen = False
     for candidate in reversed(lines[: line_number - 1]):
         stripped = candidate.strip()
         if brace_depth == 0 and "=>" in stripped:
-            return guard_found and not boundary_candidate
-        if brace_depth == 1 and stripped.endswith("=> {"):
-            boundary_candidate = True
-        brace_depth += stripped.count("}") - stripped.count("{")
+            return guard_found
+        if (
+            inside_block
+            and brace_depth >= 1
+            and stripped.endswith("=> {")
+            and not nested_arrow_seen
+        ):
+            # The opener of the preceding sibling arm sits directly above its
+            # body with no nested match between, so every guard token found so
+            # far belongs to that sibling rather than to this arm.
+            return guard_found
+        if "=>" in stripped and brace_depth >= 1:
+            nested_arrow_seen = True
+        next_depth = brace_depth + stripped.count("}") - stripped.count("{")
+        if brace_depth == 0 < next_depth:
+            inside_block = True
+            nested_arrow_seen = False
+        elif next_depth <= 0 < brace_depth:
+            inside_block = False
+            nested_arrow_seen = False
+        brace_depth = next_depth
         if (
             (stripped.startswith("if ") or stripped.startswith("if("))
             and not stripped.endswith(("}", ";"))
@@ -134,8 +152,8 @@ def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
         ):
             guard_found = True
         if stripped.startswith("match "):
-            return guard_found and not boundary_candidate
-    return guard_found and not boundary_candidate
+            return guard_found
+    return guard_found
 
 
 def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:

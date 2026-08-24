@@ -321,7 +321,7 @@ class CoverageContractTests(unittest.TestCase):
                 "    }",  # 55
                 "}",  # 56
                 "    executable_statement();",  # 57 executable
-                ")",  # 58 standalone structural close
+                ")",  # 58 lone close completes a covered expression statement
                 "pub(crate) fn crate_visible() {",  # 59 visibility-qualified fn
                 "State::Accepted => {",  # 60 match-arm structure
                 "State::Guarded(value) if valid(value) => {",  # 61 guarded arm is executable
@@ -339,7 +339,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 44, 57, 61}
+            expected_executable = {13, 40, 44, 57, 58, 61}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -572,6 +572,29 @@ class CoverageContractTests(unittest.TestCase):
                     ["State::Current", "State::Current => {"],
                     2,
                 )
+            )
+
+            guarded_after_block = Path(temporary) / "guarded_after_block.rs"
+            guarded_after_block.write_text(
+                "match state {\n"
+                "    State::Previous => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "    State::Ready(value)\n"
+                "        if value.is_valid()\n"
+                "        && value.is_fresh() => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(
+                    str(guarded_after_block), 7
+                )
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(guarded_after_block), 2)
             )
 
     def test_cfg_test_and_not_feature_block_helpers(self) -> None:

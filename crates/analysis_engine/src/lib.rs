@@ -280,12 +280,14 @@ pub fn execute_analysis_run(
         });
     }
 
-    // The corpus bound makes this conversion and sum strictly smaller than
-    // `u64::MAX`: 100,000 * u32::MAX is below the 64-bit range.
+    // The corpus bound makes this conversion strictly smaller than
+    // `u64::MAX`; the fold still fails closed through checked arithmetic so a
+    // future bound change cannot wrap membership totals silently.
     let eligible_evidence_count = eligible.len() as u64;
-    let eligible_membership_count = eligible
-        .iter()
-        .fold(0_u64, |sum, unit| sum + u64::from(unit.membership_count));
+    let eligible_membership_count = eligible.iter().try_fold(0_u64, |sum, unit| {
+        sum.checked_add(u64::from(unit.membership_count))
+            .ok_or(AnalysisEngineError::ArithmeticOverflow)
+    })?;
     let (earliest, latest) = eligible.iter().fold(
         (eligible[0].event_time, eligible[0].event_time),
         |(earliest, latest), unit| (earliest.min(unit.event_time), latest.max(unit.event_time)),
