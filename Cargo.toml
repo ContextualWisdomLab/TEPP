@@ -12,6 +12,8 @@ members = [
     "crates/validation_core",
     "crates/tepp_api",
     "crates/interpretation_gateway",
+    "crates/model_selection",
+    "crates/checkpoint_authority",
 ]
 default-members = [
     "crates/evidence_core",
@@ -25,6 +27,8 @@ default-members = [
     "crates/validation_core",
     "crates/tepp_api",
     "crates/interpretation_gateway",
+    "crates/model_selection",
+    "crates/checkpoint_authority",
 ]
 
 [workspace.package]

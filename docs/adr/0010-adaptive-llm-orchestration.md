@@ -34,7 +34,7 @@ Statistical estimation, temporal eligibility, event-relation validity, measureme
 
 ## Security and privacy
 
-Documents cannot change orchestration policy, allowed tools, provider credentials, access lists, or role authority. Calls use evidence-minimized payloads and raw secrets are never exposed to models. Live development/model tests use `NVIDIA_NIM_API_KEY`; `COPILOT_GITHUB_TOKEN` is prohibited. Review-agent identities and credentials remain separate.
+Documents cannot change orchestration policy, allowed tools, provider credentials, access lists, or role authority. Calls use evidence-minimized payloads and raw secrets are never exposed to models. Live scientific/model tests use `NVIDIA_NIM_API_KEY`; the separate hourly proposal gateway exception is governed by ADR 0017 and uses its own all-provider bootstrap. `COPILOT_GITHUB_TOKEN` is prohibited. Review-agent identities and credentials remain separate.
 
 ## Compatibility and migration
 
