@@ -36,6 +36,12 @@ pub enum EventError {
     SchemaPredictionIsNotStateTransition,
     /// An unknown schema-slot occupancy label was supplied.
     UnknownSchemaSlotLabel,
+    /// A TDT story segmentation was treated as an event instance.
+    StorySegmentationIsNotEventInstance,
+    /// A TDT story segmentation was treated as a state transition.
+    StorySegmentationIsNotStateTransition,
+    /// An unknown story-boundary label was supplied.
+    UnknownStoryBoundaryLabel,
 }
 
 impl fmt::Display for EventError {
@@ -60,6 +66,13 @@ impl fmt::Display for EventError {
                 "schema prediction is not a state transition"
             }
             Self::UnknownSchemaSlotLabel => "unknown schema slot label",
+            Self::StorySegmentationIsNotEventInstance => {
+                "story segmentation is not an event instance"
+            }
+            Self::StorySegmentationIsNotStateTransition => {
+                "story segmentation is not a state transition"
+            }
+            Self::UnknownStoryBoundaryLabel => "unknown story boundary label",
         };
         formatter.write_str(message)
     }
@@ -120,6 +133,16 @@ mod tests {
             (
                 EventError::UnknownSchemaSlotLabel,
                 "unknown schema slot label",
+                EventError::StorySegmentationIsNotEventInstance,
+                "story segmentation is not an event instance",
+            ),
+            (
+                EventError::StorySegmentationIsNotStateTransition,
+                "story segmentation is not a state transition",
+            ),
+            (
+                EventError::UnknownStoryBoundaryLabel,
+                "unknown story boundary label",
             ),
         ] {
             assert_eq!(error.to_string(), message);

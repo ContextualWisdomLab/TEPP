@@ -47,6 +47,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | Evidence-layer admission and first-story rates are on the active PR; full TDT tracking/calibration and CHRONOS schema extraction remain accepted-target. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | TDT tracking pair precision/recall and identity-switch rate in existing `event_core`; remaining TDT/CHRONOS stack remains accepted-target. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | CHRONOS schema-slot precision/recall in existing `event_core`; remaining TDT/CHRONOS stack remains accepted-target. |
+| [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | TDT story-segmentation `WindowDiff`/`Pk` in existing `event_core`; remaining TDT/CHRONOS stack remains accepted-target. |
 
 ## Decision ownership summary
 

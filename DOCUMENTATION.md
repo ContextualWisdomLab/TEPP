@@ -40,6 +40,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
 | VRAM budget / GPU fallback doctoring | [`docs/research/vram-budget-types.md`](docs/research/vram-budget-types.md) |
 | Causal-identification gate doctoring | [`docs/research/causal-identification-gate.md`](docs/research/causal-identification-gate.md) |
+| TDT story-segmentation `WindowDiff`/`Pk` doctoring | [`docs/research/tdt-story-segmentation.md`](docs/research/tdt-story-segmentation.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |

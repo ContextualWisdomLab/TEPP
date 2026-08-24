@@ -10,6 +10,8 @@
 //! track assignments remain measurement evidence and cannot promote an instance.
 //! and scientific estimation. Mentions and CHRONOS schema-slot predictions
 //! never silently become instances.
+//! and scientific estimation. Mentions and TDT story segmentations never
+//! silently become instances.
 
 mod confidence;
 mod error;
@@ -21,6 +23,7 @@ mod registry;
 mod role;
 mod track;
 mod schema;
+mod segment;
 
 /// Finite confidence on the closed unit interval.
 pub use confidence::EventConfidence;
@@ -90,3 +93,21 @@ pub use schema::refuse_schema_prediction_as_transition;
 pub use schema::schema_slot_precision;
 /// Recall of recovered filled slots against known truth.
 pub use schema::schema_slot_recall;
+/// TDT story-boundary versus continuation label.
+pub use segment::StoryBoundaryLabel;
+/// Ordered TDT story/event segmentation.
+pub use segment::StorySegmentation;
+/// Threshold a boundary probability into a detection label.
+pub use segment::decide_story_boundary;
+/// Explicit refusal to treat a story segmentation as an instance.
+pub use segment::refuse_story_segmentation_as_instance;
+/// Explicit refusal to treat a story segmentation as a state transition.
+pub use segment::refuse_story_segmentation_as_transition;
+/// Precision of recovered interior story boundaries against known truth.
+pub use segment::story_boundary_precision;
+/// Recall of recovered interior story boundaries against known truth.
+pub use segment::story_boundary_recall;
+/// Beeferman Pk against a known-truth segmentation.
+pub use segment::story_pk;
+/// Pevzner–Hearst `WindowDiff` against a known-truth segmentation.
+pub use segment::story_window_diff;
