@@ -24,6 +24,12 @@ pub enum EventError {
     DetectionIsNotTransition,
     /// A CHRONOS prediction was treated as an observed or promoted fact.
     PredictionIsNotFact,
+    /// A TDT track assignment was treated as an event instance.
+    EventTrackIsNotEventInstance,
+    /// A TDT track assignment was treated as a state transition.
+    EventTrackIsNotStateTransition,
+    /// An unknown event-track label was supplied.
+    UnknownEventTrackLabel,
 }
 
 impl fmt::Display for EventError {
@@ -38,6 +44,9 @@ impl fmt::Display for EventError {
             Self::UnknownEventRole => "unknown event role",
             Self::DetectionIsNotTransition => "detection is not a state transition",
             Self::PredictionIsNotFact => "prediction is not an observed fact",
+            Self::EventTrackIsNotEventInstance => "event track is not an event instance",
+            Self::EventTrackIsNotStateTransition => "event track is not a state transition",
+            Self::UnknownEventTrackLabel => "unknown event track label",
         };
         formatter.write_str(message)
     }
@@ -78,6 +87,16 @@ mod tests {
             (
                 EventError::PredictionIsNotFact,
                 "prediction is not an observed fact",
+                EventError::EventTrackIsNotEventInstance,
+                "event track is not an event instance",
+            ),
+            (
+                EventError::EventTrackIsNotStateTransition,
+                "event track is not a state transition",
+            ),
+            (
+                EventError::UnknownEventTrackLabel,
+                "unknown event track label",
             ),
         ] {
             assert_eq!(error.to_string(), message);

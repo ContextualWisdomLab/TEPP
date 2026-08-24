@@ -18,6 +18,8 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
 | Multiple membership | `membership_core` | partial | nested ICC + non-nested refusal | unit + ESS + nested ICC recovery | Task 7 / PR #12 + #25 + this increment |
+| TDT tracking stability | `event_core` | active-PR | this PR | pair P/R + switch rate + RMSE vs always-one-track | ADR 0016; `docs/research/event-tracking-calibration.md` |
+| Multiple membership | `membership_core` | partial | — | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | backup/restore integrity | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event + concurrent-write (#37–#43 implemented-main) + restore integrity probes (#44 implemented-main) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 + restore integrity |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | typed `text_segment` SQL | migration contracts + recording transport + optional PgPool + live CI + tenant RLS + `0005`/`0006` + event relation/mention/instance + source-artifact + audit-event + concurrent-write + restore integrity (#37–#44 implemented-main) + typed `text_segment` insert/cutoff lookup (active PR) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 + text-segment SQL |

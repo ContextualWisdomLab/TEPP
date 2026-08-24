@@ -7,6 +7,7 @@
 //! and scientific estimation. Mentions never silently become instances. TDT
 //! detections and CHRONOS predictions remain measurement or hypothesis
 //! artifacts until independently promoted.
+//! track assignments remain measurement evidence and cannot promote an instance.
 
 mod confidence;
 mod error;
@@ -16,6 +17,7 @@ mod intelligence;
 mod mention;
 mod registry;
 mod role;
+mod track;
 
 /// Finite confidence on the closed unit interval.
 pub use confidence::EventConfidence;
@@ -51,3 +53,21 @@ pub use mention::EventMention;
 pub use registry::EventRegistry;
 /// Typed event role kind.
 pub use role::EventRoleKind;
+/// Assignment of one mention to one hypothesized TDT track.
+pub use track::EventTrackAssignment;
+/// Opaque TDT track identity.
+pub use track::EventTrackId;
+/// TDT continue-versus-switch track label.
+pub use track::EventTrackLabel;
+/// Threshold a same-track probability into a continue/switch label.
+pub use track::decide_track_continue;
+/// Explicit refusal to treat a TDT track as an event instance.
+pub use track::refuse_track_as_instance;
+/// Explicit refusal to treat a TDT track as a state transition.
+pub use track::refuse_track_as_transition;
+/// Identity-switch rate among consecutive same-truth-track mentions.
+pub use track::tracking_identity_switch_rate;
+/// Precision of recovered same-track mention pairs against known truth.
+pub use track::tracking_pair_precision;
+/// Recall of recovered same-track mention pairs against known truth.
+pub use track::tracking_pair_recall;
