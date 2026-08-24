@@ -1079,6 +1079,26 @@ pub enum PsychometricError {
     /// `asymCINTstd`. A finite event interval is not the
     /// `Δt → ∞` intercept change.
     StandardisedDiscreteContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept,
+    /// Driver p. 16 `T0MEANSstd` was requested with a
+    /// non-positive first-occasion variance. Footnote 4
+    /// standardisation of the 2017-era `T0MEANS` vector
+    /// requires strictly positive free `T0VAR`.
+    StandardisedInitialLatentMeanRequiresPositiveInitialLatentVariance,
+    /// Driver Table 2 unstandardised `T0MEANS` `μ_0` was treated
+    /// as `T0MEANSstd`. Unstandardised first-occasion mean is
+    /// defined for a zero first-occasion variance; standardised
+    /// `T0MEANS` is not.
+    UnstandardisedInitialLatentMeanIsNotStandardisedInitialLatentMean,
+    /// Driver p. 16 `T0VARstd` was treated as p. 16 `T0MEANSstd`.
+    /// Equal numbers when `μ_0 = √p_0` are still distinct named
+    /// quantities. `T0VARstd` is the correlation form of free
+    /// `T0VAR`; `T0MEANSstd` is the first-occasion mean.
+    StandardisedInitialLatentVarianceIsNotStandardisedInitialLatentMean,
+    /// Driver p. 16 `T0MEANS` `/ √asymDIFFUSION` was treated as
+    /// `T0MEANSstd`. Footnote 4 standardises the first-occasion
+    /// mean using free `T0VAR`, not process-dynamics
+    /// `asymDIFFUSION`.
+    WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1861,6 +1881,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::StandardisedDiscreteContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept => {
                 "standardised discrete continuous intercept is not standardised asymptotic continuous intercept"
+            }
+            Self::StandardisedInitialLatentMeanRequiresPositiveInitialLatentVariance => {
+                "standardised initial latent mean requires strictly positive initial latent variance"
+            }
+            Self::UnstandardisedInitialLatentMeanIsNotStandardisedInitialLatentMean => {
+                "unstandardised initial latent mean is not standardised initial latent mean"
+            }
+            Self::StandardisedInitialLatentVarianceIsNotStandardisedInitialLatentMean => {
+                "standardised initial latent variance is not standardised initial latent mean"
+            }
+            Self::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean => {
+                "within-subject scaled initial latent mean is not standardised initial latent mean"
             }
         };
         formatter.write_str(message)
@@ -3215,6 +3247,30 @@ mod tests {
             PsychometricError::StandardisedDiscreteContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept
                 .to_string(),
             "standardised discrete continuous intercept is not standardised asymptotic continuous intercept"
+        );
+    }
+
+    #[test]
+    fn standardised_initial_latent_mean_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentMeanRequiresPositiveInitialLatentVariance
+                .to_string(),
+            "standardised initial latent mean requires strictly positive initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedInitialLatentMeanIsNotStandardisedInitialLatentMean
+                .to_string(),
+            "unstandardised initial latent mean is not standardised initial latent mean"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedInitialLatentMean
+                .to_string(),
+            "standardised initial latent variance is not standardised initial latent mean"
+        );
+        assert_eq!(
+            PsychometricError::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean
+                .to_string(),
+            "within-subject scaled initial latent mean is not standardised initial latent mean"
         );
     }
 }
