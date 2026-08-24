@@ -5,6 +5,12 @@ use crate::profile::LanguageProfile;
 use evidence_core::{EvidenceId, SourceSpan};
 
 /// Exact-span identity of one semantic unit.
+///
+/// Identity is `(document_id, byte_start, byte_end)`. Scalar character
+/// coordinates are derived deterministically from byte coordinates inside one
+/// document encoding, so they add no distinguishing power; page or layout
+/// positions are presentation metadata that may vary across renderings and
+/// therefore stay outside identity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SemanticIdentity {
     document_id: EvidenceId,

@@ -24,9 +24,12 @@ impl LanguageProfile {
 
     /// Parse a primary language subtag with an optional region.
     ///
-    /// Accepts two or three ASCII letters, optionally followed by a hyphen and
-    /// a two-letter region. The stored form is lowercase. Empty tags and any
-    /// other shape fail closed. The tag never becomes a [`crate::SemanticIdentity`].
+    /// Accepts a two- or three-letter primary language subtag, optionally
+    /// followed by a hyphen and either an ISO 3166-1 alpha-2 region or a
+    /// three-digit UN M.49 numeric region (Phillips & Davis, 2009, section
+    /// 2.2.4; for example `es-419`). The stored form is lowercase. Empty tags
+    /// and any other shape fail closed. The tag never becomes a
+    /// [`crate::SemanticIdentity`].
     ///
     /// # Errors
     ///
@@ -59,11 +62,24 @@ impl LanguageProfile {
     }
 }
 
+/// Validate a primary language tag per RFC 5646 sections 2.2.1 and 2.2.4.
+///
+/// A region may be an ISO 3166-1 alpha-2 code or a UN M.49 three-digit
+/// numeric subtag; both are accepted here so regional variants such as
+/// Latin-American Spanish resolve instead of failing closed.
 fn is_primary_language_tag(tag: &str) -> bool {
     match tag.split_once('-') {
         None => is_letter_run(tag, 2, 3),
-        Some((language, region)) => is_letter_run(language, 2, 3) && is_letter_run(region, 2, 2),
+        Some((language, region)) => {
+            is_letter_run(language, 2, 3)
+                && (is_letter_run(region, 2, 2) || is_numeric_region(region))
+        }
     }
+}
+
+/// Return whether `region` is exactly three ASCII digits.
+fn is_numeric_region(region: &str) -> bool {
+    region.len() == 3 && region.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 fn is_letter_run(value: &str, min: usize, max: usize) -> bool {
@@ -82,6 +98,14 @@ mod tests {
         assert!(!korean.is_unresolved());
         let tagged = LanguageProfile::parse_bcp47("en-US").expect("en-us");
         assert_eq!(tagged.as_str(), "en-us");
+        let numeric = LanguageProfile::parse_bcp47("es-419").expect("es-419");
+        assert_eq!(numeric.as_str(), "es-419");
+        assert_eq!(
+            LanguageProfile::parse_bcp47("ES-419")
+                .expect("upper")
+                .as_str(),
+            "es-419"
+        );
         assert_eq!(
             LanguageProfile::parse_bcp47("yue").expect("yue").as_str(),
             "yue"
@@ -120,6 +144,18 @@ mod tests {
         );
         assert_eq!(
             LanguageProfile::parse_bcp47("e-us").unwrap_err(),
+            SemanticError::InvalidLanguageTag
+        );
+        assert_eq!(
+            LanguageProfile::parse_bcp47("es-41a").unwrap_err(),
+            SemanticError::InvalidLanguageTag
+        );
+        assert_eq!(
+            LanguageProfile::parse_bcp47("es-41").unwrap_err(),
+            SemanticError::InvalidLanguageTag
+        );
+        assert_eq!(
+            LanguageProfile::parse_bcp47("es-4199").unwrap_err(),
             SemanticError::InvalidLanguageTag
         );
         let unresolved = LanguageProfile::unresolved();

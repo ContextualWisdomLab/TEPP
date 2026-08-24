@@ -46,10 +46,18 @@ class WorkspaceContractTests(unittest.TestCase):
             REPOSITORY_ROOT / "docs" / "research" / "standards-and-literature.md"
         ).read_text(encoding="utf-8")
         self.assertEqual(text.count("RFC 5646"), 1)
+
+    def test_member_paths_match_expected_crates(self) -> None:
+        """Workspace members resolve to the approved crate roots by name."""
+
         self.assertEqual(
             contract.expected_member_paths(),
             [f"crates/{name}" for name in contract.EXPECTED_CRATES],
         )
+
+    def test_placeholder_api_detection_boundaries(self) -> None:
+        """Real APIs pass and placeholder or todo bodies are refused."""
+
         self.assertFalse(contract._contains_placeholder_api("//! documented\n"))
         self.assertFalse(
             contract._contains_placeholder_api("/// Real API.\npub struct EvidenceId;\n")
@@ -63,6 +71,10 @@ class WorkspaceContractTests(unittest.TestCase):
         self.assertTrue(
             contract._contains_placeholder_api("fn private() { unimplemented!() }\n")
         )
+
+    def test_mapping_normalizes_only_toml_tables(self) -> None:
+        """TOML tables map to dictionaries; other shapes fail to empty maps."""
+
         self.assertEqual(contract._mapping({"key": "value"}), {"key": "value"})
         self.assertEqual(contract._mapping("not-a-table"), {})
 
