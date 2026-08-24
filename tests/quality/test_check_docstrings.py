@@ -10,10 +10,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from scripts import check_workspace_contract as contract
 from scripts import check_docstrings as docstrings
 from scripts import check_workspace_contract as contract
-from scripts import check_workspace_contract as workspace_contract
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -27,6 +25,11 @@ class DocstringContractTests(unittest.TestCase):
 
         sources = docstrings.rust_sources(REPOSITORY_ROOT)
         crate_roots = sorted(REPOSITORY_ROOT.glob("crates/*/src/lib.rs"))
+        self.assertEqual(
+            len(set(contract.EXPECTED_CRATES)),
+            len(contract.EXPECTED_CRATES),
+            "workspace crate inventory must not contain duplicate entries",
+        )
         self.assertEqual(len(crate_roots), 11)
         self.assertEqual(len(crate_roots), len(contract.EXPECTED_CRATES))
         self.assertEqual(len(crate_roots), 11)
@@ -36,8 +39,7 @@ class DocstringContractTests(unittest.TestCase):
             for path in contract.expected_member_paths()
         }
         self.assertEqual(set(crate_roots), expected_crate_roots)
-        self.assertEqual(len(crate_roots), 11)
-        self.assertEqual(len(crate_roots), len(workspace_contract.EXPECTED_CRATES))
+        self.assertEqual(len(crate_roots), len(contract.EXPECTED_CRATES))
         self.assertTrue(set(crate_roots).issubset(sources))
         self.assertGreaterEqual(len(sources), len(crate_roots))
         self.assertEqual(docstrings.validate_repository(REPOSITORY_ROOT), [])
