@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `document_clocks` six-clock gate: a document analytical row cannot omit assertion time or document time, and event/system time cannot stand in for those clocks; recovered completeness flags match known truth at a higher computed rate than treating every row as complete (ADR 0002/0013).
 - `revision_order` system-time gate: a higher document revision number cannot carry earlier or equal system time; recovered order flags match known truth at a higher computed rate than accepting every pair (ADR 0002/0013).
 - `encrypted_mapping` purpose-bound AES-256-GCM envelope: source identities are sealed with an operating-system-generated nonce and analytical/key identifiers as authenticated associated data, with a 1 MiB resource bound, so analytical, log, and model-artifact purposes cannot recover plaintext; recovered identities match known truth at a higher computed rate than collapsing every mapping to one name. Persistence and KMS wait for a later migration (ADR 0009).
 - `citation_edge` provenance gate: citation, translation, revision, and retrospective-report edges may point to the past but cannot become input-process-outcome transitions; recovered kinds match known truth at a higher computed rate than collapsing every edge to citation (ADR 0002/0003).

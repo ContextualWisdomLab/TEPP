@@ -61,6 +61,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `document_clocks` | document rows must carry assertion time and document time |
 | `revision_order` | later document revisions must have later system time |
 | `encrypted_mapping` | purpose-bound in-memory AES-256-GCM identity mappings; no plaintext persistence or KMS integration |
 | `citation_edge` | citation, revision, translation, and retrospective edges are not state transitions |
