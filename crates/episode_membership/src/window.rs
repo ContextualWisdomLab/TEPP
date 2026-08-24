@@ -68,13 +68,12 @@ pub fn identity_recovery_rate(
     if truth.is_empty() || truth.len() != decided.len() {
         return Err(EpisodeMembershipError::InvalidEpisodePayload);
     }
-    let mut matches = 0_u32;
-    for (truth_flag, decided_flag) in truth.iter().zip(decided) {
-        if truth_flag == decided_flag {
-            matches += 1;
-        }
-    }
-    Ok(f64::from(matches) / truth.len() as f64)
+    let matches = truth
+        .iter()
+        .zip(decided)
+        .filter(|(truth_flag, decided_flag)| truth_flag == decided_flag)
+        .count();
+    Ok(matches as f64 / truth.len() as f64)
 }
 
 #[cfg(test)]
