@@ -54,6 +54,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "provider_receipt",
     "intake_authorization",
     "copy_identity",
+    "stopword_deletion",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (

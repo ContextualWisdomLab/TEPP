@@ -43,6 +43,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | TDT story-segmentation `WindowDiff`/`Pk` doctoring | [`docs/research/tdt-story-segmentation.md`](docs/research/tdt-story-segmentation.md) |
 | CHRONOS prediction-calibration doctoring | [`docs/research/chronos-prediction-calibration.md`](docs/research/chronos-prediction-calibration.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
+| Stopword-deletion doctoring | [`docs/research/stopword-deletion.md`](docs/research/stopword-deletion.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |

@@ -74,6 +74,7 @@ crates/summarizes_edge
 crates/provider_receipt
 crates/intake_authorization
 crates/copy_identity
+crates/stopword_deletion
 ```
 
 ## Local verification

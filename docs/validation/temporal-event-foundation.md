@@ -76,6 +76,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Adaptive orchestration router | `tepp_api` | partial | — | mode selection, document-control denial, ablation, credential-free bind; live NIM execution remains future | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
+| Default stopword deletion refusal | `stopword_deletion` | accepted-target | active PR | refuse default/global stopword lists + recovery vs stopword collapse | ADR 0004/0012 |
 
 
 ## Scientific acceptance checklist (foundation)

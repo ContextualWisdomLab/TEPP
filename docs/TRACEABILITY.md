@@ -46,6 +46,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004 | future `topic_measurement` | accepted-target |
 | global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | `topic_lineage` activity/dormancy/reactivation identity on the active PR; birth/split/merge remaining | active-PR |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
+| global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
+| no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | `stopword_deletion` default-list refusal on the active PR; TF-IDF/BM25 inferential-weight refusal remains accepted-target | partial |
 | report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
 | candidate K statistical/Pareto gates + blinded LLM review | ADR 0012; research | future `model_selection` | accepted-target |
 | compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
