@@ -1,7 +1,8 @@
 # ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
 
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** active-PR — CPU `f64` ESEM loading recovery and event-time DSEM lag gates in `psychometric_fit` on the active PR; `psychometric_core` input gates remain #49; longitudinal invariance and multilevel estimators remain accepted-target  
+**Implementation maturity:** active-PR — `longitudinal_core` separates unit means from within residuals and refuses between-as-within change; remaining ESEM/DSEM fit remains accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs upstream topic measurement/network coordinates; this ADR governs higher-order psychometric structure and longitudinal interpretation.
 
@@ -13,11 +14,13 @@ TEPP also needs to distinguish stable between-unit differences from within-unit 
 
 ## Decision
 
-Topic proportions are not treated as error-free ordinary indicators. TEPP uses logistic-normal latent coordinates or valid orthonormal log-ratio coordinates and propagates topic posterior uncertainty through plausible values or a joint text-measurement/structural model.
+Topic proportions are not treated as error-free ordinary indicators. Compositional parts are not ordinary Euclidean measurements (Aitchison, 1982). TEPP uses logistic-normal latent coordinates or valid orthonormal log-ratio coordinates and propagates topic posterior uncertainty through plausible values or a joint text-measurement/structural model.
 
-Before ESEM/SEM interpretation, each higher-order construct is classified as reflective, formative/composite, network, or unresolved. Reflective indicators may use ESEM/set-ESEM; formative structures use composite/formative models; interacting structures use network models. A good global fit statistic is not authority to reinterpret a formative/network structure as reflective.
+Before ESEM/SEM interpretation, each higher-order construct is classified as reflective, formative/composite, network, or unresolved. Reflective indicators may use exploratory structural equation modeling (Asparouhov & Muthén, 2009; Marsh et al., 2014); formative structures use composite/formative models; interacting structures use network models. A good global fit statistic is not authority to reinterpret a formative/network structure as reflective.
 
-Longitudinal analysis evaluates measurement invariance at the level needed for the claimed comparison, supports partial/approximate or time-varying loadings where scientifically justified, separates stable between-unit components from within-unit temporal change, and handles irregular intervals through appropriate discrete- or continuous-time dynamics.
+Longitudinal analysis evaluates measurement invariance at the level needed for the claimed comparison (American Educational Research Association, American Psychological Association, & National Council on Measurement in Education, 2014), supports partial/approximate or time-varying loadings where scientifically justified, separates stable between-unit components from within-unit temporal change, and handles irregular intervals through dynamic structural equation models (Asparouhov et al., 2018).
+
+This ADR remains **accepted-target**. Naming ESEM/DSEM and compositional coordinates as the model-family contract is not a protected-main implementation claim.
 
 Input/process/intervention/outcome paths obey event-time order. Temporal precedence, document linkage, event tracking, or model prediction alone do not justify causal language.
 
@@ -57,3 +60,15 @@ Synthetic studies recover loadings, cross-loadings, factors, lagged/direct/indir
 ## Rollback and supersession
 
 Rollback selects the last validated structural-model version and compatible upstream model artifact. Supersede only if a later decision preserves explicit construct classification, uncertainty propagation, invariance/longitudinal evidence, and claim discipline or deliberately changes those estimands with a PRD update.
+
+## References
+
+Aitchison, J. (1982). The statistical analysis of compositional data. *Journal of the Royal Statistical Society: Series B, 44*(2), 139–177. https://doi.org/10.1111/j.2517-6161.1982.tb01195.x
+
+American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
+
+Asparouhov, T., Hamaker, E. L., & Muthén, B. (2018). Dynamic structural equation models. *Structural Equation Modeling, 25*(3), 359–388. https://doi.org/10.1080/10705511.2017.1406803
+
+Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. *Structural Equation Modeling, 16*(3), 397–438. https://doi.org/10.1080/10705510903008204
+
+Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
