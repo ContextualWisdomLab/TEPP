@@ -7,6 +7,35 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ### Added
 
 - `subevent_containment` parent-window gate: a half-open subevent interval that starts before or ends after its parent cannot attach; recovered containment flags match known truth at a higher computed rate than accepting every child (ADR 0003).
+- `prediction_contradiction` promotion gate: `temporal_core` Allen classification refuses `before`/`after` as contradiction and `meets`/`met_by` as unsupported adjacency; `refuse_promotion` and `require_observed_coverage` refuse partial overlap that leaves unmatched predicted mass; `refuse_contradiction_or_adjacency` is the weaker contradiction/adjacency filter only; evidence available after the knowledge cutoff is ineligible. Label agreement is not RMSE recovery (ADR 0002, ADR 0016). Canonical docs name the crate, not a pull-request number, as the landable authority; `scripts/validate_documentation.py` fail-closes on `landable coverage gate is PR #N` and inverted or paraphrased forms (`PR #N is the landable coverage gate`, `the landable gate is PR #N`, `coverage-authority landing PR #N`, `merge PR #N as the coverage-authority`) including drafts #93, #94, #97, #101, #102, #104, #108, #109, #111, and #112. The hourly queue lock also fail-closes when those drafts are omitted from Keep-unmerged sentences, when a Keep-unmerged sentence is negated, or when the naruon live-HTTP *subject* is not PR #107 with #87 and #105 kept unmerged.
+- `provider_receipt` disclosure audit: a receipt records purpose and field codes sent to a model provider; source text, source identity, and blanket PII masking fail closed; recovered field codes match known truth at a higher computed rate than a collapsed set (ADR 0009).
+- `tepp_api` corpus-split leakage-audit manifest v1: cutoff exclusion counts, relation-component and partition digests, governed link-kind vocabulary, and a canonical `SHA-256` that binds to `corpus_split_manifest` without exporting source text.
+- `persistence_postgres` `audit_event` inserts call `operational_log::try_record` before SQL is rendered: author/customer/project source text, source identity, and blanket-mask grants cannot enter `INSERT INTO audit_event`; clear inspection still persists a validated action code (ADR 0009; ISO/IEC 29100:2024). No new migration number. `OperationalLogRecord::new` stays crate-private.
+- `operational_log` source separation: `try_record` is the only recording API and inspects source text, source identity, and blanket-mask intent before creating a line; `OperationalLogRecord::new` is crate-private; a source-identity `&str` cannot become an `AnalyticalSubject`; privileged-export / identity-mapping / diagnosis action codes keep author, customer, and project memberships distinct; replayed lines match known truth at a higher computed rate than a collapsed single-action or collapsed-subject log (ADR 0009; ISO/IEC 29100:2024). The live docstring crate-root count is bound to `EXPECTED_CRATES` so the eleventh crate cannot fail a hard-coded `10`.
+- `service_tls` production TLS bind gates: non-loopback binds require rustls PEM material, loopback HTTP is development-only, orchestrator live ports refuse loopback plaintext, and table-access host labels fail closed. `TlsBindRequest` Debug output redacts certificate and private-key PEM. Recovered bind decisions are computed from `authorize_production_tls` / `authorize_orchestrator_live_port` outputs and match known truth at a higher rate than a collapsed production grant (ADR 0011).
+- `derived_sensitivity` inheritance: topic, factor, and relation artifacts keep the source sensitivity class; unknown kind codes fail closed on both `inherit_sensitivity` and `DerivedArtifact::try_new`; derivation and blanket PII masking cannot declassify to public; paired kind-and-class recovery matches known 3×3 synthetic truth at a higher computed rate than a public collapse (ADR 0009; GDPR Art. 4(1)/Recital 26; WP 136).
+- `longitudinal_core` within/between decomposition: unit means stay between-unit components, occasion residuals stay within-unit change, and recovered components match known truth with lower computed RMSE than a grand-mean pooled collapse.
+- `topic_lineage` global P0 topic identity: activity may become dormant or reactivated without minting a new identity, and recovered identities match known truth at a higher computed rate than mint-on-reactivate replacements.
+- `interpretation_gateway` evidence-bounded LLM interpretations: proposals must cite at least one evidence span, remain hypothetical, cannot become estimator results or observed facts, and a cited interpreter records a lower computed unsupported-claim rate than uncited promotion.
+- `model_selection` candidate-`K` gates: statistical candidates require `K >= 2` and finite held-out log-likelihood/complexity, a Pareto front excludes dominated alternatives, LLM votes cannot define the numerical optimum, and selected `K` recovers known truth with computed RMSE.
+- `event_core` mention-confidence Brier score: known-truth binary outcomes recover a computed Brier of 0 for perfect forecasts and 0.25 for constant 0.5, with empty or mismatched streams failing closed.
+- `membership_core` nested ICC: CPU `f64` unbalanced ANOVA recovers a known cluster ICC and refuses to treat cross-classified or multiple-membership designs as a single hierarchy (ADR 0003).
+- `persistence_postgres` typed `text_segment` SQL: insert/lookup of exact UTF-8 half-open byte spans on the existing `0006` table, cutoff-eligible document reads (`available_time <= knowledge_cutoff`), and live recovery of a known `hello` span. No new migration number (`#45` still owns `0007`).
+- Hourly contextual-orchestrator discovery records all provider models but routes OpenCode only through general-chat candidates, excluding embedding, image, reranker, transcription, moderation, safety, and other endpoint-only identifiers before price selection.
+- Live `docs/product-technical-gap-baseline.md` mapping operator-visible gaps to
+  protected-main maturity, exact current PR/issue state, stacked delivery order,
+  and closure evidence; placeholder-only issues #161 and #162 were closed as
+  queue hygiene. The documentation validator requires a dated UTC snapshot, a
+  40-character protected-main SHA, an exact-head inventory matching the declared
+  open-PR count, and operator-gap closure evidence, and it rejects affirmative
+  queued-Checks-as-implemented-main claims even when wrapped across a line
+  break, and it rejects an unrelated `not` in the same span (`queued Checks are
+  not required; this PR is implemented-main`). Only never/do not/does not/
+  cannot/must not plus promote/treat/make/mean counts as a promotion denial.
+- `checkpoint_authority` estimator gate: a model checkpoint remains an untrusted run artifact until identity, canonical `SHA-256`, and model-run provenance validate, and it cannot replace the CPU `f64` estimator or promote a scientific claim; recovered roles match known truth at a higher computed rate than collapsing every artifact to the estimator (ADR 0001/0014).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
+- `event_core` now requires and retains `EventEvidenceLayer::PromotedTransition` when constructing an `EventInstance`; every other layer is rejected at the promotion boundary, and TDT story classification uses a caller-owned hash set for expected constant-time membership checks.
+- `event_core` ADR 0016 evidence-status gates: TDT detections and CHRONOS predictions cannot admit a forward state transition; first-story detection scores miss/false-alarm rates against a known story stream (Allan 2002 task).
 - `tepp_api` naruon live loopback HTTP/1.1 listener: `serve_one` installs a read/write deadline, requires a loopback `Host`, refuses `Transfer-Encoding` and NIM/proxy credential headers, parses `knowledge_cutoff` as RFC 3339 and refuses a future cutoff, keys analysis-run idempotency by tenant plus key, and proves both analysis-run and export POSTs over a real `TcpStream`. Not a production TLS/`$PORT` service (ADR 0011).
 - `tepp_api` adaptive orchestration router (ADR 0010): versioned `direct`/`verify`/`committee`/`conductor`/`abstain` selection from CPU `f64` risk, ambiguity, evidence, and token-budget inputs; recorded stages, recursion, decomposition, access lists, and role-specific reasoning effort; fail-closed document-controlled policy/access/credentials; LLM plans remain proposals under deterministic statistical authority; comparable-budget ablation requires a direct baseline; credential-free contextual-orchestrator binding. Live NIM HTTP remains accepted-target.
 - `tepp_api` purpose-bound provider-payload minimization: time-bounded `PurposeGrant` evaluation, fail-closed expired/not-yet-valid/inverted/cross-tenant/impossible-calendar denial, semantic UTC calendar validation, refusal to copy identity mappings into model-provider payloads or ordinary logs, preservation of opaque analytical identifiers and membership roles (no blanket PII mask), a separately authorized scientific re-identification path, and an internally bound FIPS 180-4 SHA-256 audit digest appended through `ReidentificationAuditSink` before disclosure.
@@ -14,6 +43,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
 - `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).
 - `persistence_postgres` audit-event SQL contracts: append-only insert that refuses empty, oversized, or hostile `action_code` values before SQL is rendered.
+- `network_analysis` compositional cluster gates: raw topic proportions cannot be treated as Euclidean coordinates; recovered clusters are scored with label-invariant pair precision and recall against known truth.
 - `persistence_postgres` event-instance SQL contracts: bitemporal insert and as-known-at lookup that refuse inverted valid/system windows and hostile type/lifecycle labels before SQL is rendered.
 - `persistence_postgres` event-mention SQL contracts: mention identity cannot equal the instance it supports; confidence must be finite and in `(0, 1]`.
 - `persistence_postgres` event-relation SQL contracts: closed ERD transition/provenance vocabulary bound to `transition_edge`, fail-closed unknown types and transition self-loops, live insert of `causes`/`references`.
@@ -37,6 +67,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `persistence_postgres` live SQL port: `SqlSession` transport, migration batch applicator, document/audit SQL contracts, `LiveDocumentRepository`, and fail-closed `DATABASE_URL`/`LiveSqlxConfig` gate for SQLx pool wiring (optional `live-sqlx` driver attaches `PgPool`).
 - `membership_core` Kish effective sample size, design effect, and group-normalized ESS helpers for multiple-membership estimation inputs.
 - Credential-separated hourly NVIDIA NIM/OpenCode product-development workflow (issue #2): proposal, independent verification, and late Maintainer-App publication with `NVIDIA_NIM_API_KEY` only for model work.
+- Hourly product-development queue gate now fails closed when either an open pull request or an open issue exists, including a second queue check immediately before publication.
 - Documented modular naruon consumer contract for TEPP analysis-run and export surfaces, with a committed example request payload.
 - Documented contextual-orchestrator interpretation port boundary and credential separation for TEPP.
 - Foundation validation/release-readiness ledger at `docs/validation/temporal-event-foundation.md` tracking capability maturity and scientific acceptance gates.
@@ -55,7 +86,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - ADR 0014 separating accepted design, protected-main implementation, scientific/product claim promotion, and release evidence authority.
 - ADR 0015 separating autonomous model proposal, deterministic verification, publication, independent review, and merge/release authority.
 - ADR 0016 separating Event Ontology observation, TDT detection/tracking, CHRONOS schema prediction, symbolic temporal consistency, and promoted transition authority.
-- Verified APA 7 research traceability for ICLR 2026 TRINITY and Conductor, the 2026 Sakana Fugu technical report, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF/GAI Profile, AICPA Trust Services Criteria, and KISA CSAP guidance.
+- Added APA 7 research traceability for ICLR 2026 TRINITY and Conductor, the 2026 Sakana Fugu technical report, ISO/IEC 42001:2023, ISO/IEC 23894:2023, NIST AI RMF/GAI Profile, AICPA Trust Services Criteria, and KISA CSAP guidance.
 - Eight-phase delivery roadmap and Temporal/Event Foundation implementation plan.
 - Immutable evidence, six-clock temporal semantics, interval reasoning, event ontology, typed relation graph, and time-varying multiple-membership contracts.
 - Shared-latent multilingual topic measurement architecture with native lexical channels and language-profile validation.
@@ -64,7 +95,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - Topic correlation, consensus clustering, TDT, CHRONOS, and evidence-grounded LLM interpretation requirements.
 - APA 7th research traceability, source archive manifests, ADRs, governance, security, and contribution contracts.
 - Hourly centralized PR-maintenance workflow and a documented requirement for a future credential-separated NVIDIA NIM/OpenCode product-development loop.
-- Rust 1.97.1 virtual Cargo workspace with ten explicit modular foundation crates.
+- Rust 1.97.1 virtual Cargo workspace with eleven explicit modular foundation crates.
 - Repository contract, public-rustdoc, line-coverage, and nightly branch-coverage gates.
 - Pinned `cargo-nextest` 0.9.140, `cargo-llvm-cov` 0.8.6, `cargo-deny` 0.19.7, and Coverage.py 7.15.2 quality tooling.
 - Task 1 architecture decision and workspace-foundation validation report.
@@ -76,12 +107,26 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- Kept one maturity row per capability in the traceability matrix while recording the active provider-receipt evidence without duplicating or downgrading existing capabilities.
+- `tepp_api` corpus-split manifest validation now rejects governed link-kind arrays that are unsorted or duplicated, keeping untrusted JSON aligned with the schema's unique canonical representation and preventing equivalent audits from receiving different valid digests.
+- Grounded `derived_sensitivity` doctoring on GDPR Article 4(1)/Recital 26 and WP29 Opinion 4/2007 (WP 136) as read from the official texts, and replaced the withdrawn ISO/IEC 29100:2011 use-limitation overclaim with the current 29100:2024 catalogue edition without quoting unread clause text.
+- Added APA 7th method citations (Allen 1983; ISO 24617-1:2012; Hobbs & Pan 2017; Fox & Glas 2001; AERA/APA/NCME 2014; Blei & Lafferty 2006; Roberts et al. 2014, 2019; Chang & Blei 2009; Mimno et al. 2009; Asparouhov & Muthén 2009; Asparouhov et al. 2018; Marsh et al. 2014; Aitchison 1982; Allan 2002; Li et al. 2021; Anagnostopoulos et al. 2013) into ADRs 0002–0005, 0012, and 0016, plus TRACEABILITY/ARCHITECTURE/TRD method rows. Clarified that TRSL-TM is the product contract, STM-style logistic-normal is the reference family, ESEM/DSEM/TDT/CHRONOS remain accepted-target, and merged PRs #8/#9—not superseded drafts #5/#6—are the protected-main temporal lineage.
+- Refreshed the live gap-baseline inventory to the 2026-08-24T05:41:54Z GitHub
+  snapshot (118 open PRs / 48 drafts / 12 issues; protected-main
+  `c45be17a9dbce95ef81cee230e9d128abc7160ac`), binding each operator-gap current
+  head SHA to that exact-head register, including #201 `6afd650667e1` (RFC 5646
+  cited once; first GAP-005 slice, not implemented-main), stacked drafts
+  #202–#204, and #164 `ff2e645b1785` as the predecessor register head. Duplicate
+  PR #179 remains closed. Stacked-merged heads and queued Checks are not
+  implemented-main.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
 
 ### Security
 
+- Naruon interchange refuses `x-apikey`, `x-api_key`, and hyphenated `api-key` credential-header aliases, not only `x-api-key`.
+- GitHub HTTPS fleet transport maps request, response, and close-path network exceptions to `upstream_unavailable` without leaking raw provider exception text.
 - Disabled-state classification and live disable confirmation now accept GitHub's official `disabled_manually`, `disabled_fork`, `disabled_inactivity`, and `deleted` registry states so orphan bootstrap/repair identities can be retired without name-only heuristics.
 - Prohibited `COPILOT_GITHUB_TOKEN` and reserved `NVIDIA_NIM_API_KEY` for approved LLM test and development workflows.
 - Defined purpose-bound PII access, opaque analytical identifiers, separately protected identity mapping, selective model-provider disclosure, retention/deletion, and privileged audit controls instead of destructive blanket masking.

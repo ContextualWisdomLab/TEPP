@@ -115,6 +115,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
+name = "checkpoint_authority"
+version = "0.1.0"
+
+[[package]]
 name = "corpus_split"
 version = "0.1.0"
 dependencies = [
@@ -201,6 +205,10 @@ checksum = "10d60334b3b2e7c9d91ef8150abfb6fa4c1c39ebbcf4a81c2e346aad939fee3e"
 dependencies = [
  "thiserror",
 ]
+
+[[package]]
+name = "derived_sensitivity"
+version = "0.1.0"
 
 [[package]]
 name = "digest"
@@ -585,6 +593,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "interpretation_gateway"
+version = "0.1.0"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "io-uring"
 version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -688,6 +703,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
+name = "longitudinal_core"
+version = "0.1.0"
+
+[[package]]
 name = "md-5"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -734,6 +753,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "model_selection"
+version = "0.1.0"
+
+[[package]]
+name = "network_analysis"
+version = "0.1.0"
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -756,6 +783,10 @@ name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
+
+[[package]]
+name = "operational_log"
+version = "0.1.0"
 
 [[package]]
 name = "parking"
@@ -796,6 +827,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 name = "persistence_postgres"
 version = "0.1.0"
 dependencies = [
+ "operational_log",
  "sqlx",
  "temporal_core",
  "tokio",
@@ -848,6 +880,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "prediction_contradiction"
+version = "0.1.0"
+dependencies = [
+ "temporal_core",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -855,6 +894,10 @@ checksum = "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "provider_receipt"
+version = "0.1.0"
 
 [[package]]
 name = "quote"
@@ -1036,6 +1079,13 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "service_tls"
+version = "0.1.0"
+dependencies = [
+ "rustls",
 ]
 
 [[package]]
@@ -1274,11 +1324,13 @@ dependencies = [
 name = "tepp_api"
 version = "0.1.0"
 dependencies = [
+ "corpus_split",
  "jiff",
  "serde",
  "serde_json",
  "sha2",
  "temporal_core",
+ "uuid",
 ]
 
 [[package]]
@@ -1375,6 +1427,13 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "topic_lineage"
+version = "0.1.0"
+dependencies = [
+ "uuid",
 ]
 
 [[package]]
