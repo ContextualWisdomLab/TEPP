@@ -39,6 +39,8 @@ members = [
     "crates/payload_bound",
     "crates/outcome_order",
     "crates/summarizes_edge",
+    "crates/provider_receipt",
+    "crates/intake_authorization",
 ]
 default-members = [
     "crates/evidence_core",
@@ -79,6 +81,8 @@ default-members = [
     "crates/payload_bound",
     "crates/outcome_order",
     "crates/summarizes_edge",
+    "crates/provider_receipt",
+    "crates/intake_authorization",
 ]
 
 [workspace.package]
