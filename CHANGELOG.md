@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `longitudinal_core` within/between decomposition: unit means stay between-unit components, occasion residuals stay within-unit change, and recovered components match known truth with lower computed RMSE than a grand-mean pooled collapse.
 - `topic_lineage` global P0 topic identity: activity may become dormant or reactivated without minting a new identity, and recovered identities match known truth at a higher computed rate than mint-on-reactivate replacements.
 - `interpretation_gateway` evidence-bounded LLM interpretations: proposals must cite at least one evidence span, remain hypothetical, cannot become estimator results or observed facts, and a cited interpreter records a lower computed unsupported-claim rate than uncited promotion.
 - `model_selection` candidate-`K` gates: statistical candidates require `K >= 2` and finite held-out log-likelihood/complexity, a Pareto front excludes dominated alternatives, LLM votes cannot define the numerical optimum, and selected `K` recovers known truth with computed RMSE.
