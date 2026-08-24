@@ -43,6 +43,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/copied_text
 crates/style_source
 crates/stopword_deletion
 crates/copy_identity
