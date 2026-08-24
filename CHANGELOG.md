@@ -6,6 +6,16 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- Live `docs/product-technical-gap-baseline.md` mapping operator-visible gaps to
+  protected-main maturity, exact current PR/issue state, stacked delivery order,
+  and closure evidence; placeholder-only issues #161 and #162 were closed as
+  queue hygiene. The documentation validator requires a dated UTC snapshot, a
+  40-character protected-main SHA, an exact-head inventory matching the declared
+  open-PR count, and operator-gap closure evidence, and it rejects affirmative
+  queued-Checks-as-implemented-main claims even when wrapped across a line
+  break, and it rejects an unrelated `not` in the same span (`queued Checks are
+  not required; this PR is implemented-main`). Only never/do not/does not/
+  cannot/must not plus promote/treat/make/mean counts as a promotion denial.
 - `checkpoint_authority` estimator gate: a model checkpoint remains an untrusted run artifact until identity, canonical `SHA-256`, and model-run provenance validate, and it cannot replace the CPU `f64` estimator or promote a scientific claim; recovered roles match known truth at a higher computed rate than collapsing every artifact to the estimator (ADR 0001/0014).
 - `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `event_core` now requires and retains `EventEvidenceLayer::PromotedTransition` when constructing an `EventInstance`; every other layer is rejected at the promotion boundary, and TDT story classification uses a caller-owned hash set for expected constant-time membership checks.
@@ -79,6 +89,14 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- Refreshed the live gap-baseline inventory to the 2026-08-24T05:41:54Z GitHub
+  snapshot (118 open PRs / 48 drafts / 12 issues; protected-main
+  `c45be17a9dbce95ef81cee230e9d128abc7160ac`), binding each operator-gap current
+  head SHA to that exact-head register, including #201 `6afd650667e1` (RFC 5646
+  cited once; first GAP-005 slice, not implemented-main), stacked drafts
+  #202–#204, and #164 `ff2e645b1785` as the predecessor register head. Duplicate
+  PR #179 remains closed. Stacked-merged heads and queued Checks are not
+  implemented-main.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
