@@ -1,5 +1,6 @@
 //! Fail-closed persistence validation and migration errors.
 
+use operational_log::OperationalLogError;
 use std::fmt;
 
 /// A fail-closed persistence-domain error.
@@ -42,10 +43,18 @@ pub enum PersistenceError {
     InvalidSourceArtifact,
     /// An audit action code was empty, oversized, or hostile.
     InvalidAuditEvent,
+    /// Source text was supplied to an `audit_event` insert.
+    SourceTextNotAuditable,
+    /// Source identity was supplied to an `audit_event` insert.
+    SourceIdentityNotAuditable,
+    /// Blanket PII masking was treated as an `audit_event` insert grant.
+    BlanketMaskIsNotAuditAuthorization,
     /// A concurrent writer won the open-row lock or serialization contest.
     ConcurrentWriteConflict,
     /// A restored snapshot failed integrity revalidation and is not usable.
     RestoreIntegrityFailed,
+    /// A text segment had a negative or inverted UTF-8 byte span.
+    InvalidTextSegment,
     /// A retention, hold, deletion, or tombstone record failed closed validation.
     InvalidRetentionLifecycle,
     /// An active legal hold blocked completed deletion.
@@ -75,8 +84,14 @@ impl fmt::Display for PersistenceError {
             Self::ConflictingSourceArtifact => "conflicting source artifact",
             Self::InvalidSourceArtifact => "invalid source artifact",
             Self::InvalidAuditEvent => "invalid audit event",
+            Self::SourceTextNotAuditable => "source text cannot appear in an audit event",
+            Self::SourceIdentityNotAuditable => "source identity cannot appear in an audit event",
+            Self::BlanketMaskIsNotAuditAuthorization => {
+                "blanket PII masking is not audit-event authorization"
+            }
             Self::ConcurrentWriteConflict => "concurrent write conflict",
             Self::RestoreIntegrityFailed => "restore integrity failed",
+            Self::InvalidTextSegment => "invalid text segment",
             Self::InvalidRetentionLifecycle => "invalid retention lifecycle",
             Self::LegalHoldBlocksDeletion => "legal hold blocks deletion",
             Self::UngovernedEvidenceRestore => "ungoverned evidence restore",
@@ -86,6 +101,19 @@ impl fmt::Display for PersistenceError {
 }
 
 impl std::error::Error for PersistenceError {}
+
+impl From<OperationalLogError> for PersistenceError {
+    fn from(error: OperationalLogError) -> Self {
+        match error {
+            OperationalLogError::SourceTextNotLoggable => Self::SourceTextNotAuditable,
+            OperationalLogError::SourceIdentityNotLoggable => Self::SourceIdentityNotAuditable,
+            OperationalLogError::BlanketMaskIsNotAuthorization => {
+                Self::BlanketMaskIsNotAuditAuthorization
+            }
+            _ => Self::InvalidAuditEvent,
+        }
+    }
+}
 
 /// Migration SQL contract violations.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -139,6 +167,7 @@ impl std::error::Error for MigrationContractError {}
 #[cfg(test)]
 mod tests {
     use super::{MigrationContractError, PersistenceError};
+    use operational_log::OperationalLogError;
 
     #[test]
     #[allow(clippy::too_many_lines)]
@@ -220,8 +249,24 @@ mod tests {
             "invalid audit event"
         );
         assert_eq!(
+            PersistenceError::SourceTextNotAuditable.to_string(),
+            "source text cannot appear in an audit event"
+        );
+        assert_eq!(
+            PersistenceError::SourceIdentityNotAuditable.to_string(),
+            "source identity cannot appear in an audit event"
+        );
+        assert_eq!(
+            PersistenceError::BlanketMaskIsNotAuditAuthorization.to_string(),
+            "blanket PII masking is not audit-event authorization"
+        );
+        assert_eq!(
             PersistenceError::RestoreIntegrityFailed.to_string(),
             "restore integrity failed"
+        );
+        assert_eq!(
+            PersistenceError::InvalidTextSegment.to_string(),
+            "invalid text segment"
         );
         assert_eq!(
             PersistenceError::InvalidRetentionLifecycle.to_string(),
@@ -274,6 +319,22 @@ mod tests {
         assert_eq!(
             MigrationContractError::MissingTemporalIntervalConstraint.to_string(),
             "missing temporal interval constraint"
+        );
+        assert_eq!(
+            PersistenceError::from(OperationalLogError::SourceTextNotLoggable),
+            PersistenceError::SourceTextNotAuditable
+        );
+        assert_eq!(
+            PersistenceError::from(OperationalLogError::SourceIdentityNotLoggable),
+            PersistenceError::SourceIdentityNotAuditable
+        );
+        assert_eq!(
+            PersistenceError::from(OperationalLogError::BlanketMaskIsNotAuthorization),
+            PersistenceError::BlanketMaskIsNotAuditAuthorization
+        );
+        assert_eq!(
+            PersistenceError::from(OperationalLogError::InvalidLogPayload),
+            PersistenceError::InvalidAuditEvent
         );
         assert_eq!(
             MigrationContractError::MissingRetentionLegalHold.to_string(),

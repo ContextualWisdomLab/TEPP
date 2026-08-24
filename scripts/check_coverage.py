@@ -10,16 +10,68 @@ from typing import Any, Iterable, Mapping, Sequence
 
 
 def load_totals(path: Path) -> Mapping[str, Any]:
-    """Load the single-report totals mapping from LLVM coverage JSON."""
+    """Load exact totals from LLVM coverage JSON.
+
+    Full LLVM branch exports can contain several instrumented copies of the
+    same source file when unit and integration test binaries are merged. The
+    source-level contract is the union of each branch coordinate's true and
+    false outcomes, so those copies are merged before the branch gate runs.
+    Summary-only reports retain the original LLVM totals fallback.
+    """
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     data = payload.get("data")
     if not isinstance(data, list) or len(data) != 1:
         raise ValueError("coverage JSON must contain exactly one data entry")
-    totals = data[0].get("totals")
+    report = data[0]
+    totals = report.get("totals")
     if not isinstance(totals, Mapping):
         raise ValueError("coverage JSON data entry must contain totals")
-    return totals
+    files = report.get("files")
+    if not isinstance(files, list) or not any(
+        isinstance(record, Mapping) and "branches" in record for record in files
+    ):
+        return totals
+    return {**totals, "branches": load_union_branch_totals(files)}
+
+
+def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | float]:
+    """Merge LLVM branch outcomes by source coordinate across test binaries."""
+
+    outcomes: dict[tuple[str, int, int, int, int], list[int]] = {}
+    for file_record in files:
+        if not isinstance(file_record, Mapping):
+            raise ValueError("coverage file record must be an object")
+        filename = file_record.get("filename")
+        if "branches" not in file_record:
+            raise ValueError("coverage file record must contain branches")
+        branches = file_record["branches"]
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("coverage file record must contain a filename")
+        if not isinstance(branches, list):
+            raise ValueError("coverage branches must be a list")
+        for branch in branches:
+            if not isinstance(branch, list) or len(branch) < 6:
+                raise ValueError("coverage branch record is malformed")
+            coordinates = branch[:4]
+            counts = branch[4:6]
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in coordinates
+            ):
+                raise ValueError("coverage branch coordinates are invalid")
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in counts
+            ):
+                raise ValueError("coverage branch counts are invalid")
+            key = (filename, *coordinates)
+            outcome = outcomes.setdefault(key, [0, 0])
+            outcome[0] += counts[0]
+            outcome[1] += counts[1]
+    count = len(outcomes) * 2
+    covered = sum(outcome > 0 for counts in outcomes.values() for outcome in counts)
+    return {"count": count, "covered": covered}
 
 
 def resolve_repository_source_path(source_path: str, repository_root: Path) -> Path:
@@ -51,9 +103,10 @@ def is_executable_source_line(
     """Return whether *line_number* in *source_path* is an executable source line.
 
     LLVM LCOV sometimes emits zero-count DA records for documentation comments,
-    attributes, pure structural braces, multi-line signatures, and in-file
-    ``#[cfg(test)]`` modules. Those records are not evidence of uncovered
-    production behavior and are excluded from the authored-line gate.
+    attributes, pure structural braces, multi-line signatures, literal
+    continuations, expression continuations, and in-file ``#[cfg(test)]``
+    modules. Those records are not evidence of uncovered production behavior
+    and are excluded from the authored-line gate.
 
     When *repository_root* is provided, *source_path* must resolve under that
     root (same fail-closed rule as LCOV ``SF:`` loading).
@@ -75,6 +128,8 @@ def is_executable_source_line(
         return False
     if _line_in_cfg_not_feature_block(lines, line_number):
         return False
+    if _line_in_multiline_string(lines, line_number):
+        return False
     text = lines[line_number - 1].strip()
     if not text:
         return False
@@ -82,8 +137,24 @@ def is_executable_source_line(
         return False
     if text.startswith("#[") or text.startswith("#!["):
         return False
-    if text in {"{", "}", "},", ");", "];", "();", "};"}:
+    if text in {
+        "{",
+        "}",
+        "(",
+        ")",
+        "},",
+        ");",
+        "];",
+        "();",
+        "};",
+        "});",
+        "Ok(())",
+    }:
         return False
+    if text.endswith(" {"):
+        type_name = text[:-2]
+        if type_name and all(character.isalnum() or character in "_:" for character in type_name):
+            return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False
     if text.startswith("mod ") or text.startswith("pub mod "):
@@ -92,7 +163,14 @@ def is_executable_source_line(
         return False
     if text.startswith(") ->"):
         return False
-    if text.startswith("pub fn ") or text.startswith("fn "):
+    if text.startswith((
+        "pub fn ",
+        "pub const fn ",
+        "pub(crate) fn ",
+        "pub(crate) const fn ",
+        "const fn ",
+        "fn ",
+    )):
         return False
     if text.startswith("pub struct ") or text.startswith("struct "):
         return False
@@ -100,9 +178,39 @@ def is_executable_source_line(
         return False
     if text.startswith("Ok(Self") or text in {")}", "})", "})"}:
         return False
+    if text in {"} else {", "else {", "));"} or text.startswith((".", "||", "&&")):
+        return False
     if text.endswith(",") and not text.startswith("let ") and not text.startswith("return "):
         return False
     return True
+
+
+def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
+    """Return whether a source line is only a continuation of a string literal.
+
+    LLVM assigns one line location to a multi-line SQL or JSON literal, while
+    LCOV can still emit zero-count records for its continuation lines. Those
+    bytes are data, not independently executable Rust statements.
+    """
+
+    in_string = False
+    for index, line in enumerate(lines, start=1):
+        if index == line_number:
+            if in_string:
+                return True
+            quote_count = sum(
+                character == '"' and (position == 0 or line[position - 1] != "\\")
+                for position, character in enumerate(line)
+            )
+            return quote_count == 1 and line.strip().startswith('"')
+        escaped = False
+        for character in line:
+            if character == '"' and not escaped:
+                in_string = not in_string
+            escaped = character == "\\" and not escaped
+            if character != "\\":
+                escaped = False
+    return False
 
 
 def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:

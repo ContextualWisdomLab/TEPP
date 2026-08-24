@@ -9,7 +9,7 @@ use crate::classify_lifecycle_sql_failure;
 use crate::classify_write_conflict;
 use crate::live_pool::{LiveSqlxPool, LiveSqlxPoolOptions};
 use crate::sqlx_gate::LiveSqlxConfig;
-use std::thread;
+use std::future::Future;
 
 /// Open a live `SQLx` pool and wrap it as [`LiveSqlxPool`].
 ///
@@ -41,6 +41,30 @@ struct SqlxTransport {
     runtime: Option<tokio::runtime::Runtime>,
 }
 
+/// Drive a future on the transport-owned runtime from any caller context.
+///
+/// Tokio's `block_on` panics when invoked from within an asynchronous
+/// execution context, so the future is driven on a scoped OS thread that has
+/// no ambient Tokio context. The call stays synchronous for the caller and the
+/// joined result keeps teardown deterministic.
+///
+/// # Panics
+///
+/// Propagates panics from the driven future itself.
+fn drive_on_owned_runtime<'env, F, T>(runtime: &tokio::runtime::Runtime, future: F) -> T
+where
+    F: Future<Output = T> + Send + 'env,
+    T: Send + 'env,
+{
+    let handle = runtime.handle().clone();
+    std::thread::scope(|scope| {
+        scope
+            .spawn(move || handle.block_on(future))
+            .join()
+            .expect("owned-runtime bridge thread")
+    })
+}
+
 impl SqlxTransport {
     fn connect(
         config: &LiveSqlxConfig,
@@ -51,7 +75,7 @@ impl SqlxTransport {
             .enable_all()
             .build()
             .map_err(|_| PersistenceError::SqlExecutionFailed)?;
-        let pool = runtime.block_on(async {
+        let pool = drive_on_owned_runtime(&runtime, async {
             sqlx::postgres::PgPoolOptions::new()
                 .max_connections(options.max_connections())
                 .acquire_timeout(std::time::Duration::from_millis(
@@ -61,8 +85,7 @@ impl SqlxTransport {
                 .await
         });
         let pool = pool.map_err(|_| PersistenceError::SqlExecutionFailed)?;
-        let connection = runtime
-            .block_on(async { pool.acquire().await })
+        let connection = drive_on_owned_runtime(&runtime, async { pool.acquire().await })
             .map_err(|_| PersistenceError::SqlExecutionFailed)?;
         Ok(Self {
             connection: Some(connection),
@@ -71,74 +94,43 @@ impl SqlxTransport {
     }
 
     fn execute(&mut self, sql: &str) -> Result<(), PersistenceError> {
-        let sql = sql.to_owned();
-        if tokio::runtime::Handle::try_current().is_ok() {
-            let mut connection = self
-                .connection
-                .take()
-                .ok_or(PersistenceError::SqlExecutionFailed)?;
-            let Some(runtime) = self.runtime.take() else {
-                self.connection = Some(connection);
-                return Err(PersistenceError::SqlExecutionFailed);
-            };
-            let joined = thread::spawn(move || {
-                let result =
-                    runtime.block_on(async { sqlx::query(&sql).execute(&mut *connection).await });
-                (connection, runtime, result)
-            })
-            .join()
-            .map_err(|_| PersistenceError::SqlExecutionFailed)?;
-            self.connection = Some(joined.0);
-            self.runtime = Some(joined.1);
-            joined.2.map(|_| ()).map_err(|error| map_sqlx_error(&error))
-        } else {
-            let connection = self
-                .connection
-                .as_mut()
-                .ok_or(PersistenceError::SqlExecutionFailed)?;
-            let runtime = self
-                .runtime
-                .as_ref()
-                .ok_or(PersistenceError::SqlExecutionFailed)?;
-            runtime
-                .block_on(async { sqlx::query(&sql).execute(&mut **connection).await })
-                .map(|_| ())
-                .map_err(|error| map_sqlx_error(&error))
-        }
+        let connection = self
+            .connection
+            .as_mut()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        let runtime = self
+            .runtime
+            .as_ref()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        drive_on_owned_runtime(runtime, async {
+            sqlx::query(sql).execute(&mut **connection).await
+        })
+        .map(|_| ())
+        .map_err(|error| map_sqlx_error(&error))
     }
 }
 
 impl Drop for SqlxTransport {
     fn drop(&mut self) {
         let connection = self.connection.take();
-        let runtime = self.runtime.take();
-        let Some(runtime) = runtime else {
+        let Some(runtime) = self.runtime.take() else {
             return;
-        };
-        if connection.is_none() {
-            drop_runtime_safely(runtime);
-            return;
-        }
-        let close = move || {
-            if let Some(connection) = connection {
-                let _ = runtime.block_on(connection.close());
-            }
         };
 
-        // Both closing a PoolConnection and dropping a Tokio runtime may panic
-        // when performed inside another runtime. Move both operations to a
-        // dedicated thread in that case so synchronous teardown remains safe.
-        if tokio::runtime::Handle::try_current().is_ok() {
-            let _ = thread::spawn(close).join();
-        } else {
-            close();
+        // SQLx's PoolConnection::Drop spawns a return-to-pool task and therefore
+        // needs a current Tokio context. Consume it inside the owned runtime via
+        // the context-free bridge so dropping from a synchronous caller, or from
+        // inside another runtime's task, closes the session instead of panicking.
+        if let Some(connection) = connection {
+            let _ = drive_on_owned_runtime(&runtime, connection.close());
         }
+        drop_runtime_safely(runtime);
     }
 }
 
 fn drop_runtime_safely(runtime: tokio::runtime::Runtime) {
     if tokio::runtime::Handle::try_current().is_ok() {
-        let _ = thread::spawn(move || drop(runtime)).join();
+        let _ = std::thread::spawn(move || drop(runtime)).join();
     } else {
         drop(runtime);
     }
@@ -158,6 +150,47 @@ fn map_sqlx_error(error: &sqlx::Error) -> PersistenceError {
 
 #[cfg(test)]
 mod tests {
+    use super::{drive_on_owned_runtime, drop_runtime_safely};
+
+    #[test]
+    fn bridge_drives_futures_from_inside_a_foreign_runtime() {
+        // Reproduces the reviewed hazard: transport machinery entered while the
+        // caller already sits inside another runtime's execution context, where
+        // a direct Runtime::block_on panics.
+        let outer = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("outer runtime");
+        let owned = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .expect("owned runtime");
+        let driven =
+            outer.block_on(async { drive_on_owned_runtime(&owned, std::future::ready(7_u8)) });
+        assert_eq!(driven, 7);
+    }
+
+    #[test]
+    fn teardown_bridge_closes_from_inside_a_foreign_runtime_without_panicking() {
+        let outer = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("outer runtime");
+        let owned = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .expect("owned runtime");
+        // Mirrors Drop for SqlxTransport: a close future is consumed on the
+        // owned runtime even when drop runs inside another runtime context.
+        let closed = outer.block_on(async {
+            drive_on_owned_runtime(&owned, async {
+                tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+                true
+            })
+        });
+        assert!(closed);
+    }
+
     #[test]
     fn owned_runtime_drop_is_safe_inside_another_runtime() {
         let outer = tokio::runtime::Builder::new_current_thread()
@@ -165,11 +198,12 @@ mod tests {
             .build()
             .expect("outer runtime");
         outer.block_on(async {
-            let owned = tokio::runtime::Builder::new_current_thread()
+            let owned = tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(1)
                 .enable_all()
                 .build()
                 .expect("owned runtime");
-            super::drop_runtime_safely(owned);
+            drop_runtime_safely(owned);
         });
     }
 }
