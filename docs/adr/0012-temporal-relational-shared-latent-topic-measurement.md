@@ -1,5 +1,8 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
+**Decision status:** Accepted
+**Implementation maturity:** partial — `corpus_background`, `topic_lineage`, `network_analysis`, `model_selection`, `stopword_deletion`, `style_source`, `copied_text`, and `modality_source` implement bounded identity and recovery gates; the TRSL-TM estimator, method effects, global topic identity, and backend interchange remain accepted-target.
+**Date:** 2026-08-12
 **Decision status:** Accepted  
 **Implementation maturity:** accepted-target — prompt-versus-unique-content identity in `prompt_source` on the active PR; estimator-side method model remains accepted-target  
 **Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; estimator-side method model remains accepted-target  

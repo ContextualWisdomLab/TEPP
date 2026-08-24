@@ -1,7 +1,7 @@
 # TEPP Whole-Conversation Documentation Assessment
 
-**Assessment date:** 2026-08-19  
-**Scope:** Durable TEPP decisions established in the product conversation, approved PRD v0.4/planning pack, and protected-main implementation through the current TRACEABILITY matrix. Merged PRs #8 and #9 are the temporal lineage; superseded PRs #5 and #6 are historical only.  
+**Assessment date:** 2026-08-19
+**Scope:** Durable TEPP decisions established in the product conversation, approved PRD v0.4/planning pack, and protected-main implementation through the current TRACEABILITY matrix. Merged PRs #8 and #9 are the temporal lineage; superseded PRs #5 and #6 are historical only.
 **Verdict:** **The canonical documentation/ADR graph is protected-main authority after PR #7; implementation maturity remains independently tracked and is not promoted by documentation completeness.**
 
 ## 1. Assessment rule
@@ -28,7 +28,7 @@ Decision status and implementation maturity are separate. ADR `Accepted` means t
 | Architecture | PRESENT-CURRENT | root `ARCHITECTURE.md` owns service/crate boundaries and scientific/compute invariants |
 | UML / system flows | PRESENT-CURRENT | `docs/UML.md` covers component, sequence, clock state, relation authority, membership, compute and implementation lineage |
 | ERD / logical data model | PRESENT-CURRENT | `docs/ERD.md` distinguishes current domain objects from planned PostgreSQL entities and preserves uncertain time/membership/provenance |
-| ADR index / core decisions | PRESENT-CURRENT | ADR 0001–0016 cover numerical authority, clocks, event/membership, multilingual semantics, ESEM/DSEM, GPU, quality, evidence, PII, LLM orchestration, MSA, topic measurement, persistence/manifests/splits, claim promotion/release, autonomous-development authority, and TDT/CHRONOS boundaries |
+| ADR index / core decisions | PRESENT-CURRENT | Numbered ADRs in the canonical index cover numerical authority, clocks, event/membership, multilingual semantics, ESEM/DSEM, GPU, quality, evidence, PII, LLM orchestration, MSA, topic measurement, persistence/manifests/splits, claim promotion/release, autonomous-development authority, TDT/CHRONOS boundaries, and consumer-scoped modular ingress |
 | ADR status/maturity/supersession policy | PRESENT-CURRENT | `docs/adr/ADR_POLICY.md` makes `Accepted` vs implemented/released explicit and requires exact partial-supersession scope |
 | API / modular integration | PRESENT-CURRENT | `docs/API_CONTRACT.md` defines versioning, target async lifecycle, authority and naruon/contextual-orchestrator boundaries |
 | Security | PRESENT-CURRENT | `SECURITY.md` plus `docs/THREAT_MODEL.md` |

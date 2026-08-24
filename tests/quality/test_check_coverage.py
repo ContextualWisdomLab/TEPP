@@ -123,14 +123,11 @@ class CoverageContractTests(unittest.TestCase):
         payload["data"][0]["files"] = [  # type: ignore[index]
             {
                 "filename": "src/live.rs",
-                "branches": [
-                    [10, 4, 10, 12, 1, 0, 0, 0, 4],
-                    [10, 4, 10, 12, 0, 1, 0, 0, 4],
-                ],
+                "branches": [[10, 4, 10, 12, 1, 0, 0, 0, 4]],
             },
             {
                 "filename": "src/live.rs",
-                "branches": [[10, 4, 10, 12, 0, 0, 0, 0, 4]],
+                "branches": [[10, 4, 10, 12, 0, 1, 0, 0, 4]],
             },
         ]
         with tempfile.TemporaryDirectory() as temporary:
@@ -150,11 +147,28 @@ class CoverageContractTests(unittest.TestCase):
         malformed_reports = (
             ([None], "file record must be an object"),
             ([{"filename": "", "branches": []}], "must contain a filename"),
+            ([{"filename": "src.rs"}], "must contain branches"),
             ([{"filename": "src.rs", "branches": {}}], "branches must be a list"),
             ([{"filename": "src.rs", "branches": [[1, 2]]}], "record is malformed"),
             (
+                [{"filename": "src.rs", "branches": [[True, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1.5, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, True, 0]]}],
+                "counts are invalid",
+            ),
+            (
                 [{"filename": "src.rs", "branches": [[-1, 2, 3, 4, 1, 0]]}],
                 "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, 0.5, 0]]}],
+                "counts are invalid",
             ),
             (
                 [{"filename": "src.rs", "branches": [[1, 2, 3, 4, -1, 0]]}],
@@ -371,6 +385,17 @@ class CoverageContractTests(unittest.TestCase):
                 "    }",  # 55
                 "}",  # 56
                 "    executable_statement();",  # 57 executable
+                "    append_value(",  # 58 multiline call opener
+                "        value,",  # 59 trailing comma noise
+                "    );",  # 60 call close
+                "    values",  # 61
+                "        .iter()",  # 62 method-chain continuation
+                "        .collect::<Vec<_>>()",  # 63 method-chain continuation
+                "    });",  # 64 closure call close
+                "(",  # 65 structural call opener
+                ")",  # 66 structural call close
+                "    Ok(())",  # 67 structural unit result
+                "    NaruonLiveResponse {",  # 68 structural struct literal
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -385,7 +410,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 44, 57}
+            expected_executable = {13, 40, 44, 57, 58, 61, 62, 63}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -405,6 +430,9 @@ class CoverageContractTests(unittest.TestCase):
                     [
                         f"SF:{path}",
                         "DA:57,1",
+                        "DA:58,0",
+                        "DA:62,0",
+                        "DA:63,0",
                         "DA:1,0",
                         "DA:2,0",
                         "DA:48,0",
@@ -417,7 +445,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.load_lcov_line_totals(
                     lcov, repository_root=Path(temporary)
                 ),
-                {"lines": {"count": 1, "covered": 1}},
+                {"lines": {"count": 4, "covered": 1}},
             )
 
     def test_lcov_rejects_source_paths_outside_repository(self) -> None:

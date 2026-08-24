@@ -31,7 +31,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         self.assertIn("steps.line-report.outcome == 'success'", workflow)
         self.assertIn("id: branch-report", workflow)
         self.assertIn(
-            "cargo +nightly-2026-08-18 llvm-cov report --branch --text --show-missing-lines",
+            "cargo +nightly-2026-08-21 llvm-cov report --branch --text --show-missing-lines",
             workflow,
         )
         self.assertIn("steps.branch-report.outcome == 'success'", workflow)
@@ -87,7 +87,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         self.assertEqual(manifest["toolchain"]["channel"], "1.97.1")
 
         workflow = CI_WORKFLOW.read_text(encoding="utf-8")
-        self.assertEqual(workflow.count("nightly-2026-08-18"), 3)
+        self.assertEqual(workflow.count("nightly-2026-08-21"), 3)
         self.assertNotIn("nightly-2026-08-01", workflow)
 
         dependabot = DEPENDABOT.read_text(encoding="utf-8")

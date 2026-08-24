@@ -1,19 +1,8 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
-**Decision status:** Accepted  
-**Implementation maturity:** partial — typed clocks/intervals are implemented-main (PR #8); input-process-outcome event-time order is `outcome_order` on the active PR; remaining clock-identity and split enforcement stay accepted-target  
-**Implementation maturity:** partial — typed clocks/intervals implemented-main via `temporal_core`; retrospective-reporting identity in `retrospective_edge` on the active PR; downstream transition/split enforcement remains accepted-target  
-**Implementation maturity:** active-PR — evidential-vs-transition gate in `support_edge` on the active PR; remaining graph/split enforcement stays accepted-target  
-**Implementation maturity:** active-PR — system-clock identity in `system_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
-**Implementation maturity:** active-PR — event-clock identity in `event_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
-**Implementation maturity:** active-PR — assertion-clock identity in `assertion_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
-**Implementation maturity:** active-PR — knowledge-cutoff identity in `cutoff_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
-**Implementation maturity:** active-PR — availability-clock identity in `available_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
-**Implementation maturity:** active-PR — typed clocks/intervals are implemented-main; `document_clocks` refuses omitted assertion time and document time on this PR; downstream transition/split enforcement remains accepted-target  
-**Implementation maturity:** active-PR — provenance-vs-transition gate in `citation_edge` on the active PR; remaining graph/split enforcement stays accepted-target  
-**Implementation maturity:** partial — typed six-clock values and uncertain intervals are implemented-main on protected `main` (merged PR #8 / `temporal_core`); Allen interval algebra and bounded path-consistency are implemented-main on protected `main` (merged PR #9 / `temporal_core`). Superseded PRs #5 and #6 are historical lineage only and are not current-product claims. Downstream estimator, event-intelligence, and remaining persistence-policy uses of these primitives follow their owning ADRs and [`docs/TRACEABILITY.md`](../TRACEABILITY.md).  
-**Implementation maturity:** active-PR — unmerged PR #8 is the canonical Task 3 replacement implementing typed clocks/intervals against the current protected-main lineage; superseded/conflicted PR #5 is historical lineage only; downstream transition/split enforcement remains accepted-target
-**Date:** 2026-08-05  
+**Decision status:** Accepted
+**Implementation maturity:** partial — typed clocks, interval algebra, event/assertion/system/cutoff/availability identity, complete document clocks, revision ordering, retrospective/provenance-vs-transition gates, bounded payload validation, and strict input-process-outcome ordering are implemented-main; downstream graph/split enforcement remains accepted-target.
+**Date:** 2026-08-05
 **Supersedes:** None. ADR 0013 owns persistence/split representation; ADR 0016 owns event-intelligence reasoning above these temporal primitives.
 
 ## Context
