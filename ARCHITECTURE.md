@@ -85,6 +85,7 @@ APIs.
 | `compute_backend` | VRAM-budgeted streamed planning, executable OOM retry plans, and a compensated CPU `f64` reference |
 | `cutoff_clock` | knowledge cutoff cannot be replaced by event, system, or availability time |
 | `assertion_clock` | assertion time cannot be replaced by event, system, document, or available time |
+| `event_clock` | event time cannot be replaced by assertion, system, document, or available time |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

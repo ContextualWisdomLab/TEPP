@@ -9,6 +9,7 @@
 **Implementation maturity:** partial — typed clocks/intervals and Allen path-consistency are implemented-main (PR #8/#9); interval-aware historical eligibility (`AvailableTime` interval fully ≤ `KnowledgeCutoff`, unknown/open-ended availability fail closed) is active-PR; remaining downstream split/persistence enforcement remains accepted-target  
 **Implementation maturity:** active-PR — knowledge-cutoff identity in `cutoff_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — assertion-clock identity in `assertion_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
+**Implementation maturity:** active-PR — event-clock identity in `event_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0013 owns persistence/split representation; ADR 0016 owns event-intelligence reasoning above these temporal primitives.
 

@@ -22,6 +22,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; `available_clock` availability-vs-event/system identity on the active PR | active-PR |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; `cutoff_clock` cutoff-vs-event/system/availability identity on the active PR | active-PR |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; `assertion_clock` assertion-vs-event/system/document/available identity on the active PR | active-PR |
+| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; `event_clock` event-vs-assertion/system/document/available identity on the active PR | active-PR |
 | Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `citation_edge` provenance-vs-transition gate on the active PR | active-PR |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
