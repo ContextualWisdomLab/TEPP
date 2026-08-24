@@ -1,6 +1,7 @@
 # ADR 0004 — Shared multilingual latent semantic space
 
 **Decision status:** Accepted  
+**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; shared-space estimators remain accepted-target  
 **Implementation maturity:** accepted-target — copied-versus-unique-content identity in `copied_text` on the active PR; shared-space estimators remain accepted-target  
 **Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; shared-space estimators remain accepted-target  
 **Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; shared-space estimators, language profiles, and TF-IDF/BM25 inferential-weight refusal remain accepted-target

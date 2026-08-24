@@ -36,6 +36,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Mention-confidence Brier score | `event_core` | active-PR | calibration vs binary truth | perfect 0 / half 0.25 RMSE | ADR 0003; `docs/research/mention-confidence-brier.md` |
 | Checkpoint is not the estimator | `checkpoint_authority` | accepted-target | active PR | refuse checkpoint-as-estimator + unvalidated artifact + recovery vs estimator collapse | ADR 0001/0014 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Modality-versus-unique-content identity | `modality_source` | accepted-target | active PR | refuse modality-as-unique/stopword + recovery vs unique-content collapse | ADR 0004/0012 |
 | Copied-versus-unique-content identity | `copied_text` | accepted-target | active PR | refuse copied-text-as-unique/stopword + recovery vs unique-content collapse | ADR 0004/0012 |
 | Style-versus-unique-content identity | `style_source` | accepted-target | active PR | refuse style-as-unique/stopword + recovery vs unique-content collapse | ADR 0004/0012 |
 | Untrusted intake grant presence | `intake_authorization` | accepted-target | active PR | refuse missing grant + refuse bounds-as-authorization + recovery vs accept-all | ADR 0009; AGENTS.md |

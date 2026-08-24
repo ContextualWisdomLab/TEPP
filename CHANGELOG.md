@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `modality_source` identity gate: non-lexical modality is not unique latent content and is not erased by a stopword list; recovered modality kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
 - `copied_text` identity gate: copied and boilerplate residue is not unique latent content and is not erased by a stopword list; recovered copied-text kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
 - `style_source` identity gate: house-voice style residue is not unique latent content and is not erased by a stopword list; recovered style kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
 - `stopword_deletion` method gate: a default or global stopword list cannot erase repeated report language; recovered deletion kinds match known truth at a higher computed rate than collapsing every token treatment to stopword deletion (ADR 0004/0012).
