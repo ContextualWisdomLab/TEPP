@@ -1,6 +1,7 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
 **Decision status:** Accepted  
+**Implementation maturity:** active-PR — provenance-vs-transition gate in `citation_edge` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** partial — typed six-clock values and uncertain intervals are implemented-main on protected `main` (merged PR #8 / `temporal_core`); Allen interval algebra and bounded path-consistency are implemented-main on protected `main` (merged PR #9 / `temporal_core`). Superseded PRs #5 and #6 are historical lineage only and are not current-product claims. Downstream estimator, event-intelligence, and remaining persistence-policy uses of these primitives follow their owning ADRs and [`docs/TRACEABILITY.md`](../TRACEABILITY.md).  
 **Implementation maturity:** active-PR — unmerged PR #8 is the canonical Task 3 replacement implementing typed clocks/intervals against the current protected-main lineage; superseded/conflicted PR #5 is historical lineage only; downstream transition/split enforcement remains accepted-target
 **Implementation maturity:** partial — typed clocks/intervals and Allen path-consistency are implemented-main (PR #8/#9); interval-aware historical eligibility (`AvailableTime` interval fully ≤ `KnowledgeCutoff`, unknown/open-ended availability fail closed) is active-PR; remaining downstream split/persistence enforcement remains accepted-target  
