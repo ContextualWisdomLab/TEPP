@@ -42,6 +42,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/summarizes_edge
 crates/outcome_order
 crates/retrospective_edge
 crates/payload_bound

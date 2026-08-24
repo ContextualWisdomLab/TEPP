@@ -6,6 +6,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `summarizes_edge` identity gate: a summary may point to earlier event time but cannot become a state transition or reuse the source document identity; recovered summary kinds match known truth at a higher computed rate than collapsing every summary to the source (ADR 0003).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `outcome_order` identity gate: `input_to` and `process_to` cannot move backward or stay contemporaneous in event-time rank; `outcome_of` may point at an earlier producer and cannot become a state transition; recovered kinds match known truth at a higher computed rate than collapsing every kind to `input_to` (ADR 0002/0003).
 - `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `retrospective_edge` identity gate: retrospective reporting may point to earlier event time but cannot become a state transition or a translation; recovered reporting kinds match known truth at a higher computed rate than collapsing every report to a contemporaneous forward report (ADR 0002/0003).
