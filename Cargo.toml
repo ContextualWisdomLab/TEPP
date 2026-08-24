@@ -35,6 +35,7 @@ members = [
     "crates/event_clock",
     "crates/system_clock",
     "crates/support_edge",
+    "crates/inferred_status",
 ]
 default-members = [
     "crates/evidence_core",
@@ -71,6 +72,7 @@ default-members = [
     "crates/event_clock",
     "crates/system_clock",
     "crates/support_edge",
+    "crates/inferred_status",
 ]
 
 [workspace.package]
