@@ -771,6 +771,76 @@ fn within_residual_event_time_log_rate_beats_pooled_levels() {
 }
 
 #[test]
+fn within_residual_log_rate_rejects_nonpositive_centered_lags() {
+    let rows = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 1.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 1.0,
+            score: 2.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 2.0,
+            score: 0.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: 5.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 1.0,
+            score: 6.0,
+        },
+    ];
+    assert_eq!(
+        recover_within_residual_event_time_log_rate(&rows, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn within_residual_log_rate_rejects_nonfinite_centered_lag_ratios() {
+    let rows = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 1e-320,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 1.0,
+            score: 1.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 2.0,
+            score: -1.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: 2.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 1.0,
+            score: 3.0,
+        },
+    ];
+    assert_eq!(
+        recover_within_residual_event_time_log_rate(&rows, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
 fn irregular_centered_residuals_recover_known_drift_better_than_cwc_of_raw_ar() {
     let true_drift = -0.35_f64;
     let pairs = [
@@ -890,6 +960,12 @@ fn discrete_latent_variance_recovers_driver_equations_three_and_four() {
     // non-finite (Driver Eq. 3–4).
     assert_eq!(
         recover_discrete_latent_variance(2.0, 0.0, 1e308, 2.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    // A finite positive drift interval can overflow exp without making the
+    // interval itself non-finite; the implementation must still fail closed.
+    assert_eq!(
+        recover_discrete_latent_variance(1.0, 0.0, 1_000.0, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }
@@ -1523,6 +1599,18 @@ fn time_dependent_impulse_refuses_overflow_and_non_event_clocks() {
             0.0,
             1e308,
             1.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_latent_mean_with_impulse(
+            1.0,
+            -0.5,
+            0.3,
+            1e308,
+            2.0,
             1.0,
             LagClock::EventTime
         ),
@@ -2994,6 +3082,17 @@ fn time_dependent_impulse_carry_refuses_overflow_and_non_event_clocks() {
         ),
         Err(PsychometricError::InvalidNumericInput)
     );
+    assert_eq!(
+        recover_time_dependent_predictor_impulse_carry(
+            1.0,
+            1.0,
+            1_000.0,
+            2.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
 }
 
 #[test]
@@ -3930,6 +4029,16 @@ fn extra_process_contribution_refuses_nonnegative_extra_drift_clock_and_overflow
         ),
         Ok(0.0)
     );
+    let finite_exp_m1_overflow = recover_level_change_extra_process_contribution(
+        0.4,
+        3.0,
+        -1_000.0,
+        -0.5,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("finite exp_m1 overflow fallback");
+    assert!(finite_exp_m1_overflow.is_finite());
 }
 
 #[test]
@@ -4568,6 +4677,15 @@ fn asymptotic_time_independent_variance_refuses_unstable_drift_and_non_event_clo
     assert_eq!(
         recover_asymptotic_time_independent_predictor_variance(0.0, 1.0, 0.0, LagClock::EventTime),
         Ok(0.0)
+    );
+    assert_eq!(
+        recover_asymptotic_time_independent_predictor_variance(
+            f64::MAX,
+            1.0,
+            -1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }
 
@@ -8655,6 +8773,56 @@ fn standardised_asymptotic_time_independent_effect_refuses_non_event_clocks_and_
             PsychometricError::StandardisedAsymptoticTimeIndependentEffectRequiresPositivePredictorVariance
         )
     );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            f64::NAN,
+            1.0,
+            0.4,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            0.3,
+            f64::NAN,
+            0.4,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            0.3,
+            -0.1,
+            0.4,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            0.3,
+            f64::MAX,
+            1e-308,
+            -1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            f64::MAX,
+            4.0,
+            2.0,
+            -1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
 }
 
 #[test]
@@ -8786,6 +8954,36 @@ fn standardised_continuous_time_independent_effect_refuses_non_event_clocks_and_
             PsychometricError::StandardisedContinuousTimeIndependentEffectRequiresPositivePredictorVariance
         )
     );
+    assert_eq!(
+        recover_standardised_continuous_time_independent_predictor_effect(
+            f64::NAN,
+            1.0,
+            0.4,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_continuous_time_independent_predictor_effect(
+            0.3,
+            f64::NAN,
+            0.4,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_continuous_time_independent_predictor_effect(
+            0.3,
+            -0.1,
+            0.4,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
 }
 
 #[test]
@@ -8916,6 +9114,70 @@ fn standardised_continuous_time_dependent_effect_refuses_non_event_clocks_and_do
         Err(
             PsychometricError::StandardisedContinuousTimeDependentEffectRequiresPositivePredictorVariance
         )
+    );
+}
+
+#[test]
+fn standardised_effects_fail_closed_when_sd_ratio_overflows() {
+    let minimum_positive_variance = f64::from_bits(1);
+    let maximum_predictor_variance = f64::MAX;
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            f64::NAN,
+            1.0,
+            0.4,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_continuous_time_independent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_continuous_time_dependent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_initial_time_independent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_initial_time_dependent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }
 
@@ -9353,6 +9615,14 @@ fn standardised_time_independent_predictor_variance_refuses_non_event_clocks_and
     assert_eq!(
         recover_standardised_time_independent_predictor_variance(0.0, LagClock::EventTime),
         Err(PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(-0.4, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(f64::NAN, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }
 

@@ -1786,7 +1786,7 @@ pub fn refuse_trait_contaminated_initial_time_dependent_effect_as_standardised_i
 /// [`PsychometricError::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance`]
 /// when `T0VAR` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when the variance is
-/// non-finite, negative, or the quadratic form overflows.
+/// non-finite or negative.
 pub fn recover_standardised_initial_latent_variance(
     initial_latent_variance: f64,
     clock: LagClock,
@@ -1802,10 +1802,7 @@ pub fn recover_standardised_initial_latent_variance(
             PsychometricError::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance,
         );
     }
-    let process_sd = initial_latent_variance.sqrt();
-    let inverse_sd = require_finite(1.0 / process_sd)?;
-    let scaled = require_finite(inverse_sd * initial_latent_variance)?;
-    require_finite(scaled * inverse_sd)
+    Ok(1.0)
 }
 
 /// Refuse treating unstandardised `T0VAR` as p. 16 `T0VARstd`.
@@ -1907,7 +1904,7 @@ pub fn refuse_initial_time_independent_variance_as_standardised_initial_latent_v
 /// [`PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance`]
 /// when `TRAITVAR` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when the variance is
-/// non-finite, negative, or the quadratic form overflows.
+/// non-finite or negative.
 pub fn recover_standardised_trait_variance(
     trait_variance: f64,
     clock: LagClock,
@@ -1921,10 +1918,7 @@ pub fn recover_standardised_trait_variance(
     if trait_variance == 0.0 {
         return Err(PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance);
     }
-    let process_sd = trait_variance.sqrt();
-    let inverse_sd = require_finite(1.0 / process_sd)?;
-    let scaled = require_finite(inverse_sd * trait_variance)?;
-    require_finite(scaled * inverse_sd)
+    Ok(1.0)
 }
 
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
@@ -2025,7 +2019,7 @@ pub fn refuse_initial_time_independent_variance_as_standardised_trait_variance(
 /// [`PsychometricError::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance`]
 /// when `MANIFESTTRAITVAR` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when the variance is
-/// non-finite, negative, or the quadratic form overflows.
+/// non-finite or negative.
 pub fn recover_standardised_manifest_trait_variance(
     manifest_trait_variance: f64,
     clock: LagClock,
@@ -2041,10 +2035,7 @@ pub fn recover_standardised_manifest_trait_variance(
             PsychometricError::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance,
         );
     }
-    let process_sd = manifest_trait_variance.sqrt();
-    let inverse_sd = require_finite(1.0 / process_sd)?;
-    let scaled = require_finite(inverse_sd * manifest_trait_variance)?;
-    require_finite(scaled * inverse_sd)
+    Ok(1.0)
 }
 
 /// Refuse treating unstandardised `MANIFESTTRAITVAR` as p. 16
@@ -2161,7 +2152,7 @@ pub fn refuse_measurement_error_as_standardised_manifest_trait_variance(
 /// [`PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance`]
 /// when `MANIFESTVAR` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when the variance is
-/// non-finite, negative, or the quadratic form overflows.
+/// non-finite or negative.
 pub fn recover_standardised_manifest_variance(
     measurement_error_variance: f64,
     clock: LagClock,
@@ -2177,10 +2168,7 @@ pub fn recover_standardised_manifest_variance(
             PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance,
         );
     }
-    let process_sd = measurement_error_variance.sqrt();
-    let inverse_sd = require_finite(1.0 / process_sd)?;
-    let scaled = require_finite(inverse_sd * measurement_error_variance)?;
-    require_finite(scaled * inverse_sd)
+    Ok(1.0)
 }
 
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16
@@ -2289,7 +2277,7 @@ pub fn refuse_observed_variance_as_standardised_manifest_variance(
 /// [`PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance`]
 /// when `TIPREDVAR` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when the variance is
-/// non-finite, negative, or the quadratic form overflows.
+/// non-finite or negative.
 pub fn recover_standardised_time_independent_predictor_variance(
     predictor_variance: f64,
     clock: LagClock,
@@ -2305,10 +2293,7 @@ pub fn recover_standardised_time_independent_predictor_variance(
             PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance,
         );
     }
-    let process_sd = predictor_variance.sqrt();
-    let inverse_sd = require_finite(1.0 / process_sd)?;
-    let scaled = require_finite(inverse_sd * predictor_variance)?;
-    require_finite(scaled * inverse_sd)
+    Ok(1.0)
 }
 
 /// Refuse treating unstandardised `TIPREDVAR` as p. 16
@@ -11873,6 +11858,18 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+        assert_eq!(
+            recover_discrete_latent_mean_with_impulse(
+                1.0,
+                -0.5,
+                0.3,
+                1e308,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]
@@ -12304,6 +12301,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn nonfinite_short_circuit_operands_of_fail_closed_guards_execute() {
         let event = LagClock::EventTime;
         assert_eq!(
@@ -12355,6 +12353,10 @@ mod tests {
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
+            recover_discrete_time_independent_predictor_effect(0.2, 1.0, f64::NAN, 2.0, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
             recover_asymptotic_time_independent_predictor_effect(0.2, f64::NAN, -0.5, event),
             Err(PsychometricError::InvalidNumericInput)
         );
@@ -12372,6 +12374,36 @@ mod tests {
         );
         assert_eq!(
             recover_asymptotic_time_independent_predictor_variance(0.2, 1.0, f64::NAN, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let evolved = recover_discrete_latent_mean(1.0, -0.5, 0.3, 2.0, event)
+            .expect("evolved-extra-process");
+        assert_eq!(
+            recover_discrete_latent_mean_with_extra_process(
+                1.0, -0.5, 0.3, 0.0, 3.0, -0.05, 2.0, event
+            ),
+            Ok(evolved)
+        );
+        let contribution =
+            recover_level_change_extra_process_contribution(0.4, 3.0, -0.5, -0.05, 2.0, event)
+                .expect("extra-process-contribution");
+        assert_eq!(
+            recover_discrete_latent_mean_with_extra_process(
+                0.0, -0.5, 0.0, 0.4, 3.0, -0.05, 2.0, event
+            ),
+            Ok(contribution)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_extra_process(
+                1.0,
+                -0.5,
+                0.3,
+                f64::NAN,
+                3.0,
+                -0.05,
+                2.0,
+                event
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
@@ -12847,6 +12879,30 @@ mod tests {
             ),
             Ok(evolved)
         );
+        let after_contribution = recover_level_change_extra_process_contribution_after(
+            0.4,
+            3.0,
+            -0.5,
+            -0.05,
+            2.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("after-extra-process-contribution");
+        assert_eq!(
+            recover_discrete_latent_mean_with_extra_process_after(
+                0.0,
+                -0.5,
+                0.0,
+                0.4,
+                3.0,
+                -0.05,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Ok(after_contribution)
+        );
     }
 
     #[test]
@@ -13136,6 +13192,15 @@ mod tests {
                 1e200,
                 1.0,
                 -1e-200,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_time_independent_predictor_variance(
+                1e200,
+                1.0,
+                -1e-100,
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
@@ -20230,7 +20295,8 @@ mod tests {
             LagClock::EventTime,
         )
         .expect("growing a>0");
-        assert!(growing.is_finite() && growing > 2.0);
+        assert!(growing.is_finite());
+        assert!(growing > 2.0);
         assert_eq!(
             recover_predetermined_later_lagged_latent_covariance(
                 f64::NAN,
@@ -20897,7 +20963,8 @@ mod tests {
             LagClock::EventTime,
         )
         .expect("growing a>0");
-        assert!(growing.is_finite() && growing > 2.0);
+        assert!(growing.is_finite());
+        assert!(growing > 2.0);
         assert_eq!(
             recover_predetermined_later_start_later_latent_variance(
                 f64::NAN,
@@ -21264,7 +21331,8 @@ mod tests {
         );
         let growing = recover_discrete_lag_from_log_rate(0.5, event_delta, LagClock::EventTime)
             .expect("growing a>0");
-        assert!(growing.is_finite() && growing > 1.0);
+        assert!(growing.is_finite());
+        assert!(growing > 1.0);
         assert_eq!(
             recover_standardised_discrete_drift(0.4, 0.5, event_delta, LagClock::EventTime),
             Err(PsychometricError::StationaryVarianceRequiresStableDrift)
@@ -21385,7 +21453,8 @@ mod tests {
         );
         let growing = recover_discrete_process_noise(0.4, 0.5, event_delta, LagClock::EventTime)
             .expect("growing a>0");
-        assert!(growing.is_finite() && growing > 0.0);
+        assert!(growing.is_finite());
+        assert!(growing > 0.0);
         assert_eq!(
             recover_standardised_discrete_diffusion(0.4, 0.5, event_delta, LagClock::EventTime),
             Err(PsychometricError::StationaryVarianceRequiresStableDrift)
@@ -22223,6 +22292,70 @@ mod tests {
                 1e308,
                 1e-308,
                 log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_effects_fail_closed_when_sd_ratio_overflows() {
+        let minimum_positive_variance = f64::from_bits(1);
+        let maximum_predictor_variance = f64::MAX;
+        assert_eq!(
+            recover_standardised_asymptotic_time_independent_predictor_effect(
+                f64::NAN,
+                1.0,
+                0.4,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_time_independent_predictor_effect(
+                0.4,
+                maximum_predictor_variance,
+                minimum_positive_variance,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_independent_predictor_effect(
+                0.4,
+                maximum_predictor_variance,
+                minimum_positive_variance,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_continuous_time_dependent_predictor_effect(
+                0.4,
+                maximum_predictor_variance,
+                minimum_positive_variance,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_independent_predictor_effect(
+                0.4,
+                maximum_predictor_variance,
+                minimum_positive_variance,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.4,
+                maximum_predictor_variance,
+                minimum_positive_variance,
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
