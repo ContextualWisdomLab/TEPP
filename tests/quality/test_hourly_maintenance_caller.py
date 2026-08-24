@@ -8,7 +8,7 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CALLER_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "hourly-pr-maintenance.yml"
-CENTRAL_SCHEDULER_REVISION = "f070c504c1cb06891b800d7ab0cf6ac7d3cf8eae"
+CENTRAL_SCHEDULER_REVISION = "731af58e954901c4f1cc853231c592abb1eaf617"
 
 
 class HourlyMaintenanceCallerContractTests(unittest.TestCase):
