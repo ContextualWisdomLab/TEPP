@@ -29,6 +29,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `citation_edge` provenance-vs-transition gate on the active PR | active-PR |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `support_edge` evidential-vs-transition gate on the active PR | active-PR |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `outcome_order` IPO event-time order on the active PR | partial |
+| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `summarizes_edge` summary-versus-source identity on the active PR | partial |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `inferred_status` inferred-versus-observed identity on the active PR; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |

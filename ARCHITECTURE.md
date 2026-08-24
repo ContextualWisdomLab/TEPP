@@ -91,6 +91,7 @@ APIs.
 | `inferred_status` | inferred relations cannot be promoted to observed evidence or transitions |
 | `payload_bound` | untrusted documents, records, checkpoints, and LLM outputs fail closed without identity, provenance, size, and depth |
 | `outcome_order` | input-process-outcome edges cannot move backward in event time |
+| `summarizes_edge` | a summary is not a state transition and not the source document |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests
