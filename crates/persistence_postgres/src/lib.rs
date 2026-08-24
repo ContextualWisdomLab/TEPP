@@ -17,7 +17,9 @@
 //! can belong to multiple entities and projects without atomistic collapse.
 //! Entity and project target SQL refuse empty, oversized, or hostile labels
 //! before `INSERT`, so membership foreign keys cannot be seeded from raw
-//! attacker-controlled type or status strings.
+//! attacker-controlled type or status strings. Typed `text_segment` SQL
+//! persists exact UTF-8 byte spans and cutoff-eligible document lookups so
+//! segment-level membership is not raw SQL.
 //! Concurrent document revises use one transactional `DO` block that requires
 //! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
 //! typed conflict errors. Restore integrity probes refuse to mark analytical
@@ -26,6 +28,8 @@
 //! `0007`) records policy-driven lifecycle without restoring tombstoned
 //! evidence or completing a deletion under an active hold. Analysis exclusion
 //! is kind-aligned, and deletion requests bind to the cited policy.
+//! `audit_event` inserts call `operational_log::try_record` so source text,
+//! source identity, and blanket-mask grants cannot become SQL.
 
 mod artifact_sql;
 mod concurrent_write;
@@ -47,6 +51,7 @@ mod project_sql;
 mod relation_sql;
 mod restore_integrity;
 mod retention_sql;
+mod segment_sql;
 mod sql_session;
 mod sqlx_gate;
 #[cfg(feature = "live-sqlx")]
@@ -89,8 +94,12 @@ pub use document_sql::insert_document_sql;
 pub use document_sql::revise_document_atomic_sql;
 /// Render revise close+insert SQL pair.
 pub use document_sql::revise_document_sqls;
+/// Closed operational-log action for an inspected `audit_event` append.
+pub use document_store::ACTION_AUDIT_EVENT_APPEND;
 /// Append-only audit event.
 pub use document_store::AuditEvent;
+/// Source payloads inspected before an `audit_event` insert.
+pub use document_store::AuditSourceInspection;
 /// Bitemporal document version.
 pub use document_store::DocumentRecord;
 /// In-memory bitemporal document store.
@@ -211,6 +220,14 @@ pub use retention_sql::release_legal_hold_sql;
 pub use retention_sql::select_active_analysis_document_sql;
 /// Render supersede SQL for a successive retention policy.
 pub use retention_sql::supersede_retention_policy_sql;
+/// Exact-span text segment row.
+pub use segment_sql::TextSegmentRecord;
+/// Render insert SQL for a validated text segment.
+pub use segment_sql::insert_text_segment_sql;
+/// Render selection SQL for a text segment by primary key.
+pub use segment_sql::select_text_segment_by_id_sql;
+/// Render cutoff-eligible text-segment selection for one document.
+pub use segment_sql::select_text_segments_for_document_as_of_sql;
 /// Recording SQL transport for offline contract tests.
 pub use sql_session::RecordingSqlSession;
 /// Live SQL transport contract.
