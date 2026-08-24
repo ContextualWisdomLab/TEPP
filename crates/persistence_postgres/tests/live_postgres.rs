@@ -14,9 +14,6 @@ use persistence_postgres::{
     RetentionPolicyRecord, SqlSession, TextSegmentRecord, apply_sql_batch,
     assume_app_runtime_role_sql, clear_session_tenant_sql, insert_entity_record_sql,
     insert_project_record_sql, open_live_sqlx_pool, require_live_sqlx_config,
-    ModelRunRecord, PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord,
-    SqlSession, TextSegmentRecord, apply_sql_batch, assume_app_runtime_role_sql,
-    clear_session_tenant_sql, open_live_sqlx_pool, require_live_sqlx_config,
     reset_app_runtime_role_sql, select_active_analysis_document_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
