@@ -4,9 +4,9 @@
 //! Purpose-bound encrypted identity mappings without plaintext persistence.
 //!
 //! Opaque analytical identifiers stay in the clear. Source identity is sealed
-//! with a keyed `SHA-256` HMAC envelope and opens only under an explicit
-//! re-identification purpose (ADR 0009). Persistence and KMS wait for a later
-//! migration; this crate does not allocate `0008`.
+//! with AES-256-GCM and opens only under an explicit re-identification purpose
+//! (ADR 0009). Persistence and KMS wait for a later migration; this crate does
+//! not allocate `0008`.
 
 mod envelope;
 mod error;

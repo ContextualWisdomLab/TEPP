@@ -10,7 +10,7 @@ pub enum EncryptedMappingError {
     UnauthorizedPurpose,
     /// The supplied key identity does not match the sealed envelope.
     KeyIdentityMismatch,
-    /// HMAC authentication of the sealed envelope failed.
+    /// AEAD authentication of the sealed envelope failed.
     AuthenticationFailed,
     /// A source identity was empty or a key was all zeros.
     EmptyIdentity,
@@ -20,6 +20,8 @@ pub enum EncryptedMappingError {
     PersistenceRequiresLaterMigration,
     /// A blanket PII mask was treated as an encryption control.
     BlanketMaskIsNotEncryption,
+    /// The operating-system randomness source could not provide a nonce.
+    RandomnessUnavailable,
 }
 
 impl fmt::Display for EncryptedMappingError {
@@ -37,6 +39,9 @@ impl fmt::Display for EncryptedMappingError {
             }
             Self::BlanketMaskIsNotEncryption => {
                 "a blanket PII mask is not encrypted identity mapping"
+            }
+            Self::RandomnessUnavailable => {
+                "operating-system randomness was unavailable for the encryption nonce"
             }
         };
         formatter.write_str(message)
@@ -79,6 +84,10 @@ mod tests {
             (
                 EncryptedMappingError::BlanketMaskIsNotEncryption,
                 "a blanket PII mask is not encrypted identity mapping",
+            ),
+            (
+                EncryptedMappingError::RandomnessUnavailable,
+                "operating-system randomness was unavailable for the encryption nonce",
             ),
         ] {
             assert_eq!(error.to_string(), message);

@@ -1,10 +1,16 @@
-//! Keyed SHA-256 HMAC envelope for identity mappings.
+//! AES-256-GCM envelope for purpose-bound identity mappings.
 
 use crate::EncryptedMappingError;
+use aes_gcm::{
+    Aes256Gcm,
+    aead::{Aead, KeyInit, Nonce as AeadNonce, Payload},
+};
 use sha2::{Digest, Sha256};
 
-const ENC_CONTEXT: &[u8] = b"tepp-encrypted-mapping-enc";
-const MAC_CONTEXT: &[u8] = b"tepp-encrypted-mapping-mac";
+const NONCE_LENGTH: usize = 12;
+const TAG_LENGTH: usize = 16;
+const MAX_SOURCE_IDENTITY_LENGTH: usize = 1 << 20;
+const AAD_CONTEXT: &[u8] = b"tepp-encrypted-mapping-aes256gcm-v1";
 
 /// Caller-held mapping key identity and bytes.
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -93,9 +99,9 @@ pub enum MappingPurpose {
 pub struct EncryptedIdentityMapping {
     analytical_id: u128,
     key_id: u128,
-    nonce: [u8; 16],
+    nonce: [u8; NONCE_LENGTH],
     ciphertext: Vec<u8>,
-    tag: [u8; 32],
+    tag: [u8; TAG_LENGTH],
 }
 
 impl EncryptedIdentityMapping {
@@ -112,32 +118,63 @@ impl EncryptedIdentityMapping {
     }
 }
 
-/// Seal a source identity so analytical artifacts cannot read it.
+/// Seal a source identity with AES-256-GCM and an operating-system nonce.
 ///
 /// # Errors
 ///
-/// Returns [`EncryptedMappingError::EmptyIdentity`] when the identity is empty.
+/// Returns [`EncryptedMappingError::EmptyIdentity`] when the identity is empty,
+/// [`EncryptedMappingError::InvalidMappingPayload`] when it exceeds the
+/// bounded identity size, or [`EncryptedMappingError::RandomnessUnavailable`]
+/// when the operating system cannot provide a nonce.
+///
+/// # Panics
+///
+/// The fixed-size key, nonce, and bounded payload invariants make the internal
+/// AES-GCM conversions infallible for values accepted by this API.
 pub fn seal_identity(
     analytical_id: u128,
     source_identity: &[u8],
     key: &MappingKey,
-    nonce: [u8; 16],
+) -> Result<EncryptedIdentityMapping, EncryptedMappingError> {
+    seal_identity_with_fill(analytical_id, source_identity, key, getrandom::fill)
+}
+
+fn seal_identity_with_fill(
+    analytical_id: u128,
+    source_identity: &[u8],
+    key: &MappingKey,
+    fill: impl FnOnce(&mut [u8]) -> Result<(), getrandom::Error>,
 ) -> Result<EncryptedIdentityMapping, EncryptedMappingError> {
     if source_identity.is_empty() {
         return Err(EncryptedMappingError::EmptyIdentity);
     }
-    let ciphertext = xor_keystream(
-        source_identity,
-        &derive_key(key, ENC_CONTEXT),
-        analytical_id,
-        &nonce,
-    );
-    let tag = authenticate(key, analytical_id, &nonce, &ciphertext);
+    if source_identity.len() > MAX_SOURCE_IDENTITY_LENGTH {
+        return Err(EncryptedMappingError::InvalidMappingPayload);
+    }
+    let mut nonce = [0_u8; NONCE_LENGTH];
+    fill_nonce(&mut nonce, fill)?;
+    let cipher = Aes256Gcm::new_from_slice(&key.key_bytes).expect("AES-256 key has fixed length");
+    let nonce_array =
+        AeadNonce::<Aes256Gcm>::try_from(nonce.as_slice()).expect("nonce has fixed length");
+    let aad = associated_data(analytical_id, key.key_id);
+    let mut sealed = cipher
+        .encrypt(
+            &nonce_array,
+            Payload {
+                msg: source_identity,
+                aad: &aad,
+            },
+        )
+        .expect("bounded identity fits AES-GCM payload limit");
+    let tag_start = sealed.len() - TAG_LENGTH;
+    let tag_bytes = sealed.split_off(tag_start);
+    let mut tag = [0_u8; TAG_LENGTH];
+    tag.copy_from_slice(&tag_bytes);
     Ok(EncryptedIdentityMapping {
         analytical_id,
         key_id: key.key_id,
         nonce,
-        ciphertext,
+        ciphertext: sealed,
         tag,
     })
 }
@@ -148,6 +185,11 @@ pub fn seal_identity(
 ///
 /// Returns purpose, key-identity, or authentication errors when opening is
 /// unauthorized or the envelope does not authenticate.
+///
+/// # Panics
+///
+/// The envelope stores a fixed-size nonce and the key is a fixed-size
+/// AES-256 key, so the internal conversions are infallible.
 pub fn open_identity(
     envelope: &EncryptedIdentityMapping,
     key: &MappingKey,
@@ -159,21 +201,21 @@ pub fn open_identity(
     if envelope.key_id != key.key_id {
         return Err(EncryptedMappingError::KeyIdentityMismatch);
     }
-    let expected = authenticate(
-        key,
-        envelope.analytical_id,
-        &envelope.nonce,
-        &envelope.ciphertext,
-    );
-    if !tags_equal(&expected, &envelope.tag) {
-        return Err(EncryptedMappingError::AuthenticationFailed);
-    }
-    Ok(xor_keystream(
-        &envelope.ciphertext,
-        &derive_key(key, ENC_CONTEXT),
-        envelope.analytical_id,
-        &envelope.nonce,
-    ))
+    let cipher = Aes256Gcm::new_from_slice(&key.key_bytes).expect("AES-256 key has fixed length");
+    let aad = associated_data(envelope.analytical_id, envelope.key_id);
+    let mut sealed = envelope.ciphertext.clone();
+    sealed.extend_from_slice(&envelope.tag);
+    let nonce = AeadNonce::<Aes256Gcm>::try_from(envelope.nonce.as_slice())
+        .expect("nonce has fixed length");
+    cipher
+        .decrypt(
+            &nonce,
+            Payload {
+                msg: &sealed,
+                aad: &aad,
+            },
+        )
+        .map_err(|_| EncryptedMappingError::AuthenticationFailed)
 }
 
 /// Refuse to treat a blanket PII mask as encryption.
@@ -216,45 +258,19 @@ pub fn identity_recovery_rate(
     Ok(f64::from(matches) / truth.len() as f64)
 }
 
-fn derive_key(key: &MappingKey, context: &[u8]) -> [u8; 32] {
-    hmac_sha256(&key.key_bytes, context)
+fn associated_data(analytical_id: u128, key_id: u128) -> Vec<u8> {
+    let mut data = Vec::with_capacity(AAD_CONTEXT.len() + 32);
+    data.extend_from_slice(AAD_CONTEXT);
+    data.extend_from_slice(&analytical_id.to_be_bytes());
+    data.extend_from_slice(&key_id.to_be_bytes());
+    data
 }
 
-fn authenticate(
-    key: &MappingKey,
-    analytical_id: u128,
-    nonce: &[u8; 16],
-    ciphertext: &[u8],
-) -> [u8; 32] {
-    let mut message = Vec::with_capacity(16 + 16 + ciphertext.len());
-    message.extend_from_slice(&analytical_id.to_be_bytes());
-    message.extend_from_slice(nonce);
-    message.extend_from_slice(ciphertext);
-    hmac_sha256(&derive_key(key, MAC_CONTEXT), &message)
-}
-
-fn xor_keystream(
-    payload: &[u8],
-    enc_key: &[u8; 32],
-    analytical_id: u128,
-    nonce: &[u8; 16],
-) -> Vec<u8> {
-    payload
-        .chunks(32)
-        .enumerate()
-        .flat_map(|(block_index, chunk)| {
-            let mut block_input = [0_u8; 40];
-            block_input[..16].copy_from_slice(&analytical_id.to_be_bytes());
-            block_input[16..32].copy_from_slice(nonce);
-            block_input[32..].copy_from_slice(&(block_index as u64).to_be_bytes());
-            let block = hmac_sha256(enc_key, &block_input);
-            chunk
-                .iter()
-                .zip(block)
-                .map(|(byte, mask)| byte ^ mask)
-                .collect::<Vec<u8>>()
-        })
-        .collect()
+fn fill_nonce(
+    nonce: &mut [u8; NONCE_LENGTH],
+    fill: impl FnOnce(&mut [u8]) -> Result<(), getrandom::Error>,
+) -> Result<(), EncryptedMappingError> {
+    fill(nonce).map_err(|_| EncryptedMappingError::RandomnessUnavailable)
 }
 
 fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
@@ -289,19 +305,11 @@ fn keyed_block(key: &[u8]) -> [u8; 64] {
     block
 }
 
-fn tags_equal(left: &[u8; 32], right: &[u8; 32]) -> bool {
-    let mut acc = 0_u8;
-    for index in 0..32 {
-        acc |= left[index] ^ right[index];
-    }
-    acc == 0
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        MappingKey, MappingPurpose, hmac_sha256, identity_recovery_rate, open_identity,
-        seal_identity, tags_equal,
+        MAX_SOURCE_IDENTITY_LENGTH, MappingKey, MappingPurpose, NONCE_LENGTH, fill_nonce,
+        hmac_sha256, identity_recovery_rate, open_identity, seal_identity, seal_identity_with_fill,
     };
     use crate::EncryptedMappingError;
 
@@ -336,7 +344,7 @@ mod tests {
         let mut delayed = [0_u8; 32];
         delayed[5] = 0x33;
         let key = MappingKey::new(1, delayed).expect("key");
-        let sealed = seal_identity(9, b"department-north", &key, [9; 16]).expect("seal");
+        let sealed = seal_identity(9, b"department-north", &key).expect("seal");
         let mut body = sealed.clone();
         body.ciphertext[0] ^= 0x01;
         assert_eq!(
@@ -349,23 +357,43 @@ mod tests {
             open_identity(&tagged, &key, MappingPurpose::ReidentificationExport),
             Err(EncryptedMappingError::AuthenticationFailed)
         );
-        assert!(!tags_equal(&[0; 32], &[1; 32]));
     }
 
     #[test]
-    fn long_identity_uses_more_than_one_keystream_block() {
+    fn randomness_failure_fails_closed() {
+        let mut nonce = [0_u8; NONCE_LENGTH];
+        assert_eq!(
+            fill_nonce(&mut nonce, |_| Err(getrandom::Error::new_custom(1))),
+            Err(EncryptedMappingError::RandomnessUnavailable)
+        );
+        let key = MappingKey::new(15, [0x99; 32]).expect("key");
+        assert_eq!(
+            seal_identity_with_fill(15, b"secret-name", &key, |_| {
+                Err(getrandom::Error::new_custom(1))
+            }),
+            Err(EncryptedMappingError::RandomnessUnavailable)
+        );
+    }
+
+    #[test]
+    fn long_identity_round_trips_through_aead() {
         let key = MappingKey::new(2, [0x44; 32]).expect("key");
         let identity = vec![0x55_u8; 40];
-        let sealed = seal_identity(10, &identity, &key, [10; 16]).expect("seal");
+        let sealed = seal_identity(10, &identity, &key).expect("seal");
         let opened =
             open_identity(&sealed, &key, MappingPurpose::ReidentificationExport).expect("open");
         assert_eq!(opened, identity);
         assert_ne!(sealed.ciphertext, identity);
-        assert!(
-            !sealed
-                .ciphertext
-                .windows(identity.len())
-                .any(|window| window == identity)
+    }
+
+    #[test]
+    fn oversized_identity_fails_closed_before_encryption() {
+        let key = MappingKey::new(14, [0x88; 32]).expect("key");
+        let oversized = vec![0_u8; MAX_SOURCE_IDENTITY_LENGTH + 1];
+
+        assert_eq!(
+            seal_identity(14, &oversized, &key),
+            Err(EncryptedMappingError::InvalidMappingPayload)
         );
     }
 
@@ -382,7 +410,7 @@ mod tests {
     #[test]
     fn debug_does_not_print_the_source_identity() {
         let key = MappingKey::new(3, [0x55; 32]).expect("key");
-        let sealed = seal_identity(11, b"secret-name", &key, [11; 16]).expect("seal");
+        let sealed = seal_identity(11, b"secret-name", &key).expect("seal");
         let rendered = format!("{sealed:?}");
         assert!(!rendered.contains("secret-name"));
         assert_eq!(sealed.analytical_id(), 11);
@@ -390,29 +418,21 @@ mod tests {
     }
 
     #[test]
+    fn analytical_id_is_authenticated_as_associated_data() {
+        let key = MappingKey::new(4, [0x77; 32]).expect("key");
+        let mut altered = seal_identity(12, b"secret-name", &key).expect("seal");
+        altered.analytical_id = 13;
+
+        assert_eq!(
+            open_identity(&altered, &key, MappingPurpose::ReidentificationExport),
+            Err(EncryptedMappingError::AuthenticationFailed)
+        );
+    }
+
+    #[test]
     fn mapping_key_debug_does_not_print_key_bytes() {
         let key = MappingKey::new(12, [0xa5; 32]).expect("key");
 
         assert_eq!(format!("{key:?}"), "MappingKey { key_id: 12 }");
-    }
-
-    #[test]
-    fn analytical_identity_separates_same_nonce_keystreams() {
-        let key = MappingKey::new(13, [0x66; 32]).expect("key");
-        let left = seal_identity(1, b"alice", &key, [9; 16]).expect("left");
-        let right = seal_identity(2, b"bob!!", &key, [9; 16]).expect("right");
-
-        let ciphertext_xor: Vec<u8> = left
-            .ciphertext
-            .iter()
-            .zip(right.ciphertext.iter())
-            .map(|(left, right)| left ^ right)
-            .collect();
-        let plaintext_xor: Vec<u8> = b"alice"
-            .iter()
-            .zip(b"bob!!".iter())
-            .map(|(left, right)| left ^ right)
-            .collect();
-        assert_ne!(ciphertext_xor, plaintext_xor);
     }
 }

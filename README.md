@@ -7,9 +7,10 @@ implemented in Rust.
 ## Current implementation state
 
 This branch establishes the Task 1 Rust workspace and quality-gate foundation.
-The eleven bounded crates compile independently but intentionally expose no
-placeholder production APIs. Domain behavior begins in Task 2 with immutable
-evidence identifiers and source records.
+The eleven bounded crates compile independently; Task 1 includes the
+implemented `encrypted_mapping` crate with AES-256-GCM sealing and
+purpose-bound opening, while the remaining domain behavior begins in Task 2
+with immutable evidence identifiers and source records.
 
 ```text
 crates/evidence_core

@@ -88,6 +88,8 @@ Davis, K., Peabody, B., & Leach, P. (2024). *Universally unique identifier (UUID
 
 National Institute of Standards and Technology. (2015). *Secure Hash Standard (SHS)* (FIPS PUB 180-4). https://doi.org/10.6028/NIST.FIPS.180-4
 
+Dworkin, M. (2007). *Recommendation for block cipher modes of operation: Galois/Counter mode (GCM) and GMAC* (NIST Special Publication 800-38D). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-38D
+
 Krawczyk, H., Bellare, M., & Canetti, R. (1997). *HMAC: Keyed-hashing for message authentication* (RFC 2104). RFC Editor. https://doi.org/10.17487/RFC2104
 
 Nystrom, M. (2005). *Identifiers and Test Vectors for HMAC-SHA-224, HMAC-SHA-256, HMAC-SHA-384, and HMAC-SHA-512* (RFC 4231). RFC Editor. https://doi.org/10.17487/RFC4231
@@ -98,7 +100,7 @@ Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology
 
 Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
 
-TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. `encrypted_mapping` uses HMAC-SHA-256 as a purpose-bound envelope (Krawczyk et al., 1997; Nystrom, 2005); that construction is not a FIPS, CSAP, or SOC 2 claim and does not persist mappings.
+TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. `encrypted_mapping` uses AES-256-GCM authenticated encryption with an operating-system-generated nonce and identifier-bound associated data (Dworkin, 2007); HMAC-SHA-256 remains a key-material normalization primitive (Krawczyk et al., 1997; Nystrom, 2005). These constructions are not a CSAP or SOC 2 certification claim and do not persist mappings.
 
 ## Privacy lifecycle, retention, and legal hold
 
