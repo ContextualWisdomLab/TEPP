@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- Hourly contextual-orchestrator discovery records all provider models but routes OpenCode only through general-chat candidates, excluding embedding, image, reranker, transcription, moderation, safety, and other endpoint-only identifiers before price selection.
 - Live `docs/product-technical-gap-baseline.md` mapping operator-visible gaps to
   protected-main maturity, exact current PR/issue state, stacked delivery order,
   and closure evidence; placeholder-only issues #161 and #162 were closed as
@@ -50,6 +51,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `persistence_postgres` live SQL port: `SqlSession` transport, migration batch applicator, document/audit SQL contracts, `LiveDocumentRepository`, and fail-closed `DATABASE_URL`/`LiveSqlxConfig` gate for SQLx pool wiring (optional `live-sqlx` driver attaches `PgPool`).
 - `membership_core` Kish effective sample size, design effect, and group-normalized ESS helpers for multiple-membership estimation inputs.
 - Credential-separated hourly NVIDIA NIM/OpenCode product-development workflow (issue #2): proposal, independent verification, and late Maintainer-App publication with `NVIDIA_NIM_API_KEY` only for model work.
+- Hourly product-development queue gate now fails closed when either an open pull request or an open issue exists, including a second queue check immediately before publication.
 - Documented modular naruon consumer contract for TEPP analysis-run and export surfaces, with a committed example request payload.
 - Documented contextual-orchestrator interpretation port boundary and credential separation for TEPP.
 - Foundation validation/release-readiness ledger at `docs/validation/temporal-event-foundation.md` tracking capability maturity and scientific acceptance gates.
