@@ -14,6 +14,8 @@ This report tracks exact-head scientific and engineering evidence required befor
 |---|---|---|---|---|---|
 | Immutable evidence + spans | `evidence_core` | implemented-main | — | unit + wire + coverage | Task 2 |
 | Six-clock temporal | `temporal_core` | implemented-main | — | unit + wire | Task 3 / PR #8 |
+| Knowledge-cutoff identity | `cutoff_clock` | active-PR | this PR | recovered cutoff flags vs availability-time stand-in | ADR 0002 |
+| Six-clock temporal | `temporal_core` | implemented-main | `document_clocks` omitted assertion/document time | unit + wire | Task 3 / PR #8; document-row clocks on this PR |
 | Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
 | Multiple membership | `membership_core` | partial | nested ICC + non-nested refusal | unit + ESS + nested ICC recovery | Task 7 / PR #12 + #25 + this increment |
@@ -27,6 +29,11 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Mention-confidence Brier score | `event_core` | active-PR | calibration vs binary truth | perfect 0 / half 0.25 RMSE | ADR 0003; `docs/research/mention-confidence-brier.md` |
 | Checkpoint is not the estimator | `checkpoint_authority` | accepted-target | active PR | refuse checkpoint-as-estimator + unvalidated artifact + recovery vs estimator collapse | ADR 0001/0014 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Availability-clock identity | `available_clock` | active-PR | this PR | recovered availability flags vs system-time stand-in | ADR 0002 |
+| Revision system-time order | `revision_order` | active-PR | this PR | order-flag recovery vs accept-all | ADR 0002/0013 |
+| Provenance-vs-transition gate | `citation_edge` | active-PR | this PR | recovered kind rate vs citation collapse | ADR 0002/0003 |
+| ESEM/DSEM CPU fit | `psychometric_fit` | active-PR | this PR | loading RMSE vs zero-collapse; reverse-lag refusal | ADR 0005; does not recreate `psychometric_core` |
+| Subevent parent containment | `subevent_containment` | active-PR | this PR | containment-flag recovery vs accept-all | ADR 0003 |
 | Predicted-vs-observed contradiction | `prediction_contradiction` | active-PR | this PR | `refuse_promotion` requires observed coverage; `refuse_contradiction_or_adjacency` is not promotion authority; cutoff eligibility; label agreement is not RMSE recovery | ADR 0016 |
 | Provider-disclosure receipts | `provider_receipt` | active-PR | this PR | recovered field-code rate vs collapsed set | ADR 0009 |
  | Purpose-bound provider payloads | `tepp_api` | implemented-main | provider-payload minimization | expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay | ADR 0009; `docs/research/provider-payload-minimization.md` |
@@ -43,6 +50,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Derived sensitivity inheritance | `derived_sensitivity` | active-PR | this PR | fixed 3×3 topic/factor/relation × Public/Internal/Restricted truth with kind-and-class recovery and public-collapse rates invariant to reordering; fail-closed unknown kinds, validated public constructors, empty/mismatched payloads, unauthorized derivation-as-public, unauthorized blanket PII masking | ADR 0009; GDPR Art. 4(1)/Recital 26; WP 136 |
 | Evidence-bounded LLM interpretation | `interpretation_gateway` | active-PR | this PR | span citation + unsupported-claim rate | ADR 0010; live orchestration remaining |
 | TDT/CHRONOS evidence-status gates | `event_core` | active-PR | PR #50 | admission + first-story rates | known-stream miss/FA; full tracking/calibration/schema extraction remains future; ADR 0016; `docs/research/event-intelligence-status-gates.md` |
+| Encrypted identity mapping envelope | `encrypted_mapping` | active-PR | this PR | exact-head evidence with no unresolved security blocker; unauthorized purpose, wrong key identity/bytes, tampered ciphertext/tag, key redaction, empty input, persistence refusal, generated-nonce/reuse resistance, and recovered identity rate vs collapsed names | ADR 0009; persistence waits for later migration; promotion requires the complete fail-closed security matrix |
 | Purpose-bound provider payloads | `tepp_api` | implemented-main | — | expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay | ADR 0009; `docs/research/provider-payload-minimization.md` |
 | Adaptive orchestration router | `tepp_api` | partial | — | mode selection, document-control denial, ablation, credential-free bind; live NIM execution remains future | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |

@@ -11,6 +11,14 @@ members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
+    "crates/cutoff_clock",
+    "crates/available_clock",
+    "crates/document_clocks",
+    "crates/revision_order",
+    "crates/encrypted_mapping",
+    "crates/citation_edge",
+    "crates/psychometric_fit",
+    "crates/subevent_containment",
     "crates/prediction_contradiction",
     "crates/provider_receipt",
     "crates/operational_log",
@@ -34,6 +42,14 @@ default-members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
+    "crates/cutoff_clock",
+    "crates/available_clock",
+    "crates/document_clocks",
+    "crates/revision_order",
+    "crates/encrypted_mapping",
+    "crates/citation_edge",
+    "crates/psychometric_fit",
+    "crates/subevent_containment",
     "crates/prediction_contradiction",
     "crates/provider_receipt",
     "crates/operational_log",
@@ -60,6 +76,8 @@ keywords = ["psychometrics", "temporal", "events", "topic-modeling", "rust"]
 categories = ["science", "algorithms"]
 
 [workspace.dependencies]
+aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "alloc"] }
+getrandom = "=0.4.3"
 jiff = { version = "=0.2.35", default-features = false, features = ["std"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"

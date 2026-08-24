@@ -16,7 +16,7 @@ Fox, J.-P., & Glas, C. A. W. (2001). Bayesian estimation of a multilevel IRT mod
 
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM (American Educational Research Association, American Psychological Association, & National Council on Measurement in Education, 2014; Asparouhov & Muthén, 2009; Asparouhov et al., 2018; Hamaker et al., 2015; Marsh et al., 2014). Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. `longitudinal_core` separates stable between-unit means from within-unit residuals and refuses to score a between component as within-unit change.
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. `psychometric_fit` recovers those cross-loadings and event-time lagged paths on a CPU `f64` OLS path; see `docs/research/esem-dsem-fit.md`.
 
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 
@@ -87,8 +87,13 @@ International Organization for Standardization. (2019). *Date and time—Represe
 `meets`/`met_by` as unsupported adjacency, and
 `during`/`starts`/`finishes`/`equals` as the only coverage relations that can
 authorize promotion.
+Jensen, C. S., & Snodgrass, R. T. (1999). Temporal data management. *IEEE Transactions on Knowledge and Data Engineering, 11*(1), 36–44. https://doi.org/10.1109/69.755613
 
-TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers.
+Snodgrass, R. T. (2000). *Developing time-oriented database applications in SQL*. Morgan Kaufmann.
+
+Tashman, L. J. (2000). Out-of-sample tests of forecasting accuracy: An analysis and review. *International Journal of Forecasting, 16*(4), 437–450. https://doi.org/10.1016/S0169-2070(00)00065-0
+
+TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Valid time, transaction time, and a document's availability are not substitutes for `cutoff_clock` knowledge cutoff.
 
 ## Unicode, language tags, and multilingual structure
 
@@ -114,6 +119,12 @@ Davis, K., Peabody, B., & Leach, P. (2024). *Universally unique identifier (UUID
 
 National Institute of Standards and Technology. (2015). *Secure Hash Standard (SHS)* (FIPS PUB 180-4). https://doi.org/10.6028/NIST.FIPS.180-4
 
+Dworkin, M. (2007). *Recommendation for block cipher modes of operation: Galois/Counter mode (GCM) and GMAC* (NIST Special Publication 800-38D). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-38D
+
+Krawczyk, H., Bellare, M., & Canetti, R. (1997). *HMAC: Keyed-hashing for message authentication* (RFC 2104). RFC Editor. https://doi.org/10.17487/RFC2104
+
+Nystrom, M. (2005). *Identifiers and Test Vectors for HMAC-SHA-224, HMAC-SHA-256, HMAC-SHA-384, and HMAC-SHA-512* (RFC 4231). RFC Editor. https://doi.org/10.17487/RFC4231
+
 Yergeau, F. (2003). *UTF-8, a transformation format of ISO 10646* (RFC 3629). RFC Editor. https://doi.org/10.17487/RFC3629
 
 Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology*. World Wide Web Consortium. https://www.w3.org/TR/prov-o/
@@ -124,7 +135,7 @@ National Academies of Sciences, Engineering, and Medicine. (2019). *Reproducibil
 
 Peng, R. D. (2011). Reproducible research in computational science. *Science, 334*(6060), 1226–1227. https://doi.org/10.1126/science.1213847
 
-TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. A model checkpoint is a derived run artifact whose digest verifies bytes (National Institute of Standards and Technology, 2015); it does not become the CPU `f64` estimator or a scientific claim (Peng, 2011; National Academies of Sciences, Engineering, and Medicine, 2019).
+TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. `encrypted_mapping` uses AES-256-GCM authenticated encryption with an operating-system-generated nonce and identifier-bound associated data (Dworkin, 2007); HMAC-SHA-256 remains a key-material normalization primitive (Krawczyk et al., 1997; Nystrom, 2005). A model checkpoint is a derived run artifact whose digest verifies bytes (National Institute of Standards and Technology, 2015); it does not become the CPU `f64` estimator or a scientific claim (Peng, 2011; National Academies of Sciences, Engineering, and Medicine, 2019). These constructions are not a CSAP or SOC 2 certification claim and do not persist mappings.
 
 ## Privacy and operational log/source separation
 
@@ -133,6 +144,16 @@ International Organization for Standardization and International Electrotechnica
 International Organization for Standardization and International Electrotechnical Commission. (2022). *Information security, cybersecurity and privacy protection—Information security controls* (ISO/IEC Standard No. 27002:2022). Logging is an operational control, not authorization to copy source text or source identity into the log.
 
 International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011). Data minimization informs `provider_receipt`; it is not a certification claim.
+
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434. The `during` relation informs `subevent_containment`; the crate does not implement Allen composition.
+
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434. Interval relations inform `citation_edge`; they do not make a citation a state transition.
+
+Snodgrass, R. T. (2000). *Developing time-oriented database applications in SQL*. Morgan Kaufmann. Transaction/system time informs `revision_order`; a later recorded revision cannot precede an earlier one.
+
+Jensen, C. S., & Snodgrass, R. T. (1996). Semantics of time-varying information. *Information Systems, 21*(4), 311–352. https://doi.org/10.1016/0306-4379(96)00017-8 Valid time versus transaction/system time informs `document_clocks`; assertion time and document time remain additional TEPP clocks and cannot be omitted or replaced by event or system time.
+
+Snodgrass, R. T. (2000). *Developing time-oriented database applications in SQL*. Morgan Kaufmann. Valid vs transaction time informs `available_clock`; availability is a third TEPP clock.
 
 ## Privacy lifecycle, retention, and legal hold
 
