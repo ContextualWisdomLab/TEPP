@@ -22,7 +22,8 @@ Add standalone crate `semantic_core` as the first ADR 0004 production slice:
 - a semantic unit is identified by exact `SourceSpan` coordinates
   (document identity plus byte start/end);
 - a language profile is optional metadata (`unresolved` or a primary ISO 639
-  subtag with optional region);
+  subtag with an optional region validated against the pinned IANA Language
+  Subtag Registry snapshot dated 2026-08-08);
 - unresolved language keeps the caller-supplied span and does not switch
   segmentation heuristic;
 - `SemanticIdentity::from_language_tag` fails closed;
@@ -56,7 +57,8 @@ units without inheriting language-as-identity.
 
 ## Failure and recovery
 
-Empty or malformed language tags fail closed. Offering a language tag as
+Empty, malformed, private-use, or unknown-region language tags fail closed.
+Offering a language tag as
 identity fails closed. Recovery supplies a valid exact span and optional
 profile; it does not rewrite historical artifacts.
 

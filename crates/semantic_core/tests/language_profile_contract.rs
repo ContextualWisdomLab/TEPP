@@ -52,3 +52,20 @@ fn missing_language_does_not_retokenize_or_steal_identity() {
         Err(SemanticError::LanguageIsNotIdentity)
     );
 }
+
+#[test]
+fn language_profiles_use_registered_iana_region_subtags() {
+    assert_eq!(
+        LanguageProfile::parse_bcp47("es-419")
+            .expect("registered numeric region")
+            .as_str(),
+        "es-419"
+    );
+    for tag in ["en-aa", "en-XX", "en-QM", "en-abc", "en-999"] {
+        assert_eq!(
+            LanguageProfile::parse_bcp47(tag),
+            Err(SemanticError::InvalidLanguageTag),
+            "private or unknown region must fail closed: {tag}"
+        );
+    }
+}
