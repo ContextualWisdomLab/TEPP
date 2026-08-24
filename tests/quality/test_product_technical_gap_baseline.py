@@ -193,6 +193,45 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             ):
                 docs.validate_product_technical_gap_baseline(root)
 
+    def test_leading_negation_before_queued_checks_is_accepted(self) -> None:
+        """Negation placed before the phrase still denies promotion honestly."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline(
+                    extra=(
+                        "\nThe register does not treat queued Checks "
+                        "as implemented-main.\n"
+                    )
+                ),
+                encoding="utf-8",
+            )
+            docs.validate_product_technical_gap_baseline(root)
+
+    def test_adversative_severed_negation_still_fails(self) -> None:
+        """An unrelated negated clause cannot license a later maturity claim."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline(
+                    extra=(
+                        "\nqueued Checks never make noise, but "
+                        "this PR is implemented-main.\n"
+                    )
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "queued Checks as implemented-main"
+            ):
+                docs.validate_product_technical_gap_baseline(root)
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
