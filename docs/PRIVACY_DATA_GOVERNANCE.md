@@ -66,7 +66,7 @@ Retention is policy-driven per data class and purpose. Raw evidence, derived mod
 - immutable audit evidence that records the deletion action without retaining unnecessary raw PII;
 - legal or contractual hold that prevents deletion and records its authority.
 
-Historical model reproducibility cannot silently override an approved deletion obligation. If source deletion makes exact reproduction unavailable, TEPP records that limitation rather than restoring deleted data from an ungoverned copy. Migration `0007` (active PR) persists `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` so an active hold blocks completed deletion and a tombstone blocks restore of the same document identity.
+Historical model reproducibility cannot silently override an approved deletion obligation. If source deletion makes exact reproduction unavailable, TEPP records that limitation rather than restoring deleted data from an ungoverned copy. Migration `0007` (implemented-main via PR #45) persists `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` so an active hold blocks completed deletion and a tombstone blocks restore of the same document identity.
 
 ## 7. Tenant and service isolation
 
