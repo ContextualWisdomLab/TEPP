@@ -44,7 +44,8 @@ cargo deny check
 Stable Rust line coverage is measured with `cargo-llvm-cov`. Branch coverage is
 measured in a separately pinned nightly lane because Rust branch coverage remains
 an unstable compiler capability. A zero denominator is reported explicitly for
-this skeleton-only slice; it must never conceal uncovered production behavior.
+any crate whose lane still ships no executable behavior; it must never conceal
+uncovered production behavior.
 
 ## Normative documents
 
@@ -54,5 +55,12 @@ this skeleton-only slice; it must never conceal uncovered production behavior.
 - `docs/superpowers/plans/2026-08-05-temporal-event-foundation.md`
 - `docs/research/standards-and-literature.md`
 
-No release, production-readiness, GPU, database, or statistical-recovery claim is
-made by this foundation slice.
+Validated statistical-recovery APIs exist only inside `psychometric_core`: OLS
+loading recovery on already-mapped coordinates, posterior-draw point estimates,
+the Rubin total-variance identity `T = U_bar + (1 + 1/m) B`, CWC/event-time/
+contextual recovery maps, and two-group OLS latent-mean comparison gated behind
+typed strong/strict invariance evidence (`LatentMeanComparisonEvidence`; metric,
+weak, or configural status cannot reduce to a passing flag). No release,
+production-readiness, GPU, or database claim is made by this foundation slice,
+and no crate yet implements a full ESEM/DSEM estimator (the two-group OLS
+invariance gate is not MGCFA).

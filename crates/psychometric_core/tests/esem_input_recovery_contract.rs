@@ -2,9 +2,10 @@
 #![allow(clippy::cast_precision_loss)]
 
 use psychometric_core::{
-    CausalHeuristic, ConstructClass, IndicatorKind, PsychometricError, claim_causal_effect,
-    compare_latent_means, interpret_as_reflective, ordinary_least_squares_slope,
-    pearson_correlation, posterior_draw_point_estimate_mean, recover_loading_point_estimate_mean,
+    CausalHeuristic, ConstructClass, IndicatorKind, LatentMeanComparisonEvidence,
+    MeanInvarianceStatus, PsychometricError, claim_causal_effect, compare_latent_means,
+    interpret_as_reflective, ordinary_least_squares_slope, pearson_correlation,
+    posterior_draw_point_estimate_mean, recover_loading_point_estimate_mean,
     recover_reflective_loading, require_valid_indicator,
 };
 
@@ -210,10 +211,20 @@ fn construct_class_and_causal_heuristics_refuse_overclaim() {
         Err(PsychometricError::UnresolvedConstruct)
     );
 
-    compare_latent_means(true).expect("invariance met");
+    let licensed = LatentMeanComparisonEvidence {
+        status: MeanInvarianceStatus::Strong,
+        comparison_scope: String::from("construct mean across two groups"),
+        model_version: String::from("esem-input-contract-v1"),
+    };
+    compare_latent_means(&licensed).expect("strong invariance met");
+    let unlicensed = LatentMeanComparisonEvidence {
+        status: MeanInvarianceStatus::Configural,
+        comparison_scope: String::from("construct mean across two groups"),
+        model_version: String::from("esem-input-contract-v1"),
+    };
     assert_eq!(
-        compare_latent_means(false),
-        Err(PsychometricError::InvarianceRequired)
+        compare_latent_means(&unlicensed),
+        Err(PsychometricError::StrongInvarianceRequired)
     );
 
     for heuristic in [
@@ -277,8 +288,8 @@ fn finite_alr_correlation_and_error_messages_are_stable() {
         "construct class is unresolved"
     );
     assert_eq!(
-        PsychometricError::InvarianceRequired.to_string(),
-        "latent-mean comparison requires invariance evidence"
+        PsychometricError::MalformedInvarianceEvidence.to_string(),
+        "invariance evidence requires a non-empty comparison scope and model version"
     );
     assert_eq!(
         PsychometricError::EventTimeRequired.to_string(),

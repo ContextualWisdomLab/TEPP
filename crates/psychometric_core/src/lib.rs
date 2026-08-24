@@ -215,7 +215,9 @@ pub use cluster_mean::recover_cluster_mean_within_between_slopes;
 pub use cluster_mean::recover_kish_weighted_slope;
 /// Higher-order construct class.
 pub use construct::ConstructClass;
-/// Permit latent-mean comparison only with invariance evidence.
+/// Typed invariance evidence required before a latent-mean comparison.
+pub use construct::LatentMeanComparisonEvidence;
+/// Permit latent-mean comparison only on strong/strict typed evidence.
 pub use construct::compare_latent_means;
 /// Refuse fit-driven reinterpretation as reflective.
 pub use construct::interpret_as_reflective;

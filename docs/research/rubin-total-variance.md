@@ -12,7 +12,7 @@ Adds Rubin combining for complete-data OLS loadings across posterior indicator d
 
 Rubin, D. B. (1996). Multiple imputation after 18+ years. *Journal of the American Statistical Association, 91*(434), 473–489. https://doi.org/10.1080/01621459.1996.10476908
 
-The scanned page 473 restates \(T_m=\bar U_m+(1+1/m)B_m\) from Rubin (1987). The 1987 book itself was not opened.
+The scanned page 473 of the reviewed Rubin (1996) article restates \(T_m=\bar U_m+(1+1/m)B_m\). The 1987 book was not opened; this document's authority for the combining rule is the reviewed Rubin (1996) source above, and Rubin (1987) is named only as the origin that source points to.
 
 ## Formula notes
 

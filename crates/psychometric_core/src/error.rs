@@ -21,9 +21,6 @@ pub enum PsychometricError {
     /// The construct class is unresolved and cannot support a reflective
     /// interpretation.
     UnresolvedConstruct,
-    /// Latent-mean or path comparison was requested without invariance
-    /// evidence.
-    InvarianceRequired,
     /// A structural lag or local log-rate was requested on a non-event clock.
     EventTimeRequired,
     /// The Voelkle–Oud difference quotient was offered as a continuous-time
@@ -44,6 +41,9 @@ pub enum PsychometricError {
     InsufficientDraws,
     /// Latent-mean comparison was requested at metric/weak invariance.
     StrongInvarianceRequired,
+    /// Invariance evidence carried an empty comparison-scope or
+    /// model-version label.
+    MalformedInvarianceEvidence,
     /// Driver Eq. 3 process noise was treated as the unconditional latent
     /// variance. `Q_Δt` is `cov(η_ti | η_{t-1,i})`.
     ProcessNoiseIsConditionalVariance,
@@ -520,7 +520,6 @@ impl fmt::Display for PsychometricError {
             }
             Self::CausalUnderidentified => "temporal precedence is not causal identification",
             Self::UnresolvedConstruct => "construct class is unresolved",
-            Self::InvarianceRequired => "latent-mean comparison requires invariance evidence",
             Self::EventTimeRequired => {
                 "discrete lag and local log-rate require event time, not another clock"
             }
@@ -541,6 +540,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::StrongInvarianceRequired => {
                 "latent-mean comparison requires strong or strict invariance; metric/weak is not enough"
+            }
+            Self::MalformedInvarianceEvidence => {
+                "invariance evidence requires a non-empty comparison scope and model version"
             }
             Self::ProcessNoiseIsConditionalVariance => {
                 "discrete process noise is the conditional residual variance, not the unconditional latent variance"
@@ -935,10 +937,6 @@ mod tests {
             "construct class is unresolved"
         );
         assert_eq!(
-            PsychometricError::InvarianceRequired.to_string(),
-            "latent-mean comparison requires invariance evidence"
-        );
-        assert_eq!(
             PsychometricError::EventTimeRequired.to_string(),
             "discrete lag and local log-rate require event time, not another clock"
         );
@@ -973,6 +971,10 @@ mod tests {
         assert_eq!(
             PsychometricError::StrongInvarianceRequired.to_string(),
             "latent-mean comparison requires strong or strict invariance; metric/weak is not enough"
+        );
+        assert_eq!(
+            PsychometricError::MalformedInvarianceEvidence.to_string(),
+            "invariance evidence requires a non-empty comparison scope and model version"
         );
         assert_eq!(
             PsychometricError::ProcessNoiseIsConditionalVariance.to_string(),
