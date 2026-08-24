@@ -9155,8 +9155,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
-        recover_asymptotic_continuous_intercept,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
+        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_observed_variance,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
@@ -9417,8 +9417,7 @@ mod tests {
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
-        refuse_unstandardised_trait_variance_as_standardised_trait_variance, ClusteredEventScore,
-        EventOccasion, LagClock, LaggedWithinResidual,
+        refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     };
     use crate::error::PsychometricError;
 
@@ -13456,8 +13455,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -14032,8 +14031,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
         // λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ.
@@ -14609,8 +14608,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of stationary T0VAR is
         // λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ.
@@ -15265,8 +15264,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn predetermined_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn predetermined_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of predetermined T0VAR is
         // λ²(trait + e^{2 a Δt} p_0 + Q_Δt + (B / a)² v) + θ + ψ.
@@ -18037,8 +18036,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
-    ) {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
+     {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -18188,8 +18187,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
-    ) {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
+     {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -18807,8 +18806,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
-    ) {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
+     {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,
@@ -19485,8 +19484,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn predetermined_later_lagged_latent_covariance_recovers_driver_equation_four_after_startoffset(
-    ) {
+    fn predetermined_later_lagged_latent_covariance_recovers_driver_equation_four_after_startoffset()
+     {
         // Driver et al. (2017, §4.3 startoffset; Eq. 4):
         // cov = trait + e^{a s}(e^{2 a u} p_0 + Q_u) + (B / a)² v.
         let printed_effect = -0.225_f64;
@@ -20073,8 +20072,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn predetermined_later_start_later_latent_variance_recovers_driver_equation_four_after_startoffset(
-    ) {
+    fn predetermined_later_start_later_latent_variance_recovers_driver_equation_four_after_startoffset()
+     {
         // Driver et al. (2017, §4.3 startoffset; Eq. 3–4 Chapman–Kolmogorov):
         // Var = trait + e^{2 a s}(e^{2 a u} p_0 + Q_u) + Q_s + (B / a)² v.
         let printed_effect = -0.225_f64;
@@ -21183,8 +21182,8 @@ mod tests {
     }
 
     #[test]
-    fn standardised_asymptotic_time_independent_effect_recovers_driver_page_sixteen_after_positive_variances(
-    ) {
+    fn standardised_asymptotic_time_independent_effect_recovers_driver_page_sixteen_after_positive_variances()
+     {
         // Driver et al. (2017, p. 16 asymTIPREDEFFECTstd; §7.2; footnote 4):
         // form strictly positive asymDIFFUSION = −q / (2 a) and
         // strictly positive v, then (−B / a) · √v / √p.
@@ -21367,11 +21366,23 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+        // A non-finite coefficient survives the outer variance gates and must
+        // propagate through the delegated unstandardised recovery.
+        assert_eq!(
+            recover_standardised_asymptotic_time_independent_predictor_effect(
+                f64::NAN,
+                1.0,
+                0.4,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]
-    fn standardised_continuous_time_independent_effect_recovers_driver_page_sixteen_after_positive_variances(
-    ) {
+    fn standardised_continuous_time_independent_effect_recovers_driver_page_sixteen_after_positive_variances()
+     {
         // Driver et al. (2017, p. 16 TIPREDEFFECTstd; §7.2; footnote 4):
         // form strictly positive asymDIFFUSION = −q / (2 a) and
         // strictly positive v, then B · √v / √p.
@@ -21578,8 +21589,8 @@ mod tests {
     }
 
     #[test]
-    fn standardised_continuous_time_dependent_effect_recovers_driver_page_sixteen_after_positive_variances(
-    ) {
+    fn standardised_continuous_time_dependent_effect_recovers_driver_page_sixteen_after_positive_variances()
+     {
         // Driver et al. (2017, p. 16 TDPREDEFFECTstd; Table 2; footnote 4):
         // form strictly positive asymDIFFUSION = −q / (2 a) and
         // strictly positive v, then m · √v / √p.
@@ -21785,8 +21796,8 @@ mod tests {
     }
 
     #[test]
-    fn standardised_initial_time_dependent_effect_recovers_driver_table_three_after_positive_variances(
-    ) {
+    fn standardised_initial_time_dependent_effect_recovers_driver_table_three_after_positive_variances()
+     {
         // Driver et al. (2017, Table 3 T0TDPREDEFFECTstd; p. 16; footnote 4):
         // form strictly positive free T0VAR p_0 and strictly positive v,
         // then t0_m · √v / √p_0. Affected variance is p_0, not
@@ -22125,8 +22136,8 @@ mod tests {
     }
 
     #[test]
-    fn standardised_initial_time_independent_effect_recovers_driver_table_three_after_positive_variances(
-    ) {
+    fn standardised_initial_time_independent_effect_recovers_driver_table_three_after_positive_variances()
+     {
         // Driver et al. (2017, Table 3 T0TIPREDEFFECTstd; p. 16; footnote 4):
         // form strictly positive free T0VAR p_0 and strictly positive v,
         // then t0_b · √v / √p_0. Affected variance is p_0, not
