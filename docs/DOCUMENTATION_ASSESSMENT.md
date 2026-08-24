@@ -1,7 +1,7 @@
 # TEPP Whole-Conversation Documentation Assessment
 
-**Assessment date:** 2026-08-12  
-**Scope:** Durable TEPP decisions established in the product conversation, approved PRD v0.4/planning pack, protected-main implementation through merged PR #7, canonical Task 3 replacement PR #8, and legacy Task 4 PR #6.  
+**Assessment date:** 2026-08-19  
+**Scope:** Durable TEPP decisions established in the product conversation, approved PRD v0.4/planning pack, and protected-main implementation through the current TRACEABILITY matrix. Merged PRs #8 and #9 are the temporal lineage; superseded PRs #5 and #6 are historical only.  
 **Verdict:** **The canonical documentation/ADR graph is protected-main authority after PR #7; implementation maturity remains independently tracked and is not promoted by documentation completeness.**
 
 ## 1. Assessment rule
@@ -58,7 +58,7 @@ The ADR set was not fully clear before the PR #7 reconciliation because accepted
 - adding ADRs 0012–0016 for previously unowned durable decisions; and
 - making `scripts/validate_documentation.py` fail when numbered ADR files/index diverge or required ADR metadata/sections disappear.
 
-PR #8 now exercises that policy by updating ADR 0002, the ADR index, TRD/UML/Test Strategy/Traceability, and this assessment to identify the canonical Task 3 replacement lineage rather than leaving stale PR #5 maturity claims.
+Merged PR #8 exercised that policy by identifying the canonical Task 3 replacement lineage rather than leaving stale PR #5 maturity claims. Merged PR #9 later replayed Task 4 Allen algebra onto that foundation. Those pull requests are lineage, not living drafts.
 
 ## 4. Durable conversation decisions covered
 
@@ -91,9 +91,9 @@ The canonical graph explicitly preserves:
 
 Documentation completeness must not be confused with product completeness.
 
-- **implemented-main:** Rust workspace/quality foundation, immutable evidence/exact-span boundary, typed six-clock/uncertain interval foundation (PR #8), and canonical documentation/ADR authority graph through PR #7/#8.
-- **active-PR:** PR #9 Allen relation algebra and bounded path-consistency reasoner replayed onto protected-main temporal foundation; promote only after exact-head gates and merge.
-- **accepted-target:** Event ontology/graph, multilevel estimators beyond the membership network surface, persistence/splits, multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, TDT/CHRONOS, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority, and production service APIs.
+- **implemented-main:** Rust workspace/quality foundation, immutable evidence/exact-span boundary, typed six-clock/uncertain interval foundation (merged PR #8), Allen relation algebra and bounded path-consistency (merged PR #9), and the canonical documentation/ADR authority graph. See [`docs/TRACEABILITY.md`](TRACEABILITY.md) for the exact capability rows.
+- **active-PR:** only capabilities whose TRACEABILITY row still says `active-PR`. Unmerged or draft PRs are not implemented-main claims.
+- **accepted-target:** multilingual semantic units, TRSL-TM topic measurement, GPU compute, model selection, TDT/CHRONOS, ESEM/DSEM, networks/clusters, interpretation, visual analytics, autonomous product-development authority, production service APIs, and multilevel estimators beyond the membership network surface.
 - **partial:** selected repository-quality and standalone crate boundaries are implemented, while complete estimator/service/release authorities remain target work.
 - **deployment-owned/external-assurance:** production infrastructure controls, measured SLO/RPO/RTO, CSAP certification, SOC 2 attestation and jurisdiction-specific legal determinations.
 
@@ -111,4 +111,4 @@ No additional large parallel documentation pack should be created merely for com
 
 ## 7. Exit criterion
 
-The canonical documentation design is already protected-main authority through merged PR #7. Future documentation fitness is event-driven and must stay synchronized with actual implementation lineage. PR #8 can promote the Task 3 temporal capability only after its unchanged exact head satisfies all live repository gates and is merged to protected main; the same rule applies independently to the future Task 4 replay.
+The canonical documentation design is already protected-main authority. Future documentation fitness is event-driven and must stay synchronized with actual implementation lineage. Unmerged or draft PRs cannot promote a capability to implemented-main; only exact-head protected-main integration and the live TRACEABILITY row can.
