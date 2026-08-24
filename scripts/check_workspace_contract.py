@@ -58,6 +58,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "episode_membership",
     "style_source",
     "modality_source",
+    "corpus_background",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (

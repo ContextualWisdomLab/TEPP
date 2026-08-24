@@ -78,6 +78,7 @@ crates/stopword_deletion
 crates/episode_membership
 crates/style_source
 crates/modality_source
+crates/corpus_background
 ```
 
 ## Local verification

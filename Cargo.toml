@@ -46,6 +46,7 @@ members = [
     "crates/episode_membership",
     "crates/style_source",
     "crates/modality_source",
+    "crates/corpus_background",
 ]
 default-members = [
     "crates/evidence_core",
@@ -93,6 +94,7 @@ default-members = [
     "crates/episode_membership",
     "crates/style_source",
     "crates/modality_source",
+    "crates/corpus_background",
 ]
 
 [workspace.package]
