@@ -61,6 +61,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
