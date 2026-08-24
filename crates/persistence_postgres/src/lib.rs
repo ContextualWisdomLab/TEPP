@@ -15,6 +15,8 @@
 //! contracts chain immutable run identities to those manifests. Typed
 //! membership-assignment SQL (migration `0006`) replaces the polymorphic 0001 stub so documents
 //! can belong to multiple entities and projects without atomistic collapse.
+//! Typed `text_segment` SQL persists exact UTF-8 byte spans and cutoff-eligible
+//! document lookups so segment-level membership is not raw SQL.
 //! Concurrent document revises use one transactional `DO` block that requires
 //! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
 //! typed conflict errors. Restore integrity probes refuse to mark analytical
@@ -44,6 +46,7 @@ mod naming;
 mod relation_sql;
 mod restore_integrity;
 mod retention_sql;
+mod segment_sql;
 mod sql_session;
 mod sqlx_gate;
 #[cfg(feature = "live-sqlx")]
@@ -200,6 +203,14 @@ pub use retention_sql::release_legal_hold_sql;
 pub use retention_sql::select_active_analysis_document_sql;
 /// Render supersede SQL for a successive retention policy.
 pub use retention_sql::supersede_retention_policy_sql;
+/// Exact-span text segment row.
+pub use segment_sql::TextSegmentRecord;
+/// Render insert SQL for a validated text segment.
+pub use segment_sql::insert_text_segment_sql;
+/// Render selection SQL for a text segment by primary key.
+pub use segment_sql::select_text_segment_by_id_sql;
+/// Render cutoff-eligible text-segment selection for one document.
+pub use segment_sql::select_text_segments_for_document_as_of_sql;
 /// Recording SQL transport for offline contract tests.
 pub use sql_session::RecordingSqlSession;
 /// Live SQL transport contract.
