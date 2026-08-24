@@ -60,6 +60,7 @@ crates/network_analysis
 crates/interpretation_gateway
 crates/model_selection
 crates/checkpoint_authority
+crates/cutoff_clock
 ```
 
 ## Local verification

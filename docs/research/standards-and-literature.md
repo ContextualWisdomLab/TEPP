@@ -106,6 +106,13 @@ Snijders, T. A. B., & Bosker, R. J. (2012). *Multilevel analysis: An introductio
 Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J. Hox & J. K. Roberts (Eds.), *Handbook of advanced multilevel analysis* (pp. 313–334). Routledge.
 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Typed `entity_record` and `project_record` SQL keep multiple-membership targets referentially intact and refuse hostile labels before insert (Snijders & Bosker, 2012; Beretvas, 2011; Jensen & Snodgrass, 1999).
+Jensen, C. S., & Snodgrass, R. T. (1999). Temporal data management. *IEEE Transactions on Knowledge and Data Engineering, 11*(1), 36–44. https://doi.org/10.1109/69.755613
+
+Snodgrass, R. T. (2000). *Developing time-oriented database applications in SQL*. Morgan Kaufmann.
+
+Tashman, L. J. (2000). Out-of-sample tests of forecasting accuracy: An analysis and review. *International Journal of Forecasting, 16*(4), 437–450. https://doi.org/10.1016/S0169-2070(00)00065-0
+
+TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Valid time, transaction time, and a document's availability are not substitutes for `cutoff_clock` knowledge cutoff.
 
 ## Unicode, language tags, and multilingual structure
 

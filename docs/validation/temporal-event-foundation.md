@@ -16,6 +16,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Six-clock temporal | `temporal_core` | implemented-main | — | unit + wire | Task 3 / PR #8 |
 | Interval-aware cutoff eligibility | `temporal_core` | active-PR | this PR | unknown/open-ended fail-closed + computed latest-instant agreement | ADR 0002 |
 | Six-clock temporal | `temporal_core` | implemented-main | `document_clocks` omitted assertion/document time | unit + wire | Task 3 / PR #8; document-row clocks on this PR |
+| Knowledge-cutoff identity | `cutoff_clock` | active-PR | this PR | recovered cutoff flags vs availability-time stand-in | ADR 0002 |
 | Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
 | Multiple membership | `membership_core` | partial | nested ICC + non-nested refusal | unit + ESS + nested ICC recovery | Task 7 / PR #12 + #25 + this increment |
