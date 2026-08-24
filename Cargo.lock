@@ -904,6 +904,10 @@ name = "provider_receipt"
 version = "0.1.0"
 
 [[package]]
+name = "psychometric_fit"
+version = "0.1.0"
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1270,6 +1274,10 @@ dependencies = [
  "unicode-normalization",
  "unicode-properties",
 ]
+
+[[package]]
+name = "subevent_containment"
+version = "0.1.0"
 
 [[package]]
 name = "subtle"

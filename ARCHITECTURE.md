@@ -61,6 +61,8 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, Monte Carlo, and exact-head claim-promotion metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `psychometric_fit` | CPU `f64` ESEM loading recovery and event-time DSEM lag gates |
+| `subevent_containment` | subevent event-time intervals must stay inside the parent |
 | `prediction_contradiction` | Allen promotion gate: `before`/`after` stay contradictory; `meets`/`met_by` stay unsupported; coverage is required before unmatched predicted mass may be authorized for promotion |
 | `provider_receipt` | provider-disclosure field-code receipts; source text and identity are not disclosable |
 | `operational_log` | operational logs; `try_record` is the only recording API; source text and source identity are not loggable; `persistence_postgres` `audit_event` inserts call the same gate |

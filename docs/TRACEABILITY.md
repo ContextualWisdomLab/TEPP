@@ -17,6 +17,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; Brier calibration on the active PR; full intelligence stack remaining | partial |
 | no unidentified causal language from association/precedence | ADR 0002/0003; research | `relation_graph` causal-identification gate on the active PR | active-PR |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
+| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `subevent_containment` parent-window gate on the active PR; event-instance SQL implemented-main; full intelligence stack remaining | active-PR |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | interval-aware historical eligibility (`available_time` fully ≤ cutoff) | ADR 0002 | `temporal_core` `evaluate_historical_eligibility` on the active PR; unknown/open-ended availability fails closed | active-PR |
@@ -33,8 +34,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
 | candidate K statistical/Pareto gates + blinded LLM review | ADR 0012; research | future `model_selection` | accepted-target |
 | compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
-| longitudinal within/between decomposition | ADR 0005 | `longitudinal_core` decomposition, component RMSE, and known-truth recovery on the active PR | active-PR |
-| posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core`; invariance and ESEM/DSEM fit remain accepted-target | accepted-target |
+| posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | `psychometric_fit` ESEM loading and DSEM lag gates on the active PR; `psychometric_core` input gates remain #49; invariance/multilevel remain accepted-target | active-PR |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `prediction_contradiction` bounded Allen promotion gate on the active PR (`refuse_promotion` requires coverage; `refuse_contradiction_or_adjacency` is not promotion authority; remaining TDT/CHRONOS tasks stay accepted-target) | active-PR |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` TDT tracking pair precision/recall and identity-switch rate on the active PR; remaining TDT/CHRONOS stack and any future `event_intelligence` crate remain accepted-target | active-PR |
