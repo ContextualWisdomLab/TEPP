@@ -154,7 +154,6 @@ pub(crate) fn header_is_credential(name: &str) -> bool {
     lowered == "authorization"
         || lowered == "proxy-authorization"
         || lowered == "cookie"
-        || lowered == "x-api-key"
         || lowered.contains("api-key")
         || lowered.contains("api_key")
         || lowered.contains("apikey")

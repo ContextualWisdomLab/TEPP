@@ -182,7 +182,7 @@ class GithubHttpsTransport:
         finally:
             try:
                 connection.close()
-            except OSError:
+            except (OSError, http.client.HTTPException):
                 if request_error is None:
                     raise FleetAuditError(
                         "upstream_unavailable",
