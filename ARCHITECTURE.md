@@ -61,6 +61,8 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `location_membership` | location is not entity identity and not a language channel |
+| `prompt_source` | prompt boilerplate is not unique latent content and not stopword deletion |
 | `corpus_background` | corpus-background wording is not unique latent content and not stopword deletion |
 | `modality_source` | non-lexical modality is not unique latent content and not stopword deletion |
 | `copied_text` | copied-text residue is not unique latent content and not stopword deletion |

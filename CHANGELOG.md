@@ -6,6 +6,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `location_membership` identity gate: geographic and market assignments are time-varying memberships, not permanent entity identity and not language channels; recovered location kinds match known truth at a higher computed rate than collapsing every assignment to entity identity (ADR 0003).
+- `prompt_source` identity gate: instruction and prompt boilerplate is not unique latent content and is not erased by a stopword list; `identity_recovery_rate` reports exact kind matches, with a contract test comparing correct recovery with an all-unique collapse on a mixed known-truth fixture (ADR 0004/0012).
 - `corpus_background` identity gate: corpus-level background wording is not unique latent content and is not erased by a stopword list; recovered background kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
 - `modality_source` identity gate: non-lexical modality is not unique latent content and is not erased by a stopword list; recovered modality kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
 - `copied_text` identity gate: copied and boilerplate residue is not unique latent content and is not erased by a stopword list; recovered copied-text kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
