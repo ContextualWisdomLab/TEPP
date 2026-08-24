@@ -40,6 +40,7 @@ TEPP retains a logistic-normal CPU reference while allowing adapter backends tha
 Schofield, A., Magnusson, M., & Mimno, D. (2017). Pulling out the stops: Rethinking stopword removal for topic models. In *Proceedings of the 15th Conference of the European Chapter of the Association for Computational Linguistics: Volume 2, Short Papers* (pp. 432–436). Association for Computational Linguistics. https://doi.org/10.18653/v1/E17-2069
 
 TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Default or global stopword deletion is not a valid method for removing repeated report language; `stopword_deletion` refuses that treatment so boilerplate stays explicit method/background structure (Schofield, Magnusson, & Mimno, 2017).
+TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. House-voice style residue is modeled as explicit structure, not unique latent content and not a stopword deletion (Roberts et al., 2019).
 
 ## Topic-model evaluation and LLM judges
 

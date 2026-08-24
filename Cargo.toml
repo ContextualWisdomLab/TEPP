@@ -44,6 +44,7 @@ members = [
     "crates/copy_identity",
     "crates/stopword_deletion",
     "crates/episode_membership",
+    "crates/style_source",
 ]
 default-members = [
     "crates/evidence_core",
@@ -89,6 +90,7 @@ default-members = [
     "crates/copy_identity",
     "crates/stopword_deletion",
     "crates/episode_membership",
+    "crates/style_source",
 ]
 
 [workspace.package]

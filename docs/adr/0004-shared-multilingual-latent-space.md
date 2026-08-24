@@ -2,6 +2,7 @@
 
 **Decision status:** Accepted  
 **Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; shared-space estimators, language profiles, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
+**Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; shared-space estimators remain accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs the complete topic-estimator/backend/global-topic contract built on this multilingual measurement decision.
 
