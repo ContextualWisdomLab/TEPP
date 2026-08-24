@@ -1,6 +1,7 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
 **Decision status:** Accepted  
+**Implementation maturity:** partial — typed clocks/intervals implemented-main via `temporal_core`; retrospective-reporting identity in `retrospective_edge` on the active PR; downstream transition/split enforcement remains accepted-target  
 **Implementation maturity:** active-PR — evidential-vs-transition gate in `support_edge` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — system-clock identity in `system_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — event-clock identity in `event_clock` on the active PR; remaining graph/split enforcement stays accepted-target  

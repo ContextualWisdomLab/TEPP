@@ -6,6 +6,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `retrospective_edge` identity gate: retrospective reporting may point to earlier event time but cannot become a state transition or a translation; recovered reporting kinds match known truth at a higher computed rate than collapsing every report to a contemporaneous forward report (ADR 0002/0003).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `payload_bound` identity gate: documents, serialized records, model checkpoints, and LLM outputs stay untrusted until identity, provenance, size, and depth validate; recovered accept/reject flags match known truth at a higher computed rate than accepting every payload (ADR 0008/0013).
 - `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `inferred_status` identity gate: inferred relations cannot be promoted to observed evidence or to state transitions; recovered observed/inferred labels match known truth at a higher computed rate than treating every status as observed (ADR 0003).

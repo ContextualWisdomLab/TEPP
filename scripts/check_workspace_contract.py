@@ -23,6 +23,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "tepp_simulation",
     "validation_core",
     "tepp_api",
+    "retrospective_edge",
     "payload_bound",
     "inferred_status",
     "support_edge",

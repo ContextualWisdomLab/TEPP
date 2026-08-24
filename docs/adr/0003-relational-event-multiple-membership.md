@@ -1,6 +1,7 @@
 # ADR 0003 — Relational event ontology and time-varying multiple membership
 
 **Decision status:** Accepted  
+**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; retrospective-reporting identity in `retrospective_edge` on the active PR; typed relation graph with forward-only transitions active-PR; multilevel estimators and persistence remain accepted-target  
 **Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; inferred-versus-observed identity in `inferred_status` on the active PR; typed relation graph with forward-only transitions active-PR; multilevel estimators and persistence remain accepted-target  
 **Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; evidential-vs-transition identity in `support_edge` on the active PR; typed relation graph with forward-only transitions implemented-main; multilevel estimators and persistence remain accepted-target  
 **Implementation maturity:** active-PR — subevent parent-window containment in `subevent_containment` on the active PR; multilevel estimators remain accepted-target  
