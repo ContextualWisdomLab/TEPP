@@ -2,6 +2,7 @@
 
 **Decision status:** Accepted  
 **Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; shared-space estimators remain accepted-target  
+**Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; shared-space estimators, language profiles, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0012 governs the complete topic-estimator/backend/global-topic contract built on this multilingual measurement decision.
 
@@ -14,6 +15,8 @@ The product therefore needs a language-independent analytical contract while pre
 ## Decision
 
 TEPP learns one shared latent semantic and topic space across languages. Equivalent meanings share concept prototypes, topic identities, and document coordinates. Language-specific morphology, script, syntax, lexical emissions, and content deviations remain explicit rather than being forced to match.
+
+This ADR owns the multilingual measurement substrate. The product topic-estimator contract is **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** under ADR 0012. Temporal topic identity follows the dynamic topic-model family (Blei & Lafferty, 2006). An STM-style logistic-normal document-coordinate model (Roberts et al., 2014, 2019) is the **reference family**, not a claim that every compliant backend is already shipped. Implementation maturity for this ADR and for TRSL-TM remains accepted-target.
 
 Original text and exact source spans are preserved. Segmentation and morphology are language-tailored. Universal POS/dependency information may act as soft source evidence or priors but does not authorize irreversible deletion. LLM-proposed semantic units must resolve to exact source evidence and a versioned concept/semantic contract; unknown meaning can remain unresolved rather than being forced into a known concept.
 
@@ -57,3 +60,11 @@ Parallel/comparable corpora and human-reviewed evidence test exact-span F1, conc
 ## Rollback and supersession
 
 Rollback selects the prior validated language/concept/profile version and does not silently remap already-published artifacts. Supersede only through a decision that maintains cross-language comparability and explicit validity status or intentionally changes the measurement target with new PRD/validation evidence.
+
+## References
+
+Blei, D. M., & Lafferty, J. D. (2006). Dynamic topic models. In *Proceedings of the 23rd International Conference on Machine Learning* (pp. 113–120). ACM. https://doi.org/10.1145/1143844.1143859
+
+Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02
+
+Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082. https://doi.org/10.1111/ajps.12103
