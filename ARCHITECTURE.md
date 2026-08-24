@@ -97,6 +97,7 @@ APIs.
 | `stopword_deletion` | default stopword deletion is not a valid method for repeated report language |
 | `episode_membership` | episode membership cannot escape the episode event-time interval |
 | `style_source` | house-voice style residue is not unique latent content and not stopword deletion |
+| `modality_source` | non-lexical modality is not unique latent content and not stopword deletion |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

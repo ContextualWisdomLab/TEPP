@@ -77,6 +77,7 @@ crates/copy_identity
 crates/stopword_deletion
 crates/episode_membership
 crates/style_source
+crates/modality_source
 ```
 
 ## Local verification

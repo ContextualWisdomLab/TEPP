@@ -6,6 +6,7 @@
 **Implementation maturity:** active-PR — `model_selection` statistical/Pareto candidate-`K` gates and known-`K` RMSE live in the new crate; remaining TRSL-TM estimator, global topic identity, method effects, and backend interchange remain accepted-target  
 **Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; topic estimator, global topic identity, method-effect model, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
 **Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; estimator-side method model remains accepted-target  
 **Date:** 2026-08-12  
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
