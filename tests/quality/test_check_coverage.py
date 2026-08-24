@@ -502,6 +502,16 @@ class CoverageContractTests(unittest.TestCase):
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 4))
             self.assertFalse(coverage_contract.is_executable_source_line(str(source), 7))
 
+            source.write_text(
+                "match state {\n"
+                "    State::Ready(value) if(value.is_valid()) => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
+
     def test_guard_after_brace_closing_pattern_is_executable(self) -> None:
         """Count a guard after a destructuring pattern that closes with a brace."""
 

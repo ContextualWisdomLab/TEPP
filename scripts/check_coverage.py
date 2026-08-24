@@ -167,7 +167,12 @@ def is_executable_source_line(
     # Keep guarded match arms in the authored-line denominator: the guard
     # executes even though the arm label itself is structural.
     if text.endswith("=> {") and " if " not in text:
-        if text.startswith("if ") or text.startswith("if("):
+        if (
+            text.startswith("if ")
+            or text.startswith("if(")
+            or " if(" in text
+            or " if (" in text
+        ):
             return True
         return _is_multiline_match_guard(lines, line_number)
     if text.startswith("pub struct ") or text.startswith("struct "):
