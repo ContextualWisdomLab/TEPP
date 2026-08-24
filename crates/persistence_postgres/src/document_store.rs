@@ -29,6 +29,29 @@ pub struct DocumentRecord {
     pub revision_number: u64,
 }
 
+/// Closed operational-log action for an inspected `audit_event` append.
+pub const ACTION_AUDIT_EVENT_APPEND: u16 = 2_001;
+
+/// Source payloads inspected before an `audit_event` insert is rendered.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AuditSourceInspection<'payload> {
+    /// Raw source text that must not enter the audit row.
+    pub source_text: Option<&'payload str>,
+    /// Source identity that must not enter the audit row.
+    pub source_identity: Option<&'payload str>,
+    /// Whether a blanket PII mask is being treated as an insert grant.
+    pub blanket_mask: bool,
+}
+
+impl AuditSourceInspection<'static> {
+    /// Inspection that asserts no source text, source identity, or blanket mask.
+    pub const CLEAR: Self = Self {
+        source_text: None,
+        source_identity: None,
+        blanket_mask: false,
+    };
+}
+
 /// Append-only audit row.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuditEvent {
@@ -172,12 +195,17 @@ impl DocumentStore {
         Ok(latest.into_values().collect())
     }
 
-    /// Append an immutable audit event.
+    /// Append an immutable audit event after operational-log inspection.
     ///
     /// # Errors
     ///
-    /// Returns [`PersistenceError::ImmutableAuditViolation`] on identity reuse.
-    pub fn append_audit(&mut self, event: &AuditEvent) -> Result<(), PersistenceError> {
+    /// Returns source-payload, action-code, or identity-reuse failures.
+    pub fn append_audit(
+        &mut self,
+        event: &AuditEvent,
+        inspection: AuditSourceInspection<'_>,
+    ) -> Result<(), PersistenceError> {
+        crate::document_sql::append_audit_sql(event, inspection)?;
         if self.audit_ids.contains(&event.audit_event_id) {
             return Err(PersistenceError::ImmutableAuditViolation);
         }
@@ -236,7 +264,7 @@ fn valid_covers(row: &DocumentRecord, valid_at: &EventTime) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{AuditEvent, DocumentRecord, DocumentStore};
+    use super::{AuditEvent, AuditSourceInspection, DocumentRecord, DocumentStore};
     use crate::PersistenceError;
     use temporal_core::{AvailableTime, EventTime, SystemTime};
 
@@ -297,10 +325,26 @@ mod tests {
             subject_record_id: uuid::Uuid::nil(),
             recorded_system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
         };
-        store.append_audit(&audit).expect("first audit");
+        store
+            .append_audit(&audit, AuditSourceInspection::CLEAR)
+            .expect("first audit");
         assert_eq!(
-            store.append_audit(&audit),
+            store.append_audit(&audit, AuditSourceInspection::CLEAR),
             Err(PersistenceError::ImmutableAuditViolation)
+        );
+        assert_eq!(store.audit_count(), 1);
+        let mut refused = audit.clone();
+        refused.audit_event_id = uuid::Uuid::from_u128(1);
+        assert_eq!(
+            store.append_audit(
+                &refused,
+                AuditSourceInspection {
+                    source_text: Some("source"),
+                    source_identity: None,
+                    blanket_mask: false,
+                },
+            ),
+            Err(PersistenceError::SourceTextNotAuditable)
         );
         assert_eq!(store.audit_count(), 1);
     }
