@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `service_tls` production TLS bind gates: non-loopback binds require rustls PEM material, loopback HTTP is development-only, orchestrator live ports refuse loopback plaintext, and table-access host labels fail closed. `TlsBindRequest` Debug output redacts certificate and private-key PEM. Recovered bind decisions are computed from `authorize_production_tls` / `authorize_orchestrator_live_port` outputs and match known truth at a higher rate than a collapsed production grant (ADR 0011).
 - `derived_sensitivity` inheritance: topic, factor, and relation artifacts keep the source sensitivity class; unknown kind codes fail closed on both `inherit_sensitivity` and `DerivedArtifact::try_new`; derivation and blanket PII masking cannot declassify to public; paired kind-and-class recovery matches known 3×3 synthetic truth at a higher computed rate than a public collapse (ADR 0009; GDPR Art. 4(1)/Recital 26; WP 136).
 - `longitudinal_core` within/between decomposition: unit means stay between-unit components, occasion residuals stay within-unit change, and recovered components match known truth with lower computed RMSE than a grand-mean pooled collapse.
 - `topic_lineage` global P0 topic identity: activity may become dormant or reactivated without minting a new identity, and recovered identities match known truth at a higher computed rate than mint-on-reactivate replacements.
