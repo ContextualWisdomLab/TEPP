@@ -18,6 +18,7 @@ and component RMSE APIs; the remaining crates expose no placeholder production
 APIs, and domain behavior for them begins in Task 2 with immutable evidence
 identifiers and source records.
 This branch establishes the Task 1 Rust workspace and quality-gate foundation.
+The twelve bounded crates compile independently but intentionally expose no
 The eleven bounded crates compile independently; Task 1 includes the
 implemented `encrypted_mapping` crate with AES-256-GCM sealing and
 purpose-bound opening, while the remaining domain behavior begins in Task 2
@@ -43,6 +44,9 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/provider_receipt
+crates/intake_authorization
+crates/summarizes_edge
 crates/outcome_order
 crates/retrospective_edge
 crates/payload_bound
