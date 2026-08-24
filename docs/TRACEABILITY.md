@@ -13,7 +13,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | six distinct clocks and uncertain intervals | PRD; ADR 0002; ISO 24617-1:2012; Hobbs & Pan (2017) | merged PR #8 `temporal_core` on protected main; PR #5 historical lineage only | implemented-main |
 | Allen relation algebra/bounded closure | ADR 0002; Allen (1983) | merged PR #9 `temporal_core` path-consistency on protected main | implemented-main |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
-| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; Brier calibration on the active PR; full intelligence stack remaining | partial |
+| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `subevent_containment` parent-window gate on the active PR; event-instance SQL implemented-main; full intelligence stack remaining | active-PR |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
