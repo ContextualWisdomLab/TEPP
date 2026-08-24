@@ -2,12 +2,19 @@
 
 **Decision status:** Accepted  
 **Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; typed relation graph with forward-only transitions implemented-main; IPO event-time order in `outcome_order` on the active PR; multilevel estimators and persistence remain accepted-target  
+**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; retrospective-reporting identity in `retrospective_edge` on the active PR; typed relation graph with forward-only transitions active-PR; multilevel estimators and persistence remain accepted-target  
+**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; inferred-versus-observed identity in `inferred_status` on the active PR; typed relation graph with forward-only transitions active-PR; multilevel estimators and persistence remain accepted-target  
+**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; evidential-vs-transition identity in `support_edge` on the active PR; typed relation graph with forward-only transitions implemented-main; multilevel estimators and persistence remain accepted-target  
+**Implementation maturity:** active-PR — subevent parent-window containment in `subevent_containment` on the active PR; multilevel estimators remain accepted-target  
+**Implementation maturity:** partial — membership network, event mention/instance separation, and Kish ESS implemented-main; nested ICC with cross-classified/multiple-membership refusal is this increment; full multilevel/MMMC estimators and remaining persistence remain accepted-target  
+**Implementation maturity:** partial — membership network and event mention/instance separation are implemented-main; typed relation graph with forward-only transitions is implemented-main. Multilevel psychometric estimators remain accepted-target. Remaining persistence details follow ADR 0013 and [`docs/TRACEABILITY.md`](../TRACEABILITY.md).  
+**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; typed relation graph with forward-only transitions implemented-main; multilevel estimators and persistence remain accepted-target
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0016 owns TDT/CHRONOS event-intelligence task semantics; this ADR remains authoritative for ontology, relation, role, and membership structure.
 
 ## Context
 
-Documents, passages, events, entities, revisions, translations, projects, organizations, templates, authors, and time-varying roles are not independent observations. Treating each document as an atom can produce atomistic fallacy, inflate effective sample size, leak related variants across validation splits, and erase the fact that one observation can belong to several non-nested contexts at once.
+Documents, passages, events, entities, revisions, translations, projects, organizations, templates, authors, and time-varying roles are not independent observations. Treating each document as an atom can produce atomistic fallacy, inflate effective sample size, leak related variants across validation splits, and erase the fact that one observation can belong to several non-nested contexts at once (American Educational Research Association, American Psychological Association, & National Council on Measurement in Education, 2014; Fox & Glas, 2001).
 
 Customer, partner, and competitor are especially contextual roles rather than permanent entity types. The same organization can occupy different roles across projects, events, markets, and time.
 
@@ -18,6 +25,8 @@ TEPP represents document, passage, event, entity, revision, translation, evidenc
 Authors, departments, organizations, customers, partners, competitors, projects, opportunity pools, templates, languages, locations, and episodes form cross-classified, time-varying, multiple-membership assignments. Memberships carry explicit weights where scientifically justified and governed validity intervals. Customer/partner/competitor are role assignments, not immutable entity classes.
 
 Observed relation evidence, inferred relations, and promoted transition edges remain distinct. Relation absence is not silently interpreted as evidence of no relationship.
+
+This ADR names a **relational event ontology** and time-varying membership structure. It does not adopt, and TEPP does not implement, a statistical relational-event-model (REM) estimator family. Multilevel/non-independence measurement follows Fox and Glas (2001) and the clustered-observation discipline in the *Standards for Educational and Psychological Testing* (American Educational Research Association et al., 2014). Production multilevel IRT/ESEM/DSEM estimators remain accepted-target under ADR 0005.
 
 ## Non-goals
 
@@ -55,3 +64,9 @@ Tests recover known event/relation graphs and membership effects, reject invalid
 ## Rollback and supersession
 
 Rollback restores the previous ontology/relation/membership contract and revalidates dependent model artifacts. Supersede only through an ADR that preserves explicit evidence provenance and non-nested/multiple-membership semantics or deliberately changes the estimand with corresponding PRD and validation updates.
+
+## References
+
+American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
+
+Fox, J.-P., & Glas, C. A. W. (2001). Bayesian estimation of a multilevel IRT model using Gibbs sampling. *Psychometrika, 66*(2), 271–288. https://doi.org/10.1007/BF02294839
