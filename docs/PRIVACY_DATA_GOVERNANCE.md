@@ -38,7 +38,7 @@ Future persistent authorization entities must use descriptive multiword `snake_c
 
 ## 4. Identity separation
 
-When the scientific task does not require the direct identity string, TEPP should model with an opaque `entity_record_id` and keep the direct identity mapping in a separately encrypted/authorized store or host-owned identity service. The mapping may not be copied into model artifacts, ordinary logs, LLM prompts, or public exports merely for convenience.
+When the scientific task does not require the direct identity string, TEPP should model with an opaque `entity_record_id` and keep the direct identity mapping in a separately encrypted/authorized store or host-owned identity service. The in-memory `encrypted_mapping` envelope seals source identity so analytical, log, and model-artifact purposes cannot recover plaintext. Persistence of that envelope waits for a later migration. The mapping may not be copied into model artifacts, ordinary logs, LLM prompts, or public exports merely for convenience.
 
 Identity separation must not erase scientifically relevant time-varying memberships. The model may retain that opaque entity A authored document X and belonged to department Y at time T while the direct real-world name remains outside the ordinary compute artifact.
 
@@ -66,7 +66,7 @@ Retention is policy-driven per data class and purpose. Raw evidence, derived mod
 - immutable audit evidence that records the deletion action without retaining unnecessary raw PII;
 - legal or contractual hold that prevents deletion and records its authority.
 
-Historical model reproducibility cannot silently override an approved deletion obligation. If source deletion makes exact reproduction unavailable, TEPP records that limitation rather than restoring deleted data from an ungoverned copy. Migration `0007` (active PR) persists `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` so an active hold blocks completed deletion and a tombstone blocks restore of the same document identity.
+Historical model reproducibility cannot silently override an approved deletion obligation. If source deletion makes exact reproduction unavailable, TEPP records that limitation rather than restoring deleted data from an ungoverned copy. Migration `0007` (implemented-main via PR #45) persists `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` so an active hold blocks completed deletion and a tombstone blocks restore of the same document identity.
 
 ## 7. Tenant and service isolation
 
@@ -82,6 +82,7 @@ Ordinary logs contain identifiers/digests sufficient for diagnosis without copyi
 
 ## 10. Privacy validation
 
+Required tests include cross-tenant denial, expired-purpose denial, re-identification-boundary checks, export authorization, provider payload minimization, raw-source log absence, deletion/retention behavior, audit replay, and derived-sensitive-data classification. Privacy controls must be tested with realistic author/customer/project/multiple-membership cases rather than only anonymous fixtures. The in-memory `provider_receipt` crate is the current disclosure-audit gate; persistence of receipts remains accepted-target.
 Required tests include cross-tenant denial, expired-purpose denial, re-identification-boundary checks, export authorization, provider payload minimization, raw-source log absence, deletion/retention behavior, audit replay, and derived-sensitive-data classification. Privacy controls must be tested with realistic author/customer/project/multiple-membership cases rather than only anonymous fixtures. The in-memory `provider_receipt` crate is the current disclosure-audit gate; persistence of receipts remains accepted-target.
 Required tests include cross-tenant denial, expired-purpose denial, re-identification-boundary checks, export authorization, provider payload minimization, raw-source log absence, deletion/retention behavior, audit replay, and derived-sensitive-data classification. Privacy controls must be tested with realistic author/customer/project/multiple-membership cases rather than only anonymous fixtures. The in-memory `operational_log` crate is the current source-separation gate: `try_record` is the only recording API and inspects source text, source identity, and blanket-mask intent; a source-identity `&str` cannot become an analytical subject. `persistence_postgres` `audit_event` inserts call the same gate before SQL is rendered. Live HTTP and provider adapters remain accepted-target.
 Required tests include cross-tenant denial, expired-purpose denial, re-identification-boundary checks, export authorization, provider payload minimization, raw-source log absence, deletion/retention behavior, audit replay, and derived-sensitive-data classification. Privacy controls must be tested with realistic author/customer/project/multiple-membership cases rather than only anonymous fixtures. The in-memory `derived_sensitivity` crate is the current inheritance gate; persistence of classifications remains accepted-target.

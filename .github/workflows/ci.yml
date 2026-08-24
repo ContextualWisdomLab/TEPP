@@ -223,7 +223,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned nightly with LLVM tools
-        run: rustup toolchain install nightly-2026-08-18 --profile minimal --component llvm-tools-preview
+        run: rustup toolchain install nightly-2026-08-21 --profile minimal --component llvm-tools-preview
       - name: Restore pinned cargo-llvm-cov
         id: llvm-cov-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -237,13 +237,12 @@ jobs:
         run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
       - name: Generate exact branch coverage
         id: branch-report
-        run: cargo +nightly-2026-08-01 llvm-cov --branch --workspace --all-features --json --output-path coverage-branches.json --ignore-filename-regex 'sqlx_live\.rs'
-        run: cargo +nightly-2026-08-18 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json --ignore-filename-regex 'sqlx_live\.rs'
+        run: cargo +nightly-2026-08-21 llvm-cov --branch --workspace --all-features --json --output-path coverage-branches.json --ignore-filename-regex 'sqlx_live\.rs'
       - name: Enforce complete branch coverage
         run: python3 scripts/check_coverage.py coverage-branches.json --kind branches
       - name: Show exact missing branch diagnostics
         if: ${{ failure() && steps.branch-report.outcome == 'success' }}
-        run: cargo +nightly-2026-08-18 llvm-cov report --branch --text --show-missing-lines
+        run: cargo +nightly-2026-08-21 llvm-cov report --branch --text --show-missing-lines
       - name: Upload exact branch coverage diagnostics
         if: ${{ failure() && steps.branch-report.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

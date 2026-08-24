@@ -1,8 +1,8 @@
 # ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
 
-**Decision status:** Accepted  
-**Implementation maturity:** active-PR — `longitudinal_core` separates unit means from within residuals and refuses between-as-within change; remaining ESEM/DSEM fit remains accepted-target  
-**Date:** 2026-08-05  
+**Decision status:** Accepted
+**Implementation maturity:** active-PR — `longitudinal_core` separates unit means from within residuals and refuses between-as-within change; CPU `f64` ESEM/DSEM fit and event-time lag gates are active-PR; remaining invariance and multilevel estimator work remains accepted-target.
+**Date:** 2026-08-05
 **Supersedes:** None. ADR 0012 governs upstream topic measurement/network coordinates; this ADR governs higher-order psychometric structure and longitudinal interpretation.
 
 ## Context

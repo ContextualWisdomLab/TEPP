@@ -52,6 +52,7 @@ boundaries above remain the target modular MSA architecture.
 | Rust crate | Initial responsibility |
 |---|---|
 | `evidence_core` | immutable evidence domain primitives |
+| `semantic_core` | span-grounded semantic units; language is not identity |
 | `temporal_core` | typed clocks, intervals, and temporal reasoning |
 | `event_core` | event instances, mentions, roles, and provenance |
 | `relation_graph` | typed relations and forward-transition validation |
@@ -61,6 +62,32 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `location_membership` | location is not entity identity and not a language channel |
+| `prompt_source` | prompt boilerplate is not unique latent content and not stopword deletion |
+| `corpus_background` | corpus-background wording is not unique latent content and not stopword deletion |
+| `modality_source` | non-lexical modality is not unique latent content and not stopword deletion |
+| `copied_text` | copied-text residue is not unique latent content and not stopword deletion |
+| `style_source` | house-voice style residue is not unique latent content and not stopword deletion |
+| `stopword_deletion` | default stopword deletion is not a valid method for repeated report language |
+| `copy_identity` | a template copy is not the source document and not a state transition |
+| `intake_authorization` | untrusted intake fails closed without a grant; bounds are not authorization |
+| `summarizes_edge` | a summary is not a state transition and not the source document |
+| `outcome_order` | input-process-outcome edges cannot move backward in event time |
+| `retrospective_edge` | retrospective reporting cannot become a transition or a translation |
+| `payload_bound` | untrusted documents, records, checkpoints, and LLM outputs fail closed without identity, provenance, size, and depth |
+| `inferred_status` | inferred relations cannot be promoted to observed evidence or transitions |
+| `support_edge` | support, contradiction, summary, and outcome_of edges are not state transitions |
+| `system_clock` | system time cannot be replaced by event, assertion, document, available, or cutoff time |
+| `event_clock` | event time cannot be replaced by assertion, system, document, or available time |
+| `assertion_clock` | assertion time cannot be replaced by event, system, document, or available time |
+| `cutoff_clock` | knowledge cutoff cannot be replaced by event, system, or availability time |
+| `available_clock` | availability time cannot be replaced by event or system time |
+| `document_clocks` | document rows must carry assertion time and document time |
+| `revision_order` | later document revisions must have later system time |
+| `encrypted_mapping` | purpose-bound in-memory AES-256-GCM identity mappings; no plaintext persistence or KMS integration |
+| `citation_edge` | citation, revision, translation, and retrospective edges are not state transitions |
+| `psychometric_fit` | CPU `f64` ESEM loading recovery and event-time DSEM lag gates |
+| `subevent_containment` | subevent event-time intervals must stay inside the parent |
 | `prediction_contradiction` | Allen promotion gate: `before`/`after` stay contradictory; `meets`/`met_by` stay unsupported; coverage is required before unmatched predicted mass may be authorized for promotion |
 | `provider_receipt` | provider-disclosure field-code receipts; source text and identity are not disclosable |
 | `operational_log` | operational logs; `try_record` is the only recording API; source text and source identity are not loggable; `persistence_postgres` `audit_event` inserts call the same gate |
