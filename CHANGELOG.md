@@ -6,18 +6,47 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `semantic_core` binds exact `evidence_core` source spans as semantic units. Language profiles are `unresolved` or a primary ISO 639 subtag with an IANA-registered ISO 3166-1 alpha-2 or UN M.49 region (RFC 5646; IANA File-Date 2026-08-08); private-use and unknown regions fail closed. Unresolved metadata keeps the caller-supplied Korean `측정` span and does not retokenize. `SemanticIdentity::from_language_tag` fails closed. Korean and English report sentences remain distinct units. Not concept alignment, not invariance, not a topic estimator (ADR 0020; issue #168). The APA register cites RFC 5646 once, in the Unicode/language-tags section; the slice-specific note remains `docs/research/span-grounded-semantic-units.md`.
+- `corpus_background` identity gate: corpus-level background wording is not unique latent content or a state transition; recovery tests distinguish background evidence from unique content.
+- `modality_source` identity gate: non-lexical modality is not unique lexical content or a state transition; recovery tests keep modality evidence distinct from unique content.
+- `copied_text` identity gate: copied-text residue is not unique latent content or a state transition; recovery tests distinguish copied-text evidence from genuinely new content.
+- `style_source` identity gate: house-voice style residue is not unique latent content and is not erased by a stopword list; recovery tests distinguish style from unique content.
+- `stopword_deletion` method gate: a default or global stopword list cannot erase repeated report language; recovery tests distinguish deliberate method treatment from stopword deletion.
+- `copy_identity` identity gate: a template or pasted copy cannot reuse the source document identity or become a state transition; recovery tests distinguish copy kinds from source identity.
+- `intake_authorization` identity gate: documents, serialized records, checkpoints, and LLM outputs require a purpose-bound grant in addition to identity, provenance, size, and depth validation; recovery tests reject ungranted intake.
+- `tepp_api` LineageWeave temporal-context contract (v1): cutoff-safe event eligibility, deterministic event-time ordering, explicit non-causal association/gap boundaries, HTTPS interchange construction, and loopback listener handling at `POST /v1/temporal-context`; read-only context requests no longer require the write-only idempotency header, and no causal inference or completed-result service is included.
+- `tepp_api` LineageWeave consumer-scoped analysis-run ingress: versioned, credential-free requests use a published consumer identity and isolate idempotency by consumer, tenant workspace, and opaque caller key; the one-shot restack workflow is removed after the protected-main merge is verified.
+- ADR 0018 records the consumer-scoped analysis-run ingress, its in-memory loopback maturity, and the persistence boundary required before production use.
+- ADR 0020 records the credential-free bounded LineageWeave project-history service boundary and keeps source authorization with LineageWeave while TEPP owns temporal validation and deterministic projection.
+- `tepp_api` project-history wire-size symmetry (ADR 0019): request and projection serialization enforce the shared 256 KiB limit, and generated projections fail closed before returning when their deterministic response would exceed it.
+- `summarizes_edge` identity gate: summaries may point to earlier event time without becoming state transitions or reusing source-document identity; recovery tests outperform collapsing every summary to the source.
+- `outcome_order` identity gate: `input_to` and `process_to` require strict forward event-time rank, while `outcome_of` remains non-transition provenance; recovery tests outperform collapsing every kind to `input_to`.
+- `location_membership` identity gate: geographic and market assignments are time-varying memberships, not permanent entity identity and not language channels; recovered location kinds match known truth at a higher computed rate than collapsing every assignment to entity identity (ADR 0003).
+- `prompt_source` identity gate: instruction and prompt boilerplate is not unique latent content and is not erased by a stopword list; `identity_recovery_rate` reports exact kind matches, with a contract test comparing correct recovery with an all-unique collapse on a mixed known-truth fixture (ADR 0004/0012).
+- `corpus_background` identity gate: corpus-level background wording is not unique latent content and is not erased by a stopword list; recovered background kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
+- `modality_source` identity gate: non-lexical modality is not unique latent content and is not erased by a stopword list; recovered modality kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
+- `copied_text` identity gate: copied and boilerplate residue is not unique latent content and is not erased by a stopword list; recovered copied-text kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
+- `style_source` identity gate: house-voice style residue is not unique latent content and is not erased by a stopword list; recovered style kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
+- `stopword_deletion` method gate: a default or global stopword list cannot erase repeated report language; recovered deletion kinds match known truth at a higher computed rate than collapsing every token treatment to stopword deletion (ADR 0004/0012).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
+- `copy_identity` identity gate: a template or pasted copy cannot reuse the source document identity or become a state transition; recovered copy kinds match known truth at a higher computed rate than collapsing every copy to the source (ADR 0003).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
+- `provider_receipt` disclosure receipt: records provider field codes and
+  purpose-bound receipt metadata without persisting source text or source
+  identity (ADR 0009).
+- `intake_authorization` identity gate: documents, serialized records, checkpoints, and LLM outputs cannot be accepted without a purpose-bound grant; size/identity/provenance bounds are not that grant; recovered grant-presence flags match known truth at a higher computed rate than accepting every intake (ADR 0009).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
+- `summarizes_edge` identity gate: a summary may point to earlier event time but cannot become a state transition or reuse the source document identity; recovered summary kinds match known truth at a higher computed rate than collapsing every summary to the source (ADR 0003).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `outcome_order` identity gate: `input_to` and `process_to` cannot move backward or stay contemporaneous in event-time rank; `outcome_of` may point at an earlier producer and cannot become a state transition; recovered kinds match known truth at a higher computed rate than collapsing every kind to `input_to` (ADR 0002/0003).
 - `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `retrospective_edge` identity gate: retrospective reporting may point to earlier event time but cannot become a state transition or a translation; recovered reporting kinds match known truth at a higher computed rate than collapsing every report to a contemporaneous forward report (ADR 0002/0003).
-- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `payload_bound` identity gate: documents, serialized records, model checkpoints, and LLM outputs stay untrusted until identity, provenance, size, and depth validate; recovered accept/reject flags match known truth at a higher computed rate than accepting every payload (ADR 0008/0013).
-- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `inferred_status` identity gate: inferred relations cannot be promoted to observed evidence or to state transitions; recovered observed/inferred labels match known truth at a higher computed rate than treating every status as observed (ADR 0003).
-- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `support_edge` identity gate: support, contradiction, summary, and `outcome_of` edges cannot become state transitions; recovered evidential kinds match known truth at a higher computed rate than collapsing every kind to support (ADR 0002/0003).
-- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `system_clock` identity gate: event, assertion, document, availability, and knowledge-cutoff time cannot stand in for system time; recovered system stamps match known truth at a higher computed rate than treating every stamp as event time (ADR 0002).
 - `event_clock` identity gate: assertion, system, document, and availability time cannot stand in for event/valid time; recovered event stamps match known truth at a higher computed rate than treating every stamp as assertion time (ADR 0002).
+- Dependabot Rust toolchain updates now use a seven-day cooldown so newly published versions receive a bounded review window before automated proposals.
 - `assertion_clock` identity gate: event, system, document, and availability time cannot stand in for assertion time; recovered assertion stamps match known truth at a higher computed rate than treating every stamp as event time (ADR 0002).
 - `cutoff_clock` identity gate: event time, system time, and availability time cannot stand in for knowledge cutoff; recovered cutoff stamps match known truth at a higher computed rate than treating every stamp as availability time (ADR 0002).
 - `available_clock` identity gate: event time and system time cannot stand in for availability time; recovered availability stamps match known truth at a higher computed rate than treating every stamp as system time (ADR 0002).
@@ -158,6 +187,21 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- The docstring discovery test compares crate-root names to `EXPECTED_CRATES` instead of a hardcoded count of 10, so `semantic_core` is required and an unapproved extra crate fails closed.
+- The LineageWeave temporal-context read exchange no longer emits a fabricated
+  `idempotency-key`; that header remains reserved for retryable write/export
+  operations with a caller-owned operation key.
+- `tepp_api` project-history requests and projections now share the strict
+  `temporal_core` RFC 3339 parser and nominal `KnowledgeCutoff` boundary,
+  rejecting unknown offsets and other timestamp forms that the transport
+  parser could otherwise accept.
+- Coverage validation now ignores LLVM rows for multiline call and iterator
+  syntax that have no independently executable source coordinate, while
+  retaining the authored-line 100% gate.
+- Removed the temporary PR-155 review-repair workflows and source-fix helper after the bounded repair; subsequent changes use the normal reviewed branch path.
+- Pinned Rust branch-coverage workflows to `nightly-2026-08-21`, which is newer than the workspace Rust 1.97.1 MSRV and avoids the previous nightly/MSRV mismatch.
+- Applied the documented `sqlx_live.rs` authored-coverage exclusion to the hourly release gate so live-PostgreSQL success-path coverage is not reported as a false source failure.
+- Removed unreachable duplicate Naruon host-control validation because the shared `require_nonempty` boundary already rejects C0/C1 controls; retained a C1 regression case alongside the existing C0 case.
 - Kept one maturity row per capability in the traceability matrix while recording the active provider-receipt evidence without duplicating or downgrading existing capabilities.
 - `tepp_api` corpus-split manifest validation now rejects governed link-kind arrays that are unsorted or duplicated, keeping untrusted JSON aligned with the schema's unique canonical representation and preventing equivalent audits from receiving different valid digests.
 - Grounded `derived_sensitivity` doctoring on GDPR Article 4(1)/Recital 26 and WP29 Opinion 4/2007 (WP 136) as read from the official texts, and replaced the withdrawn ISO/IEC 29100:2011 use-limitation overclaim with the current 29100:2024 catalogue edition without quoting unread clause text.
@@ -174,6 +218,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
   workflow no longer invokes deleted repair scripts or requests write authority
   after the executable compute implementation is already present.
 - `persistence_postgres` entity and project target inserts now bind their tenant session context before rendering SQL, keeping `FORCE ROW LEVEL SECURITY` behavior consistent with every other tenant-scoped write; live coverage still proves raw wrong-tenant rejection.
+ PR #179 remains closed. Stacked-merged heads and queued Checks are not
+ implemented-main.
 - Clarified ADR 0001 so it owns Rust-first numerical/reference-backend authority while ADR 0011 owns cross-service MSA/service authority.
 - Clarified ADR 0006 so it owns GPU/VRAM and model-credential boundaries; ADR 0010 now owns LLM orchestration policy and ADR 0015 owns autonomous repository-write/review/merge authority.
 - Expanded ADR 0002–0005 and 0009–0011 with explicit implementation maturity, alternatives, failure/recovery, compatibility/migration, verification, and rollback/supersession boundaries where they were previously implicit.
@@ -199,7 +245,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 - Required 100% production line and branch coverage and complete public API docstrings.
 - Required true-parameter recovery, RMSE, bias, interval coverage, temporal leakage, graph recovery, invariance, and CPU/GPU parity evidence.
-- Expanded documentation contracts to require the canonical threat/privacy/assurance/API/orchestration/fitness documents, ADR policy, and every numbered ADR 0001–0016 to remain indexed and structurally complete.
+- Expanded documentation contracts to require the canonical threat/privacy/assurance/API/orchestration/fitness documents, ADR policy, and every numbered ADR present in the canonical index to remain indexed and structurally complete.
 - Added deterministic validation that ADR files and the index have identical decision numbers and that every ADR declares valid decision status, implementation maturity, supersession scope, core decision sections, verification, and rollback behavior.
 - Added 100% statement and branch coverage for the repository quality-gate scripts.
 - Made a zero executable-code coverage denominator explicit for the skeleton-only slice rather than treating it as evidence of implemented behavior.

@@ -7,7 +7,7 @@
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts. The active PR adds a loopback HTTP/1.1 listener for naruon analysis-run and export POSTs. That listener is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` remain target interface shapes.
+Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run and LineageWeave temporal-context POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
 
 ## 2. Contract families
 
@@ -22,7 +22,8 @@ Current protected main exposes Rust library/domain contracts. The active PR adds
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
 | analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | implemented-main |
 | corpus-split leakage-audit manifest | `tepp_api` `CorpusSplitManifest` v1 | naruon, auditors, future UI | active-PR |
-| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | implemented-main (merged PR #21) |
+| temporal-context ordering contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
+| project-history projection contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
 
 ## 3. Versioning
 
@@ -46,6 +47,7 @@ When the service layer is introduced, use resources such as:
 POST   /v1/evidence-imports
 GET    /v1/evidence-imports/{import_id}
 POST   /v1/analysis-runs
+POST   /v1/temporal-context
 GET    /v1/analysis-runs/{run_id}
 POST   /v1/analysis-runs/{run_id}/cancel
 GET    /v1/model-artifacts/{artifact_id}
@@ -53,6 +55,12 @@ GET    /v1/exports/{export_id}
 ```
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.
+
+`POST /v1/temporal-context` is a bounded LineageWeave read contract. It accepts
+only events whose availability time is at or before `knowledge_cutoff`, orders
+them by event time and opaque event ID, and emits adjacent forward temporal
+associations plus `candidate_not_causal` transition gaps. It does not infer
+causality, mutate TEPP state, or return a completed psychometric result.
 
 ## 5. Analysis request authority
 

@@ -3,6 +3,7 @@
 **Status:** Accepted cross-cutting traceability baseline  
 **Last reviewed:** 2026-08-16
 **Last reviewed:** 2026-08-20
+**Last reviewed:** 2026-08-24
 
 The full APA 7th standards/literature register remains `docs/research/standards-and-literature.md`. This matrix links durable requirements to their owning decisions and implementation/evidence maturity without duplicating the bibliography.
 
@@ -40,9 +41,9 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; `system_clock` system-vs-other-clock identity on the active PR | active-PR |
 | Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
-| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `outcome_order` IPO event-time order on the active PR | partial |
+| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `copy_identity` copy-versus-source identity on the active PR | partial |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
-| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `inferred_status` inferred-versus-observed identity on the active PR; multilevel estimators remaining | partial |
+| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `location_membership` location-versus-entity/language identity on the active PR; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | interval-aware historical eligibility (`available_time` fully ≤ cutoff) | ADR 0002 | `temporal_core` `evaluate_historical_eligibility` on the active PR; unknown/open-ended availability fails closed | active-PR |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
@@ -51,10 +52,10 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` on protected main as before; `revision_order` later-revision system-time gate on the active PR; remaining physical ERD constraints | partial |
 | known-truth temporal/event simulation manifests | PRD; TRD; Test Strategy | `tepp_simulation` on protected main; recovery metrics in `validation_core` | implemented-main |
 | versioned service/API contracts and exports | PRD; API contract; ADR 0011/0013 | `tepp_api` analysis-run/export/JSON-LD/GraphML contracts on protected main (PR #21); HTTP service remaining accepted-target | partial |
-| immutable split/run/reproducibility manifests | ADR 0013; ERD | `tepp_api` reproducibility manifest and corpus-split leakage-audit wire (`CorpusSplitManifest` v1) on this PR; `persistence_postgres` append-only SQL insert/lookup for `reproducibility_manifest`, `corpus_split_manifest`, `model_run`, and `model_artifact` (migration `0003`); full physical ERD constraints remaining | partial |
-| multilingual shared latent semantic space | PRD; ADR 0004 | future semantic/concept/topic crates | accepted-target |
+| immutable split/run/reproducibility manifests | ADR 0013; ERD | `tepp_api` reproducibility manifest contract on protected main; `persistence_postgres` append-only SQL insert/lookup for `reproducibility_manifest`, `corpus_split_manifest`, `model_run`, and `model_artifact` (migration `0003`); full physical ERD constraints remaining | partial |
+| multilingual shared latent semantic space | PRD; ADR 0004; ADR 0020 | `semantic_core` span-grounded units (active-PR); concept dictionary and shared latent estimator remaining | active-PR |
 | TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004 | future `topic_measurement` | accepted-target |
-| global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | `topic_lineage` activity/dormancy/reactivation identity on the active PR; birth/split/merge remaining | active-PR |
+| global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
 | global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | `stopword_deletion` default-list refusal on the active PR; TF-IDF/BM25 inferential-weight refusal remains accepted-target | partial |

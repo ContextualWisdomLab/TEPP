@@ -1,7 +1,7 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
-**Decision status:** Accepted  
-**Implementation maturity:** active-PR — bounded predicted-vs-observed Allen promotion gate, including coverage before unmatched predicted mass may be authorized for promotion; TDT detection/tracking, CHRONOS schema extraction, prediction calibration, and path-consistency laws remain accepted-target  
+**Decision status:** Accepted
+**Implementation maturity:** active-PR — bounded predicted-vs-observed Allen promotion gate, including coverage before unmatched predicted mass may be authorized for promotion; TDT detection/tracking, CHRONOS schema extraction, prediction calibration, and path-consistency laws remain accepted-target
 
 **Implementation maturity:** active-PR — evidence-layer admission and first-story detection rates are implemented in `event_core` on the active PR; full TDT tracking/calibration and CHRONOS schema extraction remain accepted-target.
 **Implementation maturity:** active-PR — TDT tracking pair precision/recall, identity-switch rate, and track-versus-instance/transition refusal live in existing `event_core`; remaining TDT segmentation/first-story/link and CHRONOS schema/prediction layers remain accepted-target  
@@ -9,6 +9,7 @@
 **Implementation maturity:** active-PR — TDT story-segmentation `WindowDiff`/`Pk`/boundary precision-recall and segmentation-versus-instance/transition refusal live in existing `event_core`; remaining TDT link/tracking/first-story and CHRONOS schema/prediction layers remain accepted-target  
 **Implementation maturity:** active-PR — `event_core` scores CHRONOS occurrence forecasts with a Brier rule and refuses to promote them as instances; remaining TDT detection, schema extraction, and temporal-consistency reasoning remain accepted-target  
 **Date:** 2026-08-12  
+**Date:** 2026-08-12
 **Supersedes:** None; complements ADR 0002 temporal semantics and ADR 0003 event ontology/membership.
 
 ## Context

@@ -29,6 +29,8 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Multiple membership | `membership_core` | partial | — | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Episode membership containment | `episode_membership` | accepted-target | active PR | refuse membership outside episode + recovery vs accept-all | ADR 0003 |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
+| Copy-versus-source identity | `copy_identity` | accepted-target | active PR | refuse copy-as-source/transition + recovery vs source collapse | ADR 0003 |
+| Summary-versus-source identity | `summarizes_edge` | accepted-target | active PR | refuse summary-as-transition/source + recovery vs source collapse | ADR 0003 |
 | Input-process-outcome event-time order | `outcome_order` | accepted-target | active PR | refuse reverse/uncertain IPO order + outcome_of-is-not-transition + recovery vs input collapse | ADR 0002/0003 |
 | Retrospective reporting identity | `retrospective_edge` | accepted-target | active PR | refuse retrospective-as-transition/translation + recovery vs forward collapse | ADR 0002/0003 |
 | Inferred-versus-observed promotion | `inferred_status` | accepted-target | active PR | refuse inferred-as-observed/transition + recovery vs observed collapse | ADR 0003 |
@@ -52,6 +54,12 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Scientific claim promotion gates | `validation_core` | active-PR | this PR | exact-head SHA + computed RMSE SE gate | ADR 0014; full release bundle remaining |
 | Causal-identification gate | `relation_graph` | active-PR | association ≠ cause | LeadsTo/References denied | ADR 0003; `docs/research/causal-identification-gate.md` |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Prompt-versus-unique-content identity | `prompt_source` | accepted-target | active PR | refuse prompt-as-unique/stopword + recovery vs unique-content collapse | ADR 0004/0012 |
+| Corpus-background-versus-unique-content identity | `corpus_background` | accepted-target | active PR | refuse background-as-unique/stopword + recovery vs unique-content collapse | ADR 0004/0012 |
+| Modality-versus-unique-content identity | `modality_source` | accepted-target | active PR | refuse modality-as-unique/stopword + recovery vs unique-content collapse | ADR 0004/0012 |
+| Copied-versus-unique-content identity | `copied_text` | accepted-target | active PR | refuse copied-text-as-unique/stopword + recovery vs unique-content collapse | ADR 0004/0012 |
+| Style-versus-unique-content identity | `style_source` | accepted-target | active PR | refuse style-as-unique/stopword + recovery vs unique-content collapse | ADR 0004/0012 |
+| Untrusted intake grant presence | `intake_authorization` | accepted-target | active PR | refuse missing grant + refuse bounds-as-authorization + recovery vs accept-all | ADR 0009; AGENTS.md |
 | Untrusted payload identity/provenance/size/depth | `payload_bound` | accepted-target | active PR | refuse missing identity/provenance and oversize/over-deep payloads + recovery vs accept-all | AGENTS.md untrusted-boundary |
 | System-clock identity | `system_clock` | active-PR | this PR | recovered system flags vs event-time stand-in | ADR 0002 |
 | Event-clock identity | `event_clock` | active-PR | this PR | recovered event flags vs assertion-time stand-in | ADR 0002 |

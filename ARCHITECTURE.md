@@ -52,6 +52,7 @@ boundaries above remain the target modular MSA architecture.
 | Rust crate | Initial responsibility |
 |---|---|
 | `evidence_core` | immutable evidence domain primitives |
+| `semantic_core` | span-grounded semantic units; language is not identity |
 | `temporal_core` | typed clocks, intervals, and temporal reasoning |
 | `event_core` | event instances, mentions, roles, provenance, and CHRONOS occurrence-prediction calibration |
 | `relation_graph` | typed relations and forward-transition validation |
@@ -61,6 +62,16 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, Monte Carlo, and exact-head claim-promotion metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `location_membership` | location is not entity identity and not a language channel |
+| `prompt_source` | prompt boilerplate is not unique latent content and not stopword deletion |
+| `corpus_background` | corpus-background wording is not unique latent content and not stopword deletion |
+| `modality_source` | non-lexical modality is not unique latent content and not stopword deletion |
+| `copied_text` | copied-text residue is not unique latent content and not stopword deletion |
+| `style_source` | house-voice style residue is not unique latent content and not stopword deletion |
+| `stopword_deletion` | default stopword deletion is not a valid method for repeated report language |
+| `copy_identity` | a template copy is not the source document and not a state transition |
+| `intake_authorization` | untrusted intake fails closed without a grant; bounds are not authorization |
+| `summarizes_edge` | a summary is not a state transition and not the source document |
 | `outcome_order` | input-process-outcome edges cannot move backward in event time |
 | `retrospective_edge` | retrospective reporting cannot become a transition or a translation |
 | `payload_bound` | untrusted documents, records, checkpoints, and LLM outputs fail closed without identity, provenance, size, and depth |

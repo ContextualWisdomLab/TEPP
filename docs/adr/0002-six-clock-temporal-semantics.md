@@ -21,6 +21,9 @@
 **Implementation maturity:** active-PR — evidential-vs-transition gate in `support_edge` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** partial — typed clocks/intervals are implemented-main (PR #8); input-process-outcome event-time order is `outcome_order` on the active PR; remaining clock-identity and split enforcement stay accepted-target  
 **Date:** 2026-08-05  
+**Decision status:** Accepted
+**Implementation maturity:** partial — typed clocks, interval algebra, event/assertion/system/cutoff/availability identity, complete document clocks, revision ordering, retrospective/provenance-vs-transition gates, bounded payload validation, and strict input-process-outcome ordering are implemented-main; downstream graph/split enforcement remains accepted-target.
+**Date:** 2026-08-05
 **Supersedes:** None. ADR 0013 owns persistence/split representation; ADR 0016 owns event-intelligence reasoning above these temporal primitives.
 
 ## Context
