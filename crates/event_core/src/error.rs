@@ -20,6 +20,10 @@ pub enum EventError {
     UnsupportedWireVersion,
     /// An unknown event-role name was supplied.
     UnknownEventRole,
+    /// A TDT detection or mention was treated as a state transition.
+    DetectionIsNotTransition,
+    /// A CHRONOS prediction was treated as an observed or promoted fact.
+    PredictionIsNotFact,
 }
 
 impl fmt::Display for EventError {
@@ -32,6 +36,8 @@ impl fmt::Display for EventError {
             Self::InvalidWirePayload => "invalid event wire payload",
             Self::UnsupportedWireVersion => "unsupported event wire version",
             Self::UnknownEventRole => "unknown event role",
+            Self::DetectionIsNotTransition => "detection is not a state transition",
+            Self::PredictionIsNotFact => "prediction is not an observed fact",
         };
         formatter.write_str(message)
     }
@@ -65,6 +71,14 @@ mod tests {
                 "unsupported event wire version",
             ),
             (EventError::UnknownEventRole, "unknown event role"),
+            (
+                EventError::DetectionIsNotTransition,
+                "detection is not a state transition",
+            ),
+            (
+                EventError::PredictionIsNotFact,
+                "prediction is not an observed fact",
+            ),
         ] {
             assert_eq!(error.to_string(), message);
         }
