@@ -64,6 +64,7 @@ crates/cutoff_clock
 crates/assertion_clock
 crates/event_clock
 crates/system_clock
+crates/support_edge
 ```
 
 ## Local verification

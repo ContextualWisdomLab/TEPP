@@ -87,6 +87,7 @@ APIs.
 | `assertion_clock` | assertion time cannot be replaced by event, system, document, or available time |
 | `event_clock` | event time cannot be replaced by assertion, system, document, or available time |
 | `system_clock` | system time cannot be replaced by event, assertion, document, available, or cutoff time |
+| `support_edge` | support, contradiction, summary, and outcome_of edges are not state transitions |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

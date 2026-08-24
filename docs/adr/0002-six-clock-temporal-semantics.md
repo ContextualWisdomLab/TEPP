@@ -11,6 +11,7 @@
 **Implementation maturity:** active-PR — assertion-clock identity in `assertion_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — event-clock identity in `event_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — system-clock identity in `system_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
+**Implementation maturity:** active-PR — evidential-vs-transition gate in `support_edge` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0013 owns persistence/split representation; ADR 0016 owns event-intelligence reasoning above these temporal primitives.
 
