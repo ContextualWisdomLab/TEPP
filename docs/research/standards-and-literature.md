@@ -99,6 +99,13 @@ Brier, G. W. (1950). Verification of forecasts expressed in terms of probability
 Gneiting, T., & Raftery, A. E. (2007). Strictly proper scoring rules, prediction, and estimation. *Journal of the American Statistical Association, 102*(477), 359–378. https://doi.org/10.1198/016214506000001437
 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. CHRONOS occurrence forecasts remain hypothetical and are scored with the Brier mean squared error against later-observed truth (Brier, 1950; Gneiting & Raftery, 2007).
+Jensen, C. S., & Snodgrass, R. T. (1999). Temporal data management. *IEEE Transactions on Knowledge and Data Engineering, 11*(1), 36–44. https://doi.org/10.1109/69.755613
+
+Snijders, T. A. B., & Bosker, R. J. (2012). *Multilevel analysis: An introduction to basic and advanced multilevel modeling* (2nd ed.). SAGE.
+
+Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J. Hox & J. K. Roberts (Eds.), *Handbook of advanced multilevel analysis* (pp. 313–334). Routledge.
+
+TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Typed `entity_record` and `project_record` SQL keep multiple-membership targets referentially intact and refuse hostile labels before insert (Snijders & Bosker, 2012; Beretvas, 2011; Jensen & Snodgrass, 1999).
 
 ## Unicode, language tags, and multilingual structure
 
