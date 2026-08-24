@@ -1,8 +1,8 @@
 # ADR 0001 — Rust-first numerical core and CPU `f64` reference
 
-**Decision status:** Accepted  
-**Implementation maturity:** partial — workspace/quality foundation is implemented-main; estimator/reference-backend behavior is accepted-target  
-**Date:** 2026-08-05  
+**Decision status:** Accepted
+**Implementation maturity:** partial — workspace/quality foundation is implemented-main; checkpoint-versus-estimator authority is `checkpoint_authority` on the active PR; estimator/reference-backend implementations remain accepted-target
+**Date:** 2026-08-05
 **Supersession:** ADR 0011 governs cross-service ownership and standalone/MSA integration. This ADR remains authoritative for Rust-first numerical implementation and backend parity.
 
 ## Context
