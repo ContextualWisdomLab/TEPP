@@ -142,13 +142,17 @@ Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World 
 
 TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. Documents, serialized records, checkpoints, and LLM outputs remain untrusted until identity, provenance, size, and nesting depth validate (Bray, 2017; Moreau & Missier, 2013).
 
+International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011). Data minimization informs `provider_receipt`; it is not a certification claim.
+
 ## Privacy lifecycle, retention, and legal hold
 
 European Union. (2016). *Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 on the protection of natural persons with regard to the processing of personal data and on the free movement of such data (General Data Protection Regulation)*. Official Journal of the European Union, L 119, 1–88. https://eur-lex.europa.eu/eli/reg/2016/679/oj
 
+Voigt, P., & Von dem Bussche, A. (2017). *The EU General Data Protection Regulation (GDPR): A practical guide*. Springer. https://doi.org/10.1007/978-3-319-57959-7
+
 National Institute of Standards and Technology. (2020). *NIST privacy framework: A tool for improving privacy through enterprise risk management, version 1.0*. https://doi.org/10.6028/NIST.CSWP.01162020
 
-TEPP uses these sources, together with the AICPA Trust Services Criteria cited below, as readiness inputs for purpose-bound retention, deletion, and legal hold. They are not self-certification authority. Persistence migration `0007` records policy, hold, deletion requests, and evidence tombstones; it does not assert that a deployment is lawful under GDPR Article 17 or attested under SOC 2.
+TEPP uses these sources, together with the AICPA Trust Services Criteria cited below, as readiness inputs for purpose-bound retention, deletion, and legal hold. They are not self-certification authority. Persistence migration `0007` records policy, hold, deletion requests, and evidence tombstones; it does not assert that a deployment is lawful under GDPR Article 17 or attested under SOC 2. Untrusted intake still requires a purpose-bound grant; identity and size bounds are not that grant (Voigt & Von dem Bussche, 2017).
 
 ## Privacy and derived-data sensitivity
 

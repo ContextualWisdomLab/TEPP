@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `intake_authorization` identity gate: documents, serialized records, checkpoints, and LLM outputs require a purpose-bound grant in addition to identity, provenance, size, and depth validation; recovery tests reject ungranted intake.
 - `tepp_api` LineageWeave temporal-context contract (v1): cutoff-safe event eligibility, deterministic event-time ordering, explicit non-causal association/gap boundaries, HTTPS interchange construction, and loopback listener handling at `POST /v1/temporal-context`; read-only context requests no longer require the write-only idempotency header, and no causal inference or completed-result service is included.
 - `tepp_api` LineageWeave consumer-scoped analysis-run ingress: versioned, credential-free requests use a published consumer identity and isolate idempotency by consumer, tenant workspace, and opaque caller key; the one-shot restack workflow is removed after the protected-main merge is verified.
 - ADR 0018 records the consumer-scoped analysis-run ingress, its in-memory loopback maturity, and the persistence boundary required before production use.

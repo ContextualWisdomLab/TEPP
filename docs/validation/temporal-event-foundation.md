@@ -35,6 +35,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Mention-confidence Brier score | `event_core` | active-PR | calibration vs binary truth | perfect 0 / half 0.25 RMSE | ADR 0003; `docs/research/mention-confidence-brier.md` |
 | Checkpoint is not the estimator | `checkpoint_authority` | accepted-target | active PR | refuse checkpoint-as-estimator + unvalidated artifact + recovery vs estimator collapse | ADR 0001/0014 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Untrusted intake grant presence | `intake_authorization` | accepted-target | active PR | refuse missing grant + refuse bounds-as-authorization + recovery vs accept-all | ADR 0009; AGENTS.md |
 | Untrusted payload identity/provenance/size/depth | `payload_bound` | accepted-target | active PR | refuse missing identity/provenance and oversize/over-deep payloads + recovery vs accept-all | AGENTS.md untrusted-boundary |
 | System-clock identity | `system_clock` | active-PR | this PR | recovered system flags vs event-time stand-in | ADR 0002 |
 | Event-clock identity | `event_clock` | active-PR | this PR | recovered event flags vs assertion-time stand-in | ADR 0002 |

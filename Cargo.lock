@@ -760,6 +760,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "intake_authorization"
+version = "0.1.0"
+
+[[package]]
 name = "interpretation_gateway"
 version = "0.1.0"
 dependencies = [
