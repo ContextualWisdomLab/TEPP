@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `stopword_deletion` method gate: a default or global stopword list cannot erase repeated report language; recovery tests distinguish deliberate method treatment from stopword deletion.
 - `copy_identity` identity gate: a template or pasted copy cannot reuse the source document identity or become a state transition; recovery tests distinguish copy kinds from source identity.
 - `intake_authorization` identity gate: documents, serialized records, checkpoints, and LLM outputs require a purpose-bound grant in addition to identity, provenance, size, and depth validation; recovery tests reject ungranted intake.
 - `tepp_api` LineageWeave temporal-context contract (v1): cutoff-safe event eligibility, deterministic event-time ordering, explicit non-causal association/gap boundaries, HTTPS interchange construction, and loopback listener handling at `POST /v1/temporal-context`; read-only context requests no longer require the write-only idempotency header, and no causal inference or completed-result service is included.
