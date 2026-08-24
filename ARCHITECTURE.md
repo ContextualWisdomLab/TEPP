@@ -62,6 +62,7 @@ boundaries above remain the target modular MSA architecture.
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
 | `encrypted_mapping` | purpose-bound in-memory AES-256-GCM identity mappings; no plaintext persistence or KMS integration |
+| `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

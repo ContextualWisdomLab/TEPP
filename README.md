@@ -24,6 +24,7 @@ crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
 crates/encrypted_mapping
+crates/checkpoint_authority
 ```
 
 ## Local verification
