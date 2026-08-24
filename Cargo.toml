@@ -52,7 +52,6 @@ members = [
     "crates/compute_backend",
     "crates/episode_membership",
     "crates/membership_target",
-
 ]
 default-members = [
     "crates/evidence_core",
@@ -106,7 +105,6 @@ default-members = [
     "crates/compute_backend",
     "crates/episode_membership",
     "crates/membership_target",
-
 ]
 
 [workspace.package]
