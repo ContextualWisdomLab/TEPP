@@ -1,5 +1,7 @@
 //! Unit-mean centering that separates between from within residuals.
 
+use std::collections::HashSet;
+
 use crate::{ComponentLevel, ComponentValue, LongitudinalError};
 
 /// One occasion score for one unit.
@@ -58,14 +60,12 @@ pub fn decompose_within_between(
         return Err(LongitudinalError::InvalidObservationPayload);
     }
     let mut rows: Vec<OccasionObservation> = Vec::with_capacity(observations.len());
+    let mut seen_pairs: HashSet<(u32, u32)> = HashSet::with_capacity(observations.len());
     for observation in observations {
         if !observation.score().is_finite() {
             return Err(LongitudinalError::InvalidObservationPayload);
         }
-        if rows.iter().any(|seen| {
-            seen.unit_index() == observation.unit_index()
-                && seen.occasion_index() == observation.occasion_index()
-        }) {
+        if !seen_pairs.insert((observation.unit_index(), observation.occasion_index())) {
             return Err(LongitudinalError::InvalidObservationPayload);
         }
         rows.push(*observation);

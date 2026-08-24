@@ -14,7 +14,7 @@ Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. 
 
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. `longitudinal_core` separates stable between-unit means from within-unit residuals and refuses to score a between component as within-unit change.
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM (American Educational Research Association, American Psychological Association, & National Council on Measurement in Education, 2014; Asparouhov & Muthén, 2009; Asparouhov et al., 2018; Hamaker et al., 2015; Marsh et al., 2014). Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. `longitudinal_core` separates stable between-unit means from within-unit residuals and refuses to score a between component as within-unit change.
 
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 

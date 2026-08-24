@@ -12,11 +12,10 @@ pub struct ComponentValue {
 }
 
 impl ComponentValue {
-    /// Construct a finite component record.
+    /// Construct a component record from its identity fields and raw value.
     ///
-    /// Non-finite values are rejected later by
-    /// [`component_root_mean_square_error`]; this constructor keeps the record
-    /// transparent so tests can compute the same residual.
+    /// The value is stored exactly as given, including non-finite values;
+    /// this constructor performs no validation.
     #[must_use]
     pub const fn new(
         unit_index: u32,
@@ -59,11 +58,14 @@ impl ComponentValue {
 
 /// RMSE of recovered components against known-truth components.
 ///
+/// The sum of squared residuals is accumulated with max-magnitude scaling so
+/// large finite residuals cannot overflow to infinity.
+///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidComponentPayload`] when either slice is
-/// empty, the lengths differ, a unit/occasion/level identity mismatches, or a
-/// value is non-finite.
+/// empty, the lengths differ, a unit/occasion/level identity mismatches, a
+/// value or a computed residual is non-finite.
 pub fn component_root_mean_square_error(
     truth: &[ComponentValue],
     decided: &[ComponentValue],
@@ -71,7 +73,8 @@ pub fn component_root_mean_square_error(
     if truth.is_empty() || truth.len() != decided.len() {
         return Err(LongitudinalError::InvalidComponentPayload);
     }
-    let mut sum_squares = 0.0_f64;
+    let mut scale = 0.0_f64;
+    let mut scaled_sum_squares = 0.0_f64;
     for (truth_row, decided_row) in truth.iter().zip(decided) {
         if truth_row.unit_index() != decided_row.unit_index()
             || truth_row.occasion_index() != decided_row.occasion_index()
@@ -82,15 +85,59 @@ pub fn component_root_mean_square_error(
             return Err(LongitudinalError::InvalidComponentPayload);
         }
         let residual = decided_row.value() - truth_row.value();
-        sum_squares += residual * residual;
+        if !residual.is_finite() {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        }
+        let magnitude = residual.abs();
+        if magnitude > scale {
+            let ratio = scale / magnitude;
+            scaled_sum_squares = 1.0 + scaled_sum_squares * ratio * ratio;
+            scale = magnitude;
+        } else if scale > 0.0 {
+            let ratio = magnitude / scale;
+            scaled_sum_squares += ratio * ratio;
+        }
     }
-    Ok((sum_squares / truth.len() as f64).sqrt())
+    Ok(scale * (scaled_sum_squares / truth.len() as f64).sqrt())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{ComponentValue, component_root_mean_square_error};
     use crate::{ComponentLevel, LongitudinalError};
+
+    #[test]
+    fn maximal_residuals_do_not_overflow() {
+        let truth = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.0),
+        ];
+        let maxed = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, f64::MAX),
+        ];
+        assert_eq!(
+            component_root_mean_square_error(&truth, &maxed),
+            Ok(f64::MAX)
+        );
+        let partial_extreme = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.0),
+        ];
+        let expected = f64::MAX / f64::sqrt(2.0);
+        let got = component_root_mean_square_error(&truth, &partial_extreme).expect("scaled rmse");
+        assert!((got - expected).abs() <= expected * 4.0 * f64::EPSILON);
+    }
+
+    #[test]
+    fn overflowing_residual_fails_closed() {
+        let truth = [ComponentValue::new(0, 0, ComponentLevel::Within, -f64::MAX)];
+        let decided = [ComponentValue::new(0, 0, ComponentLevel::Within, f64::MAX)];
+        assert_eq!(
+            component_root_mean_square_error(&truth, &decided),
+            Err(LongitudinalError::InvalidComponentPayload)
+        );
+    }
 
     #[test]
     fn mismatched_identity_and_nan_fail_closed() {
