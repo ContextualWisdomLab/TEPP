@@ -46,8 +46,8 @@ use psychometric_core::{
     recover_standardised_continuous_diffusion, recover_standardised_continuous_drift,
     recover_standardised_continuous_time_dependent_predictor_effect,
     recover_standardised_continuous_time_independent_predictor_effect,
-    recover_standardised_discrete_diffusion, recover_standardised_discrete_drift,
-    recover_standardised_initial_latent_variance,
+    recover_standardised_discrete_continuous_intercept, recover_standardised_discrete_diffusion,
+    recover_standardised_discrete_drift, recover_standardised_initial_latent_variance,
     recover_standardised_initial_time_dependent_predictor_effect,
     recover_standardised_initial_time_independent_predictor_effect,
     recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
@@ -66,6 +66,7 @@ use psychometric_core::{
     refuse_asymptotic_continuous_intercept_as_discrete_increment,
     refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
     refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
+    refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_coefficient,
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -185,6 +186,7 @@ use psychometric_core::{
     refuse_standardised_asymptotic_time_independent_effect_as_standardised_initial_time_independent_effect,
     refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
     refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
+    refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
     refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect,
     refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect,
     refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_independent_effect,
@@ -259,6 +261,7 @@ use psychometric_core::{
     refuse_unstandardised_continuous_drift_as_standardised_continuous_drift,
     refuse_unstandardised_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect,
     refuse_unstandardised_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect,
+    refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
     refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion,
     refuse_unstandardised_discrete_drift_as_standardised_discrete_drift,
     refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
@@ -5447,6 +5450,138 @@ fn standardised_asymptotic_diffusion_is_not_unstandardised_or_diffusionstd() {
         ),
         Err(
             psychometric_core::PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion
+        )
+    );
+}
+
+#[allow(clippy::too_many_lines)]
+#[test]
+fn standardised_discrete_continuous_intercept_is_not_unstandardised_or_cintstd() {
+    let intercept = 0.3_f64;
+    let diffusion = 0.4_f64;
+    let log_rate = -0.25_f64;
+    let event_delta = 1.0_f64;
+    let recovered = recover_standardised_discrete_continuous_intercept(
+        intercept,
+        diffusion,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("discreteCINTstd");
+    let discrete = recover_discrete_continuous_intercept_effect(
+        intercept,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("discreteCINT");
+    let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    assert!((within - 0.8).abs() < 1e-15);
+    let expected = discrete / within.sqrt();
+    assert!(
+        (recovered - expected).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 / footnote 4): discreteCINTstd is discreteCINT / √p"
+    );
+    let continuous_std = intercept / within.sqrt();
+    assert!(
+        (continuous_std - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): κ / √p does not depend on Δt and is not discreteCINTstd"
+    );
+    let asymptotic =
+        recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+            .expect("asymCINT");
+    let asymptotic_std = asymptotic / within.sqrt();
+    assert!(
+        (asymptotic_std - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): (-κ / a) / √p is not discreteCINTstd"
+    );
+    let later = recover_standardised_discrete_continuous_intercept(
+        intercept,
+        diffusion,
+        log_rate,
+        2.5,
+        LagClock::EventTime,
+    )
+    .expect("discreteCINTstd Δt=2.5");
+    assert!((later - recovered).abs() > 1e-3);
+    let zero = recover_standardised_discrete_continuous_intercept(
+        0.0,
+        diffusion,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("zero CINT");
+    assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(
+        recover_standardised_discrete_continuous_intercept(
+            intercept,
+            0.0,
+            log_rate,
+            event_delta,
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveWithinSubjectVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_discrete_continuous_intercept(
+            intercept,
+            diffusion,
+            0.5,
+            event_delta,
+            LagClock::EventTime
+        ),
+        Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_standardised_discrete_continuous_intercept(
+            intercept,
+            diffusion,
+            log_rate,
+            event_delta,
+            LagClock::SystemTime
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_discrete_continuous_intercept(
+            intercept,
+            diffusion,
+            log_rate,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(psychometric_core::PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept(
+            discrete,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+        )
+    );
+    assert_eq!(
+        refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept(
+            continuous_std,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept(
+            asymptotic_std,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
         )
     );
 }

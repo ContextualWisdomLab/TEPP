@@ -1042,6 +1042,25 @@ pub enum PsychometricError {
     /// continuous-diffusion ratio, not the correlation of
     /// `asymDIFFUSION`.
     StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion,
+    /// Driver p. 16 `discreteCINTstd` was requested with a
+    /// non-positive within-subject variance. Footnote 4
+    /// standardisation of the 2017-era `discreteCINT` vector
+    /// requires strictly positive `asymDIFFUSION`.
+    StandardisedDiscreteContinuousInterceptRequiresPositiveWithinSubjectVariance,
+    /// Driver Eq. 3 unstandardised `discreteCINT`
+    /// `A^{-1}[e^{A Δt} − I] κ` was treated as `discreteCINTstd`.
+    /// Unstandardised discrete intercept is defined for growing
+    /// `a ≥ 0` and for zero diffusion; standardised `discreteCINT`
+    /// is not.
+    UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
+    /// Driver p. 16 `CINTstd` analog `κ / √p` was treated as
+    /// `discreteCINTstd`. The continuous intercept standardisation
+    /// does not depend on the event interval.
+    StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
+    /// Driver Table 2 `asymCINT` `/ √p` was treated as
+    /// `discreteCINTstd`. `(-κ / a) / √p` is the standardised
+    /// total intercept change, not the finite-interval map.
+    AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1800,6 +1819,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion => {
                 "standardised continuous DIFFUSION is not standardised asymptotic DIFFUSION"
+            }
+            Self::StandardisedDiscreteContinuousInterceptRequiresPositiveWithinSubjectVariance => {
+                "standardised discrete continuous intercept requires strictly positive within-subject variance"
+            }
+            Self::UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept => {
+                "unstandardised discrete continuous intercept is not standardised discrete continuous intercept"
+            }
+            Self::StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept => {
+                "standardised continuous intercept is not standardised discrete continuous intercept"
+            }
+            Self::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept => {
+                "asymptotic standardised continuous intercept is not standardised discrete continuous intercept"
             }
         };
         formatter.write_str(message)
@@ -3106,6 +3137,30 @@ mod tests {
             PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion
                 .to_string(),
             "standardised continuous DIFFUSION is not standardised asymptotic DIFFUSION"
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_continuous_intercept_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised discrete continuous intercept requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+                .to_string(),
+            "unstandardised discrete continuous intercept is not standardised discrete continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+                .to_string(),
+            "standardised continuous intercept is not standardised discrete continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+                .to_string(),
+            "asymptotic standardised continuous intercept is not standardised discrete continuous intercept"
         );
     }
 }

@@ -551,6 +551,19 @@
 //! recover the same 1; `TIPREDVARstd` recovers the same number
 //! and remains a distinct named quantity; `DIFFUSIONstd`
 //! `−2 a` is not `asymDIFFUSIONstd`),
+//! recovers the Driver p. 16 `discreteCINTstd` as
+//! `A^{-1}[e^{A Δt} − I] κ / √p` after forming strictly
+//! positive `asymDIFFUSION` (JSS PDF re-opened 2026-08-24T05:20Z;
+//! p. 16; footnote 4; Eq. 3; Table 2; 2017-era
+//! `summary.ctsemFit.R` forms unstandardised `discreteCINT`
+//! whenever `verbose = TRUE`; that source does not form a
+//! `discreteCINTstd` matrix; the scalar map is the footnote 4
+//! standardisation of that named discrete intercept; unstandardised
+//! `discreteCINT` is defined for growing `a ≥ 0` and for zero
+//! diffusion and is not `discreteCINTstd`; zero `q` fails closed;
+//! a non-event clock fails closed; a non-positive event interval
+//! fails closed; `a ≥ 0` fails closed; `κ / √p` does not depend
+//! on `Δt` and is not this map; `(-κ / a) / √p` is not this map),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -725,6 +738,8 @@ pub use event_time::recover_standardised_continuous_drift;
 pub use event_time::recover_standardised_continuous_time_dependent_predictor_effect;
 /// Exact scalar p. 16 `TIPREDEFFECTstd` `B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_continuous_time_independent_predictor_effect;
+/// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_discrete_continuous_intercept;
 /// Exact scalar p. 16 `discreteDIFFUSIONstd` `Q_Δt / (−q / (2 a))` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_discrete_diffusion;
 /// Exact scalar p. 16 `discreteDRIFTstd` `e^{a Δt}` after strictly positive `asymDIFFUSION`.
@@ -785,6 +800,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_as_discrete_increment
 pub use event_time::refuse_asymptotic_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating `τ + λ(−κ / a)` as Eq. 5 of §4.3 stationary `T0MEANS`.
 pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean;
+/// Refuse treating Table 2 `asymCINT` `/ √p` as p. 16 `discreteCINTstd`.
+pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT` `B`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_coefficient;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.
@@ -1039,6 +1056,8 @@ pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_st
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion;
 /// Refuse treating continuous `DIFFUSION` standardisation `−2 a` as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
+/// Refuse treating `κ / √p` as p. 16 `discreteCINTstd`.
+pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Refuse treating p. 16 `TDPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
 pub use event_time::refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating p. 16 `TIPREDEFFECTstd` as p. 16 `TDPREDEFFECTstd`.
@@ -1191,6 +1210,8 @@ pub use event_time::refuse_unstandardised_continuous_drift_as_standardised_conti
 pub use event_time::refuse_unstandardised_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating unstandardised `TIPREDEFFECT` `B` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect;
+/// Refuse treating unstandardised `discreteCINT` as p. 16 `discreteCINTstd`.
+pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Refuse treating unstandardised `discreteDIFFUSION` as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating unstandardised `discreteDRIFT` as p. 16 `discreteDRIFTstd`.
