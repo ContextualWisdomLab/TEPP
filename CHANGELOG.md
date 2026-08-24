@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `copied_text` identity gate: copied-text residue is not unique latent content or a state transition; recovery tests distinguish copied-text evidence from genuinely new content.
 - `style_source` identity gate: house-voice style residue is not unique latent content and is not erased by a stopword list; recovery tests distinguish style from unique content.
 - `stopword_deletion` method gate: a default or global stopword list cannot erase repeated report language; recovery tests distinguish deliberate method treatment from stopword deletion.
 - `copy_identity` identity gate: a template or pasted copy cannot reuse the source document identity or become a state transition; recovery tests distinguish copy kinds from source identity.

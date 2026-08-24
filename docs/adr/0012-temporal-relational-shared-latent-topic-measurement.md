@@ -1,7 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted
-**Implementation maturity:** partial — `topic_lineage` keeps one P0 identity across active/dormant/reactivated states; `network_analysis` refuses raw-simplex Euclidean geometry and scores cluster pair precision/recall; `model_selection` applies statistical/Pareto candidate-`K` gates and known-`K` RMSE; `stopword_deletion` refuses default deletion of report language; `style_source` separates house-voice residue from unique content; the remaining TRSL-TM estimator, method effects, and backend interchange remain accepted-target
+**Implementation maturity:** partial — `topic_lineage` keeps one P0 identity across active/dormant/reactivated states; `network_analysis` refuses raw-simplex Euclidean geometry and scores cluster pair precision/recall; `model_selection` applies statistical/Pareto candidate-`K` gates and known-`K` RMSE; `stopword_deletion` refuses default deletion of report language; `style_source` separates house-voice residue from unique content; `copied_text` separates copied-text residue from unique content; the remaining TRSL-TM estimator, method effects, and backend interchange remain accepted-target
 **Date:** 2026-08-12
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
