@@ -14,6 +14,7 @@ on:
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
       - "crates/compute_backend/**"
+      - "crates/episode_membership/**"
   push:
     branches:
       - main
@@ -24,6 +25,7 @@ on:
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
       - "crates/compute_backend/**"
+      - "crates/episode_membership/**"
   workflow_dispatch:
 
 permissions:
