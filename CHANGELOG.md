@@ -6,6 +6,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `copy_identity` identity gate: a template or pasted copy cannot reuse the source document identity or become a state transition; recovered copy kinds match known truth at a higher computed rate than collapsing every copy to the source (ADR 0003).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `provider_receipt` disclosure receipt: records provider field codes and
   purpose-bound receipt metadata without persisting source text or source
   identity (ADR 0009).
