@@ -96,6 +96,7 @@ Tashman, L. J. (2000). Out-of-sample tests of forecasting accuracy: An analysis 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Valid time, transaction time, and a document's availability are not substitutes for `cutoff_clock` knowledge cutoff.
 
 Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434. Interval relations inform `support_edge`; they do not make support, contradiction, summary, or `outcome_of` a state transition.
+TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Retrospective reporting may point at earlier event time; it is not a state transition and not a translation (Allen, 1983).
 
 ## Unicode, language tags, and multilingual structure
 
@@ -133,7 +134,7 @@ Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology
 
 Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
 
-TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. Inferred relations are a PROV derivation, not an observation, and cannot be promoted to observed evidence or to a state transition without a separate validation gate (Moreau & Missier, 2013).
+TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. Documents, serialized records, checkpoints, and LLM outputs remain untrusted until identity, provenance, size, and nesting depth validate (Bray, 2017; Moreau & Missier, 2013).
 
 ## Privacy lifecycle, retention, and legal hold
 

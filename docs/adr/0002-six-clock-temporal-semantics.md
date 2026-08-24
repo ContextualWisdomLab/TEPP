@@ -1,7 +1,7 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
 **Decision status:** Accepted
-**Implementation maturity:** partial — typed clocks, interval algebra, event/assertion/system/cutoff/availability identity, complete document clocks, revision ordering, and provenance-vs-transition gates are implemented-main; downstream graph/split enforcement remains accepted-target.
+**Implementation maturity:** partial — typed clocks, interval algebra, event/assertion/system/cutoff/availability identity, complete document clocks, revision ordering, retrospective/provenance-vs-transition gates, and bounded payload validation are implemented-main; downstream graph/split enforcement remains accepted-target.
 **Date:** 2026-08-05
 **Supersedes:** None. ADR 0013 owns persistence/split representation; ADR 0016 owns event-intelligence reasoning above these temporal primitives.
 
