@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tepp.local/schemas/corpus_split_manifest_v1.json",
+  "title": "CorpusSplitManifestV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "manifest_id",
+    "knowledge_cutoff",
+    "split_policy_version",
+    "relation_component_digest",
+    "train_partition_digest",
+    "validation_partition_digest",
+    "test_partition_digest",
+    "included_document_count",
+    "excluded_unavailable_at_cutoff_count",
+    "connected_group_count",
+    "governed_link_kinds",
+    "split_manifest_digest_sha256"
+  ],
+  "properties": {
+    "contract_version": { "type": "integer", "const": 1 },
+    "manifest_id": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "knowledge_cutoff": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "split_policy_version": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "relation_component_digest": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" },
+    "train_partition_digest": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" },
+    "validation_partition_digest": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" },
+    "test_partition_digest": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" },
+    "included_document_count": { "type": "integer", "minimum": 0 },
+    "excluded_unavailable_at_cutoff_count": { "type": "integer", "minimum": 0 },
+    "connected_group_count": { "type": "integer", "minimum": 0 },
+    "governed_link_kinds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["revision", "translation", "copied_variant", "same_episode"]
+      }
+    },
+    "split_manifest_digest_sha256": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$" }
+  }
+}
