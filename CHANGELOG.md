@@ -6,6 +6,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `support_edge` identity gate: support, contradiction, summary, and `outcome_of` edges cannot become state transitions; recovered evidential kinds match known truth at a higher computed rate than collapsing every kind to support (ADR 0002/0003).
+- `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `system_clock` identity gate: event, assertion, document, availability, and knowledge-cutoff time cannot stand in for system time; recovered system stamps match known truth at a higher computed rate than treating every stamp as event time (ADR 0002).
 - `event_clock` identity gate: assertion, system, document, and availability time cannot stand in for event/valid time; recovered event stamps match known truth at a higher computed rate than treating every stamp as assertion time (ADR 0002).
 - `assertion_clock` identity gate: event, system, document, and availability time cannot stand in for assertion time; recovered assertion stamps match known truth at a higher computed rate than treating every stamp as event time (ADR 0002).
