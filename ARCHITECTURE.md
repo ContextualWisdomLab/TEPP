@@ -61,6 +61,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `citation_edge` | citation, revision, translation, and retrospective edges are not state transitions |
 | `psychometric_fit` | CPU `f64` ESEM loading recovery and event-time DSEM lag gates |
 | `subevent_containment` | subevent event-time intervals must stay inside the parent |
 | `prediction_contradiction` | Allen promotion gate: `before`/`after` stay contradictory; `meets`/`met_by` stay unsupported; coverage is required before unmatched predicted mass may be authorized for promotion |

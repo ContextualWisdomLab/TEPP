@@ -119,6 +119,10 @@ name = "checkpoint_authority"
 version = "0.1.0"
 
 [[package]]
+name = "citation_edge"
+version = "0.1.0"
+
+[[package]]
 name = "corpus_split"
 version = "0.1.0"
 dependencies = [
