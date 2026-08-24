@@ -2,10 +2,10 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-24T05:41:54Z
-**Protected-main evidence:** `c45be17a9dbce95ef81cee230e9d128abc7160ac`
+**Snapshot:** 2026-08-24T08:05:30Z
+**Protected-main evidence:** `428847372e80` (full SHA fetched live before every mutation)
 **Workspace version on protected main:** `0.1.0`
-**Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). Duplicate [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179) was closed at 2026-08-23T12:39:22Z and is not a second protected-main register.
+**Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main. Duplicate [PR #179] stays closed.
 
 ## Purpose
 
@@ -24,11 +24,11 @@ GitHub state before any customer, release, certification, or valuation claim.
 
 | Signal | Snapshot evidence | Delivery implication |
 |---|---:|---|
-| Protected-main SHA | `c45be17a9dbce95ef81cee230e9d128abc7160ac` | All as-built claims are bounded to this commit. |
+| Protected-main SHA | `428847372e80…` (2026-08-24T08:05Z) | All as-built claims are bounded to this commit. |
 | Workspace members | 10 Rust crates | The foundation is modular, but the approved target contains additional semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual boundaries. |
-| Open pull requests | **118** | The queue is itself a release blocker and requires consolidation. |
-| Draft pull requests | **48** | Most queued work is not independently review-ready. |
-| Non-draft pull requests | **70** | A non-draft state is not a qualifying review or required-check result. |
+| Open pull requests | **79** | The queue is itself a release blocker and requires consolidation. |
+| Draft pull requests | **47** | Most queued work is not independently review-ready. |
+| Non-draft pull requests | **32** | A non-draft state is not a qualifying review or required-check result. |
 | Open product issues | **12** | Issue #156 plus the product-completion program #166–#176. |
 | Duplicate gap-baseline PRs | **#164** (authority); **#179** closed as superseded | Only one live register remains; queued Checks on #164 are not protected-main evidence. |
 | Current package version | `0.1.0` | No supported product release is established by the repository version alone. |
@@ -37,8 +37,29 @@ The pull-request counts come from the live GitHub search at this snapshot. The
 full exact-head classification is owned by
 [issue #175](https://github.com/ContextualWisdomLab/TEPP/issues/175); this file
 keeps the operator-level summary while the exact-head register below records the
-current 118-row volatile queue. Passing or queued Checks on an open PR never
+volatile queue (live counts above). Passing or queued Checks on an open PR never
 promote that PR to implemented-main.
+
+### Queue-consolidation progress (GAP-012)
+
+The hourly scheduler plus one batch integration vehicle are draining the
+main-conflicting green queue:
+
+- [PR #215](https://github.com/ContextualWisdomLab/TEPP/pull/215) folds 31 fully
+  green but main-conflicting slices into one exact-head landing vehicle with
+  per-slice merge-commit provenance and local `cargo test`/quality-suite
+  verification at its head.
+- The scheduler independently landed #110, #114, #115, #118–#128, #130,
+  #133–#135, #137–#138, and #164 while #215 was in Checks; #215 was refreshed
+  onto that main and re-verified.
+- Transient Strix provider failures (`provider/backend unavailable`) on
+  #48/#49/#63/#65/#137/#149/#155/#157/#201 were re-run rather than treated as
+  code defects.
+
+Remaining after consolidation lands: strix-rerun set (#48 #49 #63 #65 #149 #155
+#157 #201), pending-check slices (#58 #59 #62 #66), conflicted #131, toolchain
+bump #214, and the 47 stacked psychometric draft PRs retained per the stacking
+plan.
 
 ## Current open pull-request evidence
 
