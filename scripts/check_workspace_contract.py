@@ -49,7 +49,6 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "psychometric_fit",
     "subevent_containment",
     "prediction_contradiction",
-    "provider_receipt",
     "operational_log",
     "service_tls",
     "derived_sensitivity",
