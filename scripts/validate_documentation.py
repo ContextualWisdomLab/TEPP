@@ -41,6 +41,10 @@ REQUIRED_FILES = (
     "docs/adr/0014-scientific-claim-promotion-and-release-evidence.md",
     "docs/adr/0015-autonomous-development-review-and-merge-authority.md",
     "docs/adr/0016-tdt-chronos-event-intelligence-boundary.md",
+    "docs/adr/0017-hourly-contextual-orchestrator-gateway.md",
+    "docs/adr/0018-consumer-scoped-analysis-run-ingress.md",
+    "docs/adr/0019-project-history-wire-size-symmetry.md",
+    "docs/adr/0020-lineageweave-project-history-boundary.md",
     "docs/product/prd-v0.4-approved.md",
     PRODUCT_TECHNICAL_GAP_BASELINE,
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
@@ -338,7 +342,6 @@ def validate_promotion_authority_pointers() -> None:
         raise AssertionError("\n".join(failures))
 
 
-def validate_documentation_map() -> None:
 def validate_documentation_map(root: Path = ROOT) -> None:
     """Require cross-cutting canonical documents to be discoverable from the root map."""
 

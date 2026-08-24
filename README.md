@@ -34,6 +34,7 @@ evidence identifiers and source records.
 
 ```text
 crates/evidence_core
+crates/semantic_core
 crates/temporal_core
 crates/event_core
 crates/relation_graph
@@ -43,6 +44,13 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/prompt_source
+crates/corpus_background
+crates/modality_source
+crates/copied_text
+crates/style_source
+crates/stopword_deletion
+crates/copy_identity
 crates/provider_receipt
 crates/intake_authorization
 crates/summarizes_edge
