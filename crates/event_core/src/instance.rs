@@ -1,6 +1,9 @@
 //! Versioned event instances distinct from mentions.
 
-use crate::{EventConfidence, EventError, EventInstanceId, EventMentionId, EventRoleKind};
+use crate::{
+    EventConfidence, EventError, EventEvidenceLayer, EventInstanceId, EventMentionId,
+    EventRoleKind, admit_state_transition,
+};
 use temporal_core::{EventTime, TemporalBoundary, TemporalInterval, TemporalPrecision};
 
 /// A versioned event instance with event-time support and typed roles.
@@ -14,6 +17,7 @@ pub struct EventInstance {
     supporting_mentions: Vec<EventMentionId>,
     event_time: TemporalInterval<EventTime>,
     confidence: EventConfidence,
+    evidence_layer: EventEvidenceLayer,
     roles: Vec<(EventRoleKind, String)>,
 }
 
@@ -24,12 +28,15 @@ impl EventInstance {
     ///
     /// Returns confidence or validity errors when inputs fail validation.
     /// At least one supporting mention is required.
+    /// The evidence layer must be [`EventEvidenceLayer::PromotedTransition`].
     pub fn promote_from_mentions(
         supporting_mentions: Vec<EventMentionId>,
         valid_from: EventTime,
         valid_to: EventTime,
         confidence: EventConfidence,
+        evidence_layer: EventEvidenceLayer,
     ) -> Result<Self, EventError> {
+        admit_state_transition(evidence_layer)?;
         if supporting_mentions.is_empty() {
             return Err(EventError::InvalidWirePayload);
         }
@@ -44,6 +51,7 @@ impl EventInstance {
             supporting_mentions,
             event_time,
             confidence,
+            evidence_layer,
             roles: Vec::new(),
         })
     }
@@ -70,6 +78,12 @@ impl EventInstance {
     #[must_use]
     pub const fn confidence(&self) -> EventConfidence {
         self.confidence
+    }
+
+    /// Return the independently promoted evidence layer retained by the instance.
+    #[must_use]
+    pub const fn evidence_layer(&self) -> EventEvidenceLayer {
+        self.evidence_layer
     }
 
     /// Attach a typed role argument.
