@@ -6,7 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
-- Stacked `analysis_engine` vertical slice (ADR 0017): bounded Rust execution
+- Stacked `analysis_engine` vertical slice (ADR 0021): bounded Rust execution
   from an accepted analysis run to a cutoff-safe, multiple-membership-aware,
   SHA-256-digest-bound terminal artifact or redacted no-eligible-evidence
   result. This remains active-PR evidence and does not claim estimator
