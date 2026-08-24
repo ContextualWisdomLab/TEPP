@@ -27,6 +27,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Mention-confidence Brier score | `event_core` | active-PR | calibration vs binary truth | perfect 0 / half 0.25 RMSE | ADR 0003; `docs/research/mention-confidence-brier.md` |
 | Checkpoint is not the estimator | `checkpoint_authority` | accepted-target | active PR | refuse checkpoint-as-estimator + unvalidated artifact + recovery vs estimator collapse | ADR 0001/0014 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Availability-clock identity | `available_clock` | active-PR | this PR | recovered availability flags vs system-time stand-in | ADR 0002 |
 | Revision system-time order | `revision_order` | active-PR | this PR | order-flag recovery vs accept-all | ADR 0002/0013 |
 | Provenance-vs-transition gate | `citation_edge` | active-PR | this PR | recovered kind rate vs citation collapse | ADR 0002/0003 |
 | ESEM/DSEM CPU fit | `psychometric_fit` | active-PR | this PR | loading RMSE vs zero-collapse; reverse-lag refusal | ADR 0005; does not recreate `psychometric_core` |
