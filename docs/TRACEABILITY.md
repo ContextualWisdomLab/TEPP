@@ -14,6 +14,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | Allen relation algebra/bounded closure | ADR 0002; Allen (1983) | merged PR #9 `temporal_core` path-consistency on protected main | implemented-main |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; Brier calibration on the active PR; full intelligence stack remaining | partial |
+| no unidentified causal language from association/precedence | ADR 0002/0003; research | `relation_graph` causal-identification gate on the active PR | active-PR |
+| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
