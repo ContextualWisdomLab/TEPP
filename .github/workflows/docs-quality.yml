@@ -13,8 +13,7 @@ on:
       - ".github/workflows/**"
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
-      - "crates/compute_backend/**"
-      - "crates/episode_membership/**"
+      - "crates/**"
   push:
     branches:
       - main
@@ -24,8 +23,7 @@ on:
       - ".github/workflows/**"
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
-      - "crates/compute_backend/**"
-      - "crates/episode_membership/**"
+      - "crates/**"
   workflow_dispatch:
 
 permissions:
