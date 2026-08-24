@@ -6,7 +6,18 @@ implemented in Rust.
 
 ## Current implementation state
 
+This branch establishes the Rust workspace, quality-gate foundation, and the
+longitudinal within/between decomposition capability. The eleven bounded crates
+compile independently. `longitudinal_core` exposes within/between decomposition
+and component RMSE APIs; the remaining crates expose no placeholder production
+APIs, and domain behavior for them begins in Task 2 with immutable evidence
+identifiers and source records.
 This branch establishes the Task 1 Rust workspace and quality-gate foundation.
+The eleven bounded crates compile independently. `derived_sensitivity` inherits
+source Restricted/Internal classes onto topic, factor, and relation artifacts
+and fails closed on unknown kinds; derivation and blanket PII masking are not
+declassification. Other crates still begin domain behavior in Task 2 with
+immutable evidence identifiers and source records.
 The eleven bounded crates compile independently but intentionally expose no
 placeholder production APIs. Domain behavior begins in Task 2 with immutable
 evidence identifiers and source records.
@@ -23,6 +34,13 @@ crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
 crates/service_tls
+crates/derived_sensitivity
+crates/longitudinal_core
+crates/topic_lineage
+crates/network_analysis
+crates/interpretation_gateway
+crates/model_selection
+crates/checkpoint_authority
 ```
 
 ## Local verification

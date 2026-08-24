@@ -1,7 +1,7 @@
 # TEPP API and Modular Integration Contract
 
 **Status:** Accepted target contract; exact endpoints are introduced only with executable services.  
-**Last reviewed:** 2026-08-16
+**Last reviewed:** 2026-08-19
 
 ## 1. Authority boundary
 
@@ -14,17 +14,19 @@ Current protected main exposes Rust library/domain contracts. The active PR adds
 | Contract | Owner | Consumers | Maturity |
 |---|---|---|---|
 | evidence record/span wire v1 | TEPP `evidence_core` | future TEPP services/adapters | implemented-main |
-| temporal clock/interval wire | `temporal_core` | relation/event/persistence | active-PR #5 |
-| interval relation/reasoner API | `temporal_core` | event/relation validation | active-PR #6 |
+| temporal clock/interval wire | `temporal_core` | relation/event/persistence | implemented-main (`temporal-core/v1`; wire `schema_version=1`; merged PR #8; [`wire_contract.rs`](../crates/temporal_core/tests/wire_contract.rs), [`schema_semantics_contract.rs`](../crates/temporal_core/tests/schema_semantics_contract.rs), [`temporal-event-foundation.md`](validation/temporal-event-foundation.md)) |
+| interval relation/reasoner API | `temporal_core` | event/relation validation | implemented-main (`temporal-core/v1`; in-memory reasoner; merged PR #9; Allen, 1983; [`relation_contract.rs`](../crates/temporal_core/tests/relation_contract.rs), [`reasoner_contract.rs`](../crates/temporal_core/tests/reasoner_contract.rs), [`temporal-event-foundation.md`](validation/temporal-event-foundation.md)) |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
-| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR |
+| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | implemented-main (merged PR #21) |
 
 ## 3. Versioning
 
 Every externally consumable contract has an explicit semantic contract version independent of software package version. Breaking changes require a new contract version, migration/compatibility notes, contract tests, and an ADR when they change measurement meaning, temporal semantics, ontology, evidence identity, or authorization.
+
+The temporal semantic contract is `temporal-core/v1`. Its JSON representation keeps `schema_version: 1` as a separate wire-schema field; changing either identifier requires its own compatibility evidence.
 
 Wire payloads:
 
