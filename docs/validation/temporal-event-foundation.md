@@ -13,6 +13,8 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Capability | Owning crate / contract | Protected-main maturity | Open PR status | Required evidence | Notes |
 |---|---|---|---|---|---|
 | Immutable evidence + spans | `evidence_core` | implemented-main | — | unit + wire + coverage | Task 2 |
+| Six-clock temporal | `temporal_core` | implemented-main | — | unit + wire | Task 3 / PR #8 |
+| Knowledge-cutoff identity | `cutoff_clock` | active-PR | this PR | recovered cutoff flags vs availability-time stand-in | ADR 0002 |
 | Six-clock temporal | `temporal_core` | implemented-main | `document_clocks` omitted assertion/document time | unit + wire | Task 3 / PR #8; document-row clocks on this PR |
 | Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |

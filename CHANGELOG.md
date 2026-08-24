@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `cutoff_clock` identity gate: event time, system time, and availability time cannot stand in for knowledge cutoff; recovered cutoff stamps match known truth at a higher computed rate than treating every stamp as availability time (ADR 0002).
 - `available_clock` identity gate: event time and system time cannot stand in for availability time; recovered availability stamps match known truth at a higher computed rate than treating every stamp as system time (ADR 0002).
 - `document_clocks` six-clock gate: a document analytical row cannot omit assertion time or document time, and event/system time cannot stand in for those clocks; recovered completeness flags match known truth at a higher computed rate than treating every row as complete (ADR 0002/0013).
 - `revision_order` system-time gate: a higher document revision number cannot carry earlier or equal system time; recovered order flags match known truth at a higher computed rate than accepting every pair (ADR 0002/0013).

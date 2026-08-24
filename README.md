@@ -42,6 +42,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/cutoff_clock
 crates/available_clock
 crates/document_clocks
 crates/revision_order

@@ -23,6 +23,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "tepp_simulation",
     "validation_core",
     "tepp_api",
+    "cutoff_clock",
     "available_clock",
     "document_clocks",
     "revision_order",
