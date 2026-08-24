@@ -1,0 +1,82 @@
+//! Other TEPP clocks cannot stand in for system time.
+
+use system_clock::{
+    ClockFamily, SystemClockError, identity_recovery_rate, refuse_assertion_time_as_system,
+    refuse_available_time_as_system, refuse_cutoff_time_as_system, refuse_document_time_as_system,
+    refuse_event_time_as_system, stamp_is_system,
+};
+
+#[test]
+fn other_clocks_cannot_stand_in_for_system_time() {
+    assert_eq!(
+        refuse_event_time_as_system(),
+        Err(SystemClockError::EventTimeIsNotSystemTime)
+    );
+    assert_eq!(
+        refuse_assertion_time_as_system(),
+        Err(SystemClockError::AssertionTimeIsNotSystemTime)
+    );
+    assert_eq!(
+        refuse_document_time_as_system(),
+        Err(SystemClockError::DocumentTimeIsNotSystemTime)
+    );
+    assert_eq!(
+        refuse_available_time_as_system(),
+        Err(SystemClockError::AvailableTimeIsNotSystemTime)
+    );
+    assert_eq!(
+        refuse_cutoff_time_as_system(),
+        Err(SystemClockError::CutoffTimeIsNotSystemTime)
+    );
+    assert!(stamp_is_system(ClockFamily::SystemTime).expect("system"));
+    assert!(!stamp_is_system(ClockFamily::EventTime).expect("event"));
+    assert!(!stamp_is_system(ClockFamily::AssertionTime).expect("assertion"));
+    assert!(!stamp_is_system(ClockFamily::DocumentTime).expect("document"));
+    assert!(!stamp_is_system(ClockFamily::AvailableTime).expect("available"));
+    assert!(!stamp_is_system(ClockFamily::CutoffTime).expect("cutoff"));
+}
+
+#[test]
+fn recovered_system_stamps_match_known_truth_better_than_event_stand_in() {
+    let recovered = [
+        ClockFamily::SystemTime,
+        ClockFamily::EventTime,
+        ClockFamily::AssertionTime,
+        ClockFamily::DocumentTime,
+        ClockFamily::AvailableTime,
+        ClockFamily::CutoffTime,
+    ];
+    let recovered_flags = recovered.map(|family| stamp_is_system(family).expect("recovered"));
+    let collapsed_flags = [false; 6];
+    let truth_flags = [true, false, false, false, false, false];
+    let recovered_rate = identity_recovery_rate(&truth_flags, &recovered_flags).expect("ok");
+    let collapsed_rate = identity_recovery_rate(&truth_flags, &collapsed_flags).expect("bad");
+    let expected = {
+        let mut matches = 0_usize;
+        for (truth_flag, decided_flag) in truth_flags.iter().zip(recovered_flags.iter()) {
+            if truth_flag == decided_flag {
+                matches += 1;
+            }
+        }
+        f64::from(u32::try_from(matches).expect("test count fits"))
+            / f64::from(u32::try_from(truth_flags.len()).expect("len"))
+    };
+    assert!((recovered_rate - expected).abs() < f64::EPSILON);
+    assert!(recovered_rate > collapsed_rate);
+}
+
+#[test]
+fn empty_or_mismatched_identity_payloads_fail_closed() {
+    assert_eq!(
+        identity_recovery_rate(&[], &[]),
+        Err(SystemClockError::InvalidSystemPayload)
+    );
+    assert_eq!(
+        identity_recovery_rate(&[true], &[]),
+        Err(SystemClockError::InvalidSystemPayload)
+    );
+    assert_eq!(
+        identity_recovery_rate(&[true, false], &[true]),
+        Err(SystemClockError::InvalidSystemPayload)
+    );
+}

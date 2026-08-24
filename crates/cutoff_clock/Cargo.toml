@@ -1,0 +1,17 @@
+[package]
+name = "cutoff_clock"
+description = "Knowledge cutoff cannot be replaced by event, system, or availability time."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
