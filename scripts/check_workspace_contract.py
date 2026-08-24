@@ -23,6 +23,15 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "tepp_simulation",
     "validation_core",
     "tepp_api",
+    "operational_log",
+    "service_tls",
+    "derived_sensitivity",
+    "longitudinal_core",
+    "topic_lineage",
+    "network_analysis",
+    "interpretation_gateway",
+    "model_selection",
+    "checkpoint_authority",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
