@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import tomllib
 import unittest
 from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+RUST_TOOLCHAIN = REPOSITORY_ROOT / "rust-toolchain.toml"
+DEPENDABOT = REPOSITORY_ROOT / ".github" / "dependabot.yml"
 
 
 class CoverageDiagnosticsContractTests(unittest.TestCase):
@@ -28,7 +31,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         self.assertIn("steps.line-report.outcome == 'success'", workflow)
         self.assertIn("id: branch-report", workflow)
         self.assertIn(
-            "cargo +nightly-2026-08-01 llvm-cov report --branch --text --show-missing-lines",
+            "cargo +nightly-2026-08-18 llvm-cov report --branch --text --show-missing-lines",
             workflow,
         )
         self.assertIn("steps.branch-report.outcome == 'success'", workflow)
@@ -76,6 +79,20 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
             workflow,
         )
         self.assertIn("migrations/**", workflow)
+
+    def test_rust_toolchains_are_reproducible_and_reviewably_updated(self) -> None:
+        """Stable and branch-coverage compilers remain explicit review boundaries."""
+
+        manifest = tomllib.loads(RUST_TOOLCHAIN.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["toolchain"]["channel"], "1.97.1")
+
+        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        self.assertEqual(workflow.count("nightly-2026-08-18"), 3)
+        self.assertNotIn("nightly-2026-08-01", workflow)
+
+        dependabot = DEPENDABOT.read_text(encoding="utf-8")
+        self.assertIn('package-ecosystem: "rust-toolchain"', dependabot)
+        self.assertIn('interval: "weekly"', dependabot)
 
 
 if __name__ == "__main__":  # pragma: no cover
