@@ -85,8 +85,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
-- Refreshed the live gap-baseline inventory to the 2026-08-23T21:46:37Z GitHub
-  snapshot (109 open PRs / 39 drafts / 12 issues; protected-main
+- Refreshed the live gap-baseline inventory to the 2026-08-24T05:41:54Z GitHub
+  snapshot (118 open PRs / 48 drafts / 12 issues; protected-main
   `c45be17a9dbce95ef81cee230e9d128abc7160ac`), binding each operator-gap current
   head SHA to that exact-head register, including #201 `6afd650667e1` (RFC 5646
   cited once; first GAP-005 slice, not implemented-main), stacked drafts
