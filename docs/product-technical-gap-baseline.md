@@ -25,7 +25,7 @@ GitHub state before any customer, release, certification, or valuation claim.
 | Signal | Snapshot evidence | Delivery implication |
 |---|---:|---|
 | Protected-main SHA | `e65cd663fc08…` (2026-08-24T10:11Z) | All as-built claims are bounded to this commit. |
-| Workspace members | 47 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual product boundaries. |
+| Workspace members | 48 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual product boundaries. |
 | Open pull requests | **71** | The queue is itself a release blocker and requires consolidation. |
 | Draft pull requests | **48** | Most queued work is not independently review-ready. |
 | Non-draft pull requests | **23** | A non-draft state is not a qualifying review or required-check result. |
@@ -163,7 +163,7 @@ and does not treat queued or passing Checks as shipped protected-main behavior.
 
 ## Protected-main as-built baseline
 
-Protected `main` contains 47 unique Rust crate boundaries in the current
+Protected `main` contains 48 unique Rust crate boundaries in the current
 workspace manifest. The `members` and `default-members` arrays enumerate the
 same crate set for distinct Cargo commands; the unique-crate count is the
 authoritative modularity measure.
