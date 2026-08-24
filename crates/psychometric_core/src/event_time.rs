@@ -2363,6 +2363,136 @@ pub fn refuse_asymptotic_time_independent_predictor_variance_as_standardised_tim
     Err(PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance)
 }
 
+/// Exact scalar p. 16 `asymDIFFUSIONstd` after strictly positive
+/// `asymDIFFUSION`.
+///
+/// Driver, Oud, and Voelkle (2017, p. 16; footnote 4; Eq. 4;
+/// 2017-era ctsem `summary.ctsemFit.R`; JSS PDF re-opened
+/// 2026-08-23T23:02Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `asymDIFFUSION` the total within-subject variance as
+/// `Δt → ∞`. Page 16 prints standardised matrices with the suffix
+/// `std` when appropriate. Footnote 4 standardises using only the
+/// relevant variance, not the total. The 2017-era
+/// `summary.ctsemFit.R` forms `asymDIFFUSIONstd` whenever
+/// `verbose = TRUE`, as
+/// `solve(sqrt(diag(asymDIFFUSION) + ridging)) %&% asymDIFFUSION`.
+/// `OpenMx` `%&%` is the quadratic form `t(A) %*% B %*% A`. That
+/// formation adds `diag(c(ridging), n.latent)`. The default
+/// `ridging = FALSE` adds 0, not `0.0001`; that ridge is a
+/// numerical hack and is not this exact map. The 2017-era source
+/// assigns `dimnames(asymDIFFUSIONstd)` to `latentNames`; that
+/// assignment matches the `n.latent × n.latent` matrix and is
+/// this map. The scalar correlation is `p / p = 1` after
+/// strictly positive Lyapunov `p = −q / (2 a)`. Form strictly
+/// positive `p` first, then `1 / √p`, then `(1 / √p) p (1 / √p)`.
+/// Unstandardised `asymDIFFUSION` is defined for a zero process;
+/// standardised `asymDIFFUSION` is not. Zero `q` makes
+/// `solve(sqrt(0))` fail in the 2017-era source and fails closed
+/// here. That source does not skip forming `asymDIFFUSIONstd`
+/// when `p = 0`; the quadratic still fails. Within-subject
+/// variance is an event-time structural quantity, so a non-event
+/// clock fails closed. Lasting `asymDIFFUSION` requires stable
+/// `a < 0`. Distinct positive `p` recover the same 1.
+/// `TIPREDVARstd` `v / v = 1` recovers the same number and
+/// remains a distinct named quantity. `DIFFUSIONstd`
+/// `q / p = −2 a` is the continuous-diffusion ratio, not this
+/// correlation. This is not a Kalman filter, not a matrix
+/// `expm`, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_stationary_latent_variance`]. Returns
+/// [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock,
+/// [`PsychometricError::StationaryVarianceRequiresStableDrift`]
+/// when the log-rate is not strictly negative,
+/// [`PsychometricError::StandardisedAsymptoticDiffusionRequiresPositiveWithinSubjectVariance`]
+/// when `asymDIFFUSION` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, negative, or the stationary variance overflows.
+pub fn recover_standardised_asymptotic_diffusion(
+    continuous_diffusion: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let within = recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?;
+    if within == 0.0 {
+        return Err(
+            PsychometricError::StandardisedAsymptoticDiffusionRequiresPositiveWithinSubjectVariance,
+        );
+    }
+    Ok(1.0)
+}
+
+/// Refuse treating unstandardised `asymDIFFUSION` as p. 16
+/// `asymDIFFUSIONstd`.
+///
+/// Unstandardised within-subject variance is defined for a zero
+/// process. Footnote 4 `asymDIFFUSIONstd` requires strictly
+/// positive `asymDIFFUSION`. Equal numbers when `p = 1` are
+/// still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticDiffusion`].
+pub fn refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion(
+    unstandardised_asymptotic_diffusion: f64,
+    standardised_asymptotic_diffusion: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_asymptotic_diffusion,
+        standardised_asymptotic_diffusion,
+    );
+    Err(PsychometricError::UnstandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticDiffusion)
+}
+
+/// Refuse treating p. 16 `TIPREDVARstd` as p. 16 `asymDIFFUSIONstd`.
+///
+/// Both scalar correlations equal 1 after strictly positive
+/// variances. `TIPREDVARstd` standardises predictor covariance.
+/// `asymDIFFUSIONstd` standardises within-subject process
+/// variance. Equal numbers remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion`].
+pub fn refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion(
+    standardised_predictor_variance: f64,
+    standardised_asymptotic_diffusion: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_predictor_variance,
+        standardised_asymptotic_diffusion,
+    );
+    Err(PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion)
+}
+
+/// Refuse treating p. 16 `DIFFUSIONstd` as p. 16 `asymDIFFUSIONstd`.
+///
+/// `q / p = −2 a` is the continuous-diffusion ratio after
+/// strictly positive `asymDIFFUSION`. `asymDIFFUSIONstd` is the
+/// correlation form `p / p = 1` of that same within-subject
+/// variance. Equal numbers when `a = −0.5` remain distinct
+/// named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion`].
+pub fn refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion(
+    standardised_continuous_diffusion: f64,
+    standardised_asymptotic_diffusion: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_continuous_diffusion,
+        standardised_asymptotic_diffusion,
+    );
+    Err(PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion)
+}
+
 /// Exact scalar 2017-era `addedT0TIPREDVAR` after a first-occasion
 /// time-independent predictor.
 ///
@@ -9608,6 +9738,7 @@ mod tests {
         recover_predetermined_later_latent_variance, recover_predetermined_later_observed_variance,
         recover_predetermined_later_start_later_latent_variance,
         recover_predetermined_later_start_later_observed_variance,
+        recover_standardised_asymptotic_diffusion,
         recover_standardised_asymptotic_time_independent_predictor_effect,
         recover_standardised_continuous_diffusion, recover_standardised_continuous_drift,
         recover_standardised_continuous_time_dependent_predictor_effect,
@@ -9754,6 +9885,7 @@ mod tests {
         refuse_process_noise_as_unconditional_variance,
         refuse_standardised_asymptotic_time_independent_effect_as_standardised_continuous_time_independent_effect,
         refuse_standardised_asymptotic_time_independent_effect_as_standardised_initial_time_independent_effect,
+        refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
         refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
         refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect,
@@ -9768,6 +9900,7 @@ mod tests {
         refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
         refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
         refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance,
+        refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
         refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -9823,6 +9956,7 @@ mod tests {
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_standardisation_variance,
         refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
+        refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
         refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
         refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion,
         refuse_unstandardised_continuous_drift_as_standardised_continuous_drift,
@@ -22907,6 +23041,89 @@ mod tests {
                 f64::INFINITY,
                 LagClock::EventTime
             ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_asymptotic_diffusion_recovers_driver_page_sixteen_after_positive_p() {
+        // Driver et al. (2017, p. 16 asymDIFFUSIONstd; Eq. 4; footnote 4;
+        // 2017-era summary.ctsemFit.R): form strictly positive
+        // p = −q / (2 a), then (1/√p) p (1/√p) = 1. Default
+        // ridging = FALSE adds 0. q=0.4, a=−0.25 → p=0.8,
+        // DIFFUSIONstd=−2a=0.5, asymDIFFUSIONstd=1.
+        let diffusion = 0.4_f64;
+        let log_rate = -0.25_f64;
+        let recovered =
+            recover_standardised_asymptotic_diffusion(diffusion, log_rate, LagClock::EventTime)
+                .expect("asymDIFFUSIONstd");
+        assert!((recovered - 1.0).abs() < 1e-15);
+        let larger_q =
+            recover_standardised_asymptotic_diffusion(1.6, log_rate, LagClock::EventTime)
+                .expect("asymDIFFUSIONstd q=1.6");
+        assert_eq!(larger_q.to_bits(), recovered.to_bits());
+        let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        assert!((within - 0.8).abs() < 1e-15);
+        let predictor_std =
+            recover_standardised_time_independent_predictor_variance(within, LagClock::EventTime)
+                .expect("TIPREDVARstd");
+        assert_eq!(predictor_std.to_bits(), recovered.to_bits());
+        let diffusion_std =
+            recover_standardised_continuous_diffusion(diffusion, log_rate, LagClock::EventTime)
+                .expect("DIFFUSIONstd");
+        assert!((diffusion_std - 0.5).abs() < 1e-15);
+        assert!((diffusion_std - recovered).abs() > 1e-3);
+        assert_eq!(
+            refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion(
+                within, recovered
+            ),
+            Err(PsychometricError::UnstandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticDiffusion)
+        );
+        assert_eq!(
+            refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion(
+                predictor_std,
+                recovered
+            ),
+            Err(PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion)
+        );
+        assert_eq!(
+            refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion(
+                diffusion_std,
+                recovered
+            ),
+            Err(PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion)
+        );
+    }
+
+    #[test]
+    fn standardised_asymptotic_diffusion_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_asymptotic_diffusion(0.0, -0.25, LagClock::EventTime),
+            Err(PsychometricError::StandardisedAsymptoticDiffusionRequiresPositiveWithinSubjectVariance)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_diffusion(0.4, 0.5, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_diffusion(0.4, 0.0, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_diffusion(0.4, -0.25, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_diffusion(-0.1, -0.25, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_diffusion(f64::NAN, -0.25, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_diffusion(f64::INFINITY, -0.25, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
