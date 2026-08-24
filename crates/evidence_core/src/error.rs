@@ -46,6 +46,8 @@ pub enum EvidenceError {
     LayoutOutOfBounds,
     /// A base64 image data URI was treated as lexical inference text.
     EmbeddedImageIsNotLexicalText,
+    /// An embedded image data URI declared an implausible image media type.
+    ImplausibleImageMediaType,
 }
 
 impl fmt::Display for EvidenceError {
@@ -73,6 +75,7 @@ impl fmt::Display for EvidenceError {
             Self::InvalidLayoutBounds => "layout bounds must be finite, nonnegative, and nonempty",
             Self::LayoutOutOfBounds => "layout bounds exceed the page geometry",
             Self::EmbeddedImageIsNotLexicalText => "embedded image is not lexical text",
+            Self::ImplausibleImageMediaType => "embedded image media type is implausible",
         };
         formatter.write_str(message)
     }

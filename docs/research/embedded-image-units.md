@@ -25,5 +25,6 @@ RFC 2397 defines the `data:` URI and the `base64` encoding used in HTML and repo
 
 - a PNG data URI between two paragraphs recovers media type `image/png` and the exact URI text;
 - `refuse_base64_image_as_lexical_text` denies the full document and allows the surrounding sentence;
+- a data URI declaring an implausible image media type (outside the accepted conservative set) fails closed with `ImplausibleImageMediaType`;
 - documents without images return `EmptySourceSpan`;
 - empty lexical input fails closed.

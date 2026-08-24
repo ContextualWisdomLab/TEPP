@@ -5,6 +5,28 @@ use crate::{DocumentRecord, EvidenceError, SourceSpan};
 const DATA_IMAGE_PREFIX: &str = "data:image/";
 const BASE64_MARK: &str = ";base64,";
 
+/// Image media types accepted as plausible by [`embedded_image_units`].
+///
+/// The set is deliberately conservative and tracks widely registered or
+/// de facto standard image subtypes; anything else fails closed instead of
+/// yielding a bogus embedded-image unit.
+const PLAUSIBLE_IMAGE_MEDIA_TYPES: [&str; 14] = [
+    "image/apng",
+    "image/avif",
+    "image/bmp",
+    "image/gif",
+    "image/heic",
+    "image/heif",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/svg+xml",
+    "image/tiff",
+    "image/vnd.microsoft.icon",
+    "image/webp",
+    "image/x-icon",
+];
+
 /// One embedded image located in a document body.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EmbeddedImageUnit<'document> {
@@ -28,10 +50,16 @@ impl<'document> EmbeddedImageUnit<'document> {
 
 /// Locate `data:image/<type>;base64,...` units and retain their original spans.
 ///
+/// Only plausible image media types are accepted: a candidate URI whose
+/// declared media type is not in [`PLAUSIBLE_IMAGE_MEDIA_TYPES`] fails the
+/// whole parse so malformed bodies cannot produce bogus units.
+///
 /// # Errors
 ///
 /// Returns [`EvidenceError::EmptySourceSpan`] when the document contains no
-/// well-formed embedded image URI.
+/// well-formed embedded image URI, and
+/// [`EvidenceError::ImplausibleImageMediaType`] when a candidate URI
+/// declares an implausible image media type.
 pub fn embedded_image_units(
     document: &DocumentRecord,
 ) -> Result<Vec<EmbeddedImageUnit<'_>>, EvidenceError> {
@@ -59,6 +87,9 @@ pub fn embedded_image_units(
         if media_type.contains(DATA_IMAGE_PREFIX) {
             search_from = after_prefix;
             continue;
+        }
+        if !is_plausible_image_media_type(media_type) {
+            return Err(EvidenceError::ImplausibleImageMediaType);
         }
         let scalar_start = text[..start].chars().count();
         let scalar_end = scalar_start + text[start..payload_end].chars().count();
@@ -94,6 +125,11 @@ fn is_base64_payload_char(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || matches!(ch, '+' | '/' | '=')
 }
 
+/// Report whether a declared media type is a plausible image media type.
+fn is_plausible_image_media_type(media_type: &str) -> bool {
+    PLAUSIBLE_IMAGE_MEDIA_TYPES.contains(&media_type)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{embedded_image_units, refuse_base64_image_as_lexical_text};
@@ -121,6 +157,35 @@ mod tests {
         assert_eq!(
             embedded_image_units(&empty_document),
             Err(EvidenceError::EmptySourceSpan)
+        );
+    }
+
+    #[test]
+    fn implausible_media_types_fail_closed() {
+        let text = "data:image/not-a-type;base64,AAAA";
+        let artifact = SourceArtifact::from_bytes(text.as_bytes()).expect("artifact");
+        let document = DocumentRecord::from_text(artifact.id(), text).expect("document");
+        assert_eq!(
+            embedded_image_units(&document),
+            Err(EvidenceError::ImplausibleImageMediaType)
+        );
+        assert_eq!(
+            refuse_base64_image_as_lexical_text(text),
+            Err(EvidenceError::EmbeddedImageIsNotLexicalText)
+        );
+    }
+
+    #[test]
+    fn common_raster_media_types_are_accepted() {
+        let text = "a data:image/png;base64,AAAA b data:image/jpeg;base64,BBBB \
+                    c data:image/webp;base64,CCCC d data:image/gif;base64,DDDD e";
+        let artifact = SourceArtifact::from_bytes(text.as_bytes()).expect("artifact");
+        let document = DocumentRecord::from_text(artifact.id(), text).expect("document");
+        let units = embedded_image_units(&document).expect("units");
+        let media_types: Vec<&str> = units.iter().map(|unit| unit.media_type()).collect();
+        assert_eq!(
+            media_types,
+            vec!["image/png", "image/jpeg", "image/webp", "image/gif"]
         );
     }
 
