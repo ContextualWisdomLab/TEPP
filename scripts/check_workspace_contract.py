@@ -45,6 +45,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "cutoff_clock",
     "assertion_clock",
     "event_clock",
+    "system_clock",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (

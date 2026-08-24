@@ -33,6 +33,7 @@ members = [
     "crates/cutoff_clock",
     "crates/assertion_clock",
     "crates/event_clock",
+    "crates/system_clock",
 ]
 default-members = [
     "crates/evidence_core",
@@ -67,6 +68,7 @@ default-members = [
     "crates/cutoff_clock",
     "crates/assertion_clock",
     "crates/event_clock",
+    "crates/system_clock",
 ]
 
 [workspace.package]

@@ -63,6 +63,7 @@ crates/checkpoint_authority
 crates/cutoff_clock
 crates/assertion_clock
 crates/event_clock
+crates/system_clock
 ```
 
 ## Local verification

@@ -55,6 +55,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Candidate-K statistical/Pareto gates | `model_selection` | active-PR | this PR | known-K RMSE + LLM-vote refusal | ADR 0012; estimator/backend remaining |
 | Assertion-clock identity | `assertion_clock` | active-PR | this PR | recovered assertion flags vs event-time stand-in | ADR 0002 |
 | Event-clock identity | `event_clock` | active-PR | this PR | recovered event flags vs assertion-time stand-in | ADR 0002 |
+| System-clock identity | `system_clock` | active-PR | this PR | recovered system flags vs event-time stand-in | ADR 0002 |
 | Purpose-bound provider payloads | `tepp_api` | implemented-main | provider-payload minimization | expired/not-yet-valid/inverted/cross-tenant/impossible-calendar grant, mapping refusal, audited elevated re-id replay | ADR 0009; `docs/research/provider-payload-minimization.md` |
 | Adaptive orchestration router | `tepp_api` | implemented-main | live execution/production ablation | mode selection, document-control denial, ablation, credential-free bind | ADR 0010; `docs/research/adaptive-orchestration-router.md` |
 | Operational log/source separation | `operational_log` + `persistence_postgres` | active-PR | this PR | replayed action recovery vs collapsed action; inspected `audit_event` insert refuses source text, source identity, and blanket-mask grants | ADR 0009 |
