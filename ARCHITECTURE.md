@@ -134,6 +134,8 @@ TEPP stores event/valid time, assertion time, document time, system time, availa
 \operatorname{available\_time}(d) \leq \operatorname{knowledge\_cutoff}.
 \]
 
+When availability is an interval, every possible instant in that interval must satisfy the inequality. Unknown or open-ended availability that can extend past the cutoff fails closed; event time and document time cannot substitute for availability.
+
 Forward transition edges require a temporally valid partial order. Retrospective, revision, translation, citation, support, and contradiction relations retain their direction and provenance but do not create reverse state transitions.
 
 ## Measurement invariants
