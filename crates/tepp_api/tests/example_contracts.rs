@@ -1,7 +1,7 @@
 //! Example payloads under `/examples` must parse through the live contracts.
 
 use std::path::PathBuf;
-use tepp_api::{AnalysisRunRequest, ReproducibilityManifest};
+use tepp_api::{AnalysisRunRequest, CorpusSplitManifest, ReproducibilityManifest};
 
 fn repo_example(name: &str) -> String {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -29,4 +29,8 @@ fn committed_examples_parse_through_live_contracts() {
         ReproducibilityManifest::from_json(&repo_example("reproducibility_manifest_v1.json"))
             .expect("manifest example");
     assert_eq!(manifest.engine_version, "0.1.0");
+
+    let split = CorpusSplitManifest::from_json(&repo_example("corpus_split_manifest_v1.json"))
+        .expect("split example");
+    assert_eq!(split.excluded_unavailable_at_cutoff_count, 1);
 }

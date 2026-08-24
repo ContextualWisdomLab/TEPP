@@ -23,9 +23,9 @@ Verify immutable source bytes/text, canonical SHA-256, UUIDv7 identifiers, size 
 
 ## Temporal tests
 
-Canonical Task 3 replacement PR #8 must prove six nominal clock types cannot be accidentally interchanged, strict known-offset RFC 3339/UTC normalization, precision retention, interval boundary semantics, unknown/open intervals, reversed/empty rejection, strict wire schemas, schema/runtime parity, and non-reflecting errors. PR #5 is historical TDD lineage only and its old checks/reviews are not current evidence.
+Protected-main `temporal_core` (merged PR #8) must prove six nominal clock types cannot be accidentally interchanged, strict known-offset RFC 3339/UTC normalization, precision retention, interval boundary semantics, unknown/open intervals, reversed/empty rejection, strict wire schemas, schema/runtime parity, and non-reflecting errors. Superseded PR #5 is historical TDD lineage only and its old checks/reviews are not current evidence.
 
-Task 4 must prove all 13 Allen relations, inverse/composition laws, independent composition verification, proper-interval classification, bounded path-consistency, contradiction evidence, provenance, resource limits, and atomic rollback. Legacy PR #6 contains this work on the superseded #5 stack; before promotion it must be replayed onto PR #8 or its exact protected-main descendant and pass fresh tests/coverage/review. It must not overclaim global satisfiability.
+Task 4 on protected main (merged PR #9) must prove all 13 Allen relations (Allen, 1983), inverse/composition laws, independent composition verification, proper-interval classification, bounded path-consistency, contradiction evidence, provenance, resource limits, and atomic rollback. Superseded PR #6 is historical lineage on the discarded #5 stack, not a current-product claim. Path consistency must not be documented as unrestricted global satisfiability.
 
 ## Leakage tests
 
@@ -45,7 +45,7 @@ Generate corpora with known topic prevalence/content parameters, covariance, cov
 
 ## Psychometric validation
 
-For ESEM/DSEM simulations evaluate loading/factor/path recovery, bias, RMSE, confidence/credible interval coverage, convergence, configural/metric/scalar or partial invariance as required, multilevel/multiple-membership effects, within/between decomposition, irregular-time dynamics, and posterior plausible-value propagation.
+For ESEM/DSEM simulations (Asparouhov & Muthén, 2009; Asparouhov et al., 2018; Marsh et al., 2014) evaluate loading/factor/path recovery, bias, RMSE, confidence/credible interval coverage, convergence, configural/metric/scalar or partial invariance as required, multilevel/multiple-membership effects, within/between decomposition, irregular-time dynamics, and posterior plausible-value propagation. These psychometric targets remain accepted-target.
 
 ## Network/cluster validation
 
@@ -66,3 +66,7 @@ Simulation thresholds account for Monte Carlo standard error and interval uncert
 ## Release acceptance
 
 A release requires one integrated protected head with all relevant scientific, numerical, security, migration, packaging, SBOM/provenance, accessibility, operational, and independent-review evidence passing. Planning validation, superseded-branch results, and local-only results are supporting evidence, not release proof.
+
+## References
+
+The full APA 7th register is [`docs/research/standards-and-literature.md`](research/standards-and-literature.md). Method names used above cite Allen (1983) for interval algebra and Asparouhov & Muthén (2009), Asparouhov et al. (2018), and Marsh et al. (2014) for ESEM/DSEM.
