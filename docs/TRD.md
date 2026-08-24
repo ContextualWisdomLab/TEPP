@@ -1,7 +1,7 @@
 # TEPP Technical Requirements Document
 
 **Status:** Accepted technical baseline aligned to approved PRD v0.4  
-**Last reviewed:** 2026-08-12
+**Last reviewed:** 2026-08-16
 
 ## 1. Technical objective
 
@@ -9,9 +9,9 @@ TEPP is a multilingual temporal-event psychometrics platform whose executable co
 
 ## 2. Current implementation maturity
 
-Protected main contains the Rust workspace foundation, immutable evidence records, exact source spans, strict versioned evidence JSON, stable content-redacting errors, repository quality contracts, and the canonical ADR/documentation authority graph merged through PR #7. PR #8 is the canonical active Task 3 replacement adding typed six-clock temporal values and uncertain intervals on that exact protected-main lineage. Conflicted PR #5 is superseded implementation lineage only. Legacy PR #6 contains Allen relation algebra and bounded path-consistency work stacked on #5; it cannot advance as implementation evidence until its unique Task 4 work is replayed onto PR #8 or its protected-main descendant and all exact-head gates are reacquired.
+Protected main contains the Rust workspace foundation, immutable evidence records, exact source spans, strict versioned evidence JSON, stable content-redacting errors, repository quality contracts, and the canonical ADR/documentation authority graph. Typed six-clock values and uncertain intervals are implemented-main (merged PR #8 / `temporal_core`). Allen interval algebra and bounded path-consistency are implemented-main (merged PR #9 / `temporal_core`; Allen, 1983). Superseded PRs #5 and #6 are historical lineage only and are not current-product claims.
 
-The remaining PRD architecture — event ontology, relation graph, multiple membership, PostgreSQL persistence, leakage-safe corpus splits, simulations, multilingual semantic units, topic measurement, GPU/VRAM compute, model selection, TDT/CHRONOS, longitudinal ESEM/DSEM, network analysis, interpretation, and visual analytics — is accepted-target, not as-built.
+Capability maturity for later layers is recorded in [`docs/TRACEABILITY.md`](TRACEABILITY.md). Multilingual semantic units, TRSL-TM topic measurement, GPU/VRAM compute, model selection, TDT/CHRONOS (Allan, 2002; Anagnostopoulos et al., 2013), longitudinal ESEM/DSEM (Asparouhov & Muthén, 2009; Asparouhov et al., 2018; Marsh et al., 2014), network analysis, interpretation, and visual analytics remain accepted-target unless a TRACEABILITY row says otherwise. Unmerged or draft PRs are not implemented-main claims.
 
 ## 3. Immutable evidence requirements
 
@@ -21,13 +21,13 @@ Evidence wire formats are explicitly versioned, reject unknown fields, and recon
 
 ## 4. Temporal requirements
 
-TEPP treats event/valid time, assertion time, document time, system time, available time, and knowledge cutoff as distinct nominal types. Analyses enforce `available_time <= knowledge_cutoff`. Exact, uncertain, open-ended, and unknown intervals preserve source precision and boundary semantics.
+TEPP treats event/valid time, assertion time, document time, system time, available time, and knowledge cutoff as distinct nominal types. Analyses enforce `available_time <= knowledge_cutoff`. Exact, uncertain, open-ended, and unknown intervals preserve source precision and boundary semantics. Interval topology follows Allen (1983); event/time-marking vocabulary is aligned with ISO-TimeML (International Organization for Standardization, 2012) and may map outward to OWL-Time (Hobbs & Pan, 2017).
 
-PR #8 implements the typed-value, interval, wire, and schema primitives for this requirement. Historical-snapshot enforcement remains owned by the future persistence/corpus-split layers; active-PR primitives must not be described as protected-main enforcement before merge.
+Merged PR #8 implements the typed-value, interval, wire, and schema primitives for this requirement on protected `main`. Historical-snapshot enforcement is owned by persistence/corpus-split layers (see TRACEABILITY); an unmerged PR is not protected-main enforcement.
 
 Forward state-transition/input→process→outcome edges must satisfy temporally valid partial order. Retrospective, revision, citation, translation, support, and contradiction edges may point backward as provenance but never create reverse state transitions.
 
-The Task 4 bounded Allen closure represented by replay PR #9, once replayed onto the canonical lineage and independently revalidated, establishes path consistency only within its stated algebra/limits; it must not be documented as a proof of global satisfiability for unrestricted disjunctive interval networks.
+The Task 4 bounded Allen closure on protected `main` (merged PR #9) establishes path consistency only within its stated algebra/limits; it must not be documented as a proof of global satisfiability for unrestricted disjunctive interval networks.
 
 ## 5. Event/relation/membership target
 
@@ -43,9 +43,9 @@ Language support is a validation claim, not a feature flag: each language profil
 
 ## 7. Topic and psychometric target
 
-Shared-latent temporal/relational topic estimation provides posterior uncertainty and covariate effects. Topic proportions are compositional; downstream correlation/ESEM uses logistic-normal coordinates or appropriate orthonormal log-ratio coordinates rather than naïve raw-proportion Pearson correlation.
+Shared-latent temporal/relational topic estimation provides posterior uncertainty and covariate effects. The product contract is TRSL-TM (ADR 0012); an STM-style logistic-normal family is the reference, not a shipped-backend claim (Blei & Lafferty, 2006; Roberts et al., 2014, 2019). Topic proportions are compositional (Aitchison, 1982); downstream correlation/ESEM uses logistic-normal coordinates or appropriate orthonormal log-ratio coordinates rather than naïve raw-proportion Pearson correlation.
 
-Longitudinal ESEM/DSEM must distinguish stable between-unit differences from within-unit temporal change, test measurement invariance where comparisons require it, account for irregular intervals when necessary, and propagate topic-posterior uncertainty through plausible values or joint estimation.
+Longitudinal ESEM/DSEM (Asparouhov & Muthén, 2009; Asparouhov et al., 2018; Marsh et al., 2014) must distinguish stable between-unit differences from within-unit temporal change, test measurement invariance where comparisons require it (American Educational Research Association, American Psychological Association, & National Council on Measurement in Education, 2014), account for irregular intervals when necessary, and propagate topic-posterior uncertainty through plausible values or joint estimation. These psychometric targets remain accepted-target.
 
 ## 8. Compute requirements
 
@@ -72,3 +72,33 @@ Documents and LLM outputs are untrusted data. Live model tests use `NVIDIA_NIM_A
 ## 13. Quality and release
 
 Production Rust line and branch coverage are exactly 100%; public API rustdoc is complete; format/build/Clippy/tests/rustdoc/supply-chain/security gates are warning-free/current-head. Releases additionally require validated migrations/rollback, SBOM/provenance, reproducible artifacts, current protected-head review/security, CHANGELOG/version consistency, operational recovery, and no unresolved scientific blocker.
+
+## References
+
+The full APA 7th register is [`docs/research/standards-and-literature.md`](research/standards-and-literature.md). Method claims in this TRD use:
+
+Aitchison, J. (1982). The statistical analysis of compositional data. *Journal of the Royal Statistical Society: Series B, 44*(2), 139–177. https://doi.org/10.1111/j.2517-6161.1982.tb01195.x
+
+Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information organization*. Kluwer Academic Publishers.
+
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434
+
+American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
+
+Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reasoning engine for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 70–77. https://doi.org/10.1016/j.procs.2013.09.082
+
+Asparouhov, T., Hamaker, E. L., & Muthén, B. (2018). Dynamic structural equation models. *Structural Equation Modeling, 25*(3), 359–388. https://doi.org/10.1080/10705511.2017.1406803
+
+Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. *Structural Equation Modeling, 16*(3), 397–438. https://doi.org/10.1080/10705510903008204
+
+Blei, D. M., & Lafferty, J. D. (2006). Dynamic topic models. In *Proceedings of the 23rd International Conference on Machine Learning* (pp. 113–120). ACM. https://doi.org/10.1145/1143844.1143859
+
+Hobbs, J. R., & Pan, F. (2017). *Time ontology in OWL* (W3C Recommendation). World Wide Web Consortium. https://www.w3.org/TR/owl-time/
+
+International Organization for Standardization. (2012). *Language resource management—Semantic annotation framework (SemAF)—Part 1: Time and events (SemAF-Time, ISO-TimeML)* (ISO 24617-1:2012).
+
+Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
+
+Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082. https://doi.org/10.1111/ajps.12103
+
+Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02
