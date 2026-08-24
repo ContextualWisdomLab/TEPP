@@ -1102,6 +1102,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "prompt_source"
+version = "0.1.0"
+
+[[package]]
 name = "provider_receipt"
 version = "0.1.0"
 
