@@ -128,6 +128,8 @@ Wilde, E., & Duerst, M. (2008). *URI fragment identifiers for the text/plain med
 
 Phillips, A., & Davis, M. (2009). *Tags for identifying languages* (RFC 5646). Internet Engineering Task Force. https://doi.org/10.17487/RFC5646
 
+Internet Assigned Numbers Authority. (2026). *Language subtag registry* (File-Date 2026-08-08). https://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
+
 Nivre, J., de Marneffe, M.-C., Ginter, F., Hajič, J., Manning, C. D., Pyysalo, S., Schuster, S., Tyers, F., & Zeman, D. (2020). Universal Dependencies v2: An evergrowing multilingual treebank collection. In *Proceedings of the 12th Language Resources and Evaluation Conference* (pp. 4034–4043). European Language Resources Association.
 
 The original source is preserved. NFC is used for canonical analysis views; compatibility normalization is limited to explicit auxiliary keys. Segmentation and morphology are language-tailored. Universal POS informs source priors rather than irreversible deletion. Persist an exact UTF-8 byte span through `text_segment` SQL when a membership or mention must point at a unit without copying source text (Bird & Liberman, 2001; Wilde & Duerst, 2008; Davis et al., 2024).

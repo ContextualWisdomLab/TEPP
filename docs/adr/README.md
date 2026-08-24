@@ -25,6 +25,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | Typed clocks/intervals are implemented-main; `document_clocks` refuses omitted assertion/document time on the active PR. Later graph/split enforcement remains target work. |
 | [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | Provenance-vs-transition gate in `citation_edge` on the active PR; remaining graph/split enforcement stays accepted-target. |
 | [0003](0003-relational-event-multiple-membership.md) | Relational event ontology and time-varying cross-classified multiple membership | Accepted | partial | Weighted time-varying membership network/roles are active-PR (PR #12); full multilevel estimators, graph ontology, and persistence remain accepted-target. ADR 0016 owns event-intelligence tasks. |
+| [0004](0004-shared-multilingual-latent-space.md) | One shared multilingual latent space with explicit invariance status | Accepted | accepted-target | ADR 0020 owns the first span-grounded unit-identity slice; ADR 0012 owns the topic estimator. |
 | [0004](0004-shared-multilingual-latent-space.md) | One shared multilingual latent space with explicit invariance status | Accepted | accepted-target | Prompt-versus-unique-content identity is `prompt_source` on the active PR; ADR 0012 owns the full topic-estimator contract. |
 | [0004](0004-shared-multilingual-latent-space.md) | One shared multilingual latent space with explicit invariance status | Accepted | accepted-target | Corpus-background-versus-unique-content identity is `corpus_background` on the active PR; ADR 0012 owns the full topic-estimator contract. |
 | [0004](0004-shared-multilingual-latent-space.md) | One shared multilingual latent space with explicit invariance status | Accepted | accepted-target | Modality-versus-unique-content identity is `modality_source` on the active PR; ADR 0012 owns the full topic-estimator contract. |
@@ -78,6 +79,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0015](0015-autonomous-development-review-and-merge-authority.md) | Autonomous development, review, and merge authority separation | Accepted | active-PR | Separates model proposal, deterministic verification, publication, independent review, and merge/release authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | Bounded predicted-vs-observed Allen promotion gate: `refuse_promotion` requires observed coverage; remaining TDT/CHRONOS tasks stay accepted-target. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
+| [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice. Does not claim concept alignment, invariance, or a topic estimator. |
 | [0017](0017-hourly-contextual-orchestrator-gateway.md) | Hourly contextual-orchestrator gateway and all-provider model discovery | Accepted | active-PR | Keeps proposal-model execution behind a pinned loopback gateway while preserving independent verifier, publisher, reviewer, and merge authority. |
 | [0018](0018-consumer-scoped-analysis-run-ingress.md) | Consumer-scoped modular analysis-run ingress | Accepted | active-PR | Narrows ADR 0011 for the closed consumer registry, credential-free exchange, and consumer-qualified idempotency namespace; production TLS remains separate. |
 | [0019](0019-project-history-wire-size-symmetry.md) | Symmetric project-history wire-size enforcement | Accepted | active-PR | Narrows ADR 0008 for request serialization and generated LineageWeave project-history projections. |
@@ -90,7 +92,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **numerical implementation / reference backend:** ADR 0001;
 - **clock/time eligibility:** ADR 0002;
 - **event ontology / relation / membership semantics:** ADR 0003;
-- **multilingual semantic alignment:** ADR 0004;
+- **multilingual semantic alignment:** ADR 0004; span-grounded unit identity: ADR 0020;
 - **ESEM/DSEM and psychometric interpretation:** ADR 0005;
 - **GPU/VRAM and model-credential boundary:** ADR 0006;
 - **repository quality tooling:** ADR 0007;

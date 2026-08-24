@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest import mock
 
 from scripts import check_docstrings as docstrings
+from scripts.check_workspace_contract import EXPECTED_CRATES
 from scripts import check_workspace_contract as contract
 
 
@@ -26,6 +27,9 @@ class DocstringContractTests(unittest.TestCase):
         sources = docstrings.rust_sources(REPOSITORY_ROOT)
         crate_roots = sorted(REPOSITORY_ROOT.glob("crates/*/src/lib.rs"))
         self.assertEqual(
+            sorted(path.parent.parent.name for path in crate_roots),
+            sorted(EXPECTED_CRATES),
+        )
             len(set(contract.EXPECTED_CRATES)),
             len(contract.EXPECTED_CRATES),
             "workspace crate inventory must not contain duplicate entries",

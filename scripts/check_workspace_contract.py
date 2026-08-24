@@ -14,6 +14,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 EXPECTED_CRATES: tuple[str, ...] = (
     "evidence_core",
+    "semantic_core",
     "temporal_core",
     "event_core",
     "relation_graph",

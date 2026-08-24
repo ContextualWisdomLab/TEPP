@@ -34,6 +34,7 @@ evidence identifiers and source records.
 
 ```text
 crates/evidence_core
+crates/semantic_core
 crates/temporal_core
 crates/event_core
 crates/relation_graph
