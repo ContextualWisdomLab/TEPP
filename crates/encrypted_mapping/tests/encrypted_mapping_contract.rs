@@ -19,9 +19,9 @@ fn sealed_identities_recover_known_truth_only_under_reidentification() {
         "department-north-east-campus-overflow-block",
     ];
     let sealed = [
-        seal_identity(1, truth[0].as_bytes(), &key, [1; 16]).expect("seal alice"),
-        seal_identity(2, truth[1].as_bytes(), &key, [2; 16]).expect("seal author"),
-        seal_identity(3, truth[2].as_bytes(), &key, [3; 16]).expect("seal long"),
+        seal_identity(1, truth[0].as_bytes(), &key).expect("seal alice"),
+        seal_identity(2, truth[1].as_bytes(), &key).expect("seal author"),
+        seal_identity(3, truth[2].as_bytes(), &key).expect("seal long"),
     ];
     assert_eq!(sealed[0].analytical_id(), 1);
     assert_eq!(sealed[0].key_id(), 7);
@@ -60,7 +60,7 @@ fn sealed_identities_recover_known_truth_only_under_reidentification() {
 #[test]
 fn analytical_log_and_artifact_purposes_cannot_open_plaintext() {
     let key = sample_key();
-    let sealed = seal_identity(3, b"partner-east", &key, [3; 16]).expect("seal");
+    let sealed = seal_identity(3, b"partner-east", &key).expect("seal");
     for purpose in [
         MappingPurpose::AnalyticalComputation,
         MappingPurpose::OperationalLog,
@@ -76,7 +76,7 @@ fn analytical_log_and_artifact_purposes_cannot_open_plaintext() {
 #[test]
 fn wrong_key_or_tampered_envelope_fails_closed() {
     let key = sample_key();
-    let sealed = seal_identity(4, b"competitor-west", &key, [4; 16]).expect("seal");
+    let sealed = seal_identity(4, b"competitor-west", &key).expect("seal");
     let other_id = MappingKey::new(8, [0x11; 32]).expect("other id");
     let other_bytes = MappingKey::new(7, [0x22; 32]).expect("other bytes");
     assert_eq!(
@@ -112,13 +112,13 @@ fn empty_payloads_masks_and_persistence_fail_closed() {
     assert_eq!(from_exact.key_id(), 7);
     let from_long = MappingKey::from_material(9, &[0xaa; 131]).expect("long");
     let opened_with_long = {
-        let sealed = seal_identity(6, b"role-partner", &from_long, [6; 16]).expect("seal long");
+        let sealed = seal_identity(6, b"role-partner", &from_long).expect("seal long");
         open_identity(&sealed, &from_long, MappingPurpose::ReidentificationExport)
             .expect("open long")
     };
     assert_eq!(opened_with_long, b"role-partner");
     assert_eq!(
-        seal_identity(1, b"", &key, [9; 16]),
+        seal_identity(1, b"", &key),
         Err(EncryptedMappingError::EmptyIdentity)
     );
     assert_eq!(

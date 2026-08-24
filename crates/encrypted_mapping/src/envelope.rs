@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 
 const ENC_CONTEXT: &[u8] = b"tepp-encrypted-mapping-enc";
 const MAC_CONTEXT: &[u8] = b"tepp-encrypted-mapping-mac";
+const NONCE_CONTEXT: &[u8] = b"tepp-encrypted-mapping-nonce";
 
 /// Caller-held mapping key identity and bytes.
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -114,6 +115,14 @@ impl EncryptedIdentityMapping {
 
 /// Seal a source identity so analytical artifacts cannot read it.
 ///
+/// The keystream nonce is derived inside this crate as an HMAC-SHA-256
+/// synthetic value bound to the key, the analytical identifier, and the exact
+/// source-identity bytes. Distinct identities therefore never share keystream
+/// material under one key, and callers cannot trigger two-time-pad reuse by
+/// repeating a caller-supplied nonce. Sealing is deterministic:
+/// re-sealing identical input reproduces the same envelope, so equal source
+/// identities are visible as equal envelopes but their contents stay sealed.
+///
 /// # Errors
 ///
 /// Returns [`EncryptedMappingError::EmptyIdentity`] when the identity is empty.
@@ -121,11 +130,11 @@ pub fn seal_identity(
     analytical_id: u128,
     source_identity: &[u8],
     key: &MappingKey,
-    nonce: [u8; 16],
 ) -> Result<EncryptedIdentityMapping, EncryptedMappingError> {
     if source_identity.is_empty() {
         return Err(EncryptedMappingError::EmptyIdentity);
     }
+    let nonce = synthetic_nonce(key, analytical_id, source_identity);
     let ciphertext = xor_keystream(
         source_identity,
         &derive_key(key, ENC_CONTEXT),
@@ -147,7 +156,9 @@ pub fn seal_identity(
 /// # Errors
 ///
 /// Returns purpose, key-identity, or authentication errors when opening is
-/// unauthorized or the envelope does not authenticate.
+/// unauthorized or the envelope does not authenticate. A stored nonce that was
+/// substituted after sealing also fails closed because it no longer matches
+/// the synthetic nonce recomputed from the recovered identity.
 pub fn open_identity(
     envelope: &EncryptedIdentityMapping,
     key: &MappingKey,
@@ -168,12 +179,17 @@ pub fn open_identity(
     if !tags_equal(&expected, &envelope.tag) {
         return Err(EncryptedMappingError::AuthenticationFailed);
     }
-    Ok(xor_keystream(
+    let plaintext = xor_keystream(
         &envelope.ciphertext,
         &derive_key(key, ENC_CONTEXT),
         envelope.analytical_id,
         &envelope.nonce,
-    ))
+    );
+    let recomputed = synthetic_nonce(key, envelope.analytical_id, &plaintext);
+    if recomputed != envelope.nonce {
+        return Err(EncryptedMappingError::AuthenticationFailed);
+    }
+    Ok(plaintext)
 }
 
 /// Refuse to treat a blanket PII mask as encryption.
@@ -218,6 +234,19 @@ pub fn identity_recovery_rate(
 
 fn derive_key(key: &MappingKey, context: &[u8]) -> [u8; 32] {
     hmac_sha256(&key.key_bytes, context)
+}
+
+/// Derive the synthetic keystream nonce from key, analytical identity, and the
+/// exact source-identity bytes so distinct identities never share a keystream.
+fn synthetic_nonce(key: &MappingKey, analytical_id: u128, source_identity: &[u8]) -> [u8; 16] {
+    let mut message = Vec::with_capacity(24 + source_identity.len());
+    message.extend_from_slice(&analytical_id.to_be_bytes());
+    message.extend_from_slice(&(source_identity.len() as u64).to_be_bytes());
+    message.extend_from_slice(source_identity);
+    let digest = hmac_sha256(&derive_key(key, NONCE_CONTEXT), &message);
+    let mut nonce = [0_u8; 16];
+    nonce.copy_from_slice(&digest[..16]);
+    nonce
 }
 
 fn authenticate(
@@ -336,17 +365,23 @@ mod tests {
         let mut delayed = [0_u8; 32];
         delayed[5] = 0x33;
         let key = MappingKey::new(1, delayed).expect("key");
-        let sealed = seal_identity(9, b"department-north", &key, [9; 16]).expect("seal");
+        let sealed = seal_identity(9, b"department-north", &key).expect("seal");
         let mut body = sealed.clone();
         body.ciphertext[0] ^= 0x01;
         assert_eq!(
             open_identity(&body, &key, MappingPurpose::ReidentificationExport),
             Err(EncryptedMappingError::AuthenticationFailed)
         );
-        let mut tagged = sealed;
+        let mut tagged = sealed.clone();
         tagged.tag[0] ^= 0x01;
         assert_eq!(
             open_identity(&tagged, &key, MappingPurpose::ReidentificationExport),
+            Err(EncryptedMappingError::AuthenticationFailed)
+        );
+        let mut nonced = sealed;
+        nonced.nonce[0] ^= 0x01;
+        assert_eq!(
+            open_identity(&nonced, &key, MappingPurpose::ReidentificationExport),
             Err(EncryptedMappingError::AuthenticationFailed)
         );
         assert!(!tags_equal(&[0; 32], &[1; 32]));
@@ -356,7 +391,7 @@ mod tests {
     fn long_identity_uses_more_than_one_keystream_block() {
         let key = MappingKey::new(2, [0x44; 32]).expect("key");
         let identity = vec![0x55_u8; 40];
-        let sealed = seal_identity(10, &identity, &key, [10; 16]).expect("seal");
+        let sealed = seal_identity(10, &identity, &key).expect("seal");
         let opened =
             open_identity(&sealed, &key, MappingPurpose::ReidentificationExport).expect("open");
         assert_eq!(opened, identity);
@@ -382,7 +417,7 @@ mod tests {
     #[test]
     fn debug_does_not_print_the_source_identity() {
         let key = MappingKey::new(3, [0x55; 32]).expect("key");
-        let sealed = seal_identity(11, b"secret-name", &key, [11; 16]).expect("seal");
+        let sealed = seal_identity(11, b"secret-name", &key).expect("seal");
         let rendered = format!("{sealed:?}");
         assert!(!rendered.contains("secret-name"));
         assert_eq!(sealed.analytical_id(), 11);
@@ -397,22 +432,40 @@ mod tests {
     }
 
     #[test]
-    fn analytical_identity_separates_same_nonce_keystreams() {
+    fn repeated_analytical_identity_never_reuses_keystream_material() {
         let key = MappingKey::new(13, [0x66; 32]).expect("key");
-        let left = seal_identity(1, b"alice", &key, [9; 16]).expect("left");
-        let right = seal_identity(2, b"bob!!", &key, [9; 16]).expect("right");
-
+        // The pre-fix defect: two identities sharing one (key, analytical_id)
+        // reused one keystream, so ciphertext_xor exposed plaintext_xor.
+        let left = seal_identity(7, b"alice", &key).expect("left");
+        let right = seal_identity(7, b"bob!!", &key).expect("right");
+        assert_ne!(left.nonce, right.nonce);
         let ciphertext_xor: Vec<u8> = left
             .ciphertext
             .iter()
             .zip(right.ciphertext.iter())
-            .map(|(left, right)| left ^ right)
+            .map(|(left_byte, right_byte)| left_byte ^ right_byte)
             .collect();
         let plaintext_xor: Vec<u8> = b"alice"
             .iter()
             .zip(b"bob!!".iter())
-            .map(|(left, right)| left ^ right)
+            .map(|(left_byte, right_byte)| left_byte ^ right_byte)
             .collect();
         assert_ne!(ciphertext_xor, plaintext_xor);
+        for envelope in [&left, &right] {
+            let opened = open_identity(envelope, &key, MappingPurpose::ReidentificationExport)
+                .expect("open");
+            assert!(!opened.is_empty());
+        }
+        let reopened =
+            open_identity(&left, &key, MappingPurpose::ReidentificationExport).expect("reopen");
+        assert_eq!(reopened, b"alice");
+    }
+
+    #[test]
+    fn sealing_is_deterministic_for_identical_input() {
+        let key = MappingKey::new(14, [0x77; 32]).expect("key");
+        let first = seal_identity(5, b"same-identity", &key).expect("first");
+        let second = seal_identity(5, b"same-identity", &key).expect("second");
+        assert_eq!(first, second);
     }
 }
