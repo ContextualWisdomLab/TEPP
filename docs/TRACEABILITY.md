@@ -2,6 +2,7 @@
 
 **Status:** Accepted cross-cutting traceability baseline  
 **Last reviewed:** 2026-08-16
+**Last reviewed:** 2026-08-20
 
 The full APA 7th standards/literature register remains `docs/research/standards-and-literature.md`. This matrix links durable requirements to their owning decisions and implementation/evidence maturity without duplicating the bibliography.
 
@@ -38,6 +39,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` TDT tracking pair precision/recall and identity-switch rate on the active PR; remaining TDT/CHRONOS stack and any future `event_intelligence` crate remain accepted-target | active-PR |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` CHRONOS schema-slot precision/recall against known truth, `refuse_schema_prediction_as_instance` and `refuse_schema_prediction_as_transition`, label-target-derived calibrated occupancy RMSE `0.1410673598` versus always-fill `0.7071067812` in `schema_slot_contract.rs` on the active PR; remaining TDT detection/tracking, symbolic temporal consistency, and any future `event_intelligence` crate remain accepted-target | active-PR |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` TDT story-segmentation `WindowDiff`/`Pk` on the active PR; remaining TDT/CHRONOS stack and any future `event_intelligence` crate remain accepted-target | active-PR |
+| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` occurrence-prediction Brier calibration on the active PR; remaining detection/schema/temporal-consistency stack future | active-PR |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router plus future `interpretation_gateway` | partial |
 | adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | `tepp_api::route_orchestration` and ablation records implemented-main; live contextual-orchestrator execution remaining | partial |
 | purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | provider-payload minimization, elevated re-identification, retention/deletion, and legal hold implemented-main; `operational_log::try_record` and inspected `audit_event` inserts active-PR; live HTTP/provider adapters remaining | active-PR |

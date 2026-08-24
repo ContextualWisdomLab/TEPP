@@ -42,6 +42,10 @@ pub enum EventError {
     StorySegmentationIsNotStateTransition,
     /// An unknown story-boundary label was supplied.
     UnknownStoryBoundaryLabel,
+    /// A CHRONOS occurrence prediction was treated as an event instance.
+    PredictionIsNotEventInstance,
+    /// An unknown occurrence-truth label was supplied.
+    UnknownOccurrenceTruth,
 }
 
 impl fmt::Display for EventError {
@@ -73,6 +77,8 @@ impl fmt::Display for EventError {
                 "story segmentation is not a state transition"
             }
             Self::UnknownStoryBoundaryLabel => "unknown story boundary label",
+            Self::PredictionIsNotEventInstance => "CHRONOS prediction is not an event instance",
+            Self::UnknownOccurrenceTruth => "unknown occurrence truth label",
         };
         formatter.write_str(message)
     }
@@ -143,6 +149,12 @@ mod tests {
             (
                 EventError::UnknownStoryBoundaryLabel,
                 "unknown story boundary label",
+                EventError::PredictionIsNotEventInstance,
+                "CHRONOS prediction is not an event instance",
+            ),
+            (
+                EventError::UnknownOccurrenceTruth,
+                "unknown occurrence truth label",
             ),
         ] {
             assert_eq!(error.to_string(), message);

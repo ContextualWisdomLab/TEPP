@@ -11,6 +11,7 @@
 //! and scientific estimation. Mentions and CHRONOS schema-slot predictions
 //! never silently become instances.
 //! and scientific estimation. Mentions and TDT story segmentations never
+//! and scientific estimation. Mentions and CHRONOS occurrence forecasts never
 //! silently become instances.
 
 mod confidence;
@@ -19,6 +20,7 @@ mod identifier;
 mod instance;
 mod intelligence;
 mod mention;
+mod prediction;
 mod registry;
 mod role;
 mod track;
@@ -55,6 +57,16 @@ pub use intelligence::classify_tdt_story;
 pub use intelligence::first_story_detection_rates;
 /// Fallible textual event mention.
 pub use mention::EventMention;
+/// One CHRONOS occurrence forecast that remains hypothetical.
+pub use prediction::ChronosOccurrenceForecast;
+/// Opaque CHRONOS occurrence-prediction identity.
+pub use prediction::ChronosPredictionId;
+/// Later-observed occurrence truth for a CHRONOS forecast.
+pub use prediction::OccurrenceTruth;
+/// Mean squared error of CHRONOS occurrence forecasts against later truth.
+pub use prediction::chronos_prediction_brier_score;
+/// Explicit refusal to treat a CHRONOS prediction as an event instance.
+pub use prediction::refuse_prediction_as_instance;
 /// In-memory registry separating mentions from instances.
 pub use registry::EventRegistry;
 /// Typed event role kind.
