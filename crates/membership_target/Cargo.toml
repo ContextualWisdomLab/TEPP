@@ -1,6 +1,6 @@
 [package]
-name = "corpus_split"
-description = "Leakage-safe corpus snapshots and relation-aware data splits."
+name = "membership_target"
+description = "Language, episode, template, department, and opportunity-pool targets are not entities."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,14 +12,6 @@ readme.workspace = true
 keywords.workspace = true
 categories.workspace = true
 publish = false
-
-[dependencies]
-temporal_core = { path = "../temporal_core", version = "0.1.0" }
-unicode-normalization = "=0.1.25"
-uuid.workspace = true
-
-[dev-dependencies]
-uuid.workspace = true
 
 [lints]
 workspace = true

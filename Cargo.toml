@@ -51,6 +51,8 @@ members = [
     "crates/checkpoint_authority",
     "crates/compute_backend",
     "crates/episode_membership",
+    "crates/membership_target",
+
 ]
 default-members = [
     "crates/evidence_core",
@@ -103,12 +105,14 @@ default-members = [
     "crates/checkpoint_authority",
     "crates/compute_backend",
     "crates/episode_membership",
+    "crates/membership_target",
+
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.97.1"
+rust-version = "1.98.0"
 license = "Apache-2.0"
 authors = ["Contextual Wisdom Lab"]
 repository = "https://github.com/ContextualWisdomLab/TEPP"

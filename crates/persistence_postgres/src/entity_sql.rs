@@ -32,6 +32,8 @@ impl EntityRecord {
     /// empty, longer than 128 bytes, or contains a character outside the ASCII
     /// letters, digits, and underscore allowlist used by the rendered SQL
     /// transport.
+    /// empty, longer than 128 bytes, or contains a character outside lowercase
+    /// ASCII letters, digits, and underscores.
     pub fn validate(&self) -> Result<(), PersistenceError> {
         validate_entity_label(&self.entity_type_code)
     }
@@ -80,6 +82,9 @@ fn validate_entity_label(value: &str) -> Result<(), PersistenceError> {
         || !value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        || value
+            .chars()
+            .any(|ch| !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_'))
     {
         return Err(PersistenceError::InvalidEntityRecord);
     }
@@ -106,6 +111,9 @@ mod tests {
     #[test]
     fn entity_sql_covers_valid_and_fail_closed_paths() {
         sample().validate().expect("valid");
+        let mut extended = sample();
+        extended.entity_type_code = "author_1".into();
+        extended.validate().expect("digit and underscore are valid");
         let sql = insert_entity_record_sql(&sample()).expect("insert");
         assert!(sql.contains("INSERT INTO entity_record"));
         assert!(sql.contains("entity_type_code"));

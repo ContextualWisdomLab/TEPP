@@ -212,6 +212,7 @@ name = "corpus_split"
 version = "0.1.0"
 dependencies = [
  "temporal_core",
+ "unicode-normalization",
  "uuid",
 ]
 
@@ -920,6 +921,10 @@ dependencies = [
  "temporal_core",
  "uuid",
 ]
+
+[[package]]
+name = "membership_target"
+version = "0.1.0"
 
 [[package]]
 name = "memchr"

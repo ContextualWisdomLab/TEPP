@@ -20,6 +20,11 @@
 //! Entity and project target SQL refuse empty, oversized, or hostile labels
 //! before `INSERT`, so membership foreign keys cannot be seeded from raw
 //! attacker-controlled type or status strings.
+//! Entity and project target SQL refuse empty, oversized, or hostile labels
+//! before `INSERT`, so membership foreign keys cannot be seeded from raw
+//! attacker-controlled type or status strings. Typed `text_segment` SQL
+//! persists exact UTF-8 byte spans and cutoff-eligible document lookups so
+//! segment-level membership is not raw SQL.
 //! Concurrent document revises use one transactional `DO` block that requires
 //! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
 //! typed conflict errors. Restore integrity probes refuse to mark analytical

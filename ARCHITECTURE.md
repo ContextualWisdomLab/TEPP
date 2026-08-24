@@ -101,6 +101,8 @@ boundaries above remain the target modular MSA architecture.
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
 | `compute_backend` | VRAM-budgeted streamed planning, executable OOM retry plans, and a compensated CPU `f64` reference |
 | `episode_membership` | episode membership cannot escape the episode event-time interval |
+| `membership_target` | language, episode, template, department, and opportunity-pool targets cannot collapse into entity or project |
+
 
 Foundation crates expose only tested contracts. Empty façades are not public
 APIs.
@@ -146,7 +148,7 @@ Repository contract scripts independently verify the approved crate set,
 workspace inheritance, action SHA pinning, absence of LLM credentials from
 ordinary CI, and complete Rust documentation.
 
-Stable Rust 1.97.1 is the compile, lint, test, and line-coverage reference.
+Stable Rust 1.98.0 is the compile, lint, test, and line-coverage reference.
 Branch coverage runs in a pinned nightly lane because LLVM branch coverage
 remains unstable in Rust. `cargo-nextest` runs tests without retries, while
 doctests remain a separate `cargo test --doc` gate. `cargo-deny` enforces

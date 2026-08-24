@@ -53,6 +53,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Corpus-split leakage-audit wire doctoring | [`docs/research/corpus-split-manifest-wire.md`](docs/research/corpus-split-manifest-wire.md) |
+| Unicode canonical-identity doctoring | [`docs/research/unicode-canonical-identity.md`](docs/research/unicode-canonical-identity.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
 ## Maturity vocabulary

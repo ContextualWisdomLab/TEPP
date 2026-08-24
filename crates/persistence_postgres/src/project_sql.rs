@@ -32,6 +32,8 @@ impl ProjectRecord {
     /// is empty, longer than 128 bytes, or contains a character outside the
     /// ASCII letters, digits, and underscore allowlist used by the rendered
     /// SQL transport.
+    /// is empty, longer than 128 bytes, or contains a character outside
+    /// lowercase ASCII letters, digits, and underscores.
     pub fn validate(&self) -> Result<(), PersistenceError> {
         validate_project_label(&self.project_status_code)
     }
@@ -80,6 +82,9 @@ fn validate_project_label(value: &str) -> Result<(), PersistenceError> {
         || !value
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        || value
+            .chars()
+            .any(|ch| !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_'))
     {
         return Err(PersistenceError::InvalidProjectRecord);
     }
@@ -106,6 +111,9 @@ mod tests {
     #[test]
     fn project_sql_covers_valid_and_fail_closed_paths() {
         sample().validate().expect("valid");
+        let mut extended = sample();
+        extended.project_status_code = "active_1".into();
+        extended.validate().expect("digit and underscore are valid");
         let sql = insert_project_record_sql(&sample()).expect("insert");
         assert!(sql.contains("INSERT INTO project_record"));
         assert!(sql.contains("project_status_code"));

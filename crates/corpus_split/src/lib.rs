@@ -12,6 +12,7 @@ mod document;
 mod error;
 mod rolling_origin;
 mod snapshot;
+mod unicode_identity;
 mod weights;
 
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -42,6 +43,12 @@ pub use rolling_origin::RollingOriginWindow;
 pub use rolling_origin::rolling_origin_windows;
 /// Cutoff-filtered corpus snapshot.
 pub use snapshot::CorpusSnapshot;
+/// NFC identity of a UTF-8 document body.
+pub use unicode_identity::CanonicalTextIdentity;
+/// Build leakage links among canonically equivalent bodies.
+pub use unicode_identity::canonical_equivalence_links;
+/// Compare two UTF-8 bodies after NFC.
+pub use unicode_identity::texts_are_canonically_equivalent;
 /// Kish effective sample size.
 pub use weights::effective_sample_size;
 /// Group-normalized observation weights.

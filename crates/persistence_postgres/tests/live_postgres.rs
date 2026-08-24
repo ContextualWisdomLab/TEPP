@@ -15,6 +15,8 @@ use persistence_postgres::{
     assume_app_runtime_role_sql, clear_session_tenant_sql, insert_entity_record_sql,
     insert_project_record_sql, open_live_sqlx_pool, require_live_sqlx_config,
     reset_app_runtime_role_sql, select_active_analysis_document_sql, set_session_tenant_sql,
+    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
+    select_active_analysis_document_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -755,7 +757,6 @@ fn prove_temporal_interval_ordering(
             '{document_record_id}'::uuid, '{tenant_record_id}'::uuid, '{source_artifact_id}'::uuid, \
             '{digest}', 'und', NULL, NULL, \
             '2026-01-01T00:00:00Z'::timestamptz, NULL, \
-            '2026-01-01T00:00:00Z'::timestamptz, NULL, \
             '2026-01-01T00:00:00Z'::timestamptz, 0\
          )",
         digest = "b".repeat(64),
@@ -888,6 +889,9 @@ fn seed_membership_targets(
     repo.session_mut()
         .execute(&set_session_tenant_sql(Uuid::nil()))
         .expect("bind wrong tenant GUC");
+    let wrong_tenant_entity = live_entity(entity_a, tenant_record_id, "author", available, system);
+    let wrong_tenant_sql =
+        insert_entity_record_sql(&wrong_tenant_entity).expect("render entity insert");
     assert!(
         repo.session_mut()
             .execute(
@@ -917,6 +921,8 @@ fn seed_membership_targets(
             )
             .is_err(),
         "wrong tenant GUC must reject raw project_record insert under FORCE RLS"
+        repo.session_mut().execute(&wrong_tenant_sql).is_err(),
+        "raw wrong-tenant SQL must reject entity_record insert under FORCE RLS"
     );
     assert_eq!(
         repo.insert_entity_record(&live_entity(

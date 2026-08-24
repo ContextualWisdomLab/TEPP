@@ -63,6 +63,8 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "checkpoint_authority",
     "compute_backend",
     "episode_membership",
+    "membership_target",
+
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
@@ -129,8 +131,8 @@ def validate_workspace(root: Path) -> list[str]:
         errors.append("workspace default-members must exactly match workspace members")
     if package_defaults.get("edition") != "2024":
         errors.append("workspace edition must be 2024")
-    if package_defaults.get("rust-version") != "1.97.1":
-        errors.append("workspace rust-version must be 1.97.1")
+    if package_defaults.get("rust-version") != "1.98.0":
+        errors.append("workspace rust-version must be 1.98.0")
     if package_defaults.get("license") != "Apache-2.0":
         errors.append("workspace license must be Apache-2.0")
     if rust_lints.get("unsafe_code") != "forbid":

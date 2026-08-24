@@ -180,6 +180,16 @@ Allen interval relations do not authorize treating a later outcome as an earlier
 Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434. Interval relations inform `support_edge`; they do not make support, contradiction, summary, or `outcome_of` a state transition.
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Retrospective reporting may point at earlier event time; it is not a state transition and not a translation (Allen, 1983).
 
+## Roles, membership, and multilevel structure
+
+Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100202
+
+Snijders, T. A. B., & Bosker, R. J. (2012). *Multilevel analysis: An introduction to basic and advanced multilevel modeling* (2nd ed.). SAGE.
+
+Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J. Hox & J. K. Roberts (Eds.), *Handbook of advanced multilevel analysis* (pp. 313–334). Routledge.
+
+Language, episode, template, department, and opportunity-pool memberships are crossed classifications. TEPP refuses collapsing those targets into the entity/project pair stored by migration `0006`; typed `entity_record` and `project_record` SQL reject hostile labels before insert (Browne et al., 2001; Snijders & Bosker, 2012; Beretvas, 2011).
+
 ## Unicode, language tags, and multilingual structure
 
 Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #15: Unicode normalization forms*. Unicode Consortium.

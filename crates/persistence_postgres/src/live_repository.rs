@@ -737,6 +737,12 @@ mod tests {
             available_time: available,
         };
         repo.insert_entity_record(&entity).expect("entity insert");
+        let executed = repo.session().executed();
+        let entity_bind = executed
+            .iter()
+            .rposition(|sql| sql.contains("tepp.current_tenant_record_id"))
+            .expect("entity insert must bind tenant session");
+        assert!(executed[entity_bind + 1].contains("INSERT INTO entity_record"));
         repo.submit_entity_record_by_id(entity.entity_record_id)
             .expect("entity lookup");
         let mut bad_entity = entity;
@@ -755,6 +761,12 @@ mod tests {
         };
         repo.insert_project_record(&project)
             .expect("project insert");
+        let executed = repo.session().executed();
+        let project_bind = executed
+            .iter()
+            .rposition(|sql| sql.contains("tepp.current_tenant_record_id"))
+            .expect("project insert must bind tenant session");
+        assert!(executed[project_bind + 1].contains("INSERT INTO project_record"));
         repo.submit_project_record_by_id(project.project_record_id)
             .expect("project lookup");
         let mut bad_project = project;
