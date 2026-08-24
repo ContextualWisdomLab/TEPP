@@ -61,6 +61,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `event_clock` | event time cannot be replaced by assertion, system, document, or available time |
 | `assertion_clock` | assertion time cannot be replaced by event, system, document, or available time |
 | `cutoff_clock` | knowledge cutoff cannot be replaced by event, system, or availability time |
 | `available_clock` | availability time cannot be replaced by event or system time |
