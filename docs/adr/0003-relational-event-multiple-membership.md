@@ -1,7 +1,7 @@
 # ADR 0003 — Relational event ontology and time-varying multiple membership
 
 **Decision status:** Accepted
-**Implementation maturity:** partial — membership network, event mention/instance separation, inferred/evidential/retrospective status gates, summary/source identity separation, typed forward-only relation graph, strict input-process-outcome ordering, nested ICC refusal, and subevent parent-window containment are implemented-main; full multilevel/MMMC estimators and remaining persistence remain accepted-target.
+**Implementation maturity:** partial — membership network, event mention/instance separation, inferred/evidential/retrospective status gates, summary/source identity separation, template-copy/source identity separation, typed forward-only relation graph, strict input-process-outcome ordering, nested ICC refusal, and subevent parent-window containment are implemented-main; full multilevel/MMMC estimators and remaining persistence remain accepted-target.
 **Date:** 2026-08-05
 **Supersedes:** None. ADR 0016 owns TDT/CHRONOS event-intelligence task semantics; this ADR remains authoritative for ontology, relation, role, and membership structure.
 

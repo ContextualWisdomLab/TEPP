@@ -140,7 +140,7 @@ Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology
 
 Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
 
-TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. Documents, serialized records, checkpoints, and LLM outputs remain untrusted until identity, provenance, size, and nesting depth validate (Bray, 2017; Moreau & Missier, 2013).
+TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. A summary, template, or pasted copy is a PROV derivation of the source document, not a state transition and not a reuse of the source identity; documents, serialized records, checkpoints, and LLM outputs remain untrusted until identity, provenance, size, and nesting depth validate (Bray, 2017; Moreau & Missier, 2013).
 
 International Organization for Standardization and International Electrotechnical Commission. (2011). *Information technology—Security techniques—Privacy framework* (ISO/IEC Standard No. 29100:2011). Data minimization informs `provider_receipt`; it is not a certification claim.
 
