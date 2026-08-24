@@ -2,6 +2,7 @@
 
 **Decision status:** Accepted  
 **Implementation maturity:** partial — membership network and event mention/instance separation are implemented-main; typed relation graph with forward-only transitions is implemented-main. Multilevel psychometric estimators remain accepted-target. Remaining persistence details follow ADR 0013 and [`docs/TRACEABILITY.md`](../TRACEABILITY.md).  
+**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; typed relation graph with forward-only transitions implemented-main; multilevel estimators and persistence remain accepted-target
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0016 owns TDT/CHRONOS event-intelligence task semantics; this ADR remains authoritative for ontology, relation, role, and membership structure.
 
