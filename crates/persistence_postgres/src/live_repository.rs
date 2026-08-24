@@ -9,7 +9,6 @@ use crate::document_sql::{
     revise_document_atomic_sql,
 };
 use crate::document_store::{AuditEvent, AuditSourceInspection, DocumentRecord};
-use crate::document_store::{AuditEvent, DocumentRecord};
 use crate::entity_sql::{EntityRecord, insert_entity_record_sql, select_entity_record_by_id_sql};
 use crate::instance_sql::{
     EventInstanceRecord, insert_event_instance_sql, select_event_instance_as_known_at_sql,
