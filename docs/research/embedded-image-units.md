@@ -13,13 +13,13 @@ No OCR/object model is executed here. No database migration is allocated.
 
 ## Authoritative sources
 
-IETF. (2017). *The "data" URL scheme* (RFC 2397). https://doi.org/10.17487/RFC2397
+Masinter, L. (1998). *The "data" URL scheme* (RFC 2397). RFC Editor. https://doi.org/10.17487/RFC2397
 
 Antol, S., Agrawal, A., Lu, J., Mitchell, M., Batra, D., Zitnick, C. L., & Parikh, D. (2015). VQA: Visual question answering. In *Proceedings of the IEEE International Conference on Computer Vision* (pp. 2425–2433). https://doi.org/10.1109/ICCV.2015.279
 
 ## Application
 
-RFC 2397 defines the `data:` URI and the `base64` encoding used in HTML and reports (IETF, 2017). Visual question answering shows that image meaning is a separate modality from surrounding words (Antol et al., 2015). TEPP therefore keeps the original URI offset as a span and refuses to treat that payload as topic or lexical evidence (IETF, 2017; Antol et al., 2015).
+RFC 2397 defines the `data:` URI and the `base64` encoding used in HTML and reports (Masinter, 1998). Visual question answering shows that image meaning is a separate modality from surrounding words (Antol et al., 2015). TEPP therefore keeps the original URI offset as a span and refuses to treat that payload as topic or lexical evidence (Masinter, 1998; Antol et al., 2015).
 
 ## Verification
 

@@ -333,6 +333,10 @@ fn every_record_validation_error_has_a_stable_message() {
             EvidenceError::EmbeddedImageIsNotLexicalText,
             "embedded image is not lexical text",
         ),
+        (
+            EvidenceError::ImplausibleImageMediaType,
+            "embedded image media type is implausible",
+        ),
     ];
 
     for (error, expected) in cases {

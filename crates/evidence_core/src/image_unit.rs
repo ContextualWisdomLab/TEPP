@@ -115,10 +115,39 @@ pub fn refuse_base64_image_as_lexical_text(text: &str) -> Result<(), EvidenceErr
     if text.is_empty() {
         return Err(EvidenceError::InvalidWirePayload);
     }
-    if text.contains(DATA_IMAGE_PREFIX) && text.contains(BASE64_MARK) {
+    if contains_base64_image_data_uri(text) {
         return Err(EvidenceError::EmbeddedImageIsNotLexicalText);
     }
     Ok(())
+}
+
+fn contains_base64_image_data_uri(text: &str) -> bool {
+    let mut search_from = 0usize;
+    while let Some(relative) = text[search_from..].find(DATA_IMAGE_PREFIX) {
+        let start = search_from + relative;
+        let after_prefix = start + DATA_IMAGE_PREFIX.len();
+        let Some(mark_rel) = text[after_prefix..].find(BASE64_MARK) else {
+            search_from = after_prefix;
+            continue;
+        };
+        let media_end = after_prefix + mark_rel;
+        let media_type = &text[start + "data:".len()..media_end];
+        if is_image_media_type_token(media_type) {
+            return true;
+        }
+        search_from = after_prefix;
+    }
+    false
+}
+
+fn is_image_media_type_token(media_type: &str) -> bool {
+    let Some(subtype) = media_type.strip_prefix("image/") else {
+        return false;
+    };
+    !subtype.is_empty()
+        && subtype
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'+' | b'-'))
 }
 
 fn is_base64_payload_char(ch: char) -> bool {
