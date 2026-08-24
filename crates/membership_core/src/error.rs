@@ -19,6 +19,16 @@ pub enum MembershipError {
     UnknownMembershipRole,
     /// A duplicate assignment key was rejected by the membership network.
     DuplicateMembershipAssignment,
+    /// Nested ICC is undefined for cross-classified or multiple-membership designs.
+    NestedIccInapplicable,
+    /// Clusters or within-group residual degrees of freedom are insufficient.
+    InsufficientClusterStructure,
+    /// An outcome value was non-finite.
+    InvalidOutcome,
+    /// The same member contributed more than one nested ICC outcome.
+    DuplicateOutcomeMember,
+    /// An outcome member has no active nested membership at the requested time.
+    UnknownOutcomeMember,
 }
 
 impl fmt::Display for MembershipError {
@@ -30,6 +40,11 @@ impl fmt::Display for MembershipError {
             Self::UnsupportedWireVersion => "unsupported membership wire version",
             Self::UnknownMembershipRole => "unknown membership role",
             Self::DuplicateMembershipAssignment => "duplicate membership assignment",
+            Self::NestedIccInapplicable => "nested ICC is inapplicable to this membership design",
+            Self::InsufficientClusterStructure => "insufficient cluster structure for nested ICC",
+            Self::InvalidOutcome => "invalid nested ICC outcome",
+            Self::DuplicateOutcomeMember => "duplicate nested ICC outcome member",
+            Self::UnknownOutcomeMember => "unknown nested ICC outcome member",
         };
         formatter.write_str(message)
     }
@@ -67,6 +82,26 @@ mod tests {
             (
                 MembershipError::DuplicateMembershipAssignment,
                 "duplicate membership assignment",
+            ),
+            (
+                MembershipError::NestedIccInapplicable,
+                "nested ICC is inapplicable to this membership design",
+            ),
+            (
+                MembershipError::InsufficientClusterStructure,
+                "insufficient cluster structure for nested ICC",
+            ),
+            (
+                MembershipError::InvalidOutcome,
+                "invalid nested ICC outcome",
+            ),
+            (
+                MembershipError::DuplicateOutcomeMember,
+                "duplicate nested ICC outcome member",
+            ),
+            (
+                MembershipError::UnknownOutcomeMember,
+                "unknown nested ICC outcome member",
             ),
         ] {
             assert_eq!(error.to_string(), message);
