@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `interpretation_gateway` evidence-bounded LLM interpretations: proposals must cite at least one evidence span, remain hypothetical, cannot become estimator results or observed facts, and a cited interpreter records a lower computed unsupported-claim rate than uncited promotion.
 - `model_selection` candidate-`K` gates: statistical candidates require `K >= 2` and finite held-out log-likelihood/complexity, a Pareto front excludes dominated alternatives, LLM votes cannot define the numerical optimum, and selected `K` recovers known truth with computed RMSE.
 - `event_core` mention-confidence Brier score: known-truth binary outcomes recover a computed Brier of 0 for perfect forecasts and 0.25 for constant 0.5, with empty or mismatched streams failing closed.
 - `membership_core` nested ICC: CPU `f64` unbalanced ANOVA recovers a known cluster ICC and refuses to treat cross-classified or multiple-membership designs as a single hierarchy (ADR 0003).

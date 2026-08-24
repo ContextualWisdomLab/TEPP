@@ -589,6 +589,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "interpretation_gateway"
+version = "0.1.0"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "io-uring"
 version = "0.7.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
