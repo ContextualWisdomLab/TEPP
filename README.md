@@ -79,6 +79,7 @@ crates/episode_membership
 crates/style_source
 crates/modality_source
 crates/corpus_background
+crates/prompt_source
 ```
 
 ## Local verification

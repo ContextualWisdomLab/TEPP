@@ -59,6 +59,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "style_source",
     "modality_source",
     "corpus_background",
+    "prompt_source",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (

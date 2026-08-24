@@ -46,6 +46,13 @@ TEPP retains a logistic-normal CPU reference while allowing adapter backends tha
 TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. House-voice style residue is modeled as explicit structure, not unique latent content and not a stopword deletion (Roberts et al., 2019).
 TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Non-lexical modality is modeled as explicit structure, not unique latent content and not a stopword deletion (Bateman, 2008).
 TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Corpus-background wording is modeled as explicit structure, not unique latent content and not a stopword deletion (Chemudugunta et al., 2007).
+Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D., Dhariwal, P., Neelakantan, A., Shyam, P., Sastry, G., Askell, A., Agarwal, S., Herbert-Voss, A., Krueger, G., Henighan, T., Child, R., Ramesh, A., Ziegler, D., Wu, J., Winter, C., … Amodei, D. (2020). Language models are few-shot learners. *Advances in Neural Information Processing Systems, 33*, 1877–1901. https://papers.neurips.cc/paper/2020/hash/1457c0d6bfcb4967418bfb8ac142f64a-Abstract.html
+
+Reynolds, L., & McDonell, K. (2021). Prompt programming for large language models: Beyond the few-shot paradigm. In *Extended abstracts of the 2021 CHI conference on human factors in computing systems*. Association for Computing Machinery. https://doi.org/10.1145/3411763.3451760
+
+Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, G. (2023). Pre-train, prompt, and predict: A systematic survey of prompting methods in natural language processing. *ACM Computing Surveys, 55*(9), Article 195. https://doi.org/10.1145/3560815
+
+TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Brown et al. (2020) and Reynolds and McDonell (2021) provide primary research context for prompts as task-conditioning and prompt-programming mechanisms; they do not define TEPP's latent-content labels. As a normative ADR 0004/0012 contract, instruction and prompt boilerplate is therefore modeled as explicit method structure, not unique latent content and not a stopword deletion. Liu et al. (2023) is secondary survey background only and is not evidence for that repository-specific classification.
 
 ## Topic-model evaluation and LLM judges
 
