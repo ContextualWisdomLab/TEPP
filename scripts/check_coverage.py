@@ -171,7 +171,6 @@ def is_executable_source_line(
             text.startswith("if ")
             or text.startswith("if(")
             or " if(" in text
-            or " if (" in text
         ):
             return True
         return _is_multiline_match_guard(lines, line_number)
