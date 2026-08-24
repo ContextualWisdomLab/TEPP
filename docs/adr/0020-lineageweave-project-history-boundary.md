@@ -1,8 +1,8 @@
 # ADR 0020 — LineageWeave project-history service boundary
 
-**Decision status:** Accepted  
-**Implementation maturity:** active-PR  
-**Date:** 2026-08-21  
+**Decision status:** Accepted
+**Implementation maturity:** active-PR
+**Date:** 2026-08-21
 **Supersedes:** None; narrows ADR 0011 for the project-history projection.
 
 ## Context
