@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `style_source` identity gate: house-voice style residue is not unique latent content and is not erased by a stopword list; recovered style kinds match known truth at a higher computed rate than collapsing every token to unique content (ADR 0004/0012).
 - `stopword_deletion` method gate: a default or global stopword list cannot erase repeated report language; recovered deletion kinds match known truth at a higher computed rate than collapsing every token treatment to stopword deletion (ADR 0004/0012).
 - `persistence_postgres` retention/deletion/legal-hold (migration `0007`): policy rows, legal holds that block completed deletion, evidence tombstones without raw-source restore, analysis exclusion only for `logical_revocation`/`identity_tombstone` (not `cache_export_removal`), and deletion requests bound to the cited retention policy's tenant/class/purpose.
 - `copy_identity` identity gate: a template or pasted copy cannot reuse the source document identity or become a state transition; recovered copy kinds match known truth at a higher computed rate than collapsing every copy to the source (ADR 0003).
