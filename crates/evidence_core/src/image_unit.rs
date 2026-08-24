@@ -88,13 +88,17 @@ pub fn embedded_image_units(
             search_from = after_prefix;
             continue;
         }
-        if !is_plausible_image_media_type(media_type) {
+        let base_media_type = base_media_type(media_type);
+        if !is_plausible_image_media_type(base_media_type) {
             return Err(EvidenceError::ImplausibleImageMediaType);
         }
         let scalar_start = text[..start].chars().count();
         let scalar_end = scalar_start + text[start..payload_end].chars().count();
         let span = SourceSpan::new(document, start, payload_end, scalar_start, scalar_end, None)?;
-        units.push(EmbeddedImageUnit { span, media_type });
+        units.push(EmbeddedImageUnit {
+            span,
+            media_type: base_media_type,
+        });
         search_from = payload_end;
     }
     if units.is_empty() {
@@ -141,14 +145,17 @@ fn contains_base64_image_data_uri(text: &str) -> bool {
 }
 
 fn is_image_media_type_token(media_type: &str) -> bool {
-    let Some(subtype) = media_type.strip_prefix("image/") else {
+    let Some(subtype) = base_media_type(media_type).strip_prefix("image/") else {
         return false;
     };
-    let subtype = subtype.split(';').next().unwrap_or("");
     !subtype.is_empty()
         && subtype
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'+' | b'-'))
+}
+
+fn base_media_type(media_type: &str) -> &str {
+    media_type.split(';').next().unwrap_or("")
 }
 
 fn is_base64_payload_char(ch: char) -> bool {

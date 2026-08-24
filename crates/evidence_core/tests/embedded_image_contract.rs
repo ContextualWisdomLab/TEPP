@@ -54,6 +54,17 @@ fn implausible_media_types_fail_closed_and_common_types_are_accepted() {
         media_types,
         vec!["image/png", "image/jpeg", "image/webp", "image/gif"]
     );
+
+    let parameterized = "data:image/png;charset=x;base64,AAAA";
+    let artifact = SourceArtifact::from_bytes(parameterized.as_bytes()).expect("artifact");
+    let document = DocumentRecord::from_text(artifact.id(), parameterized).expect("document");
+    let units = embedded_image_units(&document).expect("parameterized image");
+    assert_eq!(units.len(), 1);
+    assert_eq!(units[0].media_type(), "image/png");
+    assert_eq!(
+        &document.text()[units[0].span().byte_start()..units[0].span().byte_end()],
+        parameterized
+    );
 }
 
 #[test]
