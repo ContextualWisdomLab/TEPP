@@ -42,6 +42,8 @@ pub enum PersistenceError {
     ConcurrentWriteConflict,
     /// A restored snapshot failed integrity revalidation and is not usable.
     RestoreIntegrityFailed,
+    /// A text segment had a negative or inverted UTF-8 byte span.
+    InvalidTextSegment,
     /// A retention, hold, deletion, or tombstone record failed closed validation.
     InvalidRetentionLifecycle,
     /// An active legal hold blocked completed deletion.
@@ -71,6 +73,7 @@ impl fmt::Display for PersistenceError {
             Self::InvalidAuditEvent => "invalid audit event",
             Self::ConcurrentWriteConflict => "concurrent write conflict",
             Self::RestoreIntegrityFailed => "restore integrity failed",
+            Self::InvalidTextSegment => "invalid text segment",
             Self::InvalidRetentionLifecycle => "invalid retention lifecycle",
             Self::LegalHoldBlocksDeletion => "legal hold blocks deletion",
             Self::UngovernedEvidenceRestore => "ungoverned evidence restore",
@@ -208,6 +211,10 @@ mod tests {
         assert_eq!(
             PersistenceError::RestoreIntegrityFailed.to_string(),
             "restore integrity failed"
+        );
+        assert_eq!(
+            PersistenceError::InvalidTextSegment.to_string(),
+            "invalid text segment"
         );
         assert_eq!(
             PersistenceError::InvalidRetentionLifecycle.to_string(),

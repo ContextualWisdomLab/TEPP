@@ -10,9 +10,11 @@ Asparouhov, T., Hamaker, E. L., & Muthén, B. (2018). Dynamic structural equatio
 
 Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. *Structural Equation Modeling: A Multidisciplinary Journal, 16*(3), 397–438. https://doi.org/10.1080/10705510903008204
 
+Fox, J.-P., & Glas, C. A. W. (2001). Bayesian estimation of a multilevel IRT model using Gibbs sampling. *Psychometrika, 66*(2), 271–288. https://doi.org/10.1007/BF02294839
+
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated.
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, DSEM, and multilevel/non-independence measurement. Fox and Glas (2001) support Bayesian multilevel IRT estimation; they are not evidence for every cross-classified or multiple-membership estimator TEPP may later implement. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Clustered or cross-classified observations are not flattened into independent rows (Fox & Glas, 2001; American Educational Research Association et al., 2014).
 
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 
@@ -44,7 +46,7 @@ Stammbach, D., Zouhar, V., Hoyle, A., Sachan, M., & Ash, E. (2023). Revisiting a
 
 Yang, X., Zhao, H., Phung, D., Buntine, W., & Du, L. (2025). LLM reading tea leaves: Automatically evaluating topic models with large language models. *Transactions of the Association for Computational Linguistics, 13*.
 
-LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. Candidates are blinded and statistically gated before LLM review.
+LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. Candidates are blinded and statistically gated before LLM review. `interpretation_gateway` records those judgments as hypothetical proposals that must cite evidence spans and cannot become estimator results or observed facts.
 
 ## Compositional data, correlation, and clusters
 
@@ -65,6 +67,8 @@ and recall.
 
 ## Time, events, and topic detection and tracking
 
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434
+
 International Organization for Standardization. (2012). *Language resource management—Semantic annotation framework (SemAF)—Part 1: Time and events (SemAF-Time, ISO-TimeML)* (ISO Standard No. 24617-1:2012).
 
 Hobbs, J. R., & Pan, F. (2017). *Time ontology in OWL* (W3C Recommendation). World Wide Web Consortium. https://www.w3.org/TR/owl-time/
@@ -73,7 +77,21 @@ Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information 
 
 Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reasoning engine for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 70–77. https://doi.org/10.1016/j.procs.2013.09.082
 
-TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers.
+Li, M., Li, S., Wang, Z., Huang, L., Cho, K., Ji, H., Han, J., & Voss, C. (2021). The future is not one-dimensional: Complex event schema induction by graph modeling for event prediction. In *Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing* (pp. 5203–5215). Association for Computational Linguistics. https://doi.org/10.18653/v1/2021.emnlp-main.422
+
+TEPP uses Allen interval algebra and partial-order reasoning, ISO-TimeML/OWL-Time vocabulary, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, neural event-schema induction/prediction, and separate symbolic temporal-consistency reasoning (Allen, 1983; International Organization for Standardization, 2012; Hobbs & Pan, 2017; Allan, 2002; Li et al., 2021; Anagnostopoulos et al., 2013).
+
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434. Interval relations constrain temporal reasoning; they do not make support, contradiction, summary, or `outcome_of` a state transition.
+
+Raudenbush, S. W., & Bryk, A. S. (2002). *Hierarchical linear models: Applications and data analysis methods* (2nd ed.). Sage.
+
+Snijders, T. A. B., & Bosker, R. J. (2012). *Multilevel analysis: An introduction to basic and advanced multilevel modeling* (2nd ed.). SAGE.
+
+Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100202
+
+Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J. Hox & J. K. Roberts (Eds.), *Handbook of advanced multilevel analysis* (pp. 313–334). Routledge.
+
+Nested ICC recovery uses the unbalanced ANOVA variance-component estimator and refuses to treat cross-classified or multiple-membership designs as one hierarchy (Raudenbush & Bryk, 2002; Snijders & Bosker, 2012; Browne et al., 2001; Beretvas, 2011).
 
 ## Unicode, language tags, and multilingual structure
 
@@ -81,11 +99,15 @@ Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #15
 
 Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #29: Unicode text segmentation*. Unicode Consortium.
 
+Bird, S., & Liberman, M. (2001). A formal framework for linguistic annotation. *Speech Communication, 33*(1–2), 23–60. https://doi.org/10.1016/S0167-6393(00)00068-6
+
+Wilde, E., & Duerst, M. (2008). *URI fragment identifiers for the text/plain media type* (RFC 5147). Internet Engineering Task Force. https://doi.org/10.17487/RFC5147
+
 Phillips, A., & Davis, M. (2009). *Tags for identifying languages* (RFC 5646). Internet Engineering Task Force. https://doi.org/10.17487/RFC5646
 
 Nivre, J., de Marneffe, M.-C., Ginter, F., Hajič, J., Manning, C. D., Pyysalo, S., Schuster, S., Tyers, F., & Zeman, D. (2020). Universal Dependencies v2: An evergrowing multilingual treebank collection. In *Proceedings of the 12th Language Resources and Evaluation Conference* (pp. 4034–4043). European Language Resources Association.
 
-The original source is preserved. NFC is used for canonical analysis views; compatibility normalization is limited to explicit auxiliary keys. Segmentation and morphology are language-tailored. Universal POS informs source priors rather than irreversible deletion.
+The original source is preserved. NFC is used for canonical analysis views; compatibility normalization is limited to explicit auxiliary keys. Segmentation and morphology are language-tailored. Universal POS informs source priors rather than irreversible deletion. Persist an exact UTF-8 byte span through `text_segment` SQL when a membership or mention must point at a unit without copying source text (Bird & Liberman, 2001; Wilde & Duerst, 2008; Davis et al., 2024).
 
 ## Evidence identity, hashing, and interchange
 
@@ -101,7 +123,11 @@ Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology
 
 Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
 
-TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody.
+National Academies of Sciences, Engineering, and Medicine. (2019). *Reproducibility and replicability in science*. The National Academies Press. https://doi.org/10.17226/25303
+
+Peng, R. D. (2011). Reproducible research in computational science. *Science, 334*(6060), 1226–1227. https://doi.org/10.1126/science.1213847
+
+TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. A model checkpoint is a derived run artifact whose digest verifies bytes (National Institute of Standards and Technology, 2015); it does not become the CPU `f64` estimator or a scientific claim (Peng, 2011; National Academies of Sciences, Engineering, and Medicine, 2019).
 
 ## Privacy lifecycle, retention, and legal hold
 
