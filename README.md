@@ -61,6 +61,7 @@ crates/interpretation_gateway
 crates/model_selection
 crates/checkpoint_authority
 crates/cutoff_clock
+crates/assertion_clock
 ```
 
 ## Local verification

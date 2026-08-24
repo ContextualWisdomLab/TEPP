@@ -31,6 +31,7 @@ members = [
     "crates/checkpoint_authority",
     "crates/compute_backend",
     "crates/cutoff_clock",
+    "crates/assertion_clock",
 ]
 default-members = [
     "crates/evidence_core",
@@ -63,6 +64,7 @@ default-members = [
     "crates/checkpoint_authority",
     "crates/compute_backend",
     "crates/cutoff_clock",
+    "crates/assertion_clock",
 ]
 
 [workspace.package]
