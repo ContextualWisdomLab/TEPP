@@ -1,4 +1,4 @@
-# ADR 0017 — Consumer-scoped modular analysis-run ingress
+# ADR 0018 — Consumer-scoped modular analysis-run ingress
 
 **Decision status:** Accepted
 **Implementation maturity:** active-PR

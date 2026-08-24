@@ -1,4 +1,4 @@
-# ADR 0018 — Symmetric LineageWeave wire-size enforcement
+# ADR 0019 — Symmetric LineageWeave wire-size enforcement
 
 **Decision status:** Accepted  
 **Implementation maturity:** active-PR  

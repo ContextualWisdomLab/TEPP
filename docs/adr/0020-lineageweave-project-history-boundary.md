@@ -1,4 +1,4 @@
-# ADR 0019 — LineageWeave project-history service boundary
+# ADR 0020 — LineageWeave project-history service boundary
 
 **Decision status:** Accepted  
 **Implementation maturity:** active-PR  
@@ -86,6 +86,6 @@ or credential policy requires a superseding ADR.
 - ADR 0008 owns strict bounded wire reconstruction.
 - ADR 0009 owns purpose-bound PII governance.
 - ADR 0011 owns standalone and modular service authority.
-- ADR 0018 owns symmetric project-history wire-size enforcement.
+- ADR 0019 owns symmetric project-history wire-size enforcement.
 - `docs/doctoring/LINEAGEWEAVE_PROJECT_HISTORY_REFERENCES.md` records the
   contract sources and APA 7th references.

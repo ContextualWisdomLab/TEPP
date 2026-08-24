@@ -12,6 +12,10 @@ an LLVM optimization miscompilation and therefore supersedes 1.97.0 for this
 foundation. A future compiler update requires exact-head formatting, Clippy,
 rustdoc, test, coverage, and numerical-parity evidence before adoption.
 
+The root `rust-toolchain.toml` is monitored through GitHub Dependabot's
+`rust-toolchain` ecosystem. Updates therefore arrive as reviewable pull requests
+rather than silently changing a floating compiler channel.
+
 ## Cargo workspace
 
 The workspace uses an explicit member list and workspace-inherited package
@@ -57,6 +61,9 @@ GitHub. https://github.com/EmbarkStudios/cargo-deny
 
 Endo, T. (2026). *cargo-llvm-cov* (Version 0.8.6) [Computer software]. GitHub.
 https://github.com/taiki-e/cargo-llvm-cov
+
+GitHub. (2026). *Dependabot supports updates for Rust toolchains*. GitHub
+Changelog. https://github.blog/changelog/
 
 Nextest contributors. (2026). *cargo-nextest* (Version 0.9.140)
 [Computer software]. https://nexte.st/
