@@ -10,6 +10,7 @@
 **Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; typed relation graph with forward-only transitions implemented-main; IPO event-time order in `outcome_order` on the active PR; multilevel estimators and persistence remain accepted-target  
 **Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; summary-versus-source identity in `summarizes_edge` on the active PR; typed relation graph with forward-only transitions active-PR; multilevel estimators and persistence remain accepted-target  
 **Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; copy-versus-source identity in `copy_identity` on the active PR; typed relation graph with forward-only transitions active-PR; multilevel estimators and persistence remain accepted-target  
+**Implementation maturity:** partial — membership network and event mention/instance separation implemented-main; episode-membership containment in `episode_membership` on the active PR; typed relation graph with forward-only transitions active-PR; multilevel estimators and persistence remain accepted-target  
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0016 owns TDT/CHRONOS event-intelligence task semantics; this ADR remains authoritative for ontology, relation, role, and membership structure.
 

@@ -43,6 +43,7 @@ members = [
     "crates/intake_authorization",
     "crates/copy_identity",
     "crates/stopword_deletion",
+    "crates/episode_membership",
 ]
 default-members = [
     "crates/evidence_core",
@@ -87,6 +88,7 @@ default-members = [
     "crates/intake_authorization",
     "crates/copy_identity",
     "crates/stopword_deletion",
+    "crates/episode_membership",
 ]
 
 [workspace.package]

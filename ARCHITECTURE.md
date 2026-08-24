@@ -95,6 +95,7 @@ APIs.
 | `intake_authorization` | untrusted intake fails closed without a grant; bounds are not authorization |
 | `copy_identity` | a template copy is not the source document and not a state transition |
 | `stopword_deletion` | default stopword deletion is not a valid method for repeated report language |
+| `episode_membership` | episode membership cannot escape the episode event-time interval |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests

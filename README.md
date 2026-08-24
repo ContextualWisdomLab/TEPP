@@ -75,6 +75,7 @@ crates/provider_receipt
 crates/intake_authorization
 crates/copy_identity
 crates/stopword_deletion
+crates/episode_membership
 ```
 
 ## Local verification
