@@ -22,6 +22,7 @@ members = [
     "crates/interpretation_gateway",
     "crates/model_selection",
     "crates/checkpoint_authority",
+    "crates/compute_backend",
 ]
 default-members = [
     "crates/evidence_core",
@@ -45,6 +46,7 @@ default-members = [
     "crates/interpretation_gateway",
     "crates/model_selection",
     "crates/checkpoint_authority",
+    "crates/compute_backend",
 ]
 
 [workspace.package]

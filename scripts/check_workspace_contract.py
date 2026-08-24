@@ -34,6 +34,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "interpretation_gateway",
     "model_selection",
     "checkpoint_authority",
+    "compute_backend",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (

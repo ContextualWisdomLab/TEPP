@@ -37,6 +37,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Actions fleet research doctoring | [`docs/research/actions-workflow-fleet.md`](docs/research/actions-workflow-fleet.md) |
 | Mention-confidence Brier doctoring | [`docs/research/mention-confidence-brier.md`](docs/research/mention-confidence-brier.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
+| VRAM budget / GPU fallback doctoring | [`docs/research/vram-budget-types.md`](docs/research/vram-budget-types.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |

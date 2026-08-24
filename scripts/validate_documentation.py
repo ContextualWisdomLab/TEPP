@@ -338,7 +338,6 @@ def validate_promotion_authority_pointers() -> None:
         raise AssertionError("\n".join(failures))
 
 
-def validate_documentation_map() -> None:
 def validate_documentation_map(root: Path = ROOT) -> None:
     """Require cross-cutting canonical documents to be discoverable from the root map."""
 
