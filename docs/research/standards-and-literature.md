@@ -79,21 +79,11 @@ Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information 
 
 Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reasoning engine for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 70–77. https://doi.org/10.1016/j.procs.2013.09.082
 
-Li, M., Li, S., Wang, Z., Huang, L., Cho, K., Ji, H., Han, J., & Voss, C. (2021). The future is not one-dimensional: Complex event schema induction by graph modeling for event prediction. In *Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing* (pp. 5203–5215). Association for Computational Linguistics. https://doi.org/10.18653/v1/2021.emnlp-main.422
+Tashman, L. J. (2000). Out-of-sample tests of forecasting accuracy: An analysis and review. *International Journal of Forecasting, 16*(4), 437–450. https://doi.org/10.1016/S0169-2070(00)00065-0
 
-TEPP uses Allen interval algebra and partial-order reasoning, ISO-TimeML/OWL-Time vocabulary, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, neural event-schema induction/prediction, and separate symbolic temporal-consistency reasoning (Allen, 1983; International Organization for Standardization, 2012; Hobbs & Pan, 2017; Allan, 2002; Li et al., 2021; Anagnostopoulos et al., 2013).
+Kaufman, S., Rosset, S., Perlich, C., & Stitelman, O. (2012). Leakage in data mining: Formulation, detection, and avoidance. *ACM Transactions on Knowledge Discovery from Data, 6*(4), 1–21. https://doi.org/10.1145/2382577.2382579
 
-Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434. Interval relations constrain temporal reasoning; they do not make support, contradiction, summary, or `outcome_of` a state transition.
-
-Raudenbush, S. W., & Bryk, A. S. (2002). *Hierarchical linear models: Applications and data analysis methods* (2nd ed.). Sage.
-
-Snijders, T. A. B., & Bosker, R. J. (2012). *Multilevel analysis: An introduction to basic and advanced multilevel modeling* (2nd ed.). SAGE.
-
-Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100202
-
-Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J. Hox & J. K. Roberts (Eds.), *Handbook of advanced multilevel analysis* (pp. 313–334). Routledge.
-
-Nested ICC recovery uses the unbalanced ANOVA variance-component estimator and refuses to treat cross-classified or multiple-membership designs as one hierarchy (Raudenbush & Bryk, 2002; Snijders & Bosker, 2012; Browne et al., 2001; Beretvas, 2011).
+TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Out-of-sample splits must not use future-available evidence (Tashman, 2000) and must detect train/test contamination from revision, translation, copied-variant, and same-episode links (Kaufman et al., 2012).
 
 ## Unicode, language tags, and multilingual structure
 
