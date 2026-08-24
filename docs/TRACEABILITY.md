@@ -10,11 +10,11 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | immutable source evidence and exact spans | PRD; Architecture; ADR 0008 | `evidence_core`, Task 2 tests/doctoring; `persistence_postgres` source-artifact SQL insert/lookup plus idempotent retry (#40 implemented-main); typed `text_segment` byte-span SQL (active PR) | implemented-main |
 | Rust numerical authority / CPU `f64` reference | ADR 0001 | current workspace foundation; future estimators | partial |
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
-| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; `event_clock` event-vs-assertion/system/document/available identity on the active PR | active-PR |
+| six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; `system_clock` system-vs-other-clock identity on the active PR | active-PR |
 | Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
-| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `citation_edge` provenance-vs-transition gate on the active PR | active-PR |
+| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `support_edge` evidential-vs-transition gate on the active PR | active-PR |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
-| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
+| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `inferred_status` inferred-versus-observed identity on the active PR; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
 | recovery metrics (RMSE, bias, coverage, graph, temporal order, Monte Carlo SE gates) | PRD; Test Strategy; ADR 0007/0014 | `validation_core` on protected main (PR #19); SE-aware Monte Carlo gates included | implemented-main |
 | PostgreSQL bitemporal/lineage persistence | ADR 0013; Architecture/ERD | `persistence_postgres` on protected main as before; `revision_order` later-revision system-time gate on the active PR; remaining physical ERD constraints | partial |

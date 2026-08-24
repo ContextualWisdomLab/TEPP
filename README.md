@@ -42,6 +42,9 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/inferred_status
+crates/support_edge
+crates/system_clock
 crates/event_clock
 crates/assertion_clock
 crates/cutoff_clock
