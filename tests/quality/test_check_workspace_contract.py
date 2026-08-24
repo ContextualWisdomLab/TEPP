@@ -78,7 +78,7 @@ class WorkspaceContractTests(unittest.TestCase):
             'resolver = "2"': 'resolver = "1"',
             '"crates/tepp_api"': '"crates/unapproved_api"',
             'edition = "2024"': 'edition = "2021"',
-            'rust-version = "1.97.1"': 'rust-version = "1.96.0"',
+            'rust-version = "1.98.0"': 'rust-version = "1.96.0"',
             'license = "Apache-2.0"': 'license = "MIT"',
             'unsafe_code = "forbid"': 'unsafe_code = "allow"',
             'missing_docs = "deny"': 'missing_docs = "warn"',
