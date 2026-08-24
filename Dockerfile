@@ -3,7 +3,7 @@ WORKDIR /src
 COPY . .
 RUN cargo build --locked --release -p tepp_api --bin tepp-loopback
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
