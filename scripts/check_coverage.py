@@ -223,7 +223,9 @@ def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
             and brace_depth == 0
         ):
             guard_found = True
-        if stripped.startswith("match "):
+        if stripped.startswith("match ") or (
+            stripped.startswith("let ") and "= match " in stripped
+        ):
             return guard_found
     return guard_found
 

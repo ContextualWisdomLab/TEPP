@@ -657,6 +657,18 @@ class CoverageContractTests(unittest.TestCase):
                     2,
                 )
             )
+            self.assertFalse(
+                coverage_contract._is_multiline_match_guard(
+                    [
+                        "match state {",
+                        "    if previous_guard",
+                        "    }",
+                        "    let nested = match input {",
+                        "        0 => {",
+                    ],
+                    5,
+                )
+            )
 
             guarded_after_block = Path(temporary) / "guarded_after_block.rs"
             guarded_after_block.write_text(
