@@ -2,7 +2,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-24T10:11:01Z
+**Snapshot:** 2026-08-24T10:55:23Z
 **Protected-main evidence:** `e65cd663fc0802d6b70ff88d895a8077a1e572ae` (full SHA fetched live before every mutation)
 **Workspace version on protected main:** `0.1.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main. Duplicate [PR #179] stays closed.
@@ -56,25 +56,25 @@ main-conflicting green queue:
   #48/#49/#63/#65/#137/#149/#157 were re-run rather than treated as
   code defects.
 
-Remaining after consolidation lands: strix-rerun set (#48 #49 #63 #65 #149
-#157), pending-check slices (#58 #59 #62 #66), conflicted #131, toolchain bump
-#214, and the 48 draft PRs retained per the stacking plan, including the
-psychometric recovery stack and non-psychometric drafts.
+Remaining after consolidation lands: strix-rerun set (#48 #49 #63 #65 #149 #157),
+pending-check slices (#58 #59 #62 #66), conflicted #131, toolchain bump #214, and
+the 48 draft PRs retained per the stacking plan, including the psychometric
+recovery stack and non-psychometric drafts.
 
 ## Snapshot open pull-request evidence
 
 The following exact-head register was fetched live from GitHub at
-2026-08-24T10:11:01Z. Review decisions, required Checks, and mergeability remain
+2026-08-24T10:55:23Z. Review decisions, required Checks, and mergeability remain
 volatile; the live GitHub API supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
 Checks, and branch rules immediately before every mutation.
 
 | PR | Exact current head | Draft | Base | Title |
 |---:|---|:---:|---|---|
-| #217 | `9f46cb1281c398724dff472cd937726e53ff374a` | false | main | docs(gap): refresh baseline snapshot, consolidation progress; untrack codegraph artifacts |
+| #217 | `79df32c73b260838fd3d0bfed3e84ff3e58e4b28` | false | main | docs(gap): refresh baseline snapshot, consolidation progress; untrack codegraph artifacts |
 | #216 | `91903db726f1da6b398e0a32c5a401126598154f` | true | agent/psychometric-standardised-discrete-intercept | feat(psychometric): recover Driver p.16 asymCINTstd after positive p |
-| #215 | `dcb68a336204fa12900d3a57e64e818e777424d0` | false | main | chore(delivery): consolidate 31 queued green slices into one landing vehicle (#175) |
-| #214 | `cbf9759512434b2e56c314b1ce239db179bf33ce` | false | main | build(deps): bump rust-toolchain from 1.97.1 to 1.98.0 |
+| #215 | `f813ce51e3749a91958c1e075dc8d0824f811af0` | false | main | chore(delivery): consolidate 31 queued green slices into one landing vehicle (#175) |
+| #214 | `5c5621c27bdf18d52f6f98b7ac373eb90768fbc5` | false | main | build(deps): bump rust-toolchain from 1.97.1 to 1.98.0 |
 | #213 | `d32c069c5653434302dc2507e272ff916cb7b16a` | true | agent/psychometric-standardised-asymptotic-diffusion | feat(psychometric): recover Driver p.16 discreteCINTstd after positive p |
 | #211 | `643b9beb76ea6bc6b3a468bdb0f08e1a820cae9f` | true | agent/psychometric-standardised-manifest-variance | feat(psychometric): recover Driver p.16 TIPREDVARstd after positive TIPREDVAR |
 | #210 | `22202c57c0818d3efb28438e95bdde5d0e7143b0` | true | agent/psychometric-standardised-manifest-trait-variance | feat(psychometric): recover Driver p.16 MANIFESTVARstd after positive Θ |
@@ -111,7 +111,7 @@ Checks, and branch rules immediately before every mutation.
 | #136 | `7825c778f39bb8d1ab9f6fe18c227559f8e78fee` | true | main | feat(relation): refuse translation edges as state transitions |
 | #134 | `7f4a5df9fd18be203c995f59f1e734f69eba56f9` | true | main | feat(psychometric): refuse unidentified association as causal language |
 | #132 | `fe73209ea3407f0c8cd62fbf10ecea844ac15e50` | true | main | feat(relation): refuse unobserved pairs as no-relationship |
-| #131 | `186982504a6c95266f0280c74870bb17d800344e` | false | main | feat(membership): refuse collapsing targets into entity or project |
+| #131 | `0651aeec72cd54c1119effa77e97e992bf265b3d` | false | main | feat(membership): refuse collapsing targets into entity or project |
 | #129 | `8981696f58892a1ace9baeb6224ac55b436b8110` | true | main | feat(membership): refuse customer-competitor overlap |
 | #113 | `bd800fc62a7cb59339177e34baf3237d6897fce7` | false | main | feat(persistence): fail-closed entity and project target SQL |
 | #95 | `3c42b3b09e9a0501d7c7a1a42a322e58cba39165` | true | main | feat(privacy): refuse blanket-masked scientific field grants |
@@ -142,6 +142,7 @@ Checks, and branch rules immediately before every mutation.
 | #51 | `1801501c4d7c5be720d24aba954280fbc9068612` | false | main | feat(compute): VRAM budget types with CPU f64 fallback |
 | #49 | `9516ef1384f5239096d6d13c52155f8f7dde7795` | false | main | feat(psychometric): posterior ESEM input gates with true-parameter RMSE |
 | #48 | `6110d3660607ba46b312b4d76f048f1bcc4f3bc5` | false | main | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
+
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization
 and does not treat queued or passing Checks as shipped protected-main behavior.
@@ -177,8 +178,6 @@ membership_core
 persistence_postgres
 corpus_split
 tepp_simulation
-validation_core
-tepp_api
 validation_core
 tepp_api
 ```
@@ -217,7 +216,7 @@ visual workspace, or a supported multi-tenant release.
 | GAP-012 | The 71-PR queue obscures authority, repeatedly stales exact-head evidence, and fragments product boundaries. | `partial` | release blocker | `e65cd66` (protected-main truth) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (live queue program) | Every PR classified; unique landing vehicles; compatible slices folded; superseded work closed with provenance; scheduler prioritizes consolidation; queue reaches zero before GA. |
 | GAP-013 | Evidence-grounded LLM interpretation is routed but not executed and validated as a production interpreter/verifier port. | `partial` | active integration | `e65cd66` (routing and refusal contracts only) | [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176), [PR #69](https://github.com/ContextualWisdomLab/TEPP/pull/69), [PR #165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `8e4a3ca9cc80` / `34083c3f5d66` | Contextual-orchestrator execution, evidence citations, verifier refusals, comparable-budget ablations, provider eligibility/fallback, abstention, live/offline contract tests, and no numerical-authority escalation. |
 | GAP-014 | README/TRD and some PR descriptions lag protected-main and live queue reality. | `partial` | documentation drift | `e65cd66` (documentation is not fully synchronized) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (queue-consolidation work) | Reconcile README, TRD, traceability, ADR maturity, CHANGELOG, preferred-merge declarations, and exact protected-main evidence. |
-| GAP-015 | There was no canonical live product/operator-gap register tied to documentation validation. | `active-PR` | landing vehicle | `e65cd66` (the register and validator are implemented-main; this refresh keeps the volatile queue current) | [PR #217](https://github.com/ContextualWisdomLab/TEPP/pull/217); [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) is the merged authority; closed [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179) is not a second register | `—` | Land this refresh after exact-head checks and independent review, then regenerate it whenever protected-main or the live queue changes. |
+| GAP-015 | There was no canonical live product/operator-gap register tied to documentation validation. | `active-PR` | landing vehicle | `e65cd66` (the register and validator are implemented-main; this refresh keeps the volatile queue current) | [PR #217](https://github.com/ContextualWisdomLab/TEPP/pull/217); [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) is the merged authority; closed [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179) is not a second register | `79df32c73b260838fd3d0bfed3e84ff3e58e4b28` | Land this refresh after exact-head checks and independent review, then regenerate it whenever protected-main or the live queue changes. |
 | GAP-016 | Hourly PR maintenance used an older central scheduler revision whose per-repository sweep budgets could amplify the queued review workload. | `active-PR` | operability hardening | `e65cd66` (caller pin before central budget hardening) | [PR #177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `580d45206536` | The change pins a verified central revision immutably; closure still requires exact-head hosted Checks, resolved threads, and independent review. |
 | GAP-017 | Accepted analysis runs have a terminal DTO, and cutoff-safe execution exists only on the #157 head after stacked PR #178 merged into that branch. | `active-PR` | product vertical | `e65cd66` (accepted receipt only) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) / [PR #157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `340087494b0a` | Exact availability cutoff, snapshot binding, multiple-membership preservation, digest integrity, redacted no-eligible failure, and realistic end-to-end tests on protected main. Closed stacked PR #178 is not implemented-main. |
 
