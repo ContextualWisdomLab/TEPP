@@ -1,7 +1,7 @@
 # TEPP Requirements, Research, and Evidence Traceability
 
 **Status:** Accepted cross-cutting traceability baseline  
-**Last reviewed:** 2026-08-13
+**Last reviewed:** 2026-08-20
 
 The full APA 7th standards/literature register remains `docs/research/standards-and-literature.md`. This matrix links durable requirements to their owning decisions and implementation/evidence maturity without duplicating the bibliography.
 
@@ -12,7 +12,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | Rust workspace/quality foundation | ADR 0007 | workspace/CI/repository contract | implemented-main |
 | six distinct clocks and uncertain intervals | PRD; ADR 0002 | PR #8 `temporal_core` on protected main; PR #5 historical only | implemented-main |
 | Allen relation algebra/bounded closure | ADR 0002; temporal research | PR #9 `temporal_core` path-consistency on protected main | implemented-main |
-| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main | implemented-main |
+| forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; downstream transition/split enforcement remains accepted-target | implemented-main |
 | event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; multilevel estimators remaining | partial |
 | leakage-safe availability/cutoff snapshots | PRD; ADR 0002/0013 | `corpus_split` on protected main | implemented-main |
@@ -30,10 +30,10 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core` | accepted-target |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
-| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | future `event_intelligence` | accepted-target |
+| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` evidence-layer admission and known-stream first-story rates on PR #50; full tracking/calibration and schema extraction remain future | active-PR |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router plus future `interpretation_gateway` | partial |
-| adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | `tepp_api::route_orchestration` + ablation record on the active PR; live contextual-orchestrator execution remaining | partial |
-| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `tepp_api` export authorization plus provider-payload minimization / elevated re-identification implemented-main; persistence retention/deletion remaining | partial |
+| adaptive direct/verify/committee/conductor test-time compute | ADR 0010; `docs/LLM_ORCHESTRATION.md` | `tepp_api::route_orchestration`, ablation record, and credential-free contextual-orchestrator binding on protected main; live execution and learned conductor calibration remain future | partial |
+| purpose-bound PII handling without blanket masking | ADR 0009; `docs/PRIVACY_DATA_GOVERNANCE.md` | `tepp_api` export authorization, elevated re-identification, and provider-payload minimization are implemented-main; migration `0007` retention/deletion/legal-hold SQL contracts are implemented-main; deployment/provider evidence remains accepted-target | partial |
 | tenant/purpose/role/lifetime access and identity separation | ADR 0009; Threat Model | `tepp_api` time-bounded `PurposeGrant` + cross-tenant denial implemented-main; persistent `access_grant` storage remaining | partial |
 | standalone + modular CWL MSA / no cross-service DB coupling | ADR 0011; `docs/API_CONTRACT.md` | current standalone crates; future service ports | partial |
 | naruon modular artifact consumer boundary | ADR 0011/0012; API contract | `docs/connectors/naruon-artifact-consumer.md` + PR #22 versioned consumer contract on protected main; `tepp_api` HTTP interchange (PR #42 implemented-main); loopback live listener on the active PR; production TLS remaining | partial |

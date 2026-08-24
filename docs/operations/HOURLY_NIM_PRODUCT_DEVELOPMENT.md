@@ -1,7 +1,8 @@
-# Hourly NVIDIA NIM Product Development
+# Hourly Contextual Orchestrator Product Development
 
-The hourly NVIDIA NIM product-development workflow proposes one bounded
-commercial-quality increment when the repository has no open pull request. It is
+The hourly contextual-orchestrator product-development workflow proposes one bounded
+commercial-quality increment when the repository has no open pull request or open
+issue. It is
 separate from the deterministic minute-17 quality sentinel and never merges,
 releases, deploys, approves, or changes reviewer credentials.
 
@@ -13,12 +14,12 @@ avoids the busiest scheduler boundary. A repository-scoped concurrency group
 does not cancel an active run.
 
 Before checkout or model execution, the proposal job reads at most one open pull
-request. Unreadable inventory, any open PR, a missing `NVIDIA_NIM_API_KEY`, or a
-missing Maintainer App configuration produces a stable fail-closed no-op. A dry
-run may print the task contract without either credential.
+request and one open issue. Unreadable inventory, any open PR or issue, any
+missing provider key, or a missing Maintainer App configuration produces a stable
+fail-closed no-op. A dry run may print the task contract without credentials.
 
-When a PR exists, normal review → repair → exact-head Checks → merge governance
-owns the hour. The scheduler does not create a competing branch.
+When a PR or issue exists, normal review → repair → exact-head Checks → merge
+governance owns the hour. The scheduler does not create a competing branch.
 
 Current preferred next gap after the open-PR queue drains: persist the
 accepted ERD `document_record` foreign key on `text_segment` once `#45`
@@ -31,7 +32,8 @@ writer for the same tables.
 
 Configure these repository or organization values:
 
-- Secret `NVIDIA_NIM_API_KEY` for the proposal runner only.
+- Secrets `BYTEZ_API_KEY`, `NVIDIA_NIM_API_KEY`, `NVIDIA_NIM_API_KEY_SUB`,
+  `OPENROUTER_API_KEY`, and `OPENAI_API_KEY` for gateway bootstrap only.
 - Variable `TEPP_MAINTAINER_APP_CLIENT_ID`.
 - Secret `TEPP_MAINTAINER_APP_PRIVATE_KEY`.
 - A repository-scoped GitHub App installation with metadata read, contents
@@ -51,10 +53,21 @@ developer disabled rather than falling back to `GITHUB_TOKEN`.
 
 The proposal runner has read-only repository and pull-request permissions.
 OpenCode is downloaded from an immutable versioned URL and checked against a
-committed SHA-256. Its only model provider is NVIDIA NIM.
+committed SHA-256. It calls only the loopback contextual-orchestrator gateway.
 
-The OpenCode process receives `NVIDIA_NIM_API_KEY` but has GitHub, OIDC, Actions
-runtime/cache, and runner command-file variables removed. Network tools, GitHub
+The gateway source is downloaded from the pinned
+`ContextualWisdomLab/contextual-orchestrator` commit and checked against a
+committed SHA-256. At bootstrap, `scripts/run_contextual_orchestrator.py`
+registers all five provider keys in the orchestrator KV, removes them from its
+environment, discovers every provider model, records secret-free discovery
+evidence, excludes endpoint-only and safety-only model identifiers from chat
+routing, and enables the three lowest-cost general-chat candidates. OpenCode
+receives only the gateway bearer token; it never receives a provider key. The
+gateway's `/healthz` and authenticated `/v1/models` responses are checked before
+the agent starts.
+
+The OpenCode process has provider keys, GitHub, OIDC, Actions runtime/cache, and
+runner command-file variables removed. Network tools, GitHub
 CLI, remote Git operations, commits, pushes, tags, external-directory access,
 task delegation, interactive questions, and OpenCode web tools are denied.
 
@@ -88,8 +101,8 @@ build scripts, packages, binaries, or shell files.
 The copied parser rejects symlinks, non-regular files, malformed UTF-8,
 unsupported controls, bidirectional spoofing, and byte-limit violations. Only
 after bounded metadata is written does the publisher mint the repository-scoped
-Maintainer App token. It then rechecks open-PR inventory and live `main`, pushes
-one unique branch, and calls `gh pr create` exactly once.
+Maintainer App token. It then rechecks open-PR and open-issue inventory plus live
+`main`, pushes one unique branch, and calls `gh pr create` exactly once.
 
 ## Proposal contract
 
@@ -111,7 +124,11 @@ Stable no-op reasons are:
 
 - `pull_request_inventory_unavailable`
 - `open_pull_request`
-- `nim_api_key_unavailable`
+- `issue_inventory_unavailable`
+- `open_issue`
+- `issue_inventory_unavailable_after_generation`
+- `open_issue_after_generation`
+- `contextual_orchestrator_credentials_unavailable`
 - `maintainer_app_unavailable`
 
 A failed model candidate is discarded before a later candidate runs. A cleanup
@@ -127,9 +144,9 @@ write token.
 ## Disablement and rollback
 
 Disable scheduled development by disabling the workflow, removing its schedule,
-or removing either dedicated credential. Removing only the model secret stops
-model execution; removing the Maintainer App values stops publication. The
-minute-17 deterministic quality sentinel continues independently.
+or removing any one of the five provider credentials. Removing any provider key
+stops model execution; removing the Maintainer App values stops publication.
+The minute-17 deterministic quality sentinel continues independently.
 
 Rollback a faulty workflow through a reviewed revert PR. Do not edit branch
 protection, review workflows, or release workflows as an incident shortcut.
@@ -138,13 +155,15 @@ references them.
 
 ## Residual risks
 
-- The model process necessarily receives the NIM credential. A future narrow
-  inference broker could keep the upstream secret outside the model process.
-- NVIDIA NIM may process repository source; operators must review confidentiality,
-  retention, regional, and contractual obligations.
+- The ephemeral gateway process receives provider credentials during bootstrap,
+  then removes them from its environment before serving. A future narrow
+  inference broker could keep upstream secrets outside the runner.
+- Each configured provider may process repository source; operators must review
+  confidentiality, retention, regional, and contractual obligations for every
+  provider before enabling the schedule.
 - The verifier executes untrusted code on an ephemeral hosted runner with
-  outbound network access, but receives no publication, NIM, OIDC, artifact/cache
-  runtime, command-file, or reviewer credential.
+  outbound network access, but receives no publication, provider, OIDC,
+  artifact/cache runtime, command-file, or reviewer credential.
 - GitHub artifact storage, hosted runners, and pinned actions remain trusted
   infrastructure. Digests prove identity, not semantic correctness.
 - GitHub cannot atomically create a PR only when none exists. Final queue and
