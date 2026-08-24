@@ -2410,7 +2410,7 @@ pub fn refuse_asymptotic_time_independent_predictor_variance_as_standardised_tim
 /// [`PsychometricError::StandardisedAsymptoticDiffusionRequiresPositiveWithinSubjectVariance`]
 /// when `asymDIFFUSION` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when an input is
-/// non-finite, negative, or the quadratic form overflows.
+/// non-finite, negative, or the stationary variance overflows.
 pub fn recover_standardised_asymptotic_diffusion(
     continuous_diffusion: f64,
     log_rate: f64,
@@ -2422,10 +2422,7 @@ pub fn recover_standardised_asymptotic_diffusion(
             PsychometricError::StandardisedAsymptoticDiffusionRequiresPositiveWithinSubjectVariance,
         );
     }
-    let process_sd = within.sqrt();
-    let inverse_sd = require_finite(1.0 / process_sd)?;
-    let scaled = require_finite(inverse_sd * within)?;
-    require_finite(scaled * inverse_sd)
+    Ok(1.0)
 }
 
 /// Refuse treating unstandardised `asymDIFFUSION` as p. 16
