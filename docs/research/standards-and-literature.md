@@ -36,9 +36,9 @@ Bianchi, F., Terragni, S., Hovy, D., Nozza, D., & Fersini, E. (2021). Cross-ling
 
 Nguyen, T. P., Minh, N. V., Nguyen, T., Van, L. N., Nguyen, D. A., Sang, D. V., & Le, T. (2025). XTRA: Cross-lingual topic modeling with topic and representation alignments. In *Findings of the Association for Computational Linguistics: EMNLP 2025*. Association for Computational Linguistics.
 
-Schofield, A., Magnusson, M., & Mimno, D. (2017). Pulling out the stops: Rethinking stopword removal for topic models. In *Proceedings of the 15th Conference of the European Chapter of the Association for Computational Linguistics: Volume 2, Short Papers* (pp. 432–436). Association for Computational Linguistics. https://doi.org/10.18653/v1/E17-2069
+Kohlschütter, C., Fankhauser, P., & Nejdl, W. (2010). Boilerplate detection using shallow text features. In *Proceedings of the Third ACM International Conference on Web Search and Data Mining* (pp. 441–450). Association for Computing Machinery. https://doi.org/10.1145/1718487.1718542
 
-TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Default or global stopword deletion is not a valid method for removing repeated report language; `stopword_deletion` refuses that treatment so boilerplate stays explicit method/background structure (Schofield, Magnusson, & Mimno, 2017).
+TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Copied and boilerplate residue is modeled as explicit structure, not unique latent content and not a stopword deletion (Kohlschütter et al., 2010).
 
 ## Topic-model evaluation and LLM judges
 
