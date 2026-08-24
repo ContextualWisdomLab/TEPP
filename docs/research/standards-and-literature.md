@@ -122,7 +122,7 @@ Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple
 
 Snijders, T. A. B., & Bosker, R. J. (2012). *Multilevel analysis: An introduction to basic and advanced multilevel modeling* (2nd ed.). SAGE.
 
-Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J. Hox & R. J. Roberts (Eds.), *Handbook of advanced multilevel analysis* (pp. 313–334). Routledge.
+Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J. Hox & J. K. Roberts (Eds.), *Handbook of advanced multilevel analysis* (pp. 313–334). Routledge.
 
 Language, episode, template, department, and opportunity-pool memberships are crossed classifications. TEPP refuses collapsing those targets into the entity/project pair stored by migration `0006`; typed `entity_record` and `project_record` SQL reject hostile labels before insert (Browne et al., 2001; Snijders & Bosker, 2012; Beretvas, 2011).
 
