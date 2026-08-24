@@ -36,7 +36,8 @@ flowchart LR
     INT --> ART
 ```
 
-On current protected main the workspace/evidence foundation and canonical documentation/ADR authority graph are implemented. Typed six-clock values/uncertain intervals are on canonical replacement PR #8. Legacy PR #6 contains Task 4 Allen/path-consistency work on the superseded PR #5 stack and is not current-lineage implementation evidence until replayed and revalidated. Later boxes are accepted-target.
+On current protected main the workspace/evidence foundation, six-clock temporal values, Allen algebra/path-consistency, event ontology/membership, and PostgreSQL persistence through restore-integrity probes are implemented. The active-PR `prediction_contradiction` crate is the promotion-authority gate: call `refuse_promotion` before authorizing promotion of unmatched predicted mass. Remaining TDT/CHRONOS, topic, psychometric, and service boxes stay accepted-target.
+On current protected main the workspace/evidence foundation, canonical documentation/ADR authority graph, typed six-clock values/uncertain intervals (merged PR #8), and Allen interval algebra/bounded path-consistency (merged PR #9; Allen, 1983) are implemented. Superseded PRs #5 and #6 are historical lineage only. Later boxes such as TRSL-TM, TDT/CHRONOS, and ESEM/DSEM remain accepted-target unless TRACEABILITY records a narrower subset.
 
 ## Evidence-to-analysis sequence
 
@@ -67,7 +68,7 @@ sequenceDiagram
     Artifact-->>Analyst: accessible tables/graphs/manifest
 ```
 
-PR #8 provides typed clock/interval primitives only. Persistence/corpus-split enforcement of historical cutoff eligibility and graph integration remain accepted-target rather than as-built leakage protection.
+Merged PR #8 provides typed clock/interval primitives on protected `main`. Leakage-safe corpus splits are implemented-main per TRACEABILITY; remaining graph/estimator integration follows owning ADRs. An unmerged PR is not as-built leakage protection.
 
 ## Six-clock availability state rule
 
@@ -82,7 +83,7 @@ stateDiagram-v2
     analysis_snapshot --> [*]
 ```
 
-A later document may report an earlier event, but it cannot be inserted into an earlier historical analysis before its availability time. PR #8 implements the typed clock/interval primitives; persistence/split enforcement of `cutoff_eligible` remains accepted-target.
+A later document may report an earlier event, but it cannot be inserted into an earlier historical analysis before its availability time. Merged PR #8 implements the typed clock/interval primitives; `corpus_split` cutoff eligibility is implemented-main per TRACEABILITY.
 
 ## Relation authority view
 
@@ -140,8 +141,8 @@ GPU may be absent or fall back to CPU. A GPU result is not accepted merely becau
 stateDiagram-v2
     [*] --> workspace_foundation
     workspace_foundation --> immutable_evidence: protected_main
-    immutable_evidence --> six_clock_temporal: PR_8_active_replacement
-    six_clock_temporal --> interval_reasoning: Task_4_replay_required
+    immutable_evidence --> six_clock_temporal: PR_8_merged_implemented_main
+    six_clock_temporal --> interval_reasoning: PR_9_merged_implemented_main
     interval_reasoning --> event_relation_membership: accepted_target
     event_relation_membership --> persistence_and_splits: accepted_target
     persistence_and_splits --> topic_measurement: accepted_target
@@ -152,7 +153,7 @@ stateDiagram-v2
 
 ### Legacy stack note
 
-PR #5 is superseded/conflicted lineage for Task 3. PR #6 remains a legacy Draft carrying Task 4 implementation history but is based on that superseded lineage. Its unique behavior must be replayed onto PR #8 or the exact protected-main descendant after PR #8 merges; old checks/reviews do not transfer.
+PR #5 is superseded/conflicted lineage for Task 3. PR #6 is superseded Task 4 history on that discarded stack. The protected-main implementation is merged PR #8 plus merged PR #9; those drafts are not current-product claims. Old checks/reviews do not transfer as current-head evidence.
 
 ## Maintenance rule
 

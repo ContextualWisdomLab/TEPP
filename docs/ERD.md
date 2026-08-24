@@ -392,6 +392,8 @@ Customer/partner/competitor/author/department/project/opportunity roles are cont
 
 All four identifiers are typed UUID foreign keys to their named entities; there is no untyped polymorphic `membership_target_id`. This permits document-level and exact-segment weighted membership while preserving relational integrity. If event-level membership is added later, it must be an explicit typed foreign key plus an updated exactly-one constraint and ADR/data-model change.
 
+Physical `text_segment` from migration `0006` currently stores `start_byte` / `end_byte` (half-open UTF-8 offsets), tenant, document identity, and system/available clocks. Call `insert_text_segment` to write that row. The accepted ERD still lists scalar offsets, `segment_type_code`, and a `document_record` foreign key; those columns are later migrations (`#45` owns `0007`).
+
 `valid_from_window` is a non-empty `tstzrange` containing the possible start instant; an exact start is encoded as the singleton closed range `[t,t]`. `valid_to_window` uses the same representation for an exact or uncertain end and is NULL only for an open-ended membership. `valid_time_precision_code` records the governed precision vocabulary used to construct both windows. Database/application validation must reject empty windows, a definitely-later start than end, and a precision code inconsistent with either bound; it must never coerce an uncertain or open bound to a false exact timestamp.
 
 ## Reproducibility and relation-aware split invariant
