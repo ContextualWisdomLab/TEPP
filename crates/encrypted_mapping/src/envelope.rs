@@ -309,7 +309,8 @@ fn keyed_block(key: &[u8]) -> [u8; 64] {
 mod tests {
     use super::{
         MAX_SOURCE_IDENTITY_LENGTH, MappingKey, MappingPurpose, NONCE_LENGTH, fill_nonce,
-        hmac_sha256, identity_recovery_rate, open_identity, seal_identity, seal_identity_with_fill,
+        hmac_sha256, identity_recovery_rate, keyed_block, open_identity, seal_identity,
+        seal_identity_with_fill,
     };
     use crate::EncryptedMappingError;
 
@@ -337,6 +338,14 @@ mod tests {
             0x0e, 0xe3, 0x7f, 0x54,
         ];
         assert_eq!(tag, expected);
+    }
+
+    #[test]
+    fn keyed_block_copies_keys_at_the_block_boundary() {
+        let key_length = std::hint::black_box(64_usize);
+        let key = vec![0xa5_u8; key_length];
+
+        assert_eq!(&keyed_block(&key)[..key_length], key.as_slice());
     }
 
     #[test]
@@ -398,6 +407,24 @@ mod tests {
     }
 
     #[test]
+    fn empty_payloads_fail_closed() {
+        let key = MappingKey::new(15, [0x88; 32]).expect("key");
+
+        assert_eq!(
+            seal_identity(15, b"", &key),
+            Err(EncryptedMappingError::EmptyIdentity)
+        );
+        assert_eq!(
+            identity_recovery_rate(&[], &[]),
+            Err(EncryptedMappingError::InvalidMappingPayload)
+        );
+        assert_eq!(
+            identity_recovery_rate(&["a"], &[]),
+            Err(EncryptedMappingError::InvalidMappingPayload)
+        );
+    }
+
+    #[test]
     fn collapsed_identities_recover_worse_than_the_sealed_path() {
         let truth = ["alice", "bob"];
         let recovered = identity_recovery_rate(&truth, &["alice".to_owned(), "bob".to_owned()])
@@ -430,9 +457,42 @@ mod tests {
     }
 
     #[test]
+    fn ordinary_purposes_cannot_open_a_mapping() {
+        let key = MappingKey::new(5, [0x66; 32]).expect("key");
+        let sealed = seal_identity(13, b"secret-name", &key).expect("seal");
+
+        for purpose in [
+            MappingPurpose::AnalyticalComputation,
+            MappingPurpose::OperationalLog,
+            MappingPurpose::ModelArtifact,
+        ] {
+            assert_eq!(
+                open_identity(&sealed, &key, purpose),
+                Err(EncryptedMappingError::UnauthorizedPurpose)
+            );
+        }
+
+        let other_key = MappingKey::new(6, [0x66; 32]).expect("other key");
+        assert_eq!(
+            open_identity(&sealed, &other_key, MappingPurpose::ReidentificationExport),
+            Err(EncryptedMappingError::KeyIdentityMismatch)
+        );
+    }
+
+    #[test]
     fn mapping_key_debug_does_not_print_key_bytes() {
         let key = MappingKey::new(12, [0xa5; 32]).expect("key");
 
         assert_eq!(format!("{key:?}"), "MappingKey { key_id: 12 }");
+    }
+
+    #[test]
+    fn mapping_key_rejects_runtime_all_zero_bytes() {
+        let key_bytes = std::hint::black_box([0_u8; 32]);
+
+        assert_eq!(
+            MappingKey::new(13, key_bytes),
+            Err(EncryptedMappingError::EmptyIdentity)
+        );
     }
 }

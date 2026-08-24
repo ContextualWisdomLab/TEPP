@@ -96,8 +96,9 @@ fn wrong_key_or_tampered_envelope_fails_closed() {
 #[test]
 fn empty_payloads_masks_and_persistence_fail_closed() {
     let key = sample_key();
+    let zero_key = std::hint::black_box([0_u8; 32]);
     assert_eq!(
-        MappingKey::new(1, [0; 32]),
+        MappingKey::new(1, zero_key),
         Err(EncryptedMappingError::EmptyIdentity)
     );
     assert_eq!(
@@ -110,6 +111,8 @@ fn empty_payloads_masks_and_persistence_fail_closed() {
     );
     let from_exact = MappingKey::from_material(7, &[0x11; 32]).expect("exact");
     assert_eq!(from_exact.key_id(), 7);
+    let from_short = MappingKey::from_material(8, &[0x22; 40]).expect("short");
+    assert_eq!(from_short.key_id(), 8);
     let from_long = MappingKey::from_material(9, &[0xaa; 131]).expect("long");
     let opened_with_long = {
         let sealed = seal_identity(6, b"role-partner", &from_long).expect("seal long");
