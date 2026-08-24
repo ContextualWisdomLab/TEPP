@@ -37,6 +37,7 @@ class DocstringContractTests(unittest.TestCase):
         self.assertEqual(set(crate_roots), expected_crate_roots)
         self.assertEqual(len(crate_roots), 11)
         self.assertEqual(len(crate_roots), len(workspace_contract.EXPECTED_CRATES))
+        self.assertEqual(len(crate_roots), 11)
         self.assertTrue(set(crate_roots).issubset(sources))
         self.assertGreaterEqual(len(sources), len(crate_roots))
         self.assertEqual(docstrings.validate_repository(REPOSITORY_ROOT), [])

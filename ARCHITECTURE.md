@@ -100,6 +100,7 @@ APIs.
 | `modality_source` | non-lexical modality is not unique latent content and not stopword deletion |
 | `corpus_background` | corpus-background wording is not unique latent content and not stopword deletion |
 | `prompt_source` | prompt boilerplate is not unique latent content and not stopword deletion |
+| `location_membership` | location is not entity identity and not a language channel |
 
 No crate exposes placeholder production behavior in Task 1. This prevents an
 empty façade from becoming a de facto public API before its invariants and tests
