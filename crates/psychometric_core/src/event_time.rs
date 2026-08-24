@@ -21114,6 +21114,18 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+        // A maximal predictor variance over a subnormal stationary variance
+        // drives the standardising ratio to infinity inside the delegation.
+        assert_eq!(
+            recover_standardised_asymptotic_time_independent_predictor_effect(
+                0.3,
+                f64::MAX,
+                1e-320,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]
