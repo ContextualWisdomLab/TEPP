@@ -119,6 +119,8 @@ mod tests {
             (
                 EventError::PredictionIsNotFact,
                 "prediction is not an observed fact",
+            ),
+            (
                 EventError::EventTrackIsNotEventInstance,
                 "event track is not an event instance",
             ),
@@ -129,6 +131,8 @@ mod tests {
             (
                 EventError::UnknownEventTrackLabel,
                 "unknown event track label",
+            ),
+            (
                 EventError::SchemaPredictionIsNotEventInstance,
                 "schema prediction is not an event instance",
             ),
@@ -139,6 +143,8 @@ mod tests {
             (
                 EventError::UnknownSchemaSlotLabel,
                 "unknown schema slot label",
+            ),
+            (
                 EventError::StorySegmentationIsNotEventInstance,
                 "story segmentation is not an event instance",
             ),
@@ -149,6 +155,8 @@ mod tests {
             (
                 EventError::UnknownStoryBoundaryLabel,
                 "unknown story boundary label",
+            ),
+            (
                 EventError::PredictionIsNotEventInstance,
                 "CHRONOS prediction is not an event instance",
             ),

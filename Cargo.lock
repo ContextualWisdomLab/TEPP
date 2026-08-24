@@ -119,6 +119,10 @@ name = "checkpoint_authority"
 version = "0.1.0"
 
 [[package]]
+name = "compute_backend"
+version = "0.1.0"
+
+[[package]]
 name = "corpus_split"
 version = "0.1.0"
 dependencies = [
