@@ -36,6 +36,7 @@ flowchart LR
     INT --> ART
 ```
 
+On current protected main the workspace/evidence foundation, six-clock temporal values, Allen algebra/path-consistency, event ontology/membership, and PostgreSQL persistence through restore-integrity probes are implemented. The active-PR `prediction_contradiction` crate is the promotion-authority gate: call `refuse_promotion` before authorizing promotion of unmatched predicted mass. Remaining TDT/CHRONOS, topic, psychometric, and service boxes stay accepted-target.
 On current protected main the workspace/evidence foundation, canonical documentation/ADR authority graph, typed six-clock values/uncertain intervals (merged PR #8), and Allen interval algebra/bounded path-consistency (merged PR #9; Allen, 1983) are implemented. Superseded PRs #5 and #6 are historical lineage only. Later boxes such as TRSL-TM, TDT/CHRONOS, and ESEM/DSEM remain accepted-target unless TRACEABILITY records a narrower subset.
 
 ## Evidence-to-analysis sequence

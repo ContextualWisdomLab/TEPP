@@ -21,6 +21,30 @@ fail-closed no-op. A dry run may print the task contract without credentials.
 When a PR or issue exists, normal review → repair → exact-head Checks → merge
 governance owns the hour. The scheduler does not create a competing branch.
 
+Current executable queue while drafts remain open:
+
+1. Review the predicted-versus-observed Allen coverage gate
+   (`prediction_contradiction`). `refuse_promotion` requires coverage.
+   A pull-request number is never landable coverage authority. Keep
+   PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, PR #108, PR #109,
+   PR #111, and PR #112 unmerged: #93/#94 still accept unmatched
+   predicted mass from `refuse_promotion`, #97 still names PR #94 as a
+   landable authority pointer, #101/#102 still name a draft as the
+   landable gate, #104 omits later citation-repair drafts from the
+   unmerged set, #108 still treats #104 as landable, #109 still omits
+   #108, #111 still omits the naruon PR #107 lock, and #112 still
+   accepts inverted landable-gate sentences and a presence-only naruon
+   pointer.
+2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #107;
+   keep PR #87 and PR #105 unmerged),
+   `text_segment` SQL contracts on existing migration `0006`, retention and
+   legal-hold migration `0007` (PR #45), foundation known-truth recovery
+   study, then CHRONOS forecast Brier calibration (PR #85).
+3. Do not open a competing hourly proposal until the open-PR inventory is
+   empty. Prefer reviewing, repairing, and merging only after independent
+   approval and exact-head required checks. Keep PR #93, PR #94, PR #97,
+   PR #101, PR #102, PR #104, PR #108, PR #109, PR #111, and PR #112
+   unmerged.
 Current preferred next gap after the open-PR queue drains: persist the
 accepted ERD `document_record` foreign key on `text_segment` once `#45`
 releases migration `0007`. Do not allocate that number from another lane.

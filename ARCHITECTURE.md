@@ -61,6 +61,7 @@ boundaries above remain the target modular MSA architecture.
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
+| `prediction_contradiction` | Allen promotion gate: `before`/`after` stay contradictory; `meets`/`met_by` stay unsupported; coverage is required before unmatched predicted mass may be authorized for promotion |
 | `provider_receipt` | provider-disclosure field-code receipts; source text and identity are not disclosable |
 | `operational_log` | operational logs; `try_record` is the only recording API; source text and source identity are not loggable; `persistence_postgres` `audit_event` inserts call the same gate |
 | `service_tls` | production TLS bind gates and rustls server config |
@@ -72,9 +73,8 @@ boundaries above remain the target modular MSA architecture.
 | `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
 
-No crate exposes placeholder production behavior in Task 1. This prevents an
-empty façade from becoming a de facto public API before its invariants and tests
-exist.
+Foundation crates expose only tested contracts. Empty façades are not public
+APIs.
 
 ## Immutable evidence boundary
 

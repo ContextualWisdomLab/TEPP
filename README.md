@@ -6,6 +6,11 @@ implemented in Rust.
 
 ## Current implementation state
 
+This branch keeps the Rust workspace quality foundation and the bounded
+foundation crates. Domain crates expose only tested contracts: immutable
+evidence, six-clock temporal values, event mentions/instances, relations,
+membership, persistence, splits, simulation, validation, API DTOs, and the
+predicted-versus-observed promotion gate.
 This branch establishes the Rust workspace, quality-gate foundation, and the
 longitudinal within/between decomposition capability. The eleven bounded crates
 compile independently. `longitudinal_core` exposes within/between decomposition
@@ -33,6 +38,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/prediction_contradiction
 crates/provider_receipt
 crates/operational_log
 crates/service_tls

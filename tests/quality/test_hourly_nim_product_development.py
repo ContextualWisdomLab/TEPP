@@ -256,6 +256,24 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         self.assertIn("APA", doctoring)
         self.assertIn("Do not configure `COPILOT_GITHUB_TOKEN`", runbook)
 
+    def test_hourly_queue_keeps_weaker_coverage_locks_unmerged(self) -> None:
+        """A runner must not treat #104, #108, #109, #111, or #112 as the landable gate."""
+
+        runbook = _text(RUNBOOK)
+        unmerged_sentences = [
+            sentence
+            for sentence in runbook.replace("\n", " ").split(".")
+            if "unmerged" in sentence.casefold()
+        ]
+        joined = " ".join(unmerged_sentences)
+        for pull_request in (93, 94, 97, 101, 102, 104, 108, 109, 111, 112):
+            with self.subTest(pull_request=pull_request):
+                self.assertIn(f"PR #{pull_request}", joined)
+        self.assertIn("PR #107", runbook)
+        self.assertIn("PR #105", joined)
+        self.assertIn("PR #87", joined)
+        self.assertNotIn("coverage-authority landing PR #", runbook.casefold())
+        self.assertIn("`prediction_contradiction`", runbook)
     def test_bootstrap_registers_each_provider_key_and_removes_environment_values(self) -> None:
         """Exercise the real bootstrap loop with a key-counting KV double."""
 

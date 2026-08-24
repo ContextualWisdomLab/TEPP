@@ -1,6 +1,8 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
 **Decision status:** Accepted  
+**Implementation maturity:** active-PR — bounded predicted-vs-observed Allen promotion gate, including coverage before unmatched predicted mass may be authorized for promotion; TDT detection/tracking, CHRONOS schema extraction, prediction calibration, and path-consistency laws remain accepted-target  
+
 **Implementation maturity:** active-PR — evidence-layer admission and first-story detection rates are implemented in `event_core` on the active PR; full TDT tracking/calibration and CHRONOS schema extraction remain accepted-target.
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 temporal semantics and ADR 0003 event ontology/membership.
@@ -20,6 +22,8 @@ TEPP separates three event-intelligence layers:
 3. **CHRONOS-style reasoning layer** has two explicit subcontracts: semantic/neural event-schema extraction/prediction (Li et al., 2021) and symbolic/qualitative temporal-consistency reasoning in the sense of CHRONOS (Anagnostopoulos et al., 2013). A predicted event/schema completion remains hypothetical until supported by later evidence. Temporal reasoning validates consistency/partial order under its stated algebra and resource bounds; it does not prove unrestricted global satisfiability unless a later implementation explicitly does so.
 
 Transition edges admitted to the state/input-process-outcome graph remain governed by ADR 0002/0003 and cannot be created merely because TDT/CHRONOS predicts or links two events. Retrospective evidence and schema predictions remain provenance/hypothesis edges until independently promoted.
+
+The bounded `prediction_contradiction` crate is the promotion-authority gate for a pairwise predicted-versus-observed closed proper interval. `refuse_promotion` and `require_observed_coverage` succeed only when later-available evidence covers every predicted instant (`during`, `starts`, `finishes`, or `equals`). `refuse_contradiction_or_adjacency` answers only whether the pair is Allen `before`/`after` or `meets`/`met_by`; its `Ok(())` is not authority to promote unmatched predicted mass.
 
 ## Alternatives considered
 
