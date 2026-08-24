@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `membership_core` nested ICC: CPU `f64` unbalanced ANOVA recovers a known cluster ICC and refuses to treat cross-classified or multiple-membership designs as a single hierarchy (ADR 0003).
 - `persistence_postgres` typed `text_segment` SQL: insert/lookup of exact UTF-8 half-open byte spans on the existing `0006` table, cutoff-eligible document reads (`available_time <= knowledge_cutoff`), and live recovery of a known `hello` span. No new migration number (`#45` still owns `0007`).
 - Hourly contextual-orchestrator discovery records all provider models but routes OpenCode only through general-chat candidates, excluding embedding, image, reranker, transcription, moderation, safety, and other endpoint-only identifiers before price selection.
 - Live `docs/product-technical-gap-baseline.md` mapping operator-visible gaps to
