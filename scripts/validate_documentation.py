@@ -78,10 +78,16 @@ QUEUED_CHECKS_AS_SHIPPED = re.compile(
     r"queued Checks.{0,80}implemented-main",
     re.IGNORECASE | re.DOTALL,
 )
-QUEUED_CHECKS_PROMOTION_DENIAL = re.compile(
-    r"\b(?:never|do not|does not|cannot|must not)\b.{0,40}\b(?:promote|treat|make|mean)\b",
-    re.IGNORECASE | re.DOTALL,
+QUEUED_CHECKS_NEGATED_VERB = re.compile(
+    r"\b(?P<cue>never|not|cannot|must\s+not|do\s+not|does\s+not)\b"
+    r"[a-z\s]{0,12}\b"
+    r"(?P<verb>promot\w+|treat\w*|make\w*|mean\w*|constitut\w+|represent\w*)",
+    re.IGNORECASE,
 )
+QUEUED_CHECKS_ADVERSATIVE = re.compile(
+    r"\b(?:but|however|yet|although|though)\b", re.IGNORECASE
+)
+QUEUED_CHECKS_SENTENCE_BREAK = re.compile(r"[.;!?\n]")
 ADR_TABLE_ROW = re.compile(r"^\|\s*\[(?P<number>\d{4})\]", re.MULTILINE)
 ADR_FILE_NAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
 ADR_DECISION_STATUS = re.compile(
@@ -158,6 +164,27 @@ def validate_documentation_map(root: Path = ROOT) -> None:
         )
 
 
+def _promotion_is_denied(text: str, claim: re.Match[str]) -> bool:
+    """Return whether the sentence around ``claim`` negates its promotion.
+
+    A sentence denies the claim only when a negation cue directly governs a
+    promotion verb within that same sentence and no adversative conjunction
+    separates that pair from the ``implemented-main`` assertion. This accepts
+    honest wordings such as "does not treat queued Checks as implemented-main"
+    while refusing sentences where an unrelated negation coexists with an
+    affirmative maturity claim after "but".
+    """
+
+    sentence_start = 0
+    for boundary in QUEUED_CHECKS_SENTENCE_BREAK.finditer(text, 0, claim.start()):
+        sentence_start = boundary.end()
+    window_end = claim.end()
+    for cue in QUEUED_CHECKS_NEGATED_VERB.finditer(text, sentence_start, window_end):
+        if QUEUED_CHECKS_ADVERSATIVE.search(text, cue.end(), window_end) is None:
+            return True
+    return False
+
+
 def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     """Require a dated live gap register that does not promote queued Checks."""
 
@@ -177,7 +204,7 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     if "Exact current head" not in text:
         failures.append("gap baseline lacks an exact-head open-PR inventory")
     if any(
-        QUEUED_CHECKS_PROMOTION_DENIAL.search(match.group(0)) is None
+        not _promotion_is_denied(text, match)
         for match in QUEUED_CHECKS_AS_SHIPPED.finditer(text)
     ):
         failures.append("gap baseline treats queued Checks as implemented-main")
