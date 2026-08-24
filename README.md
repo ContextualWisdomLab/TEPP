@@ -38,6 +38,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/psychometric_fit
 crates/subevent_containment
 crates/prediction_contradiction
 crates/provider_receipt

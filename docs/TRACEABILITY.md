@@ -28,8 +28,7 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
 | candidate K statistical/Pareto gates + blinded LLM review | ADR 0012; research | future `model_selection` | accepted-target |
 | compositional topic correlation / stable clustering | ADR 0005/0012; research | future `network_analysis` | accepted-target |
-| longitudinal within/between decomposition | ADR 0005 | `longitudinal_core` decomposition, component RMSE, and known-truth recovery on the active PR | active-PR |
-| posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | future `psychometric_core`; invariance and ESEM/DSEM fit remain accepted-target | accepted-target |
+| posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | `psychometric_fit` ESEM loading and DSEM lag gates on the active PR; `psychometric_core` input gates remain #49; invariance/multilevel remain accepted-target | active-PR |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `prediction_contradiction` bounded Allen promotion gate on the active PR (`refuse_promotion` requires coverage; `refuse_contradiction_or_adjacency` is not promotion authority; remaining TDT/CHRONOS tasks stay accepted-target) | active-PR |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router plus future `interpretation_gateway` | partial |
