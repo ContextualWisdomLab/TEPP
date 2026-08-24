@@ -42,6 +42,11 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Causal-identification gate doctoring | [`docs/research/causal-identification-gate.md`](docs/research/causal-identification-gate.md) |
 | TDT story-segmentation `WindowDiff`/`Pk` doctoring | [`docs/research/tdt-story-segmentation.md`](docs/research/tdt-story-segmentation.md) |
 | CHRONOS prediction-calibration doctoring | [`docs/research/chronos-prediction-calibration.md`](docs/research/chronos-prediction-calibration.md) |
+| CHRONOS schema-slot calibration doctoring | [`docs/research/chronos-schema-slot-calibration.md`](docs/research/chronos-schema-slot-calibration.md) |
+| Event-tracking calibration doctoring | [`docs/research/event-tracking-calibration.md`](docs/research/event-tracking-calibration.md) |
+| Episode-membership identity doctoring | [`docs/research/episode-membership-identity.md`](docs/research/episode-membership-identity.md) |
+| Entity/project target SQL doctoring | [`docs/research/entity-project-sql.md`](docs/research/entity-project-sql.md) |
+| Scientific claim-promotion gate doctoring | [`docs/research/scientific-claim-promotion-gates.md`](docs/research/scientific-claim-promotion-gates.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Stopword-deletion doctoring | [`docs/research/stopword-deletion.md`](docs/research/stopword-deletion.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |

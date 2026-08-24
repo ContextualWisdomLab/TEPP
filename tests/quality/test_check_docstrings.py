@@ -11,7 +11,6 @@ from pathlib import Path
 from unittest import mock
 
 from scripts import check_docstrings as docstrings
-from scripts import check_workspace_contract as workspace_contract
 from scripts.check_workspace_contract import EXPECTED_CRATES
 from scripts import check_workspace_contract as contract
 
@@ -41,7 +40,7 @@ class DocstringContractTests(unittest.TestCase):
             for path in contract.expected_member_paths()
         }
         self.assertEqual(set(crate_roots), expected_crate_roots)
-        self.assertEqual(len(crate_roots), len(workspace_contract.EXPECTED_CRATES))
+        self.assertEqual(len(crate_roots), len(contract.EXPECTED_CRATES))
         self.assertEqual(len(crate_roots), len(contract.EXPECTED_CRATES))
         self.assertTrue(set(crate_roots).issubset(sources))
         self.assertGreaterEqual(len(sources), len(crate_roots))

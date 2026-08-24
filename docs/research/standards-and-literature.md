@@ -23,6 +23,22 @@ Jones, K. (1991). Specifying and estimating multi-level models for geographical 
 
 TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Location and market assignments remain multiple-membership classifications; they are not permanent entity identity and not language channels (Browne et al., 2001; Jones, 1991).
 
+## Numerical precision, memory-aware computation, and causal identification
+
+IEEE. (2019). *IEEE standard for floating-point arithmetic* (IEEE Std 754-2019). https://standards.ieee.org/ieee/754/6210/
+
+Micikevicius, P., Narang, S., Alben, J., Diamos, G., Elsen, E., Garcia, D., Ginsburg, B., Houston, M., Kuchaiev, O., Venkatesh, G., & Wu, H. (2018). Mixed precision training. In *International Conference on Learning Representations*. https://openreview.net/forum?id=r1gs9JgRZ
+
+Ogita, T., Rump, S. M., & Oishi, S. (2005). Accurate sum and dot product. *SIAM Journal on Scientific Computing, 26*(6), 1955–1988. https://doi.org/10.1137/030601818
+
+Rhu, M., Gimelshein, N., Clemons, J., Zulfiqar, A., & Keckler, S. W. (2016). vDNN: Virtualized deep neural networks for scalable, memory-efficient neural network design. In *2016 49th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO)* (pp. 1–13). IEEE. https://doi.org/10.1109/MICRO.2016.7783721
+
+Holland, P. W. (1986). Statistics and causal inference. *Journal of the American Statistical Association, 81*(396), 945–960. https://doi.org/10.1080/01621459.1986.10478354
+
+Pearl, J. (2009). *Causality: Models, reasoning, and inference* (2nd ed.). Cambridge University Press.
+
+These sources support the repository's binary64 reference arithmetic, compensated summation, bounded accelerator-memory planning, and separation of association or temporal precedence from identified causal effects. The implementation notes in `docs/research/vram-budget-types.md` and `docs/research/causal-identification-gate.md` remain the claim-specific records.
+
 ## Structural, correlated, dynamic, relational, and multilingual topic models
 
 Blei, D. M., & Lafferty, J. D. (2006). Dynamic topic models. In *Proceedings of the 23rd International Conference on Machine Learning* (pp. 113–120). Association for Computing Machinery. https://doi.org/10.1145/1143844.1143859

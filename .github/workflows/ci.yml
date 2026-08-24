@@ -237,7 +237,6 @@ jobs:
         run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
       - name: Generate exact branch coverage
         id: branch-report
-        run: cargo +nightly-2026-08-18 llvm-cov --branch --workspace --all-features --json --summary-only --output-path coverage-branches.json --ignore-filename-regex 'sqlx_live\.rs'
         run: cargo +nightly-2026-08-21 llvm-cov --branch --workspace --all-features --json --output-path coverage-branches.json --ignore-filename-regex 'sqlx_live\.rs'
       - name: Enforce complete branch coverage
         run: python3 scripts/check_coverage.py coverage-branches.json --kind branches

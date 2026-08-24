@@ -755,6 +755,7 @@ fn prove_temporal_interval_ordering(
             '{document_record_id}'::uuid, '{tenant_record_id}'::uuid, '{source_artifact_id}'::uuid, \
             '{digest}', 'und', NULL, NULL, \
             '2026-01-01T00:00:00Z'::timestamptz, NULL, \
+            '2026-01-01T00:00:00Z'::timestamptz, NULL, \
             '2026-01-01T00:00:00Z'::timestamptz, 0\
          )",
         digest = "b".repeat(64),

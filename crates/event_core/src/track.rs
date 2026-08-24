@@ -145,8 +145,7 @@ pub fn refuse_track_as_transition(_track: EventTrackId) -> Result<(), EventError
 /// # Errors
 ///
 /// Returns [`EventError::InvalidWirePayload`] when assignments are empty,
-/// mention identities collide, lengths differ, or the recovered pair set is
-/// empty.
+/// mention identities collide, lengths differ, or either pair set is empty.
 pub fn tracking_pair_precision(
     truth: &[EventTrackAssignment],
     recovered: &[EventTrackAssignment],
@@ -167,7 +166,7 @@ pub fn tracking_pair_precision(
 /// # Errors
 ///
 /// Returns [`EventError::InvalidWirePayload`] when assignments are empty,
-/// mention identities collide, lengths differ, or the truth pair set is empty.
+/// mention identities collide, lengths differ, or either pair set is empty.
 pub fn tracking_pair_recall(
     truth: &[EventTrackAssignment],
     recovered: &[EventTrackAssignment],
