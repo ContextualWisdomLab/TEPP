@@ -7,6 +7,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | ADR | Decision | Decision status | Implementation maturity | Clarification / supersession |
 |---|---|---|---|---|
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
+| [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | Event-clock identity in `event_clock` on the active PR; remaining graph/split enforcement stays accepted-target. |
 | [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | Assertion-clock identity in `assertion_clock` on the active PR; remaining graph/split enforcement stays accepted-target. |
 | [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | Knowledge-cutoff identity is `cutoff_clock` on the active PR; typed clocks/intervals remain implemented-main via `temporal_core`. Later graph/split enforcement remains target work. |
 | [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | Availability-clock identity in `available_clock` on the active PR; remaining graph/split enforcement stays accepted-target. |

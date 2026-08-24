@@ -1,6 +1,7 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
 **Decision status:** Accepted  
+**Implementation maturity:** active-PR — event-clock identity in `event_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — assertion-clock identity in `assertion_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — knowledge-cutoff identity in `cutoff_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
 **Implementation maturity:** active-PR — availability-clock identity in `available_clock` on the active PR; remaining graph/split enforcement stays accepted-target  
