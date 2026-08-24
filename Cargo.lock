@@ -747,6 +747,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "inferred_status"
+version = "0.1.0"
+
+[[package]]
 name = "inout"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -956,6 +960,10 @@ name = "operational_log"
 version = "0.1.0"
 
 [[package]]
+name = "outcome_order"
+version = "0.1.0"
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -983,6 +991,10 @@ dependencies = [
  "smallvec",
  "windows-link",
 ]
+
+[[package]]
+name = "payload_bound"
+version = "0.1.0"
 
 [[package]]
 name = "percent-encoding"
@@ -1153,6 +1165,10 @@ dependencies = [
  "temporal_core",
  "uuid",
 ]
+
+[[package]]
+name = "retrospective_edge"
+version = "0.1.0"
 
 [[package]]
 name = "revision_order"

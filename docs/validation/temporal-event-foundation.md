@@ -21,14 +21,19 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Multiple membership | `membership_core` | partial | nested ICC + non-nested refusal | unit + ESS + nested ICC recovery | Task 7 / PR #12 + #25 + this increment |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
 | Evidential-vs-transition gate | `support_edge` | implemented-main | protected main | recovered kind rate vs support collapse | ADR 0002/0003 |
+| Input-process-outcome event-time order | `outcome_order` | implemented-main | protected main | refuse reverse/uncertain IPO order + outcome_of-is-not-transition + recovery vs input collapse | ADR 0002/0003 |
+| Retrospective reporting identity | `retrospective_edge` | implemented-main | protected main | refuse retrospective-as-transition/translation + recovery vs forward collapse | ADR 0002/0003 |
+| Inferred-versus-observed promotion | `inferred_status` | implemented-main | protected main | refuse inferred-as-observed/transition + recovery vs observed collapse | ADR 0003 |
 | Typed membership targets beyond entity/project | `membership_target` | active-PR | PR #131 | refuse collapse + recovery vs entity stand-in for language, episode, template, department, and opportunity pool | ADR 0003 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | entity/project target SQL on PR #131 | migration contracts + recording transport + session-affine optional PgPool + live CI + tenant RLS + `0005`/`0006` interval/membership contracts + event relation/mention/instance + source-artifact + audit-event + concurrent-write + restore integrity + typed `text_segment` SQL (#37–#44 implemented-main) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 + entity/project SQL |
+
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Mention-confidence Brier score | `event_core` | active-PR | calibration vs binary truth | perfect 0 / half 0.25 RMSE | ADR 0003; `docs/research/mention-confidence-brier.md` |
 | Checkpoint is not the estimator | `checkpoint_authority` | accepted-target | active PR | refuse checkpoint-as-estimator + unvalidated artifact + recovery vs estimator collapse | ADR 0001/0014 |
 | Versioned API/export contracts | `tepp_api` | implemented-main | naruon HTTP interchange | unknown-field/version/limit + naruon HTTPS interchange tests | Task 12 / PR #21; live HTTP service remaining |
+| Untrusted payload identity/provenance/size/depth | `payload_bound` | accepted-target | active PR | refuse missing identity/provenance and oversize/over-deep payloads + recovery vs accept-all | AGENTS.md untrusted-boundary |
 | System-clock identity | `system_clock` | active-PR | this PR | recovered system flags vs event-time stand-in | ADR 0002 |
 | Event-clock identity | `event_clock` | active-PR | this PR | recovered event flags vs assertion-time stand-in | ADR 0002 |
 | Assertion-clock identity | `assertion_clock` | active-PR | this PR | recovered assertion flags vs event-time stand-in | ADR 0002 |

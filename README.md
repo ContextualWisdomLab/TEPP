@@ -43,6 +43,10 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/outcome_order
+crates/retrospective_edge
+crates/payload_bound
+crates/inferred_status
 crates/support_edge
 crates/system_clock
 crates/event_clock
