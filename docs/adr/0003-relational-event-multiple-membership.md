@@ -1,5 +1,8 @@
 # ADR 0003 — Relational event ontology and time-varying multiple membership
 
+**Decision status:** Accepted
+**Implementation maturity:** partial — membership network, event mention/instance separation, inferred/evidential/retrospective status gates, summary/source identity separation, template-copy/source identity separation, typed forward-only relation graph, strict input-process-outcome ordering, nested ICC refusal, and subevent parent-window containment are implemented-main; full multilevel/MMMC estimators and remaining persistence remain accepted-target.
+**Date:** 2026-08-05
 **Decision status:** Accepted  
 **Implementation maturity:** partial — membership network, event mention/instance separation, Kish ESS and nested ICC, subevent parent-window containment (`subevent_containment`), evidential-vs-transition identity (`support_edge`), inferred-versus-observed identity (`inferred_status`), retrospective-reporting identity (`retrospective_edge`), summary-versus-source identity (`summarizes_edge`), copy-versus-source identity (`copy_identity`), location-versus-entity/language identity (`location_membership`), IPO event-time order (`outcome_order`), and the typed relation graph with forward-only transitions are implemented-main; typed target-kind identity in `membership_target` is on PR #131 and is not implemented-main until exact-head checks, review, and protected-main integration complete; multilevel estimators and persistence remain accepted-target  
 

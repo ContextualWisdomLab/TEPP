@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/evidence_core",
+    "crates/semantic_core",
     "crates/temporal_core",
     "crates/event_core",
     "crates/relation_graph",
@@ -53,6 +54,7 @@ members = [
 ]
 default-members = [
     "crates/evidence_core",
+    "crates/semantic_core",
     "crates/temporal_core",
     "crates/event_core",
     "crates/relation_graph",

@@ -52,6 +52,7 @@ boundaries above remain the target modular MSA architecture.
 | Rust crate | Initial responsibility |
 |---|---|
 | `evidence_core` | immutable evidence domain primitives |
+| `semantic_core` | span-grounded semantic units; language is not identity |
 | `temporal_core` | typed clocks, intervals, and temporal reasoning |
 | `event_core` | event instances, mentions, roles, and provenance |
 | `relation_graph` | typed relations and forward-transition validation |

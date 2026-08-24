@@ -50,8 +50,11 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0015](0015-autonomous-development-review-and-merge-authority.md) | Autonomous development, review, and merge authority separation | Accepted | active-PR | Separates model proposal, deterministic verification, publication, independent review, and merge/release authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | Bounded predicted-vs-observed Allen promotion gate: `refuse_promotion` requires observed coverage; remaining TDT/CHRONOS tasks stay accepted-target. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
+| [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice. Does not claim concept alignment, invariance, or a topic estimator. |
 | [0017](0017-hourly-contextual-orchestrator-gateway.md) | Hourly contextual-orchestrator gateway and all-provider model discovery | Accepted | active-PR | Keeps proposal-model execution behind a pinned loopback gateway while preserving independent verifier, publisher, reviewer, and merge authority. |
-| [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | Evidence-layer admission and first-story rates are on the active PR; full TDT tracking/calibration and CHRONOS schema extraction remain accepted-target. |
+| [0018](0018-consumer-scoped-analysis-run-ingress.md) | Consumer-scoped modular analysis-run ingress | Accepted | active-PR | Narrows ADR 0011 for the closed consumer registry, credential-free exchange, and consumer-qualified idempotency namespace; production TLS remains separate. |
+| [0019](0019-project-history-wire-size-symmetry.md) | Symmetric project-history wire-size enforcement | Accepted | active-PR | Narrows ADR 0008 for request serialization and generated LineageWeave project-history projections. |
+| [0020](0020-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Narrows ADR 0011 for the credential-free bounded project-history API and preserves LineageWeave authorization ownership. |
 
 ## Decision ownership summary
 
@@ -60,7 +63,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **numerical implementation / reference backend:** ADR 0001;
 - **clock/time eligibility:** ADR 0002;
 - **event ontology / relation / membership semantics:** ADR 0003;
-- **multilingual semantic alignment:** ADR 0004;
+- **multilingual semantic alignment:** ADR 0004; span-grounded unit identity: ADR 0020;
 - **ESEM/DSEM and psychometric interpretation:** ADR 0005;
 - **GPU/VRAM and model-credential boundary:** ADR 0006;
 - **repository quality tooling:** ADR 0007;
@@ -72,8 +75,11 @@ Use the narrowest owning ADR when decisions overlap:
 - **persistence / manifests / leakage-safe split:** ADR 0013;
 - **claim maturity / release evidence:** ADR 0014;
 - **autonomous development/review/merge authority:** ADR 0015;
-- **TDT/CHRONOS event intelligence:** ADR 0016.
+- **TDT/CHRONOS event intelligence:** ADR 0016;
 - **hourly proposal gateway and provider discovery:** ADR 0017.
+- **modular consumer admission / replay identity:** ADR 0018.
+- **project-history wire-size symmetry:** ADR 0019.
+- **LineageWeave project-history service boundary:** ADR 0020.
 
 ## Change and supersession rule
 
