@@ -6,6 +6,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
+- `modality_source` identity gate: non-lexical modality is not unique lexical content or a state transition; recovery tests keep modality evidence distinct from unique content.
 - `copied_text` identity gate: copied-text residue is not unique latent content or a state transition; recovery tests distinguish copied-text evidence from genuinely new content.
 - `style_source` identity gate: house-voice style residue is not unique latent content and is not erased by a stopword list; recovery tests distinguish style from unique content.
 - `stopword_deletion` method gate: a default or global stopword list cannot erase repeated report language; recovery tests distinguish deliberate method treatment from stopword deletion.
