@@ -956,6 +956,10 @@ name = "operational_log"
 version = "0.1.0"
 
 [[package]]
+name = "outcome_order"
+version = "0.1.0"
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1470,6 +1474,10 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "summarizes_edge"
+version = "0.1.0"
 
 [[package]]
 name = "support_edge"

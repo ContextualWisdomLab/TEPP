@@ -95,6 +95,12 @@ Tashman, L. J. (2000). Out-of-sample tests of forecasting accuracy: An analysis 
 
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Valid time, transaction time, and a document's availability are not substitutes for `cutoff_clock` knowledge cutoff.
 
+## Input-process-outcome order
+
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434
+
+Allen interval relations do not authorize treating a later outcome as an earlier input, or treating `outcome_of` provenance as `input_to` or `process_to`. The `outcome_order` contract therefore requires strict event-time rank for forward transitions while retaining provenance edges as non-transitions.
+
 Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434. Interval relations inform `support_edge`; they do not make support, contradiction, summary, or `outcome_of` a state transition.
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks, and separate neural/symbolic event-schema and temporal-consistency layers. Retrospective reporting may point at earlier event time; it is not a state transition and not a translation (Allen, 1983).
 
