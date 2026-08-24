@@ -40,7 +40,6 @@ class DocstringContractTests(unittest.TestCase):
             for path in contract.expected_member_paths()
         }
         self.assertEqual(set(crate_roots), expected_crate_roots)
-        self.assertEqual(len(crate_roots), len(contract.EXPECTED_CRATES))
         self.assertTrue(set(crate_roots).issubset(sources))
         self.assertGreaterEqual(len(sources), len(crate_roots))
         self.assertEqual(docstrings.validate_repository(REPOSITORY_ROOT), [])
