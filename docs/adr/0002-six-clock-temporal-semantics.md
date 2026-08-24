@@ -1,6 +1,7 @@
 # ADR 0002 — Six-clock temporal semantics and leakage prevention
 
 **Decision status:** Accepted  
+**Implementation maturity:** partial — typed six-clock values and uncertain intervals are implemented-main on protected `main` (merged PR #8 / `temporal_core`); Allen interval algebra and bounded path-consistency are implemented-main on protected `main` (merged PR #9 / `temporal_core`). Superseded PRs #5 and #6 are historical lineage only and are not current-product claims. Downstream estimator, event-intelligence, and remaining persistence-policy uses of these primitives follow their owning ADRs and [`docs/TRACEABILITY.md`](../TRACEABILITY.md).  
 **Implementation maturity:** active-PR — unmerged PR #8 is the canonical Task 3 replacement implementing typed clocks/intervals against the current protected-main lineage; superseded/conflicted PR #5 is historical lineage only; downstream transition/split enforcement remains accepted-target
 **Date:** 2026-08-05  
 **Supersedes:** None. ADR 0013 owns persistence/split representation; ADR 0016 owns event-intelligence reasoning above these temporal primitives.
@@ -13,13 +14,13 @@ TEPP also needs uncertain, open, overlapping, and irregular intervals. A total o
 
 ## Decision
 
-TEPP stores event/valid time, assertion time, document time, system time, availability time, and model knowledge cutoff as different typed values. Uncertain and open intervals retain boundary semantics, source precision, and provenance.
+TEPP stores event/valid time, assertion time, document time, system time, availability time, and model knowledge cutoff as different typed values. Uncertain and open intervals retain boundary semantics, source precision, and provenance. Interval topology follows Allen's thirteen elementary relations (Allen, 1983). Event and time-marking vocabulary is aligned with ISO-TimeML (International Organization for Standardization, 2012). Outward instant/interval relation names may map to OWL-Time (Hobbs & Pan, 2017). These sources define the temporal algebra and annotation contract; they do not by themselves claim a complete TimeML corpus annotator or unrestricted global satisfiability.
 
 Historical analysis includes evidence only when its governed availability interval is fully eligible for the analysis cutoff. The practical invariant is `available_time <= knowledge_cutoff`; uncertain availability that can extend beyond the cutoff fails closed unless a versioned policy explicitly defines a conservative admissible interpretation.
 
 Forward transition, state-change, and input→process→outcome edges require a valid event-time partial order. Citation, revision, translation, support, contradiction, summary, and retrospective-reporting edges may point to the past but cannot become reverse transitions. Derived interval relations retain source evidence and the reasoner claim boundary.
 
-Legacy PR #6 contains Allen/path-consistency work stacked on the superseded PR #5 lineage. It may narrow possible interval relations, but it is not eligible to advance until its unique Task 4 work is replayed on the canonical PR #8 lineage (or the exact protected-main descendant after PR #8 merges) and revalidated. Path consistency is not documented as unrestricted global satisfiability.
+Superseded PRs #5 and #6 retain earlier clock and Allen/path-consistency work on a discarded lineage. They are historical audit evidence only. The protected-main implementation is the merged PR #8 temporal foundation plus the merged PR #9 replay of Task 4 interval algebra; those pull requests are lineage, not a living unmerged product. Path consistency is not documented as unrestricted global satisfiability.
 
 ## Non-goals
 
@@ -54,8 +55,16 @@ Wire/database/API contracts retain clock type, interval boundaries, precision, a
 
 Property and integration tests cover nominal clock separation, interval algebra, uncertain/open boundaries, timezone/DST normalization, contradiction detection, transition cycles, historical snapshots, delayed availability, cutoff-crossing uncertainty, rolling-origin/relation-aware partitioning, and synthetic truth with known event and document processes.
 
-PR #8 must re-run exact-head repository, line/branch coverage, rustdoc, dependency/security, and current-review gates on the replacement lineage. Historical checks from PR #5 do not transfer as merge evidence even though the tested production/test blobs preserve its TDD implementation lineage.
+Protected-main `temporal_core` must continue to pass exact-head repository, line/branch coverage, rustdoc, dependency/security, and current-review gates. Historical checks from superseded PRs #5 and #6 do not transfer as current-head merge evidence even when later PRs preserved their TDD implementation lineage.
 
 ## Rollback and supersession
 
 Rollback selects the previous temporal contract/version and recomputes dependent snapshots/artifacts; it never reinterprets already-published evidence silently. Supersede only with a contract that explicitly migrates all six clock meanings and preserves or deliberately changes leakage semantics with new validation evidence.
+
+## References
+
+Allen, J. F. (1983). Maintaining knowledge about temporal intervals. *Communications of the ACM, 26*(11), 832–843. https://doi.org/10.1145/182.358434
+
+Hobbs, J. R., & Pan, F. (2017). *Time ontology in OWL* (W3C Recommendation). World Wide Web Consortium. https://www.w3.org/TR/owl-time/
+
+International Organization for Standardization. (2012). *Language resource management—Semantic annotation framework (SemAF)—Part 1: Time and events (SemAF-Time, ISO-TimeML)* (ISO 24617-1:2012).
