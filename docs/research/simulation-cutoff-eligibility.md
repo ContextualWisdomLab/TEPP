@@ -2,7 +2,7 @@
 
 ## Scope
 
-This note doctors the `tepp_simulation` historical-fit filter:
+This note documents the `tepp_simulation` historical-fit filter:
 
 1. a delayed-reporting document is eligible only when `available_time <= knowledge_cutoff`;
 2. eligible counts must match the known-truth count computed from generated clocks;
