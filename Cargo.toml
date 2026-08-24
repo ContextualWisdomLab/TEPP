@@ -50,17 +50,7 @@ members = [
     "crates/model_selection",
     "crates/checkpoint_authority",
     "crates/compute_backend",
-    "crates/summarizes_edge",
-    "crates/provider_receipt",
-    "crates/intake_authorization",
-    "crates/copy_identity",
-    "crates/stopword_deletion",
     "crates/episode_membership",
-    "crates/style_source",
-    "crates/modality_source",
-    "crates/corpus_background",
-    "crates/prompt_source",
-    "crates/location_membership",
 ]
 default-members = [
     "crates/evidence_core",
@@ -112,17 +102,7 @@ default-members = [
     "crates/model_selection",
     "crates/checkpoint_authority",
     "crates/compute_backend",
-    "crates/summarizes_edge",
-    "crates/provider_receipt",
-    "crates/intake_authorization",
-    "crates/copy_identity",
-    "crates/stopword_deletion",
     "crates/episode_membership",
-    "crates/style_source",
-    "crates/modality_source",
-    "crates/corpus_background",
-    "crates/prompt_source",
-    "crates/location_membership",
 ]
 
 [workspace.package]

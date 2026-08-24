@@ -62,17 +62,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "model_selection",
     "checkpoint_authority",
     "compute_backend",
-    "summarizes_edge",
-    "provider_receipt",
-    "intake_authorization",
-    "copy_identity",
-    "stopword_deletion",
     "episode_membership",
-    "style_source",
-    "modality_source",
-    "corpus_background",
-    "prompt_source",
-    "location_membership",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
