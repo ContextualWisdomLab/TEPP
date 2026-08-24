@@ -41,6 +41,7 @@ members = [
     "crates/summarizes_edge",
     "crates/provider_receipt",
     "crates/intake_authorization",
+    "crates/copy_identity",
 ]
 default-members = [
     "crates/evidence_core",
@@ -83,6 +84,7 @@ default-members = [
     "crates/summarizes_edge",
     "crates/provider_receipt",
     "crates/intake_authorization",
+    "crates/copy_identity",
 ]
 
 [workspace.package]

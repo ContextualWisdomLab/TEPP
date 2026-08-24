@@ -29,6 +29,7 @@ declassification. Other crates still begin domain behavior in Task 2 with
 immutable evidence identifiers and source records.
 The eleven bounded crates compile independently but intentionally expose no
 The twelve bounded crates compile independently but intentionally expose no
+The eleven bounded crates compile independently but intentionally expose no
 placeholder production APIs. Domain behavior begins in Task 2 with immutable
 evidence identifiers and source records.
 
@@ -72,6 +73,7 @@ crates/outcome_order
 crates/summarizes_edge
 crates/provider_receipt
 crates/intake_authorization
+crates/copy_identity
 ```
 
 ## Local verification
