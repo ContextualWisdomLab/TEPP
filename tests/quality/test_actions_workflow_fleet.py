@@ -216,6 +216,8 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
         """403, 404, and 5xx stay distinct so operators cannot treat them as empty."""
 
         def expect(status: int, reason: str) -> None:
+            """Assert one HTTP status maps to its stable fleet-audit reason."""
+
             transport = FakeTransport(
                 {
                     (
@@ -758,19 +760,29 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
             status = 403
 
             def read(self) -> bytes:
+                """Return the body used by the status-mapping response."""
+
                 return b'{"message":"no"}'
 
             def getheaders(self) -> list[tuple[str, str]]:
+                """Return the headers used by the status-mapping response."""
+
                 return [("X-GitHub", "yes")]
 
         class _FakeConnection:
             def request(self, *args: object, **kwargs: object) -> None:
+                """Accept the request without changing the fake response."""
+
                 return None
 
             def getresponse(self) -> _FakeResponse:
+                """Return the status-mapping fake response."""
+
                 return _FakeResponse()
 
             def close(self) -> None:
+                """Close the status-mapping fake connection."""
+
                 return None
 
         transport = fleet.GithubHttpsTransport("secret-token")
@@ -788,19 +800,29 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
             status = 200
 
             def read(self) -> bytes:
+                """Return the body used by the normal response test."""
+
                 return b'{"ok":true}'
 
             def getheaders(self) -> list[tuple[str, str]]:
+                """Return the headers used by the normal response test."""
+
                 return [("Content-Type", "application/json")]
 
         class _FakeConnection:
             def request(self, *args: object, **kwargs: object) -> None:
+                """Accept the request without changing the fake response."""
+
                 return None
 
             def getresponse(self) -> _FakeResponse:
+                """Return the normal fake response."""
+
                 return _FakeResponse()
 
             def close(self) -> None:
+                """Close the normal fake connection."""
+
                 return None
 
         transport = fleet.GithubHttpsTransport("secret-token")
@@ -847,26 +869,36 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
 
                 class _FakeResponse:
                     def read(self) -> bytes:
+                        """Raise the stage-specific body error or return valid JSON."""
+
                         if stage == "read":
                             raise error
                         return b'{"ok":true}'
 
                     def getheaders(self) -> list[tuple[str, str]]:
+                        """Raise the stage-specific header error or return no headers."""
+
                         if stage == "getheaders":
                             raise error
                         return []
 
                 class _FakeConnection:
                     def request(self, *args: object, **kwargs: object) -> None:
+                        """Raise the stage-specific request error when selected."""
+
                         if stage == "request":
                             raise error
 
                     def getresponse(self) -> _FakeResponse:
+                        """Raise the stage-specific response error or return a response."""
+
                         if stage == "getresponse":
                             raise error
                         return _FakeResponse()
 
                     def close(self) -> None:
+                        """Record that the transport always closes the connection."""
+
                         closed["called"] = True
 
                 transport = fleet.GithubHttpsTransport("secret-token")
@@ -891,29 +923,45 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
             status = 200
 
             def read(self) -> bytes:
+                """Return a valid response body for the close-path test."""
+
                 return b'{"ok":true}'
 
             def getheaders(self) -> list[tuple[str, str]]:
+                """Return a valid response header for the close-path test."""
+
                 return [("Content-Type", "application/json")]
 
         class _CloseFails:
             def request(self, *args: object, **kwargs: object) -> None:
+                """Complete the request before close raises the transport error."""
+
                 return None
 
             def getresponse(self) -> _FakeResponse:
+                """Return a valid response before close raises the transport error."""
+
                 return _FakeResponse()
 
             def close(self) -> None:
+                """Raise a close error whose provider text must be redacted."""
+
                 raise OSError("provider close and token must not escape")
 
         class _RequestAndCloseFail:
             def request(self, *args: object, **kwargs: object) -> None:
+                """Raise the request error before the close error also occurs."""
+
                 raise OSError("provider request and token must not escape")
 
             def getresponse(self) -> _FakeResponse:
+                """Fail the test if transport continues after request failure."""
+
                 raise AssertionError("getresponse must not run after request failure")
 
             def close(self) -> None:
+                """Raise a close error without replacing the request failure."""
+
                 raise OSError("provider close and token must not escape")
 
         transport = fleet.GithubHttpsTransport("secret-token")
@@ -1116,10 +1164,14 @@ class _AlternatingWorkflowTransport(FakeTransport):
     """Return active then disabled for the same workflow GET during apply."""
 
     def __init__(self, responses: dict[tuple[str, str], fleet.HttpResponse]) -> None:
+        """Store responses and initialize per-path observation counts."""
+
         super().__init__(responses)
         self._get_counts: dict[str, int] = {}
 
     def request(self, method: str, path: str) -> fleet.HttpResponse:
+        """Return active then disabled state for each workflow confirmation."""
+
         if method == "GET" and path.endswith("/actions/workflows/10"):
             count = self._get_counts.get(path, 0)
             self._get_counts[path] = count + 1
@@ -1145,10 +1197,14 @@ class _ConfirmFailsTransport(FakeTransport):
     """Leave workflow 10 active after a successful disable PUT."""
 
     def __init__(self, responses: dict[tuple[str, str], fleet.HttpResponse]) -> None:
+        """Store responses and initialize the confirmation read counter."""
+
         super().__init__(responses)
         self._gets = 0
 
     def request(self, method: str, path: str) -> fleet.HttpResponse:
+        """Keep workflow 10 active so post-disable confirmation fails closed."""
+
         if method == "GET" and path.endswith("/actions/workflows/10"):
             self.calls.append((method, path))
             self._gets += 1
