@@ -12,6 +12,42 @@ members = [
     "crates/validation_core",
     "crates/tepp_api",
     "crates/prompt_source",
+    "crates/corpus_background",
+    "crates/modality_source",
+    "crates/copied_text",
+    "crates/style_source",
+    "crates/stopword_deletion",
+    "crates/copy_identity",
+    "crates/provider_receipt",
+    "crates/intake_authorization",
+    "crates/summarizes_edge",
+    "crates/outcome_order",
+    "crates/retrospective_edge",
+    "crates/payload_bound",
+    "crates/inferred_status",
+    "crates/support_edge",
+    "crates/system_clock",
+    "crates/event_clock",
+    "crates/assertion_clock",
+    "crates/cutoff_clock",
+    "crates/available_clock",
+    "crates/document_clocks",
+    "crates/revision_order",
+    "crates/encrypted_mapping",
+    "crates/citation_edge",
+    "crates/psychometric_fit",
+    "crates/subevent_containment",
+    "crates/prediction_contradiction",
+    "crates/provider_receipt",
+    "crates/operational_log",
+    "crates/service_tls",
+    "crates/derived_sensitivity",
+    "crates/longitudinal_core",
+    "crates/topic_lineage",
+    "crates/network_analysis",
+    "crates/interpretation_gateway",
+    "crates/model_selection",
+    "crates/checkpoint_authority",
 ]
 default-members = [
     "crates/evidence_core",
@@ -25,6 +61,42 @@ default-members = [
     "crates/validation_core",
     "crates/tepp_api",
     "crates/prompt_source",
+    "crates/corpus_background",
+    "crates/modality_source",
+    "crates/copied_text",
+    "crates/style_source",
+    "crates/stopword_deletion",
+    "crates/copy_identity",
+    "crates/provider_receipt",
+    "crates/intake_authorization",
+    "crates/summarizes_edge",
+    "crates/outcome_order",
+    "crates/retrospective_edge",
+    "crates/payload_bound",
+    "crates/inferred_status",
+    "crates/support_edge",
+    "crates/system_clock",
+    "crates/event_clock",
+    "crates/assertion_clock",
+    "crates/cutoff_clock",
+    "crates/available_clock",
+    "crates/document_clocks",
+    "crates/revision_order",
+    "crates/encrypted_mapping",
+    "crates/citation_edge",
+    "crates/psychometric_fit",
+    "crates/subevent_containment",
+    "crates/prediction_contradiction",
+    "crates/provider_receipt",
+    "crates/operational_log",
+    "crates/service_tls",
+    "crates/derived_sensitivity",
+    "crates/longitudinal_core",
+    "crates/topic_lineage",
+    "crates/network_analysis",
+    "crates/interpretation_gateway",
+    "crates/model_selection",
+    "crates/checkpoint_authority",
 ]
 
 [workspace.package]
@@ -40,6 +112,8 @@ keywords = ["psychometrics", "temporal", "events", "topic-modeling", "rust"]
 categories = ["science", "algorithms"]
 
 [workspace.dependencies]
+aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "alloc"] }
+getrandom = "=0.4.3"
 jiff = { version = "=0.2.35", default-features = false, features = ["std"] }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
@@ -47,6 +121,7 @@ sha2 = { version = "=0.10.9", default-features = false }
 uuid = { version = "=1.24.0", features = ["serde", "v7"] }
 tokio = { version = "=1.47.1", default-features = false, features = ["rt-multi-thread", "macros", "time"] }
 sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-tokio", "postgres", "tls-rustls-ring-webpki"] }
+rustls = { version = "=0.23.43", default-features = false, features = ["std", "tls12", "ring"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
