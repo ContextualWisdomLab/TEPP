@@ -7,6 +7,11 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
+    AuditEvent, AuditSourceInspection, CorpusSplitManifestRecord, DeletionRequestRecord,
+    DocumentRecord, EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository,
+    LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
+    ModelRunRecord, PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord,
+    SqlSession, apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql,
     AuditEvent, CorpusSplitManifestRecord, DeletionRequestRecord, DocumentRecord,
     EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository, LiveSqlxPoolOptions,
     MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
@@ -202,7 +207,8 @@ fn prove_document_insert_revise_and_audit(
         subject_record_id: document_record_id,
         recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
     };
-    repo.append_audit(&audit).expect("append audit_event");
+    repo.append_audit(&audit, AuditSourceInspection::CLEAR)
+        .expect("append audit_event");
 }
 
 fn open_migrated_live_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {

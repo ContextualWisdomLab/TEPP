@@ -193,6 +193,9 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "Do not release",
             "Do not deploy",
             "Rust",
+            "audit_event",
+            "try_record",
+            "OperationalLogRecord::new",
         ):
             self.assertIn(token.casefold(), normalized)
 

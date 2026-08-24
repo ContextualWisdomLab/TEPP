@@ -8,7 +8,7 @@ use crate::document_sql::{
     append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql,
     revise_document_atomic_sql,
 };
-use crate::document_store::{AuditEvent, DocumentRecord};
+use crate::document_store::{AuditEvent, AuditSourceInspection, DocumentRecord};
 use crate::instance_sql::{
     EventInstanceRecord, insert_event_instance_sql, select_event_instance_as_known_at_sql,
 };
@@ -172,14 +172,18 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
-    /// Append an immutable audit event through SQL.
+    /// Append an immutable audit event through SQL after inspection.
     ///
     /// # Errors
     ///
-    /// Returns action-code validation or transport failures.
-    pub fn append_audit(&mut self, event: &AuditEvent) -> Result<(), PersistenceError> {
+    /// Returns source-payload, action-code, or transport failures.
+    pub fn append_audit(
+        &mut self,
+        event: &AuditEvent,
+        inspection: AuditSourceInspection<'_>,
+    ) -> Result<(), PersistenceError> {
+        let sql = append_audit_sql(event, inspection)?;
         self.bind_session_tenant(event.tenant_record_id)?;
-        let sql = append_audit_sql(event)?;
         self.session.execute(&sql)
     }
 
@@ -561,7 +565,7 @@ impl std::error::Error for LiveMigrationError {}
 mod tests {
     use super::{LiveDocumentRepository, LiveMigrationError};
     use crate::artifact_sql::SourceArtifactRecord;
-    use crate::document_store::{AuditEvent, DocumentRecord};
+    use crate::document_store::{AuditEvent, AuditSourceInspection, DocumentRecord};
     use crate::instance_sql::EventInstanceRecord;
     use crate::manifest_sql::ReproducibilityManifestRecord;
     use crate::mention_sql::EventMentionRecord;
@@ -1089,7 +1093,8 @@ mod tests {
             subject_record_id: uuid::Uuid::nil(),
             recorded_system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
         };
-        repo.append_audit(&audit).expect("audit");
+        repo.append_audit(&audit, AuditSourceInspection::CLEAR)
+            .expect("audit");
 
         let session = repo.into_session();
         assert!(
@@ -1104,6 +1109,30 @@ mod tests {
                 .iter()
                 .any(|sql| sql.contains("audit_event"))
         );
+    }
+
+    #[test]
+    fn live_audit_append_refuses_source_text_before_sql() {
+        let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
+        let audit = AuditEvent {
+            audit_event_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            action_code: "insert".into(),
+            subject_record_id: uuid::Uuid::nil(),
+            recorded_system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+        };
+        assert_eq!(
+            repo.append_audit(
+                &audit,
+                AuditSourceInspection {
+                    source_text: Some("source"),
+                    source_identity: None,
+                    blanket_mask: false,
+                },
+            ),
+            Err(PersistenceError::SourceTextNotAuditable)
+        );
+        assert!(repo.into_session().executed().is_empty());
     }
 
     #[test]

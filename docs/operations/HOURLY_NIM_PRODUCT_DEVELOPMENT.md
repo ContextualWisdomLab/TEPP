@@ -109,6 +109,11 @@ Maintainer App token. It then rechecks open-PR and open-issue inventory plus liv
 The autonomous prompt requires one buyer-visible gap, standalone and modular MSA
 compatibility, realistic test-first evidence, 100% coverage and docstrings,
 database naming policy, CHANGELOG and operations updates, and APA 7 doctoring.
+After `audit_event` inserts are bound to `try_record`, the scheduled increment
+is binding `tepp_api` privileged-export authorization decision records to
+`operational_log::try_record`. It must not reopen a public
+`OperationalLogRecord::new` constructor or mix `service_tls` or persistence
+migration `0007` into that increment.
 LLM work must use or improve Contextual Orchestrator and consider Fugu,
 Conductor, TRINITY, workflow stages, access lists, bounded recursion,
 role-specific reasoning effort, and ablation.

@@ -110,6 +110,11 @@ jobs:
           product, technical, operations, security, doctoring, source, prompts,
           tests, workflows, releases, issues, and recently merged pull requests.
           Select the single highest-value buyer-visible Gap that fits exactly one bounded pull request.
+          After audit_event inserts are bound to try_record, the next bounded
+          increment is binding tepp_api privileged-export authorization
+          decision records to operational_log::try_record.
+          Do not reopen the public OperationalLogRecord::new constructor hole.
+          Do not mix service_tls or persistence migration 0007 into that increment.
 
           Preserve standalone operation and modular MSA integration with
           ContextualWisdomLab/.github, naruon, contextual-orchestrator, and other

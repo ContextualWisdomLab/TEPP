@@ -1,6 +1,8 @@
 # ADR 0009 — Purpose-bound PII governance without blanket masking
 
 **Decision status:** Accepted
+**Implementation maturity:** active-PR — persistence retention/deletion/legal-hold (migration `0007`) and purpose-bound provider-payload minimization are implemented-main; `operational_log::try_record` and inspected `audit_event` inserts are on this active PR and are not implemented-main until exact-head checks, review, and protected-main integration complete; deployment/provider-region evidence remains accepted-target
+**Date:** 2026-08-10  
 **Implementation maturity:** active-PR — persistence retention/deletion/legal-hold (migration `0007`) and purpose-bound provider-payload minimization are implemented-main; `derived_sensitivity` inheritance is on the active PR and is not implemented-main until exact-head checks, review, and protected-main integration complete; deployment/provider-region evidence remains accepted-target
 **Implementation maturity:** partial — persistence retention/deletion/legal-hold (migration `0007`) is implemented-main; purpose-bound provider-payload minimization (expired-purpose denial, log/source separation, separately authorized re-identification) is on the active PR and is not implemented-main until exact-head checks, review, and protected-main integration complete; deployment/provider-region evidence remains accepted-target
 **Decision status:** Accepted  
