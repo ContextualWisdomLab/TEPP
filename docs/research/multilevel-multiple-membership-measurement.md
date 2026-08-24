@@ -2,7 +2,7 @@
 
 ## Claim boundary
 
-TEPP documents and events may simultaneously belong to authors, departments, customers, partners, competitors, projects, opportunity pools, templates, languages, and event episodes. Treating documents as independent atoms produces atomistic fallacy, overstates independent information and the effective sample size estimated under independence, and can leak related units across validation splits (ADR 0003; AGENTS.md §6).
+TEPP documents and events may simultaneously belong to authors, departments, customers, partners, competitors, projects, opportunity pools, templates, languages, locations, and event episodes. Treating documents as independent atoms produces atomistic fallacy, overstates independent information and the effective sample size estimated under independence, and can leak related units across validation splits (ADR 0003; AGENTS.md §6).
 
 ## Implemented foundation
 
