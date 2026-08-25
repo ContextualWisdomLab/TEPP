@@ -104,6 +104,13 @@ fn empty_oversized_and_hostile_entity_labels_fail_closed() {
         insert_entity_record_sql(&oversized),
         Err(PersistenceError::InvalidEntityRecord)
     );
+
+    let mut non_identifier = entity();
+    non_identifier.entity_type_code = "author role".into();
+    assert_eq!(
+        insert_entity_record_sql(&non_identifier),
+        Err(PersistenceError::InvalidEntityRecord)
+    );
 }
 
 #[test]
@@ -147,6 +154,13 @@ fn empty_oversized_and_hostile_project_labels_fail_closed() {
     oversized.project_status_code = "s".repeat(129);
     assert_eq!(
         insert_project_record_sql(&oversized),
+        Err(PersistenceError::InvalidProjectRecord)
+    );
+
+    let mut non_identifier = project();
+    non_identifier.project_status_code = "active$".into();
+    assert_eq!(
+        insert_project_record_sql(&non_identifier),
         Err(PersistenceError::InvalidProjectRecord)
     );
 }
