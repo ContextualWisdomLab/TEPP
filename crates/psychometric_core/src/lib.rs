@@ -474,6 +474,22 @@
 //! and is not this extra; `λ² p + θ` is stationary observed
 //! variance and is not this extra; `MANIFESTVAR` `θ` is not this
 //! extra),
+//! recovers the Driver p. 16 `TDPREDEFFECTstd` as
+//! `m · √v / √(-q / (2 a))` after forming strictly positive
+//! `asymDIFFUSION` and strictly positive predictor variance
+//! (JSS PDF re-opened 2026-08-23T21:10Z; footnote 4 standardises
+//! using only the relevant variance, not the total; the affecting
+//! variance is time-dependent predictor variance `v`; the affected
+//! variance is `asymDIFFUSION`; unstandardised `M` is defined for a
+//! zero coefficient and for zero predictor variance, and is not
+//! `TDPREDEFFECTstd`; zero `asymDIFFUSION` or zero `v` fails
+//! closed; `TIPREDEFFECTstd` `B · √v / √p` is not
+//! `TDPREDEFFECTstd` even when `M = B`; the finite-interval
+//! intercept-style standardisation
+//! `A^{-1}[e^{A Δt} − I] M · √v / √p` is not `TDPREDEFFECTstd`;
+//! `m · √v / √(trait + p + added)` uses `TRAITVAR` and is
+//! not `TDPREDEFFECTstd`; `TRAITVAR` is not the standardisation
+//! variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -651,6 +667,8 @@ pub use event_time::recover_standardised_continuous_diffusion;
 pub use event_time::recover_standardised_continuous_drift;
 /// Exact scalar p. 16 `CINTstd` `κ / √(-q / (2 a))` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_continuous_intercept;
+/// Exact scalar p. 16 `TDPREDEFFECTstd` `m · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
+pub use event_time::recover_standardised_continuous_time_dependent_predictor_effect;
 /// Exact scalar p. 16 `TIPREDEFFECTstd` `B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_continuous_time_independent_predictor_effect;
 /// Exact scalar p. 16 `discreteDIFFUSIONstd` `Q_Δt / (−q / (2 a))` after strictly positive `asymDIFFUSION`.
@@ -955,12 +973,16 @@ pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_dis
 pub use event_time::refuse_standardised_discrete_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `TIPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
 pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_dependent_effect;
+/// Refuse treating p. 16 `TIPREDEFFECTstd` as p. 16 `TDPREDEFFECTstd`.
+pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating p. 16 `TIPREDEFFECTstd` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
 pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating p. 16 `discreteDIFFUSIONstd` `1 − exp(2 a Δt)` as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating p. 16 `discreteDRIFTstd` `e^{a Δt}` as p. 16 `DRIFTstd`.
 pub use event_time::refuse_standardised_discrete_drift_as_standardised_continuous_drift;
+/// Refuse treating intercept-style standardised `TDPREDEFFECT` as p. 16 `TDPREDEFFECTstd`.
+pub use event_time::refuse_standardised_discrete_time_dependent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating a finite-interval standardised `TIPREDEFFECT` as p. 16 `asymTIPREDEFFECTstd`.
 pub use event_time::refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
 /// Refuse treating a finite-interval standardised `TIPREDEFFECT` as p. 16 `TIPREDEFFECTstd`.
@@ -1059,6 +1081,8 @@ pub use event_time::refuse_trait_contaminated_continuous_drift_as_standardised_c
 pub use event_time::refuse_trait_contaminated_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated continuous intercept as p. 16 `CINTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating Driver §7.1 trait-contaminated continuous TD effect as p. 16 `TDPREDEFFECTstd`.
+pub use event_time::refuse_trait_contaminated_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated continuous TI effect as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated first-occasion TD effect as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
@@ -1087,6 +1111,8 @@ pub use event_time::refuse_unstandardised_continuous_diffusion_as_standardised_c
 pub use event_time::refuse_unstandardised_continuous_drift_as_standardised_continuous_drift;
 /// Refuse treating unstandardised `CINT` `κ` as p. 16 `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating unstandardised `TDPREDEFFECT` `M` as p. 16 `TDPREDEFFECTstd`.
+pub use event_time::refuse_unstandardised_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating unstandardised `TIPREDEFFECT` `B` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect;
 /// Refuse treating unstandardised `discreteDIFFUSION` as p. 16 `discreteDIFFUSIONstd`.
