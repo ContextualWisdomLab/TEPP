@@ -118,10 +118,11 @@ pub fn bootstrap_edge_stability(
             for j in (i + 1)..k {
                 if admitted_set.contains(&(i, j)) {
                     admitted_count[pair] += 1;
-                    let full_sign = full_rs[pair].signum();
-                    let replicate_sign = rs[pair].signum();
-                    #[allow(clippy::float_cmp)]
-                    if full_sign != 0.0 && replicate_sign == full_sign {
+                    // Sign agreement uses the signum product so both the
+                    // matching and the flipped outcome are ordinary
+                    // arithmetic branches rather than a float equality.
+                    let sign_agreement = full_rs[pair].signum() * rs[pair].signum();
+                    if sign_agreement > 0.0 {
                         sign_match_count[pair] += 1;
                     }
                 }
@@ -272,6 +273,42 @@ mod tests {
                 score.target,
                 score.stability
             );
+        }
+    }
+
+    #[test]
+    fn sign_flips_under_noise_reduce_stability() {
+        // Independent LCG noise makes every pair's sample correlation a
+        // near-zero draw; with admission at zero and a permissive FDR
+        // level every replicate admits all edges, and resampling flips
+        // signs often enough that reported stability is partial.
+        let mut state = 0x5EED_1234_ABCD_9876_u64;
+        let mut next_unit = move || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            ((state >> 33) as f64) / ((u64::MAX >> 33) as f64)
+        };
+        let draws: Vec<Vec<f64>> = (0..24)
+            .map(|i| {
+                let signal = f64::from(i) / 24.0;
+                vec![
+                    // One perfectly aligned pair keeps the ceiling arm
+                    // of the stability assertion exercised.
+                    signal,
+                    signal + 1e-12,
+                    next_unit() - 0.5,
+                ]
+            })
+            .collect();
+        let scores = bootstrap_edge_stability(&draws, 0.0, 1.0, 80, 29).unwrap();
+        // The aligned pair is perfectly stable (ceiling arm); each
+        // noise pair flips sign in at least one resample (strictly
+        // below the ceiling) while remaining mostly consistent.
+        assert!((scores[0].stability - 1.0).abs() < f64::EPSILON);
+        for score in &scores[1..] {
+            assert!(score.stability > 0.05, "{score:?}");
+            assert!(score.stability < 0.999, "{score:?}");
         }
     }
 

@@ -148,9 +148,13 @@ fn contains_base64_image_data_uri(text: &str) -> bool {
 }
 
 fn is_image_media_type_token(media_type: &str) -> bool {
-    let Some(subtype) = base_media_type(media_type).strip_prefix("image/") else {
-        return false;
-    };
+    // The scanner above only yields candidates already prefixed with
+    // "data:image/", so the strip below cannot fail on any reachable
+    // input; a missing prefix degrades to an empty subtype, which the
+    // emptiness test then rejects.
+    let subtype = base_media_type(media_type)
+        .strip_prefix("image/")
+        .unwrap_or_default();
     !subtype.is_empty()
         && subtype
             .bytes()
@@ -217,15 +221,28 @@ mod tests {
 
     #[test]
     fn non_image_and_empty_subtype_data_uris_are_not_lexical_images() {
-        // A non-image media type exercises the strip-prefix refusal arm.
+        // A non-image media type is outside the scanner's "data:image/"
+        // scope entirely, so the body is treated as plain lexical text.
         assert_eq!(
             refuse_base64_image_as_lexical_text("data:text/plain;base64,AAAA"),
             Ok(())
         );
-        // An empty image subtype exercises the empty-subtype refusal arm.
+        // An empty image subtype is not a plausible image, so the
+        // refusal gate treats the body as plain lexical text while the
+        // classifier fails closed on the malformed candidate.
         assert_eq!(
             refuse_base64_image_as_lexical_text("data:image/;base64,AAAA"),
             Ok(())
+        );
+        let empty_subtype_text = "data:image/;base64,AAAA";
+        let empty_subtype_artifact =
+            SourceArtifact::from_bytes(empty_subtype_text.as_bytes()).expect("artifact");
+        let empty_subtype_document =
+            DocumentRecord::from_text(empty_subtype_artifact.id(), empty_subtype_text)
+                .expect("document");
+        assert_eq!(
+            embedded_image_units(&empty_subtype_document),
+            Err(EvidenceError::ImplausibleImageMediaType)
         );
     }
 
