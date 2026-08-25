@@ -24,6 +24,26 @@ operator workspace, or supported release.
 
 ```text
 crates/analysis_engine
+These are production contracts, not a claim that the complete commercial
+estimator, operator workspace, or supported release already exists. Read the
+[product and technical gap baseline](docs/product-technical-gap-baseline.md)
+before treating a crate as a shipped product capability.
+This branch keeps the Rust workspace quality foundation and the bounded
+foundation crates. Domain crates expose only tested contracts: immutable
+evidence, six-clock temporal values, event mentions/instances, relations,
+membership, persistence, splits, simulation, validation, API DTOs, and the
+predicted-versus-observed promotion gate.
+This branch establishes the Rust workspace, quality-gate foundation, and the
+longitudinal within/between decomposition capability. The eleven bounded crates
+compile independently. `longitudinal_core` exposes within/between decomposition
+and component RMSE APIs; the remaining crates expose no placeholder production
+APIs, and domain behavior for them begins in Task 2 with immutable evidence
+identifiers and source records.
+This branch establishes the Rust workspace and quality-gate foundation. The
+bounded crates compile independently. Domain crates expose only validated
+production APIs; placeholder surfaces are prohibited.
+
+```text
 crates/assertion_clock
 crates/available_clock
 crates/checkpoint_authority
@@ -38,6 +58,39 @@ crates/derived_sensitivity
 crates/document_clocks
 crates/encrypted_mapping
 crates/episode_membership
+crates/event_clock
+crates/evidence_core
+crates/semantic_core
+crates/temporal_core
+crates/event_core
+crates/evidence_core
+crates/inferred_status
+crates/intake_authorization
+crates/interpretation_gateway
+crates/location_membership
+crates/longitudinal_core
+crates/membership_core
+crates/membership_target
+crates/modality_source
+crates/model_selection
+crates/network_analysis
+crates/operational_log
+crates/outcome_order
+crates/payload_bound
+crates/persistence_postgres
+crates/prediction_contradiction
+crates/prompt_source
+crates/provider_receipt
+crates/corpus_background
+crates/modality_source
+crates/copied_text
+crates/copy_identity
+crates/corpus_background
+crates/corpus_split
+crates/cutoff_clock
+crates/derived_sensitivity
+crates/document_clocks
+crates/encrypted_mapping
 crates/event_clock
 crates/event_core
 crates/evidence_core
@@ -58,11 +111,13 @@ crates/persistence_postgres
 crates/prediction_contradiction
 crates/prompt_source
 crates/provider_receipt
+crates/psychometric_core
 crates/psychometric_fit
 crates/relation_graph
 crates/retrospective_edge
 crates/revision_order
 crates/semantic_core
+crates/operational_log
 crates/service_tls
 crates/stopword_deletion
 crates/style_source
@@ -76,6 +131,14 @@ crates/tepp_simulation
 crates/topic_lineage
 crates/topic_measurement
 crates/validation_core
+crates/network_analysis
+crates/interpretation_gateway
+crates/model_selection
+crates/checkpoint_authority
+crates/compute_backend
+crates/episode_membership
+crates/membership_target
+
 ```
 
 ## Local verification
@@ -98,7 +161,8 @@ cargo deny check
 Stable Rust line coverage is measured with `cargo-llvm-cov`. Branch coverage is
 measured in a separately pinned nightly lane because Rust branch coverage remains
 an unstable compiler capability. A zero denominator is reported explicitly for
-this skeleton-only slice; it must never conceal uncovered production behavior.
+any crate whose lane still ships no executable behavior; it must never conceal
+uncovered production behavior.
 
 ## Normative documents
 
@@ -114,3 +178,12 @@ made by this foundation slice.
 The active stacked analysis-engine slice adds a bounded executable readiness path
 from an accepted run to a digest-bound terminal artifact. It is not yet
 implemented-main and does not replace scientific estimator contracts.
+Validated statistical-recovery APIs exist only inside `psychometric_core`: OLS
+loading recovery on already-mapped coordinates, posterior-draw point estimates,
+the Rubin total-variance identity `T = U_bar + (1 + 1/m) B`, CWC/event-time/
+contextual recovery maps, and two-group OLS latent-mean comparison gated behind
+typed strong/strict invariance evidence (`LatentMeanComparisonEvidence`; metric,
+weak, or configural status cannot reduce to a passing flag). No release,
+production-readiness, GPU, or database claim is made by this foundation slice,
+and no crate yet implements a full ESEM/DSEM estimator (the two-group OLS
+invariance gate is not MGCFA).

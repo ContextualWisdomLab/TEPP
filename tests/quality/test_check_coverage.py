@@ -116,6 +116,168 @@ class CoverageContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "contain totals"):
                 coverage_contract.load_totals(path)
 
+    def test_unique_branch_fold_overrides_phantom_json_totals(self) -> None:
+        """Unique True/False arms, not LLVM totals, are the 100% branch contract.
+
+        Nightly ``files[].summary.branches`` on #49 head ``1e3e2eb`` reported
+        ``event_time.rs`` 505/506 while every unique ``files[].branches`` site
+        had both arms taken after max-folding the two instantiations. Summary-only
+        reports without branch arrays still fail closed on totals.
+        """
+
+        with tempfile.TemporaryDirectory() as temporary:
+            summary_only = self.write_report(
+                temporary,
+                {
+                    "data": [
+                        {
+                            "totals": {
+                                "lines": {"count": 1, "covered": 1},
+                                "branches": {"count": 4, "covered": 3},
+                            }
+                        }
+                    ]
+                },
+            )
+            with self.assertRaisesRegex(ValueError, "incomplete: 3/4"):
+                coverage_contract.validate_report(summary_only, ["branches"])
+
+            phantom_totals = self.write_report(
+                temporary,
+                {
+                    "data": [
+                        {
+                            "totals": {
+                                "lines": {"count": 1, "covered": 1},
+                                "branches": {"count": 4, "covered": 3},
+                            },
+                            "files": [
+                                {"filename": "crates/psychometric_core/src/causality.rs"},
+                                {
+                                    "filename": "crates/psychometric_core/src/error.rs",
+                                    "branches": [],
+                                },
+                                {
+                                    "filename": "crates/psychometric_core/src/event_time.rs",
+                                    "branches": [
+                                        [292, 8, 292, 28, 1, 13, 0, 0, 4],
+                                        [292, 8, 292, 28, 0, 7, 0, 0, 4],
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                },
+            )
+            self.assertEqual(
+                coverage_contract.validate_report(phantom_totals, ["branches"]),
+                ["branches coverage: PASS (2/2, 100%)"],
+            )
+
+            uncovered_true = self.write_report(
+                temporary,
+                {
+                    "data": [
+                        {
+                            "totals": {
+                                "lines": {"count": 1, "covered": 1},
+                                "branches": {"count": 2, "covered": 2},
+                            },
+                            "files": [
+                                {
+                                    "filename": "src/lib.rs",
+                                    "branches": [
+                                        [10, 1, 10, 8, 0, 4, 0, 0, 4],
+                                        [10, 1, 10, 8, 0, 2, 0, 0, 4],
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                },
+            )
+            with self.assertRaisesRegex(ValueError, "incomplete: 1/2"):
+                coverage_contract.validate_report(uncovered_true, ["branches"])
+
+            uncovered_false = self.write_report(
+                temporary,
+                {
+                    "data": [
+                        {
+                            "totals": {
+                                "lines": {"count": 1, "covered": 1},
+                                "branches": {"count": 2, "covered": 2},
+                            },
+                            "files": [
+                                {
+                                    "filename": "src/lib.rs",
+                                    "branches": [[11, 1, 11, 8, 3, 0, 0, 0, 4]],
+                                }
+                            ],
+                        }
+                    ]
+                },
+            )
+            with self.assertRaisesRegex(ValueError, "incomplete: 1/2"):
+                coverage_contract.validate_report(uncovered_false, ["branches"])
+
+    def test_malformed_unique_branch_records_fail_closed(self) -> None:
+        """Absent filenames, short tuples, and non-integer counts are rejected."""
+
+        totals = {
+            "lines": {"count": 1, "covered": 1},
+            "branches": {"count": 2, "covered": 2},
+        }
+        malformed = (
+            ([{"branches": [[10, 1, 10, 8, 1, 1, 0, 0, 4]]}], "contain a filename"),
+            (
+                [{"filename": "src/lib.rs", "branches": "wrong"}],
+                "branches must be a list",
+            ),
+            (
+                [{"filename": "src/lib.rs", "branches": [[10, 1, 10, 8, 1]]}],
+                "branch record must contain nine values",
+            ),
+            (
+                [{"filename": "src/lib.rs", "branches": [[10, 1, 10, 8, -1, 1, 0, 0, 4]]}],
+                "branch counts must be non-negative integers",
+            ),
+            (
+                [{"filename": "src/lib.rs", "branches": [[True, 1, 10, 8, 1, 1, 0, 0, 4]]}],
+                "branch coordinates must be integers",
+            ),
+            (
+                [{"filename": "src/lib.rs", "branches": [[10, 1, 10, 8, True, 1, 0, 0, 4]]}],
+                "branch counts must be non-negative integers",
+            ),
+            (["src/lib.rs"], "file entry must be an object"),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, (files, message) in enumerate(malformed):
+                with self.subTest(message=message):
+                    path = Path(temporary) / f"malformed-{index}.json"
+                    path.write_text(
+                        json.dumps({"data": [{"totals": totals, "files": files}]}),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(ValueError, message):
+                        coverage_contract.load_totals(path)
+
+            empty_arrays = self.write_report(
+                temporary,
+                {
+                    "data": [
+                        {
+                            "totals": totals,
+                            "files": [{"filename": "src/lib.rs", "branches": []}],
+                        }
+                    ]
+                },
+            )
+            self.assertEqual(
+                coverage_contract.load_totals(empty_arrays)["branches"],
+                totals["branches"],
+            )
     def test_full_branch_reports_merge_duplicate_instrumented_copies(self) -> None:
         """A source branch passes when either test binary covers each outcome."""
 

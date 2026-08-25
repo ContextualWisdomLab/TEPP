@@ -12,6 +12,7 @@ members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
+
     "crates/location_membership",
     "crates/prompt_source",
     "crates/corpus_background",
@@ -54,6 +55,7 @@ members = [
     "crates/membership_target",
     "crates/topic_measurement",
     "crates/analysis_engine",
+    "crates/psychometric_core",
 ]
 default-members = [
     "crates/evidence_core",
@@ -67,6 +69,7 @@ default-members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
+
     "crates/location_membership",
     "crates/prompt_source",
     "crates/corpus_background",
@@ -109,6 +112,7 @@ default-members = [
     "crates/membership_target",
     "crates/topic_measurement",
     "crates/analysis_engine",
+    "crates/psychometric_core",
 ]
 
 [workspace.package]
