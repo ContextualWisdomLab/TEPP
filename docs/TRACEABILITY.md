@@ -57,6 +57,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | `topic_measurement::refuse_lexical_inferential_weight` on the active PR; preprocessing pipeline remaining | partial |
 | TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004 | future `topic_measurement` | accepted-target |
 | global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
+| no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | `corpus_split` inferential-weight gate on the active PR; estimator-side method model remains future | active-PR |
+| report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; `prompt_source` prompt-versus-unique-content identity implemented-main; estimator-side method model remains future | partial |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | `stopword_deletion` default-list refusal on the active PR; TF-IDF/BM25 inferential-weight refusal remains accepted-target | partial |
 | report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |

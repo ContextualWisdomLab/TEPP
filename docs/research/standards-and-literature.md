@@ -104,6 +104,14 @@ Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, G. (2023). Pre-trai
 
 TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Brown et al. (2020) and Reynolds and McDonell (2021) provide primary research context for prompts as task-conditioning and prompt-programming mechanisms; they do not define TEPP's latent-content labels. As a normative ADR 0004/0012 contract, instruction and prompt boilerplate is therefore modeled as explicit method structure, not unique latent content and not a stopword deletion. Liu et al. (2023) is secondary survey background only and is not evidence for that repository-specific classification. `topic_lineage` keeps one global topic identity when activity becomes dormant or reactivated.
 
+## Information retrieval and inferential-weight boundaries
+
+Salton, G., & Buckley, C. (1988). Term-weighting approaches in automatic text retrieval. *Information Processing & Management, 24*(5), 513–523. https://doi.org/10.1016/0306-4573(88)90021-0
+
+Robertson, S., & Zaragoza, H. (2009). The probabilistic relevance framework: BM25 and beyond. *Foundations and Trends® in Information Retrieval, 3*(4), 333–389. https://doi.org/10.1561/1500000019
+
+TEPP uses these primary information-retrieval sources to classify TF-IDF and BM25 as retrieval-ranking functions, while the estimator-input refusal remains an explicit TEPP implementation contract in `corpus_split`.
+
 ## Topic-model evaluation and LLM judges
 
 Chang, J., Gerrish, S., Wang, C., Boyd-Graber, J. L., & Blei, D. M. (2009). Reading tea leaves: How humans interpret topic models. In *Advances in Neural Information Processing Systems 22*.
