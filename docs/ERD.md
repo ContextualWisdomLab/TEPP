@@ -3,7 +3,7 @@
 **Status:** Accepted logical target model with current implementation maturity explicitly marked.  
 **Last reviewed:** 2026-08-13
 
-Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`), tenant row-level security (`0002`), the model-run/artifact chain (`0003`), append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006`), event-relation/mention/instance SQL, source-artifact SQL, audit-event SQL, concurrent document-write stress, and naruon HTTP interchange contracts as executable migration/application contracts with live CI. Migration `0007` (active PR) adds `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone` and is not implemented-main until exact-head checks, review, and protected-main integration complete. Broader planned ERD entities and backup/recovery gates remain accepted-target.
+Protected main implements storage-independent domain objects plus `persistence_postgres` foundation tables (`0001`), tenant row-level security (`0002`), the model-run/artifact chain (`0003`), append-only immutability triggers (`0004`), temporal interval ordering CHECKs (`0005`), typed membership assignment (`0006`), event-relation/mention/instance SQL, source-artifact SQL, audit-event SQL, concurrent document-write stress, and naruon HTTP interchange contracts as executable migration/application contracts with live CI. Migration `0007` (active PR) adds `retention_policy`, `legal_hold`, `deletion_request`, and `evidence_tombstone`; entity/project target SQL contracts for `entity_record` and `project_record` are on this active PR. These changes are not implemented-main until exact-head checks, review, and protected-main integration complete. Broader planned ERD entities and backup/recovery gates remain accepted-target.
 
 ## Current domain foundation
 
@@ -391,6 +391,8 @@ Customer/partner/competitor/author/department/project/opportunity roles are cont
 2. **Membership target:** exactly one of `target_entity_id` or `target_project_id` is non-null.
 
 All four identifiers are typed UUID foreign keys to their named entities; there is no untyped polymorphic `membership_target_id`. This permits document-level and exact-segment weighted membership while preserving relational integrity. If event-level membership is added later, it must be an explicit typed foreign key plus an updated exactly-one constraint and ADR/data-model change.
+
+Physical `text_segment` from migration `0006` currently stores `start_byte` / `end_byte` (half-open UTF-8 offsets), tenant, document identity, and system/available clocks. Call `insert_text_segment` to write that row. The accepted ERD still lists scalar offsets, `segment_type_code`, and a `document_record` foreign key; those columns are later migrations (`#45` owns `0007`).
 
 `valid_from_window` is a non-empty `tstzrange` containing the possible start instant; an exact start is encoded as the singleton closed range `[t,t]`. `valid_to_window` uses the same representation for an exact or uncertain end and is NULL only for an open-ended membership. `valid_time_precision_code` records the governed precision vocabulary used to construct both windows. Database/application validation must reject empty windows, a definitely-later start than end, and a precision code inconsistent with either bound; it must never coerce an uncertain or open bound to a false exact timestamp.
 

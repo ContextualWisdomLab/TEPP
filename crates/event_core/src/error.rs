@@ -20,6 +20,10 @@ pub enum EventError {
     UnsupportedWireVersion,
     /// An unknown event-role name was supplied.
     UnknownEventRole,
+    /// A TDT detection or mention was treated as a state transition.
+    DetectionIsNotTransition,
+    /// A CHRONOS prediction was treated as an observed or promoted fact.
+    PredictionIsNotFact,
     /// A TDT link detection was treated as an event instance.
     EventLinkIsNotEventInstance,
     /// A TDT link detection was treated as a state transition.
@@ -38,6 +42,8 @@ impl fmt::Display for EventError {
             Self::InvalidWirePayload => "invalid event wire payload",
             Self::UnsupportedWireVersion => "unsupported event wire version",
             Self::UnknownEventRole => "unknown event role",
+            Self::DetectionIsNotTransition => "detection is not a state transition",
+            Self::PredictionIsNotFact => "prediction is not an observed fact",
             Self::EventLinkIsNotEventInstance => "event link is not an event instance",
             Self::EventLinkIsNotStateTransition => "event link is not a state transition",
             Self::UnknownEventLinkLabel => "unknown event link label",
@@ -74,6 +80,14 @@ mod tests {
                 "unsupported event wire version",
             ),
             (EventError::UnknownEventRole, "unknown event role"),
+            (
+                EventError::DetectionIsNotTransition,
+                "detection is not a state transition",
+            ),
+            (
+                EventError::PredictionIsNotFact,
+                "prediction is not an observed fact",
+            ),
             (
                 EventError::EventLinkIsNotEventInstance,
                 "event link is not an event instance",
