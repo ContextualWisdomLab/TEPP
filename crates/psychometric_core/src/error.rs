@@ -589,6 +589,43 @@ pub enum PsychometricError {
     /// as predetermined first-occasion observed variance. Later
     /// variance includes `Q_Δt`.
     PredeterminedLaterObservedVarianceIsNotPredeterminedInitialObservedVariance,
+    /// Driver §4.3 later-start lagged covariance of predetermined
+    /// `T0VAR` was treated as first-occasion lagged covariance.
+    /// Later-start lag includes `e^{a s} Q_u`.
+    PredeterminedLaterLaggedLatentCovarianceIsNotPredeterminedLaggedCovariance,
+    /// Driver §4.3 later-start lagged covariance of predetermined
+    /// `T0VAR` was treated as later-occasion variance. Lagged
+    /// covariance is `e^{a s}` of the later state, not that variance.
+    PredeterminedLaterLaggedLatentCovarianceIsNotLaterLatentVariance,
+    /// Driver §4.3 later-start lagged covariance of predetermined
+    /// `T0VAR` was treated as lagged stationary `T0VAR`. Free `T0VAR`
+    /// is not `−q / (2 a)`.
+    PredeterminedLaterLaggedLatentCovarianceIsNotStationaryLaggedCovariance,
+    /// Driver §4.3 later-start lagged covariance of predetermined
+    /// `T0VAR` was treated as the decayed later total. Trait variance
+    /// and `addedTIPREDVAR` do not decay.
+    PredeterminedLaterLaggedLatentCovarianceIsNotDecayedLaterTotal,
+    /// Driver §4.3 later-start lagged covariance of predetermined
+    /// `T0VAR` was treated as later-start lagged observed covariance.
+    /// Equation 5 maps `cov(y, y_{lag}) = λ²` of that covariance plus
+    /// `ψ`.
+    PredeterminedLaterLaggedLatentCovarianceIsNotObservedCovariance,
+    /// Driver Eq. 5 measurement error was treated as later-start lagged
+    /// observed covariance of predetermined `T0VAR`. Independent `ε_t`
+    /// does not enter.
+    MeasurementErrorIsNotPredeterminedLaterLaggedObservedCovariance,
+    /// Driver Eq. 5 of first-occasion lagged predetermined `T0VAR` was
+    /// treated as later-start lagged observed covariance. First-occasion
+    /// lag omits `e^{a s} Q_u`.
+    PredeterminedLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance,
+    /// Driver Eq. 5 of lagged §4.3 stationary `T0VAR` was treated as
+    /// later-start lagged observed covariance of predetermined `T0VAR`.
+    /// Stationary lagged covariance uses `−q / (2 a)`, not free `p_0`.
+    StationaryLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance,
+    /// Driver Eq. 5 of predetermined later-occasion `T0VAR` was treated
+    /// as later-start lagged observed covariance. Later variance
+    /// includes `Q_Δt` and `θ`.
+    PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1049,6 +1086,33 @@ impl fmt::Display for PsychometricError {
             }
             Self::PredeterminedLaterObservedVarianceIsNotPredeterminedInitialObservedVariance => {
                 "predetermined later-occasion observed variance is not the predetermined first-occasion observed variance"
+            }
+            Self::PredeterminedLaterLaggedLatentCovarianceIsNotPredeterminedLaggedCovariance => {
+                "predetermined later-start lagged latent covariance is not the predetermined first-occasion lagged latent covariance"
+            }
+            Self::PredeterminedLaterLaggedLatentCovarianceIsNotLaterLatentVariance => {
+                "predetermined later-start lagged latent covariance is not the predetermined later-occasion latent variance"
+            }
+            Self::PredeterminedLaterLaggedLatentCovarianceIsNotStationaryLaggedCovariance => {
+                "predetermined later-start lagged latent covariance is not the stationary lagged latent covariance"
+            }
+            Self::PredeterminedLaterLaggedLatentCovarianceIsNotDecayedLaterTotal => {
+                "predetermined later-start lagged latent covariance is not the decayed later-occasion total"
+            }
+            Self::PredeterminedLaterLaggedLatentCovarianceIsNotObservedCovariance => {
+                "predetermined later-start lagged latent covariance is not the predetermined later-start lagged observed covariance"
+            }
+            Self::MeasurementErrorIsNotPredeterminedLaterLaggedObservedCovariance => {
+                "measurement-error variance is not the predetermined later-start lagged observed covariance"
+            }
+            Self::PredeterminedLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance => {
+                "predetermined first-occasion lagged observed covariance is not the predetermined later-start lagged observed covariance"
+            }
+            Self::StationaryLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance => {
+                "stationary lagged observed covariance is not the predetermined later-start lagged observed covariance"
+            }
+            Self::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance => {
+                "predetermined later-occasion observed variance is not the predetermined later-start lagged observed covariance"
             }
         };
         formatter.write_str(message)
@@ -1781,6 +1845,55 @@ mod tests {
             PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedInitialObservedVariance
                 .to_string(),
             "predetermined later-occasion observed variance is not the predetermined first-occasion observed variance"
+        );
+    }
+
+    #[test]
+    fn predetermined_later_lagged_covariance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotPredeterminedLaggedCovariance
+                .to_string(),
+            "predetermined later-start lagged latent covariance is not the predetermined first-occasion lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotLaterLatentVariance
+                .to_string(),
+            "predetermined later-start lagged latent covariance is not the predetermined later-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotStationaryLaggedCovariance
+                .to_string(),
+            "predetermined later-start lagged latent covariance is not the stationary lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotDecayedLaterTotal
+                .to_string(),
+            "predetermined later-start lagged latent covariance is not the decayed later-occasion total"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLaggedLatentCovarianceIsNotObservedCovariance
+                .to_string(),
+            "predetermined later-start lagged latent covariance is not the predetermined later-start lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotPredeterminedLaterLaggedObservedCovariance
+                .to_string(),
+            "measurement-error variance is not the predetermined later-start lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance
+                .to_string(),
+            "predetermined first-occasion lagged observed covariance is not the predetermined later-start lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaggedObservedCovarianceIsNotPredeterminedLaterLaggedObservedCovariance
+                .to_string(),
+            "stationary lagged observed covariance is not the predetermined later-start lagged observed covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance
+                .to_string(),
+            "predetermined later-occasion observed variance is not the predetermined later-start lagged observed covariance"
         );
     }
 }
