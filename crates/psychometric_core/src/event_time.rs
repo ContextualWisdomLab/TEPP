@@ -5938,17 +5938,6 @@ mod tests {
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
         recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-<<<<<<< HEAD
-        recover_standardised_continuous_intercept,
-        recover_standardised_discrete_continuous_intercept, recover_stationary_initial_latent_mean,
-        recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-        recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-        recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-        recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate,
-=======
         recover_standardised_continuous_intercept, recover_standardised_manifest_mean,
         recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
         recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
@@ -5957,7 +5946,7 @@ mod tests {
         recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
         recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
         recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
->>>>>>> origin/main
+        recover_standardised_discrete_continuous_intercept,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -6035,11 +6024,8 @@ mod tests {
         refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance,
-<<<<<<< HEAD
-        refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
-=======
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
->>>>>>> origin/main
+        refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
         refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -6081,11 +6067,8 @@ mod tests {
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
         refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
-<<<<<<< HEAD
-        refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
-=======
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
->>>>>>> origin/main
+        refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
     };
     use crate::error::PsychometricError;
 
@@ -14568,7 +14551,66 @@ mod tests {
     }
 
     #[test]
-<<<<<<< HEAD
+    fn standardised_manifest_mean_recovers_driver_page_sixteen_after_positive_theta() {
+        // Driver et al. (2017, p. 16 MANIFESTMEANSstd; Table 2; footnote 4;
+        // 2017-era summary.ctsemFit.R MANIFESTMEANS): form strictly
+        // positive MANIFESTVAR θ, then τ / √θ. Relevant variance
+        // is θ, not λ² Var(η) + θ.
+        let mean = 0.8_f64;
+        let measurement_error = 1.6_f64;
+        let recovered =
+            recover_standardised_manifest_mean(mean, measurement_error, LagClock::EventTime)
+                .expect("MANIFESTMEANSstd");
+        let expected = mean / measurement_error.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let larger_theta = recover_standardised_manifest_mean(mean, 6.4, LagClock::EventTime)
+            .expect("MANIFESTMEANSstd θ=6.4");
+        assert!((larger_theta - recovered).abs() > 1e-3);
+        assert!(larger_theta.abs() < recovered.abs());
+        let unit = recover_standardised_manifest_mean(
+            measurement_error.sqrt(),
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("MANIFESTMEANSstd τ=√θ");
+        // MANIFESTVARstd is θ/θ = 1 after strictly positive θ. Equal
+        // numbers when τ = √θ remain distinct named quantities.
+        let variance_std = 1.0_f64;
+        assert!((unit - variance_std).abs() < 1e-15);
+        let loading = 1.2_f64;
+        let latent_variance = 0.9_f64;
+        let observed = loading * loading * latent_variance + measurement_error;
+        let observed_scaled = mean / observed.sqrt();
+        assert!((observed_scaled - recovered).abs() > 1e-3);
+        // T0MEANSstd μ_0/√p_0 recovers the same number when τ = μ_0
+        // and θ = p_0 and remains a distinct named quantity.
+        let matching_t0 = mean / measurement_error.sqrt();
+        assert!((matching_t0 - recovered).abs() < 1e-15);
+        let zero = recover_standardised_manifest_mean(0.0, measurement_error, LagClock::EventTime)
+            .expect("zero MANIFESTMEANS");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative =
+            recover_standardised_manifest_mean(-mean, measurement_error, LagClock::EventTime)
+                .expect("negative signed MANIFESTMEANSstd");
+        assert!((negative + expected).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_manifest_mean_as_standardised_manifest_mean(mean, recovered),
+            Err(PsychometricError::UnstandardisedManifestMeanIsNotStandardisedManifestMean)
+        );
+        assert_eq!(
+            refuse_standardised_manifest_variance_as_standardised_manifest_mean(variance_std, unit),
+            Err(PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean)
+        );
+        assert_eq!(
+            refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean(
+                observed_scaled,
+                recovered
+            ),
+            Err(PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean)
+        );
+    }
+
+    #[test]
     fn standardised_discrete_continuous_intercept_recovers_driver_page_sixteen_after_positive_p() {
         // Driver et al. (2017, p. 16 discreteCINTstd; Table 2; footnote 4; Eq. 3):
         // form strictly positive asymDIFFUSION p = −q/(2a), then
@@ -14654,69 +14696,38 @@ mod tests {
             Err(
                 PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
             )
-=======
-    fn standardised_manifest_mean_recovers_driver_page_sixteen_after_positive_theta() {
-        // Driver et al. (2017, p. 16 MANIFESTMEANSstd; Table 2; footnote 4;
-        // 2017-era summary.ctsemFit.R MANIFESTMEANS): form strictly
-        // positive MANIFESTVAR θ, then τ / √θ. Relevant variance
-        // is θ, not λ² Var(η) + θ.
-        let mean = 0.8_f64;
-        let measurement_error = 1.6_f64;
-        let recovered =
-            recover_standardised_manifest_mean(mean, measurement_error, LagClock::EventTime)
-                .expect("MANIFESTMEANSstd");
-        let expected = mean / measurement_error.sqrt();
-        assert!((recovered - expected).abs() < 1e-15);
-        let larger_theta = recover_standardised_manifest_mean(mean, 6.4, LagClock::EventTime)
-            .expect("MANIFESTMEANSstd θ=6.4");
-        assert!((larger_theta - recovered).abs() > 1e-3);
-        assert!(larger_theta.abs() < recovered.abs());
-        let unit = recover_standardised_manifest_mean(
-            measurement_error.sqrt(),
-            measurement_error,
-            LagClock::EventTime,
-        )
-        .expect("MANIFESTMEANSstd τ=√θ");
-        // MANIFESTVARstd is θ/θ = 1 after strictly positive θ. Equal
-        // numbers when τ = √θ remain distinct named quantities.
-        let variance_std = 1.0_f64;
-        assert!((unit - variance_std).abs() < 1e-15);
-        let loading = 1.2_f64;
-        let latent_variance = 0.9_f64;
-        let observed = loading * loading * latent_variance + measurement_error;
-        let observed_scaled = mean / observed.sqrt();
-        assert!((observed_scaled - recovered).abs() > 1e-3);
-        // T0MEANSstd μ_0/√p_0 recovers the same number when τ = μ_0
-        // and θ = p_0 and remains a distinct named quantity.
-        let matching_t0 = mean / measurement_error.sqrt();
-        assert!((matching_t0 - recovered).abs() < 1e-15);
-        let zero = recover_standardised_manifest_mean(0.0, measurement_error, LagClock::EventTime)
-            .expect("zero MANIFESTMEANS");
-        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
-        let negative =
-            recover_standardised_manifest_mean(-mean, measurement_error, LagClock::EventTime)
-                .expect("negative signed MANIFESTMEANSstd");
-        assert!((negative + expected).abs() < 1e-15);
-        assert_eq!(
-            refuse_unstandardised_manifest_mean_as_standardised_manifest_mean(mean, recovered),
-            Err(PsychometricError::UnstandardisedManifestMeanIsNotStandardisedManifestMean)
-        );
-        assert_eq!(
-            refuse_standardised_manifest_variance_as_standardised_manifest_mean(variance_std, unit),
-            Err(PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean)
-        );
-        assert_eq!(
-            refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean(
-                observed_scaled,
-                recovered
-            ),
-            Err(PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean)
->>>>>>> origin/main
         );
     }
 
     #[test]
-<<<<<<< HEAD
+    fn standardised_manifest_mean_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_manifest_mean(0.8, 0.0, LagClock::EventTime),
+            Err(PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(0.8, 1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(0.8, -1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(f64::NAN, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(0.8, f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(f64::MAX, 1e-4, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput),
+        );
+    }
+
+    #[test]
     fn standardised_discrete_continuous_intercept_fails_closed_when_unstandardised_is_defined() {
         assert_eq!(
             recover_standardised_discrete_continuous_intercept(
@@ -14788,31 +14799,6 @@ mod tests {
                 1.0,
                 LagClock::EventTime
             ),
-=======
-    fn standardised_manifest_mean_fails_closed_when_unstandardised_is_defined() {
-        assert_eq!(
-            recover_standardised_manifest_mean(0.8, 0.0, LagClock::EventTime),
-            Err(PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance)
-        );
-        assert_eq!(
-            recover_standardised_manifest_mean(0.8, 1.6, LagClock::SystemTime),
-            Err(PsychometricError::EventTimeRequired)
-        );
-        assert_eq!(
-            recover_standardised_manifest_mean(0.8, -1.6, LagClock::EventTime),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_standardised_manifest_mean(f64::NAN, 1.6, LagClock::EventTime),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_standardised_manifest_mean(0.8, f64::INFINITY, LagClock::EventTime),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_standardised_manifest_mean(f64::MAX, 1e-4, LagClock::EventTime),
->>>>>>> origin/main
             Err(PsychometricError::InvalidNumericInput)
         );
     }
