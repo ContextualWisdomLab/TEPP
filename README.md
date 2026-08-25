@@ -34,11 +34,29 @@ evidence, six-clock temporal values, event mentions/instances, relations,
 membership, persistence, splits, simulation, validation, API DTOs, and the
 predicted-versus-observed promotion gate.
 This branch establishes the Rust workspace, quality-gate foundation, and the
-longitudinal within/between decomposition capability. The eleven bounded crates
+longitudinal within/between decomposition capability. The workspace bounded crates
 compile independently. `longitudinal_core` exposes within/between decomposition
 and component RMSE APIs; the remaining crates expose no placeholder production
 APIs, and domain behavior for them begins in Task 2 with immutable evidence
 identifiers and source records.
+This branch establishes the Task 1 Rust workspace and quality-gate foundation.
+The workspace bounded crates compile independently but intentionally expose no
+The workspace bounded crates compile independently; Task 1 includes the
+The twelve bounded crates compile independently but intentionally expose no
+The eleven bounded crates compile independently; Task 1 includes the
+implemented `encrypted_mapping` crate with AES-256-GCM sealing and
+purpose-bound opening, while the remaining domain behavior begins in Task 2
+with immutable evidence identifiers and source records.
+The workspace bounded crates compile independently. `derived_sensitivity` inherits
+source Restricted/Internal classes onto topic, factor, and relation artifacts
+and fails closed on unknown kinds; derivation and blanket PII masking are not
+declassification. Other crates still begin domain behavior in Task 2 with
+immutable evidence identifiers and source records.
+The workspace bounded crates compile independently but intentionally expose no
+
+The eleven bounded crates compile independently but intentionally expose no
+placeholder production APIs. Domain behavior begins in Task 2 with immutable
+evidence identifiers and source records.
 This branch establishes the Rust workspace and quality-gate foundation. The
 bounded crates compile independently. Domain crates expose only validated
 production APIs; placeholder surfaces are prohibited.
@@ -78,6 +96,12 @@ crates/operational_log
 crates/outcome_order
 crates/payload_bound
 crates/persistence_postgres
+crates/corpus_split
+crates/tepp_simulation
+crates/validation_core
+crates/tepp_api
+crates/episode_membership
+crates/location_membership
 crates/prediction_contradiction
 crates/prompt_source
 crates/provider_receipt
