@@ -49,6 +49,8 @@ members = [
     "crates/interpretation_gateway",
     "crates/model_selection",
     "crates/checkpoint_authority",
+    "crates/compute_backend",
+    "crates/episode_membership",
     "crates/membership_target",
     "crates/analysis_engine",
 ]
@@ -101,6 +103,8 @@ default-members = [
     "crates/interpretation_gateway",
     "crates/model_selection",
     "crates/checkpoint_authority",
+    "crates/compute_backend",
+    "crates/episode_membership",
     "crates/membership_target",
     "crates/analysis_engine",
 ]

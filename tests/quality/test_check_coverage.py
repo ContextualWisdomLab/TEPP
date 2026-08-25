@@ -839,5 +839,46 @@ class CoverageContractTests(unittest.TestCase):
             self.assertFalse(coverage_contract.is_executable_source_line(path, 7))
 
 
+
+
+    def test_multiline_string_empty_lines_returns_false(self) -> None:
+        """An empty source produces no multiline-string continuations."""
+
+        self.assertFalse(
+            coverage_contract._line_in_multiline_string([], 1)
+        )
+
+    def test_structural_comma_continuation_edge_cases(self) -> None:
+        """Exercise structural comma continuation detection edge branches."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "commas.rs"
+            # Lines 211->215 and 212->211: loop skips blank lines and non-matching
+            source.write_text(
+                "fn example() {\n"
+                "    let value = foo(\n"
+                "\n"
+                "        1,\n"
+                "    );\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
+
+            # Line 318->311: while loop with backslash at end of line inside string
+            source.write_text(
+                'fn path() {\n'
+                '    let s = "a\\\n'
+                'b";\n'
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

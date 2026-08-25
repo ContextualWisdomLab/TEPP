@@ -5,6 +5,24 @@
 **Date:** 2026-08-24  
 **Decision status:** Accepted  
 **Implementation maturity:** partial — the prompt-source, corpus-background, modality-source, copied-text, style-source, and default-stopword-deletion identity gates plus `topic_lineage` single-identity persistence across dormancy/reactivation are implemented-main; `network_analysis` cluster-pair scoring and `model_selection` candidate-K gates remain on their open PRs; the TRSL-TM estimator, global topic identity, method-effect model, and backend interchange remain accepted-target.
+**Date:** 2026-08-12
+**Decision status:** Accepted  
+**Implementation maturity:** accepted-target — prompt-versus-unique-content identity in `prompt_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — copied-versus-unique-content identity in `copied_text` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; topic estimator, global topic identity, method-effect model, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
+**Implementation maturity:** active-PR — `topic_lineage` keeps one P0 identity across active/dormant/reactivated states; remaining TRSL-TM estimator, method effects, and backend interchange remain accepted-target  
+**Implementation maturity:** active-PR — `network_analysis` refuses raw-simplex Euclidean geometry and scores cluster pair precision/recall; remaining TRSL-TM estimator, global topic identity, method effects, and backend interchange remain accepted-target  
+**Implementation maturity:** active-PR — `model_selection` statistical/Pareto candidate-`K` gates and known-`K` RMSE live in the new crate; remaining TRSL-TM estimator, global topic identity, method effects, and backend interchange remain accepted-target  
+**Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; topic estimator, global topic identity, method-effect model, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
+**Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — prompt-versus-unique-content identity in `prompt_source` on the active PR; estimator-side method model remains accepted-target  
+**Date:** 2026-08-12  
+**Date:** 2026-08-24
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
 ## Context
