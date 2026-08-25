@@ -1,6 +1,6 @@
 [package]
 name = "model_selection"
-description = "Statistical and Pareto candidate-K gates that refuse LLM numerical authority."
+description = "Fitted candidate-K scoring and Pareto gates that refuse LLM numerical authority."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +12,16 @@ readme.workspace = true
 keywords.workspace = true
 categories.workspace = true
 publish = false
+
+[dependencies]
+topic_measurement = { path = "../topic_measurement", version = "0.1.0" }
+
+[dev-dependencies]
+corpus_split = { path = "../corpus_split", version = "0.1.0" }
+membership_core = { path = "../membership_core", version = "0.1.0" }
+relation_graph = { path = "../relation_graph", version = "0.1.0" }
+temporal_core = { path = "../temporal_core", version = "0.1.0" }
+uuid.workspace = true
 
 [lints]
 workspace = true

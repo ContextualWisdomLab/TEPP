@@ -14,6 +14,10 @@ pub enum ModelSelectionError {
     EmptyCandidateSet,
     /// An LLM vote was asked to define the numerical optimum.
     LlmVoteIsNotStatisticalAuthority,
+    /// TF-IDF, BM25, stopword deletion, or LLM labels were offered as coordinates.
+    LexicalWeightForbidden,
+    /// Every fitted candidate failed to converge or produced a typed numeric failure.
+    NoSuccessfulFit,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -23,6 +27,8 @@ impl fmt::Display for ModelSelectionError {
             Self::InvalidDiagnostic => "invalid model-selection diagnostic",
             Self::EmptyCandidateSet => "empty model-selection candidate set",
             Self::LlmVoteIsNotStatisticalAuthority => "llm vote is not statistical authority",
+            Self::LexicalWeightForbidden => "lexical inferential weights are forbidden",
+            Self::NoSuccessfulFit => "no fitted candidate produced a finite diagnostic",
         };
         formatter.write_str(message)
     }
@@ -52,6 +58,14 @@ mod tests {
             (
                 ModelSelectionError::LlmVoteIsNotStatisticalAuthority,
                 "llm vote is not statistical authority",
+            ),
+            (
+                ModelSelectionError::LexicalWeightForbidden,
+                "lexical inferential weights are forbidden",
+            ),
+            (
+                ModelSelectionError::NoSuccessfulFit,
+                "no fitted candidate produced a finite diagnostic",
             ),
         ] {
             assert_eq!(error.to_string(), message);

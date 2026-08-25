@@ -188,6 +188,13 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
         .expect("rmse")
         .min(root_mean_square_error(&truth_b, &recovered).expect("label-swapped rmse"));
     assert!(rmse < 0.25, "known-truth topic RMSE {rmse} exceeded 0.25");
+
+    let log_likelihood = input
+        .in_sample_log_likelihood(&result)
+        .expect("in-sample mixture log-likelihood");
+    assert!(log_likelihood.is_finite());
+    let tokens = input.token_count().expect("token count");
+    assert!((tokens - 600.0).abs() < f64::EPSILON);
 }
 
 #[test]

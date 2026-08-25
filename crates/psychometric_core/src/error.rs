@@ -1099,6 +1099,27 @@ pub enum PsychometricError {
     /// mean using free `T0VAR`, not process-dynamics
     /// `asymDIFFUSION`.
     WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean,
+    /// Driver p. 16 `MANIFESTMEANSstd` was requested with a
+    /// non-positive residual. Footnote 4 standardisation of the
+    /// 2017-era `MANIFESTMEANS` vector requires strictly positive
+    /// `MANIFESTVAR`.
+    StandardisedManifestMeanRequiresPositiveManifestVariance,
+    /// Driver Table 2 unstandardised `MANIFESTMEANS` `τ` was treated
+    /// as `MANIFESTMEANSstd`. Unstandardised measurement intercept
+    /// is defined for a zero residual; standardised `MANIFESTMEANS`
+    /// is not.
+    UnstandardisedManifestMeanIsNotStandardisedManifestMean,
+    /// Driver p. 16 `MANIFESTVARstd` was treated as p. 16
+    /// `MANIFESTMEANSstd`. Equal numbers when `τ = √θ` are still
+    /// distinct named quantities. `MANIFESTVARstd` is the
+    /// correlation form of residual `MANIFESTVAR`;
+    /// `MANIFESTMEANSstd` is the measurement intercept.
+    StandardisedManifestVarianceIsNotStandardisedManifestMean,
+    /// Driver Eq. 5 `τ / √(λ² Var(η) + θ)` was treated as
+    /// `MANIFESTMEANSstd`. Footnote 4 standardises the named
+    /// intercept using residual `MANIFESTVAR`, not total observed
+    /// variance.
+    ObservedScaledManifestMeanIsNotStandardisedManifestMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1895,6 +1916,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean => {
                 "within-subject scaled initial latent mean is not standardised initial latent mean"
+            }
+            Self::StandardisedManifestMeanRequiresPositiveManifestVariance => {
+                "standardised manifest mean requires strictly positive measurement error"
+            }
+            Self::UnstandardisedManifestMeanIsNotStandardisedManifestMean => {
+                "unstandardised manifest mean is not standardised manifest mean"
+            }
+            Self::StandardisedManifestVarianceIsNotStandardisedManifestMean => {
+                "standardised manifest variance is not standardised manifest mean"
+            }
+            Self::ObservedScaledManifestMeanIsNotStandardisedManifestMean => {
+                "observed scaled manifest mean is not standardised manifest mean"
             }
         };
         formatter.write_str(message)
@@ -3273,6 +3306,27 @@ mod tests {
             PsychometricError::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean
                 .to_string(),
             "within-subject scaled initial latent mean is not standardised initial latent mean"
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_mean_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance.to_string(),
+            "standardised manifest mean requires strictly positive measurement error"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedManifestMeanIsNotStandardisedManifestMean.to_string(),
+            "unstandardised manifest mean is not standardised manifest mean"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean
+                .to_string(),
+            "standardised manifest variance is not standardised manifest mean"
+        );
+        assert_eq!(
+            PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean.to_string(),
+            "observed scaled manifest mean is not standardised manifest mean"
         );
     }
 }
