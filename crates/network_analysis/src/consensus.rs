@@ -133,8 +133,9 @@ pub fn consensus_clusters(
         if assignments[i].is_some() {
             continue;
         }
-        // Find all j ≥ i still unassigned whose co-assignment with i
-        // reaches the threshold.
+        // Every candidate j in i..k is still unassigned here: topics
+        // below i were finalized earlier and the loop never revisits
+        // them, so membership reduces to the co-assignment threshold.
         let members: Vec<usize> = (i..k_topics)
             .filter(|&j| {
                 assignments[j].is_none()
@@ -142,12 +143,11 @@ pub fn consensus_clusters(
             })
             .collect();
 
+        // Self-coassignment is identically one, so i itself is always a
+        // member; a lone member forms a cluster only when the topic
+        // actually appears in the perturbed graph.
         if members.len() < 2 {
-            // Singletons stay unclustered unless they pair strongly.
-            if !members.is_empty()
-                && co_count[i][i] as f64 / n_replicates as f64 >= consensus_threshold
-                && adjacency.contains_key(&i)
-            {
+            if adjacency.contains_key(&i) {
                 assignments[i] = Some(next_cluster);
                 next_cluster += 1;
             }
@@ -317,9 +317,47 @@ mod tests {
         // its co-assignment stays well above the consensus threshold
         // while never reaching a deterministic 1.0.
         let within_pair = output.co_assignment[0][1];
-        assert!(within_pair > 0.6 && within_pair < 1.0, "co = {within_pair}");
+        assert!(within_pair > 0.6, "co = {within_pair}");
+        assert!(within_pair < 1.0, "co = {within_pair}");
         // Cross-pair topics never co-assign: they share no edge.
         assert!((output.co_assignment[0][2]).abs() < 1e-12);
+    }
+
+    #[test]
+    fn heavily_perturbed_single_edge_leaves_both_topics_unclustered() {
+        // With a 0.9 drop probability the only edge survives ~10% of
+        // replicates, so pair co-assignment stays below the threshold;
+        // each topic still carries graph adjacency and therefore forms
+        // its own singleton cluster instead of disappearing.
+        let single = vec![edge(0, 1, 0.99)];
+        let output = consensus_clusters(&single, 2, 60, 0.5, 0.9, 41).unwrap();
+        assert_ne!(output.assignments[0], None);
+        assert_ne!(output.assignments[1], None);
+        assert_ne!(output.assignments[0], output.assignments[1]);
+    }
+
+    #[test]
+    fn spanning_cluster_forces_rescan_over_assigned_topics() {
+        // A single edge joins topics 0 and 2 while topic 1 stays
+        // isolated. After the first iteration assigns {0, 2}, the scan
+        // for topic 1 must walk past an already-assigned topic before
+        // finishing, exercising the assigned-skip arm of the membership
+        // filter.
+        let skip_pair = vec![edge(0, 2, 0.97)];
+        let output = consensus_clusters(&skip_pair, 3, 20, 0.9, 0.0, 5).unwrap();
+        assert_eq!(output.assignments[0], output.assignments[2]);
+        assert_eq!(output.assignments[1], None);
+    }
+
+    #[test]
+    fn isolated_topic_without_edges_stays_unclustered() {
+        let chain = vec![edge(0, 1, 0.95), edge(1, 2, 0.9)];
+        let output = consensus_clusters(&chain, 4, 25, 0.95, 0.0, 3).unwrap();
+        assert!(output.assignments[0].is_some());
+        assert!(output.assignments[1].is_some());
+        assert!(output.assignments[2].is_some());
+        assert_eq!(output.assignments[3], None);
+        assert!((output.co_assignment[3][0]).abs() < 1e-12);
     }
 
     #[test]
