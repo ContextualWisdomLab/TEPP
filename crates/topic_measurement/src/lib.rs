@@ -13,6 +13,7 @@
 mod coordinates;
 mod error;
 mod lexical;
+mod posterior_draw;
 mod reference;
 mod sparse;
 
@@ -30,6 +31,12 @@ pub use coordinates::isometric_log_ratio;
 pub use error::TopicMeasurementError;
 /// Refuse lexical retrieval weights as inferential coordinates.
 pub use lexical::refuse_lexical_inferential_weight;
+/// Stable counter-based draw algorithm identity.
+pub use posterior_draw::JOINT_POSTERIOR_DRAW_ALGORITHM_VERSION;
+/// Versioned deterministic joint Gaussian plausible-value draw set.
+pub use posterior_draw::JointPosteriorDrawSet;
+/// One exact fit-bound plausible value before artifact provenance binding.
+pub use posterior_draw::JointPosteriorPlausibleValue;
 /// Identified joint precision in document-major ALR coordinate order.
 pub use reference::JointCoordinatePrecision;
 /// Posterior uncertainty representation retained by a fitted reference model.

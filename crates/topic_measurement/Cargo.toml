@@ -17,6 +17,7 @@ publish = false
 corpus_split = { path = "../corpus_split", version = "0.2.0" }
 membership_core = { path = "../membership_core", version = "0.2.0" }
 relation_graph = { path = "../relation_graph", version = "0.2.0" }
+sha2.workspace = true
 temporal_core = { path = "../temporal_core", version = "0.2.0" }
 uuid.workspace = true
 
