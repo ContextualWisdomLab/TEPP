@@ -2,6 +2,7 @@
 
 **Decision status:** Accepted
 **Implementation maturity:** partial — bounded identity, recovery, temporal lineage, network geometry, model-selection, preprocessing, method-effect, and modality gates are implemented across the foundation crates; the TRSL-TM estimator, global topic identity, method effects, and backend interchange remain accepted-target.
+**Implementation maturity:** partial — logistic-normal ALR/ILR coordinates, lexical-weight refusal, statistical/Pareto candidate-`K` gates, stable active/dormant/reactivated topic identity, and the bounded CPU `f64` reference estimator are implemented on the active product branch; `corpus_background`, `topic_lineage`, `network_analysis`, `model_selection`, `stopword_deletion`, `style_source`, `copied_text`, and `modality_source` implement bounded identity and recovery gates implemented-main; method effects, calibrated posterior acceptance, accelerated backends, and backend interchange remain accepted-target until implemented and protected-main integrated
 **Implementation maturity:** partial — `corpus_background`, `topic_lineage`, `network_analysis`, `model_selection`, `stopword_deletion`, `style_source`, `copied_text`, and `modality_source` implement bounded identity and recovery gates; the TRSL-TM estimator, method effects, global topic identity, and backend interchange remain accepted-target.
 **Date:** 2026-08-12
 **Decision status:** Accepted  
@@ -45,8 +46,57 @@ For the first production line:
 - stopword deletion is not the default preprocessing rule;
 - TF-IDF and BM25 are not inferential weights for the statistical topic estimator;
 - topic proportions are compositional and downstream network/psychometric analysis uses logistic-normal coordinates or valid orthonormal log-ratio coordinates;
+- ALR is a reference-dependent full-rank logistic-normal map, not an Aitchison-distance isometry; distance-based Euclidean Aitchison geometry uses an orthonormal ILR basis;
 - model selection uses statistical/recovery/stability/alignment/fairness gates and a Pareto-style comparison before any blinded LLM review;
 - the LLM may recommend among statistically admissible candidates but never defines the numerical optimum or bypasses diagnostics.
+
+### CPU `f64` reference estimand and inference
+
+The bounded reference estimator uses sparse document-by-term counts `C`, one
+global `K`-topic word matrix `β`, and document logistic-normal coordinates
+`η_d`, with `θ_d = softmax([η_d, 0])`. Its prevalence mean is the PRD-owned
+structural equation
+
+\[
+m_d = x_d\Gamma + \sum_{g \in G_d} w_{dg}u_g,
+\qquad
+\eta_d \sim N(m_d, \sigma^2 I),
+\]
+
+where `x_d` includes an intercept, standardized event time, and admitted
+prevalence covariates, while the second term retains every active weighted
+cross-classified/multiple-membership assignment. This is the logistic-normal
+prevalence boundary of correlated/structural topic models, not a raw-simplex
+regression (Blei & Lafferty, 2007; Roberts et al., 2019).
+
+For explicit observed predecessor/successor relations only, the reference
+objective adds the harmonic network penalty
+
+\[
+R(\Theta,G)=\frac{1}{2}\sum_{(d,e)\in E}a_{de}
+\lVert\theta_d-\theta_e\rVert_2^2,
+\]
+
+so absent relations remain unobserved rather than negative. This follows the
+document-network regularization estimand of Mei et al. (2008); it is not a
+causal edge, an event-identity promotion, or an RTM link-probability claim.
+The full bounded MAP objective is
+
+\[
+\sum_{d,v} C_{dv}\log\!\left(\sum_k\theta_{dk}\beta_{kv}\right)
+-\frac{1}{2\sigma^2}\sum_d\lVert\eta_d-m_d\rVert_2^2
+-\lambda R(\Theta,G)-\frac{\rho}{2}\lVert\Gamma,u\rVert_2^2.
+\]
+
+Production inference uses deterministic generalized EM: normalized latent
+term-topic responsibilities, smoothed multinomial `β` updates, bounded
+gradient updates for `η` and structural coefficients, and a diagonal Laplace
+curvature approximation for document-coordinate uncertainty. Multiple seeded
+initializations retain the best finite converged objective. A non-finite
+intermediate, invalid sparse matrix, missing cutoff-safe document, reverse
+transition, or exhausted iteration budget returns a typed failure; it never
+emits a partial topic artifact. Recovery gates remain caller-owned promotion
+criteria over completed validation evidence.
 
 ## Non-goals
 
@@ -98,3 +148,12 @@ Mimno, D., Wallach, H. M., Naradowsky, J., Smith, D. A., & McCallum, A. (2009). 
 Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02
 
 Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082. https://doi.org/10.1111/ajps.12103
+
+Blei, D. M., & Lafferty, J. D. (2007). A correlated topic model of Science.
+*The Annals of Applied Statistics, 1*(1), 17–35.
+https://doi.org/10.1214/07-AOAS114
+
+Mei, Q., Cai, D., Zhang, D., & Zhai, C. (2008). Topic modeling with network
+regularization. In *Proceedings of the 17th International Conference on World
+Wide Web* (pp. 101–110). Association for Computing Machinery.
+https://doi.org/10.1145/1367497.1367512

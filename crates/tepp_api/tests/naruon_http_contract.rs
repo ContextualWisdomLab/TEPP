@@ -57,6 +57,7 @@ fn table_access_and_non_https_origins_fail_closed() {
     let run = sample_run();
     for origin in [
         "",
+        "https://",
         "postgres://tepp.example.test/tepp",
         "postgresql://tepp.example.test/tepp",
         "jdbc:postgresql://tepp.example.test/tepp",
@@ -119,6 +120,49 @@ fn review_and_copilot_headers_are_authorization_denied() {
         ),
         Err(ApiError::AuthorizationDenied)
     );
+    for name in [
+        "x-openai-api-key",
+        "x-anthropic-key",
+        "x-bytez-api-key",
+        "x-openrouter-api-key",
+        "x-apikey",
+        "x_api_key",
+        "x-secret",
+        "x-credential",
+        "x_openai",
+        "x_bytez",
+        "x_openrouter",
+    ] {
+        assert_eq!(
+            naruon_analysis_run_exchange_with_headers(
+                "https://tepp.example.test",
+                &run,
+                &[(name, "provider-secret")]
+            ),
+            Err(ApiError::AuthorizationDenied),
+            "header={name}"
+        );
+    }
+}
+
+#[test]
+fn malformed_extra_headers_fail_closed_before_forwarding() {
+    let run = sample_run();
+    for (name, value) in [
+        ("", "value"),
+        ("bad name", "value"),
+        ("x-trace", "ok\r\nx-injected: 1"),
+    ] {
+        assert_eq!(
+            naruon_analysis_run_exchange_with_headers(
+                "https://tepp.example.test",
+                &run,
+                &[(name, value)]
+            ),
+            Err(ApiError::InvalidWirePayload),
+            "header={name:?}"
+        );
+    }
 }
 
 #[test]

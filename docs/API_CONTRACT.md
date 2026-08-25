@@ -1,13 +1,13 @@
 # TEPP API and Modular Integration Contract
 
 **Status:** Accepted target contract; exact endpoints are introduced only with executable services.  
-**Last reviewed:** 2026-08-19
+**Last reviewed:** 2026-08-21
 
 ## 1. Authority boundary
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run and LineageWeave temporal-context POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
+Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
 
 ## 2. Contract families
 
@@ -20,9 +20,10 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
-| analysis-run request/accepted contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | implemented-main |
+| analysis-run request/accepted/status/terminal-result contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active product branch |
 | corpus-split leakage-audit manifest | `tepp_api` `CorpusSplitManifest` v1 | naruon, auditors, future UI | active-PR |
 | temporal-context ordering contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
+| cutoff-safe analysis-run readiness execution | `analysis_engine` bounded Rust crate | `tepp_api`, future HTTP/service adapters | active product branch |
 | project-history projection contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
 
 ## 3. Versioning
@@ -61,6 +62,24 @@ only events whose availability time is at or before `knowledge_cutoff`, orders
 them by event time and opaque event ID, and emits adjacent forward temporal
 associations plus `candidate_not_causal` transition gaps. It does not infer
 causality, mutate TEPP state, or return a completed psychometric result.
+
+The typed status/read contract returns `accepted`, `running`, `succeeded`, or
+`failed`. Accepted and running statuses contain no measurement result. A
+terminal status contains exactly one request-bound
+`AnalysisRunTerminalResult`; consumers must validate its request, receipt,
+snapshot, cutoff, model, profile, and idempotency bindings before treating the
+run as measurement evidence. The Rust DTO is available before the future HTTP
+service is deployed.
+
+The stacked `analysis_engine` slice provides the first executable service-side
+path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
+evidence unavailable at the historical cutoff, preserves multiple-membership
+counts, and emits a digest-bound terminal result or a redacted failure. For the
+`trsl_topic_lineage_v1` profile it invokes the ADR-0012 `topic_measurement`
+reference estimator and publishes validated fitted associations and counts in
+`tepp.trsl_topic_lineage.v1`; it does not infer causality or replace production
+`K` selection. This remains active product-branch evidence until its exact-head
+checks and protected merge pass.
 
 ## 5. Analysis request authority
 
