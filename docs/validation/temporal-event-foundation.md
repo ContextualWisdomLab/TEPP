@@ -20,6 +20,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Knowledge-cutoff identity | `cutoff_clock` | active-PR | this PR | recovered cutoff flags vs availability-time stand-in | ADR 0002 |
 | Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
+| First-story FAR/miss | `event_core` | active-PR | this PR | computed FAR/miss + RMSE vs always-first | ADR 0016; `docs/research/first-story-detection-calibration.md` |
 | Multiple membership | `membership_core` | partial | nested ICC + non-nested refusal | unit + ESS + nested ICC recovery | Task 7 / PR #12 + #25 + this increment |
 | TDT tracking stability | `event_core` | active-PR | this PR | pair P/R + switch rate + RMSE vs always-one-track | ADR 0016; `docs/research/event-tracking-calibration.md` |
 | CHRONOS schema-slot accuracy | `event_core` | active-PR | this PR | computed slot P/R + RMSE vs always-fill | ADR 0016; `docs/research/chronos-schema-slot-calibration.md` |
