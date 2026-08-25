@@ -953,6 +953,23 @@ class CoverageContractTests(unittest.TestCase):
             coverage_contract._cfg_test_module_line_numbers(unclosed_mod),
             {2, 3},
         )
+        # Attributes between #[cfg(test)] and the mod declaration belong to
+        # the module: detection must survive them (real-world pattern in
+        # network_analysis edges/stability test modules).
+        with_attribute = [
+            "fn production() {}",
+            "#[cfg(test)]",
+            "#[allow(clippy::float_cmp)]",
+            "mod tests {",
+            "    #[test]",
+            "    fn inner() {}",
+            "}",
+            "fn after() {}",
+        ]
+        self.assertEqual(
+            coverage_contract._cfg_test_module_line_numbers(with_attribute),
+            {4, 5, 6, 7},
+        )
         unclosed_not_feature = [
             '#[cfg(not(feature = "x"))]',
             "fn dangling() {",
