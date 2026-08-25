@@ -64,6 +64,7 @@ boundaries above remain the target modular MSA architecture.
 | `relation_graph` | typed relations and forward-transition validation |
 | `membership_core` | time-varying cross-classified multiple membership, Kish ESS, nested ICC with non-nested refusal |
 | `role_contradiction` | customer and competitor cannot occupy the same group |
+| `relation_absence` | unobserved relation pairs are not evidence of no relationship |
 | `persistence_postgres` | PostgreSQL repositories and migrations |
 | `corpus_split` | cutoff-safe, relation-aware partitioning |
 | `tepp_simulation` | known-truth temporal/event data generation |
@@ -105,6 +106,7 @@ boundaries above remain the target modular MSA architecture.
 | `topic_lineage` | global topic identity across active/dormant/reactivated states |
 | `network_analysis` | compositional cluster-pair gates; raw simplex is not Euclidean |
 | `interpretation_gateway` | evidence-bounded LLM interpretations; not estimators or observed facts |
+| `orchestrator_live` | loopback interpretation HTTP/1.1 listener |
 | `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
 | `compute_backend` | VRAM-budgeted streamed planning, executable OOM retry plans, and a compensated CPU `f64` reference |

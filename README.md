@@ -44,11 +44,6 @@ operator workspace, or supported release.
 - `psychometric_core`: validated statistical-recovery APIs on already-mapped
   coordinates. It does not implement a full ESEM/DSEM estimator.
 
-These are production contracts, not a claim that the complete commercial
-estimator, operator workspace, or supported release already exists. Read the
-[product and technical gap baseline](docs/product-technical-gap-baseline.md)
-before treating a crate as a shipped product capability.
-
 ```text
 crates/analysis_engine
 crates/assertion_clock
@@ -87,9 +82,11 @@ crates/prompt_source
 crates/provider_receipt
 crates/psychometric_core
 crates/psychometric_fit
+crates/relation_absence
 crates/relation_graph
 crates/retrospective_edge
 crates/revision_order
+crates/role_contradiction
 crates/semantic_core
 crates/service_tls
 crates/stopword_deletion

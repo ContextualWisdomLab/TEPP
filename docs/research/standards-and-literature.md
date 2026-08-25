@@ -245,6 +245,12 @@ Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple
 
 Customer, partner, and competitor are contextual roles. TEPP refuses a customer/competitor pair in the same group and does not collapse those roles into one commercial class (Biddle, 1986; Browne et al., 2001).
 
+## Relation observation and missingness
+
+Altman, D. G., & Bland, J. M. (1995). Absence of evidence is not evidence of absence. *BMJ, 311*(7003), 485. https://doi.org/10.1136/bmj.311.7003.485
+
+Unobserved relation pairs are missing statuses, not negative edges. TEPP refuses treating absence as evidence of no relationship (Altman & Bland, 1995).
+
 ## Unicode, language tags, and multilingual structure
 
 Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #15: Unicode normalization forms*. Unicode Consortium.
@@ -385,6 +391,12 @@ OWASP Foundation. (2023). *OWASP Top 10 CI/CD Security Risks*. https://owasp.org
 
 TEPP treats documents and model output as untrusted, requires exact evidence and fail-closed validation, supplies accessible exact-value alternatives to graphics, and emits SBOM and provenance evidence for releases. Actions registry identities are inventoried against the protected-main tree rather than trusted because a YAML path once existed (GitHub, n.d.; OpenSSF, 2023; OWASP Foundation, 2023).
 
+## HTTP interchange
+
+Fielding, R. T., & Reschke, J. (Eds.). (2014). *Hypertext Transfer Protocol (HTTP/1.1): Semantics and content* (RFC 7231). IETF. https://doi.org/10.17487/RFC7231
+
+TEPP uses RFC 7231 for method, status, and header semantics on versioned interchange and loopback live listeners. Fail-closed table-access, credential, and scientific-authority rules remain repository contracts, not RFC inferences.
+
 ## LLM orchestration and test-time compute
 
 ### ORCH-TRINITY-2026
@@ -399,4 +411,4 @@ Nielsen, S., Cetin, E., Schwendeman, P., Sun, Q., Xu, J., & Tang, Y. (2026). Lea
 
 Tang, Y., Cetin, E., Xu, J., Sun, Q., Nielsen, S., Richard, V., Goda, H., Tymchenko, I., Nguyen, N., Lee, H., Ashiga, M., Kotyan, S., Kuroki, S., & Clanuwat, T. (2026). *Sakana Fugu technical report* [Preprint]. arXiv. https://arxiv.org/abs/2606.21228
 
-TRINITY motivates lightweight learned model/role delegation over multiple turns; Conductor motivates query-adaptive natural-language workflow/topology/instruction generation and recursive test-time scaling; Fugu demonstrates a production-oriented family of query-adaptive agentic scaffolds building on these research lines (Xu et al., 2026; Nielsen et al., 2026; Tang et al., 2026). TEPP therefore treats direct routing, verification, fixed multi-agent workflows, adaptive orchestration, stage count, decomposition, recursion, access lists, role-specific reasoning effort, and total test-time budget as explicit experimental variables. `tepp_api::route_orchestration` is the deterministic selector for those variables; live provider execution and production-quality claims remain later work. Deeper/more-agent orchestration is never assumed better by default. Comparable-budget ablation, evidence support, calibration, disagreement, safety, cost, and failure behavior are required before a production claim. See `docs/research/adaptive-orchestration-router.md`.
+TRINITY motivates lightweight learned model/role delegation over multiple turns; Conductor motivates query-adaptive natural-language workflow/topology/instruction generation and recursive test-time scaling; Fugu demonstrates a production-oriented family of query-adaptive agentic scaffolds building on these research lines (Xu et al., 2026; Nielsen et al., 2026; Tang et al., 2026). TEPP therefore treats direct routing, verification, fixed multi-agent workflows, adaptive orchestration, stage count, decomposition, recursion, access lists, role-specific reasoning effort, and total test-time budget as explicit experimental variables. `tepp_api::route_orchestration` is the deterministic selector for those variables, while `orchestrator_live` records the selected mode on `POST /v1/interpretation-runs` and refuses scientific-authority promotion. Deeper/more-agent orchestration is never assumed better by default. Comparable-budget ablation, evidence support, calibration, disagreement, safety, cost, and failure behavior are required before a production claim. See `docs/research/adaptive-orchestration-router.md` and `docs/research/orchestrator-live-http.md`.

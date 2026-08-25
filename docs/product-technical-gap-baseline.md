@@ -9,6 +9,32 @@
 | Workspace members | 48 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual product boundaries. |
 | Open pull requests | **33** | The consolidation program drained all main-conflicting slices; the residual queue is 31 stacked drafts plus two non-draft slices and the coverage repairs in flight. |
 | Draft pull requests | **31** | Most queued work is not independently review-ready; the psychometric recovery stack dominates. |
+**Snapshot:** 2026-08-25T02:30:00Z
+**Protected-main evidence:** `abbd89874b0087ae0645c7a5c493557a1be8c2d5` (full SHA fetched live before every mutation)
+**Workspace version on protected main:** `0.1.0`
+**Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main. Duplicate [PR #179] stays closed.
+
+## Purpose
+
+This document is the executable operator-gap register for TEPP. It separates:
+
+- capabilities an operator can use from protected `main`;
+- bounded work that exists only on open pull requests;
+- product-completion issues with measurable acceptance evidence; and
+- release claims that remain prohibited.
+
+A planning document, local test, queued check, predecessor-head result, LLM
+judgment, or mergeable branch does not make a capability shipped. Re-read live
+GitHub state before any customer, release, certification, or valuation claim.
+
+## Snapshot facts
+
+| Signal | Snapshot evidence | Delivery implication |
+|---|---:|---|
+| Protected-main SHA | `5c8599442e85…` (2026-08-25T02:12Z, merge of #215) | All as-built claims are bounded to this commit. |
+| Workspace members | 48 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual product boundaries. |
+| Open pull requests | **59** | The consolidation vehicle landed; the residual queue is stacked drafts plus nine non-draft slices and one coverage repair. |
+| Draft pull requests | **33** | Most queued work is not independently review-ready; the psychometric recovery stack dominates. |
 | Non-draft pull requests | **0** | A non-draft state is not a qualifying review or required-check result. |
 | Open product issues | **10** | Issue #156 plus open product-completion issues #166–#169 and #171–#176. |
 | Duplicate gap-baseline PRs | **#164** (authority); **#179** closed as superseded | Only one live register remains; queued Checks on #164 are not protected-main evidence. |

@@ -12,6 +12,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Modular/API integration contract | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) |
 | naruon modular consumer contract | [`docs/connectors/naruon-artifact-consumer.md`](docs/connectors/naruon-artifact-consumer.md) |
 | contextual-orchestrator interpretation port | [`docs/connectors/contextual-orchestrator-interpretation-port.md`](docs/connectors/contextual-orchestrator-interpretation-port.md) |
+| Orchestrator live HTTP doctoring | [`docs/research/orchestrator-live-http.md`](docs/research/orchestrator-live-http.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
 | Logical/physical ERD | [`docs/ERD.md`](docs/ERD.md) |
 | Security policy | [`SECURITY.md`](SECURITY.md) |
@@ -57,6 +58,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Scientific claim-promotion gate doctoring | [`docs/research/scientific-claim-promotion-gates.md`](docs/research/scientific-claim-promotion-gates.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
+| Relation absence is not negative evidence | [`docs/research/relation-absence-not-negative.md`](docs/research/relation-absence-not-negative.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
 | Mention-confidence Brier doctoring | [`docs/research/mention-confidence-brier.md`](docs/research/mention-confidence-brier.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
@@ -142,6 +144,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Stopword-deletion doctoring | [`docs/research/stopword-deletion.md`](docs/research/stopword-deletion.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
+| Relation absence is not negative evidence | [`docs/research/relation-absence-not-negative.md`](docs/research/relation-absence-not-negative.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Corpus-split leakage-audit wire doctoring | [`docs/research/corpus-split-manifest-wire.md`](docs/research/corpus-split-manifest-wire.md) |
