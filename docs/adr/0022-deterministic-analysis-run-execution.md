@@ -1,4 +1,4 @@
-# ADR 0021 — Deterministic cutoff-safe analysis-run execution
+# ADR 0022 — Deterministic cutoff-safe analysis-run execution
 
 **Decision status:** Accepted
 **Implementation maturity:** active-PR — composed on the active product branch; not implemented-main

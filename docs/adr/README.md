@@ -27,6 +27,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0019](0019-project-history-wire-size-symmetry.md) | Symmetric LineageWeave project-history wire-size enforcement | Accepted | active-PR | Request serialization and generated project-history projections share bounded size rules. |
 | [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice; concept alignment, invariance, and topic estimation are not claimed. |
 | [0021](0021-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Credential-free bounded project-history API preserves LineageWeave authorization ownership. |
+| [0022](0022-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
 | [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | partial | Typed clocks/intervals (merged PR #8), Allen/path-consistency (merged PR #9), the clock-identity/revision-order/document-completeness gates (`system_clock`, `event_clock`, `assertion_clock`, `cutoff_clock`, `available_clock`, `document_clocks`, `revision_order`), and the provenance/ordering gates (`citation_edge`, `support_edge`, `retrospective_edge`) are implemented-main; superseded PRs #5/#6 are historical lineage only; remaining graph/split enforcement stays accepted-target. |
 | [0003](0003-relational-event-multiple-membership.md) | Relational event ontology and time-varying cross-classified multiple membership | Accepted | partial | Membership network/roles, Kish ESS, nested ICC, subevent parent-window containment (`subevent_containment`), the forward-only relation graph, evidential-vs-transition identity (`support_edge`), inferred-versus-observed identity (`inferred_status`), retrospective-reporting identity (`retrospective_edge`), summary-versus-source identity (`summarizes_edge`), copy-versus-source identity (`copy_identity`), location-versus-entity/language identity (`location_membership`), and IPO event-time order (`outcome_order`) are implemented-main; typed target-kind identity in `membership_target` is on PR #131; full multilevel estimators and persistence remain accepted-target. ADR 0016 owns event-intelligence tasks. |
@@ -59,8 +60,8 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0017](0017-hourly-contextual-orchestrator-gateway.md) | Hourly contextual-orchestrator gateway and all-provider model discovery | Accepted | active-PR | Keeps proposal-model execution behind a pinned loopback gateway while preserving independent verifier, publisher, reviewer, and merge authority. |
 | [0018](0018-consumer-scoped-analysis-run-ingress.md) | Consumer-scoped modular analysis-run ingress | Accepted | active-PR | Narrows ADR 0011 for the closed consumer registry, credential-free exchange, and consumer-qualified idempotency namespace; production TLS remains separate. |
 | [0019](0019-project-history-wire-size-symmetry.md) | Symmetric project-history wire-size enforcement | Accepted | active-PR | Narrows ADR 0008 for request serialization and generated LineageWeave project-history projections. |
-| [0020](0020-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Narrows ADR 0011 for the credential-free bounded project-history API and preserves LineageWeave authorization ownership. |
-| [0021](0021-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
+| [0021](0021-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Narrows ADR 0011 for the credential-free bounded project-history API and preserves LineageWeave authorization ownership. |
+| [0022](0022-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
 
 ## Decision ownership summary
 
@@ -85,9 +86,8 @@ Use the narrowest owning ADR when decisions overlap:
 - **hourly proposal gateway and provider discovery:** ADR 0017.
 - **modular consumer admission / replay identity:** ADR 0018.
 - **project-history wire-size symmetry:** ADR 0019.
-- **LineageWeave project-history service boundary:** ADR 0020.
-- **accepted-run execution and terminal artifact production:** ADR 0021.
 - **LineageWeave project-history service boundary:** ADR 0021.
+- **accepted-run execution and terminal artifact production:** ADR 0022.
 
 ## Change and supersession rule
 
