@@ -14,10 +14,10 @@ categories.workspace = true
 publish = false
 
 [dependencies]
-evidence_core = { path = "../evidence_core", version = "0.1.0" }
+evidence_core = { path = "../evidence_core", version = "0.2.0" }
 serde.workspace = true
 serde_json.workspace = true
-temporal_core = { path = "../temporal_core", version = "0.1.0" }
+temporal_core = { path = "../temporal_core", version = "0.2.0" }
 uuid.workspace = true
 
 [dev-dependencies]

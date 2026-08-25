@@ -14,7 +14,7 @@ categories.workspace = true
 publish = false
 
 [dependencies]
-evidence_core = { path = "../evidence_core", version = "0.1.0" }
+evidence_core = { path = "../evidence_core", version = "0.2.0" }
 
 [lints]
 workspace = true

@@ -14,7 +14,7 @@ categories.workspace = true
 publish = false
 
 [dependencies]
-temporal_core = { path = "../temporal_core", version = "0.1.0" }
+temporal_core = { path = "../temporal_core", version = "0.2.0" }
 
 [lints]
 workspace = true
