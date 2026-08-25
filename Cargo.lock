@@ -60,7 +60,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "analysis_engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "corpus_split",
  "membership_core",
@@ -76,7 +76,7 @@ dependencies = [
 
 [[package]]
 name = "assertion_clock"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "atoi"
@@ -95,7 +95,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "available_clock"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "backtrace"
@@ -184,7 +184,7 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "checkpoint_authority"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "cipher"
@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "citation_edge"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "cmov"
@@ -209,23 +209,23 @@ checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
 name = "compute_backend"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "copied_text"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "copy_identity"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "corpus_background"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "corpus_split"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "temporal_core",
  "unicode-normalization",
@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "cutoff_clock"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "defmt"
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "derived_sensitivity"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "digest"
@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "document_clocks"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "dotenvy"
@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "encrypted_mapping"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "aes-gcm",
  "getrandom 0.4.3",
@@ -414,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "episode_membership"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "equivalent"
@@ -445,11 +445,11 @@ dependencies = [
 
 [[package]]
 name = "event_clock"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "event_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "evidence_core",
  "serde",
@@ -460,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "evidence_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -786,7 +786,7 @@ dependencies = [
 
 [[package]]
 name = "inferred_status"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "inout"
@@ -799,11 +799,11 @@ dependencies = [
 
 [[package]]
 name = "intake_authorization"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "interpretation_gateway"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "uuid",
 ]
@@ -898,7 +898,7 @@ checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
 
 [[package]]
 name = "location_membership"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "lock_api"
@@ -917,7 +917,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "longitudinal_core"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "md-5"
@@ -931,7 +931,7 @@ dependencies = [
 
 [[package]]
 name = "membership_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -941,7 +941,7 @@ dependencies = [
 
 [[package]]
 name = "membership_target"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "memchr"
@@ -971,11 +971,11 @@ dependencies = [
 
 [[package]]
 name = "modality_source"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "model_selection"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "corpus_split",
  "membership_core",
@@ -987,7 +987,7 @@ dependencies = [
 
 [[package]]
 name = "network_analysis"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "num-traits"
@@ -1015,11 +1015,11 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "operational_log"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "orchestrator_live"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1027,7 +1027,7 @@ dependencies = [
 
 [[package]]
 name = "outcome_order"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "parking"
@@ -1060,7 +1060,7 @@ dependencies = [
 
 [[package]]
 name = "payload_bound"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "percent-encoding"
@@ -1070,7 +1070,7 @@ checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
 name = "persistence_postgres"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "operational_log",
  "sqlx",
@@ -1137,7 +1137,7 @@ dependencies = [
 
 [[package]]
 name = "prediction_contradiction"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "temporal_core",
 ]
@@ -1153,19 +1153,19 @@ dependencies = [
 
 [[package]]
 name = "prompt_source"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "provider_receipt"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "psychometric_core"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "psychometric_fit"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "quote"
@@ -1232,11 +1232,11 @@ dependencies = [
 
 [[package]]
 name = "relation_absence"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "relation_graph"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1246,11 +1246,11 @@ dependencies = [
 
 [[package]]
 name = "retrospective_edge"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "revision_order"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "ring"
@@ -1268,7 +1268,7 @@ dependencies = [
 
 [[package]]
 name = "role_contradiction"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "rustc-demangle"
@@ -1324,7 +1324,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "semantic_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "evidence_core",
 ]
@@ -1374,7 +1374,7 @@ dependencies = [
 
 [[package]]
 name = "service_tls"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "rustls",
 ]
@@ -1549,7 +1549,7 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "stopword_deletion"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "stringprep"
@@ -1564,11 +1564,11 @@ dependencies = [
 
 [[package]]
 name = "style_source"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "subevent_containment"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "subtle"
@@ -1578,11 +1578,11 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "summarizes_edge"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "support_edge"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "syn"
@@ -1619,11 +1619,11 @@ dependencies = [
 
 [[package]]
 name = "system_clock"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "temporal_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jiff",
  "serde",
@@ -1633,7 +1633,7 @@ dependencies = [
 
 [[package]]
 name = "tepp_api"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "corpus_split",
  "jiff",
@@ -1646,7 +1646,7 @@ dependencies = [
 
 [[package]]
 name = "tepp_simulation"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1742,14 +1742,14 @@ dependencies = [
 
 [[package]]
 name = "topic_lineage"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "uuid",
 ]
 
 [[package]]
 name = "topic_measurement"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "corpus_split",
  "membership_core",
@@ -1872,7 +1872,7 @@ dependencies = [
 
 [[package]]
 name = "validation_core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
