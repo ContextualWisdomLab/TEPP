@@ -439,6 +439,18 @@
 //! `T0TDPREDEFFECTstd`; `t0_m · √v_x / √(trait + p_0 + added)` uses
 //! `TRAITVAR` and is not `T0TDPREDEFFECTstd`; `TRAITVAR` is not the
 //! standardisation variance),
+//! recovers the Driver Table 3 / p. 16 / 2017-era
+//! `addedT0TIPREDVAR` as `t0_b² v`
+//! (JSS PDF re-opened 2026-08-23T18:20Z; 2017-era
+//! `summary.ctsemFit.R` forms
+//! `T0TIPREDEFFECT %*% TIPREDVAR %*% t(T0TIPREDEFFECT)` immediately
+//! after `T0TIPREDEFFECTstd`; form `t0_b` first, then square, then
+//! multiply by `v`; a zero coefficient or zero predictor variance is
+//! exactly zero; free `T0TIPREDEFFECT` does not require `a < 0`;
+//! `(B / a)² v` is `addedTIPREDVAR` and is not this first-occasion
+//! map; `t0_b · √v / √p_0` is `T0TIPREDEFFECTstd` and is not this
+//! variance; free `T0VAR` is not this extra TI variance; `TRAITVAR`
+//! is not this extra TI variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -562,6 +574,8 @@ pub use event_time::recover_initial_time_dependent_predictor_effect;
 pub use event_time::recover_initial_time_independent_predictor_carry;
 /// Exact scalar first-occasion `T0TIPREDEFFECT` shift `t0_b z`.
 pub use event_time::recover_initial_time_independent_predictor_effect;
+/// Exact scalar 2017-era `addedT0TIPREDVAR` `t0_b² v`.
+pub use event_time::recover_initial_time_independent_predictor_variance;
 /// Mean exact log-rate on already-centered irregular residuals.
 pub use event_time::recover_irregular_centered_residual_log_rate;
 /// Exact scalar §7.2 level-change `CINT` `κ = −a m x`.
@@ -764,6 +778,14 @@ pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
 pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating first-occasion TI observed mean as the first-occasion TD observed mean.
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as §7.2 `addedTIPREDVAR`.
+pub use event_time::refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as free first-occasion `T0VAR`.
+pub use event_time::refuse_initial_time_independent_variance_as_initial_latent_variance;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as `TRAITVAR`.
+pub use event_time::refuse_initial_time_independent_variance_as_trait_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.

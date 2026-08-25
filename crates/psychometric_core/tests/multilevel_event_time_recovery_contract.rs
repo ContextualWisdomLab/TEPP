@@ -28,6 +28,7 @@ use psychometric_core::{
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_variance,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
     recover_level_change_continuous_intercept, recover_level_change_discrete_increment,
     recover_level_change_extra_process_contribution,
@@ -113,6 +114,10 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
+    refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance,
+    refuse_initial_time_independent_variance_as_initial_latent_variance,
+    refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect,
+    refuse_initial_time_independent_variance_as_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -9257,6 +9262,81 @@ fn standardised_initial_time_dependent_effect_refuses_non_event_clocks_and_does_
             1e-308,
             LagClock::EventTime
         ),
+fn initial_time_independent_predictor_variance_recovers_driver_added_t0_tipred_var() {
+    let coefficient = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let recovered = recover_initial_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TIPREDVAR");
+    assert!((recovered - coefficient * coefficient * predictor_variance).abs() < 1e-15);
+    let asymptotic = recover_asymptotic_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        -0.5,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    assert!((asymptotic - recovered).abs() > 1e-3);
+    assert_eq!(
+        recover_asymptotic_time_independent_predictor_variance(
+            coefficient,
+            predictor_variance,
+            0.5,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+    );
+    let standardised = recover_standardised_initial_time_independent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        1.6,
+        LagClock::EventTime,
+    )
+    .expect("T0TIPREDEFFECTstd");
+    assert!((standardised - recovered).abs() > 1e-3);
+    assert_eq!(
+        recover_initial_time_independent_predictor_variance(0.0, 4.0, LagClock::EventTime)
+            .expect("zero")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance(
+            recovered, asymptotic
+        ),
+        Err(
+            PsychometricError::InitialTimeIndependentVarianceIsNotAsymptoticTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect(
+            recovered, standardised
+        ),
+        Err(
+            PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedInitialTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_initial_latent_variance(recovered, 1.6),
+        Err(PsychometricError::InitialTimeIndependentVarianceIsNotInitialLatentVariance)
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_trait_variance(recovered, 1.0),
+        Err(PsychometricError::InitialTimeIndependentVarianceIsNotTraitVariance)
+    );
+}
+
+#[test]
+fn initial_time_independent_predictor_variance_refuses_non_event_clocks_and_negative_variance() {
+    assert_eq!(
+        recover_initial_time_independent_predictor_variance(0.3, 4.0, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_time_independent_predictor_variance(0.3, -0.1, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }
