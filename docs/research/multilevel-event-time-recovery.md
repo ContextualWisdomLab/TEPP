@@ -102,11 +102,11 @@ This slice stays inside `psychometric_core`. It does not add a second invariance
 96. refuse treating unstandardised `T0MEANS` as `T0MEANSstd`, refuse treating `T0VARstd` as `T0MEANSstd` even when both equal 1, and refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`;
 97. recover the exact scalar p. 16 `MANIFESTMEANSstd` as `τ / √θ` after forming strictly positive `MANIFESTVAR` `θ` (Driver et al., 2017, p. 16; footnote 4; Table 2, p. 12; Eq. 5, p. 5; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-25T05:04Z; the 2017-era source forms unstandardised `MANIFESTMEANS` as `mxEval(MANIFESTMEANS, mxobj, compute=TRUE)`; that source does not form a `MANIFESTMEANSstd` matrix; the 2017-era `dimnames` assignment to `list(manifestNames, manifestNames)` on an `n.manifest × 1` matrix is a source bug; a zero mean is exactly zero; `θ = 0` fails closed; a non-event clock fails closed; `MANIFESTMEANS` does not require `a < 0`);
 98. refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`, refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd` even when both equal 1, and refuse treating `τ / √(λ² Var(η) + θ)` as `MANIFESTMEANSstd`;
-87. refuse pooling discrete lags from unequal event intervals as one coefficient;
-88. refuse unmatched sampling and constancy intervals for a time-varying predictor (Oud & Jansen, 2000, unread);
-89. refuse the difference quotient as a continuous-time rate;
-90. apply the same event-time map to CWC residuals (still not DSEM);
-89. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608).
+97. refuse pooling discrete lags from unequal event intervals as one coefficient;
+98. refuse unmatched sampling and constancy intervals for a time-varying predictor (Oud & Jansen, 2000, unread);
+99. refuse the difference quotient as a continuous-time rate;
+100. apply the same event-time map to CWC residuals (still not DSEM);
+101. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608).
 
 ## Claim boundary
 

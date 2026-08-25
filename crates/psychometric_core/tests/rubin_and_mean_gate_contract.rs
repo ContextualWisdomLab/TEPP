@@ -100,9 +100,17 @@ fn rubin_t_noisy_truth_reports_bias_rmse_and_interval_coverage() {
     let coverage = covered as f64 / recovered.len() as f64;
     assert!(bias.abs() < 0.01, "loading bias {bias}");
     assert!(rmse < 0.02, "loading RMSE {rmse}");
+    // CONTRIBUTING.md requires Monte Carlo thresholds to carry sampling
+    // uncertainty: the acceptance floor is the nominal 95% target minus the
+    // 1.96-quantile binomial standard error at that target over the 40
+    // deterministic replicates, not the bare nominal rate.
+    let replicates = recovered.len() as f64;
+    let nominal = 0.95_f64;
+    let monte_carlo_se = (nominal * (1.0 - nominal) / replicates).sqrt();
+    let acceptance_floor = nominal - 1.96 * monte_carlo_se;
     assert!(
-        coverage >= 0.95,
-        "95% interval coverage {coverage} must meet the constructed 1.96 gate"
+        coverage >= acceptance_floor,
+        "95% interval coverage {coverage} below derived floor {acceptance_floor}"
     );
 }
 

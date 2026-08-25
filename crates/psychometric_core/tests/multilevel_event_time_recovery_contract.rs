@@ -10499,3 +10499,15 @@ fn asymptotic_time_independent_observed_variance_refuses_non_event_clocks_and_un
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
 }
+
+#[test]
+fn lag_clock_wire_names_are_stable() {
+    // Every lag clock keeps its stable wire name so persisted artifacts and
+    // interchange payloads never silently rename a clock across versions.
+    assert_eq!(LagClock::EventTime.as_str(), "event_time");
+    assert_eq!(LagClock::SystemTime.as_str(), "system_time");
+    assert_eq!(LagClock::AssertionTime.as_str(), "assertion_time");
+    assert_eq!(LagClock::DocumentTime.as_str(), "document_time");
+    assert_eq!(LagClock::AvailabilityTime.as_str(), "availability_time");
+    assert_eq!(LagClock::KnowledgeCutoff.as_str(), "knowledge_cutoff");
+}
