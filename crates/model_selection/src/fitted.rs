@@ -9,10 +9,15 @@ use topic_measurement::{
 
 use crate::{ModelCandidate, ModelSelectionError, select_candidate_k};
 
+/// ADR 0012 `σ²` prior variance. Identical to `topic_measurement` reference.
 const DEFAULT_PRIOR_VARIANCE: f64 = 1.0;
+/// ADR 0012 network penalty `λ`. Identical to `topic_measurement` reference.
 const DEFAULT_RELATION_STRENGTH: f64 = 0.25;
+/// ADR 0012 coefficient ridge `ρ`. Identical to `topic_measurement` reference.
 const DEFAULT_RIDGE: f64 = 0.01;
+/// Smoothed multinomial `β` floor. Identical to `topic_measurement` reference.
 const DEFAULT_TOPIC_SMOOTHING: f64 = 0.05;
+/// Bounded GEM step. Identical to `topic_measurement` reference.
 const DEFAULT_STEP_SIZE: f64 = 0.2;
 
 /// Seeds, iteration budget, and candidate topic counts for fitted selection.
@@ -144,10 +149,10 @@ impl FittedCandidateKConfig {
 
 /// Build a statistically supported candidate from one actual fitted model.
 ///
-/// The first diagnostic is the BIC-penalized in-sample mixture
-/// log-likelihood `ℓ − (p ln N)/2` from the fitted `θ` and `β`. Complexity is
-/// the free parameter count `p`. A failed or non-finite diagnostic is returned
-/// as a typed error; it is never replaced with a fabricated likelihood.
+/// The first diagnostic is Schwarz's (1978) large-sample maximizer
+/// `ℓ − (p ln N)/2` from the fitted `θ` and `β`. Complexity is the free
+/// parameter count `p`. A failed or non-finite diagnostic is returned as a
+/// typed error; it is never replaced with a fabricated likelihood.
 ///
 /// # Errors
 ///
@@ -319,7 +324,19 @@ mod tests {
         assert!((config.tolerance() - 1e-5).abs() < f64::EPSILON);
         refuse_nonstatistical_method("trsl_tm_reference").expect("allowed");
         refuse_nonstatistical_method("logistic_normal").expect("allowed");
-        for method in ["stopwords", "llm", "llm-labels", "llm_vote_only"] {
+        for method in [
+            "tfidf",
+            "bm25",
+            "keyword",
+            "stopword",
+            "stopwords",
+            "stopworddeletion",
+            "llm",
+            "llmlabel",
+            "llm-labels",
+            "llm_vote",
+            "llm_vote_only",
+        ] {
             assert_eq!(
                 refuse_nonstatistical_method(method),
                 Err(ModelSelectionError::LexicalWeightForbidden)

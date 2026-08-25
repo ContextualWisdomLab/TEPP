@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-24
 **Decision status:** Accepted
-**Implementation maturity:** coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring is this PR; method effects and GPU remain accepted-target.
+**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring is this PR; method effects and GPU remain accepted-target.
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
 ## Context

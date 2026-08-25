@@ -266,12 +266,18 @@ fn lexical_and_llm_label_methods_are_refused() {
     let config = FittedCandidateKConfig::new(vec![2], vec![1], 10, 1e-6).expect("config");
     for method in [
         "tf-idf",
+        "tfidf",
         "BM25",
+        "bm25",
         "keyword",
         "stopword-deletion",
         "stopword",
+        "stopwords",
         "llm-label",
+        "llm-labels",
+        "llm",
         "llm_vote",
+        "llm_vote_only",
         "",
     ] {
         assert_eq!(
@@ -311,17 +317,26 @@ fn invalid_fitted_configuration_fails_closed() {
         FittedCandidateKConfig::new(vec![2], vec![1], 10, 0.0),
         Err(ModelSelectionError::InvalidDiagnostic)
     );
+    assert_eq!(
+        FittedCandidateKConfig::new(vec![2], vec![1], 10, f64::INFINITY),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
     let base = FittedCandidateKConfig::new(vec![2], vec![1], 10, 1e-6).expect("base");
     for values in [
         (f64::NAN, 0.5, 0.01, 0.05, 0.2),
+        (f64::INFINITY, 0.5, 0.01, 0.05, 0.2),
         (0.0, 0.5, 0.01, 0.05, 0.2),
         (1.0, f64::NAN, 0.01, 0.05, 0.2),
+        (1.0, f64::INFINITY, 0.01, 0.05, 0.2),
         (1.0, -1.0, 0.01, 0.05, 0.2),
         (1.0, 0.5, f64::NAN, 0.05, 0.2),
+        (1.0, 0.5, f64::INFINITY, 0.05, 0.2),
         (1.0, 0.5, -1.0, 0.05, 0.2),
         (1.0, 0.5, 0.01, f64::NAN, 0.2),
+        (1.0, 0.5, 0.01, f64::INFINITY, 0.2),
         (1.0, 0.5, 0.01, 0.0, 0.2),
         (1.0, 0.5, 0.01, 0.05, f64::NAN),
+        (1.0, 0.5, 0.01, 0.05, f64::INFINITY),
         (1.0, 0.5, 0.01, 0.05, 0.0),
     ] {
         assert_eq!(

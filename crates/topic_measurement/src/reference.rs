@@ -1001,6 +1001,10 @@ mod tests {
         );
 
         assert_eq!(
+            scoring_input(vec![vec![]], 2).token_count(),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        assert_eq!(
             scoring_input(vec![vec![(0, 0.0)], vec![(1, 0.0)]], 2).token_count(),
             Err(TopicMeasurementError::InvalidModelInput)
         );
