@@ -145,17 +145,23 @@ mod tests {
                 value
             );
         }
+        let mut digit_digest = anchor();
+        digit_digest.source_snapshot_sha256 = "0".repeat(64);
+        assert!(digit_digest.to_json().is_ok());
     }
 
     #[test]
     fn malformed_or_unbound_artifacts_fail_closed() {
-        for mutate in 0..5 {
+        for mutate in 0..8 {
             let mut value = anchor();
             match mutate {
                 0 => value.contract_version = 2,
                 1 => value.anchor_kind_code = "internal_structure".into(),
                 2 => value.estimation_run_id = "not-a-uuid".into(),
                 3 => value.source_snapshot_sha256 = "A".repeat(64),
+                4 => value.source_snapshot_sha256 = "a".repeat(63),
+                5 => value.estimation_run_id.clear(),
+                6 => value.knowledge_cutoff = "not-a-time".into(),
                 _ => value.validated_pair_count = 0,
             }
             assert!(value.to_json().is_err());
@@ -167,5 +173,11 @@ mod tests {
         let json = anchor().to_json().expect("serialize");
         let payload = json.strip_suffix('}').expect("object");
         assert!(LineageCriterionAnchor::from_json(&format!("{payload},\"theta\":0.8}}")).is_err());
+    }
+
+    #[test]
+    fn caller_payload_limit_is_enforced_before_parsing() {
+        let json = anchor().to_json().expect("serialize");
+        assert!(LineageCriterionAnchor::from_json_with_limit(&json, 1).is_err());
     }
 }
