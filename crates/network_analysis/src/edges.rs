@@ -412,6 +412,14 @@ mod tests {
             Err(NetworkEstimatorError::InvalidConfidenceLevel)
         ));
         assert!(matches!(
+            posterior_correlation_matrix(&draws, 0.3, f64::INFINITY, 10, 1),
+            Err(NetworkEstimatorError::InvalidConfidenceLevel)
+        ));
+        assert!(matches!(
+            posterior_correlation_matrix(&draws, 0.3, f64::NAN, 10, 1),
+            Err(NetworkEstimatorError::InvalidConfidenceLevel)
+        ));
+        assert!(matches!(
             posterior_correlation_matrix(&draws, 0.3, 0.0, 10, 1),
             Err(NetworkEstimatorError::InvalidConfidenceLevel)
         ));
