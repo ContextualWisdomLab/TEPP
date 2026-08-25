@@ -177,6 +177,7 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
     assert_eq!(precision.document_ids(), document_ids);
     assert_eq!(precision.topic_ids(), topic_ids);
     assert_eq!(precision.values().len(), 6);
+    assert_eq!(precision.coordinate_means().len(), 6);
     assert!(precision.values().iter().enumerate().all(|(row, values)| {
         values.iter().enumerate().all(|(column, value)| {
             value.is_finite() && (value - precision.values()[column][row]).abs() < f64::EPSILON

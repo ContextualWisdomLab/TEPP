@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-25  
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — contract validation and an explicit
-joint-posterior unavailable boundary; no estimator emits it
+**Implementation maturity:** active-PR — contract validation and deterministic
+CPU joint Laplace plausible values; no complete producer artifact yet
 **Supersedes:** None; composes ADR 0012 and Event Lineage contracts.
 
 ## Context
@@ -58,25 +58,42 @@ result exists until fast-mlsirm implements and validates the governed
 posterior-aware estimator. Contract acceptance therefore remains distinct from
 model availability.
 
-The CPU reference fit currently retains only per-document diagonal Laplace
-variances. Its Rust API reports `DiagonalLaplace` and refuses requests for a
-joint coordinate precision with `JointPosteriorUnavailable`. Those diagonal
-entries cannot be used as independent plausible-value draws: the fitted
-relational penalty and shared structural coefficients induce dependence that
-the retained diagonal does not identify. A producer can become available only
-after the estimator retains and validates the full identified joint precision,
-then binds document order, stable topic order, run, source snapshot, and cutoff
-identities before sampling.
+The standalone CPU reference-fit result retains only per-document diagonal
+Laplace variances. Its Rust API therefore reports `DiagonalLaplace` and refuses
+requests for a joint coordinate precision with `JointPosteriorUnavailable`.
+Those diagonal entries cannot be used as independent plausible-value draws:
+the fitted relational penalty and shared structural coefficients induce
+dependence that the retained diagonal does not identify. The separate
+fit-bound input API recomputes and validates the full identified joint
+precision while the exact admitted documents, event instants, relations, and
+stable topic basis remain available.
 
-The next CPU prerequisite builds an identified document-major joint precision
+The CPU prerequisite builds an identified document-major joint precision
 at a converged MAP fit. Its within-document block is the conditional
 multinomial information used by generalized EM plus Gaussian prior precision;
 each admitted relation adds the positive-semidefinite generalized-Gauss-Newton
 blocks from the softmax Jacobians of the harmonic network residual. The Rust
 boundary validates stable topic order, document order, finiteness, symmetry,
-and positive-definiteness. This matrix is not yet a covariance or draw set;
-inversion and deterministic sampling remain unavailable until separately
-governed and recovery-tested.
+and positive-definiteness. It is the only precision accepted by the governed
+deterministic sampler below; the standalone diagonal fit output remains
+ineligible.
+
+The CPU draw boundary now uses Philox4x32-10 counters keyed by an explicit
+`u64` seed, a versioned Box-Muller transform, and an upper-triangular Cholesky
+solve. It never substitutes the older diagonal variances. A SHA-256 draw-set
+identity binds the algorithm version, seed, draw count, ordered document and
+topic identities, MAP coordinates, joint precision, and emitted values. The
+counter layout assigns each `(draw_index, normal_block)` independently of
+execution order so a later GPU implementation can test the same stream
+contract (Salmon et al., 2011). Empirical covariance tests use probability
+bounds derived from Gaussian second moments rather than an arbitrary tolerance.
+
+This still is not a complete `tepp.topic_context_posterior.v1` producer. The
+topic fit binds each admitted event instant but does not own the declared event
+clock identity, source snapshot/run/cutoff identity, activity intervals,
+qualified document-lineage evidence, or time-valid membership provenance. The
+analysis layer must bind those exact records before assembling an artifact;
+absence of any required record remains unavailable.
 
 ## Verification
 
@@ -94,6 +111,10 @@ Blei, D. M., & Lafferty, J. D. (2006). Dynamic topic models. In *Proceedings of
 the 23rd International Conference on Machine Learning* (pp. 113–120). ACM.
 https://doi.org/10.1145/1143844.1143859
 
+Box, G. E. P., & Muller, M. E. (1958). A note on the generation of random
+normal deviates. *The Annals of Mathematical Statistics, 29*(2), 610–611.
+https://doi.org/10.1214/aoms/1177706645
+
 Chang, J., & Blei, D. M. (2009). Relational topic models for document networks.
 In *Proceedings of Machine Learning Research, 5*, 81–88.
 https://proceedings.mlr.press/v5/chang09a.html
@@ -110,6 +131,12 @@ latent Gaussian models by using integrated nested Laplace approximations.
 Schraudolph, N. N. (2002). Fast curvature matrix-vector products for
 second-order gradient descent. *Neural Computation, 14*(7), 1723–1738.
 https://doi.org/10.1162/08997660260028683
+
+Salmon, J. K., Moraes, M. A., Dror, R. O., & Shaw, D. E. (2011). Parallel
+random numbers: As easy as 1, 2, 3. In *Proceedings of 2011 International
+Conference for High Performance Computing, Networking, Storage and Analysis*
+(Article 16). Association for Computing Machinery.
+https://doi.org/10.1145/2063384.2063405
 
 ## Rollback and supersession
 

@@ -41,6 +41,7 @@ pub enum PrevalenceFeature {
 #[derive(Clone, Debug)]
 pub struct ReferenceTopicInput {
     document_ids: Vec<Uuid>,
+    event_times: Vec<EventTime>,
     term_rows: Vec<Vec<(usize, f64)>>,
     vocabulary_size: usize,
     design: Vec<Vec<f64>>,
@@ -105,6 +106,7 @@ impl ReferenceTopicInput {
 
         Ok(Self {
             document_ids,
+            event_times: event_times.to_vec(),
             term_rows,
             vocabulary_size: document_term.columns(),
             design,
@@ -414,9 +416,11 @@ pub enum PosteriorApproximation {
 /// Identified joint precision in document-major ALR coordinate order.
 #[derive(Clone, Debug, PartialEq)]
 pub struct JointCoordinatePrecision {
-    document_ids: Vec<Uuid>,
-    topic_ids: Vec<Uuid>,
-    values: Vec<Vec<f64>>,
+    pub(crate) document_ids: Vec<Uuid>,
+    pub(crate) topic_ids: Vec<Uuid>,
+    pub(crate) event_times: Vec<EventTime>,
+    pub(crate) coordinate_means: Vec<f64>,
+    pub(crate) values: Vec<Vec<f64>>,
 }
 
 impl JointCoordinatePrecision {
@@ -436,6 +440,12 @@ impl JointCoordinatePrecision {
     #[must_use]
     pub fn topic_ids(&self) -> &[Uuid] {
         &self.topic_ids
+    }
+
+    /// Return MAP ALR coordinates in document-major order.
+    #[must_use]
+    pub fn coordinate_means(&self) -> &[f64] {
+        &self.coordinate_means
     }
 
     /// Return the symmetric positive-definite precision matrix.
@@ -482,15 +492,17 @@ impl ReferenceTopicModel {
     /// Refuse to expose diagonal curvature as a joint posterior precision.
     ///
     /// A valid joint plausible-value producer needs the full identified
-    /// Hessian/precision over every document ALR coordinate. The current
-    /// estimator discards those off-diagonal blocks, so manufacturing a
+    /// Hessian/precision over every document ALR coordinate. This standalone
+    /// result discards those off-diagonal blocks, so manufacturing a
     /// diagonal-independent draw would understate dependence and violate ADR
-    /// 0024.
+    /// 0024. Callers that retain the admitted [`ReferenceTopicInput`] can build
+    /// its fit-bound joint precision instead.
     ///
     /// # Errors
     ///
     /// Always returns [`TopicMeasurementError::JointPosteriorUnavailable`]
-    /// until the estimator retains and validates the joint precision matrix.
+    /// because this result does not retain the fit input needed to reconstruct
+    /// and bind the joint precision matrix.
     pub const fn joint_coordinate_precision(&self) -> Result<&[Vec<f64>], TopicMeasurementError> {
         Err(TopicMeasurementError::JointPosteriorUnavailable)
     }
@@ -539,7 +551,9 @@ impl ReferenceTopicInput {
         }
 
         let mut precision = vec![vec![0.0; dimension]; dimension];
+        let mut coordinate_means = Vec::with_capacity(dimension);
         for (document, theta) in model.document_topic_proportions.iter().enumerate() {
+            coordinate_means.extend(crate::additive_log_ratio(theta)?);
             let tokens = self.term_rows[document]
                 .iter()
                 .map(|(_, count)| count)
@@ -570,6 +584,8 @@ impl ReferenceTopicInput {
         Ok(JointCoordinatePrecision {
             document_ids: self.document_ids.clone(),
             topic_ids,
+            event_times: self.event_times.clone(),
+            coordinate_means,
             values: precision,
         })
     }
@@ -629,7 +645,7 @@ fn add_relation_precision(
     }
 }
 
-fn validate_positive_definite(matrix: &[Vec<f64>]) -> Result<(), TopicMeasurementError> {
+pub(crate) fn cholesky(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, TopicMeasurementError> {
     let dimension = matrix.len();
     if dimension == 0
         || matrix
@@ -658,7 +674,11 @@ fn validate_positive_definite(matrix: &[Vec<f64>]) -> Result<(), TopicMeasuremen
             }
         }
     }
-    Ok(())
+    Ok(lower)
+}
+
+fn validate_positive_definite(matrix: &[Vec<f64>]) -> Result<(), TopicMeasurementError> {
+    cholesky(matrix).map(|_| ())
 }
 
 #[derive(Clone)]
@@ -1074,6 +1094,10 @@ mod tests {
     use temporal_core::EventTime;
     use uuid::Uuid;
 
+    fn event_time(day: u8) -> EventTime {
+        EventTime::parse_rfc3339(&format!("2026-01-{day:02}T00:00:00Z")).expect("event time")
+    }
+
     #[test]
     fn numeric_helpers_are_deterministic_and_fail_closed() {
         let mut seed = 1;
@@ -1106,6 +1130,7 @@ mod tests {
     fn impossible_numeric_states_and_mixed_topic_edges_fail_closed() {
         let input = ReferenceTopicInput {
             document_ids: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            event_times: vec![event_time(1), event_time(2)],
             term_rows: vec![vec![(0, f64::MAX)], vec![(0, f64::MAX)]],
             vocabulary_size: 2,
             design: vec![vec![1.0], vec![1.0]],
@@ -1195,6 +1220,7 @@ mod tests {
     ) -> ReferenceTopicInput {
         ReferenceTopicInput {
             document_ids: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            event_times: vec![event_time(1), event_time(2)],
             term_rows,
             vocabulary_size,
             design: vec![vec![1.0], vec![1.0]],
@@ -1361,6 +1387,7 @@ mod tests {
 
         let empty = ReferenceTopicInput {
             document_ids: Vec::new(),
+            event_times: Vec::new(),
             term_rows: Vec::new(),
             vocabulary_size: 2,
             design: Vec::new(),
@@ -1381,6 +1408,7 @@ mod tests {
         );
         let oversized = ReferenceTopicInput {
             document_ids: vec![Uuid::from_u128(1); 4_097],
+            event_times: vec![event_time(1); 4_097],
             term_rows: vec![vec![(0, 1.0)]; 4_097],
             vocabulary_size: 2,
             design: vec![vec![1.0]; 4_097],
