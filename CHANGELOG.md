@@ -88,6 +88,16 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `persistence_postgres` entity/project target SQL now rejects empty, oversized, or hostile type/status labels before insert; interpolated codes are restricted to lowercase ASCII `snake_case` characters so membership foreign keys remain referentially safe (ADR 0003 / ADR 0013).
 - `persistence_postgres` live SQLx transport retains one pool-backed PostgreSQL connection per session so tenant binding and the following statement share a session, and closes the connection and owned runtime safely from another Tokio runtime (ADR 0013).
 - The authored-line coverage gate now filters LLVM-only literal and expression continuation records while retaining branch coverage for their executable decisions; Rust function signatures and structural branch lines are no longer counted as uncovered statements.
+- Stacked `analysis_engine` vertical slice (ADR 0021): bounded Rust execution
+  from an accepted analysis run to a cutoff-safe, multiple-membership-aware,
+  SHA-256-digest-bound terminal artifact or redacted no-eligible-evidence
+  result. This remains active-PR evidence and does not claim estimator
+  authority.
+- `tepp_api` request-bound terminal analysis results and typed analysis-run
+  status/read responses: accepted/running states cannot carry measurement
+  evidence, and terminal results bind exact request and receipt identities.
+- Coverage classification now preserves multiline Rust `match` guard expression
+  lines while ignoring structural closing parentheses and match-arm labels.
 - `corpus_split` Unicode canonical identity: NFC/NFD-equivalent bodies produce `CanonicalEquivalent` leakage links and cannot occupy independent partitions; empty bodies and duplicate document identities fail closed (ADR 0004/0008/0013; PR #59).
 - `semantic_core` binds exact `evidence_core` source spans as semantic units. Language profiles are `unresolved` or a primary ISO 639 subtag with an IANA-registered ISO 3166-1 alpha-2 or UN M.49 region (RFC 5646; IANA File-Date 2026-08-08); private-use and unknown regions fail closed. Unresolved metadata keeps the caller-supplied Korean `측정` span and does not retokenize. `SemanticIdentity::from_language_tag` fails closed. Korean and English report sentences remain distinct units. Not concept alignment, not invariance, not a topic estimator (ADR 0020; issue #168). The APA register cites RFC 5646 once, in the Unicode/language-tags section; the slice-specific note remains `docs/research/span-grounded-semantic-units.md`.
 - `corpus_background` identity gate: corpus-level background wording is not unique latent content or a state transition; recovery tests distinguish background evidence from unique content.

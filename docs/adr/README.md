@@ -95,6 +95,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0015](0015-autonomous-development-review-and-merge-authority.md) | Autonomous development, review, and merge authority separation | Accepted | active-PR | Separates model proposal, deterministic verification, publication, independent review, and merge/release authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | TDT link precision/recall in existing `event_core`; remaining TDT/CHRONOS stack remains accepted-target. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
+| [0021](0021-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Stacked on PR #157; closes the first executable buyer path from accepted run to digest-bound terminal result without claiming estimator authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | First-story FAR/miss in existing `event_core`; remaining TDT/CHRONOS stack remains accepted-target. |
 | [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice. Does not claim concept alignment, invariance, or a topic estimator. |
 | [0017](0017-hourly-contextual-orchestrator-gateway.md) | Hourly contextual-orchestrator gateway and all-provider model discovery | Accepted | active-PR | Keeps proposal-model execution behind a pinned loopback gateway while preserving independent verifier, publisher, reviewer, and merge authority. |
@@ -123,6 +124,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **claim maturity / release evidence:** ADR 0014;
 - **autonomous development/review/merge authority:** ADR 0015;
 - **TDT/CHRONOS event intelligence:** ADR 0016;
+- **accepted-run execution and terminal artifact production:** ADR 0021.
 - **hourly proposal gateway and provider discovery:** ADR 0017.
 - **modular consumer admission / replay identity:** ADR 0018.
 - **project-history wire-size symmetry:** ADR 0019.

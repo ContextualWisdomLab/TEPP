@@ -6,6 +6,25 @@ implemented in Rust.
 
 ## Current implementation state
 
+This branch preserves the protected-main Rust workspace and quality-gate
+foundation. The workspace crates expose tested contracts only: immutable
+evidence identities and exact spans, six-clock temporal values with Allen
+algebra and cutoff eligibility, event mentions/instances with
+evidence-layer intelligence gates, a forward-only relation graph,
+cross-classified membership, bitemporal persistence, leakage-safe corpus
+splits, simulation manifests, claim-promotion validation, API DTOs, the
+purpose-bound privacy envelope, and longitudinal within/between
+decomposition. It adds the independently usable `analysis_engine` vertical
+slice: bounded cutoff-safe readiness work that emits a digest-bound terminal
+artifact or a redacted no-eligible-evidence result. That slice is active-PR
+evidence, not a psychometric estimator or a release claim.
+The current workspace contains 50 independently documented Rust crates. Each
+crate exposes a bounded, tested contract for evidence, temporal semantics,
+event and relation reasoning, membership, persistence, simulation, validation,
+API exchange, compute planning, or evidence-grounded interpretation. Numerical
+and psychometric authority remains on the CPU `f64` reference path; streamed
+accelerator plans must preserve the full observation set and fail closed to the
+reference path when resources or validation are insufficient.
 The repository currently implements 53 independently documented crates rather
 than a full commercial release. The implemented crates include topic measurement
 and the analysis engine; they do not claim a complete commercial estimator,
@@ -100,6 +119,7 @@ crates/corpus_split
 crates/tepp_simulation
 crates/validation_core
 crates/tepp_api
+crates/analysis_engine
 crates/episode_membership
 crates/location_membership
 crates/prediction_contradiction

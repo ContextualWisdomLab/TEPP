@@ -5,7 +5,9 @@
 **Implementation maturity:** partial — membership networks, event mention/instance separation, and the protected-main forward-transition foundation are implemented-main; `support_edge`, `outcome_order`, `retrospective_edge`, `inferred_status`, `copy_identity`, `summarizes_edge`, `subevent_containment`, `location_membership`, `episode_membership`, and typed target kinds are covered by this active consolidation PR; full multilevel/MMMC estimators and remaining persistence remain accepted-target.
 **Date:** 2026-08-05
 **Implementation maturity:** partial — membership network, event mention/instance separation, inferred/evidential/retrospective status gates, summary/source identity separation, template-copy/source identity separation, typed forward-only relation graph, strict input-process-outcome ordering, nested ICC refusal, and subevent parent-window containment are implemented-main; full multilevel/MMMC estimators and remaining persistence remain accepted-target.
-**Date:** 2026-08-24
+**Date:** 2026-08-24  
+**Decision status:** Accepted  
+**Implementation maturity:** partial — membership network/roles with Kish ESS and nested ICC (cross-classified/multiple-membership refusal), event mention/instance separation, the typed forward-only relation graph, and the copy/summary/outcome-order/support/inferred-status/retrospective-reporting/location identity gates are implemented-main; typed target-kind membership identity in `membership_target` is on PR #131; multilevel psychometric estimators and remaining persistence details follow ADR 0013 and [`docs/TRACEABILITY.md`](../TRACEABILITY.md) as accepted-target.
 **Supersedes:** None. ADR 0016 owns TDT/CHRONOS event-intelligence task semantics; this ADR remains authoritative for ontology, relation, role, and membership structure.
 
 ## Context

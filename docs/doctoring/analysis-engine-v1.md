@@ -32,6 +32,9 @@ Technology, 2015).
 The local preflight for this slice passed with Rust 1.97.1:
 
 - `cargo fmt --all -- --check`;
+- `cargo test -p analysis_engine` — 5 unit tests, 1 crate-contract test, 2
+  end-to-end tests, and doctest collection;
+- `cargo clippy -p analysis_engine --all-targets -- -D warnings`.
 - `cargo test -p analysis_engine` — 8 unit tests, 1 crate-contract test, 3
   readiness integration tests, 2 topic-lineage integration tests, and doctest
   collection;

@@ -6,6 +6,7 @@
 //! was unavailable at the requested knowledge cutoff, counts multiple-membership
 //! assignments without collapsing them, and emits a digest-bound terminal result
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
+//! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
 //! contracts and preserves their artifact meaning.
 
@@ -303,6 +304,14 @@ pub fn execute_analysis_run(
         });
     }
 
+    // The corpus bound makes this conversion strictly smaller than
+    // `u64::MAX`; the fold still fails closed through checked arithmetic so a
+    // future bound change cannot wrap membership totals silently.
+    let eligible_evidence_count = eligible.len() as u64;
+    let eligible_membership_count = eligible.iter().try_fold(0_u64, |sum, unit| {
+        sum.checked_add(u64::from(unit.membership_count))
+            .ok_or(AnalysisEngineError::ArithmeticOverflow)
+    })?;
     // The corpus bound makes this conversion and sum strictly smaller than
     // `u64::MAX`: 100,000 * u32::MAX is below the 64-bit range.
     let eligible_evidence_count = eligible.len() as u64;
@@ -378,6 +387,7 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
+        MAX_EVIDENCE_UNITS, execute_analysis_run,
         MAX_EVIDENCE_UNITS, TopicMeasurementError, execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
@@ -529,7 +539,6 @@ mod tests {
             vec![unit(
                 "evidence-1",
                 "2026-07-01T00:00:00Z",
-                "2026-07-01T00:00:00Z",
                 1,
             )],
         )
@@ -544,7 +553,6 @@ mod tests {
             "snapshot-1",
             vec![unit(
                 "evidence-1",
-                "2026-07-01T00:00:00Z",
                 "2026-07-01T00:00:00Z",
                 1,
             )],
@@ -585,7 +593,6 @@ mod tests {
     fn public_accessors_limits_and_error_messages_are_executable() {
         let evidence = unit(
             "evidence-accessor",
-            "2026-07-01T00:00:00Z",
             "2026-07-01T00:00:00Z",
             4,
         );
@@ -660,7 +667,6 @@ mod tests {
             "snapshot-1",
             vec![unit(
                 "evidence-1",
-                "2026-07-01T00:00:00Z",
                 "2026-07-01T00:00:00Z",
                 1,
             )],

@@ -1,6 +1,7 @@
 # TEPP API and Modular Integration Contract
 
 **Status:** Accepted target contract; exact endpoints are introduced only with executable services.  
+**Last reviewed:** 2026-08-24
 **Last reviewed:** 2026-08-21
 
 ## 1. Authority boundary
@@ -25,6 +26,8 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | temporal-context ordering contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
 | cutoff-safe analysis-run readiness execution | `analysis_engine` bounded Rust crate | `tepp_api`, future HTTP/service adapters | active product branch |
 | project-history projection contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
+| analysis-run status/terminal-result contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR #157 |
+| cutoff-safe analysis-run readiness execution | `analysis_engine` bounded Rust crate | `tepp_api`, future HTTP/service adapters | active-PR |
 
 ## 3. Versioning
 
@@ -56,6 +59,18 @@ GET    /v1/exports/{export_id}
 ```
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.
+
+The typed status/read contract returns `accepted`, `running`, `succeeded`, or
+`failed`. Accepted and running statuses contain no measurement result. A
+terminal status contains exactly one request-bound `AnalysisRunTerminalResult`;
+consumers validate its request, receipt, snapshot, cutoff, model, profile, and
+idempotency bindings before treating it as measurement evidence.
+
+The stacked `analysis_engine` slice provides the first executable service-side
+path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
+evidence unavailable at the historical cutoff, preserves multiple-membership
+counts, and emits a digest-bound terminal result or a redacted failure. It is
+not a substitute for approved topic or psychometric estimators.
 
 `POST /v1/temporal-context` is a bounded LineageWeave read contract. It accepts
 only events whose availability time is at or before `knowledge_cutoff`, orders

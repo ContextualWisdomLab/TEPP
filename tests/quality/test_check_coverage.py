@@ -671,6 +671,16 @@ class CoverageContractTests(unittest.TestCase):
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 4))
             self.assertFalse(coverage_contract.is_executable_source_line(str(source), 7))
 
+            source.write_text(
+                "match state {\n"
+                "    State::Ready(value) if(value.is_valid()) => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
+
     def test_guard_after_brace_closing_pattern_is_executable(self) -> None:
         """Count a guard after a destructuring pattern that closes with a brace."""
 
@@ -815,6 +825,41 @@ class CoverageContractTests(unittest.TestCase):
                     ["State::Current", "State::Current => {"],
                     2,
                 )
+            )
+            self.assertFalse(
+                coverage_contract._is_multiline_match_guard(
+                    [
+                        "match state {",
+                        "    if previous_guard",
+                        "    }",
+                        "    let nested = match input {",
+                        "        0 => {",
+                    ],
+                    5,
+                )
+            )
+
+            guarded_after_block = Path(temporary) / "guarded_after_block.rs"
+            guarded_after_block.write_text(
+                "match state {\n"
+                "    State::Previous => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "    State::Ready(value)\n"
+                "        if value.is_valid()\n"
+                "        && value.is_fresh() => {\n"
+                "        consume(value);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(
+                    str(guarded_after_block), 7
+                )
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(guarded_after_block), 2)
             )
 
     def test_cfg_test_and_not_feature_block_helpers(self) -> None:
