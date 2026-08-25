@@ -35,6 +35,8 @@ use psychometric_core::{
     recover_predetermined_later_lagged_latent_covariance,
     recover_predetermined_later_lagged_observed_covariance,
     recover_predetermined_later_latent_variance, recover_predetermined_later_observed_variance,
+    recover_predetermined_later_start_later_latent_variance,
+    recover_predetermined_later_start_later_observed_variance,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
     recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
     recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -112,6 +114,7 @@ use psychometric_core::{
     refuse_measurement_error_as_predetermined_lagged_observed_covariance,
     refuse_measurement_error_as_predetermined_later_lagged_observed_covariance,
     refuse_measurement_error_as_predetermined_later_observed_variance,
+    refuse_measurement_error_as_predetermined_later_start_later_observed_variance,
     refuse_measurement_error_as_stationary_lagged_observed_covariance,
     refuse_measurement_error_as_stationary_later_observed_variance,
     refuse_predetermined_initial_latent_variance_as_initial_latent_variance,
@@ -130,6 +133,7 @@ use psychometric_core::{
     refuse_predetermined_later_lagged_latent_covariance_as_observed_covariance,
     refuse_predetermined_later_lagged_latent_covariance_as_predetermined_lagged_covariance,
     refuse_predetermined_later_lagged_latent_covariance_as_stationary_lagged_covariance,
+    refuse_predetermined_later_lagged_observed_covariance_as_predetermined_later_start_later_observed_variance,
     refuse_predetermined_later_latent_variance_as_discrete_variance,
     refuse_predetermined_later_latent_variance_as_initial_latent_variance,
     refuse_predetermined_later_latent_variance_as_observed_variance,
@@ -137,6 +141,13 @@ use psychometric_core::{
     refuse_predetermined_later_observed_variance_as_predetermined_initial_observed_variance,
     refuse_predetermined_later_observed_variance_as_predetermined_lagged_observed_covariance,
     refuse_predetermined_later_observed_variance_as_predetermined_later_lagged_observed_covariance,
+    refuse_predetermined_later_observed_variance_as_predetermined_later_start_later_observed_variance,
+    refuse_predetermined_later_start_later_latent_variance_as_decayed_later_total,
+    refuse_predetermined_later_start_later_latent_variance_as_lag_interval_later_latent_variance,
+    refuse_predetermined_later_start_later_latent_variance_as_later_lagged_covariance,
+    refuse_predetermined_later_start_later_latent_variance_as_later_latent_variance,
+    refuse_predetermined_later_start_later_latent_variance_as_observed_variance,
+    refuse_predetermined_later_start_later_latent_variance_as_stationary_later_latent_variance,
     refuse_process_noise_as_unconditional_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -164,6 +175,7 @@ use psychometric_core::{
     refuse_stationary_later_latent_variance_as_observed_variance,
     refuse_stationary_later_latent_variance_as_process_noise,
     refuse_stationary_later_observed_variance_as_predetermined_later_observed_variance,
+    refuse_stationary_later_observed_variance_as_predetermined_later_start_later_observed_variance,
     refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
@@ -3827,6 +3839,287 @@ fn predetermined_later_lagged_observed_covariance_is_not_manifest_first_or_stati
         ),
         Err(
             psychometric_core::PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterLaggedObservedCovariance
+        )
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn predetermined_later_start_later_latent_variance_is_not_later_lagged_or_stationary() {
+    let trait_variance = 1.0_f64;
+    let initial_latent_variance = 2.0_f64;
+    let diffusion = 0.4_f64;
+    let log_rate = -0.134_488_942_f64;
+    let start_delta = 2.0_f64;
+    let lag_delta = 1.0_f64;
+    let recovered = recover_predetermined_later_start_later_latent_variance(
+        trait_variance,
+        initial_latent_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        start_delta,
+        lag_delta,
+        LagClock::EventTime,
+    )
+    .expect("predetermined later-start later T0VAR");
+    let later = recover_predetermined_later_latent_variance(
+        trait_variance,
+        initial_latent_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        start_delta,
+        LagClock::EventTime,
+    )
+    .expect("later variance");
+    let later_lagged = recover_predetermined_later_lagged_latent_covariance(
+        trait_variance,
+        initial_latent_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        start_delta,
+        lag_delta,
+        LagClock::EventTime,
+    )
+    .expect("later-start lagged");
+    let stationary_later = recover_stationary_later_latent_variance(
+        trait_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        lag_delta,
+        LagClock::EventTime,
+    )
+    .expect("stationary later");
+    let decayed_later = recover_discrete_latent_variance(
+        later,
+        diffusion,
+        log_rate,
+        lag_delta,
+        LagClock::EventTime,
+    )
+    .expect("evolved later total");
+    let lag_interval = recover_predetermined_later_latent_variance(
+        trait_variance,
+        initial_latent_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        lag_delta,
+        LagClock::EventTime,
+    )
+    .expect("later over s only");
+    assert!(
+        (recovered - later).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 startoffset): later-start later-occasion adds Q_s"
+    );
+    assert!(
+        (recovered - later_lagged).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 startoffset): later-occasion variance is not lagged covariance"
+    );
+    assert!(
+        (recovered - stationary_later).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 predetermined later-start later): free p_0 is not −q/(2a)"
+    );
+    assert!(
+        (recovered - decayed_later).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 startoffset): trait and addedTIPREDVAR do not enter Q_s"
+    );
+    assert!(
+        (recovered - lag_interval).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 startoffset): ignoring startoffset omits e^{{2as}} Q_u"
+    );
+    assert_eq!(
+        refuse_predetermined_later_start_later_latent_variance_as_later_latent_variance(
+            recovered, later
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLaterLatentVariance
+        )
+    );
+    assert_eq!(
+        refuse_predetermined_later_start_later_latent_variance_as_later_lagged_covariance(
+            recovered,
+            later_lagged
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLaterLaggedCovariance
+        )
+    );
+    assert_eq!(
+        refuse_predetermined_later_start_later_latent_variance_as_stationary_later_latent_variance(
+            recovered,
+            stationary_later
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotStationaryLaterLatentVariance
+        )
+    );
+    assert_eq!(
+        refuse_predetermined_later_start_later_latent_variance_as_decayed_later_total(
+            recovered,
+            decayed_later
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotDecayedLaterTotal
+        )
+    );
+    assert_eq!(
+        refuse_predetermined_later_start_later_latent_variance_as_lag_interval_later_latent_variance(
+            recovered,
+            lag_interval
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLagIntervalLaterLatentVariance
+        )
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn predetermined_later_start_later_observed_variance_is_not_manifest_later_or_stationary() {
+    let trait_variance = 1.0_f64;
+    let initial_latent_variance = 2.0_f64;
+    let diffusion = 0.4_f64;
+    let log_rate = -0.134_488_942_f64;
+    let loading = 2.0_f64;
+    let measurement_error = 0.5_f64;
+    let start_delta = 2.0_f64;
+    let lag_delta = 1.0_f64;
+    let recovered = recover_predetermined_later_start_later_observed_variance(
+        loading,
+        trait_variance,
+        initial_latent_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        start_delta,
+        lag_delta,
+        measurement_error,
+        0.1,
+        LagClock::EventTime,
+    )
+    .expect("eq5-later-start-later-predetermined-T0VAR");
+    let latent = recover_predetermined_later_start_later_latent_variance(
+        trait_variance,
+        initial_latent_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        start_delta,
+        lag_delta,
+        LagClock::EventTime,
+    )
+    .expect("later-start later T0VAR");
+    let later = recover_predetermined_later_observed_variance(
+        loading,
+        trait_variance,
+        initial_latent_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        start_delta,
+        measurement_error,
+        0.1,
+        LagClock::EventTime,
+    )
+    .expect("eq5-later");
+    let later_lagged = recover_predetermined_later_lagged_observed_covariance(
+        loading,
+        trait_variance,
+        initial_latent_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        start_delta,
+        lag_delta,
+        0.1,
+        LagClock::EventTime,
+    )
+    .expect("eq5-later-start-lagged");
+    let stationary = recover_stationary_later_observed_variance(
+        loading,
+        trait_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        lag_delta,
+        measurement_error,
+        0.1,
+        LagClock::EventTime,
+    )
+    .expect("eq5-stationary-later");
+    assert!(
+        (recovered - measurement_error).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of later-start later-occasion predetermined T0VAR): Var(y) is not MANIFESTVAR"
+    );
+    assert!(
+        (recovered - latent).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of later-start later-occasion predetermined T0VAR): Var(y) is not later-start later T0VAR"
+    );
+    assert!(
+        (recovered - later).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of later-start later-occasion predetermined T0VAR): later at u omits Q_s"
+    );
+    assert!(
+        (recovered - later_lagged).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of later-start later-occasion predetermined T0VAR): lagged omits Q_s and θ"
+    );
+    assert!(
+        (recovered - stationary).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of later-start later-occasion predetermined T0VAR): free p_0 is not −q/(2a)"
+    );
+    assert_eq!(
+        refuse_predetermined_later_start_later_latent_variance_as_observed_variance(
+            latent, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_measurement_error_as_predetermined_later_start_later_observed_variance(
+            measurement_error,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::MeasurementErrorIsNotPredeterminedLaterStartLaterObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_predetermined_later_observed_variance_as_predetermined_later_start_later_observed_variance(
+            later, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_predetermined_later_lagged_observed_covariance_as_predetermined_later_start_later_observed_variance(
+            later_lagged, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterLaggedObservedCovarianceIsNotPredeterminedLaterStartLaterObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_stationary_later_observed_variance_as_predetermined_later_start_later_observed_variance(
+            stationary, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StationaryLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance
         )
     );
 }
