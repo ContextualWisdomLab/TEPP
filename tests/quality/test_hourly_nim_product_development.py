@@ -216,6 +216,10 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             'python3 scripts/check_coverage.py "$branch_coverage" --kind branches',
         ):
             self.assertIn(command, verifier)
+        self.assertNotIn(
+            "--json --summary-only --output-path \"$branch_coverage\"",
+            verifier,
+        )
 
     def test_parser_accepts_unicode_and_owner_only_outputs(self) -> None:
         """Parse realistic Korean metadata and protect trusted output files."""

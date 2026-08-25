@@ -36,6 +36,10 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Hourly NIM product-development operations | [`docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md`](docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md) |
 | Actions workflow fleet audit | [`docs/operations/ACTIONS_WORKFLOW_FLEET.md`](docs/operations/ACTIONS_WORKFLOW_FLEET.md) |
 | Actions fleet research doctoring | [`docs/research/actions-workflow-fleet.md`](docs/research/actions-workflow-fleet.md) |
+| Posterior ESEM/DSEM input-gate doctoring | [`docs/research/posterior-esem-input-gates.md`](docs/research/posterior-esem-input-gates.md) |
+| Multilevel/event-time recovery doctoring | [`docs/research/multilevel-event-time-recovery.md`](docs/research/multilevel-event-time-recovery.md) |
+| Rubin total-variance doctoring | [`docs/research/rubin-total-variance.md`](docs/research/rubin-total-variance.md) |
+| Strong-invariance latent-mean doctoring | [`docs/research/strong-invariance-latent-means.md`](docs/research/strong-invariance-latent-means.md) |
 | Mention-confidence Brier doctoring | [`docs/research/mention-confidence-brier.md`](docs/research/mention-confidence-brier.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
 | VRAM budget / GPU fallback doctoring | [`docs/research/vram-budget-types.md`](docs/research/vram-budget-types.md) |

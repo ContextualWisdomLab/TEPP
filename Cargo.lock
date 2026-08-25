@@ -1127,6 +1127,10 @@ name = "provider_receipt"
 version = "0.1.0"
 
 [[package]]
+name = "psychometric_core"
+version = "0.1.0"
+
+[[package]]
 name = "psychometric_fit"
 version = "0.1.0"
 

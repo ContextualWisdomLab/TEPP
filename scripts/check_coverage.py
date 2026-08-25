@@ -10,13 +10,15 @@ from typing import Any, Iterable, Mapping, Sequence
 
 
 def load_totals(path: Path) -> Mapping[str, Any]:
-    """Load exact totals from LLVM coverage JSON.
+    """Load exact totals from LLVM coverage JSON with unique branch arms.
 
     Full LLVM branch exports can contain several instrumented copies of the
-    same source file when unit and integration test binaries are merged. The
-    source-level contract is the union of each branch coordinate's true and
-    false outcomes, so those copies are merged before the branch gate runs.
-    Summary-only reports retain the original LLVM totals fallback.
+    same source file when unit and integration test binaries are merged and
+    when generic instantiations are max-folded. The source-level contract is
+    the unique union of each ``(filename, coordinate)`` site's true and false
+    outcomes, so those copies are merged before the branch gate runs.
+    Summary-only reports without branch arrays keep the totals mapping and
+    fail closed on that summary.
     """
 
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -27,12 +29,124 @@ def load_totals(path: Path) -> Mapping[str, Any]:
     totals = report.get("totals")
     if not isinstance(totals, Mapping):
         raise ValueError("coverage JSON data entry must contain totals")
-    files = report.get("files")
-    if not isinstance(files, list) or not any(
-        isinstance(record, Mapping) and "branches" in record for record in files
-    ):
+    folded = fold_unique_branch_totals(report.get("files"))
+    if folded is None:
         return totals
-    return {**totals, "branches": load_union_branch_totals(files)}
+    merged = dict(totals)
+    merged["branches"] = folded
+    return merged
+
+
+def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | float]:
+    """Merge LLVM branch outcomes by source coordinate across test binaries."""
+
+    outcomes: dict[tuple[str, int, int, int, int], list[int]] = {}
+    for file_record in files:
+        if not isinstance(file_record, Mapping):
+            raise ValueError("coverage file record must be an object")
+        filename = file_record.get("filename")
+        if "branches" not in file_record:
+            raise ValueError("coverage file record must contain branches")
+        branches = file_record["branches"]
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("coverage file record must contain a filename")
+        if not isinstance(branches, list):
+            raise ValueError("coverage branches must be a list")
+        for branch in branches:
+            if not isinstance(branch, list) or len(branch) < 6:
+                raise ValueError("coverage branch record is malformed")
+            coordinates = branch[:4]
+            counts = branch[4:6]
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in coordinates
+            ):
+                raise ValueError("coverage branch coordinates are invalid")
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in counts
+            ):
+                raise ValueError("coverage branch counts are invalid")
+            key = (filename, *coordinates)
+            outcome = outcomes.setdefault(key, [0, 0])
+            outcome[0] += counts[0]
+            outcome[1] += counts[1]
+    count = len(outcomes) * 2
+    covered = sum(outcome > 0 for counts in outcomes.values() for outcome in counts)
+    return {"count": count, "covered": covered}
+
+
+def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int, int]:
+    """Return ``(site, true_count, false_count)`` from one LLVM branch tuple.
+
+    LLVM export writes
+    ``[lineStart, colStart, lineEnd, colEnd, trueCount, falseCount, fileId,
+    expandedFileId, kind]``.
+    """
+
+    if not isinstance(record, list) or len(record) != 9:
+        raise ValueError("coverage JSON branch record must contain nine values")
+    line_start, column_start, line_end, column_end, true_count, false_count = record[:6]
+    coordinates = (line_start, column_start, line_end, column_end)
+    if any(not isinstance(value, int) or isinstance(value, bool) for value in coordinates):
+        raise ValueError("coverage JSON branch coordinates must be integers")
+    if (
+        not isinstance(true_count, int)
+        or isinstance(true_count, bool)
+        or not isinstance(false_count, int)
+        or isinstance(false_count, bool)
+        or true_count < 0
+        or false_count < 0
+    ):
+        raise ValueError("coverage JSON branch counts must be non-negative integers")
+    return coordinates, true_count, false_count
+
+
+def fold_unique_branch_totals(files: object) -> dict[str, int] | None:
+    """Return unique-site True/False arm totals, or None when arrays are absent.
+
+    Instantiations of the same ``(filename, start, end)`` site max-fold. One
+    LLVM JSON total that is not in that unique set is not an uncovered
+    production arm. Empty ``branches`` lists are instrumentation-absent and
+    leave the caller on summary totals.
+    """
+
+    if not isinstance(files, list):
+        return None
+    sites: dict[tuple[str, int, int, int, int], tuple[int, int]] = {}
+    saw_records = False
+    for file_entry in files:
+        if not isinstance(file_entry, Mapping):
+            raise ValueError("coverage JSON file entry must be an object")
+        records = file_entry.get("branches")
+        if records is None:
+            continue
+        if not isinstance(records, list):
+            raise ValueError("coverage JSON branches must be a list")
+        if not records:
+            continue
+        filename = file_entry.get("filename")
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("coverage JSON file entry must contain a filename")
+        for record in records:
+            site, true_count, false_count = _parse_branch_record(record)
+            saw_records = True
+            key = (filename, *site)
+            previous = sites.get(key, (0, 0))
+            sites[key] = (
+                max(previous[0], true_count),
+                max(previous[1], false_count),
+            )
+    if not saw_records:
+        return None
+    count = len(sites) * 2
+    covered = 0
+    for true_count, false_count in sites.values():
+        if true_count > 0:
+            covered += 1
+        if false_count > 0:
+            covered += 1
+    return {"count": count, "covered": covered}
 
 
 def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | float]:
