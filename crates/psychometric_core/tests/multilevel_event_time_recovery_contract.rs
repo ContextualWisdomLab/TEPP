@@ -524,6 +524,8 @@ fn time_varying_predictor_discrete_effect_recovers_equation_fourteen() {
     let recovered = recover_discrete_time_varying_predictor_effect(
         outcome_on_predictor,
         delta,
+        delta,
+        delta,
         LagClock::EventTime,
     )
     .expect("eq 14");
@@ -547,6 +549,7 @@ fn time_varying_predictor_discrete_effect_recovers_equation_fourteen() {
             outcome_on_predictor,
             1.0,
             2.0,
+            2.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::UnmatchedTimeVaryingInterval)
@@ -564,6 +567,8 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
         recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
             1.0,
+            1.0,
+            1.0,
             LagClock::SystemTime
         ),
         Err(PsychometricError::EventTimeRequired)
@@ -573,6 +578,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
             outcome_on_predictor,
             f64::NAN,
             1.0,
+            1.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::NonPositiveInterval)
@@ -581,6 +587,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
         recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
             0.0,
+            1.0,
             1.0,
             LagClock::EventTime
         ),
@@ -610,6 +617,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
         recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
             1.0,
+            1.0,
             f64::NAN,
             LagClock::EventTime
         ),
@@ -619,6 +627,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
         recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
             1.0,
+            1.0,
             0.0,
             LagClock::EventTime
         ),
@@ -627,6 +636,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
     assert_eq!(
         recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
+            2.0,
             2.0,
             1.0,
             LagClock::EventTime
@@ -641,6 +651,8 @@ fn time_varying_predictor_equation_fourteen_numeric_inputs_fail_closed() {
         recover_discrete_time_varying_predictor_effect(
             f64::NAN,
             1.0,
+            1.0,
+            1.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::InvalidNumericInput)
@@ -648,6 +660,8 @@ fn time_varying_predictor_equation_fourteen_numeric_inputs_fail_closed() {
     assert_eq!(
         recover_discrete_time_varying_predictor_effect(
             1e308,
+            10.0,
+            10.0,
             10.0,
             LagClock::EventTime
         ),
@@ -1558,6 +1572,8 @@ fn time_dependent_impulse_recovers_driver_equation_three_fourth_summand() {
     let equation_fourteen = recover_discrete_time_varying_predictor_effect(
         effect,
         delta,
+        delta,
+        delta,
         LagClock::EventTime,
     )
     .expect("eq14");
@@ -1590,15 +1606,30 @@ fn time_dependent_impulse_refuses_overflow_and_non_event_clocks() {
             0.3,
             0.4,
             2.0,
+            2.0,
             LagClock::SystemTime
         ),
         Err(PsychometricError::EventTimeRequired)
     );
     assert_eq!(
         recover_discrete_latent_mean_with_impulse(
+            1.0,
+            -0.5,
+            0.3,
+            1e308,
+            2.0,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_latent_mean_with_impulse(
             1e308,
             0.0,
+            0.0,
             1e308,
+            1.0,
             1.0,
             LagClock::EventTime
         ),
@@ -1787,6 +1818,8 @@ fn discrete_observed_mean_with_impulse_refuses_overflow_and_non_event_clocks() {
             1e308,
             2.0,
             0.0,
+            0.0,
+            0.0,
             3.0,
             0.0,
             1.0,
@@ -1826,6 +1859,8 @@ fn discrete_observed_mean_with_impulse_refuses_overflow_and_non_event_clocks() {
         recover_discrete_observed_mean_with_impulse(
             1e308,
             0.0,
+            0.0,
+            0.0,
             1e308,
             1.0,
             0.0,
@@ -1837,6 +1872,8 @@ fn discrete_observed_mean_with_impulse_refuses_overflow_and_non_event_clocks() {
     let scaled = recover_discrete_observed_mean_with_impulse(
         1e308,
         1e-308,
+        0.0,
+        0.0,
         0.0,
         3.0,
         0.0,
@@ -1878,6 +1915,8 @@ fn time_independent_predictor_recovers_driver_equation_three_second_summand() {
     let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
     let equation_fourteen = recover_discrete_time_varying_predictor_effect(
         effect,
+        delta,
+        delta,
         delta,
         LagClock::EventTime,
     )
@@ -1937,6 +1976,16 @@ fn time_independent_predictor_refuses_overflow_and_non_event_clocks() {
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
+        recover_discrete_time_independent_predictor_effect(
+            0.4,
+            3.0,
+            f64::NAN,
+            2.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
         recover_discrete_latent_mean_with_time_independent_predictor(
             1.0,
             -0.5,
@@ -1952,7 +2001,9 @@ fn time_independent_predictor_refuses_overflow_and_non_event_clocks() {
         recover_discrete_latent_mean_with_time_independent_predictor(
             1e308,
             0.0,
+            0.0,
             1e308,
+            1.0,
             1.0,
             LagClock::EventTime
         ),
@@ -1964,6 +2015,7 @@ fn time_independent_predictor_refuses_overflow_and_non_event_clocks() {
             -0.5,
             0.3,
             1e308,
+            2.0,
             2.0,
             LagClock::EventTime
         ),
@@ -2086,7 +2138,9 @@ fn initial_time_independent_predictor_refuses_overflow_and_non_event_clocks() {
         recover_discrete_latent_mean_with_initial_time_independent_predictor(
             1e308,
             0.0,
+            0.0,
             1e308,
+            1.0,
             1.0,
             LagClock::EventTime
         ),
@@ -2233,7 +2287,9 @@ fn initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks() {
         recover_discrete_latent_mean_with_initial_time_dependent_predictor(
             1e308,
             0.0,
+            0.0,
             1e308,
+            1.0,
             1.0,
             LagClock::EventTime
         ),
@@ -2557,6 +2613,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overfl
             1e308,
             2.0,
             0.0,
+            0.0,
+            0.0,
             3.0,
             0.0,
             1.0,
@@ -2595,6 +2653,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overfl
     let scaled = recover_discrete_observed_mean_with_initial_time_independent_predictor(
         1e308,
         1e-308,
+        0.0,
+        0.0,
         0.0,
         3.0,
         0.0,
@@ -2850,6 +2910,8 @@ fn discrete_observed_mean_with_time_independent_predictor_refuses_overflow_and_n
             1e308,
             2.0,
             0.0,
+            0.0,
+            0.0,
             3.0,
             0.0,
             1.0,
@@ -2889,6 +2951,8 @@ fn discrete_observed_mean_with_time_independent_predictor_refuses_overflow_and_n
         recover_discrete_observed_mean_with_time_independent_predictor(
             1e308,
             0.0,
+            0.0,
+            0.0,
             1e308,
             1.0,
             0.0,
@@ -2900,6 +2964,8 @@ fn discrete_observed_mean_with_time_independent_predictor_refuses_overflow_and_n
     let scaled = recover_discrete_observed_mean_with_time_independent_predictor(
         1e308,
         1e-308,
+        0.0,
+        0.0,
         0.0,
         3.0,
         0.0,
@@ -2949,6 +3015,8 @@ fn time_dependent_impulse_carry_recovers_driver_equation_one_two_dissipation() {
     .expect("tipred");
     let equation_fourteen = recover_discrete_time_varying_predictor_effect(
         effect,
+        delta,
+        delta,
         delta,
         LagClock::EventTime,
     )
@@ -3026,6 +3094,7 @@ fn time_dependent_impulse_carry_refuses_overflow_and_non_event_clocks() {
             3.0,
             -0.5,
             2.0,
+            2.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::NonPositiveInterval)
@@ -3033,6 +3102,7 @@ fn time_dependent_impulse_carry_refuses_overflow_and_non_event_clocks() {
     assert_eq!(
         recover_discrete_latent_mean_with_impulse_carry(
             1e308,
+            0.0,
             0.0,
             1e308,
             1.0,
@@ -3055,6 +3125,7 @@ fn time_dependent_impulse_carry_refuses_overflow_and_non_event_clocks() {
     );
     assert_eq!(
         recover_time_dependent_predictor_impulse_carry(
+            1.0,
             1.0,
             1_000.0,
             2.0,
@@ -3240,6 +3311,8 @@ fn discrete_observed_mean_with_impulse_carry_refuses_overflow_and_non_event_cloc
             1e308,
             2.0,
             0.0,
+            0.0,
+            0.0,
             3.0,
             0.0,
             2.0,
@@ -3273,6 +3346,7 @@ fn discrete_observed_mean_with_impulse_carry_refuses_overflow_and_non_event_cloc
             3.0,
             0.5,
             2.0,
+            2.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::NonPositiveInterval)
@@ -3280,6 +3354,8 @@ fn discrete_observed_mean_with_impulse_carry_refuses_overflow_and_non_event_cloc
     assert_eq!(
         recover_discrete_observed_mean_with_impulse_carry(
             1e308,
+            0.0,
+            0.0,
             0.0,
             1e308,
             1.0,
@@ -3293,6 +3369,8 @@ fn discrete_observed_mean_with_impulse_carry_refuses_overflow_and_non_event_cloc
     let scaled = recover_discrete_observed_mean_with_impulse_carry(
         1e308,
         1e-308,
+        0.0,
+        0.0,
         0.0,
         3.0,
         0.0,
@@ -3652,6 +3730,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow
             1e308,
             2.0,
             0.0,
+            0.0,
+            0.0,
             3.0,
             0.0,
             1.0,
@@ -3690,6 +3770,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow
     let scaled = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
         1e308,
         1e-308,
+        0.0,
+        0.0,
         0.0,
         3.0,
         0.0,
@@ -4242,6 +4324,7 @@ fn extra_process_observed_mean_refuses_clock_nonpositive_interval_and_nonnegativ
         recover_discrete_latent_mean_with_extra_process(
             1e308,
             0.0,
+            0.0,
             1e308,
             1.0,
             extra,
@@ -4399,6 +4482,7 @@ fn after_extra_process_observed_mean_refuses_non_interior_interval_and_clock() {
             original,
             extra,
             2.0,
+            2.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::NonPositiveInterval)
@@ -4421,6 +4505,7 @@ fn after_extra_process_observed_mean_refuses_non_interior_interval_and_clock() {
     );
     assert_eq!(
         recover_discrete_observed_mean_with_extra_process_after(
+            0.0,
             0.0,
             original,
             0.0,
@@ -4646,6 +4731,7 @@ fn asymptotic_time_independent_variance_refuses_unstable_drift_and_non_event_clo
     );
     assert_eq!(
         recover_asymptotic_time_independent_predictor_variance(
+            1.0,
             1.0,
             -1e-308,
             LagClock::EventTime
@@ -4962,6 +5048,7 @@ fn stationary_initial_observed_mean_refuses_unstable_drift_and_non_event_clocks(
             -0.225,
             1.0,
             0.5,
+            0.5,
             LagClock::EventTime
         ),
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
@@ -5019,6 +5106,8 @@ fn stationary_initial_latent_variance_recovers_driver_section_four_point_three()
     assert_eq!(
         recover_stationary_initial_latent_variance(
             0.0,
+            0.0,
+            0.0,
             predictor_variance,
             log_rate,
             LagClock::EventTime,
@@ -5028,6 +5117,7 @@ fn stationary_initial_latent_variance_recovers_driver_section_four_point_three()
     assert_eq!(
         recover_stationary_initial_latent_variance(
             trait_variance,
+            0.0,
             0.0,
             predictor_variance,
             0.0,
@@ -5091,6 +5181,7 @@ fn stationary_initial_latent_variance_refuses_unstable_drift_and_non_event_clock
             f64::NAN,
             0.4,
             0.0,
+            0.0,
             -0.5,
             LagClock::EventTime
         ),
@@ -5099,6 +5190,8 @@ fn stationary_initial_latent_variance_refuses_unstable_drift_and_non_event_clock
     assert_eq!(
         recover_stationary_initial_latent_variance(
             f64::MAX,
+            f64::MAX,
+            0.0,
             0.0,
             -0.5,
             LagClock::EventTime
@@ -5265,8 +5358,10 @@ fn stationary_initial_observed_variance_refuses_unstable_drift_and_non_event_clo
         recover_stationary_initial_observed_variance(
             2.0,
             0.0,
+            0.0,
             -0.225,
             1.0,
+            0.5,
             0.5,
             0.0,
             LagClock::EventTime
@@ -5276,6 +5371,8 @@ fn stationary_initial_observed_variance_refuses_unstable_drift_and_non_event_clo
     assert_eq!(
         recover_stationary_initial_observed_variance(
             2.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -5352,6 +5449,8 @@ fn stationary_lagged_latent_covariance_recovers_driver_section_four_point_three(
     assert_eq!(
         recover_stationary_lagged_latent_covariance(
             0.0,
+            0.0,
+            0.0,
             predictor_variance,
             log_rate,
             event_delta,
@@ -5362,6 +5461,7 @@ fn stationary_lagged_latent_covariance_recovers_driver_section_four_point_three(
     assert_eq!(
         recover_stationary_lagged_latent_covariance(
             trait_variance,
+            0.0,
             0.0,
             predictor_variance,
             0.0,
@@ -5446,6 +5546,7 @@ fn stationary_lagged_latent_covariance_refuses_unstable_drift_and_non_event_cloc
     assert_eq!(
         recover_stationary_lagged_latent_covariance(
             0.0,
+            0.0,
             -0.225,
             1.0,
             0.5,
@@ -5456,6 +5557,8 @@ fn stationary_lagged_latent_covariance_refuses_unstable_drift_and_non_event_cloc
     );
     assert_eq!(
         recover_stationary_lagged_latent_covariance(
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -5610,6 +5713,7 @@ fn stationary_lagged_observed_covariance_refuses_unstable_drift_and_non_event_cl
         recover_stationary_lagged_observed_covariance(
             2.0,
             0.0,
+            0.0,
             -0.225,
             1.0,
             0.5,
@@ -5622,6 +5726,8 @@ fn stationary_lagged_observed_covariance_refuses_unstable_drift_and_non_event_cl
     assert_eq!(
         recover_stationary_lagged_observed_covariance(
             2.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -5713,6 +5819,8 @@ fn stationary_later_latent_variance_recovers_driver_section_four_point_three() {
     assert_eq!(
         recover_stationary_later_latent_variance(
             0.0,
+            0.0,
+            0.0,
             predictor_variance,
             log_rate,
             event_delta,
@@ -5723,6 +5831,7 @@ fn stationary_later_latent_variance_recovers_driver_section_four_point_three() {
     assert_eq!(
         recover_stationary_later_latent_variance(
             trait_variance,
+            0.0,
             0.0,
             predictor_variance,
             0.0,
@@ -5788,6 +5897,7 @@ fn stationary_later_latent_variance_refuses_unstable_drift_and_non_event_clocks(
     );
     assert_eq!(
         recover_stationary_later_latent_variance(
+            0.0,
             0.0,
             -0.225,
             1.0,
@@ -5959,6 +6069,7 @@ fn stationary_later_observed_variance_refuses_unstable_drift_and_non_event_clock
             0.0,
             1.0,
             0.0,
+            0.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::StationaryVarianceRequiresStableDrift)
@@ -5967,10 +6078,12 @@ fn stationary_later_observed_variance_refuses_unstable_drift_and_non_event_clock
         recover_stationary_later_observed_variance(
             2.0,
             0.0,
+            0.0,
             -0.225,
             1.0,
             0.5,
             1.0,
+            0.0,
             0.0,
             LagClock::EventTime
         ),
@@ -5979,6 +6092,8 @@ fn stationary_later_observed_variance_refuses_unstable_drift_and_non_event_clock
     assert_eq!(
         recover_stationary_later_observed_variance(
             2.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -6082,6 +6197,9 @@ fn predetermined_later_latent_variance_recovers_driver_section_four_point_three(
     assert_eq!(
         recover_predetermined_later_latent_variance(
             0.0,
+            0.0,
+            0.0,
+            0.0,
             predictor_variance,
             log_rate,
             event_delta,
@@ -6092,6 +6210,8 @@ fn predetermined_later_latent_variance_recovers_driver_section_four_point_three(
     assert_eq!(
         recover_predetermined_later_latent_variance(
             trait_variance,
+            0.0,
+            0.0,
             0.0,
             predictor_variance,
             0.0,
@@ -6175,6 +6295,8 @@ fn predetermined_later_latent_variance_refuses_non_event_clocks_and_keeps_growin
     assert_eq!(
         recover_predetermined_later_latent_variance(
             0.0,
+            0.0,
+            0.0,
             -0.225,
             1.0,
             0.5,
@@ -6185,6 +6307,9 @@ fn predetermined_later_latent_variance_refuses_non_event_clocks_and_keeps_growin
     );
     assert_eq!(
         recover_predetermined_later_latent_variance(
+            0.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -6347,6 +6472,7 @@ fn predetermined_later_observed_variance_refuses_non_event_clocks_and_keeps_grow
         0.0,
         1.0,
         0.0,
+        0.0,
         LagClock::EventTime,
     )
     .expect("Brownian a=0");
@@ -6355,10 +6481,13 @@ fn predetermined_later_observed_variance_refuses_non_event_clocks_and_keeps_grow
         recover_predetermined_later_observed_variance(
             2.0,
             0.0,
+            0.0,
+            0.0,
             -0.225,
             1.0,
             0.5,
             1.0,
+            0.0,
             0.0,
             LagClock::EventTime
         ),
@@ -6367,6 +6496,9 @@ fn predetermined_later_observed_variance_refuses_non_event_clocks_and_keeps_grow
     assert_eq!(
         recover_predetermined_later_observed_variance(
             2.0,
+            0.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -6469,6 +6601,8 @@ fn predetermined_lagged_latent_covariance_recovers_driver_section_four_point_thr
     assert_eq!(
         recover_predetermined_lagged_latent_covariance(
             0.0,
+            0.0,
+            0.0,
             predictor_variance,
             0.0,
             event_delta,
@@ -6479,6 +6613,7 @@ fn predetermined_lagged_latent_covariance_recovers_driver_section_four_point_thr
     assert_eq!(
         recover_predetermined_lagged_latent_covariance(
             trait_variance,
+            0.0,
             0.0,
             predictor_variance,
             0.0,
@@ -6563,6 +6698,7 @@ fn predetermined_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_gro
         0.0,
         2.0,
         0.0,
+        0.0,
         0.5,
         1.0,
         LagClock::EventTime,
@@ -6573,6 +6709,8 @@ fn predetermined_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_gro
         0.0,
         2.0,
         0.0,
+        0.0,
+        0.0,
         1.0,
         LagClock::EventTime,
     )
@@ -6580,6 +6718,7 @@ fn predetermined_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_gro
     assert!((brownian - 2.0).abs() < 1e-12);
     assert_eq!(
         recover_predetermined_lagged_latent_covariance(
+            0.0,
             0.0,
             -0.225,
             1.0,
@@ -6591,6 +6730,8 @@ fn predetermined_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_gro
     );
     assert_eq!(
         recover_predetermined_lagged_latent_covariance(
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -6782,6 +6923,7 @@ fn predetermined_lagged_observed_covariance_refuses_non_event_clocks_and_keeps_g
         recover_predetermined_lagged_observed_covariance(
             2.0,
             0.0,
+            0.0,
             -0.225,
             1.0,
             0.5,
@@ -6794,6 +6936,8 @@ fn predetermined_lagged_observed_covariance_refuses_non_event_clocks_and_keeps_g
     assert_eq!(
         recover_predetermined_lagged_observed_covariance(
             2.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -6910,6 +7054,8 @@ fn predetermined_initial_latent_variance_recovers_driver_section_four_point_thre
     assert_eq!(
         recover_predetermined_initial_latent_variance(
             0.0,
+            0.0,
+            0.0,
             predictor_variance,
             0.0,
             LagClock::EventTime,
@@ -6919,6 +7065,7 @@ fn predetermined_initial_latent_variance_recovers_driver_section_four_point_thre
     assert_eq!(
         recover_predetermined_initial_latent_variance(
             trait_variance,
+            0.0,
             0.0,
             predictor_variance,
             0.0,
@@ -6974,6 +7121,7 @@ fn predetermined_initial_latent_variance_refuses_non_event_clocks_and_keeps_unst
     assert!((brownian - 2.0).abs() < 1e-12);
     assert_eq!(
         recover_predetermined_initial_latent_variance(
+            0.0,
             0.0,
             -0.225,
             1.0,
@@ -7134,6 +7282,8 @@ fn predetermined_initial_observed_variance_refuses_non_event_clocks_and_keeps_un
         0.0,
         1.0,
         0.0,
+        0.0,
+        0.0,
         LagClock::EventTime,
     )
     .expect("Brownian a=0");
@@ -7142,9 +7292,11 @@ fn predetermined_initial_observed_variance_refuses_non_event_clocks_and_keeps_un
         recover_predetermined_initial_observed_variance(
             2.0,
             0.0,
+            0.0,
             -0.225,
             1.0,
             0.5,
+            0.0,
             0.0,
             LagClock::EventTime
         ),
@@ -7153,6 +7305,8 @@ fn predetermined_initial_observed_variance_refuses_non_event_clocks_and_keeps_un
     assert_eq!(
         recover_predetermined_initial_observed_variance(
             2.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -7297,6 +7451,9 @@ fn predetermined_later_lagged_latent_covariance_recovers_driver_section_four_poi
     assert_eq!(
         recover_predetermined_later_lagged_latent_covariance(
             0.0,
+            0.0,
+            0.0,
+            0.0,
             predictor_variance,
             0.0,
             start_delta,
@@ -7308,6 +7465,8 @@ fn predetermined_later_lagged_latent_covariance_recovers_driver_section_four_poi
     assert_eq!(
         recover_predetermined_later_lagged_latent_covariance(
             trait_variance,
+            0.0,
+            0.0,
             0.0,
             predictor_variance,
             0.0,
@@ -7399,7 +7558,9 @@ fn predetermined_later_lagged_latent_covariance_refuses_non_event_clocks_and_kee
         2.0,
         0.4,
         0.0,
+        0.0,
         0.5,
+        1.0,
         1.0,
         LagClock::EventTime,
     )
@@ -7407,6 +7568,8 @@ fn predetermined_later_lagged_latent_covariance_refuses_non_event_clocks_and_kee
     assert!(growing.is_finite() && growing > 2.0);
     assert_eq!(
         recover_predetermined_later_lagged_latent_covariance(
+            0.0,
+            0.0,
             0.0,
             -0.225,
             1.0,
@@ -7419,6 +7582,9 @@ fn predetermined_later_lagged_latent_covariance_refuses_non_event_clocks_and_kee
     );
     assert_eq!(
         recover_predetermined_later_lagged_latent_covariance(
+            0.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -7620,7 +7786,9 @@ fn predetermined_later_lagged_observed_covariance_refuses_non_event_clocks_and_k
         2.0,
         0.4,
         0.0,
+        0.0,
         0.5,
+        1.0,
         1.0,
         0.0,
         LagClock::EventTime,
@@ -7630,6 +7798,8 @@ fn predetermined_later_lagged_observed_covariance_refuses_non_event_clocks_and_k
     assert_eq!(
         recover_predetermined_later_lagged_observed_covariance(
             2.0,
+            0.0,
+            0.0,
             0.0,
             -0.225,
             1.0,
@@ -7644,6 +7814,9 @@ fn predetermined_later_lagged_observed_covariance_refuses_non_event_clocks_and_k
     assert_eq!(
         recover_predetermined_later_lagged_observed_covariance(
             2.0,
+            0.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -7835,6 +8008,9 @@ fn predetermined_later_start_later_latent_variance_recovers_driver_section_four_
     assert_eq!(
         recover_predetermined_later_start_later_latent_variance(
             0.0,
+            0.0,
+            0.0,
+            0.0,
             predictor_variance,
             0.0,
             start_delta,
@@ -7846,6 +8022,8 @@ fn predetermined_later_start_later_latent_variance_recovers_driver_section_four_
     assert_eq!(
         recover_predetermined_later_start_later_latent_variance(
             trait_variance,
+            0.0,
+            0.0,
             0.0,
             predictor_variance,
             0.0,
@@ -7947,7 +8125,9 @@ fn predetermined_later_start_later_latent_variance_refuses_non_event_clocks_and_
         2.0,
         0.4,
         0.0,
+        0.0,
         0.5,
+        1.0,
         1.0,
         LagClock::EventTime,
     )
@@ -7955,6 +8135,8 @@ fn predetermined_later_start_later_latent_variance_refuses_non_event_clocks_and_
     assert!(growing.is_finite() && growing > 2.0);
     assert_eq!(
         recover_predetermined_later_start_later_latent_variance(
+            0.0,
+            0.0,
             0.0,
             -0.225,
             1.0,
@@ -7967,6 +8149,9 @@ fn predetermined_later_start_later_latent_variance_refuses_non_event_clocks_and_
     );
     assert_eq!(
         recover_predetermined_later_start_later_latent_variance(
+            0.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -8180,8 +8365,11 @@ fn predetermined_later_start_later_observed_variance_refuses_non_event_clocks_an
         2.0,
         0.4,
         0.0,
+        0.0,
         0.5,
         1.0,
+        1.0,
+        0.0,
         0.0,
         LagClock::EventTime,
     )
@@ -8191,11 +8379,14 @@ fn predetermined_later_start_later_observed_variance_refuses_non_event_clocks_an
         recover_predetermined_later_start_later_observed_variance(
             2.0,
             0.0,
+            0.0,
+            0.0,
             -0.225,
             1.0,
             0.5,
             2.0,
             1.0,
+            0.0,
             0.0,
             LagClock::EventTime
         ),
@@ -8204,6 +8395,9 @@ fn predetermined_later_start_later_observed_variance_refuses_non_event_clocks_an
     assert_eq!(
         recover_predetermined_later_start_later_observed_variance(
             2.0,
+            0.0,
+            0.0,
+            0.0,
             0.0,
             1.0,
             0.0,
@@ -10304,4 +10498,16 @@ fn asymptotic_time_independent_observed_variance_refuses_non_event_clocks_and_un
         ),
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
+}
+
+#[test]
+fn lag_clock_wire_names_are_stable() {
+    // Every lag clock keeps its stable wire name so persisted artifacts and
+    // interchange payloads never silently rename a clock across versions.
+    assert_eq!(LagClock::EventTime.as_str(), "event_time");
+    assert_eq!(LagClock::SystemTime.as_str(), "system_time");
+    assert_eq!(LagClock::AssertionTime.as_str(), "assertion_time");
+    assert_eq!(LagClock::DocumentTime.as_str(), "document_time");
+    assert_eq!(LagClock::AvailabilityTime.as_str(), "availability_time");
+    assert_eq!(LagClock::KnowledgeCutoff.as_str(), "knowledge_cutoff");
 }
