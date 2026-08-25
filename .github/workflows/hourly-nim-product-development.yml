@@ -117,7 +117,11 @@ jobs:
           bounded increment and name the Gap ID you are closing in the
           resulting PR_MESSAGE.md. Never invent weights: use psychometric
           estimates from evidence-grounded models instead of arbitrary
-          constants.
+          constants. No heuristics and no rules of thumb: every numeric
+          threshold, weight, or constant must trace to an authoritative
+          primary source (standard, peer-reviewed publication, or measured
+          evidence) cited in docs/doctoring; a value without such provenance
+          is a defect, not an approximation.
 
           Preserve standalone operation and modular MSA integration with
           ContextualWisdomLab/.github, naruon, contextual-orchestrator, and other
