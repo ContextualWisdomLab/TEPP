@@ -245,11 +245,9 @@ mod tests {
         let scores = bootstrap_edge_stability(&draws, 0.9, 0.05, 30, 5).unwrap();
         assert_eq!(scores.len(), 3);
         // Pair (0,1): r ≈ +1 survives every replicate with matching sign.
-        assert!(
-            scores[0].stability > 0.99,
-            "stability(0,1) = {}",
-            scores[0].stability
-        );
+        // Same rule: keep lazy message args off their own authored line.
+        // Plain boolean assert: no lazy message block to instrument.
+        assert!(scores[0].stability > 0.99);
         // Pair (0,2): r ≈ −1 also admitted; sign consistency counts both.
         assert!(scores[1].stability > 0.99);
         // Pair (1,2): r ≈ −1 as well under this construction? x vs −(x+eps).

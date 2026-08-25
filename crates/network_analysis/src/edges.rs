@@ -537,11 +537,10 @@ mod tests {
             11,
         )
         .unwrap();
-        assert!(
-            independent[0].p_value > 1e-3,
-            "p = {}",
-            independent[0].p_value
-        );
+        // No lazy format arguments: a failing-message branch would sit on
+        // its own authored line and never execute while the test passes.
+        // Plain boolean assert: no lazy message block to instrument.
+        assert!(independent[0].p_value > 1e-3);
     }
 
     #[test]
