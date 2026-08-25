@@ -193,6 +193,14 @@
 //! and is not that map; `A^{-1}[e^{A Δt} − I] κ / √p` is
 //! `discreteCINTstd` and is not that map; JSS PDF re-opened
 //! 2026-08-25T11:43Z),
+//! recovers the Driver p. 16 `discreteCINTstd` as
+//! `A^{-1}[e^{A Δt} − I] κ / √p` after strictly positive
+//! `asymDIFFUSION` `p = −q / (2 a)` (footnote 4 uses only the
+//! relevant within-subject variance; unstandardised `discreteCINT`
+//! is defined for growing `a ≥ 0` and for zero diffusion and is not
+//! that map; `κ / √p` is `CINTstd` and is not that map;
+//! `(-κ / a) / √p` is `asymCINTstd` and is not that map; JSS PDF
+//! re-opened 2026-08-25T11:57Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -333,6 +341,8 @@ pub use event_time::recover_manifest_observed_variance;
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 /// Exact scalar p. 16 `CINTstd` `κ / √p`.
 pub use event_time::recover_standardised_continuous_intercept;
+/// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
+pub use event_time::recover_standardised_discrete_continuous_intercept;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
@@ -377,6 +387,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_as_initial_latent_mea
 pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean;
 /// Refuse treating p. 16 `asymCINTstd` as `CINTstd`.
 pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating p. 16 `asymCINTstd` as `discreteCINTstd`.
+pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT` `B`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_coefficient;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.
@@ -519,6 +531,8 @@ pub use event_time::refuse_measurement_error_as_stationary_later_observed_varian
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
+/// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
+pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymTIPREDEFFECT`.
@@ -603,6 +617,8 @@ pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
+pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.
