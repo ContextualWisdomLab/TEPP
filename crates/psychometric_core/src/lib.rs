@@ -406,6 +406,21 @@
 //! `A^{-1}[e^{A Δt} − I] κ / √p` is not `CINTstd`;
 //! `κ / √(trait + p + added)` uses `TRAITVAR` and is
 //! not `CINTstd`; `TRAITVAR` is not the standardisation
+//! recovers the Driver Table 3 / p. 16 `T0TIPREDEFFECTstd` as
+//! `t0_b · √v / √p_0` after forming strictly positive free `T0VAR`
+//! and strictly positive predictor variance
+//! (JSS PDF re-opened 2026-08-23T17:20Z; footnote 4 standardises
+//! using only the relevant variance, not the total; the affecting
+//! variance is `TIPREDVAR` `v`; the affected variance is free
+//! first-occasion `T0VAR` `p_0`, not `asymDIFFUSION`; unstandardised
+//! `t0_b` is defined for a zero coefficient and for zero predictor
+//! variance, and is not `T0TIPREDEFFECTstd`; zero `p_0` or zero `v`
+//! fails closed; `T0` is event time, so a non-event clock fails
+//! closed; free `T0VAR` does not require stable `a < 0`;
+//! `B · √v / √(-q / (2 a))` is not `T0TIPREDEFFECTstd`;
+//! `(-B / a) · √v / √p` is not `T0TIPREDEFFECTstd`;
+//! `t0_b · √v / √(trait + p_0 + added)` uses `TRAITVAR` and is
+//! not `T0TIPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
@@ -421,14 +436,10 @@ mod loading;
 mod plausible;
 mod rubin_total;
 
-/// A heuristic that is not causal identification.
-pub use causality::CausalHeuristic;
 /// Refuse a causal-effect claim from a non-identifying heuristic.
 pub use causality::claim_causal_effect;
-/// One clustered predictor–outcome pair.
-pub use cluster_mean::ClusteredScore;
-/// Recovered within-cluster, between-cluster, and contextual OLS slopes.
-pub use cluster_mean::WithinBetweenSlopes;
+/// A heuristic that is not causal identification.
+pub use causality::CausalHeuristic;
 /// Kish effective sample size on psychometric weights.
 pub use cluster_mean::kish_effective_sample_size;
 /// Cluster-mean within/between OLS after CWC, plus the contextual effect.
@@ -440,21 +451,18 @@ pub use construct::ConstructClass;
 /// Typed invariance evidence required before a latent-mean comparison.
 pub use construct::LatentMeanComparisonEvidence;
 /// Permit latent-mean comparison only on strong/strict typed evidence.
+/// One clustered predictor–outcome pair.
+pub use cluster_mean::ClusteredScore;
+/// Recovered within-cluster, between-cluster, and contextual OLS slopes.
+pub use cluster_mean::WithinBetweenSlopes;
+/// Permit latent-mean comparison only with invariance evidence.
 pub use construct::compare_latent_means;
 /// Refuse fit-driven reinterpretation as reflective.
 pub use construct::interpret_as_reflective;
+/// Higher-order construct class.
+pub use construct::ConstructClass;
 /// Fail-closed psychometric errors.
 pub use error::PsychometricError;
-/// One clustered event-time score.
-pub use event_time::ClusteredEventScore;
-/// Discrete lag-1 coefficient and local log-rate.
-pub use event_time::DiscreteLagAndLogRate;
-/// One event-time occasion.
-pub use event_time::EventOccasion;
-/// Clock on which a structural lag may be computed.
-pub use event_time::LagClock;
-/// Already-centered lagged residual pair with an irregular event interval.
-pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
@@ -581,6 +589,8 @@ pub use event_time::recover_standardised_discrete_diffusion;
 pub use event_time::recover_standardised_discrete_drift;
 /// Exact scalar p. 16 finite-interval standardised `TIPREDEFFECT` `A^{-1}[e^{A Δt} − I] B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_discrete_time_independent_predictor_effect;
+/// Exact scalar Table 3 / p. 16 `T0TIPREDEFFECTstd` `t0_b · √v / √p_0` after strictly positive free `T0VAR` and `v`.
+pub use event_time::recover_standardised_initial_time_independent_predictor_effect;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
@@ -841,10 +851,14 @@ pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_st
 pub use event_time::refuse_standardised_asymptotic_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `asymTIPREDEFFECTstd` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_standardised_continuous_time_independent_effect;
+/// Refuse treating p. 16 `asymTIPREDEFFECTstd` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating continuous `DIFFUSION` standardisation `−2 a` as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating a finite-interval standardised `CINT` as p. 16 `CINTstd`.
 pub use event_time::refuse_standardised_discrete_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating p. 16 `TIPREDEFFECTstd` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating p. 16 `discreteDIFFUSIONstd` `1 − exp(2 a Δt)` as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating p. 16 `discreteDRIFTstd` `e^{a Δt}` as p. 16 `DRIFTstd`.
@@ -947,6 +961,8 @@ pub use event_time::refuse_trait_contaminated_discrete_time_independent_effect_a
 pub use event_time::refuse_trait_contaminated_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating Driver §7.1 trait-contaminated continuous TI effect as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect;
+/// Refuse treating Driver §7.1 trait-contaminated first-occasion TI effect as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_trait_contaminated_initial_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated process noise as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_trait_contaminated_process_noise_as_standardised_discrete_diffusion;
 /// Refuse treating Driver §7.1 trait-plus-state autocorrelation as p. 16 `discreteDRIFTstd`.
@@ -979,33 +995,47 @@ pub use event_time::refuse_unstandardised_discrete_drift_as_standardised_discret
 pub use event_time::refuse_unstandardised_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
+/// Refuse treating unstandardised `T0TIPREDEFFECT` `t0_b` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect;
+/// One clustered event-time score.
+pub use event_time::ClusteredEventScore;
+/// Discrete lag-1 coefficient and local log-rate.
+pub use event_time::DiscreteLagAndLogRate;
+/// One event-time occasion.
+pub use event_time::EventOccasion;
+/// Clock on which a structural lag may be computed.
+pub use event_time::LagClock;
+/// Already-centered lagged residual pair with an irregular event interval.
+pub use event_time::LaggedWithinResidual;
 /// Pearson correlation on valid coordinates.
 pub use indicator::pearson_correlation;
 /// Refuse raw topic proportions as psychometric indicators.
 pub use indicator::require_valid_indicator;
+/// Indicator coordinate kind.
+pub use indicator::IndicatorKind;
+/// Classify two-group OLS invariance.
+pub use latent_mean::classify_two_group_ols_invariance;
+/// Strong/strict-gated latent-mean difference.
+pub use latent_mean::recover_strong_gated_latent_mean_difference;
 /// One group's factor-score and indicator series.
 pub use latent_mean::GroupIndicatorSeries;
 /// Two-group OLS invariance status for a mean comparison.
 pub use latent_mean::MeanInvarianceStatus;
 /// Two-group OLS measurement parameters and status.
 pub use latent_mean::TwoGroupMeasurement;
-/// Classify two-group OLS invariance.
-pub use latent_mean::classify_two_group_ols_invariance;
-/// Strong/strict-gated latent-mean difference.
-pub use latent_mean::recover_strong_gated_latent_mean_difference;
-/// Ordinary least-squares intercept, slope, and residual variance.
-pub use loading::OrdinaryLeastSquaresFit;
 /// Ordinary least-squares intercept and slope with residual variance.
 pub use loading::ordinary_least_squares_fit;
 /// Ordinary least-squares slope.
 pub use loading::ordinary_least_squares_slope;
 /// Recover one reflective loading.
 pub use loading::recover_reflective_loading;
+/// Ordinary least-squares intercept, slope, and residual variance.
+pub use loading::OrdinaryLeastSquaresFit;
 /// Arithmetic mean of posterior-draw point estimates.
 pub use plausible::posterior_draw_point_estimate_mean;
 /// Average OLS loading point estimates across posterior indicator draws.
 pub use plausible::recover_loading_point_estimate_mean;
-/// Rubin-combined OLS loading and total variance.
-pub use rubin_total::RubinCombinedLoading;
 /// Combine OLS loadings across draws with Rubin `T`.
 pub use rubin_total::combine_draw_level_ols_loadings;
+/// Rubin-combined OLS loading and total variance.
+pub use rubin_total::RubinCombinedLoading;
