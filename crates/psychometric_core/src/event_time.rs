@@ -5938,7 +5938,8 @@ mod tests {
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
         recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-        recover_standardised_continuous_intercept, recover_standardised_manifest_mean,
+        recover_standardised_continuous_intercept,
+        recover_standardised_discrete_continuous_intercept, recover_standardised_manifest_mean,
         recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
         recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
         recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -5946,7 +5947,6 @@ mod tests {
         recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
         recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
         recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
-        recover_standardised_discrete_continuous_intercept,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -6024,8 +6024,8 @@ mod tests {
         refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance,
-        refuse_standardised_manifest_variance_as_standardised_manifest_mean,
         refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_standardised_manifest_variance_as_standardised_manifest_mean,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
         refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -6067,8 +6067,8 @@ mod tests {
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
         refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
-        refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
     };
     use crate::error::PsychometricError;
 
