@@ -25,9 +25,10 @@ API exchange, compute planning, or evidence-grounded interpretation. Numerical
 and psychometric authority remains on the CPU `f64` reference path; streamed
 accelerator plans must preserve the full observation set and fail closed to the
 reference path when resources or validation are insufficient.
-The repository currently implements 53 independently documented crates rather
-than a full commercial release. The implemented crates include topic measurement
-and the analysis engine; they do not claim a complete commercial estimator,
+The repository currently implements 54 independently documented crates rather
+than a full commercial release. The implemented crates include topic
+measurement, the analysis engine, and psychometric input/recovery gates; they
+do not claim a complete commercial estimator,
 operator workspace, or supported release.
 
 - `topic_measurement`: the first production topic-measurement crate. It
@@ -40,6 +41,13 @@ operator workspace, or supported release.
   estimator contract; persists the run with the six TEPP clocks; and emits a
   typed terminal result. The crate does not claim buyer-visible product
   completeness.
+- `psychometric_core`: validated statistical-recovery APIs on already-mapped
+  coordinates. It does not implement a full ESEM/DSEM estimator.
+
+These are production contracts, not a claim that the complete commercial
+estimator, operator workspace, or supported release already exists. Read the
+[product and technical gap baseline](docs/product-technical-gap-baseline.md)
+before treating a crate as a shipped product capability.
 
 ```text
 crates/analysis_engine
@@ -57,46 +65,6 @@ crates/derived_sensitivity
 crates/document_clocks
 crates/encrypted_mapping
 crates/episode_membership
-crates/event_clock
-crates/evidence_core
-crates/semantic_core
-crates/temporal_core
-crates/event_core
-crates/evidence_core
-crates/inferred_status
-crates/intake_authorization
-crates/interpretation_gateway
-crates/location_membership
-crates/longitudinal_core
-crates/membership_core
-crates/membership_target
-crates/modality_source
-crates/model_selection
-crates/network_analysis
-crates/operational_log
-crates/outcome_order
-crates/payload_bound
-crates/persistence_postgres
-crates/corpus_split
-crates/tepp_simulation
-crates/validation_core
-crates/tepp_api
-crates/analysis_engine
-crates/episode_membership
-crates/location_membership
-crates/prediction_contradiction
-crates/prompt_source
-crates/provider_receipt
-crates/corpus_background
-crates/modality_source
-crates/copied_text
-crates/copy_identity
-crates/corpus_background
-crates/corpus_split
-crates/cutoff_clock
-crates/derived_sensitivity
-crates/document_clocks
-crates/encrypted_mapping
 crates/event_clock
 crates/event_core
 crates/evidence_core
@@ -123,7 +91,6 @@ crates/relation_graph
 crates/retrospective_edge
 crates/revision_order
 crates/semantic_core
-crates/operational_log
 crates/service_tls
 crates/stopword_deletion
 crates/style_source
@@ -137,13 +104,6 @@ crates/tepp_simulation
 crates/topic_lineage
 crates/topic_measurement
 crates/validation_core
-crates/network_analysis
-crates/interpretation_gateway
-crates/model_selection
-crates/checkpoint_authority
-crates/compute_backend
-crates/episode_membership
-crates/membership_target
 
 ```
 

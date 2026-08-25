@@ -72,12 +72,6 @@ pub fn identity_recovery_rate(
     if truth.is_empty() || truth.len() != decided.len() {
         return Err(EpisodeMembershipError::InvalidEpisodePayload);
     }
-    let matches = truth
-        .iter()
-        .zip(decided)
-        .filter(|(truth_flag, decided_flag)| truth_flag == decided_flag)
-        .count();
-    Ok(matches as f64 / truth.len() as f64)
     let matches = count_matching_decisions(truth.iter().copied().zip(decided.iter().copied()));
     Ok(recovery_rate_from_tally(matches, truth.len()))
 }

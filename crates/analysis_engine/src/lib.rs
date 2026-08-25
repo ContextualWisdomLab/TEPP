@@ -312,12 +312,6 @@ pub fn execute_analysis_run(
         sum.checked_add(u64::from(unit.membership_count))
             .ok_or(AnalysisEngineError::ArithmeticOverflow)
     })?;
-    // The corpus bound makes this conversion and sum strictly smaller than
-    // `u64::MAX`: 100,000 * u32::MAX is below the 64-bit range.
-    let eligible_evidence_count = eligible.len() as u64;
-    let eligible_membership_count = eligible
-        .iter()
-        .fold(0_u64, |sum, unit| sum + u64::from(unit.membership_count));
     let (earliest, latest) = eligible.iter().fold(
         (eligible[0].event_time, eligible[0].event_time),
         |(earliest, latest), unit| (earliest.min(unit.event_time), latest.max(unit.event_time)),
@@ -387,7 +381,6 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, execute_analysis_run,
         MAX_EVIDENCE_UNITS, TopicMeasurementError, execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
@@ -539,6 +532,7 @@ mod tests {
             vec![unit(
                 "evidence-1",
                 "2026-07-01T00:00:00Z",
+                "2026-07-01T00:00:00Z",
                 1,
             )],
         )
@@ -553,6 +547,7 @@ mod tests {
             "snapshot-1",
             vec![unit(
                 "evidence-1",
+                "2026-07-01T00:00:00Z",
                 "2026-07-01T00:00:00Z",
                 1,
             )],
@@ -593,6 +588,7 @@ mod tests {
     fn public_accessors_limits_and_error_messages_are_executable() {
         let evidence = unit(
             "evidence-accessor",
+            "2026-07-01T00:00:00Z",
             "2026-07-01T00:00:00Z",
             4,
         );
@@ -667,6 +663,7 @@ mod tests {
             "snapshot-1",
             vec![unit(
                 "evidence-1",
+                "2026-07-01T00:00:00Z",
                 "2026-07-01T00:00:00Z",
                 1,
             )],
