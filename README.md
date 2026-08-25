@@ -28,6 +28,7 @@ source Restricted/Internal classes onto topic, factor, and relation artifacts
 and fails closed on unknown kinds; derivation and blanket PII masking are not
 declassification. Other crates still begin domain behavior in Task 2 with
 immutable evidence identifiers and source records.
+
 The eleven bounded crates compile independently but intentionally expose no
 placeholder production APIs. Domain behavior begins in Task 2 with immutable
 evidence identifiers and source records.
@@ -81,6 +82,8 @@ crates/network_analysis
 crates/interpretation_gateway
 crates/model_selection
 crates/checkpoint_authority
+crates/membership_target
+
 ```
 
 ## Local verification

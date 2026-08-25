@@ -99,6 +99,8 @@ boundaries above remain the target modular MSA architecture.
 | `interpretation_gateway` | evidence-bounded LLM interpretations; not estimators or observed facts |
 | `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
+| `membership_target` | language, episode, template, department, and opportunity-pool targets cannot collapse into entity or project |
+
 
 Foundation crates expose only tested contracts. Empty façades are not public
 APIs.
@@ -140,7 +142,7 @@ Repository contract scripts independently verify the approved crate set,
 workspace inheritance, action SHA pinning, absence of LLM credentials from
 ordinary CI, and complete Rust documentation.
 
-Stable Rust 1.97.1 is the compile, lint, test, and line-coverage reference.
+Stable Rust 1.98.0 is the compile, lint, test, and line-coverage reference.
 Branch coverage runs in a pinned nightly lane because LLVM branch coverage
 remains unstable in Rust. `cargo-nextest` runs tests without retries, while
 doctests remain a separate `cargo test --doc` gate. `cargo-deny` enforces

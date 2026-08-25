@@ -186,7 +186,11 @@ impl CorpusSplitManifest {
         for kind in &self.governed_link_kinds {
             if !matches!(
                 kind.as_str(),
-                "revision" | "translation" | "copied_variant" | "same_episode"
+                "revision"
+                    | "translation"
+                    | "copied_variant"
+                    | "same_episode"
+                    | "canonical_equivalent"
             ) {
                 return Err(ApiError::InvalidWirePayload);
             }
@@ -227,6 +231,7 @@ fn link_kind_wire(kind: LeakageLinkKind) -> &'static str {
         LeakageLinkKind::Translation => "translation",
         LeakageLinkKind::CopiedVariant => "copied_variant",
         LeakageLinkKind::SameEpisode => "same_episode",
+        LeakageLinkKind::CanonicalEquivalent => "canonical_equivalent",
     }
 }
 
@@ -462,6 +467,10 @@ mod tests {
             "copied_variant"
         );
         assert_eq!(link_kind_wire(LeakageLinkKind::SameEpisode), "same_episode");
+        assert_eq!(
+            link_kind_wire(LeakageLinkKind::CanonicalEquivalent),
+            "canonical_equivalent"
+        );
     }
 
     #[test]
@@ -488,6 +497,11 @@ mod tests {
                 kind: LeakageLinkKind::Translation,
             },
             LeakageLink {
+                left: Uuid::from_u128(1),
+                right: Uuid::from_u128(4),
+                kind: LeakageLinkKind::CanonicalEquivalent,
+            },
+            LeakageLink {
                 left: Uuid::from_u128(9),
                 right: Uuid::from_u128(1),
                 kind: LeakageLinkKind::Revision,
@@ -511,6 +525,7 @@ mod tests {
         assert_eq!(
             manifest.governed_link_kinds,
             vec![
+                "canonical_equivalent".to_owned(),
                 "copied_variant".to_owned(),
                 "revision".to_owned(),
                 "same_episode".to_owned(),

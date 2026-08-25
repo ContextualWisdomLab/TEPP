@@ -1,9 +1,9 @@
 # ADR 0008 — Immutable evidence identities, digests, exact spans, and wire records
 
-**Decision status:** Accepted  
-**Implementation maturity:** implemented-main — inbound size/depth/identity/provenance refusal for untrusted documents, records, checkpoints, and LLM outputs is `payload_bound` on the active PR  
-**Date:** 2026-08-05  
-**Decision owners:** Contextual Wisdom Lab  
+**Decision status:** Accepted
+**Implementation maturity:** implemented-main — inbound size/depth/identity/provenance refusal for untrusted documents, records, checkpoints, and LLM outputs is `payload_bound` on the active PR
+**Date:** 2026-08-05
+**Decision owners:** Contextual Wisdom Lab
 **Supersedes:** None. ADR 0013 owns future persistence, reproducibility-manifest, and relation-aware split authority.
 
 ## Context
