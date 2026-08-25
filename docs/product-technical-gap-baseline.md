@@ -2,8 +2,8 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-25T02:22:37Z
-**Protected-main evidence:** `5c8599442e85bd4c553dc0cd2c6acae5313e6a16` (full SHA fetched live before every mutation; this is the merge commit of consolidation vehicle #215)
+**Snapshot:** 2026-08-25T02:30:00Z
+**Protected-main evidence:** `abbd8987a4` (full SHA fetched live before every mutation)
 **Workspace version on protected main:** `0.1.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main. Duplicate [PR #179] stays closed.
 
@@ -26,10 +26,10 @@ GitHub state before any customer, release, certification, or valuation claim.
 |---|---:|---|
 | Protected-main SHA | `5c8599442e85…` (2026-08-25T02:12Z, merge of #215) | All as-built claims are bounded to this commit. |
 | Workspace members | 48 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual product boundaries. |
-| Open pull requests | **59** | The consolidation vehicle landed; the residual queue is stacked drafts plus nine non-draft slices and one coverage repair. |
-| Draft pull requests | **49** | Most queued work is not independently review-ready; the psychometric recovery stack dominates. |
-| Non-draft pull requests | **10** | A non-draft state is not a qualifying review or required-check result. |
-| Open product issues | **11** | Issue #156 plus open product-completion issues #166–#169 and #171–#176. |
+| Open pull requests | **33** | The consolidation vehicle landed; the residual queue is stacked drafts plus nine non-draft slices and one coverage repair. |
+| Draft pull requests | **33** | Most queued work is not independently review-ready; the psychometric recovery stack dominates. |
+| Non-draft pull requests | **0** | A non-draft state is not a qualifying review or required-check result. |
+| Open product issues | **10** | Issue #156 plus open product-completion issues #166–#169 and #171–#176. |
 | Duplicate gap-baseline PRs | **#164** (authority); **#179** closed as superseded | Only one live register remains; queued Checks on #164 are not protected-main evidence. |
 | Current package version | `0.1.0` | No supported product release is established by the repository version alone. |
 
@@ -40,7 +40,20 @@ keeps the operator-level summary while the exact-head register below records the
 volatile queue (live counts above). Passing or queued Checks on an open PR never
 promote that PR to implemented-main.
 
-### Queue-consolidation progress (GAP-012)
+### Queue-consolidation progress (GAP-012) — COMPLETE
+
+The main non-draft pull-request queue reached **zero** at 2026-08-25T02:30Z.
+All previously queued slices landed on protected main through:
+
+1. the hourly scheduler (independent merges of ~40 PRs);
+2. batch integration vehicle [#215](https://github.com/ContextualWisdomLab/TEPP/pull/215) (31 folded green slices with per-slice merge-commit provenance); and
+3. individual rebase-and-admin-merge passes for the remainder.
+
+The 33 remaining open PRs are all **drafts** forming stacked psychometric
+recovery chains (T0VAR/drift/diffusion standardised parameter families).
+They follow the stacking plan and are not independent landing vehicles.
+
+### Historical consolidation notes
 
 The hourly scheduler plus one batch integration vehicle drained the
 main-conflicting green queue, and the vehicle itself is now merged:
