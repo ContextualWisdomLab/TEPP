@@ -216,6 +216,20 @@ mod tests {
     }
 
     #[test]
+    fn non_image_and_empty_subtype_data_uris_are_not_lexical_images() {
+        // A non-image media type exercises the strip-prefix refusal arm.
+        assert_eq!(
+            refuse_base64_image_as_lexical_text("data:text/plain;base64,AAAA"),
+            Ok(())
+        );
+        // An empty image subtype exercises the empty-subtype refusal arm.
+        assert_eq!(
+            refuse_base64_image_as_lexical_text("data:image/;base64,AAAA"),
+            Ok(())
+        );
+    }
+
+    #[test]
     fn common_raster_media_types_are_accepted() {
         let text = "a data:image/png;base64,AAAA b data:image/jpeg;base64,BBBB \
                     c data:image/webp;base64,CCCC d data:image/gif;base64,DDDD e";
