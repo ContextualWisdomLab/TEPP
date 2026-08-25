@@ -3,7 +3,7 @@
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 **Snapshot:** 2026-08-25T02:30:00Z
-**Protected-main evidence:** `abbd8987a4` (full SHA fetched live before every mutation)
+**Protected-main evidence:** `abbd89874b0087ae0645c7a5c493557a1be8c2d5` (full SHA fetched live before every mutation)
 **Workspace version on protected main:** `0.1.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main. Duplicate [PR #179] stays closed.
 
@@ -26,7 +26,7 @@ GitHub state before any customer, release, certification, or valuation claim.
 |---|---:|---|
 | Protected-main SHA | `5c8599442e85…` (2026-08-25T02:12Z, merge of #215) | All as-built claims are bounded to this commit. |
 | Workspace members | 48 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual product boundaries. |
-| Open pull requests | **33** | The consolidation vehicle landed; the residual queue is stacked drafts plus nine non-draft slices and one coverage repair. |
+| Open pull requests | **59** | The consolidation vehicle landed; the residual queue is stacked drafts plus nine non-draft slices and one coverage repair. |
 | Draft pull requests | **33** | Most queued work is not independently review-ready; the psychometric recovery stack dominates. |
 | Non-draft pull requests | **0** | A non-draft state is not a qualifying review or required-check result. |
 | Open product issues | **10** | Issue #156 plus open product-completion issues #166–#169 and #171–#176. |

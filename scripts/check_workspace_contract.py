@@ -70,6 +70,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "analysis_engine",
     "topic_measurement",
     "psychometric_core",
+    "orchestrator_live",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
