@@ -127,6 +127,83 @@ impl ReferenceTopicInput {
     pub fn features(&self) -> &[PrevalenceFeature] {
         &self.features
     }
+
+    /// Return the total token count used as the BIC sample size `N`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] when the counts are
+    /// empty, non-positive, or non-finite.
+    pub fn token_count(&self) -> Result<f64, TopicMeasurementError> {
+        let mut total = 0.0_f64;
+        for row in &self.term_rows {
+            for &(_, count) in row {
+                if !count.is_finite() || count < 0.0 {
+                    return Err(TopicMeasurementError::InvalidModelInput);
+                }
+                total += count;
+            }
+        }
+        if total.is_finite() && total > 0.0 {
+            Ok(total)
+        } else {
+            Err(TopicMeasurementError::InvalidModelInput)
+        }
+    }
+
+    /// In-sample mixture log-likelihood of a fitted model on these counts.
+    ///
+    /// This is the first term of the ADR 0012 MAP objective,
+    /// `Σ C_dv log(Σ_k θ_dk β_kv)`, evaluated on the fitted `θ` and `β`. It is
+    /// not the penalized objective and not a held-out split.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] when the fitted
+    /// dimensions do not match this input, or
+    /// [`TopicMeasurementError::NonFiniteEstimate`] when a mixture probability
+    /// is not a finite positive value.
+    pub fn in_sample_log_likelihood(
+        &self,
+        model: &ReferenceTopicModel,
+    ) -> Result<f64, TopicMeasurementError> {
+        let topic_count = model.topic_term_probabilities.len();
+        if topic_count < 2
+            || model.document_topic_proportions.len() != self.document_ids.len()
+            || model
+                .topic_term_probabilities
+                .iter()
+                .any(|row| row.len() != self.vocabulary_size)
+            || model
+                .document_topic_proportions
+                .iter()
+                .any(|row| row.len() != topic_count)
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        let mut log_likelihood = 0.0_f64;
+        for (document, terms) in self.term_rows.iter().enumerate() {
+            let theta = &model.document_topic_proportions[document];
+            for &(term, count) in terms {
+                if term >= self.vocabulary_size {
+                    return Err(TopicMeasurementError::InvalidModelInput);
+                }
+                let probability = (0..topic_count)
+                    .map(|topic| theta[topic] * model.topic_term_probabilities[topic][term])
+                    .sum::<f64>();
+                let log_probability = probability.ln();
+                if !log_probability.is_finite() {
+                    return Err(TopicMeasurementError::NonFiniteEstimate);
+                }
+                log_likelihood += count * log_probability;
+            }
+        }
+        if log_likelihood.is_finite() {
+            Ok(log_likelihood)
+        } else {
+            Err(TopicMeasurementError::NonFiniteEstimate)
+        }
+    }
 }
 
 fn build_design(
@@ -752,9 +829,9 @@ fn next_unit(state: &mut u64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        FitState, PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModelConfig, argmax,
-        bounded_count, build_result, dot, expectation, next_unit, normalize, objective,
-        require_finite, standardize_event_time,
+        FitState, PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModel,
+        ReferenceTopicModelConfig, argmax, bounded_count, build_result, dot, expectation,
+        next_unit, normalize, objective, require_finite, standardize_event_time,
     };
     use crate::TopicMeasurementError;
     use temporal_core::EventTime;
@@ -872,6 +949,121 @@ mod tests {
         assert_eq!(
             bounded_count(usize::try_from(u64::from(u32::MAX) + 1).expect("wide usize")),
             Err(TopicMeasurementError::InvalidModelInput)
+        );
+    }
+
+    fn scoring_input(
+        term_rows: Vec<Vec<(usize, f64)>>,
+        vocabulary_size: usize,
+    ) -> ReferenceTopicInput {
+        ReferenceTopicInput {
+            document_ids: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            term_rows,
+            vocabulary_size,
+            design: vec![vec![1.0], vec![1.0]],
+            features: vec![PrevalenceFeature::Intercept],
+            transition_pairs: vec![(0, 1)],
+        }
+    }
+
+    fn scoring_model(
+        topic_term_probabilities: Vec<Vec<f64>>,
+        document_topic_proportions: Vec<Vec<f64>>,
+    ) -> ReferenceTopicModel {
+        ReferenceTopicModel {
+            seed: 1,
+            iterations: 4,
+            objective: -1.0,
+            topic_term_probabilities,
+            document_topic_proportions,
+            document_coordinate_variances: vec![vec![0.1], vec![0.1]],
+            prevalence_coefficients: vec![vec![0.0]],
+            prevalence_features: vec![PrevalenceFeature::Intercept],
+            sequence_edges: Vec::new(),
+            connected_post_count: 0,
+            lineage_count: 0,
+        }
+    }
+
+    #[test]
+    fn in_sample_likelihood_and_token_count_fail_closed() {
+        let input = scoring_input(vec![vec![(0, 1.0)], vec![(1, 2.0)]], 2);
+        assert!((input.token_count().expect("tokens") - 3.0).abs() < f64::EPSILON);
+        let model = scoring_model(
+            vec![vec![0.9, 0.1], vec![0.1, 0.9]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8]],
+        );
+        assert!(
+            input
+                .in_sample_log_likelihood(&model)
+                .expect("ll")
+                .is_finite()
+        );
+
+        assert_eq!(
+            scoring_input(vec![vec![(0, 0.0)], vec![(1, 0.0)]], 2).token_count(),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        assert_eq!(
+            scoring_input(vec![vec![(0, f64::NAN)], vec![(1, 1.0)]], 2).token_count(),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        assert_eq!(
+            scoring_input(vec![vec![(0, -1.0)], vec![(1, 1.0)]], 2).token_count(),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        assert_eq!(
+            scoring_input(vec![vec![(0, f64::MAX)], vec![(1, f64::MAX)]], 2).token_count(),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let short_docs = scoring_model(vec![vec![0.5, 0.5], vec![0.5, 0.5]], vec![vec![0.5, 0.5]]);
+        assert_eq!(
+            input.in_sample_log_likelihood(&short_docs),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        let one_topic = scoring_model(vec![vec![1.0, 0.0]], vec![vec![1.0], vec![1.0]]);
+        assert_eq!(
+            input.in_sample_log_likelihood(&one_topic),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        let wide_beta = scoring_model(
+            vec![vec![0.5, 0.5, 0.0], vec![0.5, 0.5, 0.0]],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+        );
+        assert_eq!(
+            input.in_sample_log_likelihood(&wide_beta),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        let wide_theta = scoring_model(
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+            vec![vec![0.5, 0.5, 0.0], vec![0.5, 0.5, 0.0]],
+        );
+        assert_eq!(
+            input.in_sample_log_likelihood(&wide_theta),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        let out_of_range = scoring_input(vec![vec![(3, 1.0)], vec![(0, 1.0)]], 2);
+        let matching = scoring_model(
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+        );
+        assert_eq!(
+            out_of_range.in_sample_log_likelihood(&matching),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        let zero_beta = scoring_model(
+            vec![vec![0.0, 0.0], vec![0.0, 0.0]],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+        );
+        assert_eq!(
+            input.in_sample_log_likelihood(&zero_beta),
+            Err(TopicMeasurementError::NonFiniteEstimate)
+        );
+        let overflow_counts = scoring_input(vec![vec![(0, f64::MAX)], vec![(1, f64::MAX)]], 2);
+        assert_eq!(
+            overflow_counts.in_sample_log_likelihood(&matching),
+            Err(TopicMeasurementError::NonFiniteEstimate)
         );
     }
 }

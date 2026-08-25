@@ -8,9 +8,13 @@ complexity) and not Pareto-dominated on those two objectives. An LLM vote may
 later recommend among admissible candidates. It cannot itself define the
 numerical optimum or bypass diagnostics (ADR 0012).
 
-This slice does not fit a topic model, choose a neural architecture, or claim a
-unique true `K` for every corpus. Known-truth recovery reports computed RMSE of
-the selected `K` against the generating `K`.
+`select_fitted_candidate_k` now fits each candidate with the CPU `f64` TRSL-TM
+reference and builds `ModelCandidate::statistical` from the actual in-sample
+mixture log-likelihood and a BIC-style parameter-count penalty. A typed
+non-convergence, non-finite, or invalid-input failure is a failed candidate,
+not a fabricated diagnostic. This slice does not choose a neural architecture,
+run GPU inference, or claim a unique true `K` for every corpus. Known-truth
+recovery reports computed RMSE of the selected `K` against the generating `K`.
 
 ## Authority
 

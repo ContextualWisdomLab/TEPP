@@ -128,7 +128,7 @@ Burnham, K. P., & Anderson, D. R. (2002). *Model selection and multimodel infere
 
 Deb, K., Pratap, A., Agarwal, S., Meyarivan, T. (2002). A fast and elitist multiobjective genetic algorithm: NSGA-II. *IEEE Transactions on Evolutionary Computation, 6*(2), 182–197. https://doi.org/10.1109/4235.996017
 
-LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. The current `model_selection` crate performs statistical/Pareto gating; candidate blinding and blinded LLM review remain accepted-target extensions and are not executed by this crate. Pareto-filtered held-out log-likelihood and complexity admit a candidate `K`; an LLM vote cannot define the numerical optimum. `interpretation_gateway` records judgments as hypothetical proposals that must cite evidence spans and cannot become estimator results or observed facts.
+LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. The current `model_selection` crate fits each candidate `K` with the CPU `f64` reference and applies statistical/Pareto gating to those fitted diagnostics; candidate blinding and blinded LLM review remain accepted-target extensions and are not executed by this crate. Pareto-filtered in-sample mixture log-likelihood and BIC-style complexity admit a candidate `K`; an LLM vote cannot define the numerical optimum. `interpretation_gateway` records judgments as hypothetical proposals that must cite evidence spans and cannot become estimator results or observed facts.
 
 ## Compositional data, correlation, and clusters
 
