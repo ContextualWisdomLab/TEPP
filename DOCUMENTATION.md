@@ -36,8 +36,13 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Hourly NIM product-development operations | [`docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md`](docs/operations/HOURLY_NIM_PRODUCT_DEVELOPMENT.md) |
 | Actions workflow fleet audit | [`docs/operations/ACTIONS_WORKFLOW_FLEET.md`](docs/operations/ACTIONS_WORKFLOW_FLEET.md) |
 | Actions fleet research doctoring | [`docs/research/actions-workflow-fleet.md`](docs/research/actions-workflow-fleet.md) |
+| Posterior ESEM/DSEM input-gate doctoring | [`docs/research/posterior-esem-input-gates.md`](docs/research/posterior-esem-input-gates.md) |
+| Multilevel/event-time recovery doctoring | [`docs/research/multilevel-event-time-recovery.md`](docs/research/multilevel-event-time-recovery.md) |
+| Rubin total-variance doctoring | [`docs/research/rubin-total-variance.md`](docs/research/rubin-total-variance.md) |
+| Strong-invariance latent-mean doctoring | [`docs/research/strong-invariance-latent-means.md`](docs/research/strong-invariance-latent-means.md) |
 | Mention-confidence Brier doctoring | [`docs/research/mention-confidence-brier.md`](docs/research/mention-confidence-brier.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
+| First-story detection FAR/miss doctoring | [`docs/research/first-story-detection-calibration.md`](docs/research/first-story-detection-calibration.md) |
 | VRAM budget / GPU fallback doctoring | [`docs/research/vram-budget-types.md`](docs/research/vram-budget-types.md) |
 | Causal-identification gate doctoring | [`docs/research/causal-identification-gate.md`](docs/research/causal-identification-gate.md) |
 | TDT story-segmentation `WindowDiff`/`Pk` doctoring | [`docs/research/tdt-story-segmentation.md`](docs/research/tdt-story-segmentation.md) |
@@ -51,6 +56,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Stopword-deletion doctoring | [`docs/research/stopword-deletion.md`](docs/research/stopword-deletion.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
+| Topic log-ratio coordinate doctoring | [`docs/research/topic-logratio-coordinates.md`](docs/research/topic-logratio-coordinates.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Analysis engine v1 doctoring | [`docs/doctoring/analysis-engine-v1.md`](docs/doctoring/analysis-engine-v1.md) |
 | Analysis engine gap-closure doctoring | [`docs/doctoring/analysis-engine-gap-closure.md`](docs/doctoring/analysis-engine-gap-closure.md) |

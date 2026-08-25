@@ -24,6 +24,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "tepp_simulation",
     "validation_core",
     "tepp_api",
+
     "location_membership",
     "prompt_source",
     "corpus_background",
@@ -65,6 +66,9 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "episode_membership",
     "membership_target",
     "analysis_engine",
+    "topic_measurement",
+    "analysis_engine",
+    "psychometric_core",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (

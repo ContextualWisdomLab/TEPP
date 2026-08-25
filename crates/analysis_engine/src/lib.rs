@@ -7,6 +7,10 @@
 //! assignments without collapsing them, and emits a digest-bound terminal result
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
+//! estimation authority; it invokes estimators through their scientific crate
+//! contracts and preserves their artifact meaning.
+
+mod topic_lineage_artifact;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -17,6 +21,14 @@ use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
     ApiError,
+};
+use topic_measurement::TopicMeasurementError;
+
+/// Topic-lineage artifact and execution contracts from this engine.
+pub use topic_lineage_artifact::{
+    TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
+    TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, TopicLineageArtifact,
+    TopicLineageArtifactEdge, TopicLineageExecution, execute_topic_lineage_run,
 };
 
 /// Versioned artifact schema emitted by this engine.
@@ -204,6 +216,10 @@ pub enum AnalysisEngineError {
     SerializationFailure,
     /// The in-memory corpus exceeded the execution bound.
     LimitExceeded,
+    /// A topic-measurement estimator rejected or could not complete the fit.
+    TopicMeasurement(TopicMeasurementError),
+    /// A topic-lineage artifact violated its bounded schema or count invariants.
+    InvalidTopicLineageArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -216,6 +232,8 @@ impl fmt::Display for AnalysisEngineError {
             Self::ArithmeticOverflow => "analysis evidence count overflow",
             Self::SerializationFailure => "analysis artifact serialization failed",
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
+            Self::TopicMeasurement(error) => return error.fmt(formatter),
+            Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
         };
         formatter.write_str(message)
     }
@@ -226,6 +244,12 @@ impl std::error::Error for AnalysisEngineError {}
 impl From<ApiError> for AnalysisEngineError {
     fn from(error: ApiError) -> Self {
         Self::Api(error)
+    }
+}
+
+impl From<TopicMeasurementError> for AnalysisEngineError {
+    fn from(error: TopicMeasurementError) -> Self {
+        Self::TopicMeasurement(error)
     }
 }
 
@@ -288,6 +312,12 @@ pub fn execute_analysis_run(
         sum.checked_add(u64::from(unit.membership_count))
             .ok_or(AnalysisEngineError::ArithmeticOverflow)
     })?;
+    // The corpus bound makes this conversion and sum strictly smaller than
+    // `u64::MAX`: 100,000 * u32::MAX is below the 64-bit range.
+    let eligible_evidence_count = eligible.len() as u64;
+    let eligible_membership_count = eligible
+        .iter()
+        .fold(0_u64, |sum, unit| sum + u64::from(unit.membership_count));
     let (earliest, latest) = eligible.iter().fold(
         (eligible[0].event_time, eligible[0].event_time),
         |(earliest, latest), unit| (earliest.min(unit.event_time), latest.max(unit.event_time)),
@@ -358,6 +388,7 @@ mod tests {
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
         MAX_EVIDENCE_UNITS, execute_analysis_run,
+        MAX_EVIDENCE_UNITS, TopicMeasurementError, execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -508,7 +539,6 @@ mod tests {
             vec![unit(
                 "evidence-1",
                 "2026-07-01T00:00:00Z",
-                "2026-07-01T00:00:00Z",
                 1,
             )],
         )
@@ -523,7 +553,6 @@ mod tests {
             "snapshot-1",
             vec![unit(
                 "evidence-1",
-                "2026-07-01T00:00:00Z",
                 "2026-07-01T00:00:00Z",
                 1,
             )],
@@ -564,7 +593,6 @@ mod tests {
     fn public_accessors_limits_and_error_messages_are_executable() {
         let evidence = unit(
             "evidence-accessor",
-            "2026-07-01T00:00:00Z",
             "2026-07-01T00:00:00Z",
             4,
         );
@@ -617,6 +645,14 @@ mod tests {
                 AnalysisEngineError::LimitExceeded,
                 "analysis corpus exceeded its execution bound",
             ),
+            (
+                AnalysisEngineError::TopicMeasurement(TopicMeasurementError::DidNotConverge),
+                "topic estimator did not converge",
+            ),
+            (
+                AnalysisEngineError::InvalidTopicLineageArtifact,
+                "invalid topic lineage artifact",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -631,7 +667,6 @@ mod tests {
             "snapshot-1",
             vec![unit(
                 "evidence-1",
-                "2026-07-01T00:00:00Z",
                 "2026-07-01T00:00:00Z",
                 1,
             )],
