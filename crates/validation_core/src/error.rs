@@ -12,8 +12,10 @@ pub enum ValidationError {
     InvalidConfiguration,
     /// Candidate and protected heads are not the same exact commit.
     ClaimHeadMismatch,
-    /// A required exact-head gate is absent or failed.
+    /// A required exact-head gate is absent.
     ClaimEvidenceMissing,
+    /// Required exact-head evidence of a kind was presented and failed.
+    ClaimEvidenceFailed,
     /// A queued or in-progress check was treated as passing evidence.
     ClaimQueuedEvidence,
     /// Predecessor-head or stale evidence was treated as current-head proof.
@@ -33,6 +35,7 @@ impl fmt::Display for ValidationError {
             Self::InvalidConfiguration => "invalid validation configuration",
             Self::ClaimHeadMismatch => "claim candidate head is not the protected head",
             Self::ClaimEvidenceMissing => "required claim evidence is missing",
+            Self::ClaimEvidenceFailed => "required claim evidence failed",
             Self::ClaimQueuedEvidence => "queued checks cannot promote a claim",
             Self::ClaimPredecessorHead => "predecessor-head evidence cannot promote a claim",
             Self::ClaimLlmJudgment => "llm judgment cannot promote a claim",
@@ -66,6 +69,10 @@ mod tests {
         assert_eq!(
             ValidationError::ClaimEvidenceMissing.to_string(),
             "required claim evidence is missing"
+        );
+        assert_eq!(
+            ValidationError::ClaimEvidenceFailed.to_string(),
+            "required claim evidence failed"
         );
         assert_eq!(
             ValidationError::ClaimQueuedEvidence.to_string(),

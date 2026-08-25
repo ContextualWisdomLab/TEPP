@@ -1,9 +1,9 @@
 //! ADR 0014 claim authorities cannot be promoted from unusable evidence.
 
 use validation_core::{
-    ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, PromotedClaim, PromotionRequest,
-    ValidationError, parse_commit_head, promote_claim, promote_scientific_recovery,
-    rmse_standard_error, root_mean_square_error,
+    ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, PromotionRequest, ValidationError,
+    parse_commit_head, promote_claim, promote_scientific_recovery, rmse_standard_error,
+    root_mean_square_error,
 };
 
 const PROTECTED_HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -109,7 +109,7 @@ fn implemented_main_requires_exact_protected_head_and_tests() {
             PROTECTED_HEAD,
             &[ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, false)],
         )),
-        Err(ValidationError::ClaimEvidenceMissing)
+        Err(ValidationError::ClaimEvidenceFailed)
     );
 }
 
@@ -239,8 +239,81 @@ fn promoted_claim_and_request_reject_invalid_heads() {
         PromotionRequest::new(ClaimAuthority::DecisionAccepted, "bad", PROTECTED_HEAD, &[],).err(),
         Some(ValidationError::InvalidInput)
     );
-    let _ = PromotedClaim::new(
+    // Promoted claims can no longer be minted directly: `PromotedClaim::new`
+    // is crate-internal, so the only external path to a promoted claim is the
+    // validated `promote_claim` / `promote_scientific_recovery` flow.
+    let promoted = promote_claim(&request(
         ClaimAuthority::DecisionAccepted,
-        parse_commit_head(PROTECTED_HEAD).unwrap(),
+        PROTECTED_HEAD,
+        &[],
+    ))
+    .expect("design");
+    assert_eq!(promoted.authority(), ClaimAuthority::DecisionAccepted);
+    assert_eq!(
+        promoted.bound_head(),
+        parse_commit_head(PROTECTED_HEAD).unwrap()
     );
+}
+
+#[test]
+fn required_evidence_refuses_co_present_failing_items() {
+    let mixed_passing_first = [
+        ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true),
+        ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, false),
+    ];
+    assert_eq!(
+        promote_claim(&request(
+            ClaimAuthority::ImplementedMain,
+            PROTECTED_HEAD,
+            &mixed_passing_first,
+        )),
+        Err(ValidationError::ClaimEvidenceFailed)
+    );
+    let mixed_failing_first = [
+        ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, false),
+        ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true),
+    ];
+    assert_eq!(
+        promote_claim(&request(
+            ClaimAuthority::ImplementedMain,
+            PROTECTED_HEAD,
+            &mixed_failing_first,
+        )),
+        Err(ValidationError::ClaimEvidenceFailed)
+    );
+}
+
+#[test]
+fn required_evidence_refuses_failing_only_items() {
+    assert_eq!(
+        promote_claim(&request(
+            ClaimAuthority::ImplementedMain,
+            PROTECTED_HEAD,
+            &[ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, false)],
+        )),
+        Err(ValidationError::ClaimEvidenceFailed)
+    );
+}
+
+#[test]
+fn required_evidence_accepts_passing_only_items() {
+    let promoted = promote_claim(&request(
+        ClaimAuthority::ImplementedMain,
+        PROTECTED_HEAD,
+        &implemented_main_evidence(),
+    ))
+    .expect("passing only");
+    assert_eq!(promoted.authority(), ClaimAuthority::ImplementedMain);
+    // A failing item of a non-required kind must not block promotion of a
+    // kind it does not gate.
+    let unrelated_failure = [
+        ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true),
+        ClaimEvidence::new(ClaimEvidenceKind::SecuritySupplyChain, false),
+    ];
+    promote_claim(&request(
+        ClaimAuthority::ImplementedMain,
+        PROTECTED_HEAD,
+        &unrelated_failure,
+    ))
+    .expect("unrelated failure does not gate");
 }

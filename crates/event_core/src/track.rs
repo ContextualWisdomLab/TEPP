@@ -145,16 +145,13 @@ pub fn refuse_track_as_transition(_track: EventTrackId) -> Result<(), EventError
 /// # Errors
 ///
 /// Returns [`EventError::InvalidWirePayload`] when assignments are empty,
-/// mention identities collide, lengths differ, or either pair set is empty.
+/// mention identities collide, lengths differ, mention identity sets disagree
+/// between truth and recovered, or either pair set is empty.
 pub fn tracking_pair_precision(
     truth: &[EventTrackAssignment],
     recovered: &[EventTrackAssignment],
 ) -> Result<f64, EventError> {
-    let truth_pairs = same_track_pairs(truth)?;
-    let recovered_pairs = same_track_pairs(recovered)?;
-    if truth.len() != recovered.len() {
-        return Err(EventError::InvalidWirePayload);
-    }
+    let (truth_pairs, recovered_pairs) = aligned_pair_sets(truth, recovered)?;
     counted_rate(
         recovered_pairs.intersection(&truth_pairs).count(),
         recovered_pairs.len(),
@@ -166,16 +163,13 @@ pub fn tracking_pair_precision(
 /// # Errors
 ///
 /// Returns [`EventError::InvalidWirePayload`] when assignments are empty,
-/// mention identities collide, lengths differ, or either pair set is empty.
+/// mention identities collide, lengths differ, mention identity sets disagree
+/// between truth and recovered, or either pair set is empty.
 pub fn tracking_pair_recall(
     truth: &[EventTrackAssignment],
     recovered: &[EventTrackAssignment],
 ) -> Result<f64, EventError> {
-    let truth_pairs = same_track_pairs(truth)?;
-    let recovered_pairs = same_track_pairs(recovered)?;
-    if truth.len() != recovered.len() {
-        return Err(EventError::InvalidWirePayload);
-    }
+    let (truth_pairs, recovered_pairs) = aligned_pair_sets(truth, recovered)?;
     counted_rate(
         recovered_pairs.intersection(&truth_pairs).count(),
         truth_pairs.len(),
@@ -241,10 +235,12 @@ fn unique_assignment_map(
     Ok(map)
 }
 
+/// Same-track mention-pair set derived from one unique assignment map.
+type SameTrackPairSet = BTreeSet<(EventMentionId, EventMentionId)>;
+
 fn same_track_pairs(
-    assignments: &[EventTrackAssignment],
-) -> Result<BTreeSet<(EventMentionId, EventMentionId)>, EventError> {
-    let map = unique_assignment_map(assignments)?;
+    map: &BTreeMap<EventMentionId, EventTrackId>,
+) -> Result<SameTrackPairSet, EventError> {
     let mut pairs = BTreeSet::new();
     let mentions: Vec<EventMentionId> = map.keys().copied().collect();
     for (index, left) in mentions.iter().enumerate() {
@@ -258,6 +254,38 @@ fn same_track_pairs(
         return Err(EventError::InvalidWirePayload);
     }
     Ok(pairs)
+}
+
+/// Build both same-track pair sets only after the two sides describe the
+/// identical mention identity universe.
+///
+/// Equal-length slices carrying different mention identifier sets would
+/// otherwise yield disjoint pair sets and silently report a zero rate; this
+/// helper refuses such payloads before any rate is computed.
+///
+/// # Errors
+///
+/// Returns [`EventError::InvalidWirePayload`] when either side is empty,
+/// carries duplicate mention identities, or the mention identity key sets of
+/// truth and recovered differ.
+fn aligned_pair_sets(
+    truth: &[EventTrackAssignment],
+    recovered: &[EventTrackAssignment],
+) -> Result<(SameTrackPairSet, SameTrackPairSet), EventError> {
+    let truth_map = unique_assignment_map(truth)?;
+    let recovered_map = unique_assignment_map(recovered)?;
+    if truth_map.len() != recovered_map.len()
+        || !truth_map
+            .keys()
+            .zip(recovered_map.keys())
+            .all(|(truth_key, recovered_key)| truth_key == recovered_key)
+    {
+        return Err(EventError::InvalidWirePayload);
+    }
+    Ok((
+        same_track_pairs(&truth_map)?,
+        same_track_pairs(&recovered_map)?,
+    ))
 }
 
 fn counted_rate(numerator: usize, denominator: usize) -> Result<f64, EventError> {
@@ -320,6 +348,55 @@ mod tests {
         );
         assert_eq!(counted_rate(1, 0), Err(EventError::InvalidWirePayload));
         cover_fail_closed_assignment_streams(left, right);
+    }
+
+    #[test]
+    fn pair_metrics_refuse_disjoint_mention_sets_at_equal_length() {
+        let left = EventMentionId::new();
+        let right = EventMentionId::new();
+        let stranger_a = EventMentionId::new();
+        let stranger_b = EventMentionId::new();
+        let truth = [assigned(left, 1), assigned(right, 1)];
+        let recovered = [assigned(stranger_a, 1), assigned(stranger_b, 1)];
+        assert_eq!(truth.len(), recovered.len());
+        assert_eq!(
+            tracking_pair_precision(&truth, &recovered),
+            Err(EventError::InvalidWirePayload)
+        );
+        assert_eq!(
+            tracking_pair_recall(&truth, &recovered),
+            Err(EventError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn pair_metrics_keep_values_for_identical_mention_sets() {
+        let first = EventMentionId::new();
+        let second = EventMentionId::new();
+        let third = EventMentionId::new();
+        let fourth = EventMentionId::new();
+        let fifth = EventMentionId::new();
+        // Truth pairs: {(first,second), (third,fourth)}.
+        let truth = [
+            assigned(first, 1),
+            assigned(second, 1),
+            assigned(third, 2),
+            assigned(fourth, 2),
+            assigned(fifth, 3),
+        ];
+        // Recovered pairs over the identical mention universe:
+        // {(first,second), (fourth,fifth)} -> half of each set overlaps.
+        let recovered = [
+            assigned(first, 1),
+            assigned(second, 1),
+            assigned(third, 3),
+            assigned(fourth, 2),
+            assigned(fifth, 2),
+        ];
+        let precision = tracking_pair_precision(&truth, &recovered).expect("precision");
+        let recall = tracking_pair_recall(&truth, &recovered).expect("recall");
+        assert!((precision - 0.5).abs() < f64::EPSILON);
+        assert!((recall - 0.5).abs() < f64::EPSILON);
     }
 
     fn cover_fail_closed_assignment_streams(left: EventMentionId, right: EventMentionId) {
