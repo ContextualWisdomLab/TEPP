@@ -260,8 +260,10 @@ impl TopicContextPosteriorArtifact {
             let document_event_time = event_times
                 .get(&document)
                 .ok_or(AnalysisEngineError::InvalidEvidence)?;
-            if !draws.contains_key(&document)
-                || !DIMENSIONS.contains(&membership.dimension_code.as_str())
+            // `event_times` is keyed by exactly the plausible-value
+            // documents, so the membership document is guaranteed to be a
+            // known draw document here; no redundant contains-key probe.
+            if !DIMENSIONS.contains(&membership.dimension_code.as_str())
                 || !valid_identifier(&membership.context_id)
                 || !membership.weight.is_finite()
                 || membership.weight <= 0.0
@@ -323,7 +325,7 @@ mod tests {
             schema_version: TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION.into(),
             run_id: "run-1".into(),
             snapshot_id: "snapshot-1".into(),
-            source_snapshot_sha256: "a".repeat(64),
+            source_snapshot_sha256: "a0".repeat(32),
             knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
             model_contract_version: "trsl-tm-v1".into(),
             posterior_draw_set_id: "draw-set-1".into(),
@@ -546,6 +548,35 @@ mod tests {
             |value: &mut TopicContextPosteriorArtifact| value.memberships[0].document_id =
                 "018f3f7a-7b7c-7d00-8000-000000000003".into()
         );
+        // Document event time strictly after the membership window start:
+        // the membership would claim context before the document existed.
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].valid_from =
+                "2026-07-15T00:00:01Z".into()
+        );
+        // A draw document with no membership rows at all breaks the
+        // document-coverage reconciliation even though every surviving row
+        // is individually valid.
+        let mut stripped = artifact();
+        let orphaned_document = stripped.memberships[0].document_id.clone();
+        stripped
+            .memberships
+            .retain(|membership| membership.document_id != orphaned_document);
+        assert!(stripped.to_json().is_err());
+    }
+
+    #[test]
+    fn rejects_header_when_any_entry_collection_exceeds_the_cap() {
+        // The header's entry-cap conjunct must fail closed before per-entry
+        // validation when a collection alone grows past ENTRY_LIMIT.
+        let mut oversized = artifact();
+        let template = oversized.activity_intervals[0].clone();
+        let target = ENTRY_LIMIT + 1;
+        oversized.activity_intervals.reserve(target);
+        while oversized.activity_intervals.len() <= target {
+            oversized.activity_intervals.push(template.clone());
+        }
+        assert!(oversized.to_json().is_err());
     }
 
     #[test]
@@ -584,7 +615,9 @@ mod tests {
         };
         assert!(per_document_bytes > 0);
         let extra_documents = TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT / per_document_bytes + 2;
-        let projected_entries = extra_documents * ((probe.posterior_draw_count + 4) as usize);
+        let projected_entries = extra_documents
+            * usize::try_from(probe.posterior_draw_count + 4)
+                .expect("posterior draw count fits usize");
         assert!(
             projected_entries <= ENTRY_LIMIT,
             "derived documents must stay inside the entry cap"
