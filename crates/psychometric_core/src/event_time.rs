@@ -14435,6 +14435,7 @@ mod tests {
         let trait_only = recover_stationary_initial_latent_variance(
             trait_variance,
             0.0,
+            0.0,
             predictor_variance,
             0.0,
             LagClock::EventTime,
@@ -15577,6 +15578,8 @@ mod tests {
         assert_eq!(
             recover_stationary_later_latent_variance(
                 0.0,
+                0.0,
+                0.0,
                 predictor_variance,
                 0.0,
                 event_delta,
@@ -15712,6 +15715,7 @@ mod tests {
         assert_eq!(
             recover_stationary_later_latent_variance(
                 0.0,
+                0.0,
                 -0.225,
                 1.0,
                 0.5,
@@ -15721,13 +15725,22 @@ mod tests {
             Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
         );
         assert_eq!(
-            recover_stationary_later_latent_variance(0.0, 1.0, 0.0, 1.0, LagClock::EventTime),
+            recover_stationary_later_latent_variance(
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
             Ok(0.0)
         );
         assert_eq!(
             recover_stationary_later_latent_variance(
                 f64::NAN,
                 0.4,
+                0.0,
                 0.0,
                 -0.5,
                 1.0,
@@ -15736,7 +15749,15 @@ mod tests {
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
-            recover_stationary_later_latent_variance(f64::MAX, 0.0, -0.5, 1.0, LagClock::EventTime),
+            recover_stationary_later_latent_variance(
+                f64::MAX,
+                0.0,
+                0.0,
+                0.0,
+                -0.5,
+                1.0,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
