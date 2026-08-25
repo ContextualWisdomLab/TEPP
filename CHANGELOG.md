@@ -4,6 +4,10 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [0.2.0] - 2026-08-25
 
+### Fixed
+
+- `network_analysis` posterior edge estimation landed with heuristic and fail-open defects that this release repairs before any consumer depends on it: a non-finite correlation now fails to the neutral p-value instead of masquerading as `|r| = 1`; negative-effect edges are excluded from the whole consensus perturbation pipeline rather than leaking into the union partition; the hardcoded 0.1 edge-drop probability became an explicit validated `edge_drop_probability` parameter; pseudo-p-values were replaced by exact two-sided Fisher z-transform p-values (Fisher, 1921) driving Benjamini–Hochberg admission (Benjamini & Hochberg, 1995) with percentile-bootstrap intervals (Efron, 1979); and 27 uncovered branch outcomes gained exact red-to-green cases. The workspace version is aligned to 0.2.0 across every crate manifest.
+
 ### Added
 
 - **Analysis engine**: deterministic end-to-end analysis-run execution with cutoff-safe eligibility, immutable evidence binding, and reproducibility manifests (`analysis_engine` crate).
