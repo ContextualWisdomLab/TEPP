@@ -264,7 +264,6 @@ def is_executable_source_line(
             or text.startswith("if(")
             or " if(" in text
         ):
-        if text.startswith("if ") or text.startswith("if("):
             return True
         return _is_multiline_match_guard(lines, line_number)
     if text.startswith("pub struct ") or text.startswith("struct "):
@@ -284,30 +283,6 @@ def is_executable_source_line(
         return False
     return True
 
-
-def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
-    """Recognize a guard continued onto the lines immediately before an arm."""
-
-    target_prefix = lines[line_number - 1].strip().partition("=>")[0]
-    brace_depth = target_prefix.count("}") - target_prefix.count("{")
-    guard_found = False
-    boundary_candidate = False
-    for candidate in reversed(lines[: line_number - 1]):
-        stripped = candidate.strip()
-        if brace_depth == 0 and "=>" in stripped:
-            return guard_found and not boundary_candidate
-        if brace_depth == 1 and stripped.endswith("=> {"):
-            boundary_candidate = True
-        brace_depth += stripped.count("}") - stripped.count("{")
-        if (
-            (stripped.startswith("if ") or stripped.startswith("if("))
-            and not stripped.endswith(("}", ";"))
-            and brace_depth == 0
-        ):
-            guard_found = True
-        if stripped.startswith("match "):
-            return guard_found and not boundary_candidate
-    return guard_found and not boundary_candidate
 
 def _is_structural_comma_continuation(
     lines: list[str], line_number: int, text: str

@@ -146,12 +146,16 @@ mod tests {
             (
                 EventError::UnknownEventLinkLabel,
                 "unknown event link label",
+            ),
+            (
                 EventError::FirstStoryIsNotEventInstance,
                 "first-story detection is not an event instance",
             ),
             (
                 EventError::UnknownFirstStoryLabel,
                 "unknown first-story label",
+            ),
+            (
                 EventError::EventTrackIsNotEventInstance,
                 "event track is not an event instance",
             ),
