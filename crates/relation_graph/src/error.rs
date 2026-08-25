@@ -22,6 +22,8 @@ pub enum RelationError {
     InvalidWirePayload,
     /// A wire payload used a schema version this crate does not support.
     UnsupportedWireVersion,
+    /// An association, precedence, or provenance edge was treated as causation.
+    CausalClaimNotIdentified,
 }
 
 impl fmt::Display for RelationError {
@@ -35,6 +37,7 @@ impl fmt::Display for RelationError {
             Self::DuplicateRelationEdge => "duplicate relation edge",
             Self::InvalidWirePayload => "invalid relation wire payload",
             Self::UnsupportedWireVersion => "unsupported relation wire version",
+            Self::CausalClaimNotIdentified => "causal claim is not identified",
         };
         formatter.write_str(message)
     }
@@ -71,6 +74,10 @@ mod tests {
             (
                 RelationError::UnsupportedWireVersion,
                 "unsupported relation wire version",
+            ),
+            (
+                RelationError::CausalClaimNotIdentified,
+                "causal claim is not identified",
             ),
         ] {
             assert_eq!(error.to_string(), message);

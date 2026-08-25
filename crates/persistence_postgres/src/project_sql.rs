@@ -7,8 +7,8 @@ use uuid::Uuid;
 /// One append-only project target that membership rows may reference.
 ///
 /// Maps to `project_record` after migration `0006`. The status label is a
-/// fail-closed contextual code (`active`, `closed`) and is not a project
-/// display name.
+/// fail-closed ASCII snake-case contextual code (`active`, `closed`) and is
+/// not a project display name.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProjectRecord {
     /// Primary key for this project identity.
@@ -29,6 +29,9 @@ impl ProjectRecord {
     /// # Errors
     ///
     /// Returns [`PersistenceError::InvalidProjectRecord`] when the status code
+    /// is empty, longer than 128 bytes, or contains a character outside the
+    /// ASCII letters, digits, and underscore allowlist used by the rendered
+    /// SQL transport.
     /// is empty, longer than 128 bytes, or contains a character outside
     /// lowercase ASCII letters, digits, and underscores.
     pub fn validate(&self) -> Result<(), PersistenceError> {
@@ -43,6 +46,8 @@ impl ProjectRecord {
 /// Returns [`PersistenceError::InvalidProjectRecord`] before any SQL is produced.
 pub fn insert_project_record_sql(record: &ProjectRecord) -> Result<String, PersistenceError> {
     record.validate()?;
+    // The current SqlSession contract accepts rendered SQL, so the status is
+    // restricted to an SQL-literal-safe identifier token before interpolation.
     Ok(format!(
         "INSERT INTO project_record (\
             project_record_id, tenant_record_id, project_status_code, \
@@ -74,6 +79,9 @@ pub fn select_project_record_by_id_sql(project_record_id: Uuid) -> String {
 fn validate_project_label(value: &str) -> Result<(), PersistenceError> {
     if value.is_empty()
         || value.len() > 128
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
         || value
             .chars()
             .any(|ch| !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_'))

@@ -12,7 +12,6 @@ members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
-
     "crates/location_membership",
     "crates/prompt_source",
     "crates/corpus_background",
@@ -50,6 +49,8 @@ members = [
     "crates/interpretation_gateway",
     "crates/model_selection",
     "crates/checkpoint_authority",
+    "crates/compute_backend",
+    "crates/episode_membership",
     "crates/membership_target",
     "crates/topic_measurement",
     "crates/analysis_engine",
@@ -66,7 +67,6 @@ default-members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
-
     "crates/location_membership",
     "crates/prompt_source",
     "crates/corpus_background",
@@ -104,6 +104,8 @@ default-members = [
     "crates/interpretation_gateway",
     "crates/model_selection",
     "crates/checkpoint_authority",
+    "crates/compute_backend",
+    "crates/episode_membership",
     "crates/membership_target",
     "crates/topic_measurement",
     "crates/analysis_engine",
