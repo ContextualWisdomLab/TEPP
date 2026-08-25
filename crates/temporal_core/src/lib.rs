@@ -25,8 +25,13 @@
 //! relations. Relation sets support inverse and complete composition, while a
 //! resource-bounded path-consistency reasoner preserves direct assertions,
 //! derived narrowing, and conservative supporting-assertion provenance.
+//!
+//! Historical eligibility requires the entire [`AvailableTime`] interval to
+//! fall at or before [`KnowledgeCutoff`]. Unknown or open-ended availability
+//! fails closed and cannot be replaced by event or document time.
 
 mod clock;
+mod eligibility;
 mod error;
 mod instant;
 mod interval;
@@ -48,6 +53,8 @@ pub use clock::KnowledgeCutoff;
 pub use clock::SystemTime;
 /// A sealed nominal TEPP clock over one absolute instant representation.
 pub use clock::TemporalClock;
+/// Decide whether an availability interval is fully eligible at a cutoff.
+pub use eligibility::evaluate_historical_eligibility;
 /// A fail-closed temporal-domain validation error.
 pub use error::TemporalError;
 /// An absolute UTC instant represented to nanosecond precision.

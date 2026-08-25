@@ -44,7 +44,7 @@ REQUIRED_FILES = (
     "docs/adr/0017-hourly-contextual-orchestrator-gateway.md",
     "docs/adr/0018-consumer-scoped-analysis-run-ingress.md",
     "docs/adr/0019-project-history-wire-size-symmetry.md",
-    "docs/adr/0020-lineageweave-project-history-boundary.md",
+    "docs/adr/0021-lineageweave-project-history-boundary.md",
     "docs/product/prd-v0.4-approved.md",
     PRODUCT_TECHNICAL_GAP_BASELINE,
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
