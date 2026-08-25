@@ -109,12 +109,15 @@ jobs:
           Read AGENTS.md, CLAUDE.md, ARCHITECTURE.md, README.md, CHANGELOG.md,
           product, technical, operations, security, doctoring, source, prompts,
           tests, workflows, releases, issues, and recently merged pull requests.
-          Select the single highest-value buyer-visible Gap that fits exactly one bounded pull request.
-          After audit_event inserts are bound to try_record, the next bounded
-          increment is binding tepp_api privileged-export authorization
-          decision records to operational_log::try_record.
-          Do not reopen the public OperationalLogRecord::new constructor hole.
-          Do not mix service_tls or persistence migration 0007 into that increment.
+          Derive the single highest-value buyer-visible Gap from
+          docs/product-technical-gap-baseline.md (refreshed each cycle against
+          live GitHub state); if that file is absent or exhausted, re-derive
+          the gap from ADRs, research registers, and protected-main evidence.
+          Select exactly one bounded pull request whose scope fits one
+          bounded increment and name the Gap ID you are closing in the
+          resulting PR_MESSAGE.md. Never invent weights: use psychometric
+          estimates from evidence-grounded models instead of arbitrary
+          constants.
 
           Preserve standalone operation and modular MSA integration with
           ContextualWisdomLab/.github, naruon, contextual-orchestrator, and other
@@ -139,7 +142,11 @@ jobs:
 
           Do not merge. Do not release. Do not deploy. Do not publish. Do not
           weaken exact-head review, Checks, security, privacy, coverage, docstring,
-          credential, deterministic-grounding, or fail-closed controls. Leave one
+          credential, deterministic-grounding, or fail-closed controls. Operational
+          logging stays on the fail-closed contract: privileged persistence inserts
+          go through the audited audit_event path, in-memory records are created
+          only via operational_log try_record / OperationalLogRecord::new, and raw
+          source text or source identity never enters the log. Leave one
           coherent working-tree increment and create PR_MESSAGE.md: title first,
           then a body with Gap, design, RED/GREEN evidence, verification, APA 7
           sources, version decision, and residual risk.

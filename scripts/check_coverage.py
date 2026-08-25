@@ -37,45 +37,6 @@ def load_totals(path: Path) -> Mapping[str, Any]:
     return merged
 
 
-def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | float]:
-    """Merge LLVM branch outcomes by source coordinate across test binaries."""
-
-    outcomes: dict[tuple[str, int, int, int, int], list[int]] = {}
-    for file_record in files:
-        if not isinstance(file_record, Mapping):
-            raise ValueError("coverage file record must be an object")
-        filename = file_record.get("filename")
-        if "branches" not in file_record:
-            raise ValueError("coverage file record must contain branches")
-        branches = file_record["branches"]
-        if not isinstance(filename, str) or not filename:
-            raise ValueError("coverage file record must contain a filename")
-        if not isinstance(branches, list):
-            raise ValueError("coverage branches must be a list")
-        for branch in branches:
-            if not isinstance(branch, list) or len(branch) < 6:
-                raise ValueError("coverage branch record is malformed")
-            coordinates = branch[:4]
-            counts = branch[4:6]
-            if not all(
-                isinstance(value, int) and not isinstance(value, bool) and value >= 0
-                for value in coordinates
-            ):
-                raise ValueError("coverage branch coordinates are invalid")
-            if not all(
-                isinstance(value, int) and not isinstance(value, bool) and value >= 0
-                for value in counts
-            ):
-                raise ValueError("coverage branch counts are invalid")
-            key = (filename, *coordinates)
-            outcome = outcomes.setdefault(key, [0, 0])
-            outcome[0] += counts[0]
-            outcome[1] += counts[1]
-    count = len(outcomes) * 2
-    covered = sum(outcome > 0 for counts in outcomes.values() for outcome in counts)
-    return {"count": count, "covered": covered}
-
-
 def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int, int]:
     """Return ``(site, true_count, false_count)`` from one LLVM branch tuple.
 
@@ -322,30 +283,6 @@ def is_executable_source_line(
         return False
     return True
 
-
-def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
-    """Recognize a guard continued onto the lines immediately before an arm."""
-
-    target_prefix = lines[line_number - 1].strip().partition("=>")[0]
-    brace_depth = target_prefix.count("}") - target_prefix.count("{")
-    guard_found = False
-    boundary_candidate = False
-    for candidate in reversed(lines[: line_number - 1]):
-        stripped = candidate.strip()
-        if brace_depth == 0 and "=>" in stripped:
-            return guard_found and not boundary_candidate
-        if brace_depth == 1 and stripped.endswith("=> {"):
-            boundary_candidate = True
-        brace_depth += stripped.count("}") - stripped.count("{")
-        if (
-            (stripped.startswith("if ") or stripped.startswith("if("))
-            and not stripped.endswith(("}", ";"))
-            and brace_depth == 0
-        ):
-            guard_found = True
-        if stripped.startswith("match "):
-            return guard_found and not boundary_candidate
-    return guard_found and not boundary_candidate
 
 def _is_structural_comma_continuation(
     lines: list[str], line_number: int, text: str

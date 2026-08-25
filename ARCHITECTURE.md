@@ -63,17 +63,14 @@ boundaries above remain the target modular MSA architecture.
 | `event_core` | event instances, mentions, roles, provenance, and CHRONOS occurrence-prediction calibration |
 | `relation_graph` | typed relations and forward-transition validation |
 | `membership_core` | time-varying cross-classified multiple membership, Kish ESS, nested ICC with non-nested refusal |
+| `role_contradiction` | customer and competitor cannot occupy the same group |
 | `persistence_postgres` | PostgreSQL repositories and migrations |
 | `corpus_split` | cutoff-safe, relation-aware partitioning |
 | `tepp_simulation` | known-truth temporal/event data generation |
-| `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
+| `validation_core` | RMSE, bias, coverage, graph, Monte Carlo, and exact-head claim-promotion metrics |
 | `tepp_api` | versioned DTO, schema, terminal-result, and export contracts |
 | `analysis_engine` | bounded cutoff-safe temporal evidence readiness execution and digest-bound terminal artifacts |
-| `location_membership` | location is not entity identity and not a language channel |
-| `validation_core` | RMSE, bias, coverage, graph, Monte Carlo, and exact-head claim-promotion metrics |
-| `tepp_api` | versioned DTO, schema, and export contracts |
 | `episode_membership` | event-time episode membership containment gate |
-| `location_membership` | location is not entity identity and not a language channel |
 | `prompt_source` | prompt boilerplate is not unique latent content and not stopword deletion |
 | `corpus_background` | corpus-background wording is not unique latent content and not stopword deletion |
 | `modality_source` | non-lexical modality is not unique latent content and not stopword deletion |

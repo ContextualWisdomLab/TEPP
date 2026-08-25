@@ -237,6 +237,14 @@ Beretvas, S. N. (2011). Cross-classified and multiple-membership models. In J. J
 
 Language, episode, template, department, and opportunity-pool memberships are crossed classifications. TEPP refuses collapsing those targets into the entity/project pair stored by migration `0006`; typed `entity_record` and `project_record` SQL reject hostile labels before insert (Browne et al., 2001; Snijders & Bosker, 2012; Beretvas, 2011).
 
+## Roles, membership, and multilevel structure
+
+Biddle, B. J. (1986). Recent developments in role theory. *Annual Review of Sociology, 12*, 67–92. https://doi.org/10.1146/annurev.so.12.080186.000435
+
+Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100201
+
+Customer, partner, and competitor are contextual roles. TEPP refuses a customer/competitor pair in the same group and does not collapse those roles into one commercial class (Biddle, 1986; Browne et al., 2001).
+
 ## Unicode, language tags, and multilingual structure
 
 Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #15: Unicode normalization forms*. Unicode Consortium.

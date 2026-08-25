@@ -1229,6 +1229,48 @@ class CoverageContractTests(unittest.TestCase):
 
 
 
+    def test_union_branch_totals_merge_counts_across_binaries(self) -> None:
+        """Valid records sum per coordinate across duplicate instrumented copies."""
+
+        files = [
+            {
+                "filename": "src/lib.rs",
+                "branches": [
+                    [10, 1, 5, 6, 3, 0],
+                    [20, 2, 7, 8, 0, 4],
+                ],
+            },
+            {
+                "filename": "src/lib.rs",
+                "branches": [
+                    [10, 1, 5, 6, 1, 2],
+                ],
+            },
+        ]
+        self.assertEqual(
+            coverage_contract.load_union_branch_totals(files),
+            {"count": 4, "covered": 3},
+        )
+
+    def test_blank_history_comma_scan_exhaustion(self) -> None:
+        """Blank-only preceding lines exhaust the reverse scan and stay unproven."""
+
+        lines = ["", "   ", "    ,"]
+        self.assertFalse(
+            coverage_contract._is_structural_comma_continuation(lines, 3, ",")
+        )
+
+    def test_char_literal_with_escaped_backslash_keeps_scanner_exact(self) -> None:
+        """An escaped-backslash char literal cannot flip the multiline verdict."""
+
+        lines = [
+            "const slash: char = '\\\\';",
+            'static tail: &str = "open',
+            '    tail";',
+        ]
+        self.assertTrue(coverage_contract._line_in_multiline_string(lines, 3))
+        self.assertFalse(coverage_contract._line_in_multiline_string(lines, 2))
+
     def test_multiline_string_empty_lines_returns_false(self) -> None:
         """An empty source produces no multiline-string continuations."""
 

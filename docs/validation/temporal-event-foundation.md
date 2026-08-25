@@ -31,6 +31,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | CHRONOS occurrence-prediction calibration | `event_core` | accepted-target | active PR | Brier vs later-observed truth; refuse prediction-as-instance | ADR 0016; `docs/research/chronos-prediction-calibration.md` |
 | Multiple membership | `membership_core` | partial | — | unit + ESS weights | Task 7 / PR #12 + #25 |
 | Episode membership containment | `episode_membership` | accepted-target | active PR | refuse membership outside episode + recovery vs accept-all | ADR 0003 |
+| Customer/competitor role contradiction | `role_contradiction` | accepted-target | active PR | refuse overlap + recovery vs commercial collapse | ADR 0003 role assertions |
 | Forward transition DAG | `relation_graph` | implemented-main | — | unit + cycle rejection | Task 6 / PR #14 |
 | Copy-versus-source identity | `copy_identity` | accepted-target | active PR | refuse copy-as-source/transition + recovery vs source collapse | ADR 0003 |
 | Summary-versus-source identity | `summarizes_edge` | accepted-target | active PR | refuse summary-as-transition/source + recovery vs source collapse | ADR 0003 |
