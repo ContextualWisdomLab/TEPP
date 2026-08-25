@@ -34,14 +34,14 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
-    recover_standardised_continuous_intercept, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_continuous_intercept, recover_standardised_manifest_mean,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -5880,6 +5880,27 @@ fn standardised_continuous_intercept_recovers_driver_page_sixteen_after_positive
 }
 
 #[test]
+fn standardised_manifest_mean_recovers_driver_page_sixteen_after_positive_manifestvar() {
+    let mean = 0.8_f64;
+    let measurement_error = 1.6_f64;
+    let recovered =
+        recover_standardised_manifest_mean(mean, measurement_error, LagClock::EventTime)
+            .expect("MANIFESTMEANSstd");
+    let expected = mean / measurement_error.sqrt();
+    let error = (recovered - expected).abs();
+    assert!(
+        error < 1e-15,
+        "Driver et al. (2017, p. 16 MANIFESTMEANSstd): RMSE {error} for τ / √θ"
+    );
+    let larger =
+        recover_standardised_manifest_mean(mean, 6.4, LagClock::EventTime).expect("larger θ");
+    assert!(
+        larger.abs() < recovered.abs(),
+        "Driver et al. (2017, footnote 4): larger residual SD shrinks MANIFESTMEANSstd"
+    );
+}
+
+#[test]
 fn standardised_continuous_intercept_refuses_non_event_clocks_and_does_not_keep_zero_q() {
     assert_eq!(
         recover_standardised_continuous_intercept(0.4, 0.8, -0.5, LagClock::AssertionTime),
@@ -5899,5 +5920,24 @@ fn standardised_continuous_intercept_refuses_non_event_clocks_and_does_not_keep_
     );
     let zero = recover_standardised_continuous_intercept(0.0, 0.8, -0.5, LagClock::EventTime)
         .expect("zero CINT");
+    assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+}
+
+#[test]
+fn standardised_manifest_mean_refuses_non_event_clocks_and_does_not_keep_zero_residual() {
+    assert_eq!(
+        recover_standardised_manifest_mean(0.8, 1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_manifest_mean(0.8, 1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_manifest_mean(0.8, 0.0, LagClock::EventTime),
+        Err(PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance)
+    );
+    let zero =
+        recover_standardised_manifest_mean(0.0, 1.6, LagClock::EventTime).expect("zero mean");
     assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
 }
