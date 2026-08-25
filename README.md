@@ -6,22 +6,72 @@ implemented in Rust.
 
 ## Current implementation state
 
-This branch establishes the Task 1 Rust workspace and quality-gate foundation.
-The eleven bounded crates compile independently. Domain crates expose only
-validated production APIs; placeholder surfaces are prohibited.
+This branch keeps the Rust workspace quality foundation and the bounded
+foundation crates. Domain crates expose only tested contracts: immutable
+evidence, six-clock temporal values, event mentions/instances, relations,
+membership, persistence, splits, simulation, validation, API DTOs, and the
+predicted-versus-observed promotion gate.
+This branch establishes the Rust workspace, quality-gate foundation, and the
+longitudinal within/between decomposition capability. The eleven bounded crates
+compile independently. `longitudinal_core` exposes within/between decomposition
+and component RMSE APIs; the remaining crates expose no placeholder production
+APIs, and domain behavior for them begins in Task 2 with immutable evidence
+identifiers and source records.
+This branch establishes the Rust workspace and quality-gate foundation. The
+bounded crates compile independently. Domain crates expose only validated
+production APIs; placeholder surfaces are prohibited.
 
 ```text
-crates/evidence_core
-crates/temporal_core
-crates/event_core
-crates/relation_graph
-crates/membership_core
-crates/persistence_postgres
+crates/assertion_clock
+crates/available_clock
+crates/checkpoint_authority
+crates/citation_edge
+crates/copied_text
+crates/copy_identity
+crates/corpus_background
 crates/corpus_split
-crates/tepp_simulation
-crates/validation_core
+crates/cutoff_clock
+crates/derived_sensitivity
+crates/document_clocks
+crates/encrypted_mapping
+crates/event_clock
+crates/event_core
+crates/evidence_core
+crates/inferred_status
+crates/intake_authorization
+crates/interpretation_gateway
+crates/location_membership
+crates/longitudinal_core
+crates/membership_core
+crates/membership_target
+crates/modality_source
+crates/model_selection
+crates/network_analysis
+crates/operational_log
+crates/outcome_order
+crates/payload_bound
+crates/persistence_postgres
+crates/prediction_contradiction
+crates/prompt_source
+crates/provider_receipt
+crates/psychometric_core
+crates/psychometric_fit
+crates/relation_graph
+crates/retrospective_edge
+crates/revision_order
+crates/semantic_core
+crates/service_tls
+crates/stopword_deletion
+crates/style_source
+crates/subevent_containment
+crates/summarizes_edge
+crates/support_edge
+crates/system_clock
+crates/temporal_core
 crates/tepp_api
-crates/psychometric_core  # input gates, CWC/event-time/contextual, irregular residual lag, Rubin T, strong means, Driver Eq. 3 TDPRED/TIPRED maps including Eq. 5 of TIPREDEFFECT; not a full ESEM/DSEM estimator
+crates/tepp_simulation
+crates/topic_lineage
+crates/validation_core
 ```
 
 ## Local verification

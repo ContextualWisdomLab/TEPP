@@ -9,10 +9,10 @@ Extends Task 8 / ADR 0013 with:
 3. parameterized document/audit SQL rendering for bitemporal tables;
 4. `LiveDocumentRepository` over any `SqlSession`;
 5. fail-closed `DATABASE_URL` configuration gate for `SQLx` pool wiring;
-6. optional `live-sqlx` feature compiling a real `SQLx`/`PgPool` open/execute driver behind validated URL and pool options;
+6. optional `live-sqlx` feature compiling a real `SQLx`/`PgPool` driver behind validated URL and pool options, with one pool-backed connection retained per live session so tenant GUC binding and the following statement share a PostgreSQL session;
 7. exact-head live PostgreSQL CI (`live-postgres` job) that opens the pool, applies foundation+RLS migrations, exercises document insert/revise/as-of/audit SQL, and proves tenant isolation under `tepp_app_runtime` when `TEPP_LIVE_POSTGRES=1`.
 
-Offline/`RecordingSqlSession` backends keep deterministic default CI free of a database process; `live-sqlx` fails closed without a reachable server. Tenant RLS migration `0002` (FORCE policies + `tepp_app_runtime` + session GUC), live isolation proof, and concurrent document-write stress are included; backup/restore integrity revalidation is on the active PR; remaining physical ERD constraints remain follow-ons.
+Offline/`RecordingSqlSession` backends keep deterministic default CI free of a database process; `live-sqlx` fails closed without a reachable server. Tenant RLS migration `0002` (FORCE policies + `tepp_app_runtime` + session GUC), session-affinity isolation proof, live isolation proof, and concurrent document-write stress are included; backup/restore integrity revalidation is on the active PR; remaining physical ERD constraints remain follow-ons.
 
 ## Authority
 

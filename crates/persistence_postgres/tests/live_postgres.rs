@@ -7,19 +7,20 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
-    AuditEvent, CorpusSplitManifestRecord, DeletionRequestRecord, DocumentRecord,
-    EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository, LiveSqlxPoolOptions,
-    MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord, ModelRunRecord,
-    PersistenceError, ReproducibilityManifestRecord, RetentionPolicyRecord, SqlSession,
-    apply_sql_batch, assume_app_runtime_role_sql, clear_session_tenant_sql, open_live_sqlx_pool,
-    require_live_sqlx_config, reset_app_runtime_role_sql, select_active_analysis_document_sql,
-    set_session_tenant_sql,
+    AuditEvent, AuditSourceInspection, CorpusSplitManifestRecord, DeletionRequestRecord,
+    DocumentRecord, EntityRecord, EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository,
+    LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
+    ModelRunRecord, PersistenceError, ProjectRecord, ReproducibilityManifestRecord,
+    RetentionPolicyRecord, SqlSession, TextSegmentRecord, apply_sql_batch,
+    assume_app_runtime_role_sql, clear_session_tenant_sql, insert_entity_record_sql,
+    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
+    select_active_analysis_document_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
-use temporal_core::{AvailableTime, EventTime, SystemTime};
+use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff, SystemTime};
 use uuid::Uuid;
 
 const CONCURRENT_WRITERS: usize = 2;
@@ -142,6 +143,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
 
     exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
+    prove_text_segment_known_span(&mut repo, tenant_record_id, available, system);
     prove_retention_deletion_legal_hold(
         &mut repo,
         tenant_record_id,
@@ -201,7 +203,8 @@ fn prove_document_insert_revise_and_audit(
         subject_record_id: document_record_id,
         recorded_system_time: SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("audit"),
     };
-    repo.append_audit(&audit).expect("append audit_event");
+    repo.append_audit(&audit, AuditSourceInspection::CLEAR)
+        .expect("append audit_event");
 }
 
 fn open_migrated_live_repo() -> LiveDocumentRepository<persistence_postgres::LiveSqlxPool> {
@@ -838,24 +841,36 @@ fn live_membership(
     }
 }
 
-fn entity_insert_sql(
-    entity_id: Uuid,
+fn live_entity(
+    entity_record_id: Uuid,
     tenant_record_id: Uuid,
-    entity_type: &str,
+    entity_type_code: &str,
     available: AvailableTime,
     system: SystemTime,
-) -> String {
-    format!(
-        "INSERT INTO entity_record (\
-            entity_record_id, tenant_record_id, entity_type_code, \
-            system_time, available_time\
-         ) VALUES (\
-            '{entity_id}'::uuid, '{tenant_record_id}'::uuid, '{entity_type}', \
-            '{system}'::timestamptz, '{available}'::timestamptz\
-         )",
-        system = system.to_rfc3339(),
-        available = available.to_rfc3339(),
-    )
+) -> EntityRecord {
+    EntityRecord {
+        entity_record_id,
+        tenant_record_id,
+        entity_type_code: entity_type_code.into(),
+        system_time: system,
+        available_time: available,
+    }
+}
+
+fn live_project(
+    project_record_id: Uuid,
+    tenant_record_id: Uuid,
+    project_status_code: &str,
+    available: AvailableTime,
+    system: SystemTime,
+) -> ProjectRecord {
+    ProjectRecord {
+        project_record_id,
+        tenant_record_id,
+        project_status_code: project_status_code.into(),
+        system_time: system,
+        available_time: available,
+    }
 }
 
 fn seed_membership_targets(
@@ -873,45 +888,60 @@ fn seed_membership_targets(
     repo.session_mut()
         .execute(&set_session_tenant_sql(Uuid::nil()))
         .expect("bind wrong tenant GUC");
+    let wrong_tenant_entity = live_entity(entity_a, tenant_record_id, "author", available, system);
+    let wrong_tenant_sql =
+        insert_entity_record_sql(&wrong_tenant_entity).expect("render entity insert");
     assert!(
-        repo.session_mut()
-            .execute(&entity_insert_sql(
-                entity_a,
-                tenant_record_id,
-                "author",
-                available,
-                system,
-            ))
-            .is_err(),
-        "wrong tenant GUC must reject entity_record insert under FORCE RLS"
+        repo.session_mut().execute(&wrong_tenant_sql).is_err(),
+        "raw wrong-tenant SQL must reject entity_record insert under FORCE RLS"
     );
     repo.session_mut()
         .execute(&set_session_tenant_sql(tenant_record_id))
         .expect("bind membership tenant GUC");
+    assert_eq!(
+        repo.insert_entity_record(&live_entity(
+            entity_a,
+            tenant_record_id,
+            "author'; DROP TABLE",
+            available,
+            system,
+        )),
+        Err(PersistenceError::InvalidEntityRecord),
+        "hostile entity_type_code must fail closed before SQL"
+    );
+    assert_eq!(
+        repo.insert_project_record(&live_project(
+            project,
+            tenant_record_id,
+            "active;closed",
+            available,
+            system,
+        )),
+        Err(PersistenceError::InvalidProjectRecord),
+        "hostile project_status_code must fail closed before SQL"
+    );
     for (entity_id, entity_type) in [(entity_a, "author"), (entity_b, "department")] {
-        repo.session_mut()
-            .execute(&entity_insert_sql(
-                entity_id,
-                tenant_record_id,
-                entity_type,
-                available,
-                system,
-            ))
-            .expect("insert entity_record");
-    }
-    repo.session_mut()
-        .execute(&format!(
-            "INSERT INTO project_record (\
-                project_record_id, tenant_record_id, project_status_code, \
-                system_time, available_time\
-             ) VALUES (\
-                '{project}'::uuid, '{tenant_record_id}'::uuid, 'active', \
-                '{system}'::timestamptz, '{available}'::timestamptz\
-             )",
-            system = system.to_rfc3339(),
-            available = available.to_rfc3339(),
+        repo.insert_entity_record(&live_entity(
+            entity_id,
+            tenant_record_id,
+            entity_type,
+            available,
+            system,
         ))
-        .expect("insert project_record");
+        .expect("insert entity_record");
+        repo.submit_entity_record_by_id(entity_id)
+            .expect("select entity_record");
+    }
+    repo.insert_project_record(&live_project(
+        project,
+        tenant_record_id,
+        "active",
+        available,
+        system,
+    ))
+    .expect("insert project_record");
+    repo.submit_project_record_by_id(project)
+        .expect("select project_record");
     repo.session_mut()
         .execute(&reset_app_runtime_role_sql())
         .expect("RESET ROLE after membership seed");
@@ -973,6 +1003,79 @@ fn exercise_typed_membership_assignments(
         available,
         system,
     );
+}
+
+fn prove_text_segment_known_span(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    const DOCUMENT_UTF8: &str = "hello world";
+    assert_eq!(DOCUMENT_UTF8.len(), 11);
+    assert_eq!(&DOCUMENT_UTF8.as_bytes()[0..5], b"hello");
+    let document_record_id = Uuid::now_v7();
+    let hello = Uuid::now_v7();
+    let world = Uuid::now_v7();
+    let later = AvailableTime::parse_rfc3339("2026-06-01T00:00:00Z").expect("later");
+    repo.insert_text_segment(&TextSegmentRecord {
+        text_segment_id: hello,
+        tenant_record_id,
+        document_record_id,
+        start_byte: 0,
+        end_byte: 5,
+        system_time: system,
+        available_time: available,
+    })
+    .expect("insert known hello span");
+    repo.insert_text_segment(&TextSegmentRecord {
+        text_segment_id: world,
+        tenant_record_id,
+        document_record_id,
+        start_byte: 6,
+        end_byte: 11,
+        system_time: system,
+        available_time: later,
+    })
+    .expect("insert later world span");
+    let inverted = TextSegmentRecord {
+        text_segment_id: Uuid::now_v7(),
+        tenant_record_id,
+        document_record_id,
+        start_byte: 5,
+        end_byte: 0,
+        system_time: system,
+        available_time: available,
+    };
+    assert_eq!(
+        repo.insert_text_segment(&inverted),
+        Err(PersistenceError::InvalidTextSegment)
+    );
+    let cutoff = KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff");
+    repo.submit_text_segment_by_id(hello)
+        .expect("select text_segment by id");
+    repo.submit_text_segments_for_document_as_of(document_record_id, &cutoff)
+        .expect("select cutoff-eligible text_segment rows");
+    let recovery = format!(
+        "DO $tepp_text_segment$ BEGIN \
+           IF (SELECT start_byte FROM text_segment \
+               WHERE text_segment_id = '{hello}'::uuid) <> 0 THEN \
+             RAISE EXCEPTION 'hello start_byte did not recover'; \
+           END IF; \
+           IF (SELECT end_byte FROM text_segment \
+               WHERE text_segment_id = '{hello}'::uuid) <> 5 THEN \
+             RAISE EXCEPTION 'hello end_byte did not recover'; \
+           END IF; \
+           IF (SELECT COUNT(*) FROM text_segment \
+               WHERE document_record_id = '{document_record_id}'::uuid \
+                 AND available_time <= '2026-02-01T00:00:00Z'::timestamptz) <> 1 THEN \
+             RAISE EXCEPTION 'cutoff must keep only the available hello span'; \
+           END IF; \
+         END $tepp_text_segment$"
+    );
+    repo.session_mut()
+        .execute(&recovery)
+        .expect("known hello span and cutoff eligibility must recover");
 }
 
 fn prove_persisted_membership_rows(
@@ -1041,20 +1144,16 @@ fn prove_membership_exactly_one_rejections(
     );
 
     let text_segment_id = Uuid::now_v7();
-    repo.session_mut()
-        .execute(&format!(
-            "INSERT INTO text_segment (\
-                text_segment_id, tenant_record_id, document_record_id, \
-                start_byte, end_byte, system_time, available_time\
-             ) VALUES (\
-                '{text_segment_id}'::uuid, '{tenant_record_id}'::uuid, \
-                '{document_record_id}'::uuid, 0, 8, \
-                '{system}'::timestamptz, '{available}'::timestamptz\
-             )",
-            system = system.to_rfc3339(),
-            available = available.to_rfc3339(),
-        ))
-        .expect("insert text_segment");
+    repo.insert_text_segment(&TextSegmentRecord {
+        text_segment_id,
+        tenant_record_id,
+        document_record_id,
+        start_byte: 0,
+        end_byte: 8,
+        system_time: system,
+        available_time: available,
+    })
+    .expect("insert text_segment");
     let dual_unit = format!(
         "INSERT INTO membership_assignment (\
             membership_assignment_id, tenant_record_id, document_record_id, \

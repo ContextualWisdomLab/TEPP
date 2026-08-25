@@ -14,6 +14,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 EXPECTED_CRATES: tuple[str, ...] = (
     "evidence_core",
+    "semantic_core",
     "temporal_core",
     "event_core",
     "relation_graph",
@@ -23,6 +24,45 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "tepp_simulation",
     "validation_core",
     "tepp_api",
+
+    "location_membership",
+    "prompt_source",
+    "corpus_background",
+    "modality_source",
+    "copied_text",
+    "style_source",
+    "stopword_deletion",
+    "copy_identity",
+    "provider_receipt",
+    "intake_authorization",
+    "summarizes_edge",
+    "outcome_order",
+    "retrospective_edge",
+    "payload_bound",
+    "inferred_status",
+    "support_edge",
+    "system_clock",
+    "event_clock",
+    "assertion_clock",
+    "cutoff_clock",
+    "available_clock",
+    "document_clocks",
+    "revision_order",
+    "encrypted_mapping",
+    "citation_edge",
+    "psychometric_fit",
+    "subevent_containment",
+    "prediction_contradiction",
+    "operational_log",
+    "service_tls",
+    "derived_sensitivity",
+    "longitudinal_core",
+    "topic_lineage",
+    "network_analysis",
+    "interpretation_gateway",
+    "model_selection",
+    "checkpoint_authority",
+    "membership_target",
     "psychometric_core",
 )
 
@@ -90,8 +130,8 @@ def validate_workspace(root: Path) -> list[str]:
         errors.append("workspace default-members must exactly match workspace members")
     if package_defaults.get("edition") != "2024":
         errors.append("workspace edition must be 2024")
-    if package_defaults.get("rust-version") != "1.97.1":
-        errors.append("workspace rust-version must be 1.97.1")
+    if package_defaults.get("rust-version") != "1.98.0":
+        errors.append("workspace rust-version must be 1.98.0")
     if package_defaults.get("license") != "Apache-2.0":
         errors.append("workspace license must be Apache-2.0")
     if rust_lints.get("unsafe_code") != "forbid":

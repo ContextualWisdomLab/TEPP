@@ -278,6 +278,69 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.load_totals(empty_arrays)["branches"],
                 totals["branches"],
             )
+    def test_full_branch_reports_merge_duplicate_instrumented_copies(self) -> None:
+        """A source branch passes when either test binary covers each outcome."""
+
+        payload = self.payload(branch_count=4, branch_covered=2)
+        payload["data"][0]["files"] = [  # type: ignore[index]
+            {
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 1, 0, 0, 0, 4]],
+            },
+            {
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 0, 1, 0, 0, 4]],
+            },
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = self.write_report(temporary, payload)
+            self.assertEqual(
+                coverage_contract.load_totals(path)["branches"],
+                {"count": 2, "covered": 2},
+            )
+            self.assertEqual(
+                coverage_contract.validate_report(path, ["branches"]),
+                ["branches coverage: PASS (2/2, 100%)"],
+            )
+
+    def test_full_branch_reports_fail_closed_on_malformed_records(self) -> None:
+        """Malformed branch exports cannot weaken the coverage gate."""
+
+        malformed_reports = (
+            ([None], "file record must be an object"),
+            ([{"filename": "", "branches": []}], "must contain a filename"),
+            ([{"filename": "src.rs"}], "must contain branches"),
+            ([{"filename": "src.rs", "branches": {}}], "branches must be a list"),
+            ([{"filename": "src.rs", "branches": [[1, 2]]}], "record is malformed"),
+            (
+                [{"filename": "src.rs", "branches": [[True, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1.5, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, True, 0]]}],
+                "counts are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[-1, 2, 3, 4, 1, 0]]}],
+                "coordinates are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, 0.5, 0]]}],
+                "counts are invalid",
+            ),
+            (
+                [{"filename": "src.rs", "branches": [[1, 2, 3, 4, -1, 0]]}],
+                "counts are invalid",
+            ),
+        )
+        for files, message in malformed_reports:
+            with self.subTest(message=message):
+                with self.assertRaisesRegex(ValueError, message):
+                    coverage_contract.load_union_branch_totals(files)
 
     def test_lcov_authored_line_totals_and_incomplete_detection(self) -> None:
         """LCOV counts unique authored source lines and exposes zero-hit lines."""
@@ -467,23 +530,35 @@ class CoverageContractTests(unittest.TestCase):
                 "})",  # 38
                 "})",  # 39
                 "    return value,",  # 40 executable (return keeps it)
-                "    x + 1,",  # 41 trailing comma noise
-                '#[cfg(feature = "live-sqlx")]',  # 42 cfg attr
-                "fn live_path() {",  # 43 fn
-                "    live_body();",  # 44 executable active feature body
-                "}",  # 45 brace
-                '#[cfg(not(feature = "live-sqlx"))]',  # 46 not-feature attr
-                "fn offline_path() {",  # 47 inside not-feature
-                "    offline_body();",  # 48 inside not-feature
-                "}",  # 49 inside not-feature close
-                "#[cfg(test)]",  # 50
-                "mod tests {",  # 51 cfg(test) mod
-                "    #[test]",  # 52 inside test mod
-                "    fn unit() {",  # 53 inside test mod
-                "        assert_eq!(1, 1);",  # 54 inside test mod
-                "    }",  # 55
-                "}",  # 56
-                "    executable_statement();",  # 57 executable
+                "    x + 1,",  # 41 executable expression with trailing comma
+                "    record_uncovered(),",  # 42 executable call with trailing comma
+                '#[cfg(feature = "live-sqlx")]',  # 43 cfg attr
+                "fn live_path() {",  # 44 fn
+                "    live_body();",  # 45 executable active feature body
+                "}",  # 46 brace
+                '#[cfg(not(feature = "live-sqlx"))]',  # 47 not-feature attr
+                "fn offline_path() {",  # 48 inside not-feature
+                "    offline_body();",  # 49 inside not-feature
+                "}",  # 50 inside not-feature close
+                "#[cfg(test)]",  # 51
+                "mod tests {",  # 52 cfg(test) mod
+                "    #[test]",  # 53 inside test mod
+                "    fn unit() {",  # 54 inside test mod
+                "        assert_eq!(1, 1);",  # 55 inside test mod
+                "    }",  # 56
+                "}",  # 57
+                "    executable_statement();",  # 58 executable
+                "    append_value(",  # 59 multiline call opener
+                "        value,",  # 60 trailing comma noise
+                "    );",  # 61 call close
+                "    values",  # 62
+                "        .iter()",  # 63 method-chain continuation
+                "        .collect::<Vec<_>>()",  # 64 method-chain continuation
+                "    });",  # 65 closure call close
+                "(",  # 66 structural call opener
+                ")",  # 67 structural call close
+                "    Ok(())",  # 68 structural unit result
+                "    NaruonLiveResponse {",  # 69 structural struct literal
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -498,7 +573,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 44, 57}
+            expected_executable = {13, 40, 41, 42, 45, 58, 59, 62}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -517,7 +592,10 @@ class CoverageContractTests(unittest.TestCase):
                 "\n".join(
                     [
                         f"SF:{path}",
-                        "DA:57,1",
+                        "DA:58,1",
+                        "DA:59,0",
+                        "DA:63,0",
+                        "DA:64,0",
                         "DA:1,0",
                         "DA:2,0",
                         "DA:48,0",
@@ -530,7 +608,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.load_lcov_line_totals(
                     lcov, repository_root=Path(temporary)
                 ),
-                {"lines": {"count": 1, "covered": 1}},
+                {"lines": {"count": 2, "covered": 1}},
             )
 
     def test_lcov_rejects_source_paths_outside_repository(self) -> None:
@@ -636,6 +714,78 @@ class CoverageContractTests(unittest.TestCase):
         self.assertFalse(
             coverage_contract._line_in_cfg_not_feature_block(unclosed_not_feature, 99)
         )
+
+    def test_line_filter_excludes_literal_and_structural_continuations(self) -> None:
+        """LCOV-only literal fragments and branch continuations are filtered."""
+
+        lines = [
+            "pub(crate) const fn accessor() -> u8 {",
+            "    1",
+            "}",
+            "    if condition",
+            "        || alternate",
+            "    } else {",
+            "        format!(",
+            '            "first ' + "\\",
+            '             second"',
+            "        );",
+            "    ));",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "fixture.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path = str(source)
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 1))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 2))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 5))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 6))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 8))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 9))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 11))
+
+    def test_line_filter_keeps_inline_functions_and_block_comment_followers(self) -> None:
+        """Inline function bodies and code after quoted block comments stay visible."""
+
+        lines = [
+            "pub(crate) const fn enabled(value: u8) -> bool { value > 0 }",
+            "pub(crate) fn declaration_only(value: u8) -> bool {",
+            "    value > 0",
+            "}",
+            '/* block comment contains a " quote',
+            "   nested /* comment */ still ends here */",
+            "    record_after_block_comment();",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "inline.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path = str(source)
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 1))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 2))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 5))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 6))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 7))
+
+    def test_multiline_scanner_ignores_comments_char_literals_and_raw_strings(self) -> None:
+        """Quote-like text cannot hide executable lines from the authored-line gate."""
+
+        lines = [
+            "fn escaped_quotes() {",
+            '    let value = source.replace(\'"\', "&quot;"); // a " comment',
+            "    executable_after_char_literal();",
+            '    let raw = r##"payload " quoted"##;',
+            "    raw_continuation_is_data",
+            "    let lifetime = 'a; let multiline = r#\"first",
+            "second\"#;",
+            "    executable_after_raw_string();",
+            "}",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "quotes.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path = str(source)
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 3))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 8))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 7))
 
 
 if __name__ == "__main__":  # pragma: no cover

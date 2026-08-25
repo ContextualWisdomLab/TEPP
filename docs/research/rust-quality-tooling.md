@@ -7,10 +7,15 @@ required by later estimators.
 
 ## Rust compiler
 
-TEPP pins Rust 1.97.1 for the stable build reference. The point release repairs
-an LLVM optimization miscompilation and therefore supersedes 1.97.0 for this
-foundation. A future compiler update requires exact-head formatting, Clippy,
-rustdoc, test, coverage, and numerical-parity evidence before adoption.
+TEPP pins Rust 1.98.0 for the stable build reference. The Rust Release Team
+published 1.98.0 on August 20, 2026, with the release's compiler, Cargo, and
+Clippy changes recorded in the authoritative release announcement. A future
+compiler update requires exact-head formatting, Clippy, rustdoc, test,
+coverage, and numerical-parity evidence before adoption.
+
+The root `rust-toolchain.toml` is monitored through GitHub Dependabot's
+`rust-toolchain` ecosystem. Updates therefore arrive as reviewable pull requests
+rather than silently changing a floating compiler channel.
 
 ## Cargo workspace
 
@@ -25,9 +30,9 @@ surface.
 - `cargo-nextest` 0.9.140 runs process-isolated tests without retries.
 - Doctests run separately because nextest does not currently execute doctests.
 - `cargo-llvm-cov` 0.8.6 produces stable line coverage.
-- Branch coverage uses the same tool on `nightly-2026-08-01` because the
+- Branch coverage uses the same tool on `nightly-2026-08-21` because the
   upstream project identifies Rust branch coverage as unstable and
-  nightly-only.
+  nightly-only (Endo, 2026).
 - Coverage thresholds are evaluated from LLVM JSON totals. A nonzero line or
   branch denominator passes only when all units are covered.
 - Coverage.py 7.15.2 measures the repository-quality Python scripts at 100%
@@ -58,11 +63,14 @@ GitHub. https://github.com/EmbarkStudios/cargo-deny
 Endo, T. (2026). *cargo-llvm-cov* (Version 0.8.6) [Computer software]. GitHub.
 https://github.com/taiki-e/cargo-llvm-cov
 
+GitHub. (2026). *Dependabot supports updates for Rust toolchains*. GitHub
+Changelog. https://github.blog/changelog/
+
 Nextest contributors. (2026). *cargo-nextest* (Version 0.9.140)
 [Computer software]. https://nexte.st/
 
 The Cargo Team. (n.d.). *Workspaces*. In *The Cargo Book*. Retrieved August 5,
 2026, from https://doc.rust-lang.org/cargo/reference/workspaces.html
 
-The Rust Release Team. (2026, July 16). *Announcing Rust 1.97.1*. Rust Blog.
-https://blog.rust-lang.org/2026/07/16/Rust-1.97.1/
+The Rust Release Team. (2026, August 20). *Announcing Rust 1.98.0*. Rust Blog.
+https://blog.rust-lang.org/2026/08/20/Rust-1.98.0/
