@@ -338,6 +338,15 @@
 //! `Q_Δt / (−q / (2 a)) = 1 − exp(2 a Δt)` is not `DIFFUSIONstd`;
 //! `q / (trait + p + added)` uses `TRAITVAR` and is not
 //! `DIFFUSIONstd`; `TRAITVAR` is not the standardisation variance),
+//! recovers the Driver p. 16 `DRIFTstd` as the continuous auto-effect
+//! after forming strictly positive `asymDIFFUSION` `−q / (2 a)`
+//! (JSS PDF re-opened 2026-08-23T13:28Z; footnote 4 standardises
+//! `DRIFT` using only within-subject variance, not the total;
+//! unstandardised `a` is defined for growing `a ≥ 0` and for zero
+//! diffusion, and is not `DRIFTstd`; zero `asymDIFFUSION` fails
+//! closed; the discrete standardisation `e^{a Δt}` is not
+//! `DRIFTstd`; `a p / (trait + p + added)` uses `TRAITVAR` and is
+//! not `DRIFTstd`; `TRAITVAR` is not the standardisation variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -498,6 +507,8 @@ pub use event_time::recover_predetermined_later_start_later_latent_variance;
 pub use event_time::recover_predetermined_later_start_later_observed_variance;
 /// Exact scalar p. 16 `DIFFUSIONstd` `q / (−q / (2 a)) = −2 a` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_continuous_diffusion;
+/// Exact scalar p. 16 `DRIFTstd` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_continuous_drift;
 /// Exact scalar p. 16 `discreteDIFFUSIONstd` `Q_Δt / (−q / (2 a))` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_discrete_diffusion;
 /// Exact scalar p. 16 `discreteDRIFTstd` `e^{a Δt}` after strictly positive `asymDIFFUSION`.
@@ -760,6 +771,8 @@ pub use event_time::refuse_process_noise_as_unconditional_variance;
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating p. 16 `discreteDIFFUSIONstd` `1 − exp(2 a Δt)` as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion;
+/// Refuse treating p. 16 `discreteDRIFTstd` `e^{a Δt}` as p. 16 `DRIFTstd`.
+pub use event_time::refuse_standardised_discrete_drift_as_standardised_continuous_drift;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymTIPREDEFFECT`.
@@ -844,6 +857,8 @@ pub use event_time::refuse_time_independent_observed_mean_as_initial_time_depend
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating Driver §7.1 trait-contaminated continuous diffusion as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion;
+/// Refuse treating Driver §7.1 trait-contaminated continuous drift as p. 16 `DRIFTstd`.
+pub use event_time::refuse_trait_contaminated_continuous_drift_as_standardised_continuous_drift;
 /// Refuse treating Driver §7.1 trait-contaminated process noise as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_trait_contaminated_process_noise_as_standardised_discrete_diffusion;
 /// Refuse treating Driver §7.1 trait-plus-state autocorrelation as p. 16 `discreteDRIFTstd`.
@@ -860,6 +875,8 @@ pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 /// Refuse treating unstandardised `DIFFUSION` as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion;
+/// Refuse treating unstandardised `DRIFT` as p. 16 `DRIFTstd`.
+pub use event_time::refuse_unstandardised_continuous_drift_as_standardised_continuous_drift;
 /// Refuse treating unstandardised `discreteDIFFUSION` as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating unstandardised `discreteDRIFT` as p. 16 `discreteDRIFTstd`.
