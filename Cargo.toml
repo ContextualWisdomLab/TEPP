@@ -53,6 +53,7 @@ members = [
     "crates/episode_membership",
     "crates/compute_backend",
     "crates/membership_target",
+    "crates/role_contradiction",
     "crates/analysis_engine",
     "crates/topic_measurement",
     "crates/psychometric_core",
@@ -69,7 +70,6 @@ default-members = [
     "crates/tepp_simulation",
     "crates/validation_core",
     "crates/tepp_api",
-
     "crates/location_membership",
     "crates/prompt_source",
     "crates/corpus_background",
@@ -110,6 +110,7 @@ default-members = [
     "crates/episode_membership",
     "crates/compute_backend",
     "crates/membership_target",
+    "crates/role_contradiction",
     "crates/analysis_engine",
     "crates/topic_measurement",
     "crates/psychometric_core",

@@ -66,6 +66,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `psychometric_core` posterior-aware structural input gates: construct classification, refusal of raw-proportion Pearson/OLS, explicit ALR-versus-ILR geometry boundaries, CPU `f64` OLS recovery, posterior-draw loading point-estimate averaging without Rubin uncertainty claims, invariance-gated latent-mean comparison, and causal-heuristic refusal (ADR 0005 first production slice; no new migration).
 ### Added
 
+- `role_contradiction` identity gate: customer and competitor cannot occupy the same group; recovered commercial-role labels match known truth at a higher computed rate than collapsing every role to customer (ADR 0003).
 - `episode_membership` identity gate: a document's episode membership cannot
   start before or end after the episode event-time interval; recovered
   containment flags are compared with known truth (ADR 0003).

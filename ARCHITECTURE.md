@@ -63,6 +63,7 @@ boundaries above remain the target modular MSA architecture.
 | `event_core` | event instances, mentions, roles, provenance, and CHRONOS occurrence-prediction calibration |
 | `relation_graph` | typed relations and forward-transition validation |
 | `membership_core` | time-varying cross-classified multiple membership, Kish ESS, nested ICC with non-nested refusal |
+| `role_contradiction` | customer and competitor cannot occupy the same group |
 | `persistence_postgres` | PostgreSQL repositories and migrations |
 | `corpus_split` | cutoff-safe, relation-aware partitioning |
 | `tepp_simulation` | known-truth temporal/event data generation |
