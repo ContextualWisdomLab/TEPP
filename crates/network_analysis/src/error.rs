@@ -41,6 +41,12 @@ pub enum NetworkEstimatorError {
     InsufficientObservations,
     /// Bootstrap replicates must be at least 1.
     ZeroReplicates,
+    /// An admission threshold must be finite and non-negative.
+    InvalidThreshold,
+    /// A credible-interval level must lie strictly inside (0, 1).
+    InvalidConfidenceLevel,
+    /// A probability parameter must be finite and inside [0, 1).
+    InvalidProbability,
 }
 
 impl fmt::Display for NetworkEstimatorError {
@@ -51,6 +57,9 @@ impl fmt::Display for NetworkEstimatorError {
             Self::InsufficientCoordinates => "fewer than 3 ILR coordinates for correlation",
             Self::InsufficientObservations => "fewer than 3 observations per coordinate",
             Self::ZeroReplicates => "bootstrap replicates must be at least 1",
+            Self::InvalidThreshold => "admission threshold must be finite and non-negative",
+            Self::InvalidConfidenceLevel => "credible-interval level must be inside (0, 1)",
+            Self::InvalidProbability => "probability parameter must be inside [0, 1)",
         };
         formatter.write_str(message)
     }
@@ -104,6 +113,18 @@ mod tests {
             (
                 NetworkEstimatorError::ZeroReplicates,
                 "bootstrap replicates must be at least 1",
+            ),
+            (
+                NetworkEstimatorError::InvalidThreshold,
+                "admission threshold must be finite and non-negative",
+            ),
+            (
+                NetworkEstimatorError::InvalidConfidenceLevel,
+                "credible-interval level must be inside (0, 1)",
+            ),
+            (
+                NetworkEstimatorError::InvalidProbability,
+                "probability parameter must be inside [0, 1)",
             ),
         ] {
             assert_eq!(error.to_string(), message);

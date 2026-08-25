@@ -31,6 +31,8 @@ pub use consensus::consensus_clusters;
 pub use edges::NetworkEdge;
 /// Apply multiplicity-corrected edge-admission policy.
 pub use edges::admit_edges;
+/// Apply the per-replicate admission rule used inside stability scoring.
+pub use edges::admit_edges_within_replicate;
 /// Compute posterior correlation matrix from ILR draws.
 pub use edges::posterior_correlation_matrix;
 /// Fail-closed network-analysis errors.
