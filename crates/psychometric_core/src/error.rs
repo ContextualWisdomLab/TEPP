@@ -544,6 +544,23 @@ pub enum PsychometricError {
     /// intercept using residual `MANIFESTVAR`, not total observed
     /// variance.
     ObservedScaledManifestMeanIsNotStandardisedManifestMean,
+    /// Driver p. 16 `discreteCINTstd` was requested without a strictly
+    /// positive `asymDIFFUSION`. Footnote 4 standardises using only the
+    /// relevant variance; zero `q` has no positive process SD.
+    StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance,
+    /// Unstandardised `discreteCINT` `A^{-1}[e^{A Δt} − I] κ` was
+    /// treated as `discreteCINTstd`. Unstandardised increment is
+    /// defined for growing `a ≥ 0` and for zero diffusion;
+    /// standardised discrete intercept is not.
+    UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
+    /// Driver p. 16 `CINTstd` `κ / √p` was treated as
+    /// `discreteCINTstd`. The continuous intercept does not depend on
+    /// the event interval.
+    StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
+    /// Driver p. 16 `asymCINTstd` `(-κ / a) / √p` was treated as
+    /// `discreteCINTstd`. The asymptotic map is the total change, not
+    /// the finite-interval intercept.
+    AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
 }
 
 impl fmt::Display for PsychometricError {
@@ -965,6 +982,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedScaledManifestMeanIsNotStandardisedManifestMean => {
                 "observed scaled manifest mean is not standardised manifest mean"
+            }
+            Self::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance => {
+                "standardised discrete continuous intercept requires strictly positive stationary within-subject variance"
+            }
+            Self::UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept => {
+                "unstandardised discrete continuous intercept is not standardised discrete continuous intercept"
+            }
+            Self::StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept => {
+                "standardised continuous intercept is not standardised discrete continuous intercept"
+            }
+            Self::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept => {
+                "asymptotic standardised continuous intercept is not standardised discrete continuous intercept"
             }
         };
         formatter.write_str(message)
@@ -1630,6 +1659,30 @@ mod tests {
         assert_eq!(
             PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean.to_string(),
             "observed scaled manifest mean is not standardised manifest mean"
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_continuous_intercept_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance
+                .to_string(),
+            "standardised discrete continuous intercept requires strictly positive stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+                .to_string(),
+            "unstandardised discrete continuous intercept is not standardised discrete continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+                .to_string(),
+            "standardised continuous intercept is not standardised discrete continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+                .to_string(),
+            "asymptotic standardised continuous intercept is not standardised discrete continuous intercept"
         );
     }
 }
