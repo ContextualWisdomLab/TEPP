@@ -19,6 +19,7 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | interval relation/reasoner API | `temporal_core` | event/relation validation | implemented-main (`temporal-core/v1`; in-memory reasoner; merged PR #9; Allen, 1983; [`relation_contract.rs`](../crates/temporal_core/tests/relation_contract.rs), [`reasoner_contract.rs`](../crates/temporal_core/tests/reasoner_contract.rs), [`temporal-event-foundation.md`](validation/temporal-event-foundation.md)) |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
+| topic-context posterior plausible values | `analysis_engine` `tepp.topic_context_posterior.v1` | fast-mlsirm, LineageWeave | contract-only active-PR |
 | LLM interpretation provider port | `orchestrator_live` loopback `POST /v1/interpretation-runs` | contextual-orchestrator | partial |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
@@ -97,6 +98,16 @@ reference estimator and publishes validated fitted associations and counts in
 `tepp.trsl_topic_lineage.v1`; it does not infer causality or replace production
 `K` selection. This remains active product-branch evidence until its exact-head
 checks and protected merge pass.
+
+The separate `tepp.topic_context_posterior.v1` artifact carries per-post
+posterior logistic-normal plausible values, event time, topic activity and
+explicit lineage events, plus provenance-bound time-valid business-unit, PU,
+team, and person memberships. It is the only admitted handoff to the
+fast-mlsirm context-influence estimator. Consumers may not threshold its
+coordinates into binary responses, collapse its draws to an error-free point,
+or substitute labels, keywords, or LineageWeave-local scores.
+The strict DTO/schema is contract-only: the current CPU reference estimator
+does not yet emit posterior draws through this artifact.
 
 ## 5. Analysis request authority
 

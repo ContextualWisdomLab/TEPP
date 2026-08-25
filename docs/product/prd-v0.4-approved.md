@@ -129,6 +129,14 @@ The model separates:
 
 The initial release selects one global topic count across the analysis window and permits activation, dormancy, and reactivation. Explicit topic birth, split, merge, lineage, and retirement are later extensions.
 
+Topic-specific document influence is a downstream psychometric estimand, not a
+synonym for topic prevalence. TEPP publishes digest-bound per-post posterior
+logistic-normal coordinates or plausible values plus event time and
+provenance-bound, time-valid business-unit, PU, team, and person memberships.
+`fast-mlsirm` owns posterior-aware multiple-membership case-deletion influence
+arithmetic and LineageWeave only persists and renders accepted evidence.
+Consumers never threshold posterior coordinates into binary responses.
+
 ## 8. Topic-count selection
 
 No single metric or LLM determines the topic count. Candidate models are evaluated across:

@@ -10,6 +10,7 @@
 //! estimation authority; it invokes estimators through their scientific crate
 //! contracts and preserves their artifact meaning.
 
+mod topic_context_posterior;
 mod topic_lineage_artifact;
 
 use serde::Serialize;
@@ -24,6 +25,11 @@ use tepp_api::{
 };
 use topic_measurement::TopicMeasurementError;
 
+pub use topic_context_posterior::{
+    TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
+    TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
+    TopicLineageEvent, TopicPostPlausibleValue,
+};
 /// Topic-lineage artifact and execution contracts from this engine.
 pub use topic_lineage_artifact::{
     TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
