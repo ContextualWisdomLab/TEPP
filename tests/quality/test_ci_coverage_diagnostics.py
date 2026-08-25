@@ -84,7 +84,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         """Stable and branch-coverage compilers remain explicit review boundaries."""
 
         manifest = tomllib.loads(RUST_TOOLCHAIN.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["toolchain"]["channel"], "1.97.1")
+        self.assertEqual(manifest["toolchain"]["channel"], "1.98.0")
 
         workflow = CI_WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(workflow.count("nightly-2026-08-21"), 3)

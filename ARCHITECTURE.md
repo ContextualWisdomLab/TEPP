@@ -53,14 +53,15 @@ boundaries above remain the target modular MSA architecture.
 |---|---|
 | `evidence_core` | immutable evidence domain primitives |
 | `semantic_core` | span-grounded semantic units; language is not identity |
+| `location_membership` | location is not entity identity and not a language channel |
 | `temporal_core` | typed clocks, intervals, and temporal reasoning |
-| `event_core` | event instances, mentions, roles, and provenance |
+| `event_core` | event instances, mentions, roles, provenance, and CHRONOS occurrence-prediction calibration |
 | `relation_graph` | typed relations and forward-transition validation |
 | `membership_core` | time-varying cross-classified multiple membership, Kish ESS, nested ICC with non-nested refusal |
 | `persistence_postgres` | PostgreSQL repositories and migrations |
 | `corpus_split` | cutoff-safe, relation-aware partitioning |
 | `tepp_simulation` | known-truth temporal/event data generation |
-| `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
+| `validation_core` | RMSE, bias, coverage, graph, Monte Carlo, and exact-head claim-promotion metrics |
 | `tepp_api` | versioned DTO, schema, and export contracts |
 | `episode_membership` | event-time episode membership containment gate |
 | `location_membership` | location is not entity identity and not a language channel |
@@ -100,9 +101,17 @@ boundaries above remain the target modular MSA architecture.
 | `interpretation_gateway` | evidence-bounded LLM interpretations; not estimators or observed facts |
 | `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
+| `compute_backend` | VRAM-budgeted streamed planning, executable OOM retry plans, and a compensated CPU `f64` reference |
+| `episode_membership` | episode membership cannot escape the episode event-time interval |
+| `membership_target` | language, episode, template, department, and opportunity-pool targets cannot collapse into entity or project |
+
 
 Foundation crates expose only tested contracts. Empty façades are not public
 APIs.
+
+No crate exposes placeholder production behavior in Task 1. This prevents an
+empty façade from becoming a de facto public API before its invariants and tests
+exist.
 
 ## Immutable evidence boundary
 
@@ -141,7 +150,7 @@ Repository contract scripts independently verify the approved crate set,
 workspace inheritance, action SHA pinning, absence of LLM credentials from
 ordinary CI, and complete Rust documentation.
 
-Stable Rust 1.97.1 is the compile, lint, test, and line-coverage reference.
+Stable Rust 1.98.0 is the compile, lint, test, and line-coverage reference.
 Branch coverage runs in a pinned nightly lane because LLVM branch coverage
 remains unstable in Rust. `cargo-nextest` runs tests without retries, while
 doctests remain a separate `cargo test --doc` gate. `cargo-deny` enforces
@@ -156,6 +165,8 @@ TEPP stores event/valid time, assertion time, document time, system time, availa
 \[
 \operatorname{available\_time}(d) \leq \operatorname{knowledge\_cutoff}.
 \]
+
+When availability is an interval, every possible instant in that interval must satisfy the inequality. Unknown or open-ended availability that can extend past the cutoff fails closed; event time and document time cannot substitute for availability.
 
 Forward transition edges require a temporally valid partial order. Retrospective, revision, translation, citation, support, and contradiction relations retain their direction and provenance but do not create reverse state transitions.
 

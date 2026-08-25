@@ -52,3 +52,13 @@ exactly-one constraints preserve those distinct contexts. Migration
 - segment-level membership now inserts the observed `text_segment`
   through the typed adapter rather than ad-hoc SQL. See
   `docs/research/text-segment-sql.md`.
+  `TEPP_LIVE_POSTGRES=1`;
+- entity and project target rows are now inserted through fail-closed
+  SQL helpers rather than raw label interpolation (see
+  `docs/research/entity-project-sql.md`).
+- entity and project target rows are now inserted through fail-closed
+  SQL helpers that validate labels before rendering INSERT SQL (see
+  `docs/research/entity-project-sql.md`).
+- segment-level membership now inserts the observed `text_segment`
+  through the typed adapter rather than ad-hoc SQL. See
+  `docs/research/text-segment-sql.md`.

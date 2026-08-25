@@ -14,6 +14,8 @@ pub enum CorpusSplitError {
     DuplicateDocumentIdentity,
     /// Split proportions or seeds were invalid.
     InvalidSplitConfiguration,
+    /// A document body was empty and has no Unicode identity.
+    EmptyCanonicalText,
 }
 
 impl fmt::Display for CorpusSplitError {
@@ -23,6 +25,7 @@ impl fmt::Display for CorpusSplitError {
             Self::UnavailableAtCutoff => "document unavailable at knowledge cutoff",
             Self::DuplicateDocumentIdentity => "duplicate document identity",
             Self::InvalidSplitConfiguration => "invalid split configuration",
+            Self::EmptyCanonicalText => "empty canonical text",
         };
         formatter.write_str(message)
     }
@@ -51,6 +54,10 @@ mod tests {
         assert_eq!(
             CorpusSplitError::InvalidSplitConfiguration.to_string(),
             "invalid split configuration"
+        );
+        assert_eq!(
+            CorpusSplitError::EmptyCanonicalText.to_string(),
+            "empty canonical text"
         );
     }
 }

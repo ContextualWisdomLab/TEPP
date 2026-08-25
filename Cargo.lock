@@ -192,6 +192,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
+name = "compute_backend"
+version = "0.1.0"
+
+[[package]]
 name = "copied_text"
 version = "0.1.0"
 
@@ -208,6 +212,7 @@ name = "corpus_split"
 version = "0.1.0"
 dependencies = [
  "temporal_core",
+ "unicode-normalization",
  "uuid",
 ]
 
@@ -917,6 +922,10 @@ dependencies = [
  "temporal_core",
  "uuid",
 ]
+
+[[package]]
+name = "membership_target"
+version = "0.1.0"
 
 [[package]]
 name = "memchr"
