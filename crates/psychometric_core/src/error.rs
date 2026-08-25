@@ -524,6 +524,26 @@ pub enum PsychometricError {
     /// Footnote 4 uses only `asymDIFFUSION`, not total variance.
     /// `TRAITVAR` is not the standardisation variance.
     TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept,
+    /// Driver p. 16 `MANIFESTMEANSstd` was requested with a non-positive
+    /// residual `MANIFESTVAR`. Footnote 4 standardises using only the
+    /// relevant variance; zero `θ` has no positive SD.
+    StandardisedManifestMeanRequiresPositiveManifestVariance,
+    /// Driver Table 2 unstandardised `MANIFESTMEANS` `τ` was treated
+    /// as `MANIFESTMEANSstd`. Unstandardised measurement intercept
+    /// is defined for a zero residual; standardised `MANIFESTMEANS`
+    /// is not.
+    UnstandardisedManifestMeanIsNotStandardisedManifestMean,
+    /// Driver p. 16 `MANIFESTVARstd` was treated as p. 16
+    /// `MANIFESTMEANSstd`. Equal numbers when `τ = √θ` are still
+    /// distinct named quantities. `MANIFESTVARstd` is the
+    /// correlation form of residual `MANIFESTVAR`;
+    /// `MANIFESTMEANSstd` is the measurement intercept.
+    StandardisedManifestVarianceIsNotStandardisedManifestMean,
+    /// Driver Eq. 5 `τ / √(λ² Var(η) + θ)` was treated as
+    /// `MANIFESTMEANSstd`. Footnote 4 standardises the named
+    /// intercept using residual `MANIFESTVAR`, not total observed
+    /// variance.
+    ObservedScaledManifestMeanIsNotStandardisedManifestMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -933,6 +953,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept => {
                 "trait-scaled continuous intercept is not standardised continuous intercept"
+            }
+            Self::StandardisedManifestMeanRequiresPositiveManifestVariance => {
+                "standardised manifest mean requires strictly positive measurement error"
+            }
+            Self::UnstandardisedManifestMeanIsNotStandardisedManifestMean => {
+                "unstandardised manifest mean is not standardised manifest mean"
+            }
+            Self::StandardisedManifestVarianceIsNotStandardisedManifestMean => {
+                "standardised manifest variance is not standardised manifest mean"
+            }
+            Self::ObservedScaledManifestMeanIsNotStandardisedManifestMean => {
+                "observed scaled manifest mean is not standardised manifest mean"
             }
         };
         formatter.write_str(message)
@@ -1577,6 +1609,27 @@ mod tests {
             PsychometricError::TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept
                 .to_string(),
             "trait-scaled continuous intercept is not standardised continuous intercept"
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_mean_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance.to_string(),
+            "standardised manifest mean requires strictly positive measurement error"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedManifestMeanIsNotStandardisedManifestMean.to_string(),
+            "unstandardised manifest mean is not standardised manifest mean"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean
+                .to_string(),
+            "standardised manifest variance is not standardised manifest mean"
+        );
+        assert_eq!(
+            PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean.to_string(),
+            "observed scaled manifest mean is not standardised manifest mean"
         );
     }
 }
