@@ -20,6 +20,7 @@ mod first_story;
 mod identifier;
 mod instance;
 mod intelligence;
+mod link;
 mod mention;
 mod prediction;
 mod registry;
@@ -66,6 +67,20 @@ pub use intelligence::admit_state_transition;
 pub use intelligence::classify_tdt_story;
 /// Score first-story detections against a known stream.
 pub use intelligence::first_story_detection_rates;
+/// TDT same-event versus distinct-event link label.
+pub use link::EventLinkLabel;
+/// Undirected TDT link hypothesis between two mentions.
+pub use link::EventLinkPair;
+/// Threshold a link probability into a detection label.
+pub use link::decide_event_link;
+/// Precision of recovered TDT links against known-truth pairs.
+pub use link::event_link_precision;
+/// Recall of recovered TDT links against known-truth pairs.
+pub use link::event_link_recall;
+/// Explicit refusal to treat a TDT link as an event instance.
+pub use link::refuse_event_link_as_instance;
+/// Explicit refusal to treat a TDT link as a state transition.
+pub use link::refuse_event_link_as_transition;
 /// Fallible textual event mention.
 pub use mention::EventMention;
 /// One CHRONOS occurrence forecast that remains hypothetical.

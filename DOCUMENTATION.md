@@ -43,6 +43,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Strong-invariance latent-mean doctoring | [`docs/research/strong-invariance-latent-means.md`](docs/research/strong-invariance-latent-means.md) |
 | Mention-confidence Brier doctoring | [`docs/research/mention-confidence-brier.md`](docs/research/mention-confidence-brier.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
+| TDT link-detection precision/recall doctoring | [`docs/research/event-link-detection-calibration.md`](docs/research/event-link-detection-calibration.md) |
 | First-story detection FAR/miss doctoring | [`docs/research/first-story-detection-calibration.md`](docs/research/first-story-detection-calibration.md) |
 | VRAM budget / GPU fallback doctoring | [`docs/research/vram-budget-types.md`](docs/research/vram-budget-types.md) |
 | Causal-identification gate doctoring | [`docs/research/causal-identification-gate.md`](docs/research/causal-identification-gate.md) |

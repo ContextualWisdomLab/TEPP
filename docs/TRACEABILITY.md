@@ -70,6 +70,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
 | posterior ESEM / longitudinal invariance / DSEM | ADR 0005 | `psychometric_fit` ESEM loading and DSEM lag gates on the active PR; `psychometric_core` input gates remain #49; invariance/multilevel remain accepted-target | active-PR |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | future `compute_backend` | accepted-target |
+| TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` TDT link precision/recall on the active PR; remaining TDT/CHRONOS stack and any future `event_intelligence` crate remain accepted-target | active-PR |
+| evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router plus future `interpretation_gateway` | partial |
 | TDT detection/tracking vs CHRONOS schema/prediction/temporal consistency | ADR 0016; PRD/research | `event_core` first-story FAR/miss and mention-confidence Brier scoring on the active PR; remaining TDT/CHRONOS stack and any future `event_intelligence` crate remain accepted-target | active-PR |
 | evidence-bounded LLM interpretation | ADR 0010/0012; PRD | `tepp_api` router implemented-main plus future `interpretation_gateway` | partial |
 | CPU bounded multithreading + GPU/VRAM streaming/parity | ADR 0001/0006 | `compute_backend` CPU `f64` reference, bounded planning, and VRAM-budget refusal are active; full GPU streaming and CPU/GPU parity remain future | partial |
