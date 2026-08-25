@@ -8,7 +8,8 @@ Task 9 delivers storage-independent split contracts:
 2. relation-connected groups over revision, translation, copied-variant, and same-episode links;
 3. fail-closed leakage checks that reject partitions separating group members;
 4. rolling-origin windows over strictly increasing cutoffs;
-5. Kish effective sample size and group-normalized weights for duplicate-aware estimation.
+5. Kish effective sample size and group-normalized weights for duplicate-aware estimation;
+6. Unicode NFC/NFD canonical identity so equivalent bodies cannot occupy independent partitions.
 
 ## Authoritative sources
 

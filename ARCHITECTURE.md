@@ -57,23 +57,60 @@ boundaries above remain the target modular MSA architecture.
 | Rust crate | Initial responsibility |
 |---|---|
 | `evidence_core` | immutable evidence domain primitives |
+| `semantic_core` | span-grounded semantic units; language is not identity |
 | `temporal_core` | typed clocks, intervals, and temporal reasoning |
 | `event_core` | event instances, mentions, roles, and provenance |
 | `relation_graph` | typed relations and forward-transition validation |
-| `membership_core` | time-varying cross-classified multiple membership |
+| `membership_core` | time-varying cross-classified multiple membership, Kish ESS, nested ICC with non-nested refusal |
 | `persistence_postgres` | PostgreSQL repositories and migrations |
 | `corpus_split` | cutoff-safe, relation-aware partitioning |
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, and Monte Carlo metrics |
 | `tepp_api` | versioned DTO, schema, terminal-result, and export contracts |
-| `topic_measurement` | logistic-normal ALR and sequential Egozcue ILR topic coordinates |
-| `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
+| `location_membership` | location is not entity identity and not a language channel |
+| `prompt_source` | prompt boilerplate is not unique latent content and not stopword deletion |
+| `corpus_background` | corpus-background wording is not unique latent content and not stopword deletion |
+| `modality_source` | non-lexical modality is not unique latent content and not stopword deletion |
+| `copied_text` | copied-text residue is not unique latent content and not stopword deletion |
+| `style_source` | house-voice style residue is not unique latent content and not stopword deletion |
+| `stopword_deletion` | default stopword deletion is not a valid method for repeated report language |
+| `copy_identity` | a template copy is not the source document and not a state transition |
+| `intake_authorization` | untrusted intake fails closed without a grant; bounds are not authorization |
+| `summarizes_edge` | a summary is not a state transition and not the source document |
+| `outcome_order` | input-process-outcome edges cannot move backward in event time |
+| `retrospective_edge` | retrospective reporting cannot become a transition or a translation |
+| `payload_bound` | untrusted documents, records, checkpoints, and LLM outputs fail closed without identity, provenance, size, and depth |
+| `inferred_status` | inferred relations cannot be promoted to observed evidence or transitions |
+| `support_edge` | support, contradiction, summary, and outcome_of edges are not state transitions |
+| `system_clock` | system time cannot be replaced by event, assertion, document, available, or cutoff time |
+| `event_clock` | event time cannot be replaced by assertion, system, document, or available time |
+| `assertion_clock` | assertion time cannot be replaced by event, system, document, or available time |
+| `cutoff_clock` | knowledge cutoff cannot be replaced by event, system, or availability time |
+| `available_clock` | availability time cannot be replaced by event or system time |
+| `document_clocks` | document rows must carry assertion time and document time |
+| `revision_order` | later document revisions must have later system time |
+| `encrypted_mapping` | purpose-bound in-memory AES-256-GCM identity mappings; no plaintext persistence or KMS integration |
+| `citation_edge` | citation, revision, translation, and retrospective edges are not state transitions |
+| `psychometric_fit` | CPU `f64` ESEM loading recovery and event-time DSEM lag gates |
+| `subevent_containment` | subevent event-time intervals must stay inside the parent |
+| `prediction_contradiction` | Allen promotion gate: `before`/`after` stay contradictory; `meets`/`met_by` stay unsupported; coverage is required before unmatched predicted mass may be authorized for promotion |
+| `provider_receipt` | provider-disclosure field-code receipts; source text and identity are not disclosable |
+| `operational_log` | operational logs; `try_record` is the only recording API; source text and source identity are not loggable; `persistence_postgres` `audit_event` inserts call the same gate |
+| `service_tls` | production TLS bind gates and rustls server config |
+| `derived_sensitivity` | derived topic/factor/relation outputs inherit source sensitivity |
+| `longitudinal_core` | active-PR: within/between decomposition; refuse between-as-within; component RMSE |
 | `topic_lineage` | global topic identity across active/dormant/reactivated states |
+| `network_analysis` | compositional cluster-pair gates; raw simplex is not Euclidean |
+| `interpretation_gateway` | evidence-bounded LLM interpretations; not estimators or observed facts |
+| `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
+| `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
+| `membership_target` | language, episode, template, department, and opportunity-pool targets cannot collapse into entity or project |
+| `topic_measurement` | logistic-normal ALR and sequential Egozcue ILR topic coordinates |
 | `analysis_engine` | bounded cutoff-safe temporal evidence readiness execution and digest-bound terminal artifacts |
 
-No crate exposes placeholder production behavior in Task 1. This prevents an
-empty façade from becoming a de facto public API before its invariants and tests
-exist.
+
+Foundation crates expose only tested contracts. Empty façades are not public
+APIs.
 
 ## Immutable evidence boundary
 
@@ -112,7 +149,7 @@ Repository contract scripts independently verify the approved crate set,
 workspace inheritance, action SHA pinning, absence of LLM credentials from
 ordinary CI, and complete Rust documentation.
 
-Stable Rust 1.97.1 is the compile, lint, test, and line-coverage reference.
+Stable Rust 1.98.0 is the compile, lint, test, and line-coverage reference.
 Branch coverage runs in a pinned nightly lane because LLVM branch coverage
 remains unstable in Rust. `cargo-nextest` runs tests without retries, while
 doctests remain a separate `cargo test --doc` gate. `cargo-deny` enforces
@@ -136,7 +173,7 @@ All languages share global topic identities and latent document coordinates. Lan
 
 Repeated report vocabulary is modeled through corpus-background, template, section, style, copied-text, prompt, modality, and substantive-topic sources. It is not silently removed by stopword lists, TF-IDF, or BM25.
 
-Topic proportions are compositional. ESEM and network analysis consume logistic-normal latent coordinates or orthonormal log-ratio coordinates, with posterior uncertainty propagated through plausible values or a joint model.
+Topic proportions are compositional (Aitchison, 1982). ESEM and network analysis consume logistic-normal latent coordinates or orthonormal log-ratio coordinates, with posterior uncertainty propagated through plausible values or a joint model (Asparouhov & Muthén, 2009; Asparouhov et al., 2018; Marsh et al., 2014). The product topic-estimator contract is TRSL-TM (ADR 0012); an STM-style logistic-normal family is the reference, not a shipped-backend claim (Blei & Lafferty, 2006; Roberts et al., 2014, 2019). TDT/CHRONOS event intelligence remains an accepted-target boundary (Allan, 2002; Anagnostopoulos et al., 2013).
 
 ## Compute architecture
 
@@ -144,8 +181,30 @@ The CPU `f64` implementation is the numerical reference. Rayon-style fixed worke
 
 ## Persistence
 
-PostgreSQL is the reference relational store. Database objects use two-or-more-word `snake_case` names, including `document_record`, `temporal_interval`, `event_instance`, `event_mention`, `document_relation`, `segment_relation`, `entity_role_assignment`, `model_run`, `topic_definition`, `topic_correlation`, `topic_cluster`, `factor_solution`, `validation_metric`, and `audit_event`.
+PostgreSQL is the reference relational store. Database objects use two-or-more-word `snake_case` names, including `document_record`, `temporal_interval`, `event_instance`, `event_mention`, `document_relation`, `segment_relation`, `entity_role_assignment`, `model_run`, `topic_definition`, `topic_correlation`, `topic_cluster`, `factor_solution`, `validation_metric`, and `audit_event`. `audit_event` inserts call `operational_log::try_record` before SQL is rendered so source text and source identity cannot enter the row.
 
 ## Security and trust boundaries
 
 Documents and LLM outputs are untrusted. Exact spans, JSON Schema, size/depth limits, Unicode validity, prompt-injection isolation, provider allowlists, no-tool execution, tenant isolation, immutable audit events, dependency pinning, SBOM, provenance, and reproducible releases are mandatory. LLM live tests use `NVIDIA_NIM_API_KEY`; `COPILOT_GITHUB_TOKEN` is forbidden.
+
+## References
+
+The full APA 7th register is [`docs/research/standards-and-literature.md`](docs/research/standards-and-literature.md). Method claims on this page use:
+
+Aitchison, J. (1982). The statistical analysis of compositional data. *Journal of the Royal Statistical Society: Series B, 44*(2), 139–177. https://doi.org/10.1111/j.2517-6161.1982.tb01195.x
+
+Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information organization*. Kluwer Academic Publishers.
+
+Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A reasoning engine for qualitative temporal information in OWL. *Procedia Computer Science, 22*, 70–77. https://doi.org/10.1016/j.procs.2013.09.082
+
+Asparouhov, T., Hamaker, E. L., & Muthén, B. (2018). Dynamic structural equation models. *Structural Equation Modeling, 25*(3), 359–388. https://doi.org/10.1080/10705511.2017.1406803
+
+Asparouhov, T., & Muthén, B. (2009). Exploratory structural equation modeling. *Structural Equation Modeling, 16*(3), 397–438. https://doi.org/10.1080/10705510903008204
+
+Blei, D. M., & Lafferty, J. D. (2006). Dynamic topic models. In *Proceedings of the 23rd International Conference on Machine Learning* (pp. 113–120). ACM. https://doi.org/10.1145/1143844.1143859
+
+Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
+
+Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082. https://doi.org/10.1111/ajps.12103
+
+Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02

@@ -7,26 +7,30 @@
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` remain target interface shapes.
+Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
 
 ## 2. Contract families
 
 | Contract | Owner | Consumers | Maturity |
 |---|---|---|---|
 | evidence record/span wire v1 | TEPP `evidence_core` | future TEPP services/adapters | implemented-main |
-| temporal clock/interval wire | `temporal_core` | relation/event/persistence | active-PR #5 |
-| interval relation/reasoner API | `temporal_core` | event/relation validation | active-PR #6 |
+| temporal clock/interval wire | `temporal_core` | relation/event/persistence | implemented-main (`temporal-core/v1`; wire `schema_version=1`; merged PR #8; [`wire_contract.rs`](../crates/temporal_core/tests/wire_contract.rs), [`schema_semantics_contract.rs`](../crates/temporal_core/tests/schema_semantics_contract.rs), [`temporal-event-foundation.md`](validation/temporal-event-foundation.md)) |
+| interval relation/reasoner API | `temporal_core` | event/relation validation | implemented-main (`temporal-core/v1`; in-memory reasoner; merged PR #9; Allen, 1983; [`relation_contract.rs`](../crates/temporal_core/tests/relation_contract.rs), [`reasoner_contract.rs`](../crates/temporal_core/tests/reasoner_contract.rs), [`temporal-event-foundation.md`](validation/temporal-event-foundation.md)) |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
 | analysis-run request/accepted/status/terminal-result contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active product branch |
+| corpus-split leakage-audit manifest | `tepp_api` `CorpusSplitManifest` v1 | naruon, auditors, future UI | active-PR |
 | temporal-context ordering contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
 | cutoff-safe analysis-run readiness execution | `analysis_engine` bounded Rust crate | `tepp_api`, future HTTP/service adapters | active product branch |
+| project-history projection contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
 
 ## 3. Versioning
 
 Every externally consumable contract has an explicit semantic contract version independent of software package version. Breaking changes require a new contract version, migration/compatibility notes, contract tests, and an ADR when they change measurement meaning, temporal semantics, ontology, evidence identity, or authorization.
+
+The temporal semantic contract is `temporal-core/v1`. Its JSON representation keeps `schema_version: 1` as a separate wire-schema field; changing either identifier requires its own compatibility evidence.
 
 Wire payloads:
 
@@ -145,7 +149,7 @@ Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers mu
 
 ### contextual-orchestrator
 
-TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
+TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. A production live port must pass `service_tls::authorize_orchestrator_live_port` (valid rustls PEM on an `https` bind); loopback plaintext is refused and loopback `https` with valid PEM is authorized as production TLS. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
 
 ### organization `.github`
 

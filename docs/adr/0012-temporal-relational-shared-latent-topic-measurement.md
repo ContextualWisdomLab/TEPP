@@ -1,8 +1,8 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
-**Decision status:** Accepted  
-**Implementation maturity:** partial — logistic-normal ALR/ILR coordinates, lexical-weight refusal, statistical/Pareto candidate-`K` gates, stable active/dormant/reactivated topic identity, and the bounded CPU `f64` reference estimator are implemented on the active product branch; method effects, calibrated posterior acceptance, accelerated backends, and backend interchange remain accepted-target until implemented and protected-main integrated
-**Date:** 2026-08-12  
+**Decision status:** Accepted
+**Implementation maturity:** partial — logistic-normal ALR/ILR coordinates, lexical-weight refusal, statistical/Pareto candidate-`K` gates, stable active/dormant/reactivated topic identity, and the bounded CPU `f64` reference estimator are implemented on the active product branch; `corpus_background`, `topic_lineage`, `network_analysis`, `model_selection`, `stopword_deletion`, `style_source`, `copied_text`, and `modality_source` implement bounded identity and recovery gates implemented-main; method effects, calibrated posterior acceptance, accelerated backends, and backend interchange remain accepted-target until implemented and protected-main integrated
+**Date:** 2026-08-24
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
 ## Context
@@ -13,14 +13,16 @@ Without a dedicated decision, implementations could silently drift toward indepe
 
 ## Decision
 
-TEPP adopts **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** as the model-family contract. The initial reference backend is a temporal/relational shared-latent STM-style estimator with logistic-normal document coordinates and posterior uncertainty. Alternative polylingual or neural/contextual backends are allowed only when they satisfy the same versioned evidence, temporal, relational, posterior, invariance, and interoperability contracts.
+TEPP adopts **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** as the product model-family contract. TRSL-TM is the accepted-target estimator identity; it is not a claim that a production topic backend is already shipped on protected `main`.
+
+The reference family is a temporal/relational shared-latent STM-style estimator with logistic-normal document coordinates and posterior uncertainty (Roberts et al., 2014, 2019; Chang & Blei, 2009). Temporal topic identity over a modeled period follows the dynamic topic-model family (Blei & Lafferty, 2006): one global topic identity set may change in prevalence without silently becoming a new topic merely because a time slice was fitted independently. Alternative polylingual or neural/contextual backends are allowed only when they satisfy the same versioned evidence, temporal, relational, posterior, invariance, and interoperability contracts.
 
 For the first production line:
 
 - one global topic identity set is selected across the modeled period;
 - topics may be active, dormant, or reactivated over time without losing identity;
 - topic birth/split/merge/retirement is a later explicit lineage extension, not an implicit consequence of fitting unrelated time slices;
-- multilingual semantic/concept evidence shares topic identities, while native lexical/morphological channels remain language-specific;
+- multilingual semantic/concept evidence shares topic identities, while native lexical/morphological channels remain language-specific (Mimno et al., 2009);
 - repeated template, section, copied-text, style, modality, source, and corpus-background effects are modeled explicitly as method/background structure;
 - stopword deletion is not the default preprocessing rule;
 - TF-IDF and BM25 are not inferential weights for the statistical topic estimator;
@@ -118,6 +120,16 @@ Rollback selects the last validated model/backend contract and immutable model a
 
 ## References
 
+Blei, D. M., & Lafferty, J. D. (2006). Dynamic topic models. In *Proceedings of the 23rd International Conference on Machine Learning* (pp. 113–120). ACM. https://doi.org/10.1145/1143844.1143859
+
+Chang, J., & Blei, D. M. (2009). Relational topic models for document networks. In *Proceedings of the 12th International Conference on Artificial Intelligence and Statistics* (pp. 81–88). PMLR.
+
+Mimno, D., Wallach, H. M., Naradowsky, J., Smith, D. A., & McCallum, A. (2009). Polylingual topic models. In *Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing* (pp. 880–889). Association for Computational Linguistics.
+
+Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02
+
+Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082. https://doi.org/10.1111/ajps.12103
+
 Blei, D. M., & Lafferty, J. D. (2007). A correlated topic model of Science.
 *The Annals of Applied Statistics, 1*(1), 17–35.
 https://doi.org/10.1214/07-AOAS114
@@ -126,7 +138,3 @@ Mei, Q., Cai, D., Zhang, D., & Zhai, C. (2008). Topic modeling with network
 regularization. In *Proceedings of the 17th International Conference on World
 Wide Web* (pp. 101–110). Association for Computing Machinery.
 https://doi.org/10.1145/1367497.1367512
-
-Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for
-structural topic models. *Journal of Statistical Software, 91*(2), 1–40.
-https://doi.org/10.18637/jss.v091.i02

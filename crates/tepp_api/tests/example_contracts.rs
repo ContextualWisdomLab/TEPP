@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 use tepp_api::{
-    AnalysisRunLiveService, AnalysisRunRequest, NARUON_ANALYSIS_RUN_PATH, NaruonLiveService,
-    ReproducibilityManifest,
+    AnalysisRunLiveService, AnalysisRunRequest, CorpusSplitManifest, NARUON_ANALYSIS_RUN_PATH,
+    NaruonLiveService, ReproducibilityManifest,
 };
 
 fn repo_example(name: &str) -> String {
@@ -32,6 +32,10 @@ fn committed_examples_parse_through_live_contracts() {
         ReproducibilityManifest::from_json(&repo_example("reproducibility_manifest_v1.json"))
             .expect("manifest example");
     assert_eq!(manifest.engine_version, "0.1.0");
+
+    let split = CorpusSplitManifest::from_json(&repo_example("corpus_split_manifest_v1.json"))
+        .expect("split example");
+    assert_eq!(split.excluded_unavailable_at_cutoff_count, 1);
 }
 
 #[test]

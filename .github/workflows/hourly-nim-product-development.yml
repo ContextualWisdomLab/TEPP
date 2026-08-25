@@ -1,4 +1,4 @@
-name: Hourly NVIDIA NIM Product Development
+name: Hourly Contextual Orchestrator Product Development
 
 on:
   workflow_dispatch:
@@ -25,10 +25,10 @@ env:
   # for the newer Linux x64 asset is committed.
   OPENCODE_VERSION: "1.17.13"
   OPENCODE_SHA256: 157afa289d1a8d9372de0ce19ac726119b937a1f6b201808d46f06e4e59bb348
-  OPENCODE_MODELS: >-
-    nvidia-nim/nvidia/llama-3.3-nemotron-super-49b-v1.5
-    nvidia-nim/nvidia/nemotron-3-super-120b-a12b
-    nvidia-nim/deepseek-ai/deepseek-v4-pro
+  CONTEXTUAL_ORCHESTRATOR_COMMIT: e226e1197bdfc890c9d8e5b9b648c78857d7e465
+  CONTEXTUAL_ORCHESTRATOR_SHA256: 964b22ff577e3862b761af847ccad65489bb3f8fc750c8f84fcf8628df096673
+  CONTEXTUAL_ORCHESTRATOR_PORT: "18000"
+  OPENCODE_MODEL: contextual-orchestrator/contextual-orchestrator
   OPENCODE_RUN_TIMEOUT_SECONDS: "900"
   OPENCODE_KILL_GRACE_SECONDS: "30"
   MAX_CHANGED_FILES: "40"
@@ -43,6 +43,7 @@ jobs:
     timeout-minutes: 55
     permissions:
       contents: read
+      issues: read
       pull-requests: read
     outputs:
       has_changes: ${{ steps.proposal.outputs.has_changes }}
@@ -55,12 +56,12 @@ jobs:
     env:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
     steps:
-      - name: Enforce zero-open-PR single-flight gate
+      - name: Enforce zero-open-PR-and-issue single-flight gate
         id: gate
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          NIM_CONFIGURED: ${{ secrets.NVIDIA_NIM_API_KEY != '' }}
+          ORCHESTRATOR_KEYS_CONFIGURED: ${{ secrets.BYTEZ_API_KEY != '' && secrets.NVIDIA_NIM_API_KEY != '' && secrets.NVIDIA_NIM_API_KEY_SUB != '' && secrets.OPENROUTER_API_KEY != '' && secrets.OPENAI_API_KEY != '' }}
           APP_ID_CONFIGURED: ${{ vars.TEPP_MAINTAINER_APP_CLIENT_ID != '' }}
           APP_KEY_CONFIGURED: ${{ secrets.TEPP_MAINTAINER_APP_PRIVATE_KEY != '' }}
         run: |
@@ -75,9 +76,19 @@ jobs:
             echo 'reason=open_pull_request' >>"$GITHUB_OUTPUT"
             exit 0
           fi
-          if [ "$NIM_CONFIGURED" != true ] && [ "$DRY_RUN" != true ]; then
+          if ! open_issues="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 1 --json number,url)"; then
             echo 'dispatch=false' >>"$GITHUB_OUTPUT"
-            echo 'reason=nim_api_key_unavailable' >>"$GITHUB_OUTPUT"
+            echo 'reason=issue_inventory_unavailable' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$(jq 'length' <<<"$open_issues")" -gt 0 ]; then
+            echo 'dispatch=false' >>"$GITHUB_OUTPUT"
+            echo 'reason=open_issue' >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$ORCHESTRATOR_KEYS_CONFIGURED" != true ] && [ "$DRY_RUN" != true ]; then
+            echo 'dispatch=false' >>"$GITHUB_OUTPUT"
+            echo 'reason=contextual_orchestrator_credentials_unavailable' >>"$GITHUB_OUTPUT"
             exit 0
           fi
           if { [ "$APP_ID_CONFIGURED" != true ] || [ "$APP_KEY_CONFIGURED" != true ]; } \
@@ -99,6 +110,11 @@ jobs:
           product, technical, operations, security, doctoring, source, prompts,
           tests, workflows, releases, issues, and recently merged pull requests.
           Select the single highest-value buyer-visible Gap that fits exactly one bounded pull request.
+          After audit_event inserts are bound to try_record, the next bounded
+          increment is binding tepp_api privileged-export authorization
+          decision records to operational_log::try_record.
+          Do not reopen the public OperationalLogRecord::new constructor hole.
+          Do not mix service_tls or persistence migration 0007 into that increment.
 
           Preserve standalone operation and modular MSA integration with
           ContextualWisdomLab/.github, naruon, contextual-orchestrator, and other
@@ -174,7 +190,22 @@ jobs:
           install -D -m 0755 "$RUNNER_TEMP/opencode" "$HOME/.opencode/bin/opencode"
           echo "$HOME/.opencode/bin" >>"$GITHUB_PATH"
 
-      - name: Configure OpenCode for NVIDIA NIM only
+      - name: Install checksum-pinned contextual-orchestrator
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/contextual-orchestrator.tar.gz"
+          package_root="$RUNNER_TEMP/contextual-orchestrator"
+          install -d -m 0700 "$package_root"
+          curl --fail --silent --show-error --location --proto '=https' \
+            --connect-timeout 10 --max-time 120 --output "$archive" \
+            "https://github.com/ContextualWisdomLab/contextual-orchestrator/archive/${CONTEXTUAL_ORCHESTRATOR_COMMIT}.tar.gz"
+          printf '%s  %s\n' "$CONTEXTUAL_ORCHESTRATOR_SHA256" "$archive" | sha256sum -c -
+          tar -xzf "$archive" --strip-components=1 -C "$package_root"
+          test -f "$package_root/contextual_orchestrator/__main__.py"
+
+      - name: Configure OpenCode for contextual-orchestrator
         if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
         shell: bash
         run: |
@@ -185,7 +216,7 @@ jobs:
             "autoupdate": false,
             "lsp": false,
             "mcp": {},
-            "enabled_providers": ["nvidia-nim"],
+            "enabled_providers": ["contextual-orchestrator"],
             "permission": {
               "*": "allow",
               "external_directory": "deny",
@@ -209,17 +240,15 @@ jobs:
               }
             },
             "provider": {
-              "nvidia-nim": {
+              "contextual-orchestrator": {
                 "npm": "@ai-sdk/openai-compatible",
-                "name": "NVIDIA NIM",
+                "name": "Contextual Orchestrator",
                 "options": {
-                  "baseURL": "https://integrate.api.nvidia.com/v1",
-                  "apiKey": "{env:NVIDIA_NIM_API_KEY}"
+                  "baseURL": "http://127.0.0.1:18000/v1",
+                  "apiKey": "{env:OPENCODE_GATEWAY_TOKEN}"
                 },
                 "models": {
-                  "nvidia/llama-3.3-nemotron-super-49b-v1.5": {"tool_call": true},
-                  "nvidia/nemotron-3-super-120b-a12b": {"tool_call": true},
-                  "deepseek-ai/deepseek-v4-pro": {"tool_call": true}
+                  "contextual-orchestrator": {"tool_call": true}
                 }
               }
             }
@@ -227,11 +256,54 @@ jobs:
           CONFIG
           chmod 0400 "$RUNNER_TEMP/opencode.json"
 
-      - name: Run bounded NVIDIA NIM fallback
+      - name: Start contextual-orchestrator with all-provider discovery
         if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
         shell: bash
         env:
+          BYTEZ_API_KEY: ${{ secrets.BYTEZ_API_KEY }}
           NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
+          NVIDIA_NIM_API_KEY_SUB: ${{ secrets.NVIDIA_NIM_API_KEY_SUB }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          token_file="$RUNNER_TEMP/contextual-orchestrator-token"
+          printf '%s' "$(openssl rand -hex 32)" >"$token_file"
+          report_file="$RUNNER_TEMP/contextual-orchestrator-discovery.json"
+          log_file="$RUNNER_TEMP/contextual-orchestrator.log"
+          gateway_token="$(cat "$token_file")"
+          export CONTEXTUAL_ORCHESTRATOR_INFERENCE_TOKEN="$gateway_token"
+          export PYTHONPATH="$RUNNER_TEMP/contextual-orchestrator"
+          python3 scripts/run_contextual_orchestrator.py \
+            --host 127.0.0.1 --port "$CONTEXTUAL_ORCHESTRATOR_PORT" \
+            --report "$report_file" >"$log_file" 2>&1 &
+          echo $! >"$RUNNER_TEMP/contextual-orchestrator.pid"
+          ready=false
+          for _ in $(seq 1 120); do
+            if curl --fail --silent --show-error "http://127.0.0.1:${CONTEXTUAL_ORCHESTRATOR_PORT}/healthz" >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$(cat "$RUNNER_TEMP/contextual-orchestrator.pid")" 2>/dev/null; then
+              cat "$log_file"
+              exit 1
+            fi
+            sleep 1
+          done
+          [ "$ready" = true ]
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $(cat "$token_file")" \
+            "http://127.0.0.1:${CONTEXTUAL_ORCHESTRATOR_PORT}/v1/models" \
+            >"$RUNNER_TEMP/contextual-orchestrator-models.json"
+          jq -e '.data | length > 0' "$RUNNER_TEMP/contextual-orchestrator-models.json" >/dev/null
+          jq -e '.discovered_count > 0 and (.selected_models | length > 0)' "$report_file" >/dev/null
+          echo "CONTEXTUAL_ORCHESTRATOR_TOKEN_FILE=$token_file" >>"$GITHUB_ENV"
+
+      - name: Run bounded contextual-orchestrator agent
+        if: steps.gate.outputs.dispatch == 'true' && env.DRY_RUN != 'true'
+        shell: bash
+        env:
           OPENCODE_CONFIG: ${{ runner.temp }}/opencode.json
           OPENCODE_DISABLE_AUTOUPDATE: 'true'
           XDG_CONFIG_HOME: ${{ runner.temp }}/opencode-config
@@ -239,33 +311,19 @@ jobs:
         run: |
           set -euo pipefail
           prompt="$(cat "$RUNNER_TEMP/agent-prompt.md")"
-          status=1
-          read -r -a models <<<"$OPENCODE_MODELS"
-          model_count=${#models[@]}
-          for ((model_index = 0; model_index < model_count; model_index++)); do
-            model="${models[$model_index]}"
-            if timeout --kill-after="${OPENCODE_KILL_GRACE_SECONDS}s" \
-              "${OPENCODE_RUN_TIMEOUT_SECONDS}s" \
-              env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
-              -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL \
-              -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_RUNTIME_URL \
-              -u ACTIONS_RESULTS_URL -u ACTIONS_CACHE_URL \
-              -u GITHUB_ENV -u GITHUB_OUTPUT -u GITHUB_PATH \
-              -u GITHUB_STATE -u GITHUB_STEP_SUMMARY \
-              opencode run "$prompt" --agent build --model "$model"; then
-              status=0
-              break
-            fi
-            if [ "$model_index" -eq $((model_count - 1)) ]; then
-              break
-            fi
-            git reset --hard HEAD
-            git clean -fdx
-            env -u NVIDIA_NIM_API_KEY \
-              timeout --kill-after=15s 180s \
-              python3 -m pip install --disable-pip-version-check --no-deps --require-hashes -r requirements-quality.txt
-          done
-          [ "$status" -eq 0 ] || { echo '::error::All NIM candidates failed'; exit 1; }
+          gateway_token="$(cat "$CONTEXTUAL_ORCHESTRATOR_TOKEN_FILE")"
+          export OPENCODE_GATEWAY_TOKEN="$gateway_token"
+          timeout --kill-after="${OPENCODE_KILL_GRACE_SECONDS}s" \
+            "${OPENCODE_RUN_TIMEOUT_SECONDS}s" \
+            env -u GH_TOKEN -u GITHUB_TOKEN -u REPOSITORY_TOKEN \
+            -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL \
+            -u ACTIONS_RUNTIME_TOKEN -u ACTIONS_RUNTIME_URL \
+            -u ACTIONS_RESULTS_URL -u ACTIONS_CACHE_URL \
+            -u GITHUB_ENV -u GITHUB_OUTPUT -u GITHUB_PATH \
+            -u GITHUB_STATE -u GITHUB_STEP_SUMMARY \
+            -u BYTEZ_API_KEY -u NVIDIA_NIM_API_KEY -u NVIDIA_NIM_API_KEY_SUB \
+            -u OPENROUTER_API_KEY -u OPENAI_API_KEY \
+            opencode run "$prompt" --agent build --model "$OPENCODE_MODEL"
 
       - name: Verify, bound, and export the uncredentialed proposal
         id: proposal
@@ -428,7 +486,7 @@ jobs:
           python3 scripts/check_docstrings.py
           python3 -m coverage run --branch -m unittest discover -s tests/quality -p 'test_*.py'
           python3 -m coverage report --fail-under=100 --show-missing
-          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt --component llvm-tools-preview
+          rustup toolchain install 1.98.0 --profile minimal --component clippy --component rustfmt --component llvm-tools-preview
           cargo fmt --all -- --check
           cargo clippy --workspace --all-targets --all-features -- -D warnings
           cargo nextest run --workspace --all-features
@@ -545,6 +603,7 @@ jobs:
           owner: ContextualWisdomLab
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
+          permission-issues: read
           permission-metadata: read
           permission-pull-requests: write
 
@@ -561,6 +620,11 @@ jobs:
             exit 1
           fi
           [ "$(jq 'length' <<<"$open_prs")" -eq 0 ] || { echo '::error::open_pull_request_after_generation'; exit 1; }
+          if ! open_issues="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 1 --json number,url)"; then
+            echo '::error::issue_inventory_unavailable_after_generation'
+            exit 1
+          fi
+          [ "$(jq 'length' <<<"$open_issues")" -eq 0 ] || { echo '::error::open_issue_after_generation'; exit 1; }
           live_base="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${DEFAULT_BRANCH}" --jq '.object.sha')"
           [ "$live_base" = "$expected_base" ] || { echo '::error::base_branch_advanced'; exit 1; }
 

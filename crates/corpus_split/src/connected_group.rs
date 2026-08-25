@@ -15,6 +15,8 @@ pub enum LeakageLinkKind {
     CopiedVariant,
     /// Shared event episode membership.
     SameEpisode,
+    /// NFC/NFD (or other UAX #15) canonically equivalent document bodies.
+    CanonicalEquivalent,
 }
 
 /// Undirected leakage link between two document identities.

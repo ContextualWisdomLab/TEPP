@@ -368,40 +368,41 @@ class CoverageContractTests(unittest.TestCase):
                 "})",  # 38
                 "})",  # 39
                 "    return value,",  # 40 executable (return keeps it)
-                "    x + 1,",  # 41 trailing comma noise
-                '"standalone string literal",',  # 42 string noise
-                "} else {",  # 43 structural branch noise
-                ")",  # 44 structural close noise
-                '#[cfg(feature = "live-sqlx")]',  # 45 cfg attr
-                "fn live_path() {",  # 46 fn
-                "    live_body();",  # 47 executable active feature body
-                "}",  # 48 brace
-                '#[cfg(not(feature = "live-sqlx"))]',  # 49 not-feature attr
-                "fn offline_path() {",  # 50 inside not-feature
-                "    offline_body();",  # 51 inside not-feature
-                "}",  # 52 inside not-feature close
-                "#[cfg(test)]",  # 53
-                "mod tests {",  # 54 cfg(test) mod
-                "    #[test]",  # 55 inside test mod
-                "    fn unit() {",  # 56 inside test mod
-                "        assert_eq!(1, 1);",  # 57 inside test mod
-                "    }",  # 58
-                "}",  # 59
-                "    executable_statement();",  # 60 executable
-                "    append_value(",  # 61 multiline call opener
-                "        value,",  # 62 trailing comma noise
-                "    );",  # 63 call close
-                "    values",  # 64
-                "        .iter()",  # 65 method-chain continuation
-                "        .collect::<Vec<_>>()",  # 66 method-chain continuation
-                "    });",  # 67 closure call close
-                "(",  # 68 structural call opener
-                ")",  # 69 structural call close
-                "    Ok(())",  # 70 structural unit result
-                "    NaruonLiveResponse {",  # 71 structural struct literal
-                "pub(crate) fn crate_visible() {",  # 72 visibility-qualified fn
-                "State::Accepted => {",  # 73 match-arm structure
-                "State::Guarded(value) if valid(value) => {",  # 74 guarded arm is executable
+                "    x + 1,",  # 41 executable expression with trailing comma
+                "    record_uncovered(),",  # 42 executable call with trailing comma
+                '"standalone string literal",',  # 43 standalone string noise
+                "} else {",  # 44 structural branch noise
+                ")",  # 45 structural close noise
+                '#[cfg(feature = "live-sqlx")]',  # 46 cfg attr
+                "fn live_path() {",  # 47 fn
+                "    live_body();",  # 48 executable active feature body
+                "}",  # 49 brace
+                '#[cfg(not(feature = "live-sqlx"))]',  # 50 not-feature attr
+                "fn offline_path() {",  # 51 inside not-feature
+                "    offline_body();",  # 52 inside not-feature
+                "}",  # 53 inside not-feature close
+                "#[cfg(test)]",  # 54
+                "mod tests {",  # 55 cfg(test) mod
+                "    #[test]",  # 56 inside test mod
+                "    fn unit() {",  # 57 inside test mod
+                "        assert_eq!(1, 1);",  # 58 inside test mod
+                "    }",  # 59
+                "}",  # 60
+                "    executable_statement();",  # 61 executable
+                "    append_value(",  # 62 multiline call opener
+                "        value,",  # 63 trailing comma noise
+                "    );",  # 64 call close
+                "    values",  # 65 receiver line stays executable
+                "        .iter()",  # 66 method-chain continuation
+                "        .collect::<Vec<_>>()",  # 67 method-chain continuation
+                "    });",  # 68 closure call close
+                "(",  # 69 structural call opener
+                ")",  # 70 structural call close
+                "    Ok(())",  # 71 structural unit result
+                "    NaruonLiveResponse {",  # 72 structural struct literal
+                "pub(crate) fn crate_visible() {",  # 73 visibility-qualified fn
+                "State::Accepted => {",  # 74 match-arm structure
+                "State::Guarded(value) if valid(value) => {",  # 75 guarded arm is executable
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -416,7 +417,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 47, 60, 61, 64, 65, 66, 74}
+            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 75}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -435,10 +436,10 @@ class CoverageContractTests(unittest.TestCase):
                 "\n".join(
                     [
                         f"SF:{path}",
-                        "DA:60,1",
-                        "DA:61,0",
-                        "DA:65,0",
+                        "DA:61,1",
+                        "DA:62,0",
                         "DA:66,0",
+                        "DA:67,0",
                         "DA:1,0",
                         "DA:2,0",
                         "DA:51,0",
@@ -451,7 +452,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.load_lcov_line_totals(
                     lcov, repository_root=Path(temporary)
                 ),
-                {"lines": {"count": 4, "covered": 1}},
+                {"lines": {"count": 2, "covered": 1}},
             )
 
     def test_lcov_rejects_source_paths_outside_repository(self) -> None:
@@ -878,6 +879,77 @@ class CoverageContractTests(unittest.TestCase):
             self.assertEqual(
                 coverage_contract._character_literal_end(r"'\''", 0), 4
             )
+    def test_line_filter_excludes_literal_and_structural_continuations(self) -> None:
+        """LCOV-only literal fragments and branch continuations are filtered."""
+
+        lines = [
+            "pub(crate) const fn accessor() -> u8 {",
+            "    1",
+            "}",
+            "    if condition",
+            "        || alternate",
+            "    } else {",
+            "        format!(",
+            '            "first ' + "\\",
+            '             second"',
+            "        );",
+            "    ));",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "fixture.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path = str(source)
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 1))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 2))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 5))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 6))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 8))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 9))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 11))
+
+    def test_line_filter_keeps_inline_functions_and_block_comment_followers(self) -> None:
+        """Inline function bodies and code after quoted block comments stay visible."""
+
+        lines = [
+            "pub(crate) const fn enabled(value: u8) -> bool { value > 0 }",
+            "pub(crate) fn declaration_only(value: u8) -> bool {",
+            "    value > 0",
+            "}",
+            '/* block comment contains a " quote',
+            "   nested /* comment */ still ends here */",
+            "    record_after_block_comment();",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "inline.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path = str(source)
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 1))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 2))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 5))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 6))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 7))
+
+    def test_multiline_scanner_ignores_comments_char_literals_and_raw_strings(self) -> None:
+        """Quote-like text cannot hide executable lines from the authored-line gate."""
+
+        lines = [
+            "fn escaped_quotes() {",
+            '    let value = source.replace(\'"\', "&quot;"); // a " comment',
+            "    executable_after_char_literal();",
+            '    let raw = r##"payload " quoted"##;',
+            "    raw_continuation_is_data",
+            "    let lifetime = 'a; let multiline = r#\"first",
+            "second\"#;",
+            "    executable_after_raw_string();",
+            "}",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "quotes.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path = str(source)
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 3))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 8))
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 7))
 
 
 if __name__ == "__main__":  # pragma: no cover

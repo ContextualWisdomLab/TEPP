@@ -7,25 +7,26 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | ADR | Decision | Decision status | Implementation maturity | Clarification / supersession |
 |---|---|---|---|---|
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
-| [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | active-PR | Unmerged PR #8 is the canonical Task 3 replacement implementing typed clocks/intervals against the current protected-main lineage; conflicted PR #5 is superseded lineage. Later graph/split enforcement remains target work. |
-| [0003](0003-relational-event-multiple-membership.md) | Relational event ontology and time-varying cross-classified multiple membership | Accepted | partial | Weighted time-varying membership network/roles are active-PR (PR #12); full multilevel estimators, graph ontology, and persistence remain accepted-target. ADR 0016 owns event-intelligence tasks. |
+| [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | partial | Typed clocks/intervals (merged PR #8), Allen/path-consistency (merged PR #9), the clock-identity/revision-order/document-completeness gates (`system_clock`, `event_clock`, `assertion_clock`, `cutoff_clock`, `available_clock`, `document_clocks`, `revision_order`), and the provenance/ordering gates (`citation_edge`, `support_edge`, `retrospective_edge`) are implemented-main; superseded PRs #5/#6 are historical lineage only; remaining graph/split enforcement stays accepted-target. |
+| [0003](0003-relational-event-multiple-membership.md) | Relational event ontology and time-varying cross-classified multiple membership | Accepted | partial | Membership network/roles, Kish ESS, nested ICC, subevent parent-window containment (`subevent_containment`), the forward-only relation graph, evidential-vs-transition identity (`support_edge`), inferred-versus-observed identity (`inferred_status`), retrospective-reporting identity (`retrospective_edge`), summary-versus-source identity (`summarizes_edge`), copy-versus-source identity (`copy_identity`), location-versus-entity/language identity (`location_membership`), and IPO event-time order (`outcome_order`) are implemented-main; typed target-kind identity in `membership_target` is on PR #131; full multilevel estimators and persistence remain accepted-target. ADR 0016 owns event-intelligence tasks. |
 | [0004](0004-shared-multilingual-latent-space.md) | One shared multilingual latent space with explicit invariance status | Accepted | accepted-target | ADR 0012 owns the full topic-estimator/backend/global-topic contract. |
-| [0005](0005-posterior-esem-dsem.md) | Posterior-aware ESEM/DSEM and valid compositional coordinates | Accepted | accepted-target | Downstream psychometric authority; upstream topic/network model is clarified by ADR 0012. |
+| [0005](0005-posterior-esem-dsem.md) | Posterior-aware ESEM/DSEM and valid compositional coordinates | Accepted | active-PR | Within/between decomposition in `longitudinal_core` on the active PR; remaining ESEM/DSEM fit remains accepted-target. ADR 0012 owns the upstream topic/network contract. |
 | [0006](0006-vram-gpu-nvidia-orchestration.md) | VRAM-adaptive GPU compute and model-credential boundary | Accepted | accepted-target | LLM orchestration policy superseded by ADR 0010; autonomous development authority governed by ADR 0015. |
 | [0007](0007-rust-workspace-quality-gates.md) | Explicit Rust workspace, pinned toolchains, and exact quality gates | Accepted | implemented-main | ADR 0014 governs scientific/product claim promotion beyond repository-quality tooling. |
 | [0008](0008-immutable-evidence-identities-digests-and-spans.md) | Immutable evidence identities, `SHA-256` digests, exact spans, and strict wire reconstruction | Accepted | implemented-main | ADR 0013 governs future persistence/reproducibility/split authority. |
-| [0009](0009-purpose-bound-pii-governance.md) | Purpose-bound PII governance without blanket masking | Accepted | partial | Persistence retention/deletion/legal-hold (`0007`) is implemented-main; provider-payload minimization remains on the active PR until exact-head checks, review, and protected-main integration; deployment evidence remains accepted-target. |
-| [0010](0010-adaptive-llm-orchestration.md) | Adaptive LLM orchestration and test-time compute | Accepted | partial | `tepp_api` router/ablation/orchestrator binding remain on the active PR until exact-head checks, review, and protected-main integration; live NIM execution and production ablation evidence remain accepted-target. |
+| [0009](0009-purpose-bound-pii-governance.md) | Purpose-bound PII governance without blanket masking | Accepted | partial | Persistence retention/deletion/legal-hold (`0007`) and provider-payload minimization implemented-main; deployment evidence remains accepted-target. |
+| [0010](0010-adaptive-llm-orchestration.md) | Adaptive LLM orchestration and test-time compute | Accepted | partial | `tepp_api` router/ablation/orchestrator binding implemented-main; live NIM execution and production ablation evidence remain accepted-target. |
 | [0011](0011-standalone-modular-msa-boundary.md) | Standalone operation and modular CWL MSA boundary | Accepted | partial | Owns cross-service persistence/credential/API authority; no direct cross-service application-table coupling. |
 | [0012](0012-temporal-relational-shared-latent-topic-measurement.md) | Temporal Relational Shared-Latent Topic Measurement (TRSL-TM) | Accepted | partial | Logistic-normal ALR/ILR, lexical-weight refusal, statistical/Pareto candidate-`K` gates, and active/dormant/reactivated identity are on the active product branch; the estimator, method effects, and backend interchange remain accepted-target. |
-| [0013](0013-bitemporal-persistence-reproducibility-and-split-authority.md) | Bitemporal persistence, reproducibility manifests, and relation-aware split authority | Accepted | partial | Owns PostgreSQL adapter semantics, immutable run/split manifests, leakage-safe partitions, and recovery identity; optional `live-sqlx` `PgPool`, live PG CI, tenant RLS, and `0006` membership implemented-main; backup/restore integrity revalidation implemented-main; `0007` retention/deletion/legal-hold implemented-main; remaining physical ERD/backup accepted-target. |
-| [0014](0014-scientific-claim-promotion-and-release-evidence.md) | Scientific claim promotion and release evidence authority | Accepted | partial | Separates design, implementation, scientific/product claim, and release authority; repository SBOM/provenance generator implemented, full release bundle remaining. |
+| [0013](0013-bitemporal-persistence-reproducibility-and-split-authority.md) | Bitemporal persistence, reproducibility manifests, and relation-aware split authority | Accepted | partial | Owns PostgreSQL adapter semantics, immutable run/split manifests, leakage-safe partitions, and recovery identity; optional `live-sqlx` `PgPool`, live PG CI, tenant RLS, and `0006` membership implemented-main; `0007` retention/deletion/legal-hold on the active PR; remaining physical ERD/backup accepted-target. |
+| [0014](0014-scientific-claim-promotion-and-release-evidence.md) | Scientific claim promotion and release evidence authority | Accepted | partial | Separates design, implementation, scientific/product claim, and release authority; repository SBOM/provenance generator implemented; checkpoint-versus-estimator refusal is `checkpoint_authority` on the active PR; full release bundle remaining. |
 | [0015](0015-autonomous-development-review-and-merge-authority.md) | Autonomous development, review, and merge authority separation | Accepted | active-PR | Separates model proposal, deterministic verification, publication, independent review, and merge/release authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
-| [0017](0017-consumer-scoped-analysis-run-ingress.md) | Consumer-scoped modular analysis-run ingress | Accepted | active-PR | Narrows ADR 0011 for the closed consumer registry, credential-free exchange, and consumer-qualified idempotency namespace; production TLS remains separate. |
-| [0018](0018-project-history-wire-size-symmetry.md) | Symmetric project-history wire-size enforcement | Accepted | active-PR | Narrows ADR 0008 for request serialization and generated LineageWeave project-history projections. |
-| [0019](0019-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Narrows ADR 0011 for the credential-free bounded project-history API and preserves LineageWeave authorization ownership. |
-| [0020](0020-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
+| [0017](0017-hourly-contextual-orchestrator-gateway.md) | Hourly contextual-orchestrator gateway and all-provider model discovery | Accepted | active-PR | Keeps proposal-model execution behind a pinned loopback gateway while preserving independent verifier, publisher, reviewer, and merge authority. |
+| [0018](0018-consumer-scoped-analysis-run-ingress.md) | Consumer-scoped modular analysis-run ingress | Accepted | active-PR | Narrows ADR 0011 for the closed consumer registry, credential-free exchange, and consumer-qualified idempotency namespace; production TLS remains separate. |
+| [0019](0019-project-history-wire-size-symmetry.md) | Symmetric project-history wire-size enforcement | Accepted | active-PR | Narrows ADR 0008 for request serialization and generated LineageWeave project-history projections. |
+| [0020](0020-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Narrows ADR 0011 for the credential-free bounded project-history API and preserves LineageWeave authorization ownership. |
+| [0021](0021-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
 
 ## Decision ownership summary
 
@@ -34,7 +35,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **numerical implementation / reference backend:** ADR 0001;
 - **clock/time eligibility:** ADR 0002;
 - **event ontology / relation / membership semantics:** ADR 0003;
-- **multilingual semantic alignment:** ADR 0004;
+- **multilingual semantic alignment:** ADR 0004; span-grounded unit identity: ADR 0020;
 - **ESEM/DSEM and psychometric interpretation:** ADR 0005;
 - **GPU/VRAM and model-credential boundary:** ADR 0006;
 - **repository quality tooling:** ADR 0007;
@@ -47,10 +48,11 @@ Use the narrowest owning ADR when decisions overlap:
 - **claim maturity / release evidence:** ADR 0014;
 - **autonomous development/review/merge authority:** ADR 0015;
 - **TDT/CHRONOS event intelligence:** ADR 0016;
-- **modular consumer admission / replay identity:** ADR 0017;
-- **project-history wire-size symmetry:** ADR 0018;
-- **LineageWeave project-history service boundary:** ADR 0019;
-- **accepted-run execution and terminal artifact production:** ADR 0020.
+- **hourly proposal gateway and provider discovery:** ADR 0017.
+- **modular consumer admission / replay identity:** ADR 0018.
+- **project-history wire-size symmetry:** ADR 0019.
+- **LineageWeave project-history service boundary:** ADR 0020.
+- **accepted-run execution and terminal artifact production:** ADR 0021.
 
 ## Change and supersession rule
 

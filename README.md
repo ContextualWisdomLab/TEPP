@@ -7,24 +7,61 @@ implemented in Rust.
 ## Current implementation state
 
 This branch establishes the Rust workspace and quality-gate foundation. The
-fourteen bounded crates compile independently; domain behavior includes immutable
+bounded crates compile independently; domain behavior includes immutable
 evidence records, topic measurement, and cutoff-safe analysis execution.
 
 ```text
-crates/evidence_core
-crates/temporal_core
-crates/event_core
-crates/relation_graph
-crates/membership_core
-crates/persistence_postgres
-crates/corpus_split
-crates/tepp_simulation
-crates/validation_core
-crates/tepp_api
-crates/topic_measurement
-crates/model_selection
-crates/topic_lineage
 crates/analysis_engine
+crates/assertion_clock
+crates/available_clock
+crates/checkpoint_authority
+crates/citation_edge
+crates/copied_text
+crates/copy_identity
+crates/corpus_background
+crates/corpus_split
+crates/cutoff_clock
+crates/derived_sensitivity
+crates/document_clocks
+crates/encrypted_mapping
+crates/event_clock
+crates/event_core
+crates/evidence_core
+crates/inferred_status
+crates/intake_authorization
+crates/interpretation_gateway
+crates/location_membership
+crates/longitudinal_core
+crates/membership_core
+crates/membership_target
+crates/modality_source
+crates/model_selection
+crates/network_analysis
+crates/operational_log
+crates/outcome_order
+crates/payload_bound
+crates/persistence_postgres
+crates/prediction_contradiction
+crates/prompt_source
+crates/provider_receipt
+crates/psychometric_fit
+crates/relation_graph
+crates/retrospective_edge
+crates/revision_order
+crates/semantic_core
+crates/service_tls
+crates/stopword_deletion
+crates/style_source
+crates/subevent_containment
+crates/summarizes_edge
+crates/support_edge
+crates/system_clock
+crates/temporal_core
+crates/tepp_api
+crates/tepp_simulation
+crates/topic_lineage
+crates/topic_measurement
+crates/validation_core
 ```
 
 ## Local verification
