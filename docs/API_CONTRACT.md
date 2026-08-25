@@ -108,6 +108,13 @@ coordinates into binary responses, collapse its draws to an error-free point,
 or substitute labels, keywords, or LineageWeave-local scores.
 The strict DTO/schema is contract-only: the current CPU reference estimator
 does not yet emit posterior draws through this artifact.
+The JSON Schema is the bounded record-shape contract. Cross-record invariants
+that require joining opaque document identities—at least two distinct
+documents, a complete document-by-draw grid, and all four time-covering
+membership dimensions for every document—are enforced by the Rust domain
+validator and cannot be established by schema-only acceptance. A missing
+optional lineage target and an explicit JSON `null` both deserialize to the
+same Rust `Option` value; the schema therefore admits both representations.
 
 ## 5. Analysis request authority
 

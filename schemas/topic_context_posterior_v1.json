@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tepp.local/schemas/topic_context_posterior_v1.json",
   "title": "TEPP topic context posterior v1",
+  "$comment": "This schema validates record shapes. Cross-record completeness (distinct documents, complete document-by-draw grids, and four time-covering membership dimensions per document) is normative Rust domain validation because JSON Schema cannot express those joins without duplicating document identities.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "run_id", "snapshot_id", "source_snapshot_sha256", "knowledge_cutoff", "model_contract_version", "posterior_draw_set_id", "posterior_draw_count", "topic_count", "activity_intervals", "lineage_events", "plausible_values", "memberships", "inference_status"],
@@ -36,7 +37,7 @@
     },
     "lineage": {
       "type": "object", "additionalProperties": false,
-      "required": ["event_code", "source_topic_index", "target_topic_index", "event_time", "evidence_sha256"],
+      "required": ["event_code", "source_topic_index", "event_time", "evidence_sha256"],
       "properties": {
         "event_code": { "enum": ["birth", "split", "merge", "retirement"] },
         "source_topic_index": { "type": "integer", "minimum": 0 },

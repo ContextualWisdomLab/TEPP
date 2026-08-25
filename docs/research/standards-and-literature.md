@@ -76,6 +76,8 @@ Blei, D. M., & Lafferty, J. D. (2007). A correlated topic model of Science. *The
 
 Chang, J., & Blei, D. M. (2009). Relational topic models for document networks. In *Proceedings of the 12th International Conference on Artificial Intelligence and Statistics* (pp. 81–88). PMLR.
 
+Zhang, D. C., & Lauw, H. W. (2022). Dynamic topic models for temporal document networks. In *Proceedings of the 39th International Conference on Machine Learning* (Vol. 162, pp. 26281–26292). PMLR. https://proceedings.mlr.press/v162/zhang22n.html
+
 Mimno, D., Wallach, H. M., Naradowsky, J., Smith, D. A., & McCallum, A. (2009). Polylingual topic models. In *Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing* (pp. 880–889). Association for Computational Linguistics.
 
 Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02
