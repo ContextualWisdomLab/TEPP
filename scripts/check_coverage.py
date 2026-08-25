@@ -483,14 +483,21 @@ def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
 
 
 def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
-    """Return line numbers belonging to any ``#[cfg(test)] mod ... { ... }`` block."""
+    """Return line numbers belonging to any ``#[cfg(test)] mod ... { ... }`` block.
+
+    Blank lines and further attributes (for example ``#[allow(...)]``) may sit
+    between ``#[cfg(test)]`` and the ``mod`` declaration; both belong to the
+    module and must not break detection.
+    """
 
     test_lines: set[int] = set()
     index = 0
     while index < len(lines):
         if lines[index].strip().startswith("#[cfg(test)]"):
             look = index + 1
-            while look < len(lines) and not lines[look].strip():
+            while look < len(lines) and (
+                not lines[look].strip() or lines[look].strip().startswith("#[")
+            ):
                 look += 1
             if look < len(lines) and lines[look].strip().startswith("mod "):
                 depth = 0

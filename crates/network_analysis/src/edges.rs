@@ -412,6 +412,14 @@ mod tests {
             Err(NetworkEstimatorError::InvalidConfidenceLevel)
         ));
         assert!(matches!(
+            posterior_correlation_matrix(&draws, 0.3, f64::INFINITY, 10, 1),
+            Err(NetworkEstimatorError::InvalidConfidenceLevel)
+        ));
+        assert!(matches!(
+            posterior_correlation_matrix(&draws, 0.3, f64::NAN, 10, 1),
+            Err(NetworkEstimatorError::InvalidConfidenceLevel)
+        ));
+        assert!(matches!(
             posterior_correlation_matrix(&draws, 0.3, 0.0, 10, 1),
             Err(NetworkEstimatorError::InvalidConfidenceLevel)
         ));
@@ -529,11 +537,10 @@ mod tests {
             11,
         )
         .unwrap();
-        assert!(
-            independent[0].p_value > 1e-3,
-            "p = {}",
-            independent[0].p_value
-        );
+        // No lazy format arguments: a failing-message branch would sit on
+        // its own authored line and never execute while the test passes.
+        // Plain boolean assert: no lazy message block to instrument.
+        assert!(independent[0].p_value > 1e-3);
     }
 
     #[test]
