@@ -53,6 +53,7 @@ use psychometric_core::{
     recover_standardised_continuous_time_independent_predictor_effect,
     recover_standardised_discrete_diffusion, recover_standardised_discrete_drift,
     recover_standardised_discrete_time_independent_predictor_effect,
+    recover_standardised_initial_latent_variance,
     recover_standardised_initial_time_dependent_predictor_effect,
     recover_standardised_initial_time_independent_predictor_effect,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
@@ -130,6 +131,7 @@ use psychometric_core::{
     refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance,
     refuse_initial_time_independent_variance_as_initial_latent_variance,
     refuse_initial_time_independent_variance_as_standardised_asymptotic_time_independent_variance,
+    refuse_initial_time_independent_variance_as_standardised_initial_latent_variance,
     refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect,
     refuse_initial_time_independent_variance_as_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
@@ -197,6 +199,7 @@ use psychometric_core::{
     refuse_standardised_discrete_time_dependent_effect_as_standardised_continuous_time_dependent_effect,
     refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
     refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect,
+    refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance,
     refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -264,6 +267,7 @@ use psychometric_core::{
     refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion,
     refuse_unstandardised_discrete_drift_as_standardised_discrete_drift,
     refuse_unstandardised_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect,
+    refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
     refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
     refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
 };
@@ -9221,6 +9225,82 @@ fn standardised_initial_time_dependent_effect_refuses_non_event_clocks_and_does_
         ),
         Err(
             PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositivePredictorVariance
+        )
+    );
+}
+
+#[test]
+fn standardised_initial_latent_variance_recovers_driver_table_two_correlation() {
+    let initial_variance = 1.6_f64;
+    let recovered =
+        recover_standardised_initial_latent_variance(initial_variance, LagClock::EventTime)
+            .expect("T0VARstd");
+    assert!((recovered - 1.0).abs() < 1e-15);
+    let larger_p0 = recover_standardised_initial_latent_variance(6.4, LagClock::EventTime)
+        .expect("T0VARstd p_0=6.4");
+    assert_eq!(larger_p0.to_bits(), recovered.to_bits());
+    let standardised_effect = recover_standardised_initial_time_dependent_predictor_effect(
+        0.3,
+        1.0,
+        initial_variance,
+        LagClock::EventTime,
+    )
+    .expect("T0TDPREDEFFECTstd");
+    let effect_error = (standardised_effect - 1.0).abs();
+    let recovered_error = (recovered - 1.0).abs();
+    assert!(
+        recovered_error < effect_error,
+        "Driver et al. (2017, p. 16): T0TDPREDEFFECTstd RMSE {effect_error} must exceed T0VARstd RMSE {recovered_error}"
+    );
+    let extra = recover_initial_time_independent_predictor_variance(0.3, 4.0, LagClock::EventTime)
+        .expect("addedT0TIPREDVAR");
+    let extra_error = (extra - 1.0).abs();
+    assert!(
+        recovered_error < extra_error,
+        "Driver et al. (2017, 2017-era addedT0TIPREDVAR): extra RMSE {extra_error} must exceed T0VARstd RMSE {recovered_error}"
+    );
+    assert_eq!(
+        refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance(
+            initial_variance,
+            recovered
+        ),
+        Err(
+            PsychometricError::UnstandardisedInitialLatentVarianceIsNotStandardisedInitialLatentVariance
+        )
+    );
+    assert_eq!(
+        refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance(
+            standardised_effect,
+            recovered
+        ),
+        Err(
+            PsychometricError::StandardisedInitialTimeDependentEffectIsNotStandardisedInitialLatentVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_standardised_initial_latent_variance(
+            extra, recovered
+        ),
+        Err(
+            PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedInitialLatentVariance
+        )
+    );
+    assert_eq!(
+        refuse_trait_variance_as_standardisation_variance(1.0, initial_variance),
+        Err(PsychometricError::TraitVarianceIsNotStandardisationVariance)
+    );
+}
+
+#[test]
+fn standardised_initial_latent_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
+    assert_eq!(
+        recover_standardised_initial_latent_variance(1.6, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_initial_latent_variance(0.0, LagClock::EventTime),
+        Err(
+            PsychometricError::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance
         )
     );
 }

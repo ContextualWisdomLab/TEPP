@@ -1022,6 +1022,23 @@ pub enum PsychometricError {
     /// / p. 16 `T0TDPREDEFFECTstd`. Footnote 4 uses only free
     /// `T0VAR`, not `TRAITVAR`.
     TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect,
+    /// Driver p. 16 `T0VARstd` was requested with a non-positive
+    /// free first-occasion variance. The 2017-era correlation form
+    /// requires strictly positive free `T0VAR`.
+    StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance,
+    /// Driver Table 2 unstandardised `T0VAR` `p_0` was treated as
+    /// p. 16 `T0VARstd`. Unstandardised `p_0` is defined for a zero
+    /// first-occasion variance; standardised `T0VAR` is not.
+    UnstandardisedInitialLatentVarianceIsNotStandardisedInitialLatentVariance,
+    /// Driver Table 3 / p. 16 `T0TDPREDEFFECTstd`
+    /// `t0_m · √v / √p_0` was treated as p. 16 `T0VARstd`. The
+    /// effect map depends on `p_0`; the correlation form of free
+    /// `T0VAR` does not.
+    StandardisedInitialTimeDependentEffectIsNotStandardisedInitialLatentVariance,
+    /// Driver 2017-era `addedT0TIPREDVAR` `t0_b² v` was treated as
+    /// p. 16 `T0VARstd`. Extra TI variance is not the correlation
+    /// form of free `T0VAR`.
+    InitialTimeIndependentVarianceIsNotStandardisedInitialLatentVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1766,6 +1783,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect => {
                 "trait-contaminated initial time-dependent predictor effect is not standardised initial time-dependent predictor effect"
+            }
+            Self::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance => {
+                "standardised initial latent variance requires strictly positive initial latent variance"
+            }
+            Self::UnstandardisedInitialLatentVarianceIsNotStandardisedInitialLatentVariance => {
+                "unstandardised initial latent variance is not standardised initial latent variance"
+            }
+            Self::StandardisedInitialTimeDependentEffectIsNotStandardisedInitialLatentVariance => {
+                "standardised initial time-dependent predictor effect is not standardised initial latent variance"
+            }
+            Self::InitialTimeIndependentVarianceIsNotStandardisedInitialLatentVariance => {
+                "initial time-independent predictor variance is not standardised initial latent variance"
             }
         };
         formatter.write_str(message)
@@ -3031,6 +3060,30 @@ mod tests {
             PsychometricError::TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
                 .to_string(),
             "trait-contaminated initial time-dependent predictor effect is not standardised initial time-dependent predictor effect"
+        );
+    }
+
+    #[test]
+    fn standardised_initial_latent_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance
+                .to_string(),
+            "standardised initial latent variance requires strictly positive initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedInitialLatentVarianceIsNotStandardisedInitialLatentVariance
+                .to_string(),
+            "unstandardised initial latent variance is not standardised initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialTimeDependentEffectIsNotStandardisedInitialLatentVariance
+                .to_string(),
+            "standardised initial time-dependent predictor effect is not standardised initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedInitialLatentVariance
+                .to_string(),
+            "initial time-independent predictor variance is not standardised initial latent variance"
         );
     }
 }

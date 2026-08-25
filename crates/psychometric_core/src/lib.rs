@@ -521,6 +521,19 @@
 //! `t0_m · √v / √(trait + p_0 + added)` uses `TRAITVAR` and is
 //! not `T0TDPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
+//! recovers the Driver p. 16 `T0VARstd` as the correlation form
+//! `solve(sqrt(diag(T0VAR))) %&% T0VAR` after forming strictly
+//! positive free `T0VAR` (JSS PDF re-opened 2026-08-23T22:06Z;
+//! 2017-era `summary.ctsemFit.R` forms that quadratic when
+//! `verbose = TRUE`; `OpenMx` `%&%` is `t(A) %*% B %*% A`; the
+//! default ridge is 0; the scalar map is `p_0 / p_0 = 1`;
+//! unstandardised `p_0` is defined for a zero first-occasion
+//! variance and is not `T0VARstd`; zero `p_0` fails closed; `T0`
+//! is event time, so a non-event clock fails closed; free `T0VAR`
+//! does not require stable `a < 0`; distinct positive `p_0`
+//! recover the same 1; `t0_m · √v / √p_0` is not `T0VARstd`;
+//! `t0_b² v` is not `T0VARstd`; `TRAITVAR` is not the
+//! standardisation variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -711,6 +724,8 @@ pub use event_time::recover_standardised_discrete_drift;
 /// Exact scalar p. 16 finite-interval standardised `TIPREDEFFECT` `A^{-1}[e^{A Δt} − I] B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_discrete_time_independent_predictor_effect;
 /// Exact scalar Table 3 / p. 16 `T0TDPREDEFFECTstd` `t0_m · √v_x / √p_0` after strictly positive free `T0VAR` and `TDPREDVAR`.
+/// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
+pub use event_time::recover_standardised_initial_latent_variance;
 /// Exact scalar Table 3 / p. 16 `T0TDPREDEFFECTstd` `t0_m · √v / √p_0` after strictly positive free `T0VAR` and `v`.
 pub use event_time::recover_standardised_initial_time_dependent_predictor_effect;
 /// Exact scalar Table 3 / p. 16 `T0TIPREDEFFECTstd` `t0_b · √v / √p_0` after strictly positive free `T0VAR` and `v`.
@@ -881,6 +896,8 @@ pub use event_time::refuse_initial_time_independent_variance_as_asymptotic_time_
 pub use event_time::refuse_initial_time_independent_variance_as_initial_latent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as 2017-era `addedTIPREDVARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_asymptotic_time_independent_variance;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `T0VARstd`.
+pub use event_time::refuse_initial_time_independent_variance_as_standardised_initial_latent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as `TRAITVAR`.
@@ -1027,6 +1044,8 @@ pub use event_time::refuse_standardised_discrete_time_dependent_effect_as_standa
 pub use event_time::refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
 /// Refuse treating a finite-interval standardised `TIPREDEFFECT` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect;
+/// Refuse treating Table 3 / p. 16 `T0TDPREDEFFECTstd` as p. 16 `T0VARstd`.
+pub use event_time::refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance;
 /// Refuse treating Table 3 / p. 16 `T0TIPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
 pub use event_time::refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -1165,6 +1184,8 @@ pub use event_time::refuse_unstandardised_discrete_drift_as_standardised_discret
 pub use event_time::refuse_unstandardised_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
+/// Refuse treating unstandardised `T0VAR` as p. 16 `T0VARstd`.
+pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance;
 /// Refuse treating unstandardised `T0TDPREDEFFECT` `t0_m` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating unstandardised `T0TIPREDEFFECT` `t0_b` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
