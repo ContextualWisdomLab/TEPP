@@ -1,8 +1,8 @@
 //! Customer and competitor cannot occupy the same group at once.
 
 use role_contradiction::{
-    identity_recovery_rate, refuse_contradictory_roles, refuse_role_as_entity_class,
-    roles_contradict, ContextualRole, RoleContradictionError,
+    ContextualRole, RoleContradictionError, identity_recovery_rate, refuse_contradictory_roles,
+    refuse_role_as_entity_class, roles_contradict,
 };
 
 #[test]

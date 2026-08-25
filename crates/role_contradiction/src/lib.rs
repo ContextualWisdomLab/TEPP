@@ -12,6 +12,8 @@ mod role;
 
 /// Fail-closed role-contradiction errors.
 pub use error::RoleContradictionError;
+/// Closed vocabulary of commercial roles that can change over time.
+pub use role::ContextualRole;
 /// Fraction of recovered contextual roles that match known truth.
 pub use role::identity_recovery_rate;
 /// Refuse a contradictory customer/competitor pair in one group.
@@ -20,5 +22,3 @@ pub use role::refuse_contradictory_roles;
 pub use role::refuse_role_as_entity_class;
 /// Return whether two roles contradict in the same group.
 pub use role::roles_contradict;
-/// Closed vocabulary of commercial roles that can change over time.
-pub use role::ContextualRole;
