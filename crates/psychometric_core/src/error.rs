@@ -684,6 +684,24 @@ pub enum PsychometricError {
     /// footnote 4 standardisation variance. `TRAITVAR` is not
     /// `asymDIFFUSION`.
     TraitVarianceIsNotStandardisationVariance,
+    /// Driver p. 16 `discreteDIFFUSIONstd` was requested with a
+    /// non-positive within-subject variance. Footnote 4 standardises
+    /// process noise using only strictly positive `asymDIFFUSION`.
+    StandardisedDiscreteDiffusionRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 unstandardised `discreteDIFFUSION` `Q_Δt` was
+    /// treated as `discreteDIFFUSIONstd`. Unstandardised `Q_Δt` is
+    /// defined for growing or zero-diffusion processes; standardised
+    /// `DIFFUSION` is not.
+    UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion,
+    /// Driver continuous `DIFFUSION` standardisation `q / (−q / (2 a))`
+    /// was treated as p. 16 `discreteDIFFUSIONstd`. `−2 a` is not
+    /// `Q_Δt / (−q / (2 a))`.
+    StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion,
+    /// Driver §7.1 trait-contaminated process noise
+    /// `Q_Δt / (trait + p + added)` was treated as p. 16
+    /// `discreteDIFFUSIONstd`. Footnote 4 uses only `asymDIFFUSION`,
+    /// not `TRAITVAR`.
+    TraitContaminatedProcessNoiseIsNotStandardisedDiscreteDiffusion,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1213,6 +1231,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::TraitVarianceIsNotStandardisationVariance => {
                 "trait variance is not the standardisation variance"
+            }
+            Self::StandardisedDiscreteDiffusionRequiresPositiveWithinSubjectVariance => {
+                "standardised discrete DIFFUSION requires strictly positive within-subject variance"
+            }
+            Self::UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion => {
+                "unstandardised discrete DIFFUSION is not standardised discrete DIFFUSION"
+            }
+            Self::StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion => {
+                "standardised continuous DIFFUSION is not standardised discrete DIFFUSION"
+            }
+            Self::TraitContaminatedProcessNoiseIsNotStandardisedDiscreteDiffusion => {
+                "trait-contaminated process noise is not standardised discrete DIFFUSION"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2101,30 @@ mod tests {
         assert_eq!(
             PsychometricError::TraitVarianceIsNotStandardisationVariance.to_string(),
             "trait variance is not the standardisation variance"
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_diffusion_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteDiffusionRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised discrete DIFFUSION requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion
+                .to_string(),
+            "unstandardised discrete DIFFUSION is not standardised discrete DIFFUSION"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion
+                .to_string(),
+            "standardised continuous DIFFUSION is not standardised discrete DIFFUSION"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedProcessNoiseIsNotStandardisedDiscreteDiffusion
+                .to_string(),
+            "trait-contaminated process noise is not standardised discrete DIFFUSION"
         );
     }
 }

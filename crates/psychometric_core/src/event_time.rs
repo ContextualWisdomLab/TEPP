@@ -547,6 +547,131 @@ pub fn refuse_trait_variance_as_standardisation_variance(
     Err(PsychometricError::TraitVarianceIsNotStandardisationVariance)
 }
 
+/// Exact scalar p. 16 `discreteDIFFUSIONstd` after strictly positive
+/// `asymDIFFUSION`.
+///
+/// Driver, Oud, and Voelkle (2017, p. 16; Eq. 3–4, pp. 4–5; footnote 4;
+/// §7.1, pp. 18–19; JSS PDF re-opened 2026-08-23T13:06Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// print discrete-time transformations for a chosen event interval
+/// (`discreteDRIFT`, `discreteDIFFUSION`) and, when appropriate,
+/// standardised matrices with the suffix `std`. Footnote 4:
+/// standardisations use only the relevant variance, not the total.
+/// Process noise is within-subject stochastic input, so that relevant
+/// variance is `asymDIFFUSION`, the same footnote 4 variance used
+/// for `DRIFT`. The scalar Lyapunov solution is `−q / (2 a)` for
+/// stable `a < 0`. Form that strictly positive within-subject
+/// variance first, then `Q_Δt` from Equation 4, then
+/// `Q_Δt / (−q / (2 a))`. In the scalar stationary case that ratio
+/// equals `1 − exp(2 a Δt)`. Unstandardised `Q_Δt` is defined for
+/// growing `a ≥ 0` and for zero diffusion; standardised `DIFFUSION`
+/// is not. Zero `asymDIFFUSION` has no positive SD and fails closed.
+/// The continuous standardisation `q / (−q / (2 a)) = −2 a` is not
+/// the discrete map. Section 7.1 warns that omitting trait variance
+/// confounds between- and within-person information.
+/// `Q_Δt / (trait + p + added)` uses the total, not
+/// `asymDIFFUSION`, and is not this map when `TRAITVAR` is nonzero.
+/// `TRAITVAR` is not the standardisation variance. This is not a
+/// Kalman filter, not a matrix `expm`, not DSEM, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_stationary_latent_variance`] and
+/// [`recover_discrete_process_noise`]. Returns
+/// [`PsychometricError::EventTimeRequired`] for any non-event clock,
+/// [`PsychometricError::NonPositiveInterval`] when `event_delta` is
+/// not strictly positive,
+/// [`PsychometricError::StationaryVarianceRequiresStableDrift`] when
+/// the log-rate is not strictly negative,
+/// [`PsychometricError::StandardisedDiscreteDiffusionRequiresPositiveWithinSubjectVariance`]
+/// when `asymDIFFUSION` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite or the mapped ratio is non-finite.
+pub fn recover_standardised_discrete_diffusion(
+    continuous_diffusion: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let within = recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?;
+    if within == 0.0 {
+        return Err(
+            PsychometricError::StandardisedDiscreteDiffusionRequiresPositiveWithinSubjectVariance,
+        );
+    }
+    let process_noise =
+        recover_discrete_process_noise(continuous_diffusion, log_rate, event_delta, clock)?;
+    require_finite(process_noise / within)
+}
+
+/// Refuse treating unstandardised `discreteDIFFUSION` as p. 16
+/// `discreteDIFFUSIONstd`.
+///
+/// `Q_Δt` is defined for growing and zero-diffusion processes.
+/// Footnote 4 `discreteDIFFUSIONstd` requires strictly positive
+/// `asymDIFFUSION`. Equal numbers would still be distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion`].
+pub fn refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion(
+    unstandardised_discrete_diffusion: f64,
+    standardised_discrete_diffusion: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_discrete_diffusion,
+        standardised_discrete_diffusion,
+    );
+    Err(PsychometricError::UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion)
+}
+
+/// Refuse treating continuous `DIFFUSION` standardisation as p. 16
+/// `discreteDIFFUSIONstd`.
+///
+/// `q / (−q / (2 a)) = −2 a` standardises the continuous diffusion
+/// against `asymDIFFUSION`. Footnote 4 `discreteDIFFUSIONstd` is
+/// `Q_Δt / (−q / (2 a))`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion`].
+pub fn refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion(
+    standardised_continuous_diffusion: f64,
+    standardised_discrete_diffusion: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_continuous_diffusion,
+        standardised_discrete_diffusion,
+    );
+    Err(PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion)
+}
+
+/// Refuse treating Driver §7.1 trait-contaminated process noise as
+/// p. 16 `discreteDIFFUSIONstd`.
+///
+/// `Q_Δt / (trait + p + added)` mixes between-subject `TRAITVAR`
+/// into the process-noise ratio. Footnote 4 standardises `DIFFUSION`
+/// using only `asymDIFFUSION`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TraitContaminatedProcessNoiseIsNotStandardisedDiscreteDiffusion`].
+pub fn refuse_trait_contaminated_process_noise_as_standardised_discrete_diffusion(
+    trait_contaminated_process_noise: f64,
+    standardised_discrete_diffusion: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        trait_contaminated_process_noise,
+        standardised_discrete_diffusion,
+    );
+    Err(PsychometricError::TraitContaminatedProcessNoiseIsNotStandardisedDiscreteDiffusion)
+}
+
 /// Recover the exact scalar pair `(φ, a)` on event time.
 ///
 /// # Errors
@@ -8413,14 +8538,14 @@ mod tests {
         recover_predetermined_later_latent_variance, recover_predetermined_later_observed_variance,
         recover_predetermined_later_start_later_latent_variance,
         recover_predetermined_later_start_later_observed_variance,
-        recover_standardised_discrete_drift, recover_stationary_initial_latent_mean,
-        recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-        recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-        recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-        recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate,
+        recover_standardised_discrete_diffusion, recover_standardised_discrete_drift,
+        recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+        recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+        recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+        recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+        recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -8530,6 +8655,7 @@ mod tests {
         refuse_predetermined_later_start_later_latent_variance_as_observed_variance,
         refuse_predetermined_later_start_later_latent_variance_as_stationary_later_latent_variance,
         refuse_process_noise_as_unconditional_variance,
+        refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
         refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -8571,11 +8697,13 @@ mod tests {
         refuse_time_independent_effect_as_time_varying_discrete_effect,
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+        refuse_trait_contaminated_process_noise_as_standardised_discrete_diffusion,
         refuse_trait_plus_state_autocorrelation_as_standardised_discrete_drift,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_standardisation_variance,
         refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
+        refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion,
         refuse_unstandardised_discrete_drift_as_standardised_discrete_drift,
     };
     use crate::error::PsychometricError;
@@ -24334,6 +24462,138 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_discrete_drift(0.4, -800.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_diffusion_recovers_driver_page_sixteen_after_positive_asymdiffusion() {
+        // Driver et al. (2017, p. 16 discreteDIFFUSIONstd; Eq. 4; footnote 4):
+        // form strictly positive asymDIFFUSION = −q / (2 a), then
+        // Q_Δt / p. Scalar stationary ratio is 1 − exp(2 a Δt).
+        let diffusion = 0.4_f64;
+        let log_rate = -0.5_f64;
+        let event_delta = 1.0_f64;
+        let recovered = recover_standardised_discrete_diffusion(
+            diffusion,
+            log_rate,
+            event_delta,
+            LagClock::EventTime,
+        )
+        .expect("discreteDIFFUSIONstd");
+        let process_noise =
+            recover_discrete_process_noise(diffusion, log_rate, event_delta, LagClock::EventTime)
+                .expect("discreteDIFFUSION");
+        let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        assert!(within > 0.0);
+        assert!((recovered - (process_noise / within)).abs() < 1e-15);
+        let one_minus_phi_sq = 1.0 - (2.0 * log_rate * event_delta).exp();
+        assert!((recovered - one_minus_phi_sq).abs() < 1e-15);
+        let two_and_a_half =
+            recover_standardised_discrete_diffusion(diffusion, log_rate, 2.5, LagClock::EventTime)
+                .expect("discreteDIFFUSIONstd Δt=2.5");
+        assert!((two_and_a_half - (1.0 - (2.0 * log_rate * 2.5).exp())).abs() < 1e-15);
+        assert!((recovered - two_and_a_half).abs() > 1e-9);
+        let continuous_std = diffusion / within;
+        assert!((continuous_std - recovered).abs() > 1e-3);
+        let trait_variance = 1.0_f64;
+        let total = recover_trait_plus_state_latent_variance(trait_variance, within)
+            .expect("trait+state var");
+        let contaminated = process_noise / total;
+        assert!((contaminated - recovered).abs() > 1e-3);
+        assert_eq!(
+            refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion(
+                process_noise,
+                recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion
+            )
+        );
+        assert_eq!(
+            refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion(
+                continuous_std,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion
+            )
+        );
+        assert_eq!(
+            refuse_trait_contaminated_process_noise_as_standardised_discrete_diffusion(
+                contaminated,
+                recovered
+            ),
+            Err(PsychometricError::TraitContaminatedProcessNoiseIsNotStandardisedDiscreteDiffusion)
+        );
+        assert_eq!(
+            refuse_trait_variance_as_standardisation_variance(trait_variance, within),
+            Err(PsychometricError::TraitVarianceIsNotStandardisationVariance)
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_diffusion_fails_closed_when_unstandardised_is_defined() {
+        let log_rate = -0.5_f64;
+        let event_delta = 1.0_f64;
+        let unstandardised_zero_q =
+            recover_discrete_process_noise(0.0, log_rate, event_delta, LagClock::EventTime)
+                .expect("Q_Δt at q=0");
+        assert!((unstandardised_zero_q - 0.0).abs() < 1e-15);
+        assert_eq!(
+            recover_standardised_discrete_diffusion(0.0, log_rate, event_delta, LagClock::EventTime),
+            Err(
+                PsychometricError::StandardisedDiscreteDiffusionRequiresPositiveWithinSubjectVariance
+            )
+        );
+        let growing = recover_discrete_process_noise(0.4, 0.5, event_delta, LagClock::EventTime)
+            .expect("growing a>0");
+        assert!(growing.is_finite() && growing > 0.0);
+        assert_eq!(
+            recover_standardised_discrete_diffusion(0.4, 0.5, event_delta, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        let unit = recover_discrete_process_noise(0.4, 0.0, event_delta, LagClock::EventTime)
+            .expect("a=0");
+        assert!((unit - 0.4).abs() < 1e-15);
+        assert_eq!(
+            recover_standardised_discrete_diffusion(0.4, 0.0, event_delta, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_discrete_diffusion(
+                0.4,
+                log_rate,
+                event_delta,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_discrete_diffusion(0.4, log_rate, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_standardised_discrete_diffusion(0.4, log_rate, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_standardised_discrete_diffusion(
+                -0.1,
+                log_rate,
+                event_delta,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_discrete_diffusion(
+                0.4,
+                f64::NAN,
+                event_delta,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
