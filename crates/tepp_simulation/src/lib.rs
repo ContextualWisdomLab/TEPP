@@ -30,6 +30,8 @@ pub use document_process::SimulatedMembership;
 pub use document_process::delayed_clocks;
 /// Membership role vocabulary helper.
 pub use document_process::membership_role_at;
+/// Refuse a document that is not yet available at the cutoff.
+pub use document_process::refuse_unavailable_document;
 /// Fail-closed simulation errors.
 pub use error::SimulationError;
 /// Latent event truth row.

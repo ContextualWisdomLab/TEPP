@@ -6,6 +6,7 @@ use crate::latent_event::LatentEvent;
 use crate::relation_process::{ObservedRelation, TrueRelation};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+use temporal_core::KnowledgeCutoff;
 
 /// Immutable known-truth corpus bound to an explicit seed and content digest.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -95,6 +96,18 @@ impl TruthManifest {
     #[must_use]
     pub fn document_count(&self) -> usize {
         self.documents.len()
+    }
+
+    /// Documents whose availability time is not after `cutoff`.
+    #[must_use]
+    pub fn documents_eligible_at_cutoff(
+        &self,
+        cutoff: &KnowledgeCutoff,
+    ) -> Vec<&SimulatedDocument> {
+        self.documents
+            .iter()
+            .filter(|document| document.available_time().instant() <= cutoff.instant())
+            .collect()
     }
 
     /// Verify scientific invariants required of every truth corpus.
