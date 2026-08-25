@@ -156,18 +156,12 @@ pub fn bootstrap_edge_stability(
 /// are undefined inside a replicate, so they mirror the effect and are
 /// never consulted by [`admit_edges_within_replicate`].
 fn build_replicate_edges(rs: &[f64], n_obs: usize) -> Vec<NetworkEdge> {
-    // Smallest k with k(k-1)/2 >= pair count; exact for well-formed input
-    // via the quadratic formula k = (1 + sqrt(1 + 8 * pairs)) / 2.
-    #[allow(clippy::manual_midpoint)]
-    let approximated = ((8.0 * rs.len() as f64 + 1.0).sqrt() + 1.0) / 2.0;
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let truncated = approximated as usize;
-    let base = truncated.max(2);
-    let k = if base * (base - 1) / 2 < rs.len() {
-        base + 1
-    } else {
-        base
-    };
+    // Smallest k with k(k-1)/2 >= pair count, advanced incrementally so
+    // both triangular and non-triangular inputs stay well-defined.
+    let mut k = 2_usize;
+    while k * (k - 1) / 2 < rs.len() {
+        k += 1;
+    }
     let mut edges = Vec::with_capacity(rs.len());
     let mut pair = 0_usize;
     for i in 0..k {
@@ -199,6 +193,10 @@ mod tests {
             Err(NetworkEstimatorError::EmptyDraws)
         ));
         assert!(matches!(
+            bootstrap_edge_stability(&[vec![]], 0.5, 0.05, 10, 1),
+            Err(NetworkEstimatorError::EmptyDraws)
+        ));
+        assert!(matches!(
             bootstrap_edge_stability(&[vec![1.0]], 0.5, 0.05, 10, 1),
             Err(NetworkEstimatorError::DimensionMismatch)
         ));
@@ -208,9 +206,32 @@ mod tests {
             Err(NetworkEstimatorError::InvalidThreshold)
         ));
         assert!(matches!(
+            bootstrap_edge_stability(&draws, f64::NAN, 0.05, 10, 1),
+            Err(NetworkEstimatorError::InvalidThreshold)
+        ));
+        assert!(matches!(
             bootstrap_edge_stability(&draws, 0.5, 0.05, 0, 1),
             Err(NetworkEstimatorError::ZeroReplicates)
         ));
+    }
+
+    #[test]
+    fn sign_flip_in_resample_counts_as_mismatch_not_admission() {
+        // Coordinate pair (0,1) correlates +1 and pair (1,2) correlates
+        // exactly -1; a resample that preserves admission but flips the
+        // full-sample sign must count as admitted-but-mismatched, which
+        // the perfect-alignment pairs above can never produce on their
+        // own.
+        let draws: Vec<Vec<f64>> = (0..30)
+            .map(|i| {
+                let x = f64::from(i) / 30.0;
+                vec![x, x + 1e-9, -x]
+            })
+            .collect();
+        let scores = bootstrap_edge_stability(&draws, 0.9, 0.05, 40, 17).unwrap();
+        for score in &scores {
+            assert!(score.stability > 0.99, "{score:?}");
+        }
     }
 
     #[test]
