@@ -44,6 +44,8 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Rubin total-variance doctoring | [`docs/research/rubin-total-variance.md`](docs/research/rubin-total-variance.md) |
 | Strong-invariance latent-mean doctoring | [`docs/research/strong-invariance-latent-means.md`](docs/research/strong-invariance-latent-means.md) |
 | Mention-confidence Brier doctoring | [`docs/research/mention-confidence-brier.md`](docs/research/mention-confidence-brier.md) |
+| Span-grounded mention extent doctoring | [`docs/research/span-grounded-mentions.md`](docs/research/span-grounded-mentions.md) |
+| Span-grounded mention numeric provenance | [`docs/doctoring/span-grounded-mentions.md`](docs/doctoring/span-grounded-mentions.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
 | TDT link-detection precision/recall doctoring | [`docs/research/event-link-detection-calibration.md`](docs/research/event-link-detection-calibration.md) |
 | First-story detection FAR/miss doctoring | [`docs/research/first-story-detection-calibration.md`](docs/research/first-story-detection-calibration.md) |
@@ -61,6 +63,8 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Relation absence is not negative evidence | [`docs/research/relation-absence-not-negative.md`](docs/research/relation-absence-not-negative.md) |
 | Adaptive orchestration router doctoring | [`docs/research/adaptive-orchestration-router.md`](docs/research/adaptive-orchestration-router.md) |
 | Mention-confidence Brier doctoring | [`docs/research/mention-confidence-brier.md`](docs/research/mention-confidence-brier.md) |
+| Span-grounded mention extent doctoring | [`docs/research/span-grounded-mentions.md`](docs/research/span-grounded-mentions.md) |
+| Span-grounded mention numeric provenance | [`docs/doctoring/span-grounded-mentions.md`](docs/doctoring/span-grounded-mentions.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
 | Stopword-deletion doctoring | [`docs/research/stopword-deletion.md`](docs/research/stopword-deletion.md) |
 | Topic log-ratio coordinate doctoring | [`docs/research/topic-logratio-coordinates.md`](docs/research/topic-logratio-coordinates.md) |
@@ -131,6 +135,8 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Actions workflow fleet audit | [`docs/operations/ACTIONS_WORKFLOW_FLEET.md`](docs/operations/ACTIONS_WORKFLOW_FLEET.md) |
 | Actions fleet research doctoring | [`docs/research/actions-workflow-fleet.md`](docs/research/actions-workflow-fleet.md) |
 | Mention-confidence Brier doctoring | [`docs/research/mention-confidence-brier.md`](docs/research/mention-confidence-brier.md) |
+| Span-grounded mention extent doctoring | [`docs/research/span-grounded-mentions.md`](docs/research/span-grounded-mentions.md) |
+| Span-grounded mention numeric provenance | [`docs/doctoring/span-grounded-mentions.md`](docs/doctoring/span-grounded-mentions.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
 | VRAM budget / GPU fallback doctoring | [`docs/research/vram-budget-types.md`](docs/research/vram-budget-types.md) |
 | Causal-identification gate doctoring | [`docs/research/causal-identification-gate.md`](docs/research/causal-identification-gate.md) |

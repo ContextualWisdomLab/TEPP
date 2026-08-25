@@ -1,6 +1,7 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
 **Decision status:** Accepted  
+**Implementation maturity:** active-PR — span-grounded mentions with exact-extent precision/recall and cutoff-safe six-clock evidence live in existing `event_core`; remaining unified TDT/CHRONOS workflow, interval consistency, persistence, and exports remain accepted-target
 **Implementation maturity:** active-PR — evidence-layer admission, TDT link precision/recall, and detection-versus-instance refusal live in existing `event_core`, alongside the bounded predicted-vs-observed Allen promotion gate whose coverage authorization precedes any unmatched predicted mass; full TDT tracking/calibration and CHRONOS schema extraction/prediction layers remain accepted-target  
 **Implementation maturity:** active-PR — evidence-layer admission, first-story false-alarm/miss rates, and detection-versus-instance refusal live in existing `event_core`, alongside the bounded predicted-vs-observed Allen promotion gate whose coverage authorization precedes any unmatched predicted mass; full TDT tracking/calibration and CHRONOS schema extraction/prediction layers remain accepted-target  
 **Date:** 2026-08-12  

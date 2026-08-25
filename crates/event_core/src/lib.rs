@@ -12,7 +12,10 @@
 //! artifacts until independently promoted. Track assignments, story
 //! segmentations, CHRONOS schema-slot predictions, and occurrence forecasts
 //! remain measurement or hypothesis artifacts and cannot promote an instance
-//! without an explicit evidence-backed promotion gate.
+//! without an explicit evidence-backed promotion gate. Span-grounded mentions
+//! cite exact source extents, six-clock evidence, extractor version, and
+//! review status, and they remain observed evidence until independently
+//! promoted.
 
 mod confidence;
 mod error;
@@ -27,6 +30,7 @@ mod registry;
 mod role;
 mod schema;
 mod segment;
+mod span_mention;
 mod track;
 
 /// Finite confidence on the closed unit interval.
@@ -131,6 +135,18 @@ pub use segment::story_boundary_recall;
 pub use segment::story_pk;
 /// Pevzner–Hearst `WindowDiff` against a known-truth segmentation.
 pub use segment::story_window_diff;
+/// Six-clock evidence bound to one mention.
+pub use span_mention::MentionEvidenceClocks;
+/// Proposed-versus-reviewed mention inspection status.
+pub use span_mention::MentionReviewStatus;
+/// Fallible mention grounded in one exact source extent.
+pub use span_mention::SpanGroundedMention;
+/// Precision of recovered mention extents against known truth.
+pub use span_mention::mention_span_precision;
+/// Recall of recovered mention extents against known truth.
+pub use span_mention::mention_span_recall;
+/// Explicit refusal to treat a span-grounded mention as an instance.
+pub use span_mention::refuse_span_mention_as_instance;
 /// Assignment of one mention to one hypothesized TDT track.
 pub use track::EventTrackAssignment;
 /// Opaque TDT track identity.
