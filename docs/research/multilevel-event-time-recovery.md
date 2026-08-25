@@ -104,11 +104,11 @@ This slice stays inside `psychometric_core`. It does not add a second invariance
 98. refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`, refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd` even when both equal 1, and refuse treating `τ / √(λ² Var(η) + θ)` as `MANIFESTMEANSstd`;
 99. recover the exact scalar p. 16 `CINTstd` as `κ / √p` after forming strictly positive `asymDIFFUSION` `p = −q / (2 a)` (Driver et al., 2017, p. 16; footnote 4; Eq. 1, p. 4; Table 2, p. 12; §7.1; JSS PDF re-opened 2026-08-25T11:43Z; form `p` first, then `κ / √p`; a zero intercept is exactly zero after that positive SD; `q = 0` fails closed; a non-event clock fails closed; `a ≥ 0` fails closed);
 100. refuse treating unstandardised `CINT` as `CINTstd`, refuse treating `asymCINTstd` `(-κ / a) / √p` as `CINTstd`, refuse treating `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p` as `CINTstd`, and refuse treating `κ / √(trait + p + added)` as `CINTstd`;
-87. refuse pooling discrete lags from unequal event intervals as one coefficient;
-88. refuse unmatched sampling and constancy intervals for a time-varying predictor (Oud & Jansen, 2000, unread);
-89. refuse the difference quotient as a continuous-time rate;
-90. apply the same event-time map to CWC residuals (still not DSEM);
-89. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608).
+101. refuse pooling discrete lags from unequal event intervals as one coefficient;
+102. refuse unmatched sampling and constancy intervals for a time-varying predictor (Oud & Jansen, 2000, unread);
+103. refuse the difference quotient as a continuous-time rate;
+104. apply the same event-time map to CWC residuals (still not DSEM);
+105. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608).
 
 ## Claim boundary
 

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tepp.local/schemas/lineage_criterion_anchor_v1.json",
+  "title": "LineageCriterionAnchorV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "anchor_kind_code",
+    "estimation_run_id",
+    "source_snapshot_sha256",
+    "knowledge_cutoff",
+    "criterion_validity_status",
+    "validated_pair_count"
+  ],
+  "properties": {
+    "contract_version": { "type": "integer", "const": 1 },
+    "anchor_kind_code": { "type": "string", "const": "lineage_pair_criterion" },
+    "estimation_run_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "source_snapshot_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "knowledge_cutoff": { "type": "string", "format": "date-time" },
+    "criterion_validity_status": {
+      "type": "string",
+      "enum": ["accepted", "rejected"]
+    },
+    "validated_pair_count": { "type": "integer", "minimum": 1 }
+  }
+}
