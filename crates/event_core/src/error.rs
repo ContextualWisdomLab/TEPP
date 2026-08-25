@@ -24,6 +24,10 @@ pub enum EventError {
     DetectionIsNotTransition,
     /// A CHRONOS prediction was treated as an observed or promoted fact.
     PredictionIsNotFact,
+    /// A first-story detection was treated as an event instance.
+    FirstStoryIsNotEventInstance,
+    /// An unknown first-story label name was supplied.
+    UnknownFirstStoryLabel,
     /// A TDT track assignment was treated as an event instance.
     EventTrackIsNotEventInstance,
     /// A TDT track assignment was treated as a state transition.
@@ -60,6 +64,8 @@ impl fmt::Display for EventError {
             Self::UnknownEventRole => "unknown event role",
             Self::DetectionIsNotTransition => "detection is not a state transition",
             Self::PredictionIsNotFact => "prediction is not an observed fact",
+            Self::FirstStoryIsNotEventInstance => "first-story detection is not an event instance",
+            Self::UnknownFirstStoryLabel => "unknown first-story label",
             Self::EventTrackIsNotEventInstance => "event track is not an event instance",
             Self::EventTrackIsNotStateTransition => "event track is not a state transition",
             Self::UnknownEventTrackLabel => "unknown event track label",
@@ -121,6 +127,12 @@ mod tests {
                 "prediction is not an observed fact",
             ),
             (
+                EventError::FirstStoryIsNotEventInstance,
+                "first-story detection is not an event instance",
+            ),
+            (
+                EventError::UnknownFirstStoryLabel,
+                "unknown first-story label",
                 EventError::EventTrackIsNotEventInstance,
                 "event track is not an event instance",
             ),
