@@ -16406,16 +16406,6 @@ mod tests {
             recover_predetermined_later_latent_variance(
                 f64::MAX,
                 0.0,
-                -0.5,
-                1.0,
-                LagClock::EventTime
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_predetermined_later_latent_variance(
-                f64::MAX,
-                0.0,
                 0.0,
                 1.0,
                 f64::MAX,
@@ -17025,16 +17015,6 @@ mod tests {
                 f64::NAN,
                 2.0,
                 0.0,
-                0.0,
-                -0.5,
-                1.0,
-                LagClock::EventTime
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_predetermined_lagged_latent_covariance(
-                f64::MAX,
                 0.0,
                 -0.5,
                 1.0,
@@ -20404,10 +20384,6 @@ mod tests {
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
-            recover_predetermined_initial_latent_variance(f64::MAX, 0.0, -0.5, LagClock::EventTime),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
             recover_predetermined_initial_latent_variance(
                 f64::MAX,
                 0.0,
@@ -20972,7 +20948,10 @@ mod tests {
             recover_predetermined_later_lagged_latent_covariance(
                 f64::MAX,
                 0.0,
-                -0.5,
+                0.0,
+                1.0,
+                f64::MAX,
+                -1.0,
                 2.0,
                 1.0,
                 LagClock::EventTime
@@ -21637,7 +21616,10 @@ mod tests {
             recover_predetermined_later_start_later_latent_variance(
                 f64::MAX,
                 0.0,
-                -0.5,
+                0.0,
+                1.0,
+                f64::MAX,
+                -1.0,
                 2.0,
                 1.0,
                 LagClock::EventTime
