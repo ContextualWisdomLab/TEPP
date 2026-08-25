@@ -97,10 +97,13 @@ pub fn consensus_clusters(
     let mut co_count = vec![vec![0_u64; k_topics]; k_topics];
 
     for _ in 0..n_replicates {
-        // Perturb: drop each edge independently with the caller-supplied
-        // probability so cluster recovery is stress-tested by resampling.
+        // Perturb: drop each surviving positive edge independently with
+        // the caller-supplied probability so cluster recovery is
+        // stress-tested by resampling. Negative-effect edges are not
+        // part of the partition graph at all, matching the adjacency.
         let perturbed: Vec<&NetworkEdge> = edges
             .iter()
+            .filter(|edge| edge.effect > 0.0)
             .filter(|_| {
                 state = state
                     .wrapping_mul(6_364_136_223_846_793_005)
@@ -248,6 +251,10 @@ mod tests {
             Err(NetworkEstimatorError::InvalidProbability)
         ));
         assert!(matches!(
+            consensus_clusters(&chain, 3, 5, f64::NAN, 0.1, 1),
+            Err(NetworkEstimatorError::InvalidProbability)
+        ));
+        assert!(matches!(
             consensus_clusters(&chain, 3, 5, 0.5, 1.0, 1),
             Err(NetworkEstimatorError::InvalidProbability)
         ));
@@ -255,6 +262,30 @@ mod tests {
             consensus_clusters(&chain, 3, 5, 0.5, f64::NAN, 1),
             Err(NetworkEstimatorError::InvalidProbability)
         ));
+    }
+
+    #[test]
+    fn negative_effect_edges_never_join_the_graph() {
+        // Only the positive edge is admitted to the perturbation graph;
+        // the negative edge contributes no adjacency, so topic 2 stays
+        // unclustered even though it appears in the input.
+        let mixed = vec![edge(0, 1, 0.95), edge(1, 2, -0.95)];
+        let output = consensus_clusters(&mixed, 3, 40, 0.9, 0.0, 13).unwrap();
+        assert_eq!(output.assignments[0], output.assignments[1]);
+        assert!(output.assignments[0].is_some());
+        assert_eq!(output.assignments[2], None);
+    }
+
+    #[test]
+    fn redundant_edges_between_clustered_topics_are_harmless() {
+        // A duplicate edge forces the union step onto an already-merged
+        // pair; output must stay identical to the simple-chain case.
+        let chain = vec![edge(0, 1, 0.95), edge(1, 2, 0.9)];
+        let duplicated = vec![edge(0, 1, 0.95), edge(1, 2, 0.9), edge(0, 2, 0.8)];
+        let plain = consensus_clusters(&chain, 3, 20, 0.99, 0.0, 31).unwrap();
+        let doubled = consensus_clusters(&duplicated, 3, 20, 0.99, 0.0, 31).unwrap();
+        assert_eq!(plain.assignments, doubled.assignments);
+        assert_eq!(plain.co_assignment, doubled.co_assignment);
     }
 
     #[test]

@@ -75,9 +75,11 @@ pub(crate) fn erfc_nonnegative(x: f64) -> f64 {
         return 1.0;
     }
     if x < 3.0 {
-        // Confluent all-positive series for erf(x); the final subtraction
-        // loses at most ~1e-11 relative accuracy at the branch point,
-        // which known-truth tests lock below.
+        // Confluent all-positive series for erf(x). For every x < 3 the
+        // term ratio 2x^2/(2k+1) drops below one by k = 9 and decays
+        // geometrically afterwards, so termination needs no iteration
+        // cap; the final subtraction loses at most ~1e-11 relative
+        // accuracy at the branch point, which known-truth tests lock.
         let xx = x * x;
         let mut term = 1.0_f64;
         let mut sum = 1.0_f64;
@@ -86,7 +88,7 @@ pub(crate) fn erfc_nonnegative(x: f64) -> f64 {
             k += 1.0;
             term *= 2.0 * xx / (2.0 * k + 1.0);
             sum += term;
-            if term <= sum * 1e-18 || k >= 500.0 {
+            if term <= sum * 1e-18 {
                 break;
             }
         }
@@ -116,12 +118,14 @@ pub(crate) fn erfc_nonnegative(x: f64) -> f64 {
 /// normal under the null (Fisher, 1921), so the two-sided p-value is
 /// `erfc(|z| / sqrt(2))`.
 pub(crate) fn fisher_two_sided_p_value(r: f64, n_obs: usize) -> f64 {
+    // A non-finite finite-sample statistic is not evidence; fail to the
+    // neutral p-value instead of letting NaN masquerade as |r| = 1.
+    if r.is_nan() || n_obs < 4 {
+        return 1.0;
+    }
     let magnitude = r.abs().min(1.0);
     if magnitude >= 1.0 {
         return 0.0;
-    }
-    if n_obs < 4 || !magnitude.is_finite() {
-        return 1.0;
     }
     let z = magnitude.atanh() * ((n_obs - 3) as f64).sqrt();
     erfc_nonnegative(z / std::f64::consts::SQRT_2)
@@ -129,16 +133,18 @@ pub(crate) fn fisher_two_sided_p_value(r: f64, n_obs: usize) -> f64 {
 
 /// Type-7 linear-interpolation quantile of an ascending-sorted sample.
 fn sorted_quantile(sorted: &[f64], probability: f64) -> f64 {
-    let last = sorted.len() - 1;
-    let position = probability * last as f64;
     #[allow(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
         clippy::cast_precision_loss
     )]
-    let lower_index = position.floor() as usize;
-    let upper_index = (lower_index + 1).min(last);
-    let weight = position - lower_index as f64;
+    let lower_index = {
+        let position = probability * (sorted.len() - 1) as f64;
+        let floor_index = position.floor() as usize;
+        floor_index.min(sorted.len() - 1)
+    };
+    let upper_index = (lower_index + 1).min(sorted.len() - 1);
+    let weight = probability * (sorted.len() - 1) as f64 - lower_index as f64;
     sorted[lower_index] * (1.0 - weight) + sorted[upper_index] * weight
 }
 
@@ -269,18 +275,19 @@ pub fn admit_edges(
     fdr_alpha: f64,
 ) -> Vec<NetworkEdge> {
     edges.sort_by(|a, b| a.p_value.total_cmp(&b.p_value));
-    let total = edges.len();
-    if total > 0 {
-        let mut largest_passing_rank = 0_usize;
-        for (rank_zero, edge) in edges.iter().enumerate() {
-            let rank = rank_zero + 1;
-            let critical = fdr_alpha * rank as f64 / total as f64;
-            if edge.p_value <= critical {
-                largest_passing_rank = rank;
-            }
-        }
-        edges.truncate(largest_passing_rank);
+    if edges.is_empty() {
+        return edges;
     }
+    let total = edges.len();
+    let mut largest_passing_rank = 0_usize;
+    for (rank_zero, edge) in edges.iter().enumerate() {
+        let rank = rank_zero + 1;
+        let critical = fdr_alpha * rank as f64 / total as f64;
+        if edge.p_value <= critical {
+            largest_passing_rank = rank;
+        }
+    }
+    edges.truncate(largest_passing_rank);
     edges.retain(|edge| {
         edge.lower * edge.upper > 0.0 && edge.selection_probability >= min_selection_probability
     });
@@ -300,19 +307,20 @@ pub fn admit_edges_within_replicate(
     fdr_alpha: f64,
 ) -> Vec<NetworkEdge> {
     edges.retain(|edge| edge.effect.abs() >= admission_threshold);
+    if edges.is_empty() {
+        return edges;
+    }
     edges.sort_by(|a, b| a.p_value.total_cmp(&b.p_value));
     let total = edges.len();
-    if total > 0 {
-        let mut largest_passing_rank = 0_usize;
-        for (rank_zero, edge) in edges.iter().enumerate() {
-            let rank = rank_zero + 1;
-            let critical = fdr_alpha * rank as f64 / total as f64;
-            if edge.p_value <= critical {
-                largest_passing_rank = rank;
-            }
+    let mut largest_passing_rank = 0_usize;
+    for (rank_zero, edge) in edges.iter().enumerate() {
+        let rank = rank_zero + 1;
+        let critical = fdr_alpha * rank as f64 / total as f64;
+        if edge.p_value <= critical {
+            largest_passing_rank = rank;
         }
-        edges.truncate(largest_passing_rank);
     }
+    edges.truncate(largest_passing_rank);
     edges
 }
 
@@ -439,11 +447,7 @@ mod tests {
         ];
         for (argument, expected) in references {
             let computed = erfc_nonnegative(argument);
-            let relative_error = if expected == 0.0 {
-                computed.abs()
-            } else {
-                ((computed - expected) / expected).abs()
-            };
+            let relative_error = ((computed - expected) / expected).abs();
             assert!(
                 relative_error < 1e-13,
                 "erfc({argument}) = {computed}, expected {expected}"
@@ -451,6 +455,20 @@ mod tests {
         }
         assert_eq!(
             erfc_nonnegative(0.0).total_cmp(&1.0),
+            std::cmp::Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn fisher_p_value_guards_fail_closed() {
+        // Fewer than four paired observations cannot support the
+        // sqrt(n-3) transform; a non-finite correlation has no evidence.
+        assert_eq!(
+            fisher_two_sided_p_value(0.5, 3).total_cmp(&1.0),
+            std::cmp::Ordering::Equal
+        );
+        assert_eq!(
+            fisher_two_sided_p_value(f64::NAN, 30).total_cmp(&1.0),
             std::cmp::Ordering::Equal
         );
     }
@@ -495,7 +513,8 @@ mod tests {
         // Strong signal must carry decisive evidence on every axis.
         assert!(edges[0].p_value < 1e-20, "p(0,1) = {}", edges[0].p_value);
         assert!((edges[0].selection_probability - 1.0).abs() < f64::EPSILON);
-        assert!(edges[0].lower > 0.9 && edges[0].upper > edges[0].lower);
+        assert!(edges[0].lower > 0.9);
+        assert!(edges[0].upper > edges[0].lower);
         // Independent coordinates keep large p-values.
         let independent = posterior_correlation_matrix(
             &(0..80)
@@ -586,5 +605,59 @@ mod tests {
         let admitted = admit_edges_within_replicate(edges, 0.5, 0.05);
         assert_eq!(admitted.len(), 1);
         assert_eq!(admitted[0].source, 0);
+    }
+
+    #[test]
+    fn empty_admission_inputs_return_empty() {
+        assert!(admit_edges(Vec::new(), 0.5, 0.05).is_empty());
+        assert!(admit_edges_within_replicate(Vec::new(), 0.5, 0.05).is_empty());
+    }
+
+    #[test]
+    fn admission_retains_filter_each_arm_independently() {
+        let make_edge = |source: usize, lower: f64, upper: f64, selection: f64| NetworkEdge {
+            source,
+            target: source + 10,
+            effect: 0.9,
+            lower,
+            upper,
+            p_value: 0.0001,
+            selection_probability: selection,
+        };
+        // Both arms of the retain closure must be exercisable: one edge
+        // fails only the CI-excludes-zero test, one only the selection
+        // floor, and one passes both.
+        let edges = vec![
+            make_edge(0, -0.2, 0.4, 1.0),
+            make_edge(1, 0.5, 0.99, 0.1),
+            make_edge(2, 0.5, 0.99, 1.0),
+        ];
+        let admitted = admit_edges(edges, 0.5, 0.05);
+        assert_eq!(admitted.len(), 1);
+        assert_eq!(admitted[0].source, 2);
+    }
+
+    #[test]
+    fn cross_draw_correlations_fail_closed_on_short_or_ragged_input() {
+        // Fewer than three observations per coordinate cannot correlate.
+        let short = [vec![1.0, 2.0], vec![3.0, 4.0]];
+        assert!(matches!(
+            cross_draw_correlations(&short),
+            Err(NetworkEstimatorError::InsufficientObservations)
+        ));
+        // Ragged columns are a dimension violation, not a silent drop.
+        let ragged = [vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0, 4.0]];
+        assert!(matches!(
+            cross_draw_correlations(&ragged),
+            Err(NetworkEstimatorError::DimensionMismatch)
+        ));
+    }
+
+    #[test]
+    fn degenerate_constant_columns_correlate_as_zero() {
+        let constant = [vec![1.0, 1.0, 1.0, 1.0], vec![2.0, 3.0, 4.0, 5.0]];
+        let rs = cross_draw_correlations(&constant).unwrap();
+        assert_eq!(rs.len(), 1);
+        assert!(rs[0].abs() < f64::EPSILON);
     }
 }
