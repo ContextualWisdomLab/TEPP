@@ -168,7 +168,10 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         normalized = " ".join(text.casefold().split())
         for token in (
             "buyer-visible",
-            "exactly one bounded pull request",
+            "product-technical-gap-baseline.md",
+            "gap id",
+            "never invent weights",
+            "exactly one bounded increment",
             "standalone",
             "modular MSA",
             "ContextualWisdomLab/.github",
@@ -193,9 +196,6 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "Do not release",
             "Do not deploy",
             "Rust",
-            "audit_event",
-            "try_record",
-            "OperationalLogRecord::new",
         ):
             self.assertIn(token.casefold(), normalized)
 
