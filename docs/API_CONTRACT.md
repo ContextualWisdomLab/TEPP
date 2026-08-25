@@ -110,14 +110,24 @@ reference estimator and publishes validated fitted associations and counts in
 checks and protected merge pass.
 
 The separate `tepp.topic_context_posterior.v1` artifact carries per-post
-posterior logistic-normal plausible values, event time, topic activity and
-explicit lineage events, plus provenance-bound time-valid business-unit, PU,
-team, and person memberships. It is the only admitted handoff to the
+posterior logistic-normal plausible values, a declared event clock, opaque
+stable topic identities, artifact-local coordinate order, topic activity,
+explicit topic-lineage events, admitted Event Lineage document relations, and
+provenance-bound time-valid business-unit, PU, team, and person memberships.
+The ordered `topic_ids` array defines coordinate order. Each lineage,
+document-relation, or membership assertion identifies its immutable evidence
+resource, provenance assertion, and digest so consumers can materialize
+normalized qualified provenance. It is the only admitted handoff to the
 fast-mlsirm context-influence estimator. Consumers may not threshold its
 coordinates into binary responses, collapse its draws to an error-free point,
 or substitute labels, keywords, or LineageWeave-local scores.
+Serialization sorts every record collection by its stable identity/time key,
+so input permutations produce the same canonical JSON and SHA-256. The sole
+document-relation kind in v1 is `event_lineage_precedes`; its source document
+event time cannot follow its target document event time.
 The strict DTO/schema is contract-only: the current CPU reference estimator
-does not yet emit posterior draws through this artifact.
+does not yet emit posterior draws through this artifact, and no accepted GPU
+or asynchronous producer result exists.
 The JSON Schema is the bounded record-shape contract. Cross-record invariants
 that require joining opaque document identities—at least two distinct
 documents, a complete document-by-draw grid, and all four time-covering

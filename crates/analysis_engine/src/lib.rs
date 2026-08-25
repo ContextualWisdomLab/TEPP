@@ -29,7 +29,7 @@ use topic_measurement::TopicMeasurementError;
 pub use topic_context_posterior::{
     TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
     TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
-    TopicLineageEvent, TopicPostPlausibleValue,
+    TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue,
 };
 /// Topic-lineage artifact and execution contracts from this engine.
 pub use topic_lineage_artifact::{

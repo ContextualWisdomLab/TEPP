@@ -15,10 +15,21 @@ needs an exact, provenance-bound input rather than hard topic labels.
 ## Decision
 
 TEPP owns `tepp.topic_context_posterior.v1`: the exact run, source snapshot
-digest, knowledge cutoff, model contract, posterior draw set, global topic
-identity and activity intervals, explicit topic-lineage events, per-post
+digest, knowledge cutoff, model contract, declared event clock, posterior draw
+set, opaque stable global topic identities and activity intervals, explicit
+topic-lineage events, admitted Event Lineage document relations, per-post
 posterior logistic-normal plausible values with event time, and provenance-
-bound time-valid BU/PU/team/person multiple memberships.
+bound time-valid BU/PU/team/person multiple memberships. The ordered
+`topic_ids` array alone defines artifact-local coordinate order; consumers join
+activity and lineage by stable topic identity. Lineage, document-relation, and
+membership evidence carries a content digest, immutable evidence-resource
+identifier, and provenance-assertion identifier so a consumer can materialize
+normalized qualified provenance rather than treating a digest as provenance.
+All record collections are canonically sorted before serialization so
+equivalent input permutations produce identical JSON and SHA-256. Version 1
+admits only `event_lineage_precedes`, with source event time no later than the
+target event time; topic event target cardinality and activity transitions fail
+closed.
 
 The artifact never hard-labels a post by thresholding a topic coordinate and
 never calls topic prevalence importance. Missing draws, non-finite coordinates,
@@ -48,11 +59,13 @@ model availability.
 
 ## Verification
 
-TEPP release evidence requires known-truth topic, temporal prevalence,
-relation, dormancy/reactivation, and membership-effect recovery with bias,
-RMSE, interval coverage, posterior diagnostics, leakage-safe splits, CPU worker
-determinism, and actual GPU parity. The current CPU-only TRSL-TM estimator does
-not satisfy the GPU requirement; this ADR does not claim otherwise.
+TEPP release evidence requires realistic synthetic known-truth parameter
+recovery, RMSE, bias, interval coverage, temporal ordering, graph recovery,
+invariance, posterior diagnostics, leakage-safe splits, CPU worker determinism,
+and actual CPU/GPU parameter and objective parity. A skipped, ignored,
+emulated, or unavailable-device GPU test is not GPU evidence. The current
+CPU-only TRSL-TM estimator does not emit this artifact or satisfy the GPU
+requirement; this contract-only ADR does not claim otherwise.
 
 ## References
 
@@ -64,7 +77,7 @@ Chang, J., & Blei, D. M. (2009). Relational topic models for document networks.
 In *Proceedings of Machine Learning Research, 5*, 81–88.
 https://proceedings.mlr.press/v5/chang09a.html
 
-Zhang, D. C. W., & Lauw, H. W. (2022). Dynamic topic models for temporal document
+Zhang, D. C., & Lauw, H. W. (2022). Dynamic topic models for temporal document
 networks. In *Proceedings of Machine Learning Research, 162*, 26281–26292.
 https://proceedings.mlr.press/v162/zhang22n.html
 

@@ -15,13 +15,15 @@ pub const TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION: &str = "tepp.topic_context_pos
 pub const TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT: usize = 16 * 1024 * 1024;
 const ENTRY_LIMIT: usize = 1_000_000;
 const DIMENSIONS: [&str; 4] = ["business_unit", "process_unit", "team", "person"];
+type PosteriorDraws = BTreeMap<Uuid, BTreeSet<u64>>;
+type DocumentEventTimes = BTreeMap<Uuid, KnowledgeCutoff>;
 
 /// One explicit active, dormant, or reactivated interval for a global topic.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TopicActivityInterval {
-    /// Artifact-local global topic index.
-    pub topic_index: u64,
+    /// Opaque stable topic identity.
+    pub topic_id: String,
     /// Activity state: `active`, `dormant`, or `reactivated`.
     pub state_code: String,
     /// Inclusive event-time start.
@@ -36,14 +38,38 @@ pub struct TopicActivityInterval {
 pub struct TopicLineageEvent {
     /// Event kind supplied by TEPP, never inferred by a consumer.
     pub event_code: String,
-    /// Source global topic index.
-    pub source_topic_index: u64,
-    /// Optional target global topic index.
-    pub target_topic_index: Option<u64>,
+    /// Source stable topic identity.
+    pub source_topic_id: String,
+    /// Optional target stable topic identity.
+    pub target_topic_id: Option<String>,
     /// Event time.
     pub event_time: String,
     /// Digest of event evidence.
     pub evidence_sha256: String,
+    /// Opaque evidence resource identity.
+    pub evidence_resource_id: String,
+    /// Opaque provenance assertion identity.
+    pub provenance_assertion_id: String,
+}
+
+/// One admitted Event Lineage or document-relation record.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TopicDocumentRelation {
+    /// Opaque source document identity.
+    pub source_document_id: String,
+    /// Opaque target document identity.
+    pub target_document_id: String,
+    /// Producer-owned closed relation kind.
+    pub relation_kind_code: String,
+    /// Event time at which the relation is admitted.
+    pub event_time: String,
+    /// Digest of relation evidence.
+    pub evidence_sha256: String,
+    /// Opaque evidence resource identity.
+    pub evidence_resource_id: String,
+    /// Opaque provenance assertion identity.
+    pub provenance_assertion_id: String,
 }
 
 /// One document posterior plausible value for one draw.
@@ -78,6 +104,10 @@ pub struct TopicContextMembership {
     pub valid_to: String,
     /// Digest of membership source evidence.
     pub evidence_sha256: String,
+    /// Opaque evidence resource identity.
+    pub evidence_resource_id: String,
+    /// Opaque provenance assertion identity.
+    pub provenance_assertion_id: String,
 }
 
 /// Digest-bound posterior artifact consumed by fast-mlsirm.
@@ -94,6 +124,8 @@ pub struct TopicContextPosteriorArtifact {
     pub source_snapshot_sha256: String,
     /// Historical knowledge cutoff.
     pub knowledge_cutoff: String,
+    /// Exact event-time clock represented by all temporal fields.
+    pub event_clock_code: String,
     /// Exact model contract version.
     pub model_contract_version: String,
     /// Opaque posterior draw-set identity.
@@ -102,10 +134,14 @@ pub struct TopicContextPosteriorArtifact {
     pub posterior_draw_count: u64,
     /// Number of global topics.
     pub topic_count: u64,
+    /// Stable topic identities in logistic-normal coordinate order.
+    pub topic_ids: Vec<String>,
     /// Explicit topic-state intervals.
     pub activity_intervals: Vec<TopicActivityInterval>,
     /// Explicit topic lineage events, when present.
     pub lineage_events: Vec<TopicLineageEvent>,
+    /// Complete admitted Event Lineage/document relations.
+    pub document_relations: Vec<TopicDocumentRelation>,
     /// Complete document-by-draw posterior coordinates.
     pub plausible_values: Vec<TopicPostPlausibleValue>,
     /// Time-valid BU/PU/team/person memberships.
@@ -125,35 +161,48 @@ fn time(value: &str) -> Option<KnowledgeCutoff> {
     KnowledgeCutoff::parse_rfc3339(value).ok()
 }
 
-fn valid_activity_interval(interval: &TopicActivityInterval, topic_count: u64) -> bool {
-    interval.topic_index < topic_count
+fn canonical_time(value: &str) -> Option<KnowledgeCutoff> {
+    time(value).filter(|instant| instant.to_rfc3339() == value)
+}
+
+fn valid_activity_interval(interval: &TopicActivityInterval, topic_ids: &BTreeSet<&str>) -> bool {
+    topic_ids.contains(interval.topic_id.as_str())
         && ["active", "dormant", "reactivated"].contains(&interval.state_code.as_str())
-        && time(&interval.valid_from)
-            .zip(time(&interval.valid_to))
+        && canonical_time(&interval.valid_from)
+            .zip(canonical_time(&interval.valid_to))
             .is_some_and(|(valid_from, valid_to)| valid_from <= valid_to)
 }
 
-fn within_entry_limits(lengths: [usize; 4]) -> bool {
-    lengths.into_iter().all(|length| length <= ENTRY_LIMIT)
+fn within_entry_limits(lengths: [usize; 4], entry_limit: usize) -> bool {
+    lengths.into_iter().all(|length| length <= entry_limit)
 }
 
 impl TopicContextPosteriorArtifact {
     fn has_valid_header(&self) -> bool {
+        self.has_valid_header_with_entry_limit(ENTRY_LIMIT)
+    }
+
+    fn has_valid_header_with_entry_limit(&self, entry_limit: usize) -> bool {
         self.schema_version == TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION
             && valid_identifier(&self.run_id)
             && valid_identifier(&self.snapshot_id)
             && digest(&self.source_snapshot_sha256)
-            && time(&self.knowledge_cutoff).is_some()
+            && canonical_time(&self.knowledge_cutoff).is_some()
+            && self.event_clock_code == "event_time_rfc3339"
             && valid_identifier(&self.model_contract_version)
             && valid_identifier(&self.posterior_draw_set_id)
             && self.posterior_draw_count > 0
             && self.topic_count >= 2
-            && within_entry_limits([
-                self.activity_intervals.len(),
-                self.lineage_events.len(),
-                self.plausible_values.len(),
-                self.memberships.len(),
-            ])
+            && usize::try_from(self.topic_count) == Ok(self.topic_ids.len())
+            && within_entry_limits(
+                [
+                    self.activity_intervals.len(),
+                    self.lineage_events.len(),
+                    self.plausible_values.len(),
+                    self.memberships.len() + self.document_relations.len(),
+                ],
+                entry_limit,
+            )
             && self.inference_status == "posterior_topic_coordinates_not_importance"
     }
 
@@ -180,8 +229,68 @@ impl TopicContextPosteriorArtifact {
     /// Returns a validation, serialization, or size error.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
+        let mut canonical = self.clone();
+        canonical.activity_intervals.sort_by(|a, b| {
+            (&a.topic_id, &a.valid_from, &a.valid_to, &a.state_code).cmp(&(
+                &b.topic_id,
+                &b.valid_from,
+                &b.valid_to,
+                &b.state_code,
+            ))
+        });
+        canonical.lineage_events.sort_by(|a, b| {
+            (
+                &a.event_code,
+                &a.source_topic_id,
+                &a.target_topic_id,
+                &a.event_time,
+                &a.provenance_assertion_id,
+            )
+                .cmp(&(
+                    &b.event_code,
+                    &b.source_topic_id,
+                    &b.target_topic_id,
+                    &b.event_time,
+                    &b.provenance_assertion_id,
+                ))
+        });
+        canonical.document_relations.sort_by(|a, b| {
+            (
+                &a.source_document_id,
+                &a.target_document_id,
+                &a.relation_kind_code,
+                &a.event_time,
+                &a.provenance_assertion_id,
+            )
+                .cmp(&(
+                    &b.source_document_id,
+                    &b.target_document_id,
+                    &b.relation_kind_code,
+                    &b.event_time,
+                    &b.provenance_assertion_id,
+                ))
+        });
+        canonical
+            .plausible_values
+            .sort_by(|a, b| (&a.document_id, a.draw_index).cmp(&(&b.document_id, b.draw_index)));
+        canonical.memberships.sort_by(|a, b| {
+            (
+                &a.document_id,
+                &a.dimension_code,
+                &a.context_id,
+                &a.valid_from,
+                &a.valid_to,
+            )
+                .cmp(&(
+                    &b.document_id,
+                    &b.dimension_code,
+                    &b.context_id,
+                    &b.valid_from,
+                    &b.valid_to,
+                ))
+        });
+        let payload = serde_json::to_string(&canonical)
+            .map_err(|_| AnalysisEngineError::SerializationFailure)?;
         if payload.len() > TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT {
             return Err(AnalysisEngineError::LimitExceeded);
         }
@@ -202,30 +311,177 @@ impl TopicContextPosteriorArtifact {
         if !self.has_valid_header() {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
+        let cutoff =
+            canonical_time(&self.knowledge_cutoff).ok_or(AnalysisEngineError::InvalidEvidence)?;
+        let topic_ids: BTreeSet<&str> = self.topic_ids.iter().map(String::as_str).collect();
+        if topic_ids.len() != self.topic_ids.len()
+            || self
+                .topic_ids
+                .iter()
+                .any(|topic_id| Uuid::parse_str(topic_id).is_err())
+        {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        self.validate_topic_records(cutoff, &topic_ids)?;
+        let (draws, event_times) = self.validate_plausible_values(cutoff)?;
+        self.validate_document_relations(cutoff, &draws, &event_times)?;
+        self.validate_memberships(&draws, &event_times)?;
+        self.validate_provenance_bindings()
+    }
+
+    fn validate_provenance_bindings(&self) -> Result<(), AnalysisEngineError> {
+        let mut bindings = BTreeMap::new();
+        let mut bind = |id: &str, value: String| {
+            if bindings
+                .insert(id.to_owned(), value.clone())
+                .is_some_and(|existing| existing != value)
+            {
+                Err(AnalysisEngineError::InvalidEvidence)
+            } else {
+                Ok(())
+            }
+        };
+        for event in &self.lineage_events {
+            bind(
+                &event.provenance_assertion_id,
+                format!(
+                    "topic:{}:{}:{}:{}",
+                    event.event_code,
+                    event.source_topic_id,
+                    event.target_topic_id.as_deref().unwrap_or(""),
+                    event.evidence_sha256
+                ),
+            )?;
+        }
+        for relation in &self.document_relations {
+            bind(
+                &relation.provenance_assertion_id,
+                format!(
+                    "document:{}:{}:{}:{}",
+                    relation.relation_kind_code,
+                    relation.source_document_id,
+                    relation.target_document_id,
+                    relation.evidence_sha256
+                ),
+            )?;
+        }
+        for membership in &self.memberships {
+            bind(
+                &membership.provenance_assertion_id,
+                format!(
+                    "membership:{}:{}:{}:{}",
+                    membership.dimension_code,
+                    membership.document_id,
+                    membership.context_id,
+                    membership.evidence_sha256
+                ),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn validate_topic_records(
+        &self,
+        cutoff: KnowledgeCutoff,
+        topic_ids: &BTreeSet<&str>,
+    ) -> Result<(), AnalysisEngineError> {
+        let mut activity_by_topic: BTreeMap<&str, Vec<(KnowledgeCutoff, KnowledgeCutoff, &str)>> =
+            BTreeMap::new();
+        let mut seen_activity = BTreeSet::new();
         for interval in &self.activity_intervals {
-            if !valid_activity_interval(interval, self.topic_count) {
+            if !valid_activity_interval(interval, topic_ids) {
                 return Err(AnalysisEngineError::InvalidEvidence);
             }
+            let valid_from =
+                canonical_time(&interval.valid_from).ok_or(AnalysisEngineError::InvalidEvidence)?;
+            let valid_to =
+                canonical_time(&interval.valid_to).ok_or(AnalysisEngineError::InvalidEvidence)?;
+            if valid_to > cutoff {
+                return Err(AnalysisEngineError::InvalidEvidence);
+            }
+            let key = (
+                interval.topic_id.as_str(),
+                valid_from,
+                valid_to,
+                interval.state_code.as_str(),
+            );
+            if !seen_activity.insert(key) {
+                return Err(AnalysisEngineError::InvalidEvidence);
+            }
+            activity_by_topic
+                .entry(&interval.topic_id)
+                .or_default()
+                .push((valid_from, valid_to, interval.state_code.as_str()));
         }
+        if activity_by_topic.len() != topic_ids.len() {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        for intervals in activity_by_topic.values_mut() {
+            intervals.sort();
+            if intervals.first().map(|interval| interval.2) != Some("active") {
+                return Err(AnalysisEngineError::InvalidEvidence);
+            }
+            for pair in intervals.windows(2) {
+                let valid_transition = matches!(
+                    (pair[0].2, pair[1].2),
+                    ("active" | "reactivated", "dormant") | ("dormant", "reactivated")
+                );
+                if pair[1].0 <= pair[0].1 || !valid_transition {
+                    return Err(AnalysisEngineError::InvalidEvidence);
+                }
+            }
+        }
+        let mut seen_lineage = BTreeSet::new();
         for event in &self.lineage_events {
+            let event_time =
+                canonical_time(&event.event_time).ok_or(AnalysisEngineError::InvalidEvidence)?;
+            let key = (
+                event.event_code.as_str(),
+                event.source_topic_id.as_str(),
+                event.target_topic_id.as_deref(),
+                event_time,
+                event.evidence_resource_id.as_str(),
+                event.provenance_assertion_id.as_str(),
+            );
             if !["birth", "split", "merge", "retirement"].contains(&event.event_code.as_str())
-                || event.source_topic_index >= self.topic_count
+                || !topic_ids.contains(event.source_topic_id.as_str())
                 || event
-                    .target_topic_index
-                    .is_some_and(|target| target >= self.topic_count)
-                || time(&event.event_time).is_none()
+                    .target_topic_id
+                    .as_deref()
+                    .is_some_and(|target| !topic_ids.contains(target))
+                || match event.event_code.as_str() {
+                    "birth" | "retirement" => event.target_topic_id.is_some(),
+                    "split" | "merge" => event
+                        .target_topic_id
+                        .as_deref()
+                        .is_none_or(|target| target == event.source_topic_id),
+                    _ => true,
+                }
+                || event_time > cutoff
                 || !digest(&event.evidence_sha256)
+                || !valid_identifier(&event.evidence_resource_id)
+                || !valid_identifier(&event.provenance_assertion_id)
+                || !seen_lineage.insert(key)
             {
                 return Err(AnalysisEngineError::InvalidEvidence);
             }
         }
-        let mut draws: BTreeMap<Uuid, BTreeSet<u64>> = BTreeMap::new();
+        Ok(())
+    }
+
+    fn validate_plausible_values(
+        &self,
+        cutoff: KnowledgeCutoff,
+    ) -> Result<(PosteriorDraws, DocumentEventTimes), AnalysisEngineError> {
+        let mut draws: PosteriorDraws = BTreeMap::new();
         let mut event_times = BTreeMap::new();
         for value in &self.plausible_values {
             let document = Uuid::parse_str(&value.document_id)
                 .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
-            let event_time = time(&value.event_time).ok_or(AnalysisEngineError::InvalidEvidence)?;
+            let event_time =
+                canonical_time(&value.event_time).ok_or(AnalysisEngineError::InvalidEvidence)?;
             if value.draw_index >= self.posterior_draw_count
+                || event_time > cutoff
                 || value.logistic_normal_coordinates.len()
                     != usize::try_from(self.topic_count - 1)
                         .map_err(|_| AnalysisEngineError::InvalidEvidence)?
@@ -248,36 +504,86 @@ impl TopicContextPosteriorArtifact {
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
+        Ok((draws, event_times))
+    }
+
+    fn validate_document_relations(
+        &self,
+        cutoff: KnowledgeCutoff,
+        draws: &PosteriorDraws,
+        event_times: &DocumentEventTimes,
+    ) -> Result<(), AnalysisEngineError> {
+        let mut seen_relations = BTreeSet::new();
+        for relation in &self.document_relations {
+            let source = Uuid::parse_str(&relation.source_document_id)
+                .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+            let target = Uuid::parse_str(&relation.target_document_id)
+                .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+            let event_time =
+                canonical_time(&relation.event_time).ok_or(AnalysisEngineError::InvalidEvidence)?;
+            let key = (
+                source,
+                target,
+                relation.relation_kind_code.as_str(),
+                event_time,
+                relation.evidence_resource_id.as_str(),
+                relation.provenance_assertion_id.as_str(),
+            );
+            if source == target
+                || !draws.contains_key(&source)
+                || !draws.contains_key(&target)
+                || relation.relation_kind_code != "event_lineage_precedes"
+                || event_times.get(&source) > event_times.get(&target)
+                || event_time > cutoff
+                || !digest(&relation.evidence_sha256)
+                || !valid_identifier(&relation.evidence_resource_id)
+                || !valid_identifier(&relation.provenance_assertion_id)
+                || !seen_relations.insert(key)
+            {
+                return Err(AnalysisEngineError::InvalidEvidence);
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_memberships(
+        &self,
+        draws: &PosteriorDraws,
+        event_times: &DocumentEventTimes,
+    ) -> Result<(), AnalysisEngineError> {
         let mut dimensions: BTreeMap<Uuid, BTreeSet<&str>> = BTreeMap::new();
-        let mut membership_keys = BTreeSet::new();
+        let mut seen_memberships = BTreeSet::new();
         for membership in &self.memberships {
             let document = Uuid::parse_str(&membership.document_id)
                 .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
-            let valid_from =
-                time(&membership.valid_from).ok_or(AnalysisEngineError::InvalidEvidence)?;
+            let valid_from = canonical_time(&membership.valid_from)
+                .ok_or(AnalysisEngineError::InvalidEvidence)?;
             let valid_to =
-                time(&membership.valid_to).ok_or(AnalysisEngineError::InvalidEvidence)?;
+                canonical_time(&membership.valid_to).ok_or(AnalysisEngineError::InvalidEvidence)?;
             let document_event_time = event_times
                 .get(&document)
                 .ok_or(AnalysisEngineError::InvalidEvidence)?;
-            // `event_times` is keyed by exactly the plausible-value
-            // documents, so the membership document is guaranteed to be a
-            // known draw document here; no redundant contains-key probe.
-            if !DIMENSIONS.contains(&membership.dimension_code.as_str())
-                || !valid_identifier(&membership.context_id)
+            let dimension_ordinal = DIMENSIONS
+                .iter()
+                .position(|dimension| *dimension == membership.dimension_code)
+                .ok_or(AnalysisEngineError::InvalidEvidence)?;
+            let key = (
+                document,
+                dimension_ordinal,
+                membership.context_id.as_str(),
+                valid_from,
+                valid_to,
+            );
+            if !valid_identifier(&membership.context_id)
                 || !membership.weight.is_finite()
                 || membership.weight <= 0.0
                 || valid_from > valid_to
                 || *document_event_time < valid_from
                 || *document_event_time > valid_to
                 || !digest(&membership.evidence_sha256)
-                || !membership_keys.insert((
-                    document,
-                    membership.dimension_code.as_str(),
-                    membership.context_id.as_str(),
-                    membership.valid_from.as_str(),
-                    membership.valid_to.as_str(),
-                ))
+                || !valid_identifier(&membership.evidence_resource_id)
+                || !valid_identifier(&membership.provenance_assertion_id)
+                || !seen_memberships.insert(key)
             {
                 return Err(AnalysisEngineError::InvalidEvidence);
             }
@@ -305,7 +611,7 @@ mod tests {
     use super::{
         ENTRY_LIMIT, TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
         TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
-        TopicLineageEvent, TopicPostPlausibleValue, within_entry_limits,
+        TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue, within_entry_limits,
     };
 
     macro_rules! invalid {
@@ -325,19 +631,38 @@ mod tests {
             schema_version: TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION.into(),
             run_id: "run-1".into(),
             snapshot_id: "snapshot-1".into(),
-            source_snapshot_sha256: "a0".repeat(32),
+            source_snapshot_sha256: "0".repeat(64),
             knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            event_clock_code: "event_time_rfc3339".into(),
             model_contract_version: "trsl-tm-v1".into(),
             posterior_draw_set_id: "draw-set-1".into(),
             posterior_draw_count: 2,
             topic_count: 2,
-            activity_intervals: vec![TopicActivityInterval {
-                topic_index: 0,
+            topic_ids: vec![
+                "018f3f7a-7b7c-7d00-8000-000000000101".into(),
+                "018f3f7a-7b7c-7d00-8000-000000000102".into(),
+            ],
+            activity_intervals: [
+                "018f3f7a-7b7c-7d00-8000-000000000101",
+                "018f3f7a-7b7c-7d00-8000-000000000102",
+            ]
+            .map(|topic_id| TopicActivityInterval {
+                topic_id: topic_id.into(),
                 state_code: "active".into(),
                 valid_from: "2026-07-01T00:00:00Z".into(),
-                valid_to: "2026-08-01T00:00:00Z".into(),
-            }],
+                valid_to: "2026-07-15T00:00:00Z".into(),
+            })
+            .into(),
             lineage_events: vec![],
+            document_relations: vec![TopicDocumentRelation {
+                source_document_id: documents[0].into(),
+                target_document_id: documents[1].into(),
+                relation_kind_code: "event_lineage_precedes".into(),
+                event_time: "2026-07-15T00:00:00Z".into(),
+                evidence_sha256: "c".repeat(64),
+                evidence_resource_id: "evidence-relation-1".into(),
+                provenance_assertion_id: "provenance-relation-1".into(),
+            }],
             plausible_values: documents
                 .iter()
                 .flat_map(|document| {
@@ -361,6 +686,8 @@ mod tests {
                             valid_from: "2026-07-01T00:00:00Z".into(),
                             valid_to: "2026-08-01T00:00:00Z".into(),
                             evidence_sha256: "b".repeat(64),
+                            evidence_resource_id: format!("evidence-{dimension}-{document}"),
+                            provenance_assertion_id: format!("provenance-{dimension}-{document}"),
                         }
                     })
                 })
@@ -373,10 +700,8 @@ mod tests {
     fn round_trip_preserves_plausible_values() {
         let artifact = artifact();
         let json = artifact.to_json().expect("json");
-        assert_eq!(
-            TopicContextPosteriorArtifact::from_json(&json).expect("parse"),
-            artifact
-        );
+        let parsed = TopicContextPosteriorArtifact::from_json(&json).expect("parse");
+        assert_eq!(parsed.to_json().expect("canonical"), json);
         assert_eq!(artifact.sha256().expect("digest").len(), 64);
     }
 
@@ -391,6 +716,11 @@ mod tests {
             .plausible_values
             .push(duplicate.plausible_values[0].clone());
         assert!(duplicate.to_json().is_err());
+
+        let mut reordered = artifact();
+        reordered.plausible_values.swap(0, 1);
+        assert_eq!(reordered.to_json(), artifact().to_json());
+        assert_eq!(reordered.sha256(), artifact().sha256());
     }
 
     #[test]
@@ -398,7 +728,7 @@ mod tests {
         let mut equivalent_offsets = artifact();
         equivalent_offsets.activity_intervals[0].valid_from = "2026-07-01T09:00:00+09:00".into();
         equivalent_offsets.activity_intervals[0].valid_to = "2026-07-01T00:00:00Z".into();
-        assert!(equivalent_offsets.to_json().is_ok());
+        assert!(equivalent_offsets.to_json().is_err());
 
         let mut reversed = artifact();
         reversed.activity_intervals[0].valid_from = "2026-07-02T00:00:00Z".into();
@@ -419,13 +749,24 @@ mod tests {
             .source_snapshot_sha256
             .replace_range(..1, "A"));
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.knowledge_cutoff.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.event_clock_code.clear());
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.model_contract_version.clear());
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.posterior_draw_set_id.clear());
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.posterior_draw_count = 0);
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_count = 1);
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_ids.pop());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_ids[0].clear());
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.topic_ids[1] =
+                value.topic_ids[0].clone()
+        );
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.inference_status.clear());
-        assert!(within_entry_limits([ENTRY_LIMIT; 4]));
-        assert!(!within_entry_limits([ENTRY_LIMIT + 1, 0, 0, 0]));
+        assert!(within_entry_limits([ENTRY_LIMIT; 4], ENTRY_LIMIT));
+        assert!(!within_entry_limits(
+            [ENTRY_LIMIT + 1, 0, 0, 0],
+            ENTRY_LIMIT
+        ));
+        assert!(!artifact().has_valid_header_with_entry_limit(0));
         assert!(TopicContextPosteriorArtifact::from_json("{").is_err());
         assert!(
             TopicContextPosteriorArtifact::from_json(
@@ -438,7 +779,8 @@ mod tests {
     #[test]
     fn rejects_invalid_activity_and_lineage_records() {
         invalid!(
-            |value: &mut TopicContextPosteriorArtifact| value.activity_intervals[0].topic_index = 2
+            |value: &mut TopicContextPosteriorArtifact| value.activity_intervals[0].topic_id =
+                "018f3f7a-7b7c-7d00-8000-000000000999".into()
         );
         invalid!(
             |value: &mut TopicContextPosteriorArtifact| value.activity_intervals[0]
@@ -450,13 +792,19 @@ mod tests {
                 .valid_from
                 .clear()
         );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.activity_intervals[0].valid_to =
+                "2026-08-01T00:00:01Z".into()
+        );
 
         let event = TopicLineageEvent {
             event_code: "birth".into(),
-            source_topic_index: 0,
-            target_topic_index: Some(1),
+            source_topic_id: "018f3f7a-7b7c-7d00-8000-000000000101".into(),
+            target_topic_id: None,
             event_time: "2026-07-15T00:00:00Z".into(),
             evidence_sha256: "c".repeat(64),
+            evidence_resource_id: "evidence-lineage-1".into(),
+            provenance_assertion_id: "provenance-lineage-1".into(),
         };
         let mut valid = artifact();
         valid.lineage_events.push(event.clone());
@@ -467,24 +815,105 @@ mod tests {
         });
         invalid!(|value: &mut TopicContextPosteriorArtifact| {
             value.lineage_events.push(event.clone());
-            value.lineage_events[0].source_topic_index = 2;
+            value.lineage_events[0].source_topic_id.clear();
         });
         invalid!(|value: &mut TopicContextPosteriorArtifact| {
             value.lineage_events.push(event.clone());
-            value.lineage_events[0].target_topic_index = Some(2);
+            value.lineage_events[0].target_topic_id = Some("missing-topic".into());
         });
         invalid!(|value: &mut TopicContextPosteriorArtifact| {
             value.lineage_events.push(event.clone());
             value.lineage_events[0].event_time.clear();
         });
         invalid!(|value: &mut TopicContextPosteriorArtifact| {
-            value.lineage_events.push(event);
+            value.lineage_events.push(event.clone());
             value.lineage_events[0].evidence_sha256.clear();
         });
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event.clone());
+            value.lineage_events[0].evidence_resource_id.clear();
+        });
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event.clone());
+            value.lineage_events[0].provenance_assertion_id.clear();
+        });
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event.clone());
+            value.lineage_events[0].event_time = "2026-08-01T00:00:01Z".into();
+        });
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event.clone());
+            value.lineage_events.push(event.clone());
+        });
+
+        let mut overlap = artifact();
+        let mut non_overlapping = artifact();
+        let topic_id = non_overlapping.activity_intervals[0].topic_id.clone();
+        non_overlapping.activity_intervals.extend([
+            TopicActivityInterval {
+                topic_id: topic_id.clone(),
+                state_code: "dormant".into(),
+                valid_from: "2026-07-15T00:00:01Z".into(),
+                valid_to: "2026-07-20T00:00:00Z".into(),
+            },
+            TopicActivityInterval {
+                topic_id,
+                state_code: "reactivated".into(),
+                valid_from: "2026-07-20T00:00:01Z".into(),
+                valid_to: "2026-08-01T00:00:00Z".into(),
+            },
+        ]);
+        assert!(non_overlapping.to_json().is_ok());
+        let canonical_json = non_overlapping.to_json();
+        non_overlapping.activity_intervals.swap(0, 1);
+        assert_eq!(non_overlapping.to_json(), canonical_json);
+        overlap.activity_intervals.push(TopicActivityInterval {
+            topic_id: overlap.activity_intervals[0].topic_id.clone(),
+            state_code: "dormant".into(),
+            valid_from: "2026-07-15T00:00:00Z".into(),
+            valid_to: "2026-07-15T00:00:00Z".into(),
+        });
+        assert!(overlap.to_json().is_err());
     }
 
     #[test]
-    fn rejects_invalid_posterior_and_membership_records() {
+    fn rejects_incomplete_topic_state_and_lineage_shapes() {
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value
+            .activity_intervals
+            .push(value.activity_intervals[0].clone()));
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.activity_intervals[0].state_code =
+                "reactivated".into()
+        );
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.activity_intervals.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.activity_intervals.push(TopicActivityInterval {
+                topic_id: value.activity_intervals[0].topic_id.clone(),
+                state_code: "active".into(),
+                valid_from: "2026-07-15T00:00:01Z".into(),
+                valid_to: "2026-07-16T00:00:00Z".into(),
+            });
+        });
+        let source_topic_id = artifact().topic_ids[0].clone();
+        for (event_code, target_topic_id) in
+            [("split", None), ("merge", Some(source_topic_id.clone()))]
+        {
+            invalid!(|value: &mut TopicContextPosteriorArtifact| {
+                value.lineage_events.push(TopicLineageEvent {
+                    event_code: event_code.into(),
+                    source_topic_id: source_topic_id.clone(),
+                    target_topic_id: target_topic_id.clone(),
+                    event_time: "2026-07-15T00:00:00Z".into(),
+                    evidence_sha256: "c".repeat(64),
+                    evidence_resource_id: "evidence-lineage-shape".into(),
+                    provenance_assertion_id: "provenance-lineage-shape".into(),
+                });
+            });
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_posterior_records() {
         invalid!(
             |value: &mut TopicContextPosteriorArtifact| value.plausible_values[0]
                 .document_id
@@ -512,8 +941,15 @@ mod tests {
             |value: &mut TopicContextPosteriorArtifact| value.plausible_values[1].event_time =
                 "2026-07-16T00:00:00Z".into()
         );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.plausible_values[0].event_time =
+                "2026-08-01T00:00:01Z".into()
+        );
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.plausible_values.truncate(2));
+    }
 
+    #[test]
+    fn rejects_invalid_membership_and_relation_records() {
         invalid!(
             |value: &mut TopicContextPosteriorArtifact| value.memberships[0].document_id.clear()
         );
@@ -533,6 +969,10 @@ mod tests {
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.memberships[0].valid_to.clear());
         invalid!(
             |value: &mut TopicContextPosteriorArtifact| value.memberships[0].valid_from =
+                "2026-07-16T00:00:00Z".into()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].valid_from =
                 "2026-08-02T00:00:00Z".into()
         );
         invalid!(
@@ -540,43 +980,122 @@ mod tests {
                 .evidence_sha256
                 .clear()
         );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0]
+                .evidence_resource_id
+                .clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0]
+                .provenance_assertion_id
+                .clear()
+        );
         invalid!(|value: &mut TopicContextPosteriorArtifact| value
             .memberships
             .push(value.memberships[0].clone()));
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.memberships.remove(0));
+        let mut reordered = artifact();
+        reordered.memberships.swap(0, 1);
+        assert_eq!(reordered.to_json(), artifact().to_json());
         invalid!(
             |value: &mut TopicContextPosteriorArtifact| value.memberships[0].document_id =
                 "018f3f7a-7b7c-7d00-8000-000000000003".into()
         );
-        // Document event time strictly after the membership window start:
-        // the membership would claim context before the document existed.
+
         invalid!(
-            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].valid_from =
-                "2026-07-15T00:00:01Z".into()
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0]
+                .target_document_id =
+                value.document_relations[0].source_document_id.clone()
         );
-        // A draw document with no membership rows at all breaks the
-        // document-coverage reconciliation even though every surviving row
-        // is individually valid.
-        let mut stripped = artifact();
-        let orphaned_document = stripped.memberships[0].document_id.clone();
-        stripped
-            .memberships
-            .retain(|membership| membership.document_id != orphaned_document);
-        assert!(stripped.to_json().is_err());
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0]
+                .source_document_id =
+                "018f3f7a-7b7c-7d00-8000-000000000003".into()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0]
+                .target_document_id =
+                "018f3f7a-7b7c-7d00-8000-000000000003".into()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0]
+                .relation_kind_code
+                .clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0].event_time =
+                "2026-08-01T00:00:01Z".into()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0]
+                .evidence_sha256
+                .clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0]
+                .evidence_resource_id
+                .clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0]
+                .provenance_assertion_id
+                .clear()
+        );
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value
+            .document_relations
+            .push(value.document_relations[0].clone()));
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.memberships.truncate(4));
     }
 
     #[test]
-    fn rejects_header_when_any_entry_collection_exceeds_the_cap() {
-        // The header's entry-cap conjunct must fail closed before per-entry
-        // validation when a collection alone grows past ENTRY_LIMIT.
-        let mut oversized = artifact();
-        let template = oversized.activity_intervals[0].clone();
-        let target = ENTRY_LIMIT + 1;
-        oversized.activity_intervals.reserve(target);
-        while oversized.activity_intervals.len() <= target {
-            oversized.activity_intervals.push(template.clone());
+    fn rejects_ambiguous_relation_semantics_and_provenance() {
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.document_relations[0]
+                .relation_kind_code =
+                "associated_with".into()
+        );
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            for plausible_value in value
+                .plausible_values
+                .iter_mut()
+                .filter(|item| item.document_id.ends_with("0001"))
+            {
+                plausible_value.event_time = "2026-07-16T00:00:00Z".into();
+            }
+        });
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0]
+                .provenance_assertion_id =
+                value.document_relations[0].provenance_assertion_id.clone()
+        );
+    }
+
+    fn append_synthetic_document(
+        artifact: &mut TopicContextPosteriorArtifact,
+        document: &str,
+        context_id: &str,
+    ) {
+        for draw in 0..artifact.posterior_draw_count {
+            artifact.plausible_values.push(TopicPostPlausibleValue {
+                document_id: document.to_string(),
+                draw_index: draw,
+                event_time: "2026-07-15T00:00:00Z".into(),
+                logistic_normal_coordinates: vec![0.0],
+            });
         }
-        assert!(oversized.to_json().is_err());
+        for dimension in ["business_unit", "process_unit", "team", "person"] {
+            artifact.memberships.push(TopicContextMembership {
+                document_id: document.to_string(),
+                dimension_code: dimension.into(),
+                context_id: context_id.to_string(),
+                weight: 1.0,
+                valid_from: "2026-07-01T00:00:00Z".into(),
+                valid_to: "2026-08-01T00:00:00Z".into(),
+                evidence_sha256: "b".repeat(64),
+                evidence_resource_id: format!("evidence-{dimension}-{document}"),
+                provenance_assertion_id: format!("provenance-{dimension}-{document}"),
+            });
+        }
     }
 
     #[test]
@@ -590,34 +1109,17 @@ mod tests {
         let probe = artifact();
         let per_document_bytes = {
             let mut one = probe.clone();
-            let document = ::uuid::Uuid::from_u128(0x8000_0000_0000_0000_u128).to_string();
-            for draw in 0..one.posterior_draw_count {
-                one.plausible_values.push(TopicPostPlausibleValue {
-                    document_id: document.clone(),
-                    draw_index: draw,
-                    event_time: "2026-07-15T00:00:00Z".into(),
-                    logistic_normal_coordinates: vec![0.0],
-                });
-            }
-            for dimension in ["business_unit", "process_unit", "team", "person"] {
-                one.memberships.push(TopicContextMembership {
-                    document_id: document.clone(),
-                    dimension_code: dimension.into(),
-                    context_id: "context-probe".into(),
-                    weight: 1.0,
-                    valid_from: "2026-07-01T00:00:00Z".into(),
-                    valid_to: "2026-08-01T00:00:00Z".into(),
-                    evidence_sha256: "b".repeat(64),
-                });
-            }
+            let document =
+                ::uuid::Uuid::from_u128(0x8000_0000_0000_0000_0000_0000_0000_0000_u128).to_string();
+            append_synthetic_document(&mut one, &document, "context-probe");
             serde_json::to_string(&one).expect("probe").len()
                 - serde_json::to_string(&probe).expect("base").len()
         };
         assert!(per_document_bytes > 0);
         let extra_documents = TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT / per_document_bytes + 2;
-        let projected_entries = extra_documents
-            * usize::try_from(probe.posterior_draw_count + 4)
-                .expect("posterior draw count fits usize");
+        let entries_per_document =
+            usize::try_from(probe.posterior_draw_count + 4).expect("bounded draw count fits usize");
+        let projected_entries = extra_documents * entries_per_document;
         assert!(
             projected_entries <= ENTRY_LIMIT,
             "derived documents must stay inside the entry cap"
@@ -629,28 +1131,11 @@ mod tests {
         // payload under the threshold.
         for index in 0..extra_documents {
             let document = ::uuid::Uuid::from_u128(
-                0x8000_0000_0000_0000_u128 + u128::try_from(index).expect("index fits u128"),
+                0x8000_0000_0000_0000_0000_0000_0000_0000_u128
+                    + u128::try_from(index).expect("index fits u128"),
             )
             .to_string();
-            for draw in 0..oversized.posterior_draw_count {
-                oversized.plausible_values.push(TopicPostPlausibleValue {
-                    document_id: document.clone(),
-                    draw_index: draw,
-                    event_time: "2026-07-15T00:00:00Z".into(),
-                    logistic_normal_coordinates: vec![0.0],
-                });
-            }
-            for dimension in ["business_unit", "process_unit", "team", "person"] {
-                oversized.memberships.push(TopicContextMembership {
-                    document_id: document.clone(),
-                    dimension_code: dimension.into(),
-                    context_id: format!("context-{index}"),
-                    weight: 1.0,
-                    valid_from: "2026-07-01T00:00:00Z".into(),
-                    valid_to: "2026-08-01T00:00:00Z".into(),
-                    evidence_sha256: "b".repeat(64),
-                });
-            }
+            append_synthetic_document(&mut oversized, &document, &format!("context-{index}"));
         }
         let mut top_up = extra_documents;
         while serde_json::to_string(&oversized)
@@ -663,28 +1148,15 @@ mod tests {
                 "byte limit not crossed within the top-up budget"
             );
             let document = ::uuid::Uuid::from_u128(
-                0x8000_0000_0000_0000_u128 + u128::try_from(top_up).expect("fits"),
+                0x8000_0000_0000_0000_0000_0000_0000_0000_u128
+                    + u128::try_from(top_up).expect("fits"),
             )
             .to_string();
-            for draw in 0..oversized.posterior_draw_count {
-                oversized.plausible_values.push(TopicPostPlausibleValue {
-                    document_id: document.clone(),
-                    draw_index: draw,
-                    event_time: "2026-07-15T00:00:00Z".into(),
-                    logistic_normal_coordinates: vec![0.0],
-                });
-            }
-            for dimension in ["business_unit", "process_unit", "team", "person"] {
-                oversized.memberships.push(TopicContextMembership {
-                    document_id: document.clone(),
-                    dimension_code: dimension.into(),
-                    context_id: format!("context-topup-{top_up}"),
-                    weight: 1.0,
-                    valid_from: "2026-07-01T00:00:00Z".into(),
-                    valid_to: "2026-08-01T00:00:00Z".into(),
-                    evidence_sha256: "b".repeat(64),
-                });
-            }
+            append_synthetic_document(
+                &mut oversized,
+                &document,
+                &format!("context-topup-{top_up}"),
+            );
             top_up += 1;
         }
         assert_eq!(oversized.to_json(), Err(AnalysisEngineError::LimitExceeded));

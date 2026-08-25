@@ -5,19 +5,22 @@
   "$comment": "This schema validates record shapes. Cross-record completeness (distinct documents, complete document-by-draw grids, and four time-covering membership dimensions per document) is normative Rust domain validation because JSON Schema cannot express those joins without duplicating document identities.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "snapshot_id", "source_snapshot_sha256", "knowledge_cutoff", "model_contract_version", "posterior_draw_set_id", "posterior_draw_count", "topic_count", "activity_intervals", "lineage_events", "plausible_values", "memberships", "inference_status"],
+  "required": ["schema_version", "run_id", "snapshot_id", "source_snapshot_sha256", "knowledge_cutoff", "event_clock_code", "model_contract_version", "posterior_draw_set_id", "posterior_draw_count", "topic_count", "topic_ids", "activity_intervals", "lineage_events", "document_relations", "plausible_values", "memberships", "inference_status"],
   "properties": {
     "schema_version": { "const": "tepp.topic_context_posterior.v1" },
     "run_id": { "$ref": "#/$defs/identifier" },
     "snapshot_id": { "$ref": "#/$defs/identifier" },
     "source_snapshot_sha256": { "$ref": "#/$defs/digest" },
     "knowledge_cutoff": { "type": "string", "format": "date-time" },
+    "event_clock_code": { "const": "event_time_rfc3339" },
     "model_contract_version": { "$ref": "#/$defs/identifier" },
     "posterior_draw_set_id": { "$ref": "#/$defs/identifier" },
-    "posterior_draw_count": { "type": "integer", "minimum": 1 },
-    "topic_count": { "type": "integer", "minimum": 2 },
+    "posterior_draw_count": { "$ref": "#/$defs/positive_u64" },
+    "topic_count": { "$ref": "#/$defs/topic_count" },
+    "topic_ids": { "type": "array", "minItems": 2, "maxItems": 1000000, "uniqueItems": true, "items": { "type": "string", "format": "uuid" } },
     "activity_intervals": { "type": "array", "maxItems": 1000000, "items": { "$ref": "#/$defs/activity" } },
     "lineage_events": { "type": "array", "maxItems": 1000000, "items": { "$ref": "#/$defs/lineage" } },
+    "document_relations": { "type": "array", "maxItems": 1000000, "items": { "$ref": "#/$defs/document_relation" } },
     "plausible_values": { "type": "array", "minItems": 2, "maxItems": 1000000, "items": { "$ref": "#/$defs/plausible_value" } },
     "memberships": { "type": "array", "minItems": 8, "maxItems": 1000000, "items": { "$ref": "#/$defs/membership" } },
     "inference_status": { "const": "posterior_topic_coordinates_not_importance" }
@@ -25,11 +28,14 @@
   "$defs": {
     "identifier": { "type": "string", "minLength": 1, "maxLength": 256 },
     "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "u64": { "type": "integer", "minimum": 0, "maximum": 18446744073709551615 },
+    "positive_u64": { "type": "integer", "minimum": 1, "maximum": 18446744073709551615 },
+    "topic_count": { "type": "integer", "minimum": 2, "maximum": 18446744073709551615 },
     "activity": {
       "type": "object", "additionalProperties": false,
-      "required": ["topic_index", "state_code", "valid_from", "valid_to"],
+      "required": ["topic_id", "state_code", "valid_from", "valid_to"],
       "properties": {
-        "topic_index": { "type": "integer", "minimum": 0 },
+        "topic_id": { "type": "string", "format": "uuid" },
         "state_code": { "enum": ["active", "dormant", "reactivated"] },
         "valid_from": { "type": "string", "format": "date-time" },
         "valid_to": { "type": "string", "format": "date-time" }
@@ -37,12 +43,28 @@
     },
     "lineage": {
       "type": "object", "additionalProperties": false,
-      "required": ["event_code", "source_topic_index", "event_time", "evidence_sha256"],
+      "required": ["event_code", "source_topic_id", "event_time", "evidence_resource_id", "provenance_assertion_id", "evidence_sha256"],
       "properties": {
         "event_code": { "enum": ["birth", "split", "merge", "retirement"] },
-        "source_topic_index": { "type": "integer", "minimum": 0 },
-        "target_topic_index": { "type": ["integer", "null"], "minimum": 0 },
+        "source_topic_id": { "type": "string", "format": "uuid" },
+        "target_topic_id": { "type": ["string", "null"], "format": "uuid" },
         "event_time": { "type": "string", "format": "date-time" },
+        "evidence_resource_id": { "$ref": "#/$defs/identifier" },
+        "provenance_assertion_id": { "$ref": "#/$defs/identifier" },
+        "evidence_sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "document_relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_document_id", "target_document_id", "relation_kind_code", "event_time", "evidence_resource_id", "provenance_assertion_id", "evidence_sha256"],
+      "properties": {
+        "source_document_id": { "type": "string", "format": "uuid" },
+        "target_document_id": { "type": "string", "format": "uuid" },
+        "relation_kind_code": { "const": "event_lineage_precedes" },
+        "event_time": { "type": "string", "format": "date-time" },
+        "evidence_resource_id": { "$ref": "#/$defs/identifier" },
+        "provenance_assertion_id": { "$ref": "#/$defs/identifier" },
         "evidence_sha256": { "$ref": "#/$defs/digest" }
       }
     },
@@ -51,14 +73,14 @@
       "required": ["document_id", "draw_index", "event_time", "logistic_normal_coordinates"],
       "properties": {
         "document_id": { "type": "string", "format": "uuid" },
-        "draw_index": { "type": "integer", "minimum": 0 },
+        "draw_index": { "$ref": "#/$defs/u64" },
         "event_time": { "type": "string", "format": "date-time" },
         "logistic_normal_coordinates": { "type": "array", "minItems": 1, "items": { "type": "number" } }
       }
     },
     "membership": {
       "type": "object", "additionalProperties": false,
-      "required": ["document_id", "dimension_code", "context_id", "weight", "valid_from", "valid_to", "evidence_sha256"],
+      "required": ["document_id", "dimension_code", "context_id", "weight", "valid_from", "valid_to", "evidence_resource_id", "provenance_assertion_id", "evidence_sha256"],
       "properties": {
         "document_id": { "type": "string", "format": "uuid" },
         "dimension_code": { "enum": ["business_unit", "process_unit", "team", "person"] },
@@ -66,6 +88,8 @@
         "weight": { "type": "number", "exclusiveMinimum": 0 },
         "valid_from": { "type": "string", "format": "date-time" },
         "valid_to": { "type": "string", "format": "date-time" },
+        "evidence_resource_id": { "$ref": "#/$defs/identifier" },
+        "provenance_assertion_id": { "$ref": "#/$defs/identifier" },
         "evidence_sha256": { "$ref": "#/$defs/digest" }
       }
     }
