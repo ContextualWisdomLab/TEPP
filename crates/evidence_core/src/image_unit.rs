@@ -172,8 +172,11 @@ fn is_plausible_image_media_type(media_type: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{embedded_image_units, refuse_base64_image_as_lexical_text};
+    use super::{
+        embedded_image_units, is_image_media_type_token, refuse_base64_image_as_lexical_text,
+    };
     use crate::{DocumentRecord, EvidenceError, SourceArtifact};
+    use std::hint::black_box;
 
     #[test]
     fn jpeg_uri_and_incomplete_prefix_are_classified() {
@@ -217,7 +220,8 @@ mod tests {
 
     #[test]
     fn non_image_and_empty_subtype_data_uris_are_not_lexical_images() {
-        // A non-image media type exercises the strip-prefix refusal arm.
+        // A `data:text/plain` body never matches `data:image/`, so the public
+        // lexical gate stays Ok without calling `is_image_media_type_token`.
         assert_eq!(
             refuse_base64_image_as_lexical_text("data:text/plain;base64,AAAA"),
             Ok(())
@@ -227,6 +231,18 @@ mod tests {
             refuse_base64_image_as_lexical_text("data:image/;base64,AAAA"),
             Ok(())
         );
+    }
+
+    #[test]
+    fn non_image_media_type_token_refuses_non_image_prefix() {
+        // `contains_base64_image_data_uri` searches `data:image/`, so a
+        // `data:text/plain` body never reaches this helper. Call it directly
+        // so the `strip_prefix("image/")` None arm (`return false`) executes.
+        assert!(!is_image_media_type_token(black_box("text/plain")));
+        assert!(!is_image_media_type_token(black_box("application/json")));
+        assert!(!is_image_media_type_token(black_box(
+            "text/plain;charset=utf-8"
+        )));
     }
 
     #[test]
