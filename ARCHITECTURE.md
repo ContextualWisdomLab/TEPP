@@ -105,6 +105,7 @@ boundaries above remain the target modular MSA architecture.
 | `topic_lineage` | global topic identity across active/dormant/reactivated states |
 | `network_analysis` | compositional cluster-pair gates; raw simplex is not Euclidean |
 | `interpretation_gateway` | evidence-bounded LLM interpretations; not estimators or observed facts |
+| `orchestrator_live` | loopback interpretation HTTP/1.1 listener |
 | `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
 | `compute_backend` | VRAM-budgeted streamed planning, executable OOM retry plans, and a compensated CPU `f64` reference |

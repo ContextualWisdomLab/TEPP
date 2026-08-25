@@ -108,6 +108,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Encrypted identity mapping envelope | `encrypted_mapping` | active-PR | this PR | exact-head evidence with no unresolved security blocker; unauthorized purpose, wrong key identity/bytes, tampered ciphertext/tag, key redaction, empty input, persistence refusal, generated-nonce/reuse resistance, and recovered identity rate vs collapsed names | ADR 0009; persistence waits for later migration; promotion requires the complete fail-closed security matrix |
 | Logistic-normal topic coordinates and CPU reference estimator | `topic_measurement` | active-PR | stable ALR + sequential ILR + lexical refusal + bounded sparse TRSL-TM fit | known-simplex ALR/ILR RMSE, Aitchison-distance ILR isometry, known-topic RMSE, exact line/branch coverage | ADR 0012; calibrated posterior, method effects, persistence, and accelerated backends remaining |
 | CWL modular connectors | `docs/connectors/*` | implemented-main | — | contract docs + examples | PR #22; live HTTP ports remaining |
+| Orchestrator loopback interpretation listener | `orchestrator_live` | active-PR | this PR | loopback bind + hypothetical claim + credential/table refusal | ADR 0010/0011; not TLS or model execution |
 | Release SBOM/provenance generator | `scripts/release_evidence.py` | partial | — | generate+validate in CI | Task 13 partial / PR #28 |
 | Default stopword deletion refusal | `stopword_deletion` | accepted-target | active PR | refuse default/global stopword lists + recovery vs stopword collapse | ADR 0004/0012 |
 

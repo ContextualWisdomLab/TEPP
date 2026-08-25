@@ -113,10 +113,11 @@ jobs:
           docs/product-technical-gap-baseline.md (refreshed each cycle against
           live GitHub state); if that file is absent or exhausted, re-derive
           the gap from ADRs, research registers, and protected-main evidence.
-          Select exactly one bounded increment whose scope fits one pull
-          request and name the Gap ID you are closing in the resulting
-          PR_MESSAGE.md. Never invent weights: use psychometric estimates
-          from evidence-grounded models instead of arbitrary constants.
+          Select exactly one bounded pull request whose scope fits one
+          bounded increment and name the Gap ID you are closing in the
+          resulting PR_MESSAGE.md. Never invent weights: use psychometric
+          estimates from evidence-grounded models instead of arbitrary
+          constants.
 
           Preserve standalone operation and modular MSA integration with
           ContextualWisdomLab/.github, naruon, contextual-orchestrator, and other
@@ -141,7 +142,11 @@ jobs:
 
           Do not merge. Do not release. Do not deploy. Do not publish. Do not
           weaken exact-head review, Checks, security, privacy, coverage, docstring,
-          credential, deterministic-grounding, or fail-closed controls. Leave one
+          credential, deterministic-grounding, or fail-closed controls. Operational
+          logging stays on the fail-closed contract: privileged persistence inserts
+          go through the audited audit_event path, in-memory records are created
+          only via operational_log try_record / OperationalLogRecord::new, and raw
+          source text or source identity never enters the log. Leave one
           coherent working-tree increment and create PR_MESSAGE.md: title first,
           then a body with Gap, design, RED/GREEN evidence, verification, APA 7
           sources, version decision, and residual risk.

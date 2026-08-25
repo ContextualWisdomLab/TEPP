@@ -66,6 +66,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `psychometric_core` posterior-aware structural input gates: construct classification, refusal of raw-proportion Pearson/OLS, explicit ALR-versus-ILR geometry boundaries, CPU `f64` OLS recovery, posterior-draw loading point-estimate averaging without Rubin uncertainty claims, invariance-gated latent-mean comparison, and causal-heuristic refusal (ADR 0005 first production slice; no new migration).
 ### Added
 
+- `orchestrator_live` loopback HTTP/1.1 listener: `POST /v1/interpretation-runs` binds loopback only, replays matching idempotency keys, and refuses non-loopback binds, table-access hosts, review/Copilot/GitHub credentials, and scientific-authority promotion. Accepted output is always hypothetical. Not TLS termination or model execution (ADR 0010; ADR 0011).
 - `role_contradiction` identity gate: customer and competitor cannot occupy the same group; recovered commercial-role labels match known truth at a higher computed rate than collapsing every role to customer (ADR 0003).
 - `episode_membership` identity gate: a document's episode membership cannot
   start before or end after the episode event-time interval; recovered
