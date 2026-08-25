@@ -47,6 +47,7 @@ use psychometric_core::{
     recover_predetermined_later_latent_variance, recover_predetermined_later_observed_variance,
     recover_predetermined_later_start_later_latent_variance,
     recover_predetermined_later_start_later_observed_variance,
+    recover_standardised_asymptotic_diffusion,
     recover_standardised_asymptotic_time_independent_predictor_effect,
     recover_standardised_asymptotic_time_independent_predictor_variance,
     recover_standardised_continuous_diffusion, recover_standardised_continuous_drift,
@@ -59,14 +60,14 @@ use psychometric_core::{
     recover_standardised_initial_time_dependent_predictor_effect,
     recover_standardised_initial_time_independent_predictor_effect,
     recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_time_independent_predictor_variance, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -83,6 +84,7 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_observed_variance_as_measurement_error,
     refuse_asymptotic_time_independent_observed_variance_as_standardised_asymptotic_time_independent_variance,
     refuse_asymptotic_time_independent_observed_variance_as_stationary_observed_variance,
+    refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance,
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
@@ -204,6 +206,7 @@ use psychometric_core::{
     refuse_standardised_asymptotic_continuous_intercept_as_standardised_continuous_intercept,
     refuse_standardised_asymptotic_time_independent_effect_as_standardised_continuous_time_independent_effect,
     refuse_standardised_asymptotic_time_independent_effect_as_standardised_initial_time_independent_effect,
+    refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
     refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
     refuse_standardised_discrete_continuous_intercept_as_standardised_continuous_intercept,
     refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_dependent_effect,
@@ -219,6 +222,8 @@ use psychometric_core::{
     refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance,
     refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
+    refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance,
+    refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
     refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -276,6 +281,7 @@ use psychometric_core::{
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_standardisation_variance,
     refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
+    refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
     refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
     refuse_unstandardised_asymptotic_time_independent_variance_as_standardised_asymptotic_time_independent_variance,
     refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion,
@@ -291,6 +297,7 @@ use psychometric_core::{
     refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
+    refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
 };
 
@@ -794,31 +801,37 @@ fn within_residual_event_time_log_rate_beats_pooled_levels() {
 
 #[test]
 fn within_residual_event_time_log_rate_rejects_nonfinite_residual_ratios() {
+fn within_residual_log_rate_rejects_nonpositive_centered_lags() {
     let rows = [
         ClusteredEventScore {
             cluster_key: 1,
             event_time: 0.0,
             score: 1e-308,
+            score: 1.0,
         },
         ClusteredEventScore {
             cluster_key: 1,
             event_time: 1.0,
             score: f64::MAX,
+            score: 2.0,
         },
         ClusteredEventScore {
             cluster_key: 1,
             event_time: 2.0,
             score: -f64::MAX,
+            score: 0.0,
         },
         ClusteredEventScore {
             cluster_key: 2,
             event_time: 0.0,
             score: 0.0,
+            score: 5.0,
         },
         ClusteredEventScore {
             cluster_key: 2,
             event_time: 1.0,
             score: 1.0,
+            score: 6.0,
         },
     ];
     assert_eq!(
@@ -830,6 +843,15 @@ fn within_residual_event_time_log_rate_rejects_nonfinite_residual_ratios() {
             cluster_key: 1,
             event_time: 0.0,
             score: 0.0,
+}
+
+#[test]
+fn within_residual_log_rate_rejects_nonfinite_centered_lag_ratios() {
+    let rows = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 1e-320,
         },
         ClusteredEventScore {
             cluster_key: 1,
@@ -840,11 +862,13 @@ fn within_residual_event_time_log_rate_rejects_nonfinite_residual_ratios() {
             cluster_key: 1,
             event_time: 2.0,
             score: 2.0,
+            score: -1.0,
         },
         ClusteredEventScore {
             cluster_key: 2,
             event_time: 0.0,
             score: 0.0,
+            score: 2.0,
         },
         ClusteredEventScore {
             cluster_key: 2,
@@ -854,6 +878,11 @@ fn within_residual_event_time_log_rate_rejects_nonfinite_residual_ratios() {
     ];
     assert_eq!(
         recover_within_residual_event_time_log_rate(&zero_residual_rows, LagClock::EventTime,),
+            score: 3.0,
+        },
+    ];
+    assert_eq!(
+        recover_within_residual_event_time_log_rate(&rows, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }
@@ -984,6 +1013,12 @@ fn discrete_latent_variance_recovers_driver_equations_three_and_four() {
         recover_discrete_latent_variance(1e-308, 1e-308, 400.0, 1.0, LagClock::EventTime)
             .expect("finite exponential rewrite");
     assert!(finite_rewrite.is_finite());
+    // A finite positive drift interval can overflow exp without making the
+    // interval itself non-finite; the implementation must still fail closed.
+    assert_eq!(
+        recover_discrete_latent_variance(1.0, 0.0, 1_000.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
 }
 
 #[test]
@@ -1627,6 +1662,18 @@ fn time_dependent_impulse_refuses_overflow_and_non_event_clocks() {
             0.0,
             1e308,
             1.0,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_latent_mean_with_impulse(
+            1.0,
+            -0.5,
+            0.3,
+            1e308,
+            2.0,
             1.0,
             LagClock::EventTime
         ),
@@ -3118,6 +3165,12 @@ fn time_dependent_impulse_carry_refuses_overflow_and_non_event_clocks() {
             2.0,
             1.0,
             LagClock::EventTime,
+            1.0,
+            1.0,
+            1_000.0,
+            2.0,
+            1.0,
+            LagClock::EventTime
         ),
         Err(PsychometricError::InvalidNumericInput)
     );
@@ -4070,6 +4123,16 @@ fn extra_process_contribution_refuses_nonnegative_extra_drift_clock_and_overflow
     assert!(overflow_fallback.is_finite());
     .expect("finite exponential fallback");
     assert!(finite_exponential_fallback.is_finite());
+    let finite_exp_m1_overflow = recover_level_change_extra_process_contribution(
+        0.4,
+        3.0,
+        -1_000.0,
+        -0.5,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("finite exp_m1 overflow fallback");
+    assert!(finite_exp_m1_overflow.is_finite());
 }
 
 #[test]
@@ -4714,6 +4777,9 @@ fn asymptotic_time_independent_variance_refuses_unstable_drift_and_non_event_clo
             1.0,
             1.0,
             -1e-308,
+            f64::MAX,
+            1.0,
+            -1.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::InvalidNumericInput)
@@ -9305,6 +9371,70 @@ fn standardised_continuous_time_dependent_effect_refuses_non_event_clocks_and_do
 }
 
 #[test]
+fn standardised_effects_fail_closed_when_sd_ratio_overflows() {
+    let minimum_positive_variance = f64::from_bits(1);
+    let maximum_predictor_variance = f64::MAX;
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            f64::NAN,
+            1.0,
+            0.4,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_time_independent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_continuous_time_independent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_continuous_time_dependent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            -0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_initial_time_independent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_initial_time_dependent_predictor_effect(
+            0.4,
+            maximum_predictor_variance,
+            minimum_positive_variance,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
 fn standardised_initial_time_dependent_effect_recovers_driver_table_three_footnote_four() {
     let initial_variance = 1.6_f64;
     let coefficient = 0.3_f64;
@@ -9805,6 +9935,152 @@ fn standardised_manifest_variance_refuses_non_event_clocks_and_does_not_keep_zer
     assert_eq!(
         recover_standardised_manifest_variance(0.0, LagClock::EventTime),
         Err(PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance)
+    );
+}
+
+#[test]
+fn standardised_time_independent_predictor_variance_recovers_driver_table_two_correlation() {
+    let predictor_variance = 0.4_f64;
+    let recovered = recover_standardised_time_independent_predictor_variance(
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("TIPREDVARstd");
+    assert!((recovered - 1.0).abs() < 1e-15);
+    let larger_v =
+        recover_standardised_time_independent_predictor_variance(1.6, LagClock::EventTime)
+            .expect("TIPREDVARstd v=1.6");
+    assert_eq!(larger_v.to_bits(), recovered.to_bits());
+    let manifest_std =
+        recover_standardised_manifest_variance(predictor_variance, LagClock::EventTime)
+            .expect("MANIFESTVARstd");
+    assert_eq!(manifest_std.to_bits(), recovered.to_bits());
+    let recovered_error = (recovered - 1.0).abs();
+    let unstandardised_error = (predictor_variance - 1.0).abs();
+    assert!(
+        recovered_error < unstandardised_error,
+        "Driver et al. (2017, Table 2): unstandardised TIPREDVAR RMSE {unstandardised_error} must exceed TIPREDVARstd RMSE {recovered_error}"
+    );
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        0.2,
+        predictor_variance,
+        -0.5,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let added_rmse = (added - 1.0).abs();
+    assert!(
+        recovered_error < added_rmse,
+        "Driver et al. (2017, §7.2): addedTIPREDVAR RMSE {added_rmse} must exceed TIPREDVARstd RMSE {recovered_error}"
+    );
+    assert_eq!(
+        refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+            predictor_variance,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance)
+    );
+    assert_eq!(
+        refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance(
+            manifest_std,
+            recovered
+        ),
+        Err(PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance)
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+            added,
+            recovered
+        ),
+        Err(PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance)
+    );
+}
+
+#[test]
+fn standardised_time_independent_predictor_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance()
+ {
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(0.4, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(0.0, LagClock::EventTime),
+        Err(PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(-0.4, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(f64::NAN, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn standardised_asymptotic_diffusion_recovers_driver_page_sixteen_correlation() {
+    let diffusion = 0.4_f64;
+    let log_rate = -0.25_f64;
+    let recovered =
+        recover_standardised_asymptotic_diffusion(diffusion, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSIONstd");
+    assert!((recovered - 1.0).abs() < 1e-15);
+    let larger_q = recover_standardised_asymptotic_diffusion(1.6, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSIONstd q=1.6");
+    assert_eq!(larger_q.to_bits(), recovered.to_bits());
+    let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let predictor_std =
+        recover_standardised_time_independent_predictor_variance(within, LagClock::EventTime)
+            .expect("TIPREDVARstd");
+    assert_eq!(predictor_std.to_bits(), recovered.to_bits());
+    let recovered_error = (recovered - 1.0).abs();
+    let unstandardised_error = (within - 1.0).abs();
+    assert!(
+        recovered_error < unstandardised_error,
+        "Driver et al. (2017, p. 16): unstandardised asymDIFFUSION RMSE {unstandardised_error} must exceed asymDIFFUSIONstd RMSE {recovered_error}"
+    );
+    let diffusion_std =
+        recover_standardised_continuous_diffusion(diffusion, log_rate, LagClock::EventTime)
+            .expect("DIFFUSIONstd");
+    let diffusion_rmse = (diffusion_std - 1.0).abs();
+    assert!(
+        recovered_error < diffusion_rmse,
+        "Driver et al. (2017, p. 16): DIFFUSIONstd RMSE {diffusion_rmse} must exceed asymDIFFUSIONstd RMSE {recovered_error}"
+    );
+    assert_eq!(
+        refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion(
+            within, recovered
+        ),
+        Err(PsychometricError::UnstandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticDiffusion)
+    );
+    assert_eq!(
+        refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion(
+            predictor_std,
+            recovered
+        ),
+        Err(PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion)
+    );
+    assert_eq!(
+        refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion(
+            diffusion_std,
+            recovered
+        ),
+        Err(PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion)
+    );
+}
+
+#[test]
+fn standardised_asymptotic_diffusion_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
+    assert_eq!(
+        recover_standardised_asymptotic_diffusion(0.4, -0.25, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_diffusion(0.0, -0.25, LagClock::EventTime),
+        Err(
+            PsychometricError::StandardisedAsymptoticDiffusionRequiresPositiveWithinSubjectVariance
+        )
     );
 }
 
