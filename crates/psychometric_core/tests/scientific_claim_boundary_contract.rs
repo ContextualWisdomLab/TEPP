@@ -6,8 +6,9 @@ use psychometric_core::{
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
-    recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
-    recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
+    recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
+    recover_discrete_lagged_latent_covariance, recover_discrete_latent_mean,
+    recover_discrete_latent_mean_with_extra_process,
     recover_discrete_latent_mean_with_extra_process_after,
     recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
     recover_discrete_latent_mean_with_initial_time_dependent_predictor,
@@ -36,7 +37,7 @@ use psychometric_core::{
     recover_predetermined_later_lagged_observed_covariance,
     recover_predetermined_later_latent_variance, recover_predetermined_later_observed_variance,
     recover_predetermined_later_start_later_latent_variance,
-    recover_predetermined_later_start_later_observed_variance,
+    recover_predetermined_later_start_later_observed_variance, recover_standardised_discrete_drift,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
     recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
     recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -190,8 +191,11 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_trait_plus_state_autocorrelation_as_standardised_discrete_drift,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
-    refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
+    refuse_trait_variance_as_process_noise, refuse_trait_variance_as_standardisation_variance,
+    refuse_trait_variance_as_stationary_within_subject,
+    refuse_unstandardised_discrete_drift_as_standardised_discrete_drift,
 };
 
 #[test]
@@ -4121,5 +4125,72 @@ fn predetermined_later_start_later_observed_variance_is_not_manifest_later_or_st
         Err(
             psychometric_core::PsychometricError::StationaryLaterObservedVarianceIsNotPredeterminedLaterStartLaterObservedVariance
         )
+    );
+}
+
+#[test]
+fn standardised_discrete_drift_is_not_unstandardised_or_trait_contaminated() {
+    let diffusion = 0.4_f64;
+    let log_rate = -0.5_f64;
+    let event_delta = 1.0_f64;
+    let recovered =
+        recover_standardised_discrete_drift(diffusion, log_rate, event_delta, LagClock::EventTime)
+            .expect("discreteDRIFTstd");
+    let unstandardised =
+        recover_discrete_lag_from_log_rate(log_rate, event_delta, LagClock::EventTime)
+            .expect("discreteDRIFT");
+    let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    assert!(
+        (recovered - unstandardised).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): scalar discreteDRIFTstd equals exp(a Δt) after positive asymDIFFUSION"
+    );
+    let trait_variance = 1.0_f64;
+    let lagged = recover_trait_plus_state_lagged_covariance(
+        trait_variance,
+        within,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("trait+state lag");
+    let total =
+        recover_trait_plus_state_latent_variance(trait_variance, within).expect("trait+state var");
+    let contaminated = lagged / total;
+    assert!(
+        (contaminated - recovered).abs() > 1e-3,
+        "Driver et al. (2017, footnote 4 / §7.1): TRAITVAR contaminates the auto-effect"
+    );
+    assert_eq!(
+        recover_standardised_discrete_drift(0.0, log_rate, event_delta, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedDiscreteDriftRequiresPositiveWithinSubjectVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_discrete_drift(diffusion, 0.5, event_delta, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        refuse_unstandardised_discrete_drift_as_standardised_discrete_drift(
+            unstandardised,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedDiscreteDriftIsNotStandardisedDiscreteDrift
+        )
+    );
+    assert_eq!(
+        refuse_trait_plus_state_autocorrelation_as_standardised_discrete_drift(
+            contaminated,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::TraitPlusStateAutocorrelationIsNotStandardisedDiscreteDrift
+        )
+    );
+    assert_eq!(
+        refuse_trait_variance_as_standardisation_variance(trait_variance, within),
+        Err(psychometric_core::PsychometricError::TraitVarianceIsNotStandardisationVariance)
     );
 }
