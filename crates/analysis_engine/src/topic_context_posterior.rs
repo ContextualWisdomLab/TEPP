@@ -173,7 +173,7 @@ fn valid_activity_interval(interval: &TopicActivityInterval, topic_ids: &BTreeSe
             .is_some_and(|(valid_from, valid_to)| valid_from <= valid_to)
 }
 
-fn within_entry_limits(lengths: [usize; 4], entry_limit: usize) -> bool {
+fn within_entry_limits(lengths: [usize; 5], entry_limit: usize) -> bool {
     lengths.into_iter().all(|length| length <= entry_limit)
 }
 
@@ -198,8 +198,9 @@ impl TopicContextPosteriorArtifact {
                 [
                     self.activity_intervals.len(),
                     self.lineage_events.len(),
+                    self.document_relations.len(),
                     self.plausible_values.len(),
-                    self.memberships.len() + self.document_relations.len(),
+                    self.memberships.len(),
                 ],
                 entry_limit,
             )
@@ -244,6 +245,7 @@ impl TopicContextPosteriorArtifact {
                 &a.source_topic_id,
                 &a.target_topic_id,
                 &a.event_time,
+                &a.evidence_resource_id,
                 &a.provenance_assertion_id,
             )
                 .cmp(&(
@@ -251,6 +253,7 @@ impl TopicContextPosteriorArtifact {
                     &b.source_topic_id,
                     &b.target_topic_id,
                     &b.event_time,
+                    &b.evidence_resource_id,
                     &b.provenance_assertion_id,
                 ))
         });
@@ -260,6 +263,7 @@ impl TopicContextPosteriorArtifact {
                 &a.target_document_id,
                 &a.relation_kind_code,
                 &a.event_time,
+                &a.evidence_resource_id,
                 &a.provenance_assertion_id,
             )
                 .cmp(&(
@@ -267,6 +271,7 @@ impl TopicContextPosteriorArtifact {
                     &b.target_document_id,
                     &b.relation_kind_code,
                     &b.event_time,
+                    &b.evidence_resource_id,
                     &b.provenance_assertion_id,
                 ))
         });
@@ -721,6 +726,31 @@ mod tests {
         reordered.plausible_values.swap(0, 1);
         assert_eq!(reordered.to_json(), artifact().to_json());
         assert_eq!(reordered.sha256(), artifact().sha256());
+
+        let mut distinct_evidence = artifact();
+        let mut relation = distinct_evidence.document_relations[0].clone();
+        relation.evidence_resource_id = "evidence-relation-0".into();
+        distinct_evidence.document_relations.push(relation);
+        let lineage = TopicLineageEvent {
+            event_code: "split".into(),
+            source_topic_id: distinct_evidence.topic_ids[0].clone(),
+            target_topic_id: Some(distinct_evidence.topic_ids[1].clone()),
+            event_time: "2026-07-15T00:00:00Z".into(),
+            evidence_sha256: "d".repeat(64),
+            evidence_resource_id: "evidence-lineage-1".into(),
+            provenance_assertion_id: "provenance-lineage-canonical".into(),
+        };
+        distinct_evidence.lineage_events.extend([
+            lineage.clone(),
+            TopicLineageEvent {
+                evidence_resource_id: "evidence-lineage-0".into(),
+                ..lineage
+            },
+        ]);
+        let canonical_json = distinct_evidence.to_json();
+        distinct_evidence.document_relations.swap(0, 1);
+        distinct_evidence.lineage_events.swap(0, 1);
+        assert_eq!(distinct_evidence.to_json(), canonical_json);
     }
 
     #[test]
@@ -761,9 +791,9 @@ mod tests {
                 value.topic_ids[0].clone()
         );
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.inference_status.clear());
-        assert!(within_entry_limits([ENTRY_LIMIT; 4], ENTRY_LIMIT));
+        assert!(within_entry_limits([ENTRY_LIMIT; 5], ENTRY_LIMIT));
         assert!(!within_entry_limits(
-            [ENTRY_LIMIT + 1, 0, 0, 0],
+            [ENTRY_LIMIT + 1, 0, 0, 0, 0],
             ENTRY_LIMIT
         ));
         assert!(!artifact().has_valid_header_with_entry_limit(0));
