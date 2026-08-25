@@ -299,6 +299,7 @@ impl TopicContextPosteriorArtifact {
 
 #[cfg(test)]
 mod tests {
+    use super::AnalysisEngineError;
     use super::{
         ENTRY_LIMIT, TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
         TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
@@ -545,5 +546,128 @@ mod tests {
             |value: &mut TopicContextPosteriorArtifact| value.memberships[0].document_id =
                 "018f3f7a-7b7c-7d00-8000-000000000003".into()
         );
+    }
+
+    #[test]
+    fn to_json_refuses_payloads_over_the_canonical_byte_limit() {
+        // Grow the artifact with fully valid synthetic documents — each with
+        // the full draw set and all four membership dimensions — until the
+        // canonical serialization crosses 16 MiB, so the size branch (and
+        // only the size branch) refuses with LimitExceeded. The count is
+        // derived from one measured per-document delta, so the loop runs
+        // once instead of re-serializing the whole payload per step.
+        let probe = artifact();
+        let per_document_bytes = {
+            let mut one = probe.clone();
+            let document = ::uuid::Uuid::from_u128(0x8000_0000_0000_0000_u128).to_string();
+            for draw in 0..one.posterior_draw_count {
+                one.plausible_values.push(TopicPostPlausibleValue {
+                    document_id: document.clone(),
+                    draw_index: draw,
+                    event_time: "2026-07-15T00:00:00Z".into(),
+                    logistic_normal_coordinates: vec![0.0],
+                });
+            }
+            for dimension in [
+                "business_unit",
+                "process_unit",
+                "team",
+                "person",
+            ] {
+                one.memberships.push(TopicContextMembership {
+                    document_id: document.clone(),
+                    dimension_code: dimension.into(),
+                    context_id: "context-probe".into(),
+                    weight: 1.0,
+                    valid_from: "2026-07-01T00:00:00Z".into(),
+                    valid_to: "2026-08-01T00:00:00Z".into(),
+                    evidence_sha256: "b".repeat(64),
+                });
+            }
+            serde_json::to_string(&one).expect("probe").len()
+                - serde_json::to_string(&probe).expect("base").len()
+        };
+        assert!(per_document_bytes > 0);
+        let extra_documents = TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT / per_document_bytes + 2;
+        let projected_entries =
+            extra_documents * ((probe.posterior_draw_count + 4) as usize);
+        assert!(
+            projected_entries <= ENTRY_LIMIT,
+            "derived documents must stay inside the entry cap"
+        );
+        let mut oversized = probe;
+        // Bulk-fill up to the estimate, then top up one document at a time
+        // (near the limit, only a handful of iterations remain) so rounding
+        // differences between the probe and the real entries cannot leave the
+        // payload under the threshold.
+        for index in 0..extra_documents {
+            let document =
+                ::uuid::Uuid::from_u128(0x8000_0000_0000_0000_u128 + u128::try_from(index).expect("index fits u128"))
+                    .to_string();
+            for draw in 0..oversized.posterior_draw_count {
+                oversized.plausible_values.push(TopicPostPlausibleValue {
+                    document_id: document.clone(),
+                    draw_index: draw,
+                    event_time: "2026-07-15T00:00:00Z".into(),
+                    logistic_normal_coordinates: vec![0.0],
+                });
+            }
+            for dimension in [
+                "business_unit",
+                "process_unit",
+                "team",
+                "person",
+            ] {
+                oversized.memberships.push(TopicContextMembership {
+                    document_id: document.clone(),
+                    dimension_code: dimension.into(),
+                    context_id: format!("context-{index}"),
+                    weight: 1.0,
+                    valid_from: "2026-07-01T00:00:00Z".into(),
+                    valid_to: "2026-08-01T00:00:00Z".into(),
+                    evidence_sha256: "b".repeat(64),
+                });
+            }
+        }
+        let mut top_up = extra_documents;
+        while serde_json::to_string(&oversized)
+            .expect("canonical serialization")
+            .len()
+            <= TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT
+        {
+            assert!(
+                top_up < extra_documents + 1_000,
+                "byte limit not crossed within the top-up budget"
+            );
+            let document =
+                ::uuid::Uuid::from_u128(0x8000_0000_0000_0000_u128 + u128::try_from(top_up).expect("fits"))
+                    .to_string();
+            for draw in 0..oversized.posterior_draw_count {
+                oversized.plausible_values.push(TopicPostPlausibleValue {
+                    document_id: document.clone(),
+                    draw_index: draw,
+                    event_time: "2026-07-15T00:00:00Z".into(),
+                    logistic_normal_coordinates: vec![0.0],
+                });
+            }
+            for dimension in [
+                "business_unit",
+                "process_unit",
+                "team",
+                "person",
+            ] {
+                oversized.memberships.push(TopicContextMembership {
+                    document_id: document.clone(),
+                    dimension_code: dimension.into(),
+                    context_id: format!("context-topup-{top_up}"),
+                    weight: 1.0,
+                    valid_from: "2026-07-01T00:00:00Z".into(),
+                    valid_to: "2026-08-01T00:00:00Z".into(),
+                    evidence_sha256: "b".repeat(64),
+                });
+            }
+            top_up += 1;
+        }
+        assert_eq!(oversized.to_json(), Err(AnalysisEngineError::LimitExceeded));
     }
 }
