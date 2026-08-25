@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-25  
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — contract validation only; no estimator emits it
+**Implementation maturity:** active-PR — contract validation plus identity-bound
+Laplace moment export; no posterior sampler or GPU estimator emits it
 **Supersedes:** None; composes ADR 0012 and Event Lineage contracts.
 
 ## Context
@@ -24,6 +25,14 @@ The artifact never hard-labels a post by thresholding a topic coordinate and
 never calls topic prevalence importance. Missing draws, non-finite coordinates,
 missing membership dimensions or weights, invalid intervals, duplicate rows,
 foreign schemas, and mixed identities fail closed.
+
+The existing CPU reference fit exposes diagonal Laplace variances, not a joint
+posterior draw law. TEPP may therefore export each document identity with its
+fitted ALR mean and diagonal Laplace variance as an intermediate moment set,
+but must not relabel those moments as plausible values. Emitting this artifact
+still requires a versioned posterior sampling algorithm (including reproducible
+random-stream semantics) and an executing GPU backend; the current GPU module
+plans memory and recovery but does not execute topic kernels.
 
 fast-mlsirm owns posterior-aware likelihood, observed information, deletion
 refits, and the LineageWeave ADR-0210 case-deletion influence diagnostic.

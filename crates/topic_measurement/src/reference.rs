@@ -8,7 +8,7 @@ use relation_graph::RelationGraph;
 use temporal_core::EventTime;
 use uuid::Uuid;
 
-use crate::{SparseMatrix, TopicMeasurementError, from_additive_log_ratio};
+use crate::{SparseMatrix, TopicMeasurementError, additive_log_ratio, from_additive_log_ratio};
 
 const DEFAULT_PRIOR_VARIANCE: f64 = 1.0;
 const DEFAULT_RELATION_STRENGTH: f64 = 0.25;
@@ -425,6 +425,62 @@ pub struct ReferenceTopicModel {
     pub lineage_count: usize,
 }
 
+/// One identity-bound diagonal Laplace approximation from a converged fit.
+///
+/// This is an intermediate posterior moment, not a posterior draw or plausible
+/// value. A producer must apply a separately governed sampling algorithm before
+/// emitting `tepp.topic_context_posterior.v1`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TopicCoordinateLaplaceMoment {
+    /// Opaque source-document identity in input order.
+    pub document_id: Uuid,
+    /// Fitted additive-log-ratio posterior mode.
+    pub mean_coordinates: Vec<f64>,
+    /// Diagonal Laplace variance in the same coordinate order.
+    pub diagonal_variances: Vec<f64>,
+}
+
+/// Export identity-bound diagonal Laplace moments from a converged reference fit.
+///
+/// # Errors
+///
+/// Returns [`TopicMeasurementError::InvalidModelInput`] when identities or
+/// fitted dimensions do not agree, and [`TopicMeasurementError::NonFiniteEstimate`]
+/// for non-finite or non-positive variance output.
+pub fn topic_coordinate_laplace_moments(
+    input: &ReferenceTopicInput,
+    model: &ReferenceTopicModel,
+) -> Result<Vec<TopicCoordinateLaplaceMoment>, TopicMeasurementError> {
+    if model.document_topic_proportions.len() != input.document_ids.len()
+        || model.document_coordinate_variances.len() != input.document_ids.len()
+    {
+        return Err(TopicMeasurementError::InvalidModelInput);
+    }
+    input
+        .document_ids
+        .iter()
+        .zip(&model.document_topic_proportions)
+        .zip(&model.document_coordinate_variances)
+        .map(|((&document_id, proportions), variances)| {
+            let mean_coordinates = additive_log_ratio(proportions)?;
+            if variances.len() != mean_coordinates.len() {
+                return Err(TopicMeasurementError::InvalidModelInput);
+            }
+            if variances
+                .iter()
+                .any(|value| !value.is_finite() || *value <= 0.0)
+            {
+                return Err(TopicMeasurementError::NonFiniteEstimate);
+            }
+            Ok(TopicCoordinateLaplaceMoment {
+                document_id,
+                mean_coordinates,
+                diagonal_variances: variances.clone(),
+            })
+        })
+        .collect()
+}
+
 #[derive(Clone)]
 struct FitState {
     seed: u64,
@@ -832,6 +888,7 @@ mod tests {
         FitState, PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModel,
         ReferenceTopicModelConfig, argmax, bounded_count, build_result, dot, expectation,
         next_unit, normalize, objective, require_finite, standardize_event_time,
+        topic_coordinate_laplace_moments,
     };
     use crate::TopicMeasurementError;
     use temporal_core::EventTime;
@@ -862,6 +919,72 @@ mod tests {
         assert_eq!(
             require_finite(f64::NAN),
             Err(TopicMeasurementError::NonFiniteEstimate)
+        );
+    }
+
+    #[test]
+    fn laplace_moments_preserve_identity_and_refuse_invalid_variance() {
+        let input = ReferenceTopicInput {
+            document_ids: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            term_rows: vec![vec![(0, 1.0)], vec![(1, 1.0)]],
+            vocabulary_size: 2,
+            design: vec![vec![1.0], vec![1.0]],
+            features: vec![PrevalenceFeature::Intercept],
+            transition_pairs: vec![(0, 1)],
+        };
+        let mut model = ReferenceTopicModel {
+            seed: 1,
+            iterations: 4,
+            objective: -1.0,
+            topic_term_probabilities: vec![vec![0.8, 0.2], vec![0.2, 0.8]],
+            document_topic_proportions: vec![vec![0.8, 0.2], vec![0.25, 0.75]],
+            document_coordinate_variances: vec![vec![0.1], vec![0.2]],
+            prevalence_coefficients: vec![vec![0.0]],
+            prevalence_features: vec![PrevalenceFeature::Intercept],
+            sequence_edges: vec![],
+            connected_post_count: 0,
+            lineage_count: 0,
+        };
+        let moments = topic_coordinate_laplace_moments(&input, &model).expect("moments");
+        assert_eq!(moments[0].document_id, Uuid::from_u128(1));
+        assert!((moments[0].mean_coordinates[0] - 4.0_f64.ln()).abs() < 1e-12);
+        assert_eq!(moments[1].diagonal_variances, vec![0.2]);
+
+        let valid = model.clone();
+        model.document_coordinate_variances[1][0] = f64::NAN;
+        assert_eq!(
+            topic_coordinate_laplace_moments(&input, &model),
+            Err(TopicMeasurementError::NonFiniteEstimate)
+        );
+        model = valid.clone();
+        model.document_coordinate_variances[1][0] = 0.0;
+        assert_eq!(
+            topic_coordinate_laplace_moments(&input, &model),
+            Err(TopicMeasurementError::NonFiniteEstimate)
+        );
+        model = valid.clone();
+        model.document_coordinate_variances[1].clear();
+        assert_eq!(
+            topic_coordinate_laplace_moments(&input, &model),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        model = valid.clone();
+        model.document_coordinate_variances.pop();
+        assert_eq!(
+            topic_coordinate_laplace_moments(&input, &model),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        model = valid.clone();
+        model.document_topic_proportions.pop();
+        assert_eq!(
+            topic_coordinate_laplace_moments(&input, &model),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        model = valid;
+        model.document_topic_proportions[1][0] = f64::NAN;
+        assert_eq!(
+            topic_coordinate_laplace_moments(&input, &model),
+            Err(TopicMeasurementError::InvalidComposition)
         );
     }
 

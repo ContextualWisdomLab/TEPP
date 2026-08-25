@@ -38,10 +38,14 @@ pub use reference::ReferenceTopicInput;
 pub use reference::ReferenceTopicModel;
 /// Bounded deterministic reference-estimator configuration.
 pub use reference::ReferenceTopicModelConfig;
+/// One identity-bound diagonal Laplace approximation from a converged fit.
+pub use reference::TopicCoordinateLaplaceMoment;
 /// One inferred predecessor/successor association within a fitted topic.
 pub use reference::TopicSequenceEdge;
 /// Fit the bounded deterministic CPU `f64` TRSL-TM reference estimator.
 pub use reference::fit_reference_topic_model;
+/// Export identity-bound diagonal Laplace moments from a converged reference fit.
+pub use reference::topic_coordinate_laplace_moments;
 /// Validated compressed sparse numeric matrix.
 pub use sparse::SparseMatrix;
 /// Whether compressed values are grouped by row or by column.
