@@ -157,6 +157,19 @@ fn digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn provenance_binding(fields: &[&[u8]]) -> String {
+    let mut digest = Sha256::new();
+    for field in fields {
+        digest.update(
+            u64::try_from(field.len())
+                .expect("bounded artifact field length fits u64")
+                .to_le_bytes(),
+        );
+        digest.update(field);
+    }
+    format_digest(digest.finalize())
+}
+
 fn time(value: &str) -> Option<KnowledgeCutoff> {
     KnowledgeCutoff::parse_rfc3339(value).ok()
 }
@@ -347,39 +360,51 @@ impl TopicContextPosteriorArtifact {
             }
         };
         for event in &self.lineage_events {
-            bind(
-                &event.provenance_assertion_id,
-                format!(
-                    "topic:{}:{}:{}:{}",
-                    event.event_code,
-                    event.source_topic_id,
-                    event.target_topic_id.as_deref().unwrap_or(""),
-                    event.evidence_sha256
-                ),
-            )?;
+            let fields: [&[u8]; 8] = [
+                b"topic",
+                event.event_code.as_bytes(),
+                event.source_topic_id.as_bytes(),
+                event.target_topic_id.as_deref().unwrap_or("").as_bytes(),
+                event.event_time.as_bytes(),
+                event.evidence_resource_id.as_bytes(),
+                event.evidence_sha256.as_bytes(),
+                self.source_snapshot_sha256.as_bytes(),
+            ];
+            bind(&event.provenance_assertion_id, provenance_binding(&fields))?;
         }
         for relation in &self.document_relations {
+            let fields: [&[u8]; 8] = [
+                b"document",
+                relation.relation_kind_code.as_bytes(),
+                relation.source_document_id.as_bytes(),
+                relation.target_document_id.as_bytes(),
+                relation.event_time.as_bytes(),
+                relation.evidence_resource_id.as_bytes(),
+                relation.evidence_sha256.as_bytes(),
+                self.source_snapshot_sha256.as_bytes(),
+            ];
             bind(
                 &relation.provenance_assertion_id,
-                format!(
-                    "document:{}:{}:{}:{}",
-                    relation.relation_kind_code,
-                    relation.source_document_id,
-                    relation.target_document_id,
-                    relation.evidence_sha256
-                ),
+                provenance_binding(&fields),
             )?;
         }
         for membership in &self.memberships {
+            let weight = membership.weight.to_bits().to_le_bytes();
+            let fields: [&[u8]; 10] = [
+                b"membership",
+                membership.dimension_code.as_bytes(),
+                membership.document_id.as_bytes(),
+                membership.context_id.as_bytes(),
+                &weight,
+                membership.valid_from.as_bytes(),
+                membership.valid_to.as_bytes(),
+                membership.evidence_resource_id.as_bytes(),
+                membership.evidence_sha256.as_bytes(),
+                self.source_snapshot_sha256.as_bytes(),
+            ];
             bind(
                 &membership.provenance_assertion_id,
-                format!(
-                    "membership:{}:{}:{}:{}",
-                    membership.dimension_code,
-                    membership.document_id,
-                    membership.context_id,
-                    membership.evidence_sha256
-                ),
+                provenance_binding(&fields),
             )?;
         }
         Ok(())
@@ -1098,6 +1123,35 @@ mod tests {
                 .provenance_assertion_id =
                 value.document_relations[0].provenance_assertion_id.clone()
         );
+
+        let mut relation_time_reuse = artifact();
+        let mut relation = relation_time_reuse.document_relations[0].clone();
+        relation.event_time = "2026-07-14T00:00:00Z".into();
+        relation_time_reuse.document_relations.push(relation);
+        assert!(relation_time_reuse.to_json().is_err());
+
+        let mut lineage_time_reuse = artifact();
+        let lineage = TopicLineageEvent {
+            event_code: "birth".into(),
+            source_topic_id: lineage_time_reuse.topic_ids[0].clone(),
+            target_topic_id: None,
+            event_time: "2026-07-15T00:00:00Z".into(),
+            evidence_sha256: "c".repeat(64),
+            evidence_resource_id: "evidence-lineage-time".into(),
+            provenance_assertion_id: "provenance-lineage-time".into(),
+        };
+        lineage_time_reuse.lineage_events.push(lineage.clone());
+        lineage_time_reuse.lineage_events.push(TopicLineageEvent {
+            event_time: "2026-07-14T00:00:00Z".into(),
+            ..lineage
+        });
+        assert!(lineage_time_reuse.to_json().is_err());
+
+        let mut membership_window_reuse = artifact();
+        let mut membership = membership_window_reuse.memberships[0].clone();
+        membership.valid_from = "2026-06-30T00:00:00Z".into();
+        membership_window_reuse.memberships.push(membership);
+        assert!(membership_window_reuse.to_json().is_err());
     }
 
     fn append_synthetic_document(

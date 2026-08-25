@@ -210,6 +210,9 @@ fn standard_normals(seed: u64, draw_index: u64, dimension: usize) -> Vec<f64> {
         let [draw_low, draw_high] = split_u64(draw_index);
         let words = philox4x32_10([block_low, block_high, draw_low, draw_high], key);
         for pair in [[words[0], words[1]], [words[2], words[3]]] {
+            if values.len() == dimension {
+                break;
+            }
             let first = (f64::from(pair[0]) + 0.5) / 4_294_967_296.0;
             let second = (f64::from(pair[1]) + 0.5) / 4_294_967_296.0;
             let radius = (-2.0 * first.ln()).sqrt();
@@ -252,7 +255,7 @@ fn draw_set_digest(precision: &JointCoordinatePrecision, seed: u64, draws: &[Vec
 
 #[cfg(test)]
 mod tests {
-    use super::{JointCoordinatePrecision, philox4x32_10};
+    use super::{JointCoordinatePrecision, philox4x32_10, standard_normals};
     use crate::TopicMeasurementError;
     use temporal_core::EventTime;
     use uuid::Uuid;
@@ -293,6 +296,9 @@ mod tests {
         assert_eq!(values[0].draw_index, 0);
         assert_eq!(values[0].event_time, precision().event_times[0]);
         assert_eq!(values[0].logistic_normal_coordinates.len(), 1);
+        for dimension in 1..=6 {
+            assert_eq!(standard_normals(7, 0, dimension).len(), dimension);
+        }
     }
 
     #[test]

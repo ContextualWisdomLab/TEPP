@@ -87,6 +87,16 @@ counter layout assigns each `(draw_index, normal_block)` independently of
 execution order so a later GPU implementation can test the same stream
 contract (Salmon et al., 2011). Empirical covariance tests use probability
 bounds derived from Gaussian second moments rather than an arbitrary tolerance.
+The CPU implementation returns exactly the requested coordinate count for both
+odd and even dimensions; unused Box-Muller partners are not exposed as part of
+the versioned CPU/GPU stream contract.
+
+Every accepted lineage, document-relation, and membership provenance assertion
+is bound by length-prefixed SHA-256 input to its complete asserted identity,
+including event time or validity window, evidence resource and digest, source
+snapshot, and membership weight where applicable. Reusing one assertion ID for
+records that differ only in time therefore fails closed rather than silently
+collapsing distinct temporal claims.
 
 This still is not a complete `tepp.topic_context_posterior.v1` producer. The
 topic fit binds each admitted event instant but does not own the declared event
