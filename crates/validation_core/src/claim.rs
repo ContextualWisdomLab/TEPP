@@ -142,6 +142,13 @@ pub struct PromotionRequest<'evidence> {
 impl<'evidence> PromotionRequest<'evidence> {
     /// Parse commit identities and bind the offered evidence.
     ///
+    /// Both heads are validated as exact forty-character hexadecimal Git
+    /// commit SHAs at construction, so a request can never bind an
+    /// unparseable identity. Evidence truthfulness remains adapter-trust
+    /// based: only trusted CI and repository adapters may construct requests,
+    /// because [`ClaimEvidence::passed`] flags cannot be independently proven
+    /// inside this crate.
+    ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when either head is not a
@@ -194,8 +201,13 @@ pub struct PromotedClaim {
 
 impl PromotedClaim {
     /// Bind a promoted authority to one commit identity.
+    ///
+    /// Crate-internal on purpose: only the validated promotion flows in this
+    /// module ([`promote_claim`] and [`promote_scientific_recovery`]) may mint
+    /// a promoted claim, so external callers cannot bypass the exact-head
+    /// evidence gates by direct construction.
     #[must_use]
-    pub const fn new(authority: ClaimAuthority, bound_head: [u8; 20]) -> Self {
+    pub(crate) const fn new(authority: ClaimAuthority, bound_head: [u8; 20]) -> Self {
         Self {
             authority,
             bound_head,
@@ -227,7 +239,7 @@ pub fn parse_commit_head(value: &str) -> Result<[u8; 20], ValidationError> {
         return Err(ValidationError::InvalidInput);
     }
     let mut decoded = [0_u8; 20];
-    for (index, pair) in bytes.chunks_exact(2).enumerate() {
+    for (index, pair) in bytes.as_chunks::<2>().0.iter().enumerate() {
         decoded[index] = (hex_nibble(pair[0])? << 4) | hex_nibble(pair[1])?;
     }
     Ok(decoded)
@@ -246,13 +258,15 @@ fn hex_nibble(value: u8) -> Result<u8, ValidationError> {
 ///
 /// Design authority may bind a non-protected head. Implementation, scientific,
 /// and release authorities require the candidate to equal the protected head
-/// and every required gate to be present and passing. Queued, predecessor,
-/// skipped-required, and LLM evidence fail closed.
+/// and every required gate to be present with at least one passing item and no
+/// failing item. Queued, predecessor, skipped-required, and LLM evidence fail
+/// closed.
 ///
 /// # Errors
 ///
 /// Returns a claim-specific [`ValidationError`] when heads differ, required
-/// evidence is missing, or unusable evidence is present.
+/// evidence is missing, a required evidence kind carries a failing item, or
+/// unusable evidence is present.
 pub fn promote_claim(request: &PromotionRequest<'_>) -> Result<PromotedClaim, ValidationError> {
     for item in request.evidence {
         match item.kind {
@@ -282,11 +296,18 @@ pub fn promote_claim(request: &PromotionRequest<'_>) -> Result<PromotedClaim, Va
         return Err(ValidationError::ClaimHeadMismatch);
     }
     for required in request.target.required_kinds() {
-        let present = request
-            .evidence
-            .iter()
-            .any(|item| item.kind == *required && item.passed);
-        if !present {
+        let mut any_passed = false;
+        for item in request.evidence {
+            if item.kind != *required {
+                continue;
+            }
+            if item.passed {
+                any_passed = true;
+            } else {
+                return Err(ValidationError::ClaimEvidenceFailed);
+            }
+        }
+        if !any_passed {
             return Err(ValidationError::ClaimEvidenceMissing);
         }
     }
@@ -327,8 +348,8 @@ pub fn promote_scientific_recovery(
 #[cfg(test)]
 mod tests {
     use super::{
-        ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, PromotedClaim, PromotionRequest,
-        parse_commit_head, promote_claim, promote_scientific_recovery,
+        ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, PromotionRequest, parse_commit_head,
+        promote_claim, promote_scientific_recovery,
     };
     use crate::ValidationError;
 
@@ -379,9 +400,9 @@ mod tests {
         assert_eq!(request.candidate_head(), parse_commit_head(HEAD).unwrap());
         assert_eq!(request.protected_head(), parse_commit_head(HEAD).unwrap());
         assert_eq!(request.evidence(), evidence_row.as_slice());
-        let promoted =
-            PromotedClaim::new(ClaimAuthority::DecisionAccepted, request.candidate_head());
+        let promoted = promote_claim(&request).expect("design promotion");
         assert_eq!(promoted.authority(), ClaimAuthority::DecisionAccepted);
+        assert_eq!(promoted.bound_head(), parse_commit_head(HEAD).unwrap());
         assert_eq!(
             parse_commit_head("0123456789abcdef0123456789abcdef0123456g"),
             Err(ValidationError::InvalidInput)
