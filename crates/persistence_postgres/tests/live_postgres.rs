@@ -15,8 +15,6 @@ use persistence_postgres::{
     assume_app_runtime_role_sql, clear_session_tenant_sql, insert_entity_record_sql,
     insert_project_record_sql, open_live_sqlx_pool, require_live_sqlx_config,
     reset_app_runtime_role_sql, select_active_analysis_document_sql, set_session_tenant_sql,
-    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
-    select_active_analysis_document_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -921,6 +919,8 @@ fn seed_membership_targets(
             )
             .is_err(),
         "wrong tenant GUC must reject raw project_record insert under FORCE RLS"
+    );
+    assert!(
         repo.session_mut().execute(&wrong_tenant_sql).is_err(),
         "raw wrong-tenant SQL must reject entity_record insert under FORCE RLS"
     );
