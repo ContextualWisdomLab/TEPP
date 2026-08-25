@@ -108,6 +108,7 @@ fn span_mention_cannot_be_cast_to_an_instance() {
         mention.evidence_layer(),
         EventEvidenceLayer::ObservedMention
     );
+    assert_eq!(mention.evidence_layer().wire_name(), "observed_mention");
 }
 
 #[test]
@@ -234,6 +235,18 @@ fn empty_extractor_foreign_span_and_empty_or_duplicate_extent_sets_fail_closed()
     );
     assert_eq!(
         SpanGroundedMention::new(
+            &document,
+            span,
+            EventConfidence::certain().expect("certain"),
+            eligible_clocks(),
+            "",
+            MentionReviewStatus::Proposed,
+        )
+        .map(|_| ()),
+        Err(EventError::EmptyExtractorVersion)
+    );
+    assert_eq!(
+        SpanGroundedMention::new(
             &other,
             span,
             EventConfidence::certain().expect("certain"),
@@ -256,6 +269,19 @@ fn empty_extractor_foreign_span_and_empty_or_duplicate_extent_sets_fail_closed()
         mention_span_precision(&[span, span], &[span]),
         Err(EventError::InvalidWirePayload)
     );
+    assert_eq!(
+        mention_span_precision(&[span], &[span, span]),
+        Err(EventError::InvalidWirePayload)
+    );
+    assert_eq!(
+        mention_span_recall(&[span], &[span, span]),
+        Err(EventError::InvalidWirePayload)
+    );
+    let award = span_for(&document, "awarded the river-crossing contract");
+    let mixed_precision = mention_span_precision(&[award], &[award, span]).expect("mixed");
+    assert!((mixed_precision - 0.5).abs() < f64::EPSILON);
+    let mixed_recall = mention_span_recall(&[award, span], &[award]).expect("mixed recall");
+    assert!((mixed_recall - 0.5).abs() < f64::EPSILON);
     assert_eq!(
         MentionReviewStatus::from_wire_name("promoted"),
         Err(EventError::UnknownMentionReviewStatus)
