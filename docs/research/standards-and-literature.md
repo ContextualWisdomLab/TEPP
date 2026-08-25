@@ -245,6 +245,12 @@ Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple
 
 Customer, partner, and competitor are contextual roles. TEPP refuses a customer/competitor pair in the same group and does not collapse those roles into one commercial class (Biddle, 1986; Browne et al., 2001).
 
+## Relation observation and missingness
+
+Altman, D. G., & Bland, J. M. (1995). Absence of evidence is not evidence of absence. *BMJ, 311*(7003), 485. https://doi.org/10.1136/bmj.311.7003.485
+
+Unobserved relation pairs are missing statuses, not negative edges. TEPP refuses treating absence as evidence of no relationship (Altman & Bland, 1995).
+
 ## Unicode, language tags, and multilingual structure
 
 Davis, M., Iancu, L., & Whistler, K. (Eds.). (2024). *Unicode Standard Annex #15: Unicode normalization forms*. Unicode Consortium.
