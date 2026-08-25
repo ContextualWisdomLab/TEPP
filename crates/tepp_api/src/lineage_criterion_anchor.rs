@@ -190,4 +190,44 @@ mod tests {
         let json = anchor().to_json().expect("serialize");
         assert!(LineageCriterionAnchor::from_json_with_limit(&json, 1).is_err());
     }
+
+    #[test]
+    fn published_schema_keeps_the_executable_identity_constraints() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../schemas/lineage_criterion_anchor_v1.json"
+        ))
+        .expect("published schema");
+        let properties = schema["properties"].as_object().expect("properties");
+        assert_eq!(schema["additionalProperties"], false);
+        assert_eq!(
+            schema["required"],
+            serde_json::json!([
+                "contract_version",
+                "anchor_kind_code",
+                "estimation_run_id",
+                "source_snapshot_sha256",
+                "knowledge_cutoff",
+                "criterion_validity_status",
+                "validated_pair_count"
+            ])
+        );
+        assert_eq!(properties["contract_version"]["const"], 1);
+        assert_eq!(
+            properties["anchor_kind_code"]["const"],
+            "lineage_pair_criterion"
+        );
+        assert_eq!(
+            properties["criterion_validity_status"]["enum"],
+            serde_json::json!(["accepted", "rejected"])
+        );
+        assert_eq!(properties["validated_pair_count"]["minimum"], 1);
+        assert_eq!(
+            properties["estimation_run_id"]["pattern"],
+            "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        );
+        assert_eq!(
+            properties["source_snapshot_sha256"]["pattern"],
+            "^[0-9a-f]{64}$"
+        );
+    }
 }

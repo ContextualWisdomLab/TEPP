@@ -1,7 +1,7 @@
 # ADR 0023 — TEPP-owned Event Lineage criterion anchor
 
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — the transport contract is implemented on this PR; the registered TEPP analysis remains accepted-target  
+**Implementation maturity:** contract-only — the transport contract is implemented; the registered TEPP analysis remains accepted-target
 **Date:** 2026-08-25
 **Supersedes:** None; complements ADR 0014's scientific promotion boundary.
 
