@@ -52,11 +52,9 @@ members = [
     "crates/checkpoint_authority",
     "crates/episode_membership",
     "crates/compute_backend",
-    "crates/episode_membership",
     "crates/membership_target",
     "crates/analysis_engine",
     "crates/topic_measurement",
-    "crates/analysis_engine",
     "crates/psychometric_core",
 ]
 default-members = [
@@ -111,11 +109,9 @@ default-members = [
     "crates/checkpoint_authority",
     "crates/episode_membership",
     "crates/compute_backend",
-    "crates/episode_membership",
     "crates/membership_target",
     "crates/analysis_engine",
     "crates/topic_measurement",
-    "crates/analysis_engine",
     "crates/psychometric_core",
 ]
 

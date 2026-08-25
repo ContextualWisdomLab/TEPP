@@ -7,6 +7,9 @@ const BASE64_MARK: &str = ";base64,";
 
 /// Image media types accepted as plausible by [`embedded_image_units`].
 ///
+/// Kept private by design; the accepted set is surfaced only through the
+/// parse contract of [`embedded_image_units`].
+///
 /// The set is deliberately conservative and tracks widely registered or
 /// de facto standard image subtypes; anything else fails closed instead of
 /// yielding a bogus embedded-image unit.
@@ -51,7 +54,7 @@ impl<'document> EmbeddedImageUnit<'document> {
 /// Locate `data:image/<type>;base64,...` units and retain their original spans.
 ///
 /// Only plausible image media types are accepted: a candidate URI whose
-/// declared media type is not in [`PLAUSIBLE_IMAGE_MEDIA_TYPES`] fails the
+/// declared media type is not in the plausible-image set fails the
 /// whole parse so malformed bodies cannot produce bogus units.
 ///
 /// # Errors
