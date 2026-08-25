@@ -47,6 +47,7 @@ use psychometric_core::{
     recover_predetermined_later_latent_variance, recover_predetermined_later_observed_variance,
     recover_predetermined_later_start_later_latent_variance,
     recover_predetermined_later_start_later_observed_variance,
+    recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion,
     recover_standardised_asymptotic_time_independent_predictor_effect,
     recover_standardised_asymptotic_time_independent_predictor_variance,
@@ -213,10 +214,12 @@ use psychometric_core::{
     refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
     refuse_standardised_discrete_continuous_intercept_as_standardised_continuous_intercept,
     refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_dependent_effect,
+    refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
     refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect,
     refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect,
     refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_independent_effect,
+    refuse_standardised_discrete_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion,
     refuse_standardised_discrete_drift_as_standardised_continuous_drift,
     refuse_standardised_discrete_time_dependent_effect_as_standardised_continuous_time_dependent_effect,
@@ -285,6 +288,7 @@ use psychometric_core::{
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_standardisation_variance,
     refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
+    refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
     refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
     refuse_unstandardised_asymptotic_time_independent_variance_as_standardised_asymptotic_time_independent_variance,
@@ -10192,6 +10196,111 @@ fn standardised_discrete_continuous_intercept_refuses_non_event_clocks_and_does_
         ),
         Err(
             PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveWithinSubjectVariance
+        )
+    );
+}
+
+#[test]
+fn standardised_asymptotic_continuous_intercept_recovers_driver_page_sixteen_after_positive_p() {
+    let intercept = 0.3_f64;
+    let diffusion = 0.4_f64;
+    let log_rate = -0.25_f64;
+    let recovered = recover_standardised_asymptotic_continuous_intercept(
+        intercept,
+        diffusion,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymCINTstd");
+    let asymptotic = -intercept / log_rate;
+    let expected = asymptotic / (-diffusion / (2.0 * log_rate)).sqrt();
+    assert!((recovered - expected).abs() < 1e-15);
+    let recovered_error = (recovered - expected).abs();
+    let negative = recover_standardised_asymptotic_continuous_intercept(
+        -intercept,
+        diffusion,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("negative signed asymCINTstd");
+    assert!((negative + expected).abs() < 1e-15);
+    let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let continuous_std = intercept / within.sqrt();
+    let continuous_rmse = (continuous_std - expected).abs();
+    assert!(
+        recovered_error < continuous_rmse,
+        "Driver et al. (2017, p. 16): κ / √p RMSE {continuous_rmse} must exceed asymCINTstd RMSE {recovered_error}"
+    );
+    let discrete_std = recover_standardised_discrete_continuous_intercept(
+        intercept,
+        diffusion,
+        log_rate,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("discreteCINTstd");
+    let discrete_rmse = (discrete_std - expected).abs();
+    assert!(
+        recovered_error < discrete_rmse,
+        "Driver et al. (2017, p. 16): discreteCINTstd RMSE {discrete_rmse} must exceed asymCINTstd RMSE {recovered_error}"
+    );
+    let later = recover_standardised_discrete_continuous_intercept(
+        intercept,
+        diffusion,
+        log_rate,
+        2.5,
+        LagClock::EventTime,
+    )
+    .expect("discreteCINTstd Δt=2.5");
+    assert!((later - recovered).abs() > 1e-3);
+    let zero = recover_standardised_asymptotic_continuous_intercept(
+        0.0,
+        diffusion,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("zero CINT");
+    assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(
+        refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+            asymptotic,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedAsymptoticContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+            continuous_std,
+            recovered
+        ),
+        Err(PsychometricError::StandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept)
+    );
+    assert_eq!(
+        refuse_standardised_discrete_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+            discrete_std,
+            recovered
+        ),
+        Err(PsychometricError::StandardisedDiscreteContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept)
+    );
+}
+
+#[test]
+fn standardised_asymptotic_continuous_intercept_refuses_non_event_clocks_and_does_not_keep_zero_variance()
+ {
+    assert_eq!(
+        recover_standardised_asymptotic_continuous_intercept(0.3, 0.4, -0.25, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_continuous_intercept(
+            0.3,
+            0.0,
+            -0.25,
+            LagClock::EventTime
+        ),
+        Err(
+            PsychometricError::StandardisedAsymptoticContinuousInterceptRequiresPositiveWithinSubjectVariance
         )
     );
 }
