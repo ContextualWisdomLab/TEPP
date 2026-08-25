@@ -138,9 +138,19 @@ Aitchison, J., & Shen, S. M. (1980). Logistic-normal distributions: Some propert
 
 Aitchison, J. (1982). The statistical analysis of compositional data. *Journal of the Royal Statistical Society: Series B (Methodological), 44*(2), 139–177. https://doi.org/10.1111/j.2517-6161.1982.tb01195.x
 
+Benjamini, Y., & Hochberg, Y. (1995). Controlling the false discovery rate: A practical and powerful approach to multiple testing. *Journal of the Royal Statistical Society: Series B (Methodological), 57*(1), 289–300. https://doi.org/10.1111/j.2517-6161.1995.tb02031.x
+
+Efron, B. (1979). Bootstrap methods: Another look at the jackknife. *The Annals of Statistics, 7*(1), 1–26. https://doi.org/10.1214/aos/1176344552
+
 Egozcue, J. J., Pawlowsky-Glahn, V., Mateu-Figueras, G., & Barceló-Vidal, C. (2003). Isometric logratio transformations for compositional data analysis. *Mathematical Geology, 35*(3), 279–300. https://doi.org/10.1023/A:1023818214614
 
+Fisher, R. A. (1921). On the "probable error" of a coefficient of correlation deduced from a small sample. *Metron, 1*(4), 3–32.
+
 Friedman, J., Hastie, T., & Tibshirani, R. (2008). Sparse inverse covariance estimation with the graphical lasso. *Biostatistics, 9*(3), 432–441. https://doi.org/10.1093/biostatistics/kxm045
+
+Hennig, C. (2007). Cluster-wise assessment of cluster stability. *Computational Statistics & Data Analysis, 52*(1), 258–281. https://doi.org/10.1016/j.csda.2006.11.025
+
+Monti, S. (2003). Consensus clustering: A resampling-based method for class discovery and visualization of gene expression microarray data. *Machine Learning, 52*(1–2), 91–118. https://doi.org/10.1023/A:1023949509487
 
 Traag, V. A., Waltman, L., & van Eck, N. J. (2019). From Louvain to Leiden: Guaranteeing well-connected communities. *Scientific Reports, 9*, Article 5233. https://doi.org/10.1038/s41598-019-41695-z
 
@@ -152,6 +162,17 @@ posterior and resampling uncertainty for every network edge and cluster. The
 `crates/network_analysis/tests/compositional_cluster_contract.rs` fail-closes
 Euclidean use of a raw simplex and scores recovered clusters with pair precision
 and recall.
+
+Posterior network edge admission uses exact two-sided Fisher z-transform
+p-values against `rho = 0` (Fisher, 1921) with the Benjamini–Hochberg
+step-up false-discovery-rate control (Benjamini & Hochberg, 1995);
+credible intervals and selection fractions are percentile bootstrap
+quantities over posterior draws (Efron, 1979). Consensus clusters come
+from resampled co-assignment matrices with an explicit, caller-supplied
+perturbation probability rather than an implicit constant (Monti, 2003;
+Hennig, 2007). No numeric threshold or weight in this path is chosen by
+heuristic; each is either an explicit parameter with stated provenance
+or a value derived from these primary sources.
 
 ## Time, events, and topic detection and tracking
 
