@@ -40,6 +40,7 @@ use psychometric_core::{
     recover_predetermined_later_start_later_observed_variance,
     recover_standardised_asymptotic_time_independent_predictor_effect,
     recover_standardised_continuous_diffusion, recover_standardised_continuous_drift,
+    recover_standardised_continuous_time_independent_predictor_effect,
     recover_standardised_discrete_diffusion, recover_standardised_discrete_drift,
     recover_standardised_discrete_time_independent_predictor_effect,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
@@ -155,10 +156,12 @@ use psychometric_core::{
     refuse_predetermined_later_start_later_latent_variance_as_stationary_later_latent_variance,
     refuse_process_noise_as_unconditional_variance,
     refuse_standardised_asymptotic_time_independent_effect_as_standardised_discrete_time_independent_effect,
+    refuse_standardised_asymptotic_time_independent_effect_as_standardised_continuous_time_independent_effect,
     refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
     refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion,
     refuse_standardised_discrete_drift_as_standardised_continuous_drift,
     refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
+    refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
     refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -204,6 +207,7 @@ use psychometric_core::{
     refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion,
     refuse_trait_contaminated_continuous_drift_as_standardised_continuous_drift,
     refuse_trait_contaminated_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect,
+    refuse_trait_contaminated_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect,
     refuse_trait_contaminated_process_noise_as_standardised_discrete_diffusion,
     refuse_trait_plus_state_autocorrelation_as_standardised_discrete_drift,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
@@ -212,6 +216,7 @@ use psychometric_core::{
     refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
     refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion,
     refuse_unstandardised_continuous_drift_as_standardised_continuous_drift,
+    refuse_unstandardised_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect,
     refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion,
     refuse_unstandardised_discrete_drift_as_standardised_discrete_drift,
     refuse_unstandardised_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect,
@@ -4565,12 +4570,14 @@ fn standardised_asymptotic_time_independent_effect_is_not_unstandardised_or_trai
 #[allow(clippy::too_many_lines)]
 #[test]
 fn standardised_discrete_time_independent_effect_is_not_unstandardised_or_trait_contaminated() {
+fn standardised_continuous_time_independent_effect_is_not_unstandardised_or_trait_contaminated() {
     let diffusion = 0.4_f64;
     let log_rate = -0.5_f64;
     let coefficient = 0.3_f64;
     let predictor_variance = 1.0_f64;
     let event_delta = 1.0_f64;
     let recovered = recover_standardised_discrete_time_independent_predictor_effect(
+    let recovered = recover_standardised_continuous_time_independent_predictor_effect(
         coefficient,
         predictor_variance,
         diffusion,
@@ -4594,6 +4601,16 @@ fn standardised_discrete_time_independent_effect_is_not_unstandardised_or_trait_
         "Driver et al. (2017, p. 16 / footnote 4): finite-interval TIPREDEFFECTstd is A^{{-1}}[e^{{AΔt}}−I]B·√v/√p"
     );
     let larger_q = recover_standardised_discrete_time_independent_predictor_effect(
+        LagClock::EventTime,
+    )
+    .expect("TIPREDEFFECTstd");
+    let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    assert!(
+        (recovered - coefficient * predictor_variance.sqrt() / within.sqrt()).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 / footnote 4): TIPREDEFFECTstd is B·√v/√p"
+    );
+    let larger_q = recover_standardised_continuous_time_independent_predictor_effect(
         coefficient,
         predictor_variance,
         2.0,
@@ -4604,6 +4621,11 @@ fn standardised_discrete_time_independent_effect_is_not_unstandardised_or_trait_
     .expect("finite-interval TIPREDEFFECTstd q=2");
     assert!((larger_q - recovered).abs() > 1e-3);
     let later = recover_standardised_discrete_time_independent_predictor_effect(
+        LagClock::EventTime,
+    )
+    .expect("TIPREDEFFECTstd q=2");
+    assert!((larger_q - recovered).abs() > 1e-3);
+    let asymptotic = recover_standardised_asymptotic_time_independent_predictor_effect(
         coefficient,
         predictor_variance,
         diffusion,
@@ -4624,17 +4646,38 @@ fn standardised_discrete_time_independent_effect_is_not_unstandardised_or_trait_
     assert!(
         (asymptotic - recovered).abs() > 1e-3,
         "Driver et al. (2017, Eq. 3 / p. 16): asymTIPREDEFFECTstd is not the finite-interval map"
+        LagClock::EventTime,
+    )
+    .expect("asymTIPREDEFFECTstd");
+    assert!(
+        (asymptotic - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16 / §7.2): asymTIPREDEFFECTstd is not TIPREDEFFECTstd"
+    );
+    let discrete_increment = recover_discrete_time_independent_predictor_effect(
+        coefficient,
+        1.0,
+        log_rate,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("discrete TIPREDEFFECT");
+    let discrete_std = discrete_increment * predictor_variance.sqrt() / within.sqrt();
+    assert!(
+        (discrete_std - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): finite-interval standardised TIPRED is not TIPREDEFFECTstd"
     );
     let trait_variance = 1.0_f64;
     let total =
         recover_trait_plus_state_latent_variance(trait_variance, within).expect("trait+state var");
     let contaminated = unit * predictor_variance.sqrt() / total.sqrt();
+    let contaminated = coefficient * predictor_variance.sqrt() / total.sqrt();
     assert!(
         (contaminated - recovered).abs() > 1e-3,
         "Driver et al. (2017, footnote 4 / §7.1): TRAITVAR contaminates the affected SD"
     );
     assert_eq!(
         recover_standardised_discrete_time_independent_predictor_effect(
+        recover_standardised_continuous_time_independent_predictor_effect(
             coefficient,
             predictor_variance,
             0.0,
@@ -4648,6 +4691,14 @@ fn standardised_discrete_time_independent_effect_is_not_unstandardised_or_trait_
     );
     assert_eq!(
         recover_standardised_discrete_time_independent_predictor_effect(
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedContinuousTimeIndependentEffectRequiresPositiveWithinSubjectVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_continuous_time_independent_predictor_effect(
             coefficient,
             0.0,
             diffusion,
@@ -4661,6 +4712,14 @@ fn standardised_discrete_time_independent_effect_is_not_unstandardised_or_trait_
     );
     assert_eq!(
         recover_standardised_discrete_time_independent_predictor_effect(
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedContinuousTimeIndependentEffectRequiresPositivePredictorVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_continuous_time_independent_predictor_effect(
             coefficient,
             predictor_variance,
             diffusion,
@@ -4701,11 +4760,40 @@ fn standardised_discrete_time_independent_effect_is_not_unstandardised_or_trait_
     );
     assert_eq!(
         refuse_trait_contaminated_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect(
+        refuse_unstandardised_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect(
+            coefficient,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_standardised_asymptotic_time_independent_effect_as_standardised_continuous_time_independent_effect(
+            asymptotic,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedAsymptoticTimeIndependentEffectIsNotStandardisedContinuousTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect(
+            discrete_std,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedDiscreteTimeIndependentEffectIsNotStandardisedContinuousTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_trait_contaminated_continuous_time_independent_effect_as_standardised_continuous_time_independent_effect(
             contaminated,
             recovered
         ),
         Err(
             psychometric_core::PsychometricError::TraitContaminatedDiscreteTimeIndependentEffectIsNotStandardisedDiscreteTimeIndependentEffect
+            psychometric_core::PsychometricError::TraitContaminatedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeIndependentEffect
         )
     );
     assert_eq!(
