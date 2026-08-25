@@ -104,8 +104,8 @@ pub fn identity_recovery_rate(
 #[cfg(test)]
 mod tests {
     use super::{
-        identity_recovery_rate, refuse_contradictory_roles, refuse_role_as_entity_class,
-        roles_contradict, ContextualRole,
+        ContextualRole, identity_recovery_rate, refuse_contradictory_roles,
+        refuse_role_as_entity_class, roles_contradict,
     };
     use crate::RoleContradictionError;
 
