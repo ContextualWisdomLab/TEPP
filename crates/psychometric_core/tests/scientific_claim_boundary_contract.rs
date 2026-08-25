@@ -24,6 +24,7 @@ use psychometric_core::{
     recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
+    recover_initial_time_dependent_predictor_variance,
     recover_initial_time_independent_observed_variance,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -114,6 +115,11 @@ use psychometric_core::{
     refuse_initial_time_dependent_effect_as_continuous_intercept,
     refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
     refuse_initial_time_dependent_effect_as_process_increment,
+    refuse_initial_time_dependent_variance_as_initial_latent_variance,
+    refuse_initial_time_dependent_variance_as_initial_time_dependent_covariance,
+    refuse_initial_time_dependent_variance_as_initial_time_independent_variance,
+    refuse_initial_time_dependent_variance_as_standardised_initial_time_dependent_effect,
+    refuse_initial_time_dependent_variance_as_trait_variance,
     refuse_initial_time_independent_carry_as_initial_effect,
     refuse_initial_time_independent_coefficient_as_initial_effect,
     refuse_initial_time_independent_effect_as_continuous_intercept,
@@ -5191,6 +5197,140 @@ fn standardised_initial_time_dependent_effect_is_not_unstandardised_or_trait_con
     assert_eq!(
         refuse_trait_variance_as_standardisation_variance(trait_variance, initial_variance),
         Err(psychometric_core::PsychometricError::TraitVarianceIsNotStandardisationVariance)
+    );
+}
+
+#[test]
+fn initial_time_dependent_predictor_variance_is_not_covariance_or_added_t0_tipred_var() {
+    let coefficient = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let recovered = recover_initial_time_dependent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TDPREDVAR analog");
+    assert!(
+        (recovered - coefficient * coefficient * predictor_variance).abs() < 1e-15,
+        "Driver et al. (2017, Table 2 TDPREDVAR / analog of addedT0TIPREDVAR): extra is t0_m² v"
+    );
+    let doubled =
+        recover_initial_time_dependent_predictor_variance(coefficient, 8.0, LagClock::EventTime)
+            .expect("doubled v");
+    assert!((doubled - 2.0 * recovered).abs() < 1e-15);
+    let negative = recover_initial_time_dependent_predictor_variance(
+        -coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("signed");
+    assert_eq!(negative.to_bits(), recovered.to_bits());
+    let ti_extra = recover_initial_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TIPREDVAR");
+    assert_eq!(
+        ti_extra.to_bits(),
+        recovered.to_bits(),
+        "Driver et al. (2017, Table 3): equal numbers when t0_m=t0_b are still distinct named quantities"
+    );
+    let standardised = recover_standardised_initial_time_dependent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        1.6,
+        LagClock::EventTime,
+    )
+    .expect("T0TDPREDEFFECTstd");
+    assert!(
+        (standardised - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Table 3): T0TDPREDEFFECTstd is not the first-occasion TD extra"
+    );
+    let covariance = coefficient * predictor_variance;
+    assert!(
+        (covariance - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): T0TDPREDCOV is not t0_m² v"
+    );
+    assert_eq!(
+        recover_initial_time_dependent_predictor_variance(0.0, 4.0, LagClock::EventTime)
+            .expect("zero")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        recover_initial_time_dependent_predictor_variance(0.3, 0.0, LagClock::EventTime)
+            .expect("zero v")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        recover_initial_time_dependent_predictor_variance(0.3, 4.0, LagClock::SystemTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_time_dependent_predictor_variance(0.3, -0.1, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn initial_time_dependent_variance_refusal_boundaries_stay_distinct() {
+    // Refusals must separate addedT0TDPREDVAR from neighbouring Table 2/3
+    // quantities even when every numeric value coincides.
+    let coefficient = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let recovered = recover_initial_time_dependent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TDPREDVAR analog");
+    let ti_extra = recover_initial_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TIPREDVAR");
+    let standardised = recover_standardised_initial_time_dependent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        1.6,
+        LagClock::EventTime,
+    )
+    .expect("T0TDPREDEFFECTstd");
+    let covariance = coefficient * predictor_variance;
+    assert_eq!(
+        refuse_initial_time_dependent_variance_as_initial_time_independent_variance(
+            recovered, ti_extra
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentVarianceIsNotInitialTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_variance_as_standardised_initial_time_dependent_effect(
+            recovered, standardised
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentVarianceIsNotStandardisedInitialTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_variance_as_initial_time_dependent_covariance(
+            recovered, covariance
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentVarianceIsNotInitialTimeDependentCovariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_variance_as_initial_latent_variance(recovered, 1.6),
+        Err(psychometric_core::PsychometricError::InitialTimeDependentVarianceIsNotInitialLatentVariance)
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_variance_as_trait_variance(recovered, 1.0),
+        Err(psychometric_core::PsychometricError::InitialTimeDependentVarianceIsNotTraitVariance)
     );
 }
 
