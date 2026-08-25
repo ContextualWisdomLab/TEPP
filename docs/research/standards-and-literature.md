@@ -16,12 +16,41 @@ Fox, J.-P., & Glas, C. A. W. (2001). Bayesian estimation of a multilevel IRT mod
 
 Marsh, H. W., Morin, A. J. S., Parker, P. D., & Kaur, G. (2014). Exploratory structural equation modeling: An integration of the best features of exploratory and confirmatory factor analysis. *Annual Review of Clinical Psychology, 10*, 85–110. https://doi.org/10.1146/annurev-clinpsy-032813-153700
 
+Bollen, K., & Lennox, R. (1991). Conventional wisdom on measurement: A structural equation perspective. *Psychological Bulletin, 110*(2), 305–314. https://doi.org/10.1037/0033-2909.110.2.305
+
+Driver, C. C., Oud, J. H. L., & Voelkle, M. C. (2017). Continuous time structural equation modeling with R package ctsem. *Journal of Statistical Software, 77*(5), 1–35. https://doi.org/10.18637/jss.v077.i05
+
+Enders, C. K., & Tofighi, D. (2007). Centering predictor variables in cross-sectional multilevel models: A new look at an old issue. *Psychological Methods, 12*(2), 121–138. https://doi.org/10.1037/1082-989X.12.2.121
+
+Curran, P. J., & Bauer, D. J. (2011). The disaggregation of within-person and between-person effects in longitudinal models of change. *Annual Review of Psychology, 62*, 583–619. https://doi.org/10.1146/annurev.psych.093008.100356
+
+Hamaker, E. L., Kuiper, R. M., & Grasman, R. P. P. P. (2015). A critique of the cross-lagged panel model. *Psychological Methods, 20*(1), 102–116. https://doi.org/10.1037/a0038889
+
+Voelkle, M. C., Oud, J. H. L., Davidov, E., & Schmidt, P. (2012). An SEM approach to continuous time modeling of panel data: Relating authoritarianism and anomia. *Psychological Methods, 17*(2), 176–192. https://doi.org/10.1037/a0027543
+
+Rubin, D. B. (1996). Multiple imputation after 18+ years. *Journal of the American Statistical Association, 91*(434), 473–489. https://doi.org/10.1080/01621459.1996.10476908
+
+Mislevy, R. J. (1988). *Randomization-based inferences about latent variables from complex samples* (ETS Research Report No. RR-88-45; DTIC ADA200179). Educational Testing Service. https://doi.org/10.1002/j.2330-8516.1988.tb00310.x
+
+Mislevy, R. J. (1991). Randomization-based inference about latent variables from complex samples. *Psychometrika, 56*(2), 177–196. https://doi.org/10.1007/BF02294457
+
+Meredith, W. (1993). Measurement invariance, factor analysis and factorial invariance. *Psychometrika, 58*(4), 525–543. https://doi.org/10.1007/BF02294825
+
+Sörbom, D. (1974). A general method for studying differences in factor means and factor structure between groups. *British Journal of Mathematical and Statistical Psychology, 27*(2), 229–239. https://doi.org/10.1111/j.2044-8317.1974.tb00543.x
+
+Putnick, D. L., & Bornstein, M. H. (2016). Measurement invariance conventions and reporting: The state of the art and future directions for psychological research. *Developmental Review, 41*, 71–90. https://doi.org/10.1016/j.dr.2016.06.004
+
+Holland, P. W. (1986). Statistics and causal inference. *Journal of the American Statistical Association, 81*(396), 945–960. https://doi.org/10.1080/01621459.1986.10478354
+
 TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. `psychometric_fit` recovers those cross-loadings and event-time lagged paths on a CPU `f64` OLS path; see `docs/research/esem-dsem-fit.md`.
 Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple classification (MMMC) models. *Statistical Modelling, 1*(2), 103–124. https://doi.org/10.1177/1471082X0100100202
 
 Jones, K. (1991). Specifying and estimating multi-level models for geographical research. *Transactions of the Institute of British Geographers, 16*(2), 148–160. https://doi.org/10.2307/622612
 
-TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Location and market assignments remain multiple-membership classifications; they are not permanent entity identity and not language channels (Browne et al., 2001; Jones, 1991).
+TEPP applies these sources to construct definition, score interpretation, reliability, validity evidence, uncertainty, consequences, longitudinal invariance, ESEM cross-loadings, and DSEM. Topic outputs are treated as fallible indicators or components only after their construct role is evaluated. Reflective, formative, and network classes remain distinct (Bollen & Lennox, 1991). Complete-data OLS loadings across posterior indicator draws are combined with Rubin (1996) \(T_m\); the arithmetic-mean helper remains a point estimate. Mislevy (1991, *Psychometrika, 56*, 177–196, DOI 10.1007/bf02294457) remains unread (Unpaywall/OpenAlex/Semantic Scholar 2026-08-18T03:07Z: closed). The 1988 ETS RR-88-45 / DTIC ADA200179 technical report of the same title was opened 2026-08-17T12:04Z from archive.org; it is not the 1991 journal article and is not used as Mislevy plausible-value authority. Temporal precedence is not causal identification (Holland, 1986). Within/between OLS follows Enders and Tofighi (2007), Curran and Bauer (2011), and Hamaker et al. (2015). Enders and Tofighi (2007, Table 2, pp. 124–127; PDF opened 2026-08-17) show that the CWC cluster-mean coefficient is the contextual effect (`between − within`), not the between-cluster effect. Curran and Bauer (2011, pp. 607–608) reject person-mean subtraction on a raw autoregressive series as the lagged within-person residual; already-centered irregular residuals use the Voelkle et al. (2012, Eq. 7) / Driver et al. (2017, Eq. 3) scalar map. Discrete lags from unequal event intervals are remapped through that log-rate (Voelkle et al., 2012, ZORA accepted manuscript re-opened 2026-08-17T13:13Z) and are not pooled. Driver, Oud, and Voelkle (2017, Eq. 3 and p. 4) write \(A_{\Delta t}=\operatorname{expm}(A\Delta t)\) and restate the discrete intercept as a function of \(A\) and \(\Delta t\). A binary64 underflow of \(\exp(a\Delta t)\) to `+0` is refused because discrete auto-effects are strictly positive. The discrete effect of a constant predictor is Voelkle et al. (2012, Eq. 12; ZORA accepted manuscript re-opened 2026-08-17T14:20Z, Introducing Intercepts, manuscript p. 20), evaluated as \(a_{yx}(\operatorname{expm1}(z)/a_{xx})\) with \(z=a_{xx}\Delta t\) so a finite result is not lost when \(z\) overflows to \(-\infty\) or when \(a_{yx}\Delta t\) overflows, and in log space when `expm1(z)` overflows at a finite \(z\); a zero continuous effect is exactly zero; an overflowing \(a_{yx}/a_{xx}\) rewrite term fails closed; the first-order product is the underflow limit of that equation, not the general constant-predictor discrete effect. The discrete effect of a time-varying predictor with matched sampling and constancy intervals is Voelkle et al. (2012, Eq. 14; manuscript p. 21): \(b^{*}_{y.x}(\Delta t)=a_{yx}\Delta t\). That product is not Eq. 12. Unmatched intervals fail closed (Oud & Jansen, 2000, unread). The exact scalar discrete process noise is Driver, Oud, and Voelkle (2017, Eq. 3; JSS PDF re-opened 2026-08-18T14:04Z, p. 4): \(Q_{\Delta t}=0.5 q(\operatorname{expm1}(z)/a)\) with \(z=2(a\Delta t)\) for \(a\neq 0\) and \(q=GG^{\top}\ge 0\); do not form \(2a\) first; \(a=0\) recovers \(q\Delta t\); an overflowing rewrite scale \(0.5 q/a\) fails closed. This is not a Kalman filter. Driver, Oud, and Voelkle (2017, Eq. 3; JSS PDF re-opened 2026-08-18T14:04Z) write the same discrete intercept as \(A^{-1}[e^{A\Delta t}-I]\xi\). The lagged covariance is \(\mathrm{e}^{a\Delta t}p\) and the unconditional variance is \(\mathrm{e}^{2a\Delta t}p+Q_{\Delta t}\) (Driver et al., 2017, Eq. 3–4, pp. 4–5); a zero diffusion whose \(2(a\Delta t)\) overflows to \(+\infty\) fails closed. The stationary within-subject variance is the \(\Delta t\to\infty\) limit of Eq. 4: \(-q/(2a)\) for stable \(a<0\) (JSS p. 16 `asymDIFFUSION`; §4.3; PDF re-opened 2026-08-18T18:03Z). Finite-interval \(Q_{\Delta t}\) is not that limit. Trait-plus-state variance is \(\mathrm{trait}+\mathrm{state}\) and lagged covariance is \(\mathrm{trait}+\mathrm{e}^{a\Delta t}p\) (Driver et al., 2017, §4.3, p. 9; JSS PDF re-opened 2026-08-18T21:07Z). Trait variance is not process noise and not `asymDIFFUSION`. The first-occasion map `τ + λ μ_0` is not `E(y_t)`. The contemporaneous `TDPREDEFFECT` impulse is `m x` (Driver et al., 2017, Eq. 3 fourth summand; Table 2; §7.2; JSS PDF re-opened 2026-08-20T07:10Z). `TDPREDEFFECT` is not `CINT`. `M x` is not `A^{-1}[e^{A Δt} − I] B z` and is not Voelkle et al. (2012, Eq. 14). Metric/weak invariance does not license latent-mean comparison. Putnick and Bornstein (2016, PMC author manuscript PMC5145197 opened 2026-08-19T22:15Z) require scalar invariance before latent-mean comparison and state that residual invariance is not a prerequisite. Two-observation OLS residual variance is identically `0` and is not strict. Meredith (1993) remains unread (Unpaywall/OpenAlex 2026-08-22T12:15Z: `is_oa: false`; Springer `content/pdf` is HTML 200; Cambridge Core DOI 10.1007/BF02294825 redirects to a closed product page). Vandenberg and Lance (2000) remains unread. Mislevy (1991, *Psychometrika, 56*, 177–196, DOI 10.1007/bf02294457) remains unread (Unpaywall/OpenAlex 2026-08-22T12:15Z: `is_oa: false`; Springer `content/pdf` is HTML 200; NCES 404; ETS RR-91-18 404). ERIC ED334221 is Singer and Willett (1991), not the 1991 journal article. ERIC ED333032 is Mislevy, Sheehan, and Wingersky (1990), ETS RR-90-17-ONR, not the 1991 journal article. Oud and Jansen (2000) remains unread (Unpaywall/OpenAlex 2026-08-18T21:07Z: closed).
+
+For Meredith (1993), the Cambridge Core original-paper page and abstract were opened on 2026-08-21; Unpaywall, Springer `content/pdf`, and Cambridge Core PDF lookup were re-tried 2026-08-22T12:15Z and remain closed. The earlier `remains unread` note means that the full text was not available, not that the authoritative record was unverified.
+
 
 ## Numerical precision, memory-aware computation, and causal identification
 
@@ -73,7 +102,15 @@ Reynolds, L., & McDonell, K. (2021). Prompt programming for large language model
 
 Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, G. (2023). Pre-train, prompt, and predict: A systematic survey of prompting methods in natural language processing. *ACM Computing Surveys, 55*(9), Article 195. https://doi.org/10.1145/3560815
 
-TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Brown et al. (2020) and Reynolds and McDonell (2021) provide primary research context for prompts as task-conditioning and prompt-programming mechanisms; they do not define TEPP's latent-content labels. As a normative ADR 0004/0012 contract, instruction and prompt boilerplate is therefore modeled as explicit method structure, not unique latent content and not a stopword deletion. Liu et al. (2023) is secondary survey background only and is not evidence for that repository-specific classification.
+TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Brown et al. (2020) and Reynolds and McDonell (2021) provide primary research context for prompts as task-conditioning and prompt-programming mechanisms; they do not define TEPP's latent-content labels. As a normative ADR 0004/0012 contract, instruction and prompt boilerplate is therefore modeled as explicit method structure, not unique latent content and not a stopword deletion. Liu et al. (2023) is secondary survey background only and is not evidence for that repository-specific classification. `topic_lineage` keeps one global topic identity when activity becomes dormant or reactivated.
+
+## Information retrieval and inferential-weight boundaries
+
+Salton, G., & Buckley, C. (1988). Term-weighting approaches in automatic text retrieval. *Information Processing & Management, 24*(5), 513–523. https://doi.org/10.1016/0306-4573(88)90021-0
+
+Robertson, S., & Zaragoza, H. (2009). The probabilistic relevance framework: BM25 and beyond. *Foundations and Trends® in Information Retrieval, 3*(4), 333–389. https://doi.org/10.1561/1500000019
+
+TEPP uses these primary information-retrieval sources to classify TF-IDF and BM25 as retrieval-ranking functions, while the estimator-input refusal remains an explicit TEPP implementation contract in `corpus_split`.
 
 ## Topic-model evaluation and LLM judges
 
@@ -85,11 +122,21 @@ Stammbach, D., Zouhar, V., Hoyle, A., Sachan, M., & Ash, E. (2023). Revisiting a
 
 Yang, X., Zhao, H., Phung, D., Buntine, W., & Du, L. (2025). LLM reading tea leaves: Automatically evaluating topic models with large language models. *Transactions of the Association for Computational Linguistics, 13*.
 
-LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. Candidates are blinded and statistically gated before LLM review. `interpretation_gateway` records those judgments as hypothetical proposals that must cite evidence spans and cannot become estimator results or observed facts.
+Akaike, H. (1974). A new look at the statistical model identification. *IEEE Transactions on Automatic Control, 19*(6), 716–723. https://doi.org/10.1109/TAC.1974.1100705
+
+Burnham, K. P., & Anderson, D. R. (2002). *Model selection and multimodel inference: A practical information-theoretic approach* (2nd ed.). Springer.
+
+Deb, K., Pratap, A., Agarwal, S., Meyarivan, T. (2002). A fast and elitist multiobjective genetic algorithm: NSGA-II. *IEEE Transactions on Evolutionary Computation, 6*(2), 182–197. https://doi.org/10.1109/4235.996017
+
+LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. The current `model_selection` crate performs statistical/Pareto gating; candidate blinding and blinded LLM review remain accepted-target extensions and are not executed by this crate. Pareto-filtered held-out log-likelihood and complexity admit a candidate `K`; an LLM vote cannot define the numerical optimum. `interpretation_gateway` records judgments as hypothetical proposals that must cite evidence spans and cannot become estimator results or observed facts.
 
 ## Compositional data, correlation, and clusters
 
+Aitchison, J., & Shen, S. M. (1980). Logistic-normal distributions: Some properties and uses. *Biometrika, 67*(2), 261–272. https://doi.org/10.1093/biomet/67.2.261
+
 Aitchison, J. (1982). The statistical analysis of compositional data. *Journal of the Royal Statistical Society: Series B (Methodological), 44*(2), 139–177. https://doi.org/10.1111/j.2517-6161.1982.tb01195.x
+
+Egozcue, J. J., Pawlowsky-Glahn, V., Mateu-Figueras, G., & Barceló-Vidal, C. (2003). Isometric logratio transformations for compositional data analysis. *Mathematical Geology, 35*(3), 279–300. https://doi.org/10.1023/A:1023818214614
 
 Friedman, J., Hastie, T., & Tibshirani, R. (2008). Sparse inverse covariance estimation with the graphical lasso. *Biostatistics, 9*(3), 432–441. https://doi.org/10.1093/biostatistics/kxm045
 
@@ -227,6 +274,10 @@ Yergeau, F. (2003). *UTF-8, a transformation format of ISO 10646* (RFC 3629). RF
 Lebo, T., Sahoo, S., & McGuinness, D. (Eds.). (2013). *PROV-O: The PROV ontology*. World Wide Web Consortium. https://www.w3.org/TR/prov-o/
 
 Moreau, L., & Missier, P. (Eds.). (2013). *PROV-DM: The PROV data model*. World Wide Web Consortium. https://www.w3.org/TR/prov-dm/
+
+Masinter, L. (1998). *The "data" URL scheme* (RFC 2397). RFC Editor. https://doi.org/10.17487/RFC2397
+
+Antol, S., Agrawal, A., Lu, J., Mitchell, M., Batra, D., Zitnick, C. L., & Parikh, D. (2015). VQA: Visual question answering. In *Proceedings of the IEEE International Conference on Computer Vision* (pp. 2425–2433). https://doi.org/10.1109/ICCV.2015.279
 
 TEPP separates stable record identity, content equality, exact text location, wire representation, authorization, and provenance. JSON wire records are explicit versioned DTOs with unknown-field rejection and reconstruct through domain validation. `SHA-256` detects content substitution but is not treated as proof of origin, authority, or chain of custody. A summary, template, or pasted copy is a PROV derivation of the source document, not a state transition and not a reuse of the source identity; documents, serialized records, checkpoints, and LLM outputs remain untrusted until identity, provenance, size, and nesting depth validate (Bray, 2017; Moreau & Missier, 2013).
 

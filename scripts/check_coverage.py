@@ -10,13 +10,15 @@ from typing import Any, Iterable, Mapping, Sequence
 
 
 def load_totals(path: Path) -> Mapping[str, Any]:
-    """Load exact totals from LLVM coverage JSON.
+    """Load exact totals from LLVM coverage JSON with unique branch arms.
 
     Full LLVM branch exports can contain several instrumented copies of the
-    same source file when unit and integration test binaries are merged. The
-    source-level contract is the union of each branch coordinate's true and
-    false outcomes, so those copies are merged before the branch gate runs.
-    Summary-only reports retain the original LLVM totals fallback.
+    same source file when unit and integration test binaries are merged and
+    when generic instantiations are max-folded. The source-level contract is
+    the unique union of each ``(filename, coordinate)`` site's true and false
+    outcomes, so those copies are merged before the branch gate runs.
+    Summary-only reports without branch arrays keep the totals mapping and
+    fail closed on that summary.
     """
 
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -27,12 +29,124 @@ def load_totals(path: Path) -> Mapping[str, Any]:
     totals = report.get("totals")
     if not isinstance(totals, Mapping):
         raise ValueError("coverage JSON data entry must contain totals")
-    files = report.get("files")
-    if not isinstance(files, list) or not any(
-        isinstance(record, Mapping) and "branches" in record for record in files
-    ):
+    folded = fold_unique_branch_totals(report.get("files"))
+    if folded is None:
         return totals
-    return {**totals, "branches": load_union_branch_totals(files)}
+    merged = dict(totals)
+    merged["branches"] = folded
+    return merged
+
+
+def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | float]:
+    """Merge LLVM branch outcomes by source coordinate across test binaries."""
+
+    outcomes: dict[tuple[str, int, int, int, int], list[int]] = {}
+    for file_record in files:
+        if not isinstance(file_record, Mapping):
+            raise ValueError("coverage file record must be an object")
+        filename = file_record.get("filename")
+        if "branches" not in file_record:
+            raise ValueError("coverage file record must contain branches")
+        branches = file_record["branches"]
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("coverage file record must contain a filename")
+        if not isinstance(branches, list):
+            raise ValueError("coverage branches must be a list")
+        for branch in branches:
+            if not isinstance(branch, list) or len(branch) < 6:
+                raise ValueError("coverage branch record is malformed")
+            coordinates = branch[:4]
+            counts = branch[4:6]
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in coordinates
+            ):
+                raise ValueError("coverage branch coordinates are invalid")
+            if not all(
+                isinstance(value, int) and not isinstance(value, bool) and value >= 0
+                for value in counts
+            ):
+                raise ValueError("coverage branch counts are invalid")
+            key = (filename, *coordinates)
+            outcome = outcomes.setdefault(key, [0, 0])
+            outcome[0] += counts[0]
+            outcome[1] += counts[1]
+    count = len(outcomes) * 2
+    covered = sum(outcome > 0 for counts in outcomes.values() for outcome in counts)
+    return {"count": count, "covered": covered}
+
+
+def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int, int]:
+    """Return ``(site, true_count, false_count)`` from one LLVM branch tuple.
+
+    LLVM export writes
+    ``[lineStart, colStart, lineEnd, colEnd, trueCount, falseCount, fileId,
+    expandedFileId, kind]``.
+    """
+
+    if not isinstance(record, list) or len(record) != 9:
+        raise ValueError("coverage JSON branch record must contain nine values")
+    line_start, column_start, line_end, column_end, true_count, false_count = record[:6]
+    coordinates = (line_start, column_start, line_end, column_end)
+    if any(not isinstance(value, int) or isinstance(value, bool) for value in coordinates):
+        raise ValueError("coverage JSON branch coordinates must be integers")
+    if (
+        not isinstance(true_count, int)
+        or isinstance(true_count, bool)
+        or not isinstance(false_count, int)
+        or isinstance(false_count, bool)
+        or true_count < 0
+        or false_count < 0
+    ):
+        raise ValueError("coverage JSON branch counts must be non-negative integers")
+    return coordinates, true_count, false_count
+
+
+def fold_unique_branch_totals(files: object) -> dict[str, int] | None:
+    """Return unique-site True/False arm totals, or None when arrays are absent.
+
+    Instantiations of the same ``(filename, start, end)`` site max-fold. One
+    LLVM JSON total that is not in that unique set is not an uncovered
+    production arm. Empty ``branches`` lists are instrumentation-absent and
+    leave the caller on summary totals.
+    """
+
+    if not isinstance(files, list):
+        return None
+    sites: dict[tuple[str, int, int, int, int], tuple[int, int]] = {}
+    saw_records = False
+    for file_entry in files:
+        if not isinstance(file_entry, Mapping):
+            raise ValueError("coverage JSON file entry must be an object")
+        records = file_entry.get("branches")
+        if records is None:
+            continue
+        if not isinstance(records, list):
+            raise ValueError("coverage JSON branches must be a list")
+        if not records:
+            continue
+        filename = file_entry.get("filename")
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("coverage JSON file entry must contain a filename")
+        for record in records:
+            site, true_count, false_count = _parse_branch_record(record)
+            saw_records = True
+            key = (filename, *site)
+            previous = sites.get(key, (0, 0))
+            sites[key] = (
+                max(previous[0], true_count),
+                max(previous[1], false_count),
+            )
+    if not saw_records:
+        return None
+    count = len(sites) * 2
+    covered = 0
+    for true_count, false_count in sites.values():
+        if true_count > 0:
+            covered += 1
+        if false_count > 0:
+            covered += 1
+    return {"count": count, "covered": covered}
 
 
 def load_union_branch_totals(files: Sequence[object]) -> Mapping[str, int | float]:
@@ -103,10 +217,10 @@ def is_executable_source_line(
     """Return whether *line_number* in *source_path* is an executable source line.
 
     LLVM LCOV sometimes emits zero-count DA records for documentation comments,
-    attributes, pure structural braces, multi-line signatures, literal
-    continuations, expression continuations, and in-file ``#[cfg(test)]``
-    modules. Those records are not evidence of uncovered production behavior
-    and are excluded from the authored-line gate.
+    attributes, pure structural braces, multi-line signatures, Rust multiline
+    string continuations, literal continuations, expression continuations, and
+    in-file ``#[cfg(test)]`` modules. Those records are not evidence of
+    uncovered production behavior and are excluded from the authored-line gate.
 
     When *repository_root* is provided, *source_path* must resolve under that
     root (same fail-closed rule as LCOV ``SF:`` loading).
@@ -127,6 +241,8 @@ def is_executable_source_line(
     if line_number in _cfg_test_module_line_numbers(lines):
         return False
     if _line_in_cfg_not_feature_block(lines, line_number):
+        return False
+    if _line_in_multiline_string_literal(lines, line_number):
         return False
     if _line_in_multiline_string(lines, line_number):
         return False
@@ -150,6 +266,8 @@ def is_executable_source_line(
         "});",
         "Ok(())",
     }:
+        return False
+    if _is_standalone_string_literal(text) or text.startswith("} else"):
         return False
     if text.endswith(" {"):
         type_name = text[:-2]
@@ -177,6 +295,17 @@ def is_executable_source_line(
             return False
         body = text[text.find("{") + 1 : text.rfind("}")].strip()
         return bool(body)
+    # Keep guarded match arms in the authored-line denominator: the guard
+    # executes even though the arm label itself is structural.
+    if text.endswith("=> {") and " if " not in text:
+        if (
+            text.startswith("if ")
+            or text.startswith("if(")
+            or " if(" in text
+        ):
+        if text.startswith("if ") or text.startswith("if("):
+            return True
+        return _is_multiline_match_guard(lines, line_number)
     if text.startswith("pub struct ") or text.startswith("struct "):
         return False
     if text.startswith("pub enum ") or text.startswith("enum "):
@@ -194,6 +323,30 @@ def is_executable_source_line(
         return False
     return True
 
+
+def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
+    """Recognize a guard continued onto the lines immediately before an arm."""
+
+    target_prefix = lines[line_number - 1].strip().partition("=>")[0]
+    brace_depth = target_prefix.count("}") - target_prefix.count("{")
+    guard_found = False
+    boundary_candidate = False
+    for candidate in reversed(lines[: line_number - 1]):
+        stripped = candidate.strip()
+        if brace_depth == 0 and "=>" in stripped:
+            return guard_found and not boundary_candidate
+        if brace_depth == 1 and stripped.endswith("=> {"):
+            boundary_candidate = True
+        brace_depth += stripped.count("}") - stripped.count("{")
+        if (
+            (stripped.startswith("if ") or stripped.startswith("if("))
+            and not stripped.endswith(("}", ";"))
+            and brace_depth == 0
+        ):
+            guard_found = True
+        if stripped.startswith("match "):
+            return guard_found and not boundary_candidate
+    return guard_found and not boundary_candidate
 
 def _is_structural_comma_continuation(
     lines: list[str], line_number: int, text: str
@@ -348,6 +501,50 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
             )
     return False
 
+def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
+    """Recognize a guard continued onto the lines immediately before an arm."""
+
+    target_prefix = lines[line_number - 1].strip().partition("=>")[0]
+    brace_depth = target_prefix.count("}") - target_prefix.count("{")
+    guard_found = False
+    inside_block = False
+    nested_arrow_seen = False
+    for candidate in reversed(lines[: line_number - 1]):
+        stripped = candidate.strip()
+        if brace_depth == 0 and "=>" in stripped:
+            return guard_found
+        if (
+            inside_block
+            and brace_depth >= 1
+            and stripped.endswith("=> {")
+            and not nested_arrow_seen
+        ):
+            # The opener of the preceding sibling arm sits directly above its
+            # body with no nested match between, so every guard token found so
+            # far belongs to that sibling rather than to this arm.
+            return guard_found
+        if "=>" in stripped and brace_depth >= 1:
+            nested_arrow_seen = True
+        next_depth = brace_depth + stripped.count("}") - stripped.count("{")
+        if brace_depth == 0 < next_depth:
+            inside_block = True
+            nested_arrow_seen = False
+        elif next_depth <= 0 < brace_depth:
+            inside_block = False
+            nested_arrow_seen = False
+        brace_depth = next_depth
+        if (
+            (stripped.startswith("if ") or stripped.startswith("if("))
+            and not stripped.endswith(("}", ";"))
+            and brace_depth == 0
+        ):
+            guard_found = True
+        if stripped.startswith("match ") or (
+            stripped.startswith("let ") and "= match " in stripped
+        ):
+            return guard_found
+    return guard_found
+
 
 def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
     """Return line numbers belonging to any ``#[cfg(test)] mod ... { ... }`` block."""
@@ -405,6 +602,138 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
             index = cursor + 1
             continue
         index += 1
+    return False
+
+
+def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
+    """Return whether a line is inside a Rust string continuation.
+
+    The scanner tracks normal strings, raw strings, block comments, and character
+    literals so quotes in comments or literal contents cannot change the state of
+    a later source line.
+    """
+
+    in_string = False
+    raw_hashes: int | None = None
+    block_comment_depth = 0
+    for index, raw in enumerate(lines, start=1):
+        target_continuation = (in_string or raw_hashes is not None) and index == line_number
+        target_closing_cursor: int | None = None
+        target_has_executable_suffix = False
+        cursor = 0
+        while cursor < len(raw):
+            if block_comment_depth > 0:
+                if raw.startswith("/*", cursor):
+                    block_comment_depth += 1
+                    cursor += 2
+                elif raw.startswith("*/", cursor):
+                    block_comment_depth -= 1
+                    cursor += 2
+                else:
+                    cursor += 1
+                continue
+            if raw_hashes is not None:
+                delimiter = '"' + ("#" * raw_hashes)
+                closing = raw.find(delimiter, cursor)
+                if closing == -1:
+                    cursor = len(raw)
+                else:
+                    raw_hashes = None
+                    cursor = closing + len(delimiter)
+                    if target_continuation and target_closing_cursor is None:
+                        target_closing_cursor = cursor
+                continue
+            if in_string:
+                character = raw[cursor]
+                if character == "\\":
+                    cursor += 2
+                elif character == '"':
+                    in_string = False
+                    cursor += 1
+                    if target_continuation and target_closing_cursor is None:
+                        target_closing_cursor = cursor
+                else:
+                    cursor += 1
+                continue
+            if raw[cursor].isspace():
+                cursor += 1
+                continue
+            if raw.startswith("//", cursor):
+                break
+            if raw.startswith("/*", cursor):
+                block_comment_depth += 1
+                cursor += 2
+                continue
+            if target_continuation and target_closing_cursor is not None:
+                if raw[cursor] in ",;)]}":
+                    cursor += 1
+                    continue
+                target_has_executable_suffix = True
+            raw_start = _raw_string_start(raw, cursor)
+            if raw_start is not None:
+                raw_hashes, cursor = raw_start
+                continue
+            if raw[cursor] == '"':
+                in_string = True
+                cursor += 1
+                continue
+            if raw[cursor] == "'":
+                character_end = _character_literal_end(raw, cursor)
+                if character_end is not None:
+                    cursor = character_end
+                    continue
+            cursor += 1
+        if target_continuation:
+            if target_closing_cursor is None:
+                return True
+            return not target_has_executable_suffix
+    return False
+
+
+def _raw_string_start(line: str, cursor: int) -> tuple[int, int] | None:
+    """Return ``(hash_count, next_cursor)`` for a Rust raw-string opener."""
+
+    if line.startswith("br", cursor):
+        prefix_end = cursor + 2
+    elif line.startswith("r", cursor):
+        prefix_end = cursor + 1
+    else:
+        return None
+    hash_end = prefix_end
+    while hash_end < len(line) and line[hash_end] == "#":
+        hash_end += 1
+    if hash_end < len(line) and line[hash_end] == '"':
+        return hash_end - prefix_end, hash_end + 1
+    return None
+
+
+def _character_literal_end(line: str, cursor: int) -> int | None:
+    """Return the cursor after a one-line Rust character literal, if present."""
+
+    candidate = cursor + 1
+    if candidate >= len(line):
+        return None
+    if line[candidate] == "\\":
+        candidate += 2
+    else:
+        candidate += 1
+    if candidate < len(line) and line[candidate] == "'":
+        return candidate + 1
+    return None
+
+
+def _is_standalone_string_literal(text: str) -> bool:
+    """Return whether *text* is only a normal string literal and punctuation."""
+    if not text.startswith('"'):
+        return False
+    escaped = False
+    for index, character in enumerate(text[1:], start=1):
+        if character == '"' and not escaped:
+            return text[index + 1 :].strip() in {"", ",", ";"}
+        if character == "\\":
+            escaped = not escaped
+        else:
+            escaped = False
     return False
 
 

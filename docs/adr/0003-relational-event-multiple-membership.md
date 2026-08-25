@@ -1,10 +1,13 @@
 # ADR 0003 — Relational event ontology and time-varying multiple membership
 
 **Decision status:** Accepted
+**Implementation maturity:** partial — membership network and event mention/instance separation are implemented-main; episode membership containment, typed forward-only relation behavior, status gates, and cross-classified/multiple-membership refusal are active in this increment; full multilevel/MMMC estimators and remaining persistence remain accepted-target.
 **Implementation maturity:** partial — membership networks, event mention/instance separation, and the protected-main forward-transition foundation are implemented-main; `support_edge`, `outcome_order`, `retrospective_edge`, `inferred_status`, `copy_identity`, `summarizes_edge`, `subevent_containment`, `location_membership`, `episode_membership`, and typed target kinds are covered by this active consolidation PR; full multilevel/MMMC estimators and remaining persistence remain accepted-target.
 **Date:** 2026-08-05
 **Implementation maturity:** partial — membership network, event mention/instance separation, inferred/evidential/retrospective status gates, summary/source identity separation, template-copy/source identity separation, typed forward-only relation graph, strict input-process-outcome ordering, nested ICC refusal, and subevent parent-window containment are implemented-main; full multilevel/MMMC estimators and remaining persistence remain accepted-target.
-**Date:** 2026-08-24
+**Date:** 2026-08-24  
+**Decision status:** Accepted  
+**Implementation maturity:** partial — membership network/roles with Kish ESS and nested ICC (cross-classified/multiple-membership refusal), event mention/instance separation, the typed forward-only relation graph, and the copy/summary/outcome-order/support/inferred-status/retrospective-reporting/location identity gates are implemented-main; typed target-kind membership identity in `membership_target` is on PR #131; multilevel psychometric estimators and remaining persistence details follow ADR 0013 and [`docs/TRACEABILITY.md`](../TRACEABILITY.md) as accepted-target.
 **Supersedes:** None. ADR 0016 owns TDT/CHRONOS event-intelligence task semantics; this ADR remains authoritative for ontology, relation, role, and membership structure.
 
 ## Context
@@ -18,6 +21,10 @@ Customer, partner, and competitor are especially contextual roles rather than pe
 TEPP represents document, passage, event, entity, revision, translation, evidence, and forward-transition relationships explicitly. Event instances are distinct from fallible event mentions and retain typed roles/arguments, agents, factors, products/outcomes, places, subevents, confidence, time, and exact evidence.
 
 Authors, departments, organizations, customers, partners, competitors, projects, opportunity pools, templates, languages, locations, and episodes form cross-classified, time-varying, multiple-membership assignments. Memberships carry explicit weights where scientifically justified and governed validity intervals. Customer/partner/competitor are role assignments, not immutable entity classes.
+
+An episode assignment is accepted only when its event-time window is contained by
+the episode window. Equal boundaries are valid, while inverted windows and
+windows that escape either boundary fail closed.
 
 Observed relation evidence, inferred relations, and promoted transition edges remain distinct. Relation absence is not silently interpreted as evidence of no relationship.
 

@@ -27,21 +27,28 @@ fn membership_cannot_escape_the_episode_interval() {
 
 #[test]
 fn recovered_containment_matches_known_truth_better_than_accepting_every_membership() {
-    let truth = [true, false, false];
-    let recovered = [true, false, false];
-    let collapsed = [true, true, true];
+    let cases = [
+        (10, 20, 10, 18, true),
+        (30, 40, 32, 40, true),
+        (50, 60, 50, 60, true),
+        (70, 80, 69, 75, false),
+        (90, 100, 95, 101, false),
+        (110, 120, 112, 118, true),
+    ];
+    let mut truth = Vec::with_capacity(cases.len());
+    let mut recovered = Vec::with_capacity(cases.len());
+    for (episode_start, episode_end, member_start, member_end, expected) in cases {
+        let episode = EventWindow::new(episode_start, episode_end).expect("episode");
+        let membership = EventWindow::new(member_start, member_end).expect("membership");
+        assert!(episode.start() <= episode.end());
+        truth.push(expected);
+        recovered.push(refuse_membership_outside_episode(membership, episode).is_ok());
+    }
+    let collapsed = vec![true; truth.len()];
     let recovered_rate = identity_recovery_rate(&truth, &recovered).expect("recovered");
     let collapsed_rate = identity_recovery_rate(&truth, &collapsed).expect("collapsed");
-    let expected = {
-        let mut matches = 0_u32;
-        for (truth_flag, decided_flag) in truth.iter().zip(recovered.iter()) {
-            if truth_flag == decided_flag {
-                matches += 1;
-            }
-        }
-        f64::from(matches) / f64::from(u32::try_from(truth.len()).expect("len"))
-    };
-    assert!((recovered_rate - expected).abs() < f64::EPSILON);
+    assert!((recovered_rate - 1.0).abs() < f64::EPSILON);
+    assert!((collapsed_rate - (2.0 / 3.0)).abs() < f64::EPSILON);
     assert!(recovered_rate > collapsed_rate);
 }
 

@@ -24,6 +24,16 @@ pub enum EventError {
     DetectionIsNotTransition,
     /// A CHRONOS prediction was treated as an observed or promoted fact.
     PredictionIsNotFact,
+    /// A TDT link detection was treated as an event instance.
+    EventLinkIsNotEventInstance,
+    /// A TDT link detection was treated as a state transition.
+    EventLinkIsNotStateTransition,
+    /// An unknown event-link label was supplied.
+    UnknownEventLinkLabel,
+    /// A first-story detection was treated as an event instance.
+    FirstStoryIsNotEventInstance,
+    /// An unknown first-story label name was supplied.
+    UnknownFirstStoryLabel,
     /// A TDT track assignment was treated as an event instance.
     EventTrackIsNotEventInstance,
     /// A TDT track assignment was treated as a state transition.
@@ -60,6 +70,11 @@ impl fmt::Display for EventError {
             Self::UnknownEventRole => "unknown event role",
             Self::DetectionIsNotTransition => "detection is not a state transition",
             Self::PredictionIsNotFact => "prediction is not an observed fact",
+            Self::EventLinkIsNotEventInstance => "event link is not an event instance",
+            Self::EventLinkIsNotStateTransition => "event link is not a state transition",
+            Self::UnknownEventLinkLabel => "unknown event link label",
+            Self::FirstStoryIsNotEventInstance => "first-story detection is not an event instance",
+            Self::UnknownFirstStoryLabel => "unknown first-story label",
             Self::EventTrackIsNotEventInstance => "event track is not an event instance",
             Self::EventTrackIsNotStateTransition => "event track is not a state transition",
             Self::UnknownEventTrackLabel => "unknown event track label",
@@ -121,6 +136,22 @@ mod tests {
                 "prediction is not an observed fact",
             ),
             (
+                EventError::EventLinkIsNotEventInstance,
+                "event link is not an event instance",
+            ),
+            (
+                EventError::EventLinkIsNotStateTransition,
+                "event link is not a state transition",
+            ),
+            (
+                EventError::UnknownEventLinkLabel,
+                "unknown event link label",
+                EventError::FirstStoryIsNotEventInstance,
+                "first-story detection is not an event instance",
+            ),
+            (
+                EventError::UnknownFirstStoryLabel,
+                "unknown first-story label",
                 EventError::EventTrackIsNotEventInstance,
                 "event track is not an event instance",
             ),
