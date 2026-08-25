@@ -207,6 +207,27 @@
 //! predetermined later-occasion latent variance is not that observed
 //! variance; stationary later observed variance is not that observed
 //! variance when `p_0` is free),
+//! recovers the Driver §4.3 predetermined lagged covariance as
+//! `trait + e^{a Δt} p_0 + (B / a)² v`
+//! (JSS PDF re-opened 2026-08-23T09:04Z; form the lagged free
+//! first-occasion covariance first, then include the trait, then
+//! include the TI extra variance, then add; trait and
+//! `addedTIPREDVAR` do not decay with `e^{a Δt}`; free `T0VAR` `p_0`
+//! is not that lagged map; setting `p_0 = −q / (2 a)` recovers the
+//! stationary lagged map; stationary lagged covariance uses
+//! `−q / (2 a)` in place of `p_0` and is not that lagged map when
+//! `p_0` is free; evolving `trait + p_0 + (B / a)² v` as if it were
+//! all state is not that lagged map; later-occasion variance
+//! includes `Q_Δt` and is not that lagged map; as `Δt → ∞` with
+//! stable `a < 0` the state term vanishes; as `Δt → 0+` the
+//! composition approaches `trait + p_0 + (B / a)² v`),
+//! recovers the Driver Eq. 5 of that predetermined lagged
+//! covariance as `λ²(trait + e^{a Δt} p_0 + (B / a)² v) + ψ`
+//! (`MANIFESTVAR` does not enter; the predetermined lagged latent
+//! covariance is not that observed covariance; predetermined later
+//! observed variance includes `Q_Δt` and `θ` and is not that lagged
+//! observed covariance; stationary lagged observed covariance is
+//! not that observed covariance when `p_0` is free),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -345,6 +366,10 @@ pub use event_time::recover_manifest_observed_mean;
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
+/// Exact scalar lagged covariance of §4.3 predetermined `T0VAR` `trait + e^{a Δt} p_0 + (B / a)² v`.
+pub use event_time::recover_predetermined_lagged_latent_covariance;
+/// Exact scalar Eq. 5 of lagged §4.3 predetermined `T0VAR` `λ²(trait + e^{a Δt} p_0 + (B / a)² v) + ψ`.
+pub use event_time::recover_predetermined_lagged_observed_covariance;
 /// Exact scalar later-occasion variance of §4.3 predetermined `T0VAR` `trait + e^{2 a Δt} p_0 + Q_Δt + (B / a)² v`.
 pub use event_time::recover_predetermined_later_latent_variance;
 /// Exact scalar Eq. 5 of later-occasion §4.3 predetermined `T0VAR` `λ²(trait + e^{2 a Δt} p_0 + Q_Δt + (B / a)² v) + θ + ψ`.
@@ -523,6 +548,8 @@ pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
 pub use event_time::refuse_measurement_error_as_observed_variance;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of predetermined lagged `T0VAR`.
+pub use event_time::refuse_measurement_error_as_predetermined_lagged_observed_covariance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of predetermined later-occasion `T0VAR`.
 pub use event_time::refuse_measurement_error_as_predetermined_later_observed_variance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of lagged §4.3 stationary `T0VAR`.
@@ -531,6 +558,16 @@ pub use event_time::refuse_measurement_error_as_stationary_lagged_observed_covar
 pub use event_time::refuse_measurement_error_as_stationary_later_observed_variance;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
+/// Refuse treating predetermined lagged covariance as the decayed total.
+pub use event_time::refuse_predetermined_lagged_latent_covariance_as_decayed_total;
+/// Refuse treating predetermined lagged covariance as free first-occasion `T0VAR`.
+pub use event_time::refuse_predetermined_lagged_latent_covariance_as_initial_latent_variance;
+/// Refuse treating predetermined lagged covariance as predetermined later-occasion variance.
+pub use event_time::refuse_predetermined_lagged_latent_covariance_as_later_latent_variance;
+/// Refuse treating predetermined lagged covariance as predetermined lagged observed covariance.
+pub use event_time::refuse_predetermined_lagged_latent_covariance_as_observed_covariance;
+/// Refuse treating predetermined lagged covariance as lagged stationary `T0VAR`.
+pub use event_time::refuse_predetermined_lagged_latent_covariance_as_stationary_lagged_covariance;
 /// Refuse treating predetermined later-occasion variance as the free discrete evolution of the total.
 pub use event_time::refuse_predetermined_later_latent_variance_as_discrete_variance;
 /// Refuse treating predetermined later-occasion variance as free first-occasion `T0VAR`.
@@ -539,6 +576,8 @@ pub use event_time::refuse_predetermined_later_latent_variance_as_initial_latent
 pub use event_time::refuse_predetermined_later_latent_variance_as_observed_variance;
 /// Refuse treating predetermined later-occasion variance as later-occasion stationary `T0VAR`.
 pub use event_time::refuse_predetermined_later_latent_variance_as_stationary_later_latent_variance;
+/// Refuse treating Eq. 5 of predetermined later-occasion `T0VAR` as predetermined lagged observed covariance.
+pub use event_time::refuse_predetermined_later_observed_variance_as_predetermined_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -575,6 +614,8 @@ pub use event_time::refuse_stationary_lagged_latent_covariance_as_decayed_statio
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_observed_covariance;
 /// Refuse treating lagged §4.3 stationary `T0VAR` as contemporaneous stationary `T0VAR`.
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance;
+/// Refuse treating Eq. 5 of lagged §4.3 stationary `T0VAR` as predetermined lagged observed covariance.
+pub use event_time::refuse_stationary_lagged_observed_covariance_as_predetermined_lagged_observed_covariance;
 /// Refuse treating Eq. 5 of lagged §4.3 stationary `T0VAR` as later-occasion observed variance.
 pub use event_time::refuse_stationary_lagged_observed_covariance_as_stationary_later_observed_variance;
 /// Refuse treating later-occasion §4.3 stationary `T0VAR` as the free discrete evolution of the constrained total.
