@@ -1,7 +1,9 @@
 # ADR 0023 — TEPP-owned Event Lineage criterion anchor
 
-**Status:** Accepted  
+**Decision status:** Accepted  
+**Implementation maturity:** active-PR — the transport contract is implemented on this PR; the registered TEPP analysis remains accepted-target  
 **Date:** 2026-08-25
+**Supersedes:** None; complements ADR 0014's scientific promotion boundary.
 
 ## Context
 
@@ -31,6 +33,15 @@ interpretation and use be stated and supported by appropriate validity
 evidence; internal model fit is not silently promoted to evidence for the
 Event Lineage use.
 
+## Alternatives considered
+
+1. Let the consumer author a validity flag — rejected because the evidence
+   would not be independent of the proposed weights.
+2. Treat an accepted transport receipt as validity evidence — rejected because
+   transport acceptance does not establish the intended score interpretation.
+3. Publish a TEPP-owned, identity-bound outcome — accepted because it keeps
+   criterion authority and provenance at the measurement boundary.
+
 ## Consequences
 
 - An accepted transport receipt is never a criterion anchor.
@@ -39,6 +50,20 @@ Event Lineage use.
   outcome, and a consumer may activate weights only for an exact accepted
   artifact.
 - The executable estimator remains a separately gated delivery slice.
+
+## Verification
+
+The Rust contract tests cover accepted and rejected round trips, canonical UUID
+identity, malformed provenance, unknown fields, and payload limits. The JSON
+Schema is checked against the same canonical UUID examples by the API schema
+test suite.
+
+## Rollback and supersession
+
+Rollback stops publishing the result profile while preserving previously issued
+versioned artifacts. Supersession requires a new ADR that preserves independent
+criterion authority, exact run/snapshot/cutoff binding, and fail-closed consumer
+activation.
 
 ## Reference
 
