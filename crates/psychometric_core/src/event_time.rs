@@ -353,7 +353,16 @@
 //! re-opened 2026-08-23T22:28Z). The scalar map is `ψ / ψ = 1`.
 //! Unstandardised `MANIFESTTRAITVAR` is not `MANIFESTTRAITVARstd`.
 //! `TRAITVARstd` is not `MANIFESTTRAITVARstd` even when both equal 1.
-//! `MANIFESTVAR` is not `MANIFESTTRAITVARstd`. The JSS article
+//! `MANIFESTVAR` is not `MANIFESTTRAITVARstd`. Page 16
+//! `MANIFESTVARstd` is the correlation form
+//! `solve(sqrt(diag(MANIFESTVAR) + ridging)) %&% MANIFESTVAR` after
+//! strictly positive `MANIFESTVAR` (2017-era `summary.ctsemFit.R`
+//! forms it whenever `verbose = TRUE`; unlike `TRAITVARstd` the
+//! 2017-era source adds ridging; default ridge is 0; JSS PDF
+//! re-opened 2026-08-23T22:40Z). The scalar map is `θ / θ = 1`.
+//! Unstandardised `MANIFESTVAR` is not `MANIFESTVARstd`.
+//! `MANIFESTTRAITVARstd` is not `MANIFESTVARstd` even when both
+//! equal 1. `Var(y)` is not `MANIFESTVARstd`. The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
@@ -2668,6 +2677,136 @@ pub fn refuse_measurement_error_as_standardised_manifest_trait_variance(
         standardised_manifest_trait_variance,
     );
     Err(PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance)
+}
+
+/// Exact scalar p. 16 `MANIFESTVARstd` after strictly positive
+/// `MANIFESTVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; Eq. 5, p. 5;
+/// p. 16; footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-23T22:40Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `MANIFESTVAR` `Θ` the residual covariance of the
+/// indicators. Equation 5 writes `ζ ~ N(0, Θ)`. Page 16 prints
+/// standardised matrices with the suffix `std` when appropriate.
+/// The 2017-era `summary.ctsemFit.R` forms `MANIFESTVARstd` whenever
+/// `verbose = TRUE`, as
+/// `solve(sqrt(diag(MANIFESTVAR) + ridging)) %&% MANIFESTVAR`.
+/// `OpenMx` `%&%` is the quadratic form `t(A) %*% B %*% A`. Unlike
+/// `TRAITVARstd`, that formation adds
+/// `diag(c(ridging), n.manifest)`. The default `ridging = FALSE`
+/// adds 0, not `0.0001`; that ridge is a numerical hack and is not
+/// this exact map. The 2017-era source assigns
+/// `dimnames(MANIFESTVARstd)` to `latentNames`; the matrix is
+/// `n.manifest × n.manifest`. That assignment is a source bug and
+/// is not this exact map. The scalar correlation is `θ / θ = 1`
+/// after strictly positive `MANIFESTVAR`. Form strictly positive
+/// `θ` first, then `1 / √θ`, then `(1 / √θ) θ (1 / √θ)`.
+/// Unstandardised `MANIFESTVAR` is defined for a zero residual;
+/// standardised `MANIFESTVAR` is not. Zero `θ` makes
+/// `solve(sqrt(0))` fail in the 2017-era source and fails closed
+/// here. Unlike `TRAITVAR` / `MANIFESTTRAITVAR`, that source does
+/// not skip forming `MANIFESTVARstd` when `θ = 0`; the quadratic
+/// still fails. Measurement-error variance is an event-time
+/// structural quantity, so a non-event clock fails closed.
+/// `MANIFESTVAR` does not require stable `a < 0`. Distinct
+/// positive `θ` recover the same 1. `MANIFESTTRAITVARstd`
+/// `ψ / ψ = 1` recovers the same number and remains a distinct
+/// named quantity. Equation 5 `λ² Var(η) + θ` is `Var(y)`, not
+/// this correlation. This is not a Kalman filter, not a matrix
+/// `expm`, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance`]
+/// when `MANIFESTVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the variance is
+/// non-finite, negative, or the quadratic form overflows.
+pub fn recover_standardised_manifest_variance(
+    measurement_error_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !measurement_error_variance.is_finite() || measurement_error_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if measurement_error_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance,
+        );
+    }
+    let process_sd = measurement_error_variance.sqrt();
+    let inverse_sd = require_finite(1.0 / process_sd)?;
+    let scaled = require_finite(inverse_sd * measurement_error_variance)?;
+    require_finite(scaled * inverse_sd)
+}
+
+/// Refuse treating unstandardised `MANIFESTVAR` as p. 16
+/// `MANIFESTVARstd`.
+///
+/// Unstandardised `Θ` is defined for a zero residual. Footnote 4
+/// `MANIFESTVARstd` requires strictly positive `MANIFESTVAR`. Equal
+/// numbers when `θ = 1` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_unstandardised_manifest_variance_as_standardised_manifest_variance(
+    unstandardised_manifest_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_manifest_variance,
+        standardised_manifest_variance,
+    );
+    Err(PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance)
+}
+
+/// Refuse treating p. 16 `MANIFESTTRAITVARstd` as p. 16
+/// `MANIFESTVARstd`.
+///
+/// Both scalar correlations equal 1 after strictly positive
+/// variances. `MANIFESTTRAITVARstd` standardises indicator-level
+/// trait variance `Ψ_τ`. `MANIFESTVARstd` standardises
+/// contemporaneous measurement error `Θ`. Equal numbers remain
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance(
+    standardised_manifest_trait_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_manifest_trait_variance,
+        standardised_manifest_variance,
+    );
+    Err(PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance)
+}
+
+/// Refuse treating Driver Eq. 5 `Var(y)` as p. 16 `MANIFESTVARstd`.
+///
+/// `λ² Var(η) + θ` is the observed-indicator variance. Table 2
+/// names `MANIFESTVAR` `Θ`, not `Var(y)`. The correlation form of
+/// `Θ` is not that observed variance.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_observed_variance_as_standardised_manifest_variance(
+    observed_indicator_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (observed_indicator_variance, standardised_manifest_variance);
+    Err(PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance)
 }
 
 /// Exact scalar 2017-era `addedT0TIPREDVAR` after a first-occasion
@@ -11152,6 +11291,8 @@ mod tests {
         recover_initial_time_dependent_predictor_carry,
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_dependent_predictor_variance,
+        recover_initial_time_dependent_predictor_carry,
+        recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_observed_variance,
         recover_initial_time_independent_predictor_carry,
         recover_initial_time_independent_predictor_effect,
@@ -11183,6 +11324,10 @@ mod tests {
         recover_standardised_initial_latent_variance,
         recover_standardised_initial_time_dependent_predictor_effect,
         recover_standardised_initial_time_independent_predictor_effect,
+        recover_standardised_initial_latent_variance,
+        recover_standardised_initial_time_dependent_predictor_effect,
+        recover_standardised_initial_time_independent_predictor_effect,
+        recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
         recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
         recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
         recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
@@ -11306,6 +11451,7 @@ mod tests {
         refuse_measurement_error_as_standardised_manifest_trait_variance,
         refuse_measurement_error_as_stationary_lagged_observed_covariance,
         refuse_measurement_error_as_stationary_later_observed_variance,
+        refuse_observed_variance_as_standardised_manifest_variance,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_predetermined_initial_latent_variance_as_initial_latent_variance,
         refuse_predetermined_initial_latent_variance_as_lagged_latent_covariance,
@@ -11357,6 +11503,7 @@ mod tests {
         refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
         refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance,
         refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
+        refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
         refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -11428,6 +11575,7 @@ mod tests {
         refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
+        refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     };
     use crate::error::PsychometricError;
@@ -17136,6 +17284,51 @@ mod tests {
         let printed_effect = -0.225_f64;
         let printed_asym = -1.673_f64;
         let log_rate = -printed_effect / printed_asym;
+    fn after_extra_process_latent_mean_keeps_nonzero_contribution_when_evolved_mean_is_zero() {
+        let coupling = 1.0_f64;
+        let predictor = 1.0_f64;
+        let original = -0.4_f64;
+        let extra = -0.000_001_f64;
+        let delta = 2.0_f64;
+        let elapsed = 1.0_f64;
+        let contribution = recover_level_change_extra_process_contribution_after(
+            coupling,
+            predictor,
+            original,
+            extra,
+            delta,
+            elapsed,
+            LagClock::EventTime,
+        )
+        .expect("after-extra-process-contribution");
+        assert!(contribution.abs() > f64::EPSILON);
+        assert_eq!(
+            recover_discrete_latent_mean_with_extra_process_after(
+                0.0,
+                original,
+                0.0,
+                coupling,
+                predictor,
+                extra,
+                delta,
+                elapsed,
+                LagClock::EventTime,
+            ),
+            Ok(contribution)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn after_extra_process_observed_mean_recovers_driver_equation_five() {
+        let loading = 2.0_f64;
+        let coupling = 0.4_f64;
+        let predictor = 3.0_f64;
+        let original = -0.5_f64;
+        let extra = -0.05_f64;
+        let delta = 2.0_f64;
+        let elapsed = 1.0_f64;
+        let initial = 1.0_f64;
         let intercept = 0.3_f64;
         let recovered = recover_stationary_initial_latent_mean(
             intercept,
@@ -19076,6 +19269,8 @@ mod tests {
     fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
      {
     fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
+     {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
      {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
@@ -23806,6 +24001,21 @@ mod tests {
                 0.5,
                 1.0,
                 0.5,
+            recover_discrete_time_independent_predictor_effect(
+                1.0,
+                1.0,
+                f64::NAN,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_time_independent_predictor_effect(
+                1e308,
+                2.0,
+                -0.5,
+                2.0,
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
@@ -26758,6 +26968,37 @@ mod tests {
         )
         .expect("trait-only later-start later");
         assert!((trait_only - trait_variance).abs() < 1e-15);
+        .expect("growing a>0");
+        assert!(growing.is_finite());
+        assert!(growing > 2.0);
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                f64::NAN,
+                2.0,
+                0.4,
+                0.0,
+                0.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_predetermined_later_lagged_latent_covariance(
+                f64::MAX,
+                f64::MAX,
+                0.0,
+                0.0,
+                0.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]
@@ -26985,6 +27226,10 @@ mod tests {
     fn predetermined_later_start_later_observed_variance_recovers_driver_equation_five() {
         // Driver et al. (2017, Eq. 5 of later-start later-occasion T0VAR):
         // λ²(trait + e^{2 a s}(e^{2 a u} p_0 + Q_u) + Q_s + (B / a)² v) + θ + ψ.
+    fn predetermined_later_start_later_latent_variance_recovers_driver_equation_four_after_startoffset()
+     {
+        // Driver et al. (2017, §4.3 startoffset; Eq. 3–4 Chapman–Kolmogorov):
+        // Var = trait + e^{2 a s}(e^{2 a u} p_0 + Q_u) + Q_s + (B / a)² v.
         let printed_effect = -0.225_f64;
         let printed_asym = -1.673_f64;
         let log_rate = -printed_effect / printed_asym;
@@ -27465,6 +27710,182 @@ mod tests {
             trait_variance,
             initial_latent_variance,
             diffusion,
+            -0.225,
+            1.0,
+            log_rate,
+            lag_delta,
+            LagClock::EventTime,
+        )
+        .expect("later over s only");
+        assert_eq!(
+            refuse_predetermined_later_start_later_latent_variance_as_later_latent_variance(
+                recovered, later
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLaterLatentVariance
+            )
+        );
+        assert_eq!(
+            refuse_predetermined_later_start_later_latent_variance_as_later_lagged_covariance(
+                recovered,
+                later_lagged
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLaterLaggedCovariance
+            )
+        );
+        assert_eq!(
+            refuse_predetermined_later_start_later_latent_variance_as_stationary_later_latent_variance(
+                recovered,
+                stationary_later
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotStationaryLaterLatentVariance
+            )
+        );
+        assert_eq!(
+            refuse_predetermined_later_start_later_latent_variance_as_decayed_later_total(
+                recovered,
+                decayed_later
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotDecayedLaterTotal
+            )
+        );
+        assert_eq!(
+            refuse_predetermined_later_start_later_latent_variance_as_lag_interval_later_latent_variance(
+                recovered,
+                lag_interval
+            ),
+            Err(
+                PsychometricError::PredeterminedLaterStartLaterLatentVarianceIsNotLagIntervalLaterLatentVariance
+            )
+        );
+    }
+
+    #[test]
+    fn predetermined_later_start_later_latent_variance_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_predetermined_later_start_later_latent_variance(
+                1.0,
+                2.0,
+                0.4,
+                -0.225,
+                1.0,
+                -0.13,
+                2.0,
+                1.0,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_predetermined_later_start_later_latent_variance(
+                1.0,
+                2.0,
+                0.4,
+                -0.225,
+                1.0,
+                -0.13,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_predetermined_later_start_later_latent_variance(
+                1.0,
+                2.0,
+                0.4,
+                -0.225,
+                1.0,
+                -0.13,
+                2.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_predetermined_later_start_later_latent_variance(
+                0.0,
+                0.0,
+                0.0,
+                -0.225,
+                1.0,
+                0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
+        );
+        let growing = recover_predetermined_later_start_later_latent_variance(
+            0.0,
+            2.0,
+            0.4,
+            0.0,
+            0.0,
+            0.5,
+            1.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("growing a>0");
+        assert!(growing.is_finite());
+        assert!(growing > 2.0);
+        assert_eq!(
+            recover_predetermined_later_start_later_latent_variance(
+                f64::NAN,
+                2.0,
+                0.4,
+                0.0,
+                0.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_predetermined_later_start_later_latent_variance(
+                f64::MAX,
+                f64::MAX,
+                0.0,
+                0.0,
+                0.0,
+                -0.5,
+                2.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn predetermined_later_start_later_observed_variance_recovers_driver_equation_five() {
+        // Driver et al. (2017, Eq. 5 of later-start later-occasion T0VAR):
+        // λ²(trait + e^{2 a s}(e^{2 a u} p_0 + Q_u) + Q_s + (B / a)² v) + θ + ψ.
+        let printed_effect = -0.225_f64;
+        let printed_asym = -1.673_f64;
+        let log_rate = -printed_effect / printed_asym;
+        let trait_variance = 1.0_f64;
+        let initial_latent_variance = 2.0_f64;
+        let diffusion = 0.4_f64;
+        let loading = 2.0_f64;
+        let measurement_error = 0.5_f64;
+        let manifest_trait = 0.1_f64;
+        let start_delta = 2.0_f64;
+        let lag_delta = 1.0_f64;
+        let recovered = recover_predetermined_later_start_later_observed_variance(
+            loading,
+            trait_variance,
+            initial_latent_variance,
+            diffusion,
             printed_effect,
             predictor_variance,
             log_rate,
@@ -27822,6 +28243,10 @@ mod tests {
                 PsychometricError::StandardisedContinuousDriftRequiresPositiveWithinSubjectVariance
             )
         );
+        let growing = recover_discrete_lag_from_log_rate(0.5, event_delta, LagClock::EventTime)
+            .expect("growing a>0");
+        assert!(growing.is_finite());
+        assert!(growing > 1.0);
         assert_eq!(
             recover_standardised_continuous_drift(0.4, 0.5, LagClock::EventTime),
             Err(PsychometricError::StationaryVarianceRequiresStableDrift)
@@ -27957,6 +28382,10 @@ mod tests {
                 PsychometricError::StandardisedAsymptoticTimeIndependentEffectRequiresPositiveWithinSubjectVariance
             )
         );
+        let growing = recover_discrete_process_noise(0.4, 0.5, event_delta, LagClock::EventTime)
+            .expect("growing a>0");
+        assert!(growing.is_finite());
+        assert!(growing > 0.0);
         assert_eq!(
             recover_standardised_asymptotic_time_independent_predictor_effect(
                 0.3,
@@ -29807,6 +30236,72 @@ mod tests {
             recover_initial_time_dependent_observed_variance(2.0, 0.0, 1e308, LagClock::EventTime)
                 .expect("zero coefficient keeps zero");
         assert_eq!(zero_with_overflowing_variance.to_bits(), 0.0_f64.to_bits());
+    }
+
+    #[test]
+    fn standardised_manifest_variance_recovers_driver_table_two_after_positive_theta() {
+        // Driver et al. (2017, Table 2 MANIFESTVAR Θ; Eq. 5 p.5;
+        // p. 16 MANIFESTVARstd; 2017-era summary.ctsemFit.R):
+        // form strictly positive Θ, then (1/√θ) θ (1/√θ) = 1.
+        // Default ridging = FALSE adds 0.
+        let measurement_error = 0.4_f64;
+        let recovered =
+            recover_standardised_manifest_variance(measurement_error, LagClock::EventTime)
+                .expect("MANIFESTVARstd");
+        assert!((recovered - 1.0).abs() < 1e-15);
+        let larger_theta = recover_standardised_manifest_variance(1.6, LagClock::EventTime)
+            .expect("MANIFESTVARstd θ=1.6");
+        assert_eq!(larger_theta.to_bits(), recovered.to_bits());
+        let manifest_trait_std =
+            recover_standardised_manifest_trait_variance(measurement_error, LagClock::EventTime)
+                .expect("MANIFESTTRAITVARstd");
+        assert_eq!(manifest_trait_std.to_bits(), recovered.to_bits());
+        let observed =
+            recover_manifest_observed_variance(2.0, 0.4, measurement_error).expect("Var(y)");
+        assert_eq!(
+            refuse_unstandardised_manifest_variance_as_standardised_manifest_variance(
+                measurement_error,
+                recovered
+            ),
+            Err(PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance)
+        );
+        assert_eq!(
+            refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance(
+                manifest_trait_std,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance
+            )
+        );
+        assert_eq!(
+            refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
+            Err(PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance)
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_variance_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_manifest_variance(0.0, LagClock::EventTime),
+            Err(PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance)
+        );
+        assert_eq!(
+            recover_standardised_manifest_variance(0.4, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_manifest_variance(-0.4, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_variance(f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_variance(f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]

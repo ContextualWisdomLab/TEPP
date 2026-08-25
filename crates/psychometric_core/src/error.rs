@@ -1121,6 +1121,26 @@ pub enum PsychometricError {
     /// `λ² t0_m² v` was treated as `MANIFESTVAR` `θ`. Measurement
     /// error is not extra observed TD variance.
     InitialTimeDependentObservedVarianceIsNotMeasurementError,
+    /// Driver p. 16 `MANIFESTVARstd` was requested with a
+    /// non-positive measurement-error variance. The 2017-era
+    /// correlation form requires strictly positive `MANIFESTVAR`.
+    /// Zero `θ` makes `solve(sqrt(0))` fail in that source.
+    StandardisedManifestVarianceRequiresPositiveManifestVariance,
+    /// Driver Table 2 unstandardised `MANIFESTVAR` `Θ` was treated
+    /// as p. 16 `MANIFESTVARstd`. Unstandardised measurement error
+    /// is defined for a zero residual; standardised `MANIFESTVAR`
+    /// is not.
+    UnstandardisedManifestVarianceIsNotStandardisedManifestVariance,
+    /// Driver p. 16 `MANIFESTTRAITVARstd` was treated as p. 16
+    /// `MANIFESTVARstd`. Equal numbers when both correlations equal
+    /// 1 are still distinct named quantities. `MANIFESTTRAITVAR` is
+    /// indicator-level trait variance; `MANIFESTVAR` is
+    /// contemporaneous measurement error.
+    StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance,
+    /// Driver Eq. 5 observed-indicator variance was treated as p. 16
+    /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
+    /// correlation form of `Θ`.
+    ObservedVarianceIsNotStandardisedManifestVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1926,6 +1946,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialTimeDependentObservedVarianceIsNotMeasurementError => {
                 "initial time-dependent observed predictor variance is not measurement error"
+            }
+            Self::StandardisedManifestVarianceRequiresPositiveManifestVariance => {
+                "standardised measurement-error variance requires strictly positive measurement-error variance"
+            }
+            Self::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance => {
+                "unstandardised measurement-error variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance => {
+                "standardised manifest-trait variance is not standardised measurement-error variance"
+            }
+            Self::ObservedVarianceIsNotStandardisedManifestVariance => {
+                "observed-indicator variance is not standardised measurement-error variance"
             }
         };
         formatter.write_str(message)
@@ -3304,6 +3336,29 @@ mod tests {
             PsychometricError::InitialTimeDependentObservedVarianceIsNotMeasurementError
                 .to_string(),
             "initial time-dependent observed predictor variance is not measurement error"
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance
+                .to_string(),
+            "standardised measurement-error variance requires strictly positive measurement-error variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance
+                .to_string(),
+            "unstandardised measurement-error variance is not standardised measurement-error variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance
+                .to_string(),
+            "standardised manifest-trait variance is not standardised measurement-error variance"
+        );
+        assert_eq!(
+            PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance.to_string(),
+            "observed-indicator variance is not standardised measurement-error variance"
         );
     }
 }

@@ -590,6 +590,23 @@
 //! this extra; `λ² t0_b² v` is Eq. 5 of `addedT0TIPREDVAR` and is
 //! not this extra even when `t0_m = t0_b`; `MANIFESTVAR` `θ` is
 //! not this extra),
+//! recovers the Driver p. 16 `MANIFESTVARstd` as the
+//! correlation form `solve(sqrt(diag(MANIFESTVAR))) %&%
+//! MANIFESTVAR` after forming strictly positive `MANIFESTVAR`
+//! (JSS PDF re-opened 2026-08-23T22:40Z; Table 2, p. 12; Eq. 5,
+//! p. 5; 2017-era `summary.ctsemFit.R` forms that quadratic whenever
+//! `verbose = TRUE`; `OpenMx` `%&%` is `t(A) %*% B %*% A`; unlike
+//! `TRAITVARstd` the 2017-era source adds
+//! `diag(c(ridging), n.manifest)`; the default ridge is 0 and is
+//! not this exact map; the 2017-era `dimnames` assignment to
+//! `latentNames` is a source bug and is not this exact map; the
+//! scalar map is `θ / θ = 1`; unstandardised `Θ` is defined for a
+//! zero residual and is not `MANIFESTVARstd`; zero `MANIFESTVAR`
+//! makes `solve(sqrt(0))` fail and fails closed; a non-event clock
+//! fails closed; `MANIFESTVAR` does not require stable `a < 0`;
+//! distinct positive `θ` recover the same 1; `MANIFESTTRAITVARstd`
+//! recovers the same number and remains a distinct named quantity;
+//! `λ² Var(η) + θ` is not `MANIFESTVARstd`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -792,6 +809,8 @@ pub use event_time::recover_standardised_initial_time_dependent_predictor_effect
 pub use event_time::recover_standardised_initial_time_independent_predictor_effect;
 /// Exact scalar p. 16 `MANIFESTTRAITVARstd` `ψ / ψ = 1` after strictly positive `MANIFESTTRAITVAR`.
 pub use event_time::recover_standardised_manifest_trait_variance;
+/// Exact scalar p. 16 `MANIFESTVARstd` `θ / θ = 1` after strictly positive `MANIFESTVAR`.
+pub use event_time::recover_standardised_manifest_variance;
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
@@ -1034,6 +1053,8 @@ pub use event_time::refuse_measurement_error_as_standardised_manifest_trait_vari
 pub use event_time::refuse_measurement_error_as_stationary_lagged_observed_covariance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of later-occasion §4.3 stationary `T0VAR`.
 pub use event_time::refuse_measurement_error_as_stationary_later_observed_variance;
+/// Refuse treating Driver Eq. 5 `Var(y)` as p. 16 `MANIFESTVARstd`.
+pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating predetermined first-occasion variance as free first-occasion `T0VAR`.
@@ -1136,6 +1157,8 @@ pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_
 pub use event_time::refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance;
 /// Refuse treating Table 3 / p. 16 `T0TIPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
 pub use event_time::refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect;
+/// Refuse treating p. 16 `MANIFESTTRAITVARstd` as p. 16 `MANIFESTVARstd`.
+pub use event_time::refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance;
 /// Refuse treating p. 16 `TRAITVARstd` as p. 16 `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_standardised_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -1282,6 +1305,8 @@ pub use event_time::refuse_unstandardised_initial_time_dependent_effect_as_stand
 pub use event_time::refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating unstandardised `MANIFESTTRAITVAR` as p. 16 `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance;
+/// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
+pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Indicator coordinate kind.
