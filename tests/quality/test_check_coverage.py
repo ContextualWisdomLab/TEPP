@@ -342,6 +342,28 @@ class CoverageContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     coverage_contract.load_union_branch_totals(files)
 
+    def test_union_branch_totals_merge_valid_copies_across_files(self) -> None:
+        """Valid records union True/False counts across instrumented copies."""
+
+        files = [
+            {
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 1, 0, 0, 0, 4]],
+            },
+            {
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 0, 1, 0, 0, 4]],
+            },
+        ]
+        self.assertEqual(
+            coverage_contract.load_union_branch_totals(files),
+            {"count": 2, "covered": 2},
+        )
+        self.assertEqual(
+            coverage_contract.load_union_branch_totals([]),
+            {"count": 0, "covered": 0},
+        )
+
     def test_lcov_authored_line_totals_and_incomplete_detection(self) -> None:
         """LCOV counts unique authored source lines and exposes zero-hit lines."""
 
