@@ -19,6 +19,7 @@ mod corpus_split_manifest;
 mod envelope;
 mod error;
 mod export;
+mod lineage_criterion_anchor;
 mod lineageweave_http;
 mod live_http;
 mod naruon_http;
@@ -94,6 +95,20 @@ pub use authorization::ExportAuthorizationRequest;
 pub use authorization::authorize_export;
 /// Fail closed when an export decision is denied.
 pub use authorization::require_export_allowed;
+/// TEPP-owned criterion-validity outcome for one Event Lineage weight run.
+pub use lineage_criterion_anchor::CriterionValidityStatus;
+/// Default maximum lineage criterion-anchor artifact size.
+pub use lineage_criterion_anchor::DEFAULT_LINEAGE_CRITERION_ANCHOR_BYTE_LIMIT;
+/// Semantic version of the lineage criterion-anchor artifact.
+pub use lineage_criterion_anchor::LINEAGE_CRITERION_ANCHOR_CONTRACT_VERSION;
+/// Analysis-run model contract that requests a lineage criterion anchor.
+pub use lineage_criterion_anchor::LINEAGE_CRITERION_MODEL_CONTRACT;
+/// Analysis-run output profile that requests a lineage criterion anchor.
+pub use lineage_criterion_anchor::LINEAGE_CRITERION_OUTPUT_PROFILE;
+/// Terminal result-schema identity for a lineage criterion anchor.
+pub use lineage_criterion_anchor::LINEAGE_CRITERION_RESULT_SCHEMA;
+/// Versioned TEPP criterion-validity artifact for one Event Lineage weight run.
+pub use lineage_criterion_anchor::LineageCriterionAnchor;
 /// Published `LineageWeave` modular-consumer identity.
 pub use lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
 /// Published Naruon modular-consumer identity.

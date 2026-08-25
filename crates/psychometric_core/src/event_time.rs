@@ -1256,6 +1256,259 @@ pub fn refuse_continuous_intercept_as_manifest_means(
     Err(PsychometricError::ContinuousInterceptIsNotManifestMeans)
 }
 
+/// Exact scalar p. 16 `CINTstd` after strictly positive `asymDIFFUSION`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 1, p. 4; Table 2, p. 12; p. 16;
+/// footnote 4; §7.1, pp. 18–19; JSS PDF re-opened 2026-08-25T11:43Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `κ` `CINT`. Page 16 prints standardised matrices with the suffix
+/// `std` when appropriate. Footnote 4: standardisations use only the
+/// relevant variance, not the total. `CINT` is the process intercept of
+/// individual, or average individual, dynamics, so that relevant variance
+/// is within-subject `asymDIFFUSION` `p = −q / (2 a)`. Form strictly
+/// positive `p` first, then `κ / √p`. A zero intercept is exactly zero
+/// after that positive SD. Unstandardised `κ` is defined for growing
+/// `a ≥ 0` and for zero diffusion; standardised `CINT` is not. Zero
+/// `q` has no positive process SD and fails closed. Lasting
+/// `asymDIFFUSION` requires stable `a < 0`. A non-event clock fails
+/// closed. `(-κ / a) / √p` is `asymCINTstd` and is not this continuous
+/// intercept. `A^{-1}[e^{A Δt} − I] κ / √p` is `discreteCINTstd` and
+/// depends on the event interval. `κ / √(trait + p + added)` uses the
+/// total, not `asymDIFFUSION`. `TRAITVAR` is not the standardisation
+/// variance. This is not a Kalman filter, not a matrix `expm`, not
+/// DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::StationaryVarianceRequiresStableDrift`]
+/// when `a ≥ 0`,
+/// [`PsychometricError::StandardisedContinuousInterceptRequiresPositiveStationaryVariance`]
+/// when `asymDIFFUSION` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the intercept or
+/// diffusion is non-finite or negative, or the mapped ratio overflows.
+/// Negative intercepts remain valid signed locations.
+pub fn recover_standardised_continuous_intercept(
+    continuous_intercept: f64,
+    continuous_diffusion: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let stationary = recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?;
+    if stationary == 0.0 {
+        return Err(
+            PsychometricError::StandardisedContinuousInterceptRequiresPositiveStationaryVariance,
+        );
+    }
+    let intercept = require_finite(continuous_intercept)?;
+    if intercept == 0.0 {
+        return Ok(0.0);
+    }
+    let process_sd = stationary.sqrt();
+    require_finite(intercept / process_sd)
+}
+
+/// Refuse treating unstandardised `CINT` as p. 16 `CINTstd`.
+///
+/// Free `κ` is defined for a zero process. Footnote 4 `CINTstd`
+/// requires strictly positive `asymDIFFUSION`. Equal numbers when
+/// `p = 1` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept`].
+pub fn refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept(
+    unstandardised_intercept: f64,
+    standardised_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_intercept, standardised_intercept);
+    Err(PsychometricError::UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept)
+}
+
+/// Refuse treating p. 16 `asymCINTstd` as p. 16 `CINTstd`.
+///
+/// `(-κ / a) / √p` is the standardised total change. `CINTstd` is
+/// the continuous intercept. Equal numbers when `a = −1` remain
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept`].
+pub fn refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept(
+    asymptotic_standardised_intercept: f64,
+    standardised_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_standardised_intercept, standardised_intercept);
+    Err(
+        PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept,
+    )
+}
+
+/// Refuse treating p. 16 `discreteCINTstd` as p. 16 `CINTstd`.
+///
+/// `A^{-1}[e^{A Δt} − I] κ / √p` depends on the event interval.
+/// `CINTstd` does not.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept`].
+pub fn refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept(
+    discrete_standardised_intercept: f64,
+    standardised_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (discrete_standardised_intercept, standardised_intercept);
+    Err(
+        PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept,
+    )
+}
+
+/// Refuse treating `κ / √(trait + p + added)` as p. 16 `CINTstd`.
+///
+/// Footnote 4 measurement of the process intercept uses
+/// `asymDIFFUSION`, not total variance. `TRAITVAR` is not the
+/// standardisation variance.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept`].
+pub fn refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept(
+    trait_scaled_intercept: f64,
+    standardised_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (trait_scaled_intercept, standardised_intercept);
+    Err(PsychometricError::TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept)
+}
+
+/// Exact scalar p. 16 `MANIFESTMEANSstd` after strictly positive
+/// `MANIFESTVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; p. 16; footnote
+/// 4; Eq. 5, p. 5; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-25T11:32Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `MANIFESTMEANS` `τ` the `n.manifest × 1` matrix of manifest
+/// means. Table 2 names `MANIFESTVAR` `Θ` the residual covariance
+/// of the indicators (measurement error). Page 16 prints
+/// standardised matrices with the suffix `std` when appropriate.
+/// Footnote 4: standardisations use only the relevant variance, not
+/// the total. The relevant variance for that named measurement
+/// intercept is residual `MANIFESTVAR` `θ`, not total observed
+/// `Var(y) = λ² Var(η) + θ`. The 2017-era
+/// `summary.ctsemFit.R` forms unstandardised `MANIFESTMEANS` as
+/// `mxEval(MANIFESTMEANS, mxobj, compute=TRUE)`. That source does
+/// not form a `MANIFESTMEANSstd` matrix; the scalar map here is the
+/// footnote 4 standardisation of that named intercept: `τ / √θ`.
+/// Form strictly positive `θ` first, then divide `τ` by `√θ`. A
+/// zero mean is exactly zero. Unstandardised `MANIFESTMEANS` is
+/// defined for a zero residual; standardised `MANIFESTMEANS` is
+/// not. Zero `θ` has no positive SD and fails closed. Manifest
+/// means are an event-time measurement quantity, so a non-event
+/// clock fails closed. `MANIFESTMEANS` does not require stable
+/// `a < 0`. `MANIFESTVARstd` `θ / θ = 1` recovers the same number
+/// when `τ = √θ` and remains a distinct named quantity.
+/// `τ / √(λ² Var(η) + θ)` uses total observed variance and is not
+/// this residual map. The 2017-era source assigns
+/// `dimnames(MANIFESTMEANS)` to `list(manifestNames, manifestNames)`
+/// on an `n.manifest × 1` matrix; that assignment is a source bug
+/// and is not this map. `T0MEANSstd` `μ_0 / √p_0` recovers the
+/// same number when `τ = μ_0` and `θ = p_0` and remains a distinct
+/// named quantity. This is not a Kalman filter, not a matrix
+/// `expm`, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance`]
+/// when `MANIFESTVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the mean is
+/// non-finite, the residual is non-finite or negative, or the
+/// mapped ratio overflows. Negative means remain valid signed
+/// locations.
+pub fn recover_standardised_manifest_mean(
+    manifest_mean: f64,
+    measurement_error: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !measurement_error.is_finite() || measurement_error < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if measurement_error == 0.0 {
+        return Err(PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance);
+    }
+    let mean = require_finite(manifest_mean)?;
+    if mean == 0.0 {
+        return Ok(0.0);
+    }
+    let residual_sd = measurement_error.sqrt();
+    require_finite(mean / residual_sd)
+}
+
+/// Refuse treating unstandardised `MANIFESTMEANS` as p. 16
+/// `MANIFESTMEANSstd`.
+///
+/// Free `MANIFESTMEANS` `τ` is defined for a zero residual.
+/// Footnote 4 `MANIFESTMEANSstd` requires strictly positive `θ`.
+/// Equal numbers when `θ = 1` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedManifestMeanIsNotStandardisedManifestMean`].
+pub fn refuse_unstandardised_manifest_mean_as_standardised_manifest_mean(
+    unstandardised_manifest_mean: f64,
+    standardised_manifest_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_manifest_mean, standardised_manifest_mean);
+    Err(PsychometricError::UnstandardisedManifestMeanIsNotStandardisedManifestMean)
+}
+
+/// Refuse treating p. 16 `MANIFESTVARstd` as p. 16
+/// `MANIFESTMEANSstd`.
+///
+/// Both scalar maps equal 1 when `τ = √θ`. `MANIFESTVARstd` is
+/// the correlation form of residual `MANIFESTVAR`.
+/// `MANIFESTMEANSstd` is the measurement intercept. Equal numbers
+/// remain distinct named quantities. This crate does not currently
+/// export `MANIFESTVARstd`; the refuse still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean`].
+pub fn refuse_standardised_manifest_variance_as_standardised_manifest_mean(
+    standardised_manifest_variance: f64,
+    standardised_manifest_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_manifest_variance, standardised_manifest_mean);
+    Err(PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean)
+}
+
+/// Refuse treating `τ / √(λ² Var(η) + θ)` as p. 16
+/// `MANIFESTMEANSstd`.
+///
+/// Footnote 4 measurement-intercept standardisation uses residual
+/// `MANIFESTVAR`, not total observed `Var(y)`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean`].
+pub fn refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean(
+    observed_scaled_mean: f64,
+    standardised_manifest_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (observed_scaled_mean, standardised_manifest_mean);
+    Err(PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean)
+}
+
 /// Exact scalar discrete intercept increment from Driver Equation 3.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
@@ -1298,6 +1551,135 @@ pub fn recover_discrete_continuous_intercept_effect(
         return require_finite(continuous_intercept * event_delta);
     }
     recover_discrete_constant_predictor_effect(continuous_intercept, log_rate, event_delta, clock)
+}
+
+/// Exact scalar p. 16 `discreteCINTstd` after strictly positive
+/// `asymDIFFUSION`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; p. 16;
+/// footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF re-opened
+/// 2026-08-25T11:57Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// print discrete-time transformations for a chosen event interval and,
+/// when appropriate, standardised matrices with the suffix `std`.
+/// Footnote 4: standardisations use only the relevant variance, not the
+/// total. `CINT` is the process intercept of individual, or average
+/// individual, dynamics, so that relevant variance is within-subject
+/// `asymDIFFUSION` `p = −q / (2 a)`. The 2017-era source forms
+/// unstandardised `discreteCINT` whenever `verbose = TRUE` as
+/// `solve(DRIFT) %*% (discreteDRIFT − I) %*% CINT`. That source does
+/// not form a `discreteCINTstd` matrix. The scalar map is
+/// `A^{-1}[e^{A Δt} − I] κ / √p`. Form strictly positive `p` first,
+/// then the discrete intercept, then divide by `√p`. A zero intercept
+/// is exactly zero after that positive SD. Unstandardised
+/// `discreteCINT` is defined for growing `a ≥ 0` and for zero
+/// diffusion; standardised discrete intercept is not. Zero `q` has no
+/// positive process SD and fails closed. Lasting `asymDIFFUSION`
+/// requires stable `a < 0`. A non-event clock fails closed. A
+/// non-positive event interval fails closed. `κ / √p` is `CINTstd` and
+/// does not depend on `Δt`. `(-κ / a) / √p` is `asymCINTstd` and is
+/// not this finite-interval map. This is not a Kalman filter, not a
+/// matrix `expm`, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::StationaryVarianceRequiresStableDrift`]
+/// when `a ≥ 0`,
+/// [`PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance`]
+/// when `asymDIFFUSION` is zero,
+/// [`PsychometricError::NonPositiveInterval`] when `event_delta` is
+/// not strictly positive, and
+/// [`PsychometricError::InvalidNumericInput`] when the intercept or
+/// diffusion is non-finite or negative, or the mapped ratio overflows.
+/// Negative intercepts remain valid signed locations.
+pub fn recover_standardised_discrete_continuous_intercept(
+    continuous_intercept: f64,
+    continuous_diffusion: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let stationary = recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?;
+    if stationary == 0.0 {
+        return Err(
+            PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance,
+        );
+    }
+    let increment = recover_discrete_continuous_intercept_effect(
+        continuous_intercept,
+        log_rate,
+        event_delta,
+        clock,
+    )?;
+    if increment == 0.0 {
+        return Ok(0.0);
+    }
+    let process_sd = stationary.sqrt();
+    require_finite(increment / process_sd)
+}
+
+/// Refuse treating unstandardised `discreteCINT` as p. 16
+/// `discreteCINTstd`.
+///
+/// Free `A^{-1}[e^{A Δt} − I] κ` is defined for a zero process.
+/// Footnote 4 `discreteCINTstd` requires strictly positive
+/// `asymDIFFUSION`. Equal numbers when `p = 1` are still distinct
+/// named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept`].
+pub fn refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept(
+    unstandardised_increment: f64,
+    standardised_increment: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_increment, standardised_increment);
+    Err(
+        PsychometricError::UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
+    )
+}
+
+/// Refuse treating p. 16 `CINTstd` as p. 16 `discreteCINTstd`.
+///
+/// `κ / √p` does not depend on the event interval.
+/// `discreteCINTstd` does.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept`].
+pub fn refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept(
+    standardised_intercept: f64,
+    standardised_discrete_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_intercept, standardised_discrete_intercept);
+    Err(
+        PsychometricError::StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
+    )
+}
+
+/// Refuse treating p. 16 `asymCINTstd` as p. 16 `discreteCINTstd`.
+///
+/// `(-κ / a) / √p` is the standardised total change.
+/// `discreteCINTstd` is the finite-interval intercept.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept`].
+pub fn refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept(
+    asymptotic_standardised_intercept: f64,
+    standardised_discrete_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        asymptotic_standardised_intercept,
+        standardised_discrete_intercept,
+    );
+    Err(
+        PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
+    )
 }
 
 /// Exact scalar discrete latent mean from Driver Equation 3.
@@ -5556,6 +5938,8 @@ mod tests {
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
         recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+        recover_standardised_continuous_intercept,
+        recover_standardised_discrete_continuous_intercept, recover_standardised_manifest_mean,
         recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
         recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
         recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -5570,6 +5954,8 @@ mod tests {
         refuse_asymptotic_continuous_intercept_as_discrete_increment,
         refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
         refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
+        refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept,
+        refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_coefficient,
         refuse_asymptotic_time_independent_effect_as_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -5580,6 +5966,7 @@ mod tests {
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+        refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
         refuse_evolved_observed_mean_as_extra_process_observed_mean,
         refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -5634,8 +6021,11 @@ mod tests {
         refuse_measurement_error_as_observed_variance,
         refuse_measurement_error_as_stationary_lagged_observed_covariance,
         refuse_measurement_error_as_stationary_later_observed_variance,
+        refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance,
+        refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_standardised_manifest_variance_as_standardised_manifest_mean,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
         refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -5673,8 +6063,12 @@ mod tests {
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
+        refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
+        refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
+        refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
     };
     use crate::error::PsychometricError;
 
@@ -14026,6 +14420,382 @@ mod tests {
                 1e308,
                 1.0,
                 0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_intercept_recovers_driver_page_sixteen_after_positive_p() {
+        // Driver et al. (2017, p. 16 CINTstd; Table 2; footnote 4; Eq. 1):
+        // form strictly positive asymDIFFUSION p = −q/(2a), then κ/√p.
+        let intercept = 0.4_f64;
+        let diffusion = 0.8_f64;
+        let log_rate = -0.5_f64;
+        let recovered = recover_standardised_continuous_intercept(
+            intercept,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("CINTstd");
+        let stationary =
+            recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+                .expect("p");
+        let expected = intercept / stationary.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let larger_q = recover_standardised_continuous_intercept(
+            intercept,
+            3.2,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("larger q");
+        assert!(larger_q.abs() < recovered.abs());
+        let asymptotic =
+            recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+                .expect("asymCINT")
+                / stationary.sqrt();
+        assert!((asymptotic - recovered).abs() > 1e-3);
+        let discrete = recover_discrete_continuous_intercept_effect(
+            intercept,
+            log_rate,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("discreteCINT")
+            / stationary.sqrt();
+        assert!((discrete - recovered).abs() > 1e-3);
+        let trait_scaled = intercept / (0.5 + stationary).sqrt();
+        assert!((trait_scaled - recovered).abs() > 1e-3);
+        let zero = recover_standardised_continuous_intercept(
+            0.0,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("zero CINT");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative = recover_standardised_continuous_intercept(
+            -intercept,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("signed CINTstd");
+        assert!((negative + expected).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept(
+                intercept, recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept
+            )
+        );
+        assert_eq!(
+            refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept(
+                asymptotic, recovered
+            ),
+            Err(
+                PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept
+            )
+        );
+        assert_eq!(
+            refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept(
+                discrete, recovered
+            ),
+            Err(
+                PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept
+            )
+        );
+        assert_eq!(
+            refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept(
+                trait_scaled, recovered
+            ),
+            Err(
+                PsychometricError::TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept
+            )
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_intercept_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_continuous_intercept(0.4, 0.0, -0.5, LagClock::EventTime),
+            Err(
+                PsychometricError::StandardisedContinuousInterceptRequiresPositiveStationaryVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_continuous_intercept(0.4, 0.8, 0.5, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_continuous_intercept(0.4, 0.8, -0.5, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_continuous_intercept(0.4, -0.8, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_continuous_intercept(f64::NAN, 0.8, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_continuous_intercept(f64::MAX, 0.5, -1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_mean_recovers_driver_page_sixteen_after_positive_theta() {
+        // Driver et al. (2017, p. 16 MANIFESTMEANSstd; Table 2; footnote 4;
+        // 2017-era summary.ctsemFit.R MANIFESTMEANS): form strictly
+        // positive MANIFESTVAR θ, then τ / √θ. Relevant variance
+        // is θ, not λ² Var(η) + θ.
+        let mean = 0.8_f64;
+        let measurement_error = 1.6_f64;
+        let recovered =
+            recover_standardised_manifest_mean(mean, measurement_error, LagClock::EventTime)
+                .expect("MANIFESTMEANSstd");
+        let expected = mean / measurement_error.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let larger_theta = recover_standardised_manifest_mean(mean, 6.4, LagClock::EventTime)
+            .expect("MANIFESTMEANSstd θ=6.4");
+        assert!((larger_theta - recovered).abs() > 1e-3);
+        assert!(larger_theta.abs() < recovered.abs());
+        let unit = recover_standardised_manifest_mean(
+            measurement_error.sqrt(),
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("MANIFESTMEANSstd τ=√θ");
+        // MANIFESTVARstd is θ/θ = 1 after strictly positive θ. Equal
+        // numbers when τ = √θ remain distinct named quantities.
+        let variance_std = 1.0_f64;
+        assert!((unit - variance_std).abs() < 1e-15);
+        let loading = 1.2_f64;
+        let latent_variance = 0.9_f64;
+        let observed = loading * loading * latent_variance + measurement_error;
+        let observed_scaled = mean / observed.sqrt();
+        assert!((observed_scaled - recovered).abs() > 1e-3);
+        // T0MEANSstd μ_0/√p_0 recovers the same number when τ = μ_0
+        // and θ = p_0 and remains a distinct named quantity.
+        let matching_t0 = mean / measurement_error.sqrt();
+        assert!((matching_t0 - recovered).abs() < 1e-15);
+        let zero = recover_standardised_manifest_mean(0.0, measurement_error, LagClock::EventTime)
+            .expect("zero MANIFESTMEANS");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative =
+            recover_standardised_manifest_mean(-mean, measurement_error, LagClock::EventTime)
+                .expect("negative signed MANIFESTMEANSstd");
+        assert!((negative + expected).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_manifest_mean_as_standardised_manifest_mean(mean, recovered),
+            Err(PsychometricError::UnstandardisedManifestMeanIsNotStandardisedManifestMean)
+        );
+        assert_eq!(
+            refuse_standardised_manifest_variance_as_standardised_manifest_mean(variance_std, unit),
+            Err(PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean)
+        );
+        assert_eq!(
+            refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean(
+                observed_scaled,
+                recovered
+            ),
+            Err(PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean)
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_continuous_intercept_recovers_driver_page_sixteen_after_positive_p() {
+        // Driver et al. (2017, p. 16 discreteCINTstd; Table 2; footnote 4; Eq. 3):
+        // form strictly positive asymDIFFUSION p = −q/(2a), then
+        // A^{-1}[e^{A Δt} − I] κ / √p.
+        let intercept = 0.4_f64;
+        let diffusion = 0.8_f64;
+        let log_rate = -0.5_f64;
+        let event_delta = 1.0_f64;
+        let recovered = recover_standardised_discrete_continuous_intercept(
+            intercept,
+            diffusion,
+            log_rate,
+            event_delta,
+            LagClock::EventTime,
+        )
+        .expect("discreteCINTstd");
+        let stationary =
+            recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+                .expect("p");
+        let increment = recover_discrete_continuous_intercept_effect(
+            intercept,
+            log_rate,
+            event_delta,
+            LagClock::EventTime,
+        )
+        .expect("discreteCINT");
+        let expected = increment / stationary.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let later = recover_standardised_discrete_continuous_intercept(
+            intercept,
+            diffusion,
+            log_rate,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("later Δt");
+        assert!((later - recovered).abs() > 1e-3);
+        let continuous = intercept / stationary.sqrt();
+        assert!((continuous - recovered).abs() > 1e-3);
+        let asymptotic =
+            recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+                .expect("asymCINT")
+                / stationary.sqrt();
+        assert!((asymptotic - recovered).abs() > 1e-3);
+        let zero = recover_standardised_discrete_continuous_intercept(
+            0.0,
+            diffusion,
+            log_rate,
+            event_delta,
+            LagClock::EventTime,
+        )
+        .expect("zero CINT");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative = recover_standardised_discrete_continuous_intercept(
+            -intercept,
+            diffusion,
+            log_rate,
+            event_delta,
+            LagClock::EventTime,
+        )
+        .expect("signed discreteCINTstd");
+        assert!((negative + expected).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept(
+                increment, recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedDiscreteContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+            )
+        );
+        assert_eq!(
+            refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept(
+                continuous, recovered
+            ),
+            Err(
+                PsychometricError::StandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+            )
+        );
+        assert_eq!(
+            refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept(
+                asymptotic, recovered
+            ),
+            Err(
+                PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
+            )
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_mean_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_manifest_mean(0.8, 0.0, LagClock::EventTime),
+            Err(PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(0.8, 1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(0.8, -1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(f64::NAN, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(0.8, f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_manifest_mean(f64::MAX, 1e-4, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput),
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_continuous_intercept_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_discrete_continuous_intercept(
+                0.4,
+                0.0,
+                -0.5,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_discrete_continuous_intercept(
+                0.4,
+                0.8,
+                0.5,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_discrete_continuous_intercept(
+                0.4,
+                0.8,
+                -0.5,
+                1.0,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_discrete_continuous_intercept(
+                0.4,
+                0.8,
+                -0.5,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_standardised_discrete_continuous_intercept(
+                0.4,
+                -0.8,
+                -0.5,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_discrete_continuous_intercept(
+                f64::NAN,
+                0.8,
+                -0.5,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_discrete_continuous_intercept(
+                f64::MAX,
+                0.5,
+                -1.0,
                 1.0,
                 LagClock::EventTime
             ),

@@ -45,6 +45,16 @@ Wire payloads:
 - reconstruct through domain validation rather than deserialize directly into private state;
 - use stable machine-readable error codes plus content-redacting messages.
 
+The TEPP-owned Event Lineage criterion artifact is
+`tepp.lineage_criterion_anchor.v1` (`schemas/lineage_criterion_anchor_v1.json`).
+A LineageWeave analysis run requests model contract
+`tepp-lineage-criterion-v1` and output profile
+`lineage_pair_criterion_anchor`. The artifact carries TEPP's accepted or
+rejected criterion-validity outcome bound to one fast-mlsirm estimation run,
+snapshot, cutoff, and validated pair count. The contract does not authorize a
+consumer to self-assert validity; no weight vector activates until TEPP's
+registered implementation returns the digest-bound artifact.
+
 ## 4. Target HTTP resource model
 
 When the service layer is introduced, use resources such as:
