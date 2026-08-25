@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-25  
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — contract validation only; no estimator emits it
+**Implementation maturity:** active-PR — contract validation and an explicit
+joint-posterior unavailable boundary; no estimator emits it
 **Supersedes:** None; composes ADR 0012 and Event Lineage contracts.
 
 ## Context
@@ -56,6 +57,16 @@ Consumers can validate exact posterior inputs independently, but no importance
 result exists until fast-mlsirm implements and validates the governed
 posterior-aware estimator. Contract acceptance therefore remains distinct from
 model availability.
+
+The CPU reference fit currently retains only per-document diagonal Laplace
+variances. Its Rust API reports `DiagonalLaplace` and refuses requests for a
+joint coordinate precision with `JointPosteriorUnavailable`. Those diagonal
+entries cannot be used as independent plausible-value draws: the fitted
+relational penalty and shared structural coefficients induce dependence that
+the retained diagonal does not identify. A producer can become available only
+after the estimator retains and validates the full identified joint precision,
+then binds document order, stable topic order, run, source snapshot, and cutoff
+identities before sampling.
 
 ## Verification
 

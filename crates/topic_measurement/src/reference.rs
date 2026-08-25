@@ -398,6 +398,14 @@ pub struct TopicSequenceEdge {
     pub association_strength: f64,
 }
 
+/// Posterior uncertainty representation retained by a fitted reference model.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PosteriorApproximation {
+    /// Per-document diagonal Laplace variances without cross-coordinate or
+    /// cross-document covariance.
+    DiagonalLaplace,
+}
+
 /// A converged topic-model result with uncertainty and lineage counts.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReferenceTopicModel {
@@ -423,6 +431,30 @@ pub struct ReferenceTopicModel {
     pub connected_post_count: usize,
     /// Distinct global topics represented by at least one sequence edge.
     pub lineage_count: usize,
+}
+
+impl ReferenceTopicModel {
+    /// Return the uncertainty representation retained by this fit.
+    #[must_use]
+    pub const fn posterior_approximation(&self) -> PosteriorApproximation {
+        PosteriorApproximation::DiagonalLaplace
+    }
+
+    /// Refuse to expose diagonal curvature as a joint posterior precision.
+    ///
+    /// A valid joint plausible-value producer needs the full identified
+    /// Hessian/precision over every document ALR coordinate. The current
+    /// estimator discards those off-diagonal blocks, so manufacturing a
+    /// diagonal-independent draw would understate dependence and violate ADR
+    /// 0024.
+    ///
+    /// # Errors
+    ///
+    /// Always returns [`TopicMeasurementError::JointPosteriorUnavailable`]
+    /// until the estimator retains and validates the joint precision matrix.
+    pub const fn joint_coordinate_precision(&self) -> Result<&[Vec<f64>], TopicMeasurementError> {
+        Err(TopicMeasurementError::JointPosteriorUnavailable)
+    }
 }
 
 #[derive(Clone)]
