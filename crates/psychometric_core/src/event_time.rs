@@ -10536,9 +10536,13 @@ mod tests {
             recover_discrete_lag_from_log_rate(drift, source_delta, LagClock::EventTime)
                 .expect("forward");
         assert!((source_lag - (drift * source_delta).exp()).abs() < 1e-12);
-        let same =
-            map_discrete_lag_across_event_intervals(source_lag, source_delta, LagClock::EventTime)
-                .expect("same interval");
+        let same = map_discrete_lag_across_event_intervals(
+            source_lag,
+            source_delta,
+            source_delta,
+            LagClock::EventTime,
+        )
+        .expect("same interval");
         assert!((same - source_lag).abs() < 1e-12);
         let remapped = map_discrete_lag_across_event_intervals(
             source_lag,
@@ -10788,6 +10792,8 @@ mod tests {
         let recovered = recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
             delta,
+            delta,
+            delta,
             LagClock::EventTime,
         )
         .expect("eq 14");
@@ -10802,7 +10808,13 @@ mod tests {
         // Voelkle 2012, p. 21: Eq. 14 is not Eq. 12.
         assert!((recovered - constant).abs() > 1e-3);
         assert_eq!(
-            recover_discrete_time_varying_predictor_effect(0.0, delta, LagClock::EventTime),
+            recover_discrete_time_varying_predictor_effect(
+                0.0,
+                delta,
+                delta,
+                delta,
+                LagClock::EventTime
+            ),
             Ok(0.0)
         );
     }
@@ -10815,6 +10827,8 @@ mod tests {
             recover_discrete_time_varying_predictor_effect(
                 outcome_on_predictor,
                 delta,
+                delta,
+                delta,
                 LagClock::SystemTime
             ),
             Err(PsychometricError::EventTimeRequired)
@@ -10822,6 +10836,8 @@ mod tests {
         assert_eq!(
             recover_discrete_time_varying_predictor_effect(
                 outcome_on_predictor,
+                0.0,
+                0.0,
                 0.0,
                 LagClock::EventTime
             ),
@@ -10831,6 +10847,7 @@ mod tests {
             recover_discrete_time_varying_predictor_effect(
                 outcome_on_predictor,
                 -1.0,
+                1.0,
                 1.0,
                 LagClock::EventTime
             ),
@@ -10851,6 +10868,7 @@ mod tests {
                 outcome_on_predictor,
                 1.0,
                 0.0,
+                0.0,
                 LagClock::EventTime
             ),
             Err(PsychometricError::NonPositiveInterval)
@@ -10860,6 +10878,7 @@ mod tests {
                 outcome_on_predictor,
                 1.0,
                 2.0,
+                2.0,
                 LagClock::EventTime
             ),
             Err(PsychometricError::UnmatchedTimeVaryingInterval)
@@ -10869,16 +10888,29 @@ mod tests {
                 outcome_on_predictor,
                 2.0,
                 1.0,
+                1.0,
                 LagClock::EventTime
             ),
             Err(PsychometricError::UnmatchedTimeVaryingInterval)
         );
         assert_eq!(
-            recover_discrete_time_varying_predictor_effect(f64::NAN, delta, LagClock::EventTime),
+            recover_discrete_time_varying_predictor_effect(
+                f64::NAN,
+                delta,
+                delta,
+                delta,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
-            recover_discrete_time_varying_predictor_effect(1e308, 10.0, LagClock::EventTime),
+            recover_discrete_time_varying_predictor_effect(
+                1e308,
+                10.0,
+                10.0,
+                10.0,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
@@ -12394,9 +12426,14 @@ mod tests {
             recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
                 .expect("cint");
         assert!((impulse - intercept_effect).abs() > 1e-3);
-        let equation_fourteen =
-            recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
-                .expect("eq14");
+        let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+            effect,
+            delta,
+            delta,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq14");
         assert!((impulse - equation_fourteen).abs() > 1e-3);
     }
 
@@ -12408,9 +12445,14 @@ mod tests {
         let intercept_effect =
             recover_discrete_continuous_intercept_effect(effect, -0.5, 2.0, LagClock::EventTime)
                 .expect("cint");
-        let equation_fourteen =
-            recover_discrete_time_varying_predictor_effect(effect, 2.0, LagClock::EventTime)
-                .expect("eq14");
+        let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+            effect,
+            2.0,
+            2.0,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("eq14");
         assert_eq!(
             refuse_time_dependent_impulse_as_continuous_intercept(impulse, effect),
             Err(PsychometricError::TimeDependentImpulseIsNotContinuousIntercept)
@@ -13550,7 +13592,12 @@ mod tests {
             Ok(0.0)
         );
         assert_eq!(
-            recover_asymptotic_time_independent_predictor_effect(effect, 0.0, LagClock::EventTime),
+            recover_asymptotic_time_independent_predictor_effect(
+                effect,
+                0.0,
+                0.0,
+                LagClock::EventTime,
+            ),
             Ok(0.0)
         );
     }
@@ -13698,6 +13745,7 @@ mod tests {
         assert_eq!(
             recover_asymptotic_time_independent_predictor_variance(
                 effect,
+                0.0,
                 0.0,
                 LagClock::EventTime
             ),
@@ -17465,9 +17513,14 @@ mod tests {
             recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
                 .expect("cint");
         let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
-        let equation_fourteen =
-            recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
-                .expect("eq14");
+        let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+            effect,
+            delta,
+            delta,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq14");
         assert!((increment - intercept_effect).abs() > 1e-3);
         assert!((increment - impulse).abs() > 1e-3);
         assert!((increment - equation_fourteen).abs() > 1e-3);
@@ -17552,9 +17605,14 @@ mod tests {
         )
         .expect("tipred");
         let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
-        let equation_fourteen =
-            recover_discrete_time_varying_predictor_effect(effect, 2.0, LagClock::EventTime)
-                .expect("eq14");
+        let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+            effect,
+            2.0,
+            2.0,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("eq14");
         assert_eq!(
             refuse_time_independent_effect_as_continuous_intercept(increment, effect),
             Err(PsychometricError::TimeIndependentEffectIsNotContinuousIntercept)
@@ -18454,9 +18512,14 @@ mod tests {
             LagClock::EventTime,
         )
         .expect("tipred");
-        let equation_fourteen =
-            recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
-                .expect("eq14");
+        let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+            effect,
+            delta,
+            delta,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq14");
         assert!((carry - impulse).abs() > 1e-3);
         assert!((carry - intercept_effect).abs() > 1e-3);
         assert!((carry - time_independent).abs() > 1e-3);

@@ -524,6 +524,8 @@ fn time_varying_predictor_discrete_effect_recovers_equation_fourteen() {
     let recovered = recover_discrete_time_varying_predictor_effect(
         outcome_on_predictor,
         delta,
+        delta,
+        delta,
         LagClock::EventTime,
     )
     .expect("eq 14");
@@ -547,6 +549,7 @@ fn time_varying_predictor_discrete_effect_recovers_equation_fourteen() {
             outcome_on_predictor,
             1.0,
             2.0,
+            2.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::UnmatchedTimeVaryingInterval)
@@ -564,6 +567,8 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
         recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
             1.0,
+            1.0,
+            1.0,
             LagClock::SystemTime
         ),
         Err(PsychometricError::EventTimeRequired)
@@ -573,6 +578,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
             outcome_on_predictor,
             f64::NAN,
             1.0,
+            1.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::NonPositiveInterval)
@@ -581,6 +587,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
         recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
             0.0,
+            1.0,
             1.0,
             LagClock::EventTime
         ),
@@ -611,6 +618,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
             outcome_on_predictor,
             1.0,
             f64::NAN,
+            f64::NAN,
             LagClock::EventTime
         ),
         Err(PsychometricError::NonPositiveInterval)
@@ -619,6 +627,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
         recover_discrete_time_varying_predictor_effect(
             outcome_on_predictor,
             1.0,
+            0.0,
             0.0,
             LagClock::EventTime
         ),
@@ -629,6 +638,7 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
             outcome_on_predictor,
             2.0,
             1.0,
+            1.0,
             LagClock::EventTime
         ),
         Err(PsychometricError::UnmatchedTimeVaryingInterval)
@@ -638,11 +648,23 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
 #[test]
 fn time_varying_predictor_equation_fourteen_numeric_inputs_fail_closed() {
     assert_eq!(
-        recover_discrete_time_varying_predictor_effect(f64::NAN, 1.0, LagClock::EventTime),
+        recover_discrete_time_varying_predictor_effect(
+            f64::NAN,
+            1.0,
+            1.0,
+            1.0,
+            LagClock::EventTime
+        ),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
-        recover_discrete_time_varying_predictor_effect(1e308, 10.0, LagClock::EventTime),
+        recover_discrete_time_varying_predictor_effect(
+            1e308,
+            10.0,
+            10.0,
+            10.0,
+            LagClock::EventTime
+        ),
         Err(PsychometricError::InvalidNumericInput)
     );
 }
@@ -1547,9 +1569,14 @@ fn time_dependent_impulse_recovers_driver_equation_three_fourth_summand() {
     let intercept_effect =
         recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
             .expect("cint");
-    let equation_fourteen =
-        recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
-            .expect("eq14");
+    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+        effect,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq14");
     assert!((impulse - intercept_effect).abs() > 1e-3);
     assert!((impulse - equation_fourteen).abs() > 1e-3);
     assert_eq!(
@@ -1852,9 +1879,14 @@ fn time_independent_predictor_recovers_driver_equation_three_second_summand() {
         recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
             .expect("cint");
     let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
-    let equation_fourteen =
-        recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
-            .expect("eq14");
+    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+        effect,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq14");
     assert!(rmse(&[increment], &[intercept_effect]) > rmse(&[expected], &[increment]));
     assert!(rmse(&[increment], &[impulse]) > rmse(&[expected], &[increment]));
     assert!(rmse(&[increment], &[equation_fourteen]) > rmse(&[expected], &[increment]));
@@ -2920,9 +2952,14 @@ fn time_dependent_impulse_carry_recovers_driver_equation_one_two_dissipation() {
         LagClock::EventTime,
     )
     .expect("tipred");
-    let equation_fourteen =
-        recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
-            .expect("eq14");
+    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+        effect,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq14");
     assert!(rmse(&[carry], &[impulse]) > rmse(&[expected], &[carry]));
     assert!(rmse(&[carry], &[intercept_effect]) > rmse(&[expected], &[carry]));
     assert!(rmse(&[carry], &[time_independent]) > rmse(&[expected], &[carry]));
@@ -4603,7 +4640,12 @@ fn asymptotic_time_independent_variance_refuses_unstable_drift_and_non_event_clo
         Ok(0.0)
     );
     assert_eq!(
-        recover_asymptotic_time_independent_predictor_variance(1.0, -1e-308, LagClock::EventTime),
+        recover_asymptotic_time_independent_predictor_variance(
+            1.0,
+            -1e-308,
+            -0.5,
+            LagClock::EventTime,
+        ),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
