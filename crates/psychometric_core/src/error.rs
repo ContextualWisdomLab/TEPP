@@ -557,6 +557,38 @@ pub enum PsychometricError {
     /// predetermined lagged observed covariance. Stationary lagged
     /// covariance uses `−q / (2 a)`, not free `p_0`.
     StationaryLaggedObservedCovarianceIsNotPredeterminedLaggedObservedCovariance,
+    /// Driver §4.3 predetermined first-occasion variance was treated as
+    /// stationary first-occasion `T0VAR`. Free `T0VAR` is not
+    /// `−q / (2 a)`.
+    PredeterminedInitialLatentVarianceIsNotStationaryInitialLatentVariance,
+    /// Driver §4.3 predetermined first-occasion variance was treated as
+    /// free first-occasion `T0VAR`. `trait + p_0 + (B / a)² v` is not
+    /// `p_0`.
+    PredeterminedInitialLatentVarianceIsNotInitialLatentVariance,
+    /// Driver §4.3 predetermined first-occasion variance was treated as
+    /// predetermined lagged covariance. First-occasion variance does
+    /// not decay the state.
+    PredeterminedInitialLatentVarianceIsNotLaggedLatentCovariance,
+    /// Driver §4.3 predetermined first-occasion variance was treated as
+    /// predetermined later-occasion variance. First-occasion variance
+    /// omits `Q_Δt`.
+    PredeterminedInitialLatentVarianceIsNotLaterLatentVariance,
+    /// Driver §4.3 predetermined first-occasion variance was treated as
+    /// predetermined first-occasion observed variance. Equation 5 maps
+    /// `Var(y_0) = λ²` of that variance plus `θ + ψ`.
+    PredeterminedInitialLatentVarianceIsNotObservedVariance,
+    /// Driver Eq. 5 measurement error was treated as predetermined
+    /// first-occasion observed variance. `θ` is not
+    /// `λ²(trait + p_0 + (B / a)² v) + θ + ψ`.
+    MeasurementErrorIsNotPredeterminedInitialObservedVariance,
+    /// Driver Eq. 5 of §4.3 stationary `T0VAR` was treated as
+    /// predetermined first-occasion observed variance. Stationary
+    /// first-occasion variance uses `−q / (2 a)`, not free `p_0`.
+    StationaryInitialObservedVarianceIsNotPredeterminedInitialObservedVariance,
+    /// Driver Eq. 5 of predetermined later-occasion `T0VAR` was treated
+    /// as predetermined first-occasion observed variance. Later
+    /// variance includes `Q_Δt`.
+    PredeterminedLaterObservedVarianceIsNotPredeterminedInitialObservedVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -993,6 +1025,30 @@ impl fmt::Display for PsychometricError {
             }
             Self::StationaryLaggedObservedCovarianceIsNotPredeterminedLaggedObservedCovariance => {
                 "stationary lagged observed covariance is not the predetermined lagged observed covariance"
+            }
+            Self::PredeterminedInitialLatentVarianceIsNotStationaryInitialLatentVariance => {
+                "predetermined first-occasion latent variance is not the stationary first-occasion latent variance"
+            }
+            Self::PredeterminedInitialLatentVarianceIsNotInitialLatentVariance => {
+                "predetermined first-occasion latent variance is not the free first-occasion latent variance"
+            }
+            Self::PredeterminedInitialLatentVarianceIsNotLaggedLatentCovariance => {
+                "predetermined first-occasion latent variance is not the predetermined lagged latent covariance"
+            }
+            Self::PredeterminedInitialLatentVarianceIsNotLaterLatentVariance => {
+                "predetermined first-occasion latent variance is not the predetermined later-occasion latent variance"
+            }
+            Self::PredeterminedInitialLatentVarianceIsNotObservedVariance => {
+                "predetermined first-occasion latent variance is not the predetermined first-occasion observed variance"
+            }
+            Self::MeasurementErrorIsNotPredeterminedInitialObservedVariance => {
+                "measurement-error variance is not the predetermined first-occasion observed variance"
+            }
+            Self::StationaryInitialObservedVarianceIsNotPredeterminedInitialObservedVariance => {
+                "stationary first-occasion observed variance is not the predetermined first-occasion observed variance"
+            }
+            Self::PredeterminedLaterObservedVarianceIsNotPredeterminedInitialObservedVariance => {
+                "predetermined later-occasion observed variance is not the predetermined first-occasion observed variance"
             }
         };
         formatter.write_str(message)
@@ -1682,6 +1738,49 @@ mod tests {
             PsychometricError::StationaryLaggedObservedCovarianceIsNotPredeterminedLaggedObservedCovariance
                 .to_string(),
             "stationary lagged observed covariance is not the predetermined lagged observed covariance"
+        );
+    }
+
+    #[test]
+    fn predetermined_initial_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::PredeterminedInitialLatentVarianceIsNotStationaryInitialLatentVariance
+                .to_string(),
+            "predetermined first-occasion latent variance is not the stationary first-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedInitialLatentVarianceIsNotInitialLatentVariance
+                .to_string(),
+            "predetermined first-occasion latent variance is not the free first-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedInitialLatentVarianceIsNotLaggedLatentCovariance
+                .to_string(),
+            "predetermined first-occasion latent variance is not the predetermined lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedInitialLatentVarianceIsNotLaterLatentVariance
+                .to_string(),
+            "predetermined first-occasion latent variance is not the predetermined later-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedInitialLatentVarianceIsNotObservedVariance.to_string(),
+            "predetermined first-occasion latent variance is not the predetermined first-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotPredeterminedInitialObservedVariance
+                .to_string(),
+            "measurement-error variance is not the predetermined first-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialObservedVarianceIsNotPredeterminedInitialObservedVariance
+                .to_string(),
+            "stationary first-occasion observed variance is not the predetermined first-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterObservedVarianceIsNotPredeterminedInitialObservedVariance
+                .to_string(),
+            "predetermined later-occasion observed variance is not the predetermined first-occasion observed variance"
         );
     }
 }

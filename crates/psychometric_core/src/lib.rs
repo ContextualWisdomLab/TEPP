@@ -188,6 +188,7 @@
 //! recovers the Driver §4.3 predetermined later-occasion variance as
 //! `trait + e^{2 a Δt} p_0 + Q_Δt + (B / a)² v`
 //! (JSS PDF re-opened 2026-08-23T20:20Z; form the evolved free
+//! (JSS PDF re-opened 2026-08-23T05:12Z; form the evolved free
 //! first-occasion variance first, then include the trait, then
 //! include the TI extra variance, then add; trait and
 //! `addedTIPREDVAR` do not enter `Q_Δt`; free `T0VAR` `p_0` is not
@@ -228,6 +229,26 @@
 //! observed variance includes `Q_Δt` and `θ` and is not that lagged
 //! observed covariance; stationary lagged observed covariance is
 //! not that observed covariance when `p_0` is free),
+//! recovers the Driver §4.3 predetermined first-occasion variance as
+//! `trait + p_0 + (B / a)² v`
+//! (JSS PDF re-opened 2026-08-23T10:03Z; form the free first-occasion
+//! state variance first, then include the trait, then include the TI
+//! extra variance, then add; trait and `addedTIPREDVAR` do not decay
+//! and do not enter `Q_Δt`; free `T0VAR` `p_0` is not that
+//! first-occasion map; setting `p_0 = −q / (2 a)` recovers the
+//! stationary first-occasion map; stationary first-occasion variance
+//! uses `−q / (2 a)` in place of `p_0` and is not that map when
+//! `p_0` is free; lagged covariance decays the state and is not that
+//! map; later-occasion variance includes `Q_Δt` and is not that map;
+//! as `Δt → 0+` the lagged and later maps approach this composition),
+//! recovers the Driver Eq. 5 of that predetermined first-occasion
+//! variance as `λ²(trait + p_0 + (B / a)² v) + θ + ψ`
+//! (`MANIFESTVAR` is not that first-occasion observed variance; the
+//! predetermined first-occasion latent variance is not that observed
+//! variance; stationary first-occasion observed variance is not that
+//! observed variance when `p_0` is free; predetermined later
+//! observed variance includes `Q_Δt` and is not that first-occasion
+//! observed variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -366,6 +387,10 @@ pub use event_time::recover_manifest_observed_mean;
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
+/// Exact scalar first-occasion variance of §4.3 predetermined `T0VAR` `trait + p_0 + (B / a)² v`.
+pub use event_time::recover_predetermined_initial_latent_variance;
+/// Exact scalar Eq. 5 of first-occasion §4.3 predetermined `T0VAR` `λ²(trait + p_0 + (B / a)² v) + θ + ψ`.
+pub use event_time::recover_predetermined_initial_observed_variance;
 /// Exact scalar lagged covariance of §4.3 predetermined `T0VAR` `trait + e^{a Δt} p_0 + (B / a)² v`.
 pub use event_time::recover_predetermined_lagged_latent_covariance;
 /// Exact scalar Eq. 5 of lagged §4.3 predetermined `T0VAR` `λ²(trait + e^{a Δt} p_0 + (B / a)² v) + ψ`.
@@ -548,6 +573,8 @@ pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
 pub use event_time::refuse_measurement_error_as_observed_variance;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of predetermined first-occasion `T0VAR`.
+pub use event_time::refuse_measurement_error_as_predetermined_initial_observed_variance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of predetermined lagged `T0VAR`.
 pub use event_time::refuse_measurement_error_as_predetermined_lagged_observed_covariance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of predetermined later-occasion `T0VAR`.
@@ -558,6 +585,16 @@ pub use event_time::refuse_measurement_error_as_stationary_lagged_observed_covar
 pub use event_time::refuse_measurement_error_as_stationary_later_observed_variance;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
+/// Refuse treating predetermined first-occasion variance as free first-occasion `T0VAR`.
+pub use event_time::refuse_predetermined_initial_latent_variance_as_initial_latent_variance;
+/// Refuse treating predetermined first-occasion variance as predetermined lagged covariance.
+pub use event_time::refuse_predetermined_initial_latent_variance_as_lagged_latent_covariance;
+/// Refuse treating predetermined first-occasion variance as predetermined later-occasion variance.
+pub use event_time::refuse_predetermined_initial_latent_variance_as_later_latent_variance;
+/// Refuse treating predetermined first-occasion variance as predetermined first-occasion observed variance.
+pub use event_time::refuse_predetermined_initial_latent_variance_as_observed_variance;
+/// Refuse treating predetermined first-occasion variance as stationary first-occasion `T0VAR`.
+pub use event_time::refuse_predetermined_initial_latent_variance_as_stationary_initial_latent_variance;
 /// Refuse treating predetermined lagged covariance as the decayed total.
 pub use event_time::refuse_predetermined_lagged_latent_covariance_as_decayed_total;
 /// Refuse treating predetermined lagged covariance as free first-occasion `T0VAR`.
@@ -576,6 +613,8 @@ pub use event_time::refuse_predetermined_later_latent_variance_as_initial_latent
 pub use event_time::refuse_predetermined_later_latent_variance_as_observed_variance;
 /// Refuse treating predetermined later-occasion variance as later-occasion stationary `T0VAR`.
 pub use event_time::refuse_predetermined_later_latent_variance_as_stationary_later_latent_variance;
+/// Refuse treating Eq. 5 of predetermined later-occasion `T0VAR` as predetermined first-occasion observed variance.
+pub use event_time::refuse_predetermined_later_observed_variance_as_predetermined_initial_observed_variance;
 /// Refuse treating Eq. 5 of predetermined later-occasion `T0VAR` as predetermined lagged observed covariance.
 pub use event_time::refuse_predetermined_later_observed_variance_as_predetermined_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
@@ -606,6 +645,8 @@ pub use event_time::refuse_stationary_initial_latent_variance_as_trait_variance;
 pub use event_time::refuse_stationary_initial_observed_mean_as_manifest_means;
 /// Refuse treating Eq. 5 of §4.3 stationary `T0VAR` as `MANIFESTVAR`.
 pub use event_time::refuse_stationary_initial_observed_variance_as_measurement_error;
+/// Refuse treating Eq. 5 of §4.3 stationary `T0VAR` as predetermined first-occasion observed variance.
+pub use event_time::refuse_stationary_initial_observed_variance_as_predetermined_initial_observed_variance;
 /// Refuse treating Eq. 5 of contemporaneous §4.3 stationary `T0VAR` as lagged observed covariance.
 pub use event_time::refuse_stationary_initial_observed_variance_as_stationary_lagged_observed_covariance;
 /// Refuse treating lagged §4.3 stationary `T0VAR` as decayed total stationary variance.
