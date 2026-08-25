@@ -7,8 +7,8 @@ use uuid::Uuid;
 /// One append-only entity target that membership rows may reference.
 ///
 /// Maps to `entity_record` after migration `0006`. The type label is a
-/// fail-closed contextual code (`author`, `department`, `customer`) and is
-/// not a direct identity string.
+/// fail-closed ASCII snake-case contextual code (`author`, `department`,
+/// `customer`) and is not a direct identity string.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EntityRecord {
     /// Primary key for this entity identity.
@@ -29,6 +29,9 @@ impl EntityRecord {
     /// # Errors
     ///
     /// Returns [`PersistenceError::InvalidEntityRecord`] when the type code is
+    /// empty, longer than 128 bytes, or contains a character outside the ASCII
+    /// letters, digits, and underscore allowlist used by the rendered SQL
+    /// transport.
     /// empty, longer than 128 bytes, or contains a character outside lowercase
     /// ASCII letters, digits, and underscores.
     pub fn validate(&self) -> Result<(), PersistenceError> {
@@ -43,6 +46,8 @@ impl EntityRecord {
 /// Returns [`PersistenceError::InvalidEntityRecord`] before any SQL is produced.
 pub fn insert_entity_record_sql(record: &EntityRecord) -> Result<String, PersistenceError> {
     record.validate()?;
+    // The current SqlSession contract accepts rendered SQL, so the label is
+    // restricted to an SQL-literal-safe identifier token before interpolation.
     Ok(format!(
         "INSERT INTO entity_record (\
             entity_record_id, tenant_record_id, entity_type_code, \
@@ -74,6 +79,9 @@ pub fn select_entity_record_by_id_sql(entity_record_id: Uuid) -> String {
 fn validate_entity_label(value: &str) -> Result<(), PersistenceError> {
     if value.is_empty()
         || value.len() > 128
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
         || value
             .chars()
             .any(|ch| !(ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_'))

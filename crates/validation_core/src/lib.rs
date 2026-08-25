@@ -3,14 +3,17 @@
 // Recovery metrics intentionally cast small finite sample sizes to `f64`.
 #![allow(clippy::cast_precision_loss)]
 #![allow(clippy::cast_sign_loss)]
-//! Recovery, calibration, graph, and Monte Carlo validation metrics.
+//! Recovery, calibration, graph, Monte Carlo, and claim-promotion metrics.
 //!
 //! TEPP scientific acceptance requires realistic synthetic truth recovery:
 //! parameter match counts, RMSE, bias, interval coverage with Wilson bounds,
 //! temporal-order accuracy, relation precision/recall, and SE-aware Monte Carlo
-//! acceptance gates. Metrics are pure `f64` CPU reference implementations.
+//! acceptance gates. ADR 0014 claim authorities are promoted only by exact-head
+//! evidence; queued, predecessor, skipped, and LLM judgments fail closed.
+//! Metrics are pure `f64` CPU reference implementations.
 
 mod bias;
+mod claim;
 mod coverage;
 mod error;
 mod graph_metrics;
@@ -25,6 +28,22 @@ mod temporal_order;
 pub use bias::bias_standard_error;
 /// Mean signed bias.
 pub use bias::mean_bias;
+/// Four ADR 0014 claim authorities.
+pub use claim::ClaimAuthority;
+/// One evidence item offered for promotion.
+pub use claim::ClaimEvidence;
+/// Kind of evidence offered for a promotion request.
+pub use claim::ClaimEvidenceKind;
+/// A claim bound to one exact commit after every required gate passed.
+pub use claim::PromotedClaim;
+/// Exact-head promotion request.
+pub use claim::PromotionRequest;
+/// Parse a forty-character hexadecimal Git commit SHA.
+pub use claim::parse_commit_head;
+/// Promote a claim only when exact-head evidence satisfies ADR 0014.
+pub use claim::promote_claim;
+/// Promote a scientific claim from computed RMSE, not a hardcoded threshold.
+pub use claim::promote_scientific_recovery;
 /// Empirical interval coverage.
 pub use coverage::interval_coverage;
 /// Wilson bounds for coverage proportions.

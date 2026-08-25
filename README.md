@@ -6,6 +6,18 @@ implemented in Rust.
 
 ## Current implementation state
 
+The current workspace contains 50 independently documented Rust crates. Each
+crate exposes a bounded, tested contract for evidence, temporal semantics,
+event and relation reasoning, membership, persistence, simulation, validation,
+API exchange, compute planning, or evidence-grounded interpretation. Numerical
+and psychometric authority remains on the CPU `f64` reference path; streamed
+accelerator plans must preserve the full observation set and fail closed to the
+reference path when resources or validation are insufficient.
+
+These are production contracts, not a claim that the complete commercial
+estimator, operator workspace, or supported release already exists. Read the
+[product and technical gap baseline](docs/product-technical-gap-baseline.md)
+before treating a crate as a shipped product capability.
 This branch keeps the Rust workspace quality foundation and the bounded
 foundation crates. Domain crates expose only tested contracts: immutable
 evidence, six-clock temporal values, event mentions/instances, relations,
@@ -26,6 +38,21 @@ crates/assertion_clock
 crates/available_clock
 crates/checkpoint_authority
 crates/citation_edge
+crates/evidence_core
+crates/semantic_core
+crates/temporal_core
+crates/event_core
+crates/relation_graph
+crates/membership_core
+crates/persistence_postgres
+crates/corpus_split
+crates/tepp_simulation
+crates/validation_core
+crates/tepp_api
+crates/location_membership
+crates/prompt_source
+crates/corpus_background
+crates/modality_source
 crates/copied_text
 crates/copy_identity
 crates/corpus_background
@@ -60,6 +87,7 @@ crates/relation_graph
 crates/retrospective_edge
 crates/revision_order
 crates/semantic_core
+crates/operational_log
 crates/service_tls
 crates/stopword_deletion
 crates/style_source
@@ -72,6 +100,14 @@ crates/tepp_api
 crates/tepp_simulation
 crates/topic_lineage
 crates/validation_core
+crates/network_analysis
+crates/interpretation_gateway
+crates/model_selection
+crates/checkpoint_authority
+crates/compute_backend
+crates/episode_membership
+crates/membership_target
+
 ```
 
 ## Local verification
