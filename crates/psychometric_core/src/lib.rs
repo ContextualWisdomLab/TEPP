@@ -580,6 +580,16 @@
 //! distinct positive `ψ` recover the same 1; `TRAITVARstd`
 //! recovers the same number and remains a distinct named quantity;
 //! `θ` is not `MANIFESTTRAITVARstd`),
+//! recovers Eq. 5 of that analog extra as `λ² t0_m² v` (JSS PDF
+//! re-opened 2026-08-23T22:26Z; form `t0_m² v` first, then
+//! `(λ extra) λ` with `θ = 0`; a zero loading or zero extra is
+//! exactly zero; `v < 0` fails closed; `T0` is event time, so a
+//! non-event clock fails closed; free `t0_m` does not require
+//! stable `a < 0`; `t0_m² v` is the latent extra, not this observed
+//! extra; `λ² p_0 + θ` is first-occasion observed variance, not
+//! this extra; `λ² t0_b² v` is Eq. 5 of `addedT0TIPREDVAR` and is
+//! not this extra even when `t0_m = t0_b`; `MANIFESTVAR` `θ` is
+//! not this extra),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -697,6 +707,8 @@ pub use event_time::recover_discrete_time_varying_predictor_effect;
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
 pub use event_time::recover_event_time_discrete_lag_and_log_rate;
+/// Exact scalar Eq. 5 of the analog first-occasion TD extra `λ² t0_m² v`.
+pub use event_time::recover_initial_time_dependent_observed_variance;
 /// Exact scalar carried first-occasion `T0TDPREDEFFECT` `e^{A Δt} t0_m x0`.
 pub use event_time::recover_initial_time_dependent_predictor_carry;
 /// Exact scalar first-occasion `T0TDPREDEFFECT` shift `t0_m x0`.
@@ -922,6 +934,14 @@ pub use event_time::refuse_initial_time_dependent_effect_as_continuous_intercept
 pub use event_time::refuse_initial_time_dependent_effect_as_initial_time_independent_effect;
 /// Refuse treating the Table 3 first-occasion TD shift as the Eq. 3 process increment.
 pub use event_time::refuse_initial_time_dependent_effect_as_process_increment;
+/// Refuse treating Eq. 5 of the analog first-occasion TD extra as first-occasion observed variance.
+pub use event_time::refuse_initial_time_dependent_observed_variance_as_initial_observed_variance;
+/// Refuse treating Eq. 5 of the analog first-occasion TD extra as the latent extra.
+pub use event_time::refuse_initial_time_dependent_observed_variance_as_initial_time_dependent_variance;
+/// Refuse treating Eq. 5 of the analog first-occasion TD extra as Eq. 5 of `addedT0TIPREDVAR`.
+pub use event_time::refuse_initial_time_dependent_observed_variance_as_initial_time_independent_observed_variance;
+/// Refuse treating Eq. 5 of the analog first-occasion TD extra as `MANIFESTVAR`.
+pub use event_time::refuse_initial_time_dependent_observed_variance_as_measurement_error;
 /// Refuse treating the first-occasion TD extra as free first-occasion `T0VAR`.
 pub use event_time::refuse_initial_time_dependent_variance_as_initial_latent_variance;
 /// Refuse treating the first-occasion TD extra as Table 2 `T0TDPREDCOV`.
