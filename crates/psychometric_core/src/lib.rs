@@ -185,6 +185,14 @@
 //! (the lagged observed covariance omits `Q_Δt` and `θ`;
 //! `MANIFESTVAR` is not that later observed variance; the
 //! later-occasion latent variance is not that observed variance),
+//! recovers the Driver p. 16 `CINTstd` as `κ / √p` after strictly
+//! positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4 uses only
+//! the relevant within-subject variance, not total `trait + p + added`;
+//! unstandardised `κ` is defined for growing `a ≥ 0` and for zero
+//! diffusion and is not that map; `(-κ / a) / √p` is `asymCINTstd`
+//! and is not that map; `A^{-1}[e^{A Δt} − I] κ / √p` is
+//! `discreteCINTstd` and is not that map; JSS PDF re-opened
+//! 2026-08-25T11:43Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -323,6 +331,8 @@ pub use event_time::recover_manifest_observed_mean;
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
+/// Exact scalar p. 16 `CINTstd` `κ / √p`.
+pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
@@ -365,6 +375,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_as_discrete_increment
 pub use event_time::refuse_asymptotic_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating `τ + λ(−κ / a)` as Eq. 5 of §4.3 stationary `T0MEANS`.
 pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean;
+/// Refuse treating p. 16 `asymCINTstd` as `CINTstd`.
+pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT` `B`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_coefficient;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.
@@ -387,6 +399,8 @@ pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
+pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating evolved `τ + λ μ_t` as the after-t0 extra-process observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the extra-process observed mean.
@@ -579,12 +593,16 @@ pub use event_time::refuse_time_independent_observed_mean_as_initial_time_depend
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
+/// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
+pub use event_time::refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating Driver §4.3 trait variance as process noise.
 pub use event_time::refuse_trait_variance_as_process_noise;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.
 pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 /// Refuse a time-varying predictor whose sampling and constancy intervals differ.
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
+/// Refuse treating unstandardised `CINT` as `CINTstd`.
+pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.

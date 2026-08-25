@@ -504,6 +504,26 @@ pub enum PsychometricError {
     /// later-occasion stationary observed variance. Lagged covariance
     /// omits `Q_Δt` and `θ`.
     StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance,
+    /// Driver p. 16 `CINTstd` was requested without a strictly positive
+    /// `asymDIFFUSION`. Footnote 4 standardises using only the
+    /// relevant variance; zero `q` has no positive process SD.
+    StandardisedContinuousInterceptRequiresPositiveStationaryVariance,
+    /// Driver Table 2 unstandardised `CINT` `κ` was treated as
+    /// `CINTstd`. Unstandardised intercept is defined for growing
+    /// `a ≥ 0` and for zero diffusion; standardised `CINT` is not.
+    UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept,
+    /// Driver p. 16 `asymCINTstd` `(-κ / a) / √p` was treated as
+    /// `CINTstd`. The asymptotic map is the total change, not the
+    /// continuous intercept.
+    AsymptoticStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept,
+    /// Driver p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`
+    /// was treated as `CINTstd`. The finite-interval map depends on
+    /// `Δt` and is not the continuous intercept.
+    DiscreteStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept,
+    /// `κ / √(trait + p + added)` was treated as `CINTstd`.
+    /// Footnote 4 uses only `asymDIFFUSION`, not total variance.
+    /// `TRAITVAR` is not the standardisation variance.
+    TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept,
 }
 
 impl fmt::Display for PsychometricError {
@@ -898,6 +918,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance => {
                 "stationary lagged observed covariance is not the stationary later-occasion observed variance"
+            }
+            Self::StandardisedContinuousInterceptRequiresPositiveStationaryVariance => {
+                "standardised continuous intercept requires strictly positive stationary within-subject variance"
+            }
+            Self::UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept => {
+                "unstandardised continuous intercept is not standardised continuous intercept"
+            }
+            Self::AsymptoticStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept => {
+                "asymptotic standardised continuous intercept is not standardised continuous intercept"
+            }
+            Self::DiscreteStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept => {
+                "discrete standardised continuous intercept is not standardised continuous intercept"
+            }
+            Self::TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept => {
+                "trait-scaled continuous intercept is not standardised continuous intercept"
             }
         };
         formatter.write_str(message)
@@ -1513,6 +1548,35 @@ mod tests {
             PsychometricError::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance
                 .to_string(),
             "stationary lagged observed covariance is not the stationary later-occasion observed variance"
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_intercept_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedContinuousInterceptRequiresPositiveStationaryVariance
+                .to_string(),
+            "standardised continuous intercept requires strictly positive stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept
+                .to_string(),
+            "unstandardised continuous intercept is not standardised continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept
+                .to_string(),
+            "asymptotic standardised continuous intercept is not standardised continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedContinuousIntercept
+                .to_string(),
+            "discrete standardised continuous intercept is not standardised continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::TraitScaledContinuousInterceptIsNotStandardisedContinuousIntercept
+                .to_string(),
+            "trait-scaled continuous intercept is not standardised continuous intercept"
         );
     }
 }
