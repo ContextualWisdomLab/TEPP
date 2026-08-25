@@ -65,6 +65,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `psychometric_core` posterior-aware structural input gates: construct classification, refusal of raw-proportion Pearson/OLS, explicit ALR-versus-ILR geometry boundaries, CPU `f64` OLS recovery, posterior-draw loading point-estimate averaging without Rubin uncertainty claims, invariance-gated latent-mean comparison, and causal-heuristic refusal (ADR 0005 first production slice; no new migration).
 ### Added
 
+- `evidence_core` embedded-image units: `data:image/<type>;base64,...` URIs keep their original source spans and media types, and cannot be used as lexical inference text.
 - `persistence_postgres` entity/project target SQL now rejects empty, oversized, or hostile type/status labels before insert; interpolated codes are restricted to lowercase ASCII `snake_case` characters so membership foreign keys remain referentially safe (ADR 0003 / ADR 0013).
 - `persistence_postgres` live SQLx transport retains one pool-backed PostgreSQL connection per session so tenant binding and the following statement share a session, and closes the connection and owned runtime safely from another Tokio runtime (ADR 0013).
 - The authored-line coverage gate now filters LLVM-only literal and expression continuation records while retaining branch coverage for their executable decisions; Rust function signatures and structural branch lines are no longer counted as uncovered statements.
