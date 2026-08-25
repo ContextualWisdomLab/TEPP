@@ -951,6 +951,74 @@ class CoverageContractTests(unittest.TestCase):
             self.assertTrue(coverage_contract.is_executable_source_line(path, 8))
             self.assertFalse(coverage_contract.is_executable_source_line(path, 7))
 
+    def test_structural_comma_skips_blank_predecessors(self) -> None:
+        """Blank predecessors do not invent a call opener for a trailing comma."""
+
+        lines = [
+            "",
+            "    ",
+            "    field_name,",
+        ]
+        self.assertFalse(
+            coverage_contract._is_structural_comma_continuation(
+                lines, 3, "field_name,"
+            )
+        )
+        self.assertFalse(
+            coverage_contract._is_structural_comma_continuation(
+                ["field_name,"], 1, "field_name,"
+            )
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "blank_predecessor.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 3)
+            )
+
+    def test_structural_comma_after_blank_lines_still_sees_call_opener(self) -> None:
+        """Empty lines between a call opener and an argument remain structural."""
+
+        lines = [
+            "record_value(",
+            "",
+            "    field_name,",
+            ")",
+        ]
+        self.assertTrue(
+            coverage_contract._is_structural_comma_continuation(
+                lines, 3, "field_name,"
+            )
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "call_opener.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 3)
+            )
+
+    def test_multiline_string_scanner_handles_escaped_char_and_past_eof(self) -> None:
+        """Escaped char literals keep later lines classified; past-EOF is closed."""
+
+        lines = [
+            "fn query() {",
+            r"    let quote = '\'';",
+            r"    let slash = '\\';",
+            r"    let newline = '\n';",
+            "    execute();",
+            "}",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "escaped_char.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path = str(source)
+            self.assertFalse(coverage_contract._line_in_multiline_string(lines, 2))
+            self.assertFalse(coverage_contract._line_in_multiline_string(lines, 5))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 5))
+            self.assertFalse(
+                coverage_contract._line_in_multiline_string(lines, len(lines) + 1)
+            )
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
