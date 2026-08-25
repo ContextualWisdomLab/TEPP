@@ -32,6 +32,8 @@ The executable multilevel slice is cluster-mean centering (CWC) plus within/betw
 The executable standardised-intercept slice recovers Driver et al. (2017, p. 16 `CINTstd`) as `κ / √p` after strictly positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4; JSS PDF re-opened 2026-08-25T11:43Z). Unstandardised `κ` is defined for growing `a ≥ 0` and for zero diffusion and is not that map. `(-κ / a) / √p` is `asymCINTstd` and is not `CINTstd`. `A^{-1}[e^{A Δt} − I] κ / √p` is `discreteCINTstd` and is not `CINTstd`. `κ / √(trait + p + added)` uses total variance and is not the residual map. This is not ctsem estimation.
 The executable standardised-discrete-intercept slice recovers Driver et al. (2017, p. 16 `discreteCINTstd`) as `A^{-1}[e^{A Δt} − I] κ / √p` after strictly positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4; JSS PDF re-opened 2026-08-25T11:57Z). Unstandardised `discreteCINT` is defined for growing `a ≥ 0` and for zero diffusion and is not that map. `κ / √p` is `CINTstd` and does not depend on `Δt`. `(-κ / a) / √p` is `asymCINTstd` and is not this finite-interval map. This is not ctsem estimation.
 
+**Decision status:** Accepted
+
 Input/process/intervention/outcome paths obey event-time order. Temporal precedence, document linkage, event tracking, or model prediction alone do not justify causal language.
 
 ## Non-goals

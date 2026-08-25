@@ -29,7 +29,11 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+<<<<<<< HEAD
     recover_standardised_continuous_intercept, recover_standardised_discrete_continuous_intercept,
+=======
+    recover_standardised_continuous_intercept, recover_standardised_manifest_mean,
+>>>>>>> origin/main
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
     recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
     recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -108,8 +112,13 @@ use psychometric_core::{
     refuse_measurement_error_as_observed_variance,
     refuse_measurement_error_as_stationary_lagged_observed_covariance,
     refuse_measurement_error_as_stationary_later_observed_variance,
+    refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
     refuse_process_noise_as_unconditional_variance,
+<<<<<<< HEAD
     refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+=======
+    refuse_standardised_manifest_variance_as_standardised_manifest_mean,
+>>>>>>> origin/main
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
     refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -150,7 +159,11 @@ use psychometric_core::{
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
+<<<<<<< HEAD
     refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
+=======
+    refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
+>>>>>>> origin/main
 };
 
 #[test]
@@ -3073,6 +3086,7 @@ fn standardised_continuous_intercept_is_not_unstandardised_asymptotic_or_discret
         Err(psychometric_core::PsychometricError::EventTimeRequired)
     );
 }
+<<<<<<< HEAD
 #[test]
 fn standardised_discrete_continuous_intercept_is_not_unstandardised_continuous_or_asymptotic() {
     let intercept = 0.4_f64;
@@ -3161,6 +3175,69 @@ fn standardised_discrete_continuous_intercept_is_not_unstandardised_continuous_o
             event_delta,
             LagClock::DocumentTime
         ),
+=======
+
+#[test]
+fn standardised_manifest_mean_is_not_unstandardised_or_total_observed_scale() {
+    let mean = 0.8_f64;
+    let measurement_error = 1.6_f64;
+    let recovered =
+        recover_standardised_manifest_mean(mean, measurement_error, LagClock::EventTime)
+            .expect("MANIFESTMEANSstd");
+    assert!(
+        (recovered - mean / measurement_error.sqrt()).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 footnote 4): MANIFESTMEANSstd is τ / √θ"
+    );
+    assert!(
+        (recovered - mean).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): unstandardised MANIFESTMEANS is not MANIFESTMEANSstd"
+    );
+    let observed = 1.2_f64 * 1.2_f64 * 0.9_f64 + measurement_error;
+    let observed_scaled = mean / observed.sqrt();
+    assert!(
+        (observed_scaled - recovered).abs() > 1e-3,
+        "Driver et al. (2017, footnote 4): τ / √(λ² Var(η) + θ) is not MANIFESTMEANSstd"
+    );
+    let unit = recover_standardised_manifest_mean(
+        measurement_error.sqrt(),
+        measurement_error,
+        LagClock::EventTime,
+    )
+    .expect("τ = √θ");
+    assert!(
+        (unit - 1.0).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): τ / √θ equals 1 when τ = √θ"
+    );
+    assert_eq!(
+        refuse_unstandardised_manifest_mean_as_standardised_manifest_mean(mean, recovered),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedManifestMeanIsNotStandardisedManifestMean
+        )
+    );
+    assert_eq!(
+        refuse_standardised_manifest_variance_as_standardised_manifest_mean(1.0, unit),
+        Err(
+            psychometric_core::PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean
+        )
+    );
+    assert_eq!(
+        refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean(
+            observed_scaled,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean
+        )
+    );
+    assert_eq!(
+        recover_standardised_manifest_mean(mean, 0.0, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedManifestMeanRequiresPositiveManifestVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_manifest_mean(mean, measurement_error, LagClock::DocumentTime),
+>>>>>>> origin/main
         Err(psychometric_core::PsychometricError::EventTimeRequired)
     );
 }
