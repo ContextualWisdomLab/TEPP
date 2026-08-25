@@ -61,6 +61,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "interpretation_gateway",
     "model_selection",
     "checkpoint_authority",
+    "membership_target",
     "analysis_engine",
 )
 

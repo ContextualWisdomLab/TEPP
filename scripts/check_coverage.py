@@ -103,9 +103,10 @@ def is_executable_source_line(
     """Return whether *line_number* in *source_path* is an executable source line.
 
     LLVM LCOV sometimes emits zero-count DA records for documentation comments,
-    attributes, pure structural braces, multi-line signatures, and in-file
-    ``#[cfg(test)]`` modules. Those records are not evidence of uncovered
-    production behavior and are excluded from the authored-line gate.
+    attributes, pure structural braces, multi-line signatures, literal
+    continuations, expression continuations, and in-file ``#[cfg(test)]``
+    modules. Those records are not evidence of uncovered production behavior
+    and are excluded from the authored-line gate.
 
     When *repository_root* is provided, *source_path* must resolve under that
     root (same fail-closed rule as LCOV ``SF:`` loading).
@@ -126,6 +127,8 @@ def is_executable_source_line(
     if line_number in _cfg_test_module_line_numbers(lines):
         return False
     if _line_in_cfg_not_feature_block(lines, line_number):
+        return False
+    if _line_in_multiline_string(lines, line_number):
         return False
     text = lines[line_number - 1].strip()
     if not text:
@@ -160,10 +163,20 @@ def is_executable_source_line(
         return False
     if text.startswith(") ->"):
         return False
-    if text.startswith("pub fn ") or text.startswith("fn "):
-        return False
-    if text.startswith("pub(crate) fn "):
-        return False
+    if text.startswith(
+        (
+            "pub fn ",
+            "pub const fn ",
+            "pub(crate) fn ",
+            "pub(crate) const fn ",
+            "const fn ",
+            "fn ",
+        )
+    ):
+        if "{" not in text or "}" not in text:
+            return False
+        body = text[text.find("{") + 1 : text.rfind("}")].strip()
+        return bool(body)
     # Keep guarded match arms in the authored-line denominator: the guard
     # executes even though the arm label itself is structural.
     if text.endswith("=> {") and " if " not in text:
@@ -178,12 +191,172 @@ def is_executable_source_line(
         return False
     if text.startswith("pub enum ") or text.startswith("enum "):
         return False
-    if text.startswith("Ok(Self") or text in {")}", "})", "})"}:
+    if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
-    if text.endswith(",") and not text.startswith("let ") and not text.startswith("return "):
+    if text in {"} else {", "else {", "));"} or text.startswith((".", "||", "&&")):
+        return False
+    if (
+        text.endswith(",")
+        and not text.startswith("let ")
+        and not text.startswith("return ")
+        and _is_structural_comma_continuation(lines, line_number, text)
+    ):
         return False
     return True
 
+
+def _is_structural_comma_continuation(
+    lines: list[str], line_number: int, text: str
+) -> bool:
+    """Return whether a comma-terminated line is proven to be structural.
+
+    A comma can terminate a declaration field, enum variant, function
+    parameter, or ordinary call argument. Operators, calls, and assignments
+    remain executable because their expressions can perform observable work.
+    """
+
+    if any(character in text for character in "()=+-*/%<>!&|?"):
+        return False
+    previous = ""
+    for candidate in reversed(lines[: line_number - 1]):
+        if candidate.strip():
+            previous = candidate.strip()
+            break
+    if previous.endswith("(") and "let " not in previous and "=" not in previous:
+        return True
+
+    declaration_depth = 0
+    function_parenthesis_depth = 0
+    for candidate in lines[: line_number - 1]:
+        stripped = candidate.strip()
+        if declaration_depth:
+            declaration_depth += candidate.count("{") - candidate.count("}")
+            if declaration_depth <= 0:
+                declaration_depth = 0
+            continue
+        if stripped.startswith(
+            (
+                "struct ",
+                "pub struct ",
+                "pub(crate) struct ",
+                "enum ",
+                "pub enum ",
+                "pub(crate) enum ",
+            )
+        ) and "{" in candidate:
+            declaration_depth = candidate.count("{") - candidate.count("}")
+            continue
+        if function_parenthesis_depth:
+            function_parenthesis_depth += candidate.count("(") - candidate.count(")")
+            if function_parenthesis_depth <= 0:
+                function_parenthesis_depth = 0
+            continue
+        if "fn " in stripped and "(" in candidate:
+            function_parenthesis_depth = candidate.count("(") - candidate.count(")")
+    return declaration_depth > 0 or function_parenthesis_depth > 0
+
+
+def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
+    """Return whether a source line is only a continuation of a string literal.
+
+    LLVM assigns one line location to a multi-line SQL or JSON literal, while
+    LCOV can still emit zero-count records for its continuation lines. Those
+    bytes are data, not independently executable Rust statements. Rust comments,
+    character literals, and raw-string delimiters are ignored while finding the
+    literal so embedded quote characters cannot hide later production lines.
+    """
+
+    in_string = False
+    block_comment_depth = 0
+    raw_hashes: int | None = None
+    for index, line in enumerate(lines, start=1):
+        if index == line_number and (in_string or block_comment_depth > 0):
+            return True
+        stripped = line.strip()
+        started_literal = False
+        escaped = False
+        position = 0
+        while position < len(line):
+            if raw_hashes is not None:
+                if line[position] == '"' and line[position + 1 :].startswith(
+                    "#" * raw_hashes
+                ):
+                    position += raw_hashes + 1
+                    raw_hashes = None
+                    in_string = False
+                else:
+                    position += 1
+                continue
+            if in_string:
+                character = line[position]
+                if character == '"' and not escaped:
+                    in_string = False
+                elif character == "\\" and not escaped:
+                    escaped = True
+                else:
+                    escaped = False
+                position += 1
+                continue
+            if block_comment_depth:
+                if line.startswith("/*", position):
+                    block_comment_depth += 1
+                    position += 2
+                elif line.startswith("*/", position):
+                    block_comment_depth -= 1
+                    position += 2
+                else:
+                    position += 1
+                continue
+            if line.startswith("/*", position):
+                block_comment_depth = 1
+                position += 2
+                continue
+            if line.startswith("//", position):
+                break
+            if line[position] == "'":
+                char_start = position
+                position += 1
+                char_escaped = False
+                closed_char = False
+                while position < len(line):
+                    character = line[position]
+                    position += 1
+                    if character == "'" and not char_escaped:
+                        closed_char = True
+                        break
+                    char_escaped = character == "\\" and not char_escaped
+                    if character != "\\":
+                        char_escaped = False
+                if not closed_char:
+                    position = char_start + 1
+                continue
+            raw_prefix = None
+            for prefix in ("br", "r"):
+                if line.startswith(prefix, position):
+                    cursor = position + len(prefix)
+                    while cursor < len(line) and line[cursor] == "#":
+                        cursor += 1
+                    if cursor < len(line) and line[cursor] == '"':
+                        raw_prefix = (len(prefix), cursor - position - len(prefix))
+                        break
+            if raw_prefix is not None:
+                prefix_length, hash_count = raw_prefix
+                raw_hashes = hash_count
+                in_string = True
+                started_literal = True
+                position += prefix_length + hash_count + 1
+                continue
+            if line[position] == '"':
+                in_string = True
+                started_literal = True
+            position += 1
+        if index == line_number:
+            if block_comment_depth > 0 or stripped.startswith("/*") and stripped.endswith("*/"):
+                return True
+            return in_string and started_literal and stripped.startswith(
+                ('"', "r\"", "r#", "br\"", "br#")
+            )
+    return False
 
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""

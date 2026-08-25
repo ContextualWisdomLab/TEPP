@@ -105,6 +105,8 @@ boundaries above remain the target modular MSA architecture.
 | `interpretation_gateway` | evidence-bounded LLM interpretations; not estimators or observed facts |
 | `model_selection` | statistical/Pareto candidate-`K` gates; LLM votes are not numerical authority |
 | `checkpoint_authority` | a model checkpoint is not the CPU `f64` estimator |
+| `membership_target` | language, episode, template, department, and opportunity-pool targets cannot collapse into entity or project |
+
 
 Foundation crates expose only tested contracts. Empty façades are not public
 APIs.

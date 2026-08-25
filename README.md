@@ -7,10 +7,17 @@ implemented in Rust.
 ## Current implementation state
 
 This branch preserves the protected-main Rust workspace and quality-gate
-foundation, and adds the independently usable `analysis_engine` vertical slice.
-The engine executes bounded cutoff-safe readiness work and emits a
-digest-bound terminal artifact or a redacted no-eligible-evidence result. It is
-active-PR evidence, not a psychometric estimator or a release claim.
+foundation. The workspace crates expose tested contracts only: immutable
+evidence identities and exact spans, six-clock temporal values with Allen
+algebra and cutoff eligibility, event mentions/instances with
+evidence-layer intelligence gates, a forward-only relation graph,
+cross-classified membership, bitemporal persistence, leakage-safe corpus
+splits, simulation manifests, claim-promotion validation, API DTOs, the
+purpose-bound privacy envelope, and longitudinal within/between
+decomposition. It adds the independently usable `analysis_engine` vertical
+slice: bounded cutoff-safe readiness work that emits a digest-bound terminal
+artifact or a redacted no-eligible-evidence result. That slice is active-PR
+evidence, not a psychometric estimator or a release claim.
 
 ```text
 crates/evidence_core
@@ -62,6 +69,8 @@ crates/network_analysis
 crates/interpretation_gateway
 crates/model_selection
 crates/checkpoint_authority
+crates/membership_target
+
 ```
 
 ## Local verification

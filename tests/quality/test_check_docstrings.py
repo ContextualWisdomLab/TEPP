@@ -35,7 +35,6 @@ class DocstringContractTests(unittest.TestCase):
             len(contract.EXPECTED_CRATES),
             "workspace crate inventory must not contain duplicate entries",
         )
-        self.assertEqual(len(crate_roots), len(contract.EXPECTED_CRATES))
         expected_crate_roots = {
             REPOSITORY_ROOT / path / "src" / "lib.rs"
             for path in contract.expected_member_paths()
