@@ -342,6 +342,39 @@ class CoverageContractTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     coverage_contract.load_union_branch_totals(files)
 
+    def test_union_branch_totals_accumulate_valid_records(self) -> None:
+        """Valid records accumulate True/False counts per unique coordinate."""
+
+        files = [
+            {
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 3, 0, 0, 0, 4]],
+            },
+            {
+                # A second instrumented copy of the same coordinate unions its
+                # outcomes with the first copy instead of double-counting.
+                "filename": "src/live.rs",
+                "branches": [[10, 4, 10, 12, 0, 2, 0, 0, 4]],
+            },
+            {
+                # An empty branches array exercises the loop-exhaustion arc.
+                "filename": "src/idle.rs",
+                "branches": [],
+            },
+            {
+                "filename": "src/other.rs",
+                "branches": [[20, 8, 20, 16, 1, 1, 0, 0, 4]],
+            },
+        ]
+        self.assertEqual(
+            coverage_contract.load_union_branch_totals(files),
+            {"count": 4, "covered": 4},
+        )
+        self.assertEqual(
+            coverage_contract.load_union_branch_totals([]),
+            {"count": 0, "covered": 0},
+        )
+
     def test_lcov_authored_line_totals_and_incomplete_detection(self) -> None:
         """LCOV counts unique authored source lines and exposes zero-hit lines."""
 
