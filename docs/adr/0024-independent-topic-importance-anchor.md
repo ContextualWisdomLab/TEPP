@@ -98,6 +98,34 @@ snapshot, and membership weight where applicable. Reusing one assertion ID for
 records that differ only in time therefore fails closed rather than silently
 collapsing distinct temporal claims.
 
+Full-data plausible values do not identify model case-deletion influence. For
+document `i`, the required target is the posterior under the model fitted to
+`D \\ {i}`; deletion changes the global topic-term distributions, structural
+state, document coordinates, and every relation incident to `i`. Fast LOO and
+first-order case-influence methods are explicitly approximations to brute-force
+deletion refits and are not substituted here (Vehtari et al., 2016; Zhu et al.,
+2012).
+
+The accepted producer contract is
+`tepp.topic_context_case_deletion_posterior.v1`. It requires one actual refit
+for every admitted document under the identical prior, model configuration,
+snapshot, cutoff, and event clock; exact lists of removed relation and
+membership assertions; independent full/refit draw domains; and complete
+retained-document posterior coordinates. All fits start from an independent
+distributional topic anchor. Each fitted topic must remain strictly closer in
+squared Hellinger distance to its same-index anchor distribution than to every
+other anchor distribution. This sufficient condition proves one unique
+identity bijection; a tie, crossing, missing refit, or incomplete removal list
+fails the whole artifact.
+
+The Rust CPU prerequisite now performs all `D \\ {i}` refits rather than
+reweighting full-data draws. It recomputes event-time standardization and
+removes incident transition pairs for every reduced corpus, binds the anchor
+digest, and emits unique-alignment evidence. Artifact publication still also
+requires the analysis-layer provenance envelope, full/refit joint draws, and
+actual CPU/GPU parameter, objective, and draw parity with method-derived error
+bounds; a caller-selected tolerance cannot promote it.
+
 This still is not a complete `tepp.topic_context_posterior.v1` producer. The
 topic fit binds each admitted event instant but does not own the declared event
 clock identity, source snapshot/run/cutoff identity, activity intervals,
@@ -124,6 +152,16 @@ https://doi.org/10.1145/1143844.1143859
 Box, G. E. P., & Muller, M. E. (1958). A note on the generation of random
 normal deviates. *The Annals of Mathematical Statistics, 29*(2), 610–611.
 https://doi.org/10.1214/aoms/1177706645
+
+Vehtari, A., Mononen, T., Tolvanen, V., Sivula, T., & Winther, O. (2016).
+Bayesian leave-one-out cross-validation approximations for Gaussian latent
+variable models. *Journal of Machine Learning Research, 17*(103), 1–38.
+https://www.jmlr.org/papers/v17/14-540.html
+
+Zhu, H., Ibrahim, J. G., Cho, H., & Tang, N. (2012). Bayesian case influence
+measures for statistical models with missing data. *Journal of Computational
+and Graphical Statistics, 21*(1), 253–271.
+https://doi.org/10.1198/jcgs.2011.10139
 
 Chang, J., & Blei, D. M. (2009). Relational topic models for document networks.
 In *Proceedings of Machine Learning Research, 5*, 81–88.

@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use corpus_split::CorpusSnapshot;
 use membership_core::{GroupId, MemberId, MembershipNetwork, MembershipRole};
 use relation_graph::RelationGraph;
+use sha2::{Digest, Sha256};
 use temporal_core::EventTime;
 use uuid::Uuid;
 
@@ -209,6 +210,57 @@ impl ReferenceTopicInput {
             Err(TopicMeasurementError::NonFiniteEstimate)
         }
     }
+
+    fn without_document(&self, excluded: usize) -> Result<Self, TopicMeasurementError> {
+        if self.document_ids.len() < 3 || excluded >= self.document_ids.len() {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        let admitted: Vec<usize> = (0..self.document_ids.len())
+            .filter(|index| *index != excluded)
+            .collect();
+        let document_ids: Vec<Uuid> = admitted
+            .iter()
+            .map(|index| self.document_ids[*index])
+            .collect();
+        let event_times: Vec<EventTime> = admitted
+            .iter()
+            .map(|index| self.event_times[*index])
+            .collect();
+        let standardized_time = standardize_event_time(&event_times)?;
+        let mut design: Vec<Vec<f64>> = admitted
+            .iter()
+            .map(|index| self.design[*index].clone())
+            .collect();
+        for (row, time) in design.iter_mut().zip(standardized_time) {
+            row[1] = time;
+        }
+        let remap: BTreeMap<usize, usize> = admitted
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(new, old)| (old, new))
+            .collect();
+        let transition_pairs: Vec<(usize, usize)> = self
+            .transition_pairs
+            .iter()
+            .filter_map(|(source, target)| Some((*remap.get(source)?, *remap.get(target)?)))
+            .collect();
+        if transition_pairs.is_empty() {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        Ok(Self {
+            document_ids,
+            event_times,
+            term_rows: admitted
+                .iter()
+                .map(|index| self.term_rows[*index].clone())
+                .collect(),
+            vocabulary_size: self.vocabulary_size,
+            design,
+            features: self.features.clone(),
+            transition_pairs,
+        })
+    }
 }
 
 fn build_design(
@@ -312,6 +364,124 @@ pub struct ReferenceTopicModelConfig {
     ridge: f64,
     topic_smoothing: f64,
     step_size: f64,
+}
+
+/// Independent stable topic basis used by every exact deletion refit.
+#[derive(Clone, Debug, PartialEq)]
+pub struct IndependentTopicAnchor {
+    topic_ids: Vec<Uuid>,
+    topic_term_probabilities: Vec<Vec<f64>>,
+    anchor_id: String,
+}
+
+impl IndependentTopicAnchor {
+    /// Validate and digest an externally identified topic basis.
+    ///
+    /// Each topic row is normalized as a probability distribution. Duplicate
+    /// topic identities or identical normalized rows are rejected because they
+    /// do not independently identify a labeled basis.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] for fewer than two
+    /// topics, duplicate identities or rows, ragged vocabulary dimensions, or
+    /// non-positive/non-finite term mass.
+    pub fn new(
+        topic_ids: Vec<Uuid>,
+        mut topic_term_probabilities: Vec<Vec<f64>>,
+    ) -> Result<Self, TopicMeasurementError> {
+        if topic_ids.len() < 2
+            || topic_ids.len() != topic_term_probabilities.len()
+            || topic_ids.iter().copied().collect::<BTreeSet<_>>().len() != topic_ids.len()
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        let vocabulary_size = topic_term_probabilities[0].len();
+        if vocabulary_size < 2
+            || topic_term_probabilities.iter().any(|row| {
+                row.len() != vocabulary_size
+                    || row.iter().any(|value| !value.is_finite() || *value <= 0.0)
+            })
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        for row in &mut topic_term_probabilities {
+            normalize(row)?;
+        }
+        if (0..topic_term_probabilities.len()).any(|left| {
+            ((left + 1)..topic_term_probabilities.len())
+                .any(|right| topic_term_probabilities[left] == topic_term_probabilities[right])
+        }) {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        let mut digest = Sha256::new();
+        digest.update(b"tepp.independent-topic-anchor.v1");
+        for topic_id in &topic_ids {
+            digest.update(topic_id.as_bytes());
+        }
+        for value in topic_term_probabilities.iter().flatten() {
+            digest.update(value.to_bits().to_le_bytes());
+        }
+        Ok(Self {
+            topic_ids,
+            topic_term_probabilities,
+            anchor_id: format!("{:x}", digest.finalize()),
+        })
+    }
+
+    /// Return the immutable anchor digest.
+    #[must_use]
+    pub fn anchor_id(&self) -> &str {
+        &self.anchor_id
+    }
+
+    /// Return stable topic identities in estimator coordinate order.
+    #[must_use]
+    pub fn topic_ids(&self) -> &[Uuid] {
+        &self.topic_ids
+    }
+}
+
+/// One actual document-excluded reference-model refit.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExactLeaveOneOutRefit {
+    excluded_document_id: Uuid,
+    admitted_document_ids: Vec<Uuid>,
+    anchor_id: String,
+    alignment_evidence_sha256: String,
+    model: ReferenceTopicModel,
+}
+
+impl ExactLeaveOneOutRefit {
+    /// Return the document absent from this refit.
+    #[must_use]
+    pub const fn excluded_document_id(&self) -> Uuid {
+        self.excluded_document_id
+    }
+
+    /// Return the exact admitted document order for this refit.
+    #[must_use]
+    pub fn admitted_document_ids(&self) -> &[Uuid] {
+        &self.admitted_document_ids
+    }
+
+    /// Return the independent topic-anchor digest.
+    #[must_use]
+    pub fn anchor_id(&self) -> &str {
+        &self.anchor_id
+    }
+
+    /// Return the digest of the unique distributional identity alignment.
+    #[must_use]
+    pub fn alignment_evidence_sha256(&self) -> &str {
+        &self.alignment_evidence_sha256
+    }
+
+    /// Return the completed document-excluded model.
+    #[must_use]
+    pub const fn model(&self) -> &ReferenceTopicModel {
+        &self.model
+    }
 }
 
 impl ReferenceTopicModelConfig {
@@ -723,21 +893,155 @@ pub fn fit_reference_topic_model(
     build_result(input, config, state)
 }
 
+/// Refit the reference estimator once for every actually excluded document.
+///
+/// Every run starts from the same independently identified topic-term basis,
+/// uses the same configuration and prior, recomputes the reduced-corpus event
+/// standardization, and removes every transition incident to the excluded
+/// document. This is brute-force deletion refitting, not importance weighting,
+/// an infinitesimal approximation, or deletion from an aggregate mean.
+///
+/// # Errors
+///
+/// Returns a typed failure when the anchor does not match the configured model
+/// and vocabulary, fewer than three documents are available, a deletion leaves
+/// no admitted transition or event-time variance, or any exact refit fails.
+pub fn fit_exact_leave_one_out_refits(
+    input: &ReferenceTopicInput,
+    config: &ReferenceTopicModelConfig,
+    anchor: &IndependentTopicAnchor,
+) -> Result<Vec<ExactLeaveOneOutRefit>, TopicMeasurementError> {
+    config.validate()?;
+    if anchor.topic_ids.len() != config.topic_count
+        || anchor
+            .topic_term_probabilities
+            .iter()
+            .any(|row| row.len() != input.vocabulary_size)
+        || input.document_ids.len() < 3
+    {
+        return Err(TopicMeasurementError::InvalidModelInput);
+    }
+    input
+        .document_ids
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(excluded, excluded_document_id)| {
+            let reduced = input.without_document(excluded)?;
+            let model = fit_reference_topic_model_from_anchor(&reduced, config, anchor)?;
+            let alignment_evidence_sha256 = unique_anchor_identity(&model, anchor)?;
+            Ok(ExactLeaveOneOutRefit {
+                excluded_document_id,
+                admitted_document_ids: reduced.document_ids,
+                anchor_id: anchor.anchor_id.clone(),
+                alignment_evidence_sha256,
+                model,
+            })
+        })
+        .collect()
+}
+
+fn unique_anchor_identity(
+    model: &ReferenceTopicModel,
+    anchor: &IndependentTopicAnchor,
+) -> Result<String, TopicMeasurementError> {
+    if model.topic_term_probabilities.len() != anchor.topic_term_probabilities.len() {
+        return Err(TopicMeasurementError::InvalidModelInput);
+    }
+    let mut digest = Sha256::new();
+    digest.update(b"tepp.independent-topic-anchor-alignment.v1");
+    digest.update(anchor.anchor_id.as_bytes());
+    for (local_index, local) in model.topic_term_probabilities.iter().enumerate() {
+        let distances: Vec<f64> = anchor
+            .topic_term_probabilities
+            .iter()
+            .map(|reference| {
+                local
+                    .iter()
+                    .zip(reference)
+                    .map(|(left, right)| (left.sqrt() - right.sqrt()).powi(2))
+                    .sum::<f64>()
+            })
+            .collect();
+        let identity = distances[local_index];
+        if !identity.is_finite()
+            || distances.iter().enumerate().any(|(anchor_index, value)| {
+                anchor_index != local_index && identity.total_cmp(value).is_ge()
+            })
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        for value in distances {
+            digest.update(value.to_bits().to_le_bytes());
+        }
+    }
+    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn fit_reference_topic_model_from_anchor(
+    input: &ReferenceTopicInput,
+    config: &ReferenceTopicModelConfig,
+    anchor: &IndependentTopicAnchor,
+) -> Result<ReferenceTopicModel, TopicMeasurementError> {
+    let mut best = None;
+    for &seed in &config.seeds {
+        match fit_seed_from_anchor(input, config, seed, &anchor.topic_term_probabilities) {
+            Ok(candidate)
+                if best.as_ref().is_none_or(|incumbent: &FitState| {
+                    candidate.objective > incumbent.objective
+                }) =>
+            {
+                best = Some(candidate);
+            }
+            Ok(_) | Err(TopicMeasurementError::DidNotConverge) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    build_result(
+        input,
+        config,
+        best.ok_or(TopicMeasurementError::DidNotConverge)?,
+    )
+}
+
 fn fit_seed(
     input: &ReferenceTopicInput,
     config: &ReferenceTopicModelConfig,
     seed: u64,
 ) -> Result<FitState, TopicMeasurementError> {
+    fit_seed_with_initial_beta(input, config, seed, None)
+}
+
+fn fit_seed_from_anchor(
+    input: &ReferenceTopicInput,
+    config: &ReferenceTopicModelConfig,
+    seed: u64,
+    anchor_beta: &[Vec<f64>],
+) -> Result<FitState, TopicMeasurementError> {
+    fit_seed_with_initial_beta(input, config, seed, Some(anchor_beta))
+}
+
+fn fit_seed_with_initial_beta(
+    input: &ReferenceTopicInput,
+    config: &ReferenceTopicModelConfig,
+    seed: u64,
+    anchor_beta: Option<&[Vec<f64>]>,
+) -> Result<FitState, TopicMeasurementError> {
     let document_count = input.document_ids.len();
     let coordinate_count = config.topic_count - 1;
     let mut rng = seed.max(1);
-    let mut beta = vec![vec![0.0; input.vocabulary_size]; config.topic_count];
-    for topic in &mut beta {
-        for value in topic.iter_mut() {
-            *value = config.topic_smoothing + next_unit(&mut rng);
+    let mut beta = if let Some(value) = anchor_beta {
+        value.to_vec()
+    } else {
+        let mut value = vec![vec![0.0; input.vocabulary_size]; config.topic_count];
+        for topic in &mut value {
+            for term in topic.iter_mut() {
+                *term = config.topic_smoothing + next_unit(&mut rng);
+            }
+            normalize(topic)?;
         }
-        normalize(topic)?;
-    }
+        value
+    };
     let mut eta = vec![vec![0.0; coordinate_count]; document_count];
     for row in &mut eta {
         for value in row {
@@ -1085,10 +1389,10 @@ fn next_unit(state: &mut u64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        FitState, PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModel,
-        ReferenceTopicModelConfig, argmax, bounded_count, build_result, dot, expectation,
-        next_unit, normalize, objective, require_finite, standardize_event_time,
-        validate_positive_definite,
+        FitState, IndependentTopicAnchor, PrevalenceFeature, ReferenceTopicInput,
+        ReferenceTopicModel, ReferenceTopicModelConfig, argmax, bounded_count, build_result, dot,
+        expectation, fit_exact_leave_one_out_refits, next_unit, normalize, objective,
+        require_finite, standardize_event_time, unique_anchor_identity, validate_positive_definite,
     };
     use crate::TopicMeasurementError;
     use temporal_core::EventTime;
@@ -1331,6 +1635,110 @@ mod tests {
         assert_eq!(
             overflow_counts.in_sample_log_likelihood(&matching),
             Err(TopicMeasurementError::NonFiniteEstimate)
+        );
+    }
+
+    #[test]
+    fn exact_refit_anchor_and_deletion_boundaries_fail_closed() {
+        let ids = [Uuid::from_u128(1), Uuid::from_u128(2), Uuid::from_u128(3)];
+        let input = ReferenceTopicInput {
+            document_ids: ids.to_vec(),
+            event_times: vec![event_time(1), event_time(2), event_time(3)],
+            term_rows: vec![vec![(0, 1.0)]; 3],
+            vocabulary_size: 2,
+            design: vec![vec![1.0, -1.0], vec![1.0, 0.0], vec![1.0, 1.0]],
+            features: vec![PrevalenceFeature::Intercept, PrevalenceFeature::EventTime],
+            transition_pairs: vec![(0, 1)],
+        };
+        assert!(matches!(
+            input.without_document(3),
+            Err(TopicMeasurementError::InvalidModelInput)
+        ));
+        assert!(matches!(
+            input.without_document(0),
+            Err(TopicMeasurementError::InvalidModelInput)
+        ));
+        let two_document_input = ReferenceTopicInput {
+            document_ids: ids[..2].to_vec(),
+            event_times: vec![event_time(1), event_time(2)],
+            term_rows: vec![vec![(0, 1.0)]; 2],
+            vocabulary_size: 2,
+            design: vec![vec![1.0, -1.0], vec![1.0, 1.0]],
+            features: input.features.clone(),
+            transition_pairs: vec![(0, 1)],
+        };
+        assert!(matches!(
+            two_document_input.without_document(0),
+            Err(TopicMeasurementError::InvalidModelInput)
+        ));
+
+        let invalid_anchors = [
+            IndependentTopicAnchor::new(vec![ids[0]], vec![vec![0.5, 0.5]]),
+            IndependentTopicAnchor::new(vec![ids[0], ids[0]], vec![vec![0.5, 0.5]; 2]),
+            IndependentTopicAnchor::new(vec![ids[0], ids[1]], vec![vec![0.5, 0.5]]),
+            IndependentTopicAnchor::new(vec![ids[0], ids[1]], vec![vec![1.0], vec![1.0]]),
+            IndependentTopicAnchor::new(
+                vec![ids[0], ids[1]],
+                vec![vec![0.5, 0.5], vec![0.5, f64::NAN]],
+            ),
+            IndependentTopicAnchor::new(
+                vec![ids[0], ids[1]],
+                vec![vec![0.5, 0.5], vec![0.5, 0.5, 0.5]],
+            ),
+        ];
+        assert!(invalid_anchors.into_iter().all(|result| result.is_err()));
+
+        let anchor =
+            IndependentTopicAnchor::new(vec![ids[0], ids[1]], vec![vec![0.8, 0.2], vec![0.2, 0.8]])
+                .expect("anchor");
+        let config = ReferenceTopicModelConfig::new(2, vec![1], 10, 1e-5).expect("config");
+        let wrong_topics = IndependentTopicAnchor::new(
+            vec![ids[0], ids[1], ids[2]],
+            vec![vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+        )
+        .expect("three-topic anchor");
+        assert_eq!(
+            fit_exact_leave_one_out_refits(&input, &config, &wrong_topics),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        let wrong_vocabulary = IndependentTopicAnchor::new(
+            vec![ids[0], ids[1]],
+            vec![vec![0.6, 0.3, 0.1], vec![0.1, 0.3, 0.6]],
+        )
+        .expect("wrong-vocabulary anchor");
+        assert_eq!(
+            fit_exact_leave_one_out_refits(&input, &config, &wrong_vocabulary),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        assert_eq!(
+            fit_exact_leave_one_out_refits(&two_document_input, &config, &anchor),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut model = scoring_model(
+            vec![vec![0.8, 0.2], vec![0.2, 0.8]],
+            vec![vec![0.5, 0.5]; 2],
+        );
+        assert!(unique_anchor_identity(&model, &anchor).is_ok());
+        model.topic_term_probabilities.swap(0, 1);
+        assert_eq!(
+            unique_anchor_identity(&model, &anchor),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        model.topic_term_probabilities = vec![vec![0.5, 0.5]];
+        assert_eq!(
+            unique_anchor_identity(&model, &anchor),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        model.topic_term_probabilities = vec![vec![f64::NAN, 0.2], vec![0.2, 0.8]];
+        assert_eq!(
+            unique_anchor_identity(&model, &anchor),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        model.topic_term_probabilities = vec![vec![0.8, 0.2], vec![f64::NAN, 0.8]];
+        assert_eq!(
+            unique_anchor_identity(&model, &anchor),
+            Err(TopicMeasurementError::InvalidModelInput)
         );
     }
 

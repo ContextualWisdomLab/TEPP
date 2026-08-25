@@ -37,6 +37,10 @@ pub use posterior_draw::JOINT_POSTERIOR_DRAW_ALGORITHM_VERSION;
 pub use posterior_draw::JointPosteriorDrawSet;
 /// One exact fit-bound plausible value before artifact provenance binding.
 pub use posterior_draw::JointPosteriorPlausibleValue;
+/// One actual document-excluded CPU reference-model refit.
+pub use reference::ExactLeaveOneOutRefit;
+/// Independent distributional basis anchoring exact deletion refits.
+pub use reference::IndependentTopicAnchor;
 /// Identified joint precision in document-major ALR coordinate order.
 pub use reference::JointCoordinatePrecision;
 /// Posterior uncertainty representation retained by a fitted reference model.
@@ -51,6 +55,8 @@ pub use reference::ReferenceTopicModel;
 pub use reference::ReferenceTopicModelConfig;
 /// One inferred predecessor/successor association within a fitted topic.
 pub use reference::TopicSequenceEdge;
+/// Refit the reference estimator once for every actually excluded document.
+pub use reference::fit_exact_leave_one_out_refits;
 /// Fit the bounded deterministic CPU `f64` TRSL-TM reference estimator.
 pub use reference::fit_reference_topic_model;
 /// Validated compressed sparse numeric matrix.
