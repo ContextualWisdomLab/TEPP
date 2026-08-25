@@ -25,6 +25,7 @@ use tepp_api::{
 };
 use topic_measurement::TopicMeasurementError;
 
+/// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
     TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
     TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,

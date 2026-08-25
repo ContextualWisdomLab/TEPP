@@ -125,7 +125,38 @@ fn time(value: &str) -> Option<KnowledgeCutoff> {
     KnowledgeCutoff::parse_rfc3339(value).ok()
 }
 
+fn valid_activity_interval(interval: &TopicActivityInterval, topic_count: u64) -> bool {
+    interval.topic_index < topic_count
+        && ["active", "dormant", "reactivated"].contains(&interval.state_code.as_str())
+        && time(&interval.valid_from)
+            .zip(time(&interval.valid_to))
+            .is_some_and(|(valid_from, valid_to)| valid_from <= valid_to)
+}
+
+fn within_entry_limits(lengths: [usize; 4]) -> bool {
+    lengths.into_iter().all(|length| length <= ENTRY_LIMIT)
+}
+
 impl TopicContextPosteriorArtifact {
+    fn has_valid_header(&self) -> bool {
+        self.schema_version == TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION
+            && valid_identifier(&self.run_id)
+            && valid_identifier(&self.snapshot_id)
+            && digest(&self.source_snapshot_sha256)
+            && time(&self.knowledge_cutoff).is_some()
+            && valid_identifier(&self.model_contract_version)
+            && valid_identifier(&self.posterior_draw_set_id)
+            && self.posterior_draw_count > 0
+            && self.topic_count >= 2
+            && within_entry_limits([
+                self.activity_intervals.len(),
+                self.lineage_events.len(),
+                self.plausible_values.len(),
+                self.memberships.len(),
+            ])
+            && self.inference_status == "posterior_topic_coordinates_not_importance"
+    }
+
     /// Parse and validate one bounded posterior artifact.
     ///
     /// # Errors
@@ -168,30 +199,11 @@ impl TopicContextPosteriorArtifact {
     }
 
     fn validate(&self) -> Result<(), AnalysisEngineError> {
-        if self.schema_version != TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION
-            || !valid_identifier(&self.run_id)
-            || !valid_identifier(&self.snapshot_id)
-            || !digest(&self.source_snapshot_sha256)
-            || time(&self.knowledge_cutoff).is_none()
-            || !valid_identifier(&self.model_contract_version)
-            || !valid_identifier(&self.posterior_draw_set_id)
-            || self.posterior_draw_count == 0
-            || self.topic_count < 2
-            || self.activity_intervals.len() > ENTRY_LIMIT
-            || self.lineage_events.len() > ENTRY_LIMIT
-            || self.plausible_values.len() > ENTRY_LIMIT
-            || self.memberships.len() > ENTRY_LIMIT
-            || self.inference_status != "posterior_topic_coordinates_not_importance"
-        {
+        if !self.has_valid_header() {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         for interval in &self.activity_intervals {
-            if interval.topic_index >= self.topic_count
-                || !["active", "dormant", "reactivated"].contains(&interval.state_code.as_str())
-                || time(&interval.valid_from)
-                    .zip(time(&interval.valid_to))
-                    .is_none_or(|(valid_from, valid_to)| valid_from > valid_to)
-            {
+            if !valid_activity_interval(interval, self.topic_count) {
                 return Err(AnalysisEngineError::InvalidEvidence);
             }
         }
@@ -214,7 +226,9 @@ impl TopicContextPosteriorArtifact {
                 .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
             let event_time = time(&value.event_time).ok_or(AnalysisEngineError::InvalidEvidence)?;
             if value.draw_index >= self.posterior_draw_count
-                || value.logistic_normal_coordinates.len() != (self.topic_count - 1) as usize
+                || value.logistic_normal_coordinates.len()
+                    != usize::try_from(self.topic_count - 1)
+                        .map_err(|_| AnalysisEngineError::InvalidEvidence)?
                 || value
                     .logistic_normal_coordinates
                     .iter()
@@ -230,7 +244,7 @@ impl TopicContextPosteriorArtifact {
         if draws.len() < 2
             || draws
                 .values()
-                .any(|indices| indices.len() != self.posterior_draw_count as usize)
+                .any(|indices| usize::try_from(self.posterior_draw_count) != Ok(indices.len()))
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
@@ -286,9 +300,18 @@ impl TopicContextPosteriorArtifact {
 #[cfg(test)]
 mod tests {
     use super::{
-        TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION, TopicActivityInterval, TopicContextMembership,
-        TopicContextPosteriorArtifact, TopicPostPlausibleValue,
+        ENTRY_LIMIT, TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
+        TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
+        TopicLineageEvent, TopicPostPlausibleValue, within_entry_limits,
     };
+
+    macro_rules! invalid {
+        ($change:expr) => {{
+            let mut candidate = artifact();
+            $change(&mut candidate);
+            assert!(candidate.to_json().is_err());
+        }};
+    }
 
     fn artifact() -> TopicContextPosteriorArtifact {
         let documents = [
@@ -319,7 +342,7 @@ mod tests {
                         document_id: (*document).into(),
                         draw_index: draw,
                         event_time: "2026-07-15T00:00:00Z".into(),
-                        logistic_normal_coordinates: vec![draw as f64 / 10.0],
+                        logistic_normal_coordinates: vec![if draw == 0 { 0.0 } else { 0.1 }],
                     })
                 })
                 .collect(),
@@ -382,5 +405,145 @@ mod tests {
         let mut uncovered = artifact();
         uncovered.memberships[0].valid_to = "2026-07-14T23:59:59Z".into();
         assert!(uncovered.to_json().is_err());
+    }
+
+    #[test]
+    fn rejects_every_foreign_header_and_bound() {
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.schema_version.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.run_id.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.snapshot_id.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value
+            .source_snapshot_sha256
+            .replace_range(..1, "A"));
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.knowledge_cutoff.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.model_contract_version.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.posterior_draw_set_id.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.posterior_draw_count = 0);
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_count = 1);
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.inference_status.clear());
+        assert!(within_entry_limits([ENTRY_LIMIT; 4]));
+        assert!(!within_entry_limits([ENTRY_LIMIT + 1, 0, 0, 0]));
+        assert!(TopicContextPosteriorArtifact::from_json("{").is_err());
+        assert!(
+            TopicContextPosteriorArtifact::from_json(
+                &"x".repeat(TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT + 1)
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_activity_and_lineage_records() {
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.activity_intervals[0].topic_index = 2
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.activity_intervals[0]
+                .state_code
+                .clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.activity_intervals[0]
+                .valid_from
+                .clear()
+        );
+
+        let event = TopicLineageEvent {
+            event_code: "birth".into(),
+            source_topic_index: 0,
+            target_topic_index: Some(1),
+            event_time: "2026-07-15T00:00:00Z".into(),
+            evidence_sha256: "c".repeat(64),
+        };
+        let mut valid = artifact();
+        valid.lineage_events.push(event.clone());
+        assert!(valid.to_json().is_ok());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event.clone());
+            value.lineage_events[0].event_code.clear();
+        });
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event.clone());
+            value.lineage_events[0].source_topic_index = 2;
+        });
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event.clone());
+            value.lineage_events[0].target_topic_index = Some(2);
+        });
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event.clone());
+            value.lineage_events[0].event_time.clear();
+        });
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.lineage_events.push(event);
+            value.lineage_events[0].evidence_sha256.clear();
+        });
+    }
+
+    #[test]
+    fn rejects_invalid_posterior_and_membership_records() {
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.plausible_values[0]
+                .document_id
+                .clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.plausible_values[0]
+                .event_time
+                .clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.plausible_values[0].draw_index = 2
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.plausible_values[0]
+                .logistic_normal_coordinates
+                .clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.plausible_values[0]
+                .logistic_normal_coordinates[0] =
+                f64::NAN
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.plausible_values[1].event_time =
+                "2026-07-16T00:00:00Z".into()
+        );
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.plausible_values.truncate(2));
+
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].document_id.clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].dimension_code.clear()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].context_id.clear()
+        );
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.memberships[0].weight = 0.0);
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].weight = f64::NAN
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].valid_from.clear()
+        );
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.memberships[0].valid_to.clear());
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].valid_from =
+                "2026-08-02T00:00:00Z".into()
+        );
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0]
+                .evidence_sha256
+                .clear()
+        );
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value
+            .memberships
+            .push(value.memberships[0].clone()));
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.memberships.remove(0));
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.memberships[0].document_id =
+                "018f3f7a-7b7c-7d00-8000-000000000003".into()
+        );
     }
 }

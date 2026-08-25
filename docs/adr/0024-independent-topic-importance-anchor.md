@@ -2,8 +2,15 @@
 
 **Date:** 2026-08-25  
 **Decision status:** Accepted  
-**Implementation maturity:** contract-only active PR; no estimator emits it  
+**Implementation maturity:** active-PR — contract validation only; no estimator emits it
 **Supersedes:** None; composes ADR 0012 and Event Lineage contracts.
+
+## Context
+
+LineageWeave needs posterior topic coordinates and time-valid organizational
+memberships without reimplementing TEPP measurement or turning an uncalibrated
+coordinate into business importance. The downstream influence estimator also
+needs an exact, provenance-bound input rather than hard topic labels.
 
 ## Decision
 
@@ -23,6 +30,22 @@ refits, and the LineageWeave ADR-0210 case-deletion influence diagnostic.
 LineageWeave owns authorization, exact provenance persistence, and Dashboard
 projection only. Neither consumer performs local mathematical estimation.
 
+## Alternatives considered
+
+1. **Hard topic labels or local thresholds** — rejected because they discard
+   posterior uncertainty and invent a decision rule.
+2. **A LineageWeave-owned estimator** — rejected because it violates the TEPP
+   measurement boundary.
+3. **The bounded posterior contract** — accepted because it preserves draws,
+   time, lineage, memberships, and provenance without claiming an estimator.
+
+## Consequences
+
+Consumers can validate exact posterior inputs independently, but no importance
+result exists until fast-mlsirm implements and validates the governed
+posterior-aware estimator. Contract acceptance therefore remains distinct from
+model availability.
+
 ## Verification
 
 TEPP release evidence requires known-truth topic, temporal prevalence,
@@ -41,6 +64,14 @@ Chang, J., & Blei, D. M. (2009). Relational topic models for document networks.
 In *Proceedings of Machine Learning Research, 5*, 81–88.
 https://proceedings.mlr.press/v5/chang09a.html
 
-Zhang, D. C., & Lauw, H. (2022). Dynamic topic models for temporal document
+Zhang, D. C. W., & Lauw, H. W. (2022). Dynamic topic models for temporal document
 networks. In *Proceedings of Machine Learning Research, 162*, 26281–26292.
 https://proceedings.mlr.press/v162/zhang22n.html
+
+## Rollback and supersession
+
+Disable production or consumption of this schema while retaining source
+artifacts and provenance. Never replace missing posterior output with a local
+score or hard label. Any change to estimand, draw semantics, temporal identity,
+membership meaning, or ownership requires a versioned schema and superseding
+ADR.
