@@ -1,6 +1,6 @@
 # TEPP LLM Orchestration and Test-Time Compute Contract
 
-**Status:** Partial — `tepp_api::route_orchestration` is the governed selector; live provider execution is not yet shipped.  
+**Status:** Partial — `tepp_api::route_orchestration` is the governed selector; live provider execution is not yet shipped.
 **Last reviewed:** 2026-08-13
 
 ## 1. Purpose

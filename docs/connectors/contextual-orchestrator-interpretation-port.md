@@ -1,6 +1,6 @@
 # contextual-orchestrator interpretation port for TEPP
 
-**Status:** Partial modular integration contract — `tepp_api::bind_contextual_orchestrator` is the credential-free binding and the `orchestrator_live` loopback HTTP/1.1 listener is active-PR; production TLS remains accepted-target.  
+**Status:** Partial modular integration contract — `tepp_api::bind_contextual_orchestrator` is the credential-free binding and `service_tls::authorize_orchestrator_live_port` gates production live ports; the `orchestrator_live` loopback HTTP/1.1 interpretation listener is on the active PR; production TLS remains accepted-target.  
 **Last reviewed:** 2026-08-16
 
 ## Boundary
@@ -12,7 +12,7 @@ TEPP may call a provider-neutral interpretation/orchestration port for semantic 
 - model registry / scientific acceptance gates;
 - merge, release, or independent review authority (ADR 0010; ADR 0015).
 
-LLM/provider settings are execution policy only. Deterministic scientific gates remain authoritative (AGENTS.md §11).
+LLM/provider settings are execution policy only. Deterministic scientific gates remain authoritative (AGENTS.md §11). A production live bind uses `service_tls::authorize_orchestrator_live_port` and cannot be loopback plaintext. This document does not claim a deployed TLS listener.
 
 `orchestrator_live::OrchestratorLiveService` binds loopback TCP and serves
 `POST /v1/interpretation-runs`. Accepted output is always hypothetical and

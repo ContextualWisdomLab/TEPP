@@ -6,3 +6,6 @@ coverage-branches.json
 __pycache__/
 *.py[cod]
 .pytest_cache/
+/.codegraph/
+node_modules/
+origin/

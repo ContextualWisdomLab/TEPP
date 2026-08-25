@@ -1,8 +1,30 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
+**Decision status:** Accepted
+**Implementation maturity:** partial — bounded identity, recovery, temporal lineage, network geometry, model-selection, preprocessing, method-effect, and modality gates are implemented across the foundation crates; the TRSL-TM estimator, global topic identity, method effects, and backend interchange remain accepted-target.
+**Implementation maturity:** partial — logistic-normal ALR/ILR coordinates, lexical-weight refusal, statistical/Pareto candidate-`K` gates, stable active/dormant/reactivated topic identity, and the bounded CPU `f64` reference estimator are implemented on the active product branch; `corpus_background`, `topic_lineage`, `network_analysis`, `model_selection`, `stopword_deletion`, `style_source`, `copied_text`, and `modality_source` implement bounded identity and recovery gates implemented-main; method effects, calibrated posterior acceptance, accelerated backends, and backend interchange remain accepted-target until implemented and protected-main integrated
+**Implementation maturity:** partial — `corpus_background`, `topic_lineage`, `network_analysis`, `model_selection`, `stopword_deletion`, `style_source`, `copied_text`, and `modality_source` implement bounded identity and recovery gates; the TRSL-TM estimator, method effects, global topic identity, and backend interchange remain accepted-target.
+**Date:** 2026-08-24  
 **Decision status:** Accepted  
-**Implementation maturity:** accepted-target  
+**Implementation maturity:** partial — the prompt-source, corpus-background, modality-source, copied-text, style-source, and default-stopword-deletion identity gates plus `topic_lineage` single-identity persistence across dormancy/reactivation are implemented-main; `network_analysis` cluster-pair scoring and `model_selection` candidate-K gates remain on their open PRs; the TRSL-TM estimator, global topic identity, method-effect model, and backend interchange remain accepted-target.
+**Date:** 2026-08-12
+**Decision status:** Accepted  
+**Implementation maturity:** accepted-target — prompt-versus-unique-content identity in `prompt_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — copied-versus-unique-content identity in `copied_text` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; topic estimator, global topic identity, method-effect model, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
+**Implementation maturity:** active-PR — `topic_lineage` keeps one P0 identity across active/dormant/reactivated states; remaining TRSL-TM estimator, method effects, and backend interchange remain accepted-target  
+**Implementation maturity:** active-PR — `network_analysis` refuses raw-simplex Euclidean geometry and scores cluster pair precision/recall; remaining TRSL-TM estimator, global topic identity, method effects, and backend interchange remain accepted-target  
+**Implementation maturity:** active-PR — `model_selection` statistical/Pareto candidate-`K` gates and known-`K` RMSE live in the new crate; remaining TRSL-TM estimator, global topic identity, method effects, and backend interchange remain accepted-target  
+**Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; topic estimator, global topic identity, method-effect model, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
+**Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; estimator-side method model remains accepted-target  
+**Implementation maturity:** accepted-target — prompt-versus-unique-content identity in `prompt_source` on the active PR; estimator-side method model remains accepted-target  
 **Date:** 2026-08-12  
+**Date:** 2026-08-24
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
 ## Context
@@ -13,20 +35,71 @@ Without a dedicated decision, implementations could silently drift toward indepe
 
 ## Decision
 
-TEPP adopts **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** as the model-family contract. The initial reference backend is a temporal/relational shared-latent STM-style estimator with logistic-normal document coordinates and posterior uncertainty. Alternative polylingual or neural/contextual backends are allowed only when they satisfy the same versioned evidence, temporal, relational, posterior, invariance, and interoperability contracts.
+TEPP adopts **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** as the product model-family contract. TRSL-TM is the accepted-target estimator identity; it is not a claim that a production topic backend is already shipped on protected `main`.
+
+The reference family is a temporal/relational shared-latent STM-style estimator with logistic-normal document coordinates and posterior uncertainty (Roberts et al., 2014, 2019; Chang & Blei, 2009). Temporal topic identity over a modeled period follows the dynamic topic-model family (Blei & Lafferty, 2006): one global topic identity set may change in prevalence without silently becoming a new topic merely because a time slice was fitted independently. Alternative polylingual or neural/contextual backends are allowed only when they satisfy the same versioned evidence, temporal, relational, posterior, invariance, and interoperability contracts.
 
 For the first production line:
 
 - one global topic identity set is selected across the modeled period;
 - topics may be active, dormant, or reactivated over time without losing identity;
 - topic birth/split/merge/retirement is a later explicit lineage extension, not an implicit consequence of fitting unrelated time slices;
-- multilingual semantic/concept evidence shares topic identities, while native lexical/morphological channels remain language-specific;
+- multilingual semantic/concept evidence shares topic identities, while native lexical/morphological channels remain language-specific (Mimno et al., 2009);
 - repeated template, section, copied-text, style, modality, source, and corpus-background effects are modeled explicitly as method/background structure;
 - stopword deletion is not the default preprocessing rule;
 - TF-IDF and BM25 are not inferential weights for the statistical topic estimator;
 - topic proportions are compositional and downstream network/psychometric analysis uses logistic-normal coordinates or valid orthonormal log-ratio coordinates;
+- ALR is a reference-dependent full-rank logistic-normal map, not an Aitchison-distance isometry; distance-based Euclidean Aitchison geometry uses an orthonormal ILR basis;
 - model selection uses statistical/recovery/stability/alignment/fairness gates and a Pareto-style comparison before any blinded LLM review;
 - the LLM may recommend among statistically admissible candidates but never defines the numerical optimum or bypasses diagnostics.
+
+### CPU `f64` reference estimand and inference
+
+The bounded reference estimator uses sparse document-by-term counts `C`, one
+global `K`-topic word matrix `β`, and document logistic-normal coordinates
+`η_d`, with `θ_d = softmax([η_d, 0])`. Its prevalence mean is the PRD-owned
+structural equation
+
+\[
+m_d = x_d\Gamma + \sum_{g \in G_d} w_{dg}u_g,
+\qquad
+\eta_d \sim N(m_d, \sigma^2 I),
+\]
+
+where `x_d` includes an intercept, standardized event time, and admitted
+prevalence covariates, while the second term retains every active weighted
+cross-classified/multiple-membership assignment. This is the logistic-normal
+prevalence boundary of correlated/structural topic models, not a raw-simplex
+regression (Blei & Lafferty, 2007; Roberts et al., 2019).
+
+For explicit observed predecessor/successor relations only, the reference
+objective adds the harmonic network penalty
+
+\[
+R(\Theta,G)=\frac{1}{2}\sum_{(d,e)\in E}a_{de}
+\lVert\theta_d-\theta_e\rVert_2^2,
+\]
+
+so absent relations remain unobserved rather than negative. This follows the
+document-network regularization estimand of Mei et al. (2008); it is not a
+causal edge, an event-identity promotion, or an RTM link-probability claim.
+The full bounded MAP objective is
+
+\[
+\sum_{d,v} C_{dv}\log\!\left(\sum_k\theta_{dk}\beta_{kv}\right)
+-\frac{1}{2\sigma^2}\sum_d\lVert\eta_d-m_d\rVert_2^2
+-\lambda R(\Theta,G)-\frac{\rho}{2}\lVert\Gamma,u\rVert_2^2.
+\]
+
+Production inference uses deterministic generalized EM: normalized latent
+term-topic responsibilities, smoothed multinomial `β` updates, bounded
+gradient updates for `η` and structural coefficients, and a diagonal Laplace
+curvature approximation for document-coordinate uncertainty. Multiple seeded
+initializations retain the best finite converged objective. A non-finite
+intermediate, invalid sparse matrix, missing cutoff-safe document, reverse
+transition, or exhausted iteration budget returns a typed failure; it never
+emits a partial topic artifact. Recovery gates remain caller-owned promotion
+criteria over completed validation evidence.
 
 ## Non-goals
 
@@ -66,3 +139,24 @@ Required evidence includes known-truth topic/covariate/covariance recovery, bias
 ## Rollback and supersession
 
 Rollback selects the last validated model/backend contract and immutable model artifact. Supersede only with evidence that the new model family preserves or explicitly and deliberately changes the estimand, with corresponding PRD/ADR and migration updates.
+
+## References
+
+Blei, D. M., & Lafferty, J. D. (2006). Dynamic topic models. In *Proceedings of the 23rd International Conference on Machine Learning* (pp. 113–120). ACM. https://doi.org/10.1145/1143844.1143859
+
+Chang, J., & Blei, D. M. (2009). Relational topic models for document networks. In *Proceedings of the 12th International Conference on Artificial Intelligence and Statistics* (pp. 81–88). PMLR.
+
+Mimno, D., Wallach, H. M., Naradowsky, J., Smith, D. A., & McCallum, A. (2009). Polylingual topic models. In *Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing* (pp. 880–889). Association for Computational Linguistics.
+
+Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02
+
+Roberts, M. E., Stewart, B. M., Tingley, D., Lucas, C., Leder-Luis, J., Gadarian, S. K., Albertson, B., & Rand, D. G. (2014). Structural topic models for open-ended survey responses. *American Journal of Political Science, 58*(4), 1064–1082. https://doi.org/10.1111/ajps.12103
+
+Blei, D. M., & Lafferty, J. D. (2007). A correlated topic model of Science.
+*The Annals of Applied Statistics, 1*(1), 17–35.
+https://doi.org/10.1214/07-AOAS114
+
+Mei, Q., Cai, D., Zhang, D., & Zhai, C. (2008). Topic modeling with network
+regularization. In *Proceedings of the 17th International Conference on World
+Wide Web* (pp. 101–110). Association for Computing Machinery.
+https://doi.org/10.1145/1367497.1367512
