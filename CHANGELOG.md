@@ -2,6 +2,34 @@
 
 All notable changes to TEPP are documented here. The format follows Keep a Changelog and semantic versioning once the first implementation release is cut.
 
+## [0.2.0] - 2026-08-25
+
+### Added
+
+- **Analysis engine**: deterministic end-to-end analysis-run execution with cutoff-safe eligibility, immutable evidence binding, and reproducibility manifests (`analysis_engine` crate).
+- **Posterior network estimator**: cross-draw Pearson correlations in ILR space, jackknife SE and CI, Benjamini–Hochberg FDR edge admission, nonparametric bootstrap stability, greedy modularity consensus clustering (`network_analysis` crate).
+- **Topic measurement reference estimator**: bounded deterministic CPU `f64` TRSL-TM fitting with ALR/ILR coordinates, Aitchison distance, and lexical-inferential-weight refusal gates (`topic_measurement` crate).
+- **Psychometric core**: Driver et al. (2017) SDE discrete-time recovery suite including drift, diffusion, T0VAR, TIPRED/TDPRED effects, standardised parameters, trait/state variance decomposition, and observed-indicator mapping — 18 K lines of production Rust with true-parameter RMSE tests.
+- **Temporal six-clock architecture**: system, event, assertion, document, availability, and knowledge-cutoff clocks with forward-only transition enforcement and revision ordering (`temporal_core` + dedicated clock crates).
+- **Membership and relation boundaries**: episode membership, role contradiction, relation absence detection, support-edge refusal, inferred-status gate, payload bounds, outcome ordering, summarises-edge identity, copy identity, citation/support non-transition, retrospective reporting, intake authorization, provider receipt, encrypted identity mapping, derived sensitivity inheritance, and purpose-bound PII governance.
+- **Interpretation gateway**: loopback HTTP listener serving contextual-orchestrator interpretation POSTs with evidence-bound LLM claims and numerical-authority refusal.
+- **Compute backend**: VRAM budget types with CPU `f64` fallback policy.
+- **Persistence**: bitemporal PostgreSQL store with live sqlx integration, concurrent-write SQLSTATE classification, entity/project fail-closed SQL, audit-event inspection through try_record, and retention lifecycle.
+- **Validation**: exact-head claim promotion gates, corpus-split leakage-audit manifests, documentation quality validation, and scientific claim boundary contracts.
+
+### Changed
+
+- Consolidated 99 open pull requests into protected main through batch integration vehicle (#215), hourly scheduler independent merges, and individual rebase-admin passes.
+- Workspace grew from 10 to 57 crates covering evidence, semantic, temporal, event, relation, membership, persistence, simulation, validation, API, topic measurement, psychometric, network, interpretation, compute, and analysis-engine boundaries.
+- All database objects use two-or-more-word `snake_case`; third normal form enforced; hot-partition readiness tracked as a separate acceptance gate.
+
+### Security
+
+- Purpose-bound authorization grants; blanket PII masking refused in favour of selective disclosure.
+- Identity mappings sealed with HMAC; re-identification exports restricted to explicit purpose grants.
+- Tenant roles bound to system-time lifetimes; privileged-access decisions replayed without source identity.
+- Provider field codes recorded without source text; sensitivity inherited onto derived artifacts.
+
 ## [Unreleased]
 
 - Restored protected-main gate integrity after the consolidation merges: hourly-scheduler prompt-contract tests now assert the gap-baseline-derived task contract (Gap ID naming, no invented weights) instead of stale increment-specific tokens, the operator-gap register inventory matches the live 33-PR queue, `evidence_core::image_unit` non-image/empty-subtype refusals and `load_union_branch_totals` valid-record accumulation have exact coverage, and the README crate fence plus duplicate registry entries stay deduped.
