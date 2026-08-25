@@ -2,12 +2,18 @@ name: Documentation Quality
 
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
     paths:
       - "**/*.md"
       - "**/*.json"
       - ".github/workflows/**"
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
+      - "crates/**"
   push:
     branches:
       - main
@@ -17,6 +23,7 @@ on:
       - ".github/workflows/**"
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
+      - "crates/**"
   workflow_dispatch:
 
 permissions:

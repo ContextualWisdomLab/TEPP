@@ -30,6 +30,28 @@ pub enum EventError {
     EventLinkIsNotStateTransition,
     /// An unknown event-link label was supplied.
     UnknownEventLinkLabel,
+    /// A TDT track assignment was treated as an event instance.
+    EventTrackIsNotEventInstance,
+    /// A TDT track assignment was treated as a state transition.
+    EventTrackIsNotStateTransition,
+    /// An unknown event-track label was supplied.
+    UnknownEventTrackLabel,
+    /// A CHRONOS schema prediction was treated as an event instance.
+    SchemaPredictionIsNotEventInstance,
+    /// A CHRONOS schema prediction was treated as a state transition.
+    SchemaPredictionIsNotStateTransition,
+    /// An unknown schema-slot occupancy label was supplied.
+    UnknownSchemaSlotLabel,
+    /// A TDT story segmentation was treated as an event instance.
+    StorySegmentationIsNotEventInstance,
+    /// A TDT story segmentation was treated as a state transition.
+    StorySegmentationIsNotStateTransition,
+    /// An unknown story-boundary label was supplied.
+    UnknownStoryBoundaryLabel,
+    /// A CHRONOS occurrence prediction was treated as an event instance.
+    PredictionIsNotEventInstance,
+    /// An unknown occurrence-truth label was supplied.
+    UnknownOccurrenceTruth,
 }
 
 impl fmt::Display for EventError {
@@ -47,6 +69,25 @@ impl fmt::Display for EventError {
             Self::EventLinkIsNotEventInstance => "event link is not an event instance",
             Self::EventLinkIsNotStateTransition => "event link is not a state transition",
             Self::UnknownEventLinkLabel => "unknown event link label",
+            Self::EventTrackIsNotEventInstance => "event track is not an event instance",
+            Self::EventTrackIsNotStateTransition => "event track is not a state transition",
+            Self::UnknownEventTrackLabel => "unknown event track label",
+            Self::SchemaPredictionIsNotEventInstance => {
+                "schema prediction is not an event instance"
+            }
+            Self::SchemaPredictionIsNotStateTransition => {
+                "schema prediction is not a state transition"
+            }
+            Self::UnknownSchemaSlotLabel => "unknown schema slot label",
+            Self::StorySegmentationIsNotEventInstance => {
+                "story segmentation is not an event instance"
+            }
+            Self::StorySegmentationIsNotStateTransition => {
+                "story segmentation is not a state transition"
+            }
+            Self::UnknownStoryBoundaryLabel => "unknown story boundary label",
+            Self::PredictionIsNotEventInstance => "CHRONOS prediction is not an event instance",
+            Self::UnknownOccurrenceTruth => "unknown occurrence truth label",
         };
         formatter.write_str(message)
     }
@@ -99,6 +140,48 @@ mod tests {
             (
                 EventError::UnknownEventLinkLabel,
                 "unknown event link label",
+                EventError::EventTrackIsNotEventInstance,
+                "event track is not an event instance",
+            ),
+            (
+                EventError::EventTrackIsNotStateTransition,
+                "event track is not a state transition",
+            ),
+            (
+                EventError::UnknownEventTrackLabel,
+                "unknown event track label",
+            ),
+            (
+                EventError::SchemaPredictionIsNotEventInstance,
+                "schema prediction is not an event instance",
+            ),
+            (
+                EventError::SchemaPredictionIsNotStateTransition,
+                "schema prediction is not a state transition",
+            ),
+            (
+                EventError::UnknownSchemaSlotLabel,
+                "unknown schema slot label",
+            ),
+            (
+                EventError::StorySegmentationIsNotEventInstance,
+                "story segmentation is not an event instance",
+            ),
+            (
+                EventError::StorySegmentationIsNotStateTransition,
+                "story segmentation is not a state transition",
+            ),
+            (
+                EventError::UnknownStoryBoundaryLabel,
+                "unknown story boundary label",
+            ),
+            (
+                EventError::PredictionIsNotEventInstance,
+                "CHRONOS prediction is not an event instance",
+            ),
+            (
+                EventError::UnknownOccurrenceTruth,
+                "unknown occurrence truth label",
             ),
         ] {
             assert_eq!(error.to_string(), message);
