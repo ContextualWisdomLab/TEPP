@@ -28,6 +28,8 @@ pub use identifier::RelationEdgeId;
 pub use identifier::RelationEndpointId;
 /// Closed relation vocabulary with derived transition classification.
 pub use kind::RelationKind;
+/// Refuse treating association or precedence as causation.
+pub use kind::refuse_association_as_cause;
 /// Observed versus inferred relation evidence status.
 pub use provenance::RelationEvidenceStatus;
 /// Validate forward-only event-time order for transition edges.

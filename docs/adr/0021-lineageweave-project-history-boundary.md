@@ -1,4 +1,4 @@
-# ADR 0020 — LineageWeave project-history service boundary
+# ADR 0021 — LineageWeave project-history service boundary
 
 **Decision status:** Accepted
 **Implementation maturity:** active-PR
