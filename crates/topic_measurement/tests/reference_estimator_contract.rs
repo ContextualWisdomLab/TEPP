@@ -140,7 +140,7 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
     let counts = separated_counts();
     let input = ReferenceTopicInput::new(
         &snapshot,
-        document_ids,
+        document_ids.clone(),
         &counts,
         &times,
         None,
@@ -166,6 +166,23 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
         result.joint_coordinate_precision(),
         Err(TopicMeasurementError::JointPosteriorUnavailable)
     );
+    let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
+    let precision = input
+        .build_joint_coordinate_precision(&result, &config, topic_ids.clone())
+        .expect("joint precision");
+    assert_eq!(
+        precision.approximation(),
+        PosteriorApproximation::JointGaussNewtonLaplace
+    );
+    assert_eq!(precision.document_ids(), document_ids);
+    assert_eq!(precision.topic_ids(), topic_ids);
+    assert_eq!(precision.values().len(), 6);
+    assert!(precision.values().iter().enumerate().all(|(row, values)| {
+        values.iter().enumerate().all(|(column, value)| {
+            value.is_finite() && (value - precision.values()[column][row]).abs() < f64::EPSILON
+        })
+    }));
+    assert!(precision.values()[0][1] < 0.0);
     assert!(result.objective.is_finite());
     assert!(result.iterations <= 2_000);
     assert_eq!(result.connected_post_count, 6);

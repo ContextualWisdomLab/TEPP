@@ -68,6 +68,16 @@ after the estimator retains and validates the full identified joint precision,
 then binds document order, stable topic order, run, source snapshot, and cutoff
 identities before sampling.
 
+The next CPU prerequisite builds an identified document-major joint precision
+at a converged MAP fit. Its within-document block is the conditional
+multinomial information used by generalized EM plus Gaussian prior precision;
+each admitted relation adds the positive-semidefinite generalized-Gauss-Newton
+blocks from the softmax Jacobians of the harmonic network residual. The Rust
+boundary validates stable topic order, document order, finiteness, symmetry,
+and positive-definiteness. This matrix is not yet a covariance or draw set;
+inversion and deterministic sampling remain unavailable until separately
+governed and recovery-tested.
+
 ## Verification
 
 TEPP release evidence requires realistic synthetic known-truth parameter
@@ -91,6 +101,15 @@ https://proceedings.mlr.press/v5/chang09a.html
 Zhang, D. C., & Lauw, H. W. (2022). Dynamic topic models for temporal document
 networks. In *Proceedings of Machine Learning Research, 162*, 26281–26292.
 https://proceedings.mlr.press/v162/zhang22n.html
+
+Rue, H., Martino, S., & Chopin, N. (2009). Approximate Bayesian inference for
+latent Gaussian models by using integrated nested Laplace approximations.
+*Journal of the Royal Statistical Society: Series B (Statistical Methodology),
+71*(2), 319–392. https://doi.org/10.1111/j.1467-9868.2008.00700.x
+
+Schraudolph, N. N. (2002). Fast curvature matrix-vector products for
+second-order gradient descent. *Neural Computation, 14*(7), 1723–1738.
+https://doi.org/10.1162/08997660260028683
 
 ## Rollback and supersession
 
