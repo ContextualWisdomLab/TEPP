@@ -2,6 +2,7 @@
 
 **Decision status:** Accepted  
 **Implementation maturity:** active-PR — evidence-layer admission, TDT link precision/recall, and detection-versus-instance refusal live in existing `event_core`, alongside the bounded predicted-vs-observed Allen promotion gate whose coverage authorization precedes any unmatched predicted mass; full TDT tracking/calibration and CHRONOS schema extraction/prediction layers remain accepted-target  
+**Implementation maturity:** active-PR — evidence-layer admission, first-story false-alarm/miss rates, and detection-versus-instance refusal live in existing `event_core`, alongside the bounded predicted-vs-observed Allen promotion gate whose coverage authorization precedes any unmatched predicted mass; full TDT tracking/calibration and CHRONOS schema extraction/prediction layers remain accepted-target  
 **Date:** 2026-08-12  
 **Decision status:** Accepted
 **Implementation maturity:** active-PR — bounded predicted-vs-observed Allen promotion gate, including coverage before unmatched predicted mass may be authorized for promotion; TDT detection/tracking, CHRONOS schema extraction, prediction calibration, and path-consistency laws remain accepted-target

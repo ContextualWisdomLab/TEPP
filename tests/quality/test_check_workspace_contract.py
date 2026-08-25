@@ -47,6 +47,18 @@ class WorkspaceContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertEqual(text.count("RFC 5646"), 1)
 
+    def test_liu_2023_register_cites_graham_neubig(self) -> None:
+        """The Liu et al. (2023) survey must keep Graham Neubig's initial."""
+
+        text = (
+            REPOSITORY_ROOT / "docs" / "research" / "standards-and-literature.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, G. (2023).",
+            text,
+        )
+        self.assertNotIn("Neubig, P.", text)
+
     def test_member_paths_match_expected_crates(self) -> None:
         """Workspace members resolve to the approved crate roots by name."""
 

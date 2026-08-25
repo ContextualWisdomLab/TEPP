@@ -1,0 +1,27 @@
+[package]
+name = "topic_measurement"
+description = "Logistic-normal and log-ratio coordinates for compositional topics."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+corpus_split = { path = "../corpus_split", version = "0.1.0" }
+membership_core = { path = "../membership_core", version = "0.1.0" }
+relation_graph = { path = "../relation_graph", version = "0.1.0" }
+temporal_core = { path = "../temporal_core", version = "0.1.0" }
+uuid.workspace = true
+
+[dev-dependencies]
+validation_core = { path = "../validation_core", version = "0.1.0" }
+
+[lints]
+workspace = true
