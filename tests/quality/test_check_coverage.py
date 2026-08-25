@@ -628,6 +628,23 @@ class CoverageContractTests(unittest.TestCase):
 
 
 
+    def test_blank_history_comma_scan_exhaustion(self) -> None:
+        """Blank-only preceding lines exhaust the reverse scan and stay unproven."""
+
+        lines = ["", "   ", "    ,"]
+        self.assertFalse(
+            coverage_contract._is_structural_comma_continuation(lines, 3, ",")
+        )
+
+    def test_char_literal_with_escaped_backslash_keeps_scanner_exact(self) -> None:
+        """An escaped-backslash char literal cannot flip the multiline verdict."""
+
+        lines = [
+            "const slash: char = '\\\\';",
+            'static tail: &str = "open',
+        ]
+        self.assertTrue(coverage_contract._line_in_multiline_string(lines, 2))
+
     def test_multiline_string_empty_lines_returns_false(self) -> None:
         """An empty source produces no multiline-string continuations."""
 
