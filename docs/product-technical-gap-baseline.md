@@ -2,8 +2,8 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-24T10:55:23Z
-**Protected-main evidence:** `e65cd663fc0802d6b70ff88d895a8077a1e572ae` (full SHA fetched live before every mutation)
+**Snapshot:** 2026-08-25T02:22:37Z
+**Protected-main evidence:** `5c8599442e85bd4c553dc0cd2c6acae5313e6a16` (full SHA fetched live before every mutation; this is the merge commit of consolidation vehicle #215)
 **Workspace version on protected main:** `0.1.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main. Duplicate [PR #179] stays closed.
 
@@ -24,11 +24,11 @@ GitHub state before any customer, release, certification, or valuation claim.
 
 | Signal | Snapshot evidence | Delivery implication |
 |---|---:|---|
-| Protected-main SHA | `e65cd663fc08…` (2026-08-24T10:11Z) | All as-built claims are bounded to this commit. |
+| Protected-main SHA | `5c8599442e85…` (2026-08-25T02:12Z, merge of #215) | All as-built claims are bounded to this commit. |
 | Workspace members | 48 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, estimator, compute, psychometric, event-intelligence, network, interpretation, artifact, and visual product boundaries. |
-| Open pull requests | **71** | The queue is itself a release blocker and requires consolidation. |
-| Draft pull requests | **48** | Most queued work is not independently review-ready. |
-| Non-draft pull requests | **23** | A non-draft state is not a qualifying review or required-check result. |
+| Open pull requests | **59** | The consolidation vehicle landed; the residual queue is stacked drafts plus nine non-draft slices and one coverage repair. |
+| Draft pull requests | **49** | Most queued work is not independently review-ready; the psychometric recovery stack dominates. |
+| Non-draft pull requests | **10** | A non-draft state is not a qualifying review or required-check result. |
 | Open product issues | **11** | Issue #156 plus open product-completion issues #166–#169 and #171–#176. |
 | Duplicate gap-baseline PRs | **#164** (authority); **#179** closed as superseded | Only one live register remains; queued Checks on #164 are not protected-main evidence. |
 | Current package version | `0.1.0` | No supported product release is established by the repository version alone. |
@@ -42,106 +42,106 @@ promote that PR to implemented-main.
 
 ### Queue-consolidation progress (GAP-012)
 
-The hourly scheduler plus one batch integration vehicle are draining the
-main-conflicting green queue:
+The hourly scheduler plus one batch integration vehicle drained the
+main-conflicting green queue, and the vehicle itself is now merged:
 
-- [PR #215](https://github.com/ContextualWisdomLab/TEPP/pull/215) folds 31 fully
-  green but main-conflicting slices into one exact-head landing vehicle with
-  per-slice merge-commit provenance and local `cargo test`/quality-suite
-  verification at its head.
+- [PR #215](https://github.com/ContextualWisdomLab/TEPP/pull/215) **merged at
+  2026-08-25T02:12:17Z** as protected-main `5c8599442e85…`, landing the 19
+  remaining folded slices (#51 #57 #60 #61 #68 #70 #72 #85 #113 #139 #141
+  #143 #145 #146-content #148 #150 #151 #152 #153) with per-slice
+  merge-commit provenance. Folded PR heads whose exact commits are ancestors
+  of main auto-close as merged; advanced heads (for example the newer
+  #146 head) remain live work.
 - The scheduler independently landed #110, #114, #115, #118–#128, #130,
   #133–#135, #137–#138, and #164 while #215 was in Checks; #215 was refreshed
-  onto that main and re-verified.
+  onto that main and re-verified before merge.
 - Transient Strix provider failures (`provider/backend unavailable`) on
-  #48/#49/#63/#65/#137/#149/#157 were re-run rather than treated as
-  code defects.
+  #48/#49/#63/#65/#137/#149/#157 were re-run rather than treated as code
+  defects.
+- Central control-plane repair landed on `.github` main: commit `8fd471a3`
+  aligned the required-path Strix smoke assertions with the `gpt-5.4`
+  fallback contract after `a724582` replaced the nonexistent
+  `gpt-5.6-luna` model. New Strix runs resolve the fixed smoke.
+- Post-merge branch-coverage audit of the vehicle found two production
+  branches (`validate_entity_label`/`validate_project_label` uppercase-label
+  clause) and three Python arcs in `scripts/check_coverage.py` uncovered;
+  [PR #219](https://github.com/ContextualWisdomLab/TEPP/pull/219) carries the
+  exact red-to-green tests and must land before the next coverage-gated slice.
 
-Remaining after consolidation lands: strix-rerun set (#48 #49 #63 #65 #149 #157),
-pending-check slices (#58 #59 #62 #66), conflicted #131, toolchain bump #214, and
-the 48 draft PRs retained per the stacking plan, including the psychometric
-recovery stack and non-psychometric drafts.
+Remaining queue after consolidation: strix-rerun set (#48 #49 #63 #65 #157),
+pending-check slices (#58 #62 #66), advanced-head #146, toolchain bump #214,
+coverage repair #219, and the 49 draft PRs retained per the stacking plan,
+including the psychometric recovery stack and non-psychometric drafts.
 
 ## Snapshot open pull-request evidence
 
 The following exact-head register was fetched live from GitHub at
-2026-08-24T10:55:23Z. Review decisions, required Checks, and mergeability remain
+2026-08-25T02:22:37Z. Review decisions, required Checks, and mergeability remain
 volatile; the live GitHub API supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
 Checks, and branch rules immediately before every mutation.
 
 | PR | Exact current head | Draft | Base | Title |
 |---:|---|:---:|---|---|
-| #217 | `79df32c73b260838fd3d0bfed3e84ff3e58e4b28` | false | main | docs(gap): refresh baseline snapshot, consolidation progress; untrack codegraph artifacts |
-| #216 | `91903db726f1da6b398e0a32c5a401126598154f` | true | agent/psychometric-standardised-discrete-intercept | feat(psychometric): recover Driver p.16 asymCINTstd after positive p |
-| #215 | `f813ce51e3749a91958c1e075dc8d0824f811af0` | false | main | chore(delivery): consolidate 31 queued green slices into one landing vehicle (#175) |
-| #214 | `5c5621c27bdf18d52f6f98b7ac373eb90768fbc5` | false | main | build(deps): bump rust-toolchain from 1.97.1 to 1.98.0 |
-| #213 | `d32c069c5653434302dc2507e272ff916cb7b16a` | true | agent/psychometric-standardised-asymptotic-diffusion | feat(psychometric): recover Driver p.16 discreteCINTstd after positive p |
-| #211 | `643b9beb76ea6bc6b3a468bdb0f08e1a820cae9f` | true | agent/psychometric-standardised-manifest-variance | feat(psychometric): recover Driver p.16 TIPREDVARstd after positive TIPREDVAR |
-| #210 | `22202c57c0818d3efb28438e95bdde5d0e7143b0` | true | agent/psychometric-standardised-manifest-trait-variance | feat(psychometric): recover Driver p.16 MANIFESTVARstd after positive Θ |
-| #209 | `5e3ef38256f42ce09a934eb0f3893e02a40ad6b7` | true | agent/psychometric-added-initial-tdpred-var | feat(psychometric): recover Eq. 5 of analog addedT0TIPREDVAR extra observed TD variance |
-| #208 | `adcd68a582725130c046239753290d6cb5f3b8b7` | true | agent/psychometric-standardised-trait-variance | feat(psychometric): recover Driver p.16 MANIFESTTRAITVARstd after positive Ψ_τ |
-| #207 | `5dd0c01549c93fa05f57df5658058244c7b675e4` | true | agent/psychometric-standardised-initial-latent-variance | feat(psychometric): recover Driver p.16 TRAITVARstd after positive TRAITVAR |
-| #206 | `dcb339f3e2e5ac2dd2dda9b61b5d2c9b811c7636` | true | agent/psychometric-standardised-initial-tdpred-std | feat(psychometric): recover analog of addedT0TIPREDVAR for first-occasion TD extra |
-| #205 | `db60fe4eb47abf1efb793ccef37597689d11d09a` | true | agent/psychometric-standardised-initial-tdpred-std | feat(psychometric): recover Driver p.16 T0VARstd after positive T0VAR |
-| #204 | `ac757e5e4f3651cad98fa88d5a44db570eb1c3cf` | true | agent/psychometric-standardised-continuous-tdpred-effect | feat(psychometric): recover Driver Table 3 T0TDPREDEFFECTstd after positive T0VAR |
-| #203 | `e5a63d0c7ffac91e9945f6c483152a0bdf267525` | true | agent/psychometric-asymptotic-tipred-observed-variance | feat(psychometric): recover Driver 2017-era addedTIPREDVARstd after addedTIPREDVAR |
-| #202 | `2d2d3efe5fd2f742a335e071f22fc1738c51ab27` | true | agent/psychometric-asymptotic-tipred-observed-variance | feat(psychometric): recover Driver p.16 TDPREDEFFECTstd after positive variances |
-| #200 | `8f429471e2b249e76c9b722eaf2443518b666c98` | true | agent/psychometric-initial-tipred-observed-variance | feat(psychometric): recover Driver Eq. 5 of addedTIPREDVAR extra observed TI variance |
-| #199 | `7a476ed3c39e4ba14c9c51f5cbbafc33310979d2` | true | agent/psychometric-added-t0-tipred-var | feat(psychometric): recover Driver Eq. 5 of addedT0TIPREDVAR extra observed TI variance |
-| #198 | `52a9b4ceb26bdd89e6e49c56fb473d96c68ca352` | true | agent/psychometric-standardised-initial-tipred-effect | feat(psychometric): recover Driver 2017-era addedT0TIPREDVAR after T0TIPREDEFFECT |
-| #197 | `a19ea1ecba3d773470f12ed4dbbeb8a01b987f26` | true | agent/psychometric-standardised-initial-tipred-effect | feat(psychometric): recover Driver Table 3 T0TDPREDEFFECTstd after positive T0VAR |
-| #196 | `1cb91b43002765bf5b855be51e55cb29db41a599` | true | agent/psychometric-standardised-continuous-tipred-effect | feat(psychometric): recover Driver Table 3 T0TIPREDEFFECTstd after positive T0VAR |
-| #195 | `cf275b25611953bd405550f96df257c77df01751` | true | agent/psychometric-standardised-continuous-tipred-effect | feat(psychometric): recover Driver p.16 CINTstd after positive asymDIFFUSION |
-| #194 | `471b115e891be11fb41eb75a5cc3073258ab0f34` | true | agent/psychometric-standardised-asymptotic-tipred-effect | feat(psychometric): recover Driver p.16 TIPREDEFFECTstd after positive variances |
-| #193 | `6235a3fc6fd6899f85f74aed71053bd50529c34c` | true | agent/psychometric-standardised-asymptotic-tipred-effect | feat(psychometric): recover Driver p.16 finite-interval TIPREDEFFECTstd after positive variances |
-| #192 | `1690c7b65693cf27c8f1730150d67084594aef07` | true | agent/psychometric-standardised-continuous-drift | feat(psychometric): recover Driver p.16 asymTIPREDEFFECTstd after positive variances |
-| #190 | `adb0bc6f2a1b0684eb9242bcb0d6cddd1ff09ae3` | true | agent/psychometric-standardised-continuous-diffusion | feat(psychometric): recover Driver p.16 DRIFTstd after positive asymDIFFUSION |
-| #189 | `0836c359fab7878084ac3a711920550eb6cacb0d` | true | agent/psychometric-standardised-discrete-diffusion | feat(psychometric): recover Driver p.16 DIFFUSIONstd after positive asymDIFFUSION |
-| #188 | `444304d2d702cceb47cd4fdf695ba630d7e7c83a` | true | agent/psychometric-standardised-discrete-drift | feat(psychometric): recover Driver p.16 discreteDIFFUSIONstd after positive asymDIFFUSION |
-| #187 | `6afd048d1a78bd7e1f68555182ec6a1f0db9ea8c` | true | agent/psychometric-predetermined-later-start-later-t0var | feat(psychometric): recover Driver p.16 discreteDRIFTstd after positive asymDIFFUSION |
-| #185 | `69ffec6425863b2842094ff1b1d6c07d8eee6b5b` | true | agent/psychometric-predetermined-later-lagged-t0var | feat(psychometric): recover Driver later-start later-occasion variance of predetermined T0VAR |
-| #184 | `6b93147e668ff414240f3ea94997f2937c0817f1` | true | agent/psychometric-predetermined-initial-t0var | feat(psychometric): recover Driver later-start lagged covariance of predetermined T0VAR |
-| #183 | `c10097be0f6f4ff8dd8e6db21dce8818630fe17f` | true | agent/psychometric-predetermined-lagged-t0var | feat(psychometric): recover Driver first-occasion variance of predetermined T0VAR |
-| #182 | `ee999e1ed23327a75d9cf4eb09a4652561f07cab` | true | agent/psychometric-predetermined-later-t0var | feat(psychometric): recover Driver lagged covariance of predetermined T0VAR |
-| #181 | `96e8d1c21924124d144f6273893eda8ac6b41b2d` | true | agent/psychometric-posterior-esem-input | feat(psychometric): recover Driver later-occasion variance of predetermined T0VAR |
-| #157 | `340087494b0a9653aede4eeb4bd27049e051222d` | false | main | feat(api): publish completed analysis-run result contract |
-| #147 | `08c427f76098adcd5226d1e141d208896bfe58f8` | true | main | feat(method): refuse section boilerplate as unique content |
-| #146 | `5419b0f76a737faf65d6b0c848c83f2f1336e326` | false | main | feat(membership): refuse episode membership outside the episode |
-| #142 | `7ca6035c5d8b7c9a7761a0c5f26d1de4215c334b` | true | main | feat(evidence): refuse untrusted payloads as estimator authority |
-| #136 | `7825c778f39bb8d1ab9f6fe18c227559f8e78fee` | true | main | feat(relation): refuse translation edges as state transitions |
-| #134 | `7f4a5df9fd18be203c995f59f1e734f69eba56f9` | true | main | feat(psychometric): refuse unidentified association as causal language |
-| #132 | `fe73209ea3407f0c8cd62fbf10ecea844ac15e50` | true | main | feat(relation): refuse unobserved pairs as no-relationship |
-| #131 | `0651aeec72cd54c1119effa77e97e992bf265b3d` | false | main | feat(membership): refuse collapsing targets into entity or project |
-| #129 | `8981696f58892a1ace9baeb6224ac55b436b8110` | true | main | feat(membership): refuse customer-competitor overlap |
-| #113 | `bd800fc62a7cb59339177e34baf3237d6897fce7` | false | main | feat(persistence): fail-closed entity and project target SQL |
-| #95 | `3c42b3b09e9a0501d7c7a1a42a322e58cba39165` | true | main | feat(privacy): refuse blanket-masked scientific field grants |
-| #92 | `192e1eab459ea1c7e155d9fafe60d1b5912025f2` | true | main | feat(orchestrator): serve interpretation POSTs on a loopback HTTP listener |
-| #86 | `47f6216aec217f15a6274d889bc507e59821096f` | true | main | feat(privacy): replay privileged-access decisions without source identity |
-| #85 | `1ebb40644bb479ed8703f6df1b351f3e19d5fe13` | false | main | feat(event): score CHRONOS occurrence forecasts with a Brier rule |
-| #84 | `e0ef1f869c46aa20969ce083f9ca31d622c31bb4` | true | main | feat(invariance): replay shared-meaning gate on current main |
-| #83 | `18200b674cb29d84ab66853f50e1b5dc38096279` | true | main | docs(evidence): define language-agnostic semantic spans |
-| #82 | `774a01bc63600c0c4703114bb01467fd65e57077` | true | main | feat(privacy): export identity maps only under re-identification purpose |
-| #81 | `a7769d37ad1f950547f00e05ce2c03e5a2843b43` | true | main | feat(privacy): bind tenant roles to system-time lifetimes |
-| #80 | `9539417f223bc6067f21e701986a49b7d3a37aba` | true | main | feat(temporal): space longitudinal lags on event time |
-| #79 | `166e37c2cb540a575c690c813a21123a13d86376` | true | main | feat(privacy): bind authorization grants to one processing purpose |
-| #76 | `ccffcab50ff2f1d8c0e6ee80269d0f7ee0075368` | true | main | feat(event): score TDT topic detections without promoting clusters |
-| #75 | `90cc8b6d4848e4c7718dd4bea74c1aaaab6f3685` | true | main | feat(method): model template sources without inferential weights |
+| #48 | `c3951af34a0bc81d272395d1e1e455d0b910f385` | false | main | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
+| #49 | `7b53b2f43b3d40933e97f597037628bd72990d34` | false | main | feat(psychometric): posterior ESEM input gates with true-parameter RMSE |
+| #58 | `14febe9f343c2cd1c9891ae7f1907359c5669fc1` | false | main | feat(evidence): keep embedded image URIs as positional non-lexical units |
+| #62 | `fe29d2a409e2018690793d83d04e860b35a90b4f` | false | main | feat(simulation): exclude delayed documents before they are available |
+| #63 | `f2cbf34fcd4465490938c4eaa2e1653dd48aa21c` | false | main | feat(corpus): refuse TF-IDF and BM25 as inferential weights |
+| #65 | `3fd7b39fc71af621ff0c5df0a830ec6a5473c492` | false | main | feat(event): score first-story detections with FAR and miss rates |
+| #66 | `07fdb0246a7c21f5621990f454b58052426f6c9d` | false | main | feat(event): score TDT mention links with precision and recall |
 | #74 | `0ce7e6a923282d3533cf3b8c0592d5df244049f8` | true | main | feat(temporal): keep predicted Allen assertions hypothetical |
-| #72 | `899656968cc9f68a3d8fc55dddc4fd257fb27050` | false | main | feat(event): score TDT story segments with WindowDiff and Pk |
-| #70 | `7a1f33aa68c1c9be9e9da7ac7f7dadb1092ff9e4` | false | main | feat(event): score CHRONOS schema slots with precision and recall |
-| #68 | `6a98c812ef8e621e1bc1c46a615296b39f0bae33` | false | main | feat(event): score TDT tracks with pair precision and switch rate |
-| #66 | `0fd2e207c731909581469a1ea2c0c1b55bd99d9a` | false | main | feat(event): score TDT mention links with precision and recall |
-| #65 | `74351f398d67df590019049ab85a7f649495b860` | false | main | feat(event): score first-story detections with FAR and miss rates |
-| #63 | `0735ca67abcf5c6c2fd591a52d29067e5f16215a` | false | main | feat(corpus): refuse TF-IDF and BM25 as inferential weights |
-| #62 | `7ba0f09df56ad2fc5601a93e581f6b3fa1af76c9` | false | main | feat(simulation): exclude delayed documents before they are available |
-| #61 | `c7f094cf17b5d0be0aa9270b2d397da4d2db851d` | false | main | feat(temporal): refuse uncertain availability past knowledge cutoff |
-| #60 | `40ede67614599ba21495fea024d4493d3af9fbb3` | false | main | feat(relation): refuse association and precedence as causation |
-| #59 | `83731ec705bd4c29f8466e7990f1febb4f073120` | false | main | feat(corpus): treat NFC/NFD bodies as split leakage |
-| #58 | `6a01fefca73fb19a25d082314dcdbc10d52ee383` | false | main | feat(evidence): keep embedded image URIs as positional non-lexical units |
-| #57 | `b76e38393e932873ec2aed682ab539ee61828537` | false | main | feat(validation): exact-head claim promotion gates |
-| #51 | `1801501c4d7c5be720d24aba954280fbc9068612` | false | main | feat(compute): VRAM budget types with CPU f64 fallback |
-| #49 | `9516ef1384f5239096d6d13c52155f8f7dde7795` | false | main | feat(psychometric): posterior ESEM input gates with true-parameter RMSE |
-| #48 | `6110d3660607ba46b312b4d76f048f1bcc4f3bc5` | false | main | feat(topic): logistic-normal ALR coordinates with true-parameter RMSE |
+| #75 | `90cc8b6d4848e4c7718dd4bea74c1aaaab6f3685` | true | main | feat(method): model template sources without inferential weights |
+| #76 | `ccffcab50ff2f1d8c0e6ee80269d0f7ee0075368` | true | main | feat(event): score TDT topic detections without promoting clusters |
+| #79 | `166e37c2cb540a575c690c813a21123a13d86376` | true | main | feat(privacy): bind authorization grants to one processing purpose |
+| #80 | `9539417f223bc6067f21e701986a49b7d3a37aba` | true | main | feat(temporal): space longitudinal lags on event time |
+| #81 | `a7769d37ad1f950547f00e05ce2c03e5a2843b43` | true | main | feat(privacy): bind tenant roles to system-time lifetimes |
+| #82 | `774a01bc63600c0c4703114bb01467fd65e57077` | true | main | feat(privacy): export identity maps only under re-identification purpose |
+| #83 | `18200b674cb29d84ab66853f50e1b5dc38096279` | true | main | docs(evidence): define language-agnostic semantic spans |
+| #84 | `e0ef1f869c46aa20969ce083f9ca31d622c31bb4` | true | main | feat(invariance): replay shared-meaning gate on current main |
+| #86 | `47f6216aec217f15a6274d889bc507e59821096f` | true | main | feat(privacy): replay privileged-access decisions without source identity |
+| #92 | `192e1eab459ea1c7e155d9fafe60d1b5912025f2` | true | main | feat(orchestrator): serve interpretation POSTs on a loopback HTTP listener |
+| #95 | `3c42b3b09e9a0501d7c7a1a42a322e58cba39165` | true | main | feat(privacy): refuse blanket-masked scientific field grants |
+| #129 | `8981696f58892a1ace9baeb6224ac55b436b8110` | true | main | feat(membership): refuse customer-competitor overlap |
+| #132 | `fe73209ea3407f0c8cd62fbf10ecea844ac15e50` | true | main | feat(relation): refuse unobserved pairs as no-relationship |
+| #134 | `7f4a5df9fd18be203c995f59f1e734f69eba56f9` | true | main | feat(psychometric): refuse unidentified association as causal language |
+| #136 | `7825c778f39bb8d1ab9f6fe18c227559f8e78fee` | true | main | feat(relation): refuse translation edges as state transitions |
+| #142 | `7ca6035c5d8b7c9a7761a0c5f26d1de4215c334b` | true | main | feat(evidence): refuse untrusted payloads as estimator authority |
+| #146 | `aac43e83d8567696aeaa504e2d88b6314aedfb68` | false | main | feat(membership): refuse episode membership outside the episode |
+| #147 | `08c427f76098adcd5226d1e141d208896bfe58f8` | true | main | feat(method): refuse section boilerplate as unique content |
+| #157 | `5d1492cc46f2acef7d0875c81f72c05e745e44ae` | false | main | feat(api): publish completed analysis-run result contract |
+| #181 | `96e8d1c21924124d144f6273893eda8ac6b41b2d` | true | agent/psychometric-posterior-esem-input | feat(psychometric): recover Driver later-occasion variance of predetermined T0VAR |
+| #182 | `ee999e1ed23327a75d9cf4eb09a4652561f07cab` | true | agent/psychometric-predetermined-later-t0var | feat(psychometric): recover Driver lagged covariance of predetermined T0VAR |
+| #183 | `c10097be0f6f4ff8dd8e6db21dce8818630fe17f` | true | agent/psychometric-predetermined-lagged-t0var | feat(psychometric): recover Driver first-occasion variance of predetermined T0VAR |
+| #184 | `6b93147e668ff414240f3ea94997f2937c0817f1` | true | agent/psychometric-predetermined-initial-t0var | feat(psychometric): recover Driver later-start lagged covariance of predetermined T0VAR |
+| #185 | `69ffec6425863b2842094ff1b1d6c07d8eee6b5b` | true | agent/psychometric-predetermined-later-lagged-t0var | feat(psychometric): recover Driver later-start later-occasion variance of predetermined T0VAR |
+| #187 | `6afd048d1a78bd7e1f68555182ec6a1f0db9ea8c` | true | agent/psychometric-predetermined-later-start-later-t0var | feat(psychometric): recover Driver p.16 discreteDRIFTstd after positive asymDIFFUSION |
+| #188 | `444304d2d702cceb47cd4fdf695ba630d7e7c83a` | true | agent/psychometric-standardised-discrete-drift | feat(psychometric): recover Driver p.16 discreteDIFFUSIONstd after positive asymDIFFUSION |
+| #189 | `0836c359fab7878084ac3a711920550eb6cacb0d` | true | agent/psychometric-standardised-discrete-diffusion | feat(psychometric): recover Driver p.16 DIFFUSIONstd after positive asymDIFFUSION |
+| #190 | `adb0bc6f2a1b0684eb9242bcb0d6cddd1ff09ae3` | true | agent/psychometric-standardised-continuous-diffusion | feat(psychometric): recover Driver p.16 DRIFTstd after positive asymDIFFUSION |
+| #192 | `1690c7b65693cf27c8f1730150d67084594aef07` | true | agent/psychometric-standardised-continuous-drift | feat(psychometric): recover Driver p.16 asymTIPREDEFFECTstd after positive variances |
+| #193 | `6235a3fc6fd6899f85f74aed71053bd50529c34c` | true | agent/psychometric-standardised-asymptotic-tipred-effect | feat(psychometric): recover Driver p.16 finite-interval TIPREDEFFECTstd after positive variances |
+| #194 | `471b115e891be11fb41eb75a5cc3073258ab0f34` | true | agent/psychometric-standardised-asymptotic-tipred-effect | feat(psychometric): recover Driver p.16 TIPREDEFFECTstd after positive variances |
+| #195 | `cf275b25611953bd405550f96df257c77df01751` | true | agent/psychometric-standardised-continuous-tipred-effect | feat(psychometric): recover Driver p.16 CINTstd after positive asymDIFFUSION |
+| #196 | `1cb91b43002765bf5b855be51e55cb29db41a599` | true | agent/psychometric-standardised-continuous-tipred-effect | feat(psychometric): recover Driver Table 3 T0TIPREDEFFECTstd after positive T0VAR |
+| #197 | `a19ea1ecba3d773470f12ed4dbbeb8a01b987f26` | true | agent/psychometric-standardised-initial-tipred-effect | feat(psychometric): recover Driver Table 3 T0TDPREDEFFECTstd after positive T0VAR |
+| #198 | `52a9b4ceb26bdd89e6e49c56fb473d96c68ca352` | true | agent/psychometric-standardised-initial-tipred-effect | feat(psychometric): recover Driver 2017-era addedT0TIPREDVAR after T0TIPREDEFFECT |
+| #199 | `7a476ed3c39e4ba14c9c51f5cbbafc33310979d2` | true | agent/psychometric-added-t0-tipred-var | feat(psychometric): recover Driver Eq. 5 of addedT0TIPREDVAR extra observed TI variance |
+| #200 | `8f429471e2b249e76c9b722eaf2443518b666c98` | true | agent/psychometric-initial-tipred-observed-variance | feat(psychometric): recover Driver Eq. 5 of addedTIPREDVAR extra observed TI variance |
+| #202 | `2d2d3efe5fd2f742a335e071f22fc1738c51ab27` | true | agent/psychometric-asymptotic-tipred-observed-variance | feat(psychometric): recover Driver p.16 TDPREDEFFECTstd after positive variances |
+| #203 | `e5a63d0c7ffac91e9945f6c483152a0bdf267525` | true | agent/psychometric-asymptotic-tipred-observed-variance | feat(psychometric): recover Driver 2017-era addedTIPREDVARstd after addedTIPREDVAR |
+| #204 | `ac757e5e4f3651cad98fa88d5a44db570eb1c3cf` | true | agent/psychometric-standardised-continuous-tdpred-effect | feat(psychometric): recover Driver Table 3 T0TDPREDEFFECTstd after positive T0VAR |
+| #205 | `db60fe4eb47abf1efb793ccef37597689d11d09a` | true | agent/psychometric-standardised-initial-tdpred-std | feat(psychometric): recover Driver p.16 T0VARstd after positive T0VAR |
+| #206 | `dcb339f3e2e5ac2dd2dda9b61b5d2c9b811c7636` | true | agent/psychometric-standardised-initial-tdpred-std | feat(psychometric): recover analog of addedT0TIPREDVAR for first-occasion TD extra |
+| #207 | `5dd0c01549c93fa05f57df5658058244c7b675e4` | true | agent/psychometric-standardised-initial-latent-variance | feat(psychometric): recover Driver p.16 TRAITVARstd after positive TRAITVAR |
+| #208 | `adcd68a582725130c046239753290d6cb5f3b8b7` | true | agent/psychometric-standardised-trait-variance | feat(psychometric): recover Driver p.16 MANIFESTTRAITVARstd after positive Ψ_τ |
+| #209 | `5e3ef38256f42ce09a934eb0f3893e02a40ad6b7` | true | agent/psychometric-added-initial-tdpred-var | feat(psychometric): recover Eq. 5 of analog addedT0TIPREDVAR extra observed TD variance |
+| #210 | `22202c57c0818d3efb28438e95bdde5d0e7143b0` | true | agent/psychometric-standardised-manifest-trait-variance | feat(psychometric): recover Driver p.16 MANIFESTVARstd after positive Θ |
+| #211 | `643b9beb76ea6bc6b3a468bdb0f08e1a820cae9f` | true | agent/psychometric-standardised-manifest-variance | feat(psychometric): recover Driver p.16 TIPREDVARstd after positive TIPREDVAR |
+| #213 | `d32c069c5653434302dc2507e272ff916cb7b16a` | true | agent/psychometric-standardised-asymptotic-diffusion | feat(psychometric): recover Driver p.16 discreteCINTstd after positive p |
+| #216 | `91903db726f1da6b398e0a32c5a401126598154f` | true | agent/psychometric-standardised-discrete-intercept | feat(psychometric): recover Driver p.16 asymCINTstd after positive p |
+| #218 | `19279547f5a8622d9584d95822ec36ae3830beeb` | true | agent/psychometric-standardised-asymptotic-intercept | feat(psychometric): recover Driver p.16 T0MEANSstd after positive T0VAR |
+| #219 | `6cf0d87f0bb8e57e2cbfef190dc364fcc3867dd7` | false | main | test(persistence): cover uppercase-label and scanner edge branches |
 
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization
@@ -213,10 +213,11 @@ visual workspace, or a supported multi-tenant release.
 | GAP-009 | Topic association and cluster outputs lack posterior-valid estimation, uncertainty, edge stability, and consensus communities. | `accepted-target` | product vertical | `e65cd66` (network primitives only) | [#172](https://github.com/ContextualWisdomLab/TEPP/issues/172) / [PR #71](https://github.com/ContextualWisdomLab/TEPP/pull/71) | `2588f38281b9` | Valid log-ratio coordinates, interval/stability-bearing edges, repeated Leiden consensus, known-truth network/cluster recovery, and reproducible exports. |
 | GAP-010 | Operators lack coordinated accessible visual analytics and exact-value export workflows. | `accepted-target` | product vertical | `e65cd66` (no visual workspace) | [#173](https://github.com/ContextualWisdomLab/TEPP/issues/173) | `—` (Figma work not started) | Real Figma File ID in ADR, Storybook/design tokens, ten PRD views, exact-value tables, accessible interaction/print/PDF states, provenance, and source-consistent exports. |
 | GAP-011 | TEPP is not yet an operable multi-tenant service or supported release. | `accepted-target` | product vertical | `e65cd66` (library contracts only) | [#174](https://github.com/ContextualWisdomLab/TEPP/issues/174) | `—` (issue program; no current implementation PR) | Durable queue/storage, OIDC/RLS/purpose controls, OpenTelemetry/SLOs, load/recovery, migrations, signed release/SBOM/provenance, assurance evidence, and support policy. |
-| GAP-012 | The 71-PR queue obscures authority, repeatedly stales exact-head evidence, and fragments product boundaries. | `partial` | release blocker | `e65cd66` (protected-main truth) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (live queue program) | Every PR classified; unique landing vehicles; compatible slices folded; superseded work closed with provenance; scheduler prioritizes consolidation; queue reaches zero before GA. |
+| GAP-012 | The 71-PR queue obscured authority, repeatedly staled exact-head evidence, and fragmented product boundaries. | `partial` | release blocker (draining) | `5c8599442e85` (vehicle #215 merged 2026-08-25T02:12Z) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (live queue program) | Residual queue: nine non-draft slices, coverage repair #219, and the 49-draft stack. Remaining PRs classified; superseded work closed with provenance; scheduler prioritizes consolidation; queue reaches zero before GA. |
 | GAP-013 | Evidence-grounded LLM interpretation is routed but not executed and validated as a production interpreter/verifier port. | `partial` | active integration | `e65cd66` (routing and refusal contracts only) | [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176), [PR #69](https://github.com/ContextualWisdomLab/TEPP/pull/69), [PR #165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `8e4a3ca9cc80` / `34083c3f5d66` | Contextual-orchestrator execution, evidence citations, verifier refusals, comparable-budget ablations, provider eligibility/fallback, abstention, live/offline contract tests, and no numerical-authority escalation. |
 | GAP-014 | README/TRD and some PR descriptions lag protected-main and live queue reality. | `partial` | documentation drift | `e65cd66` (documentation is not fully synchronized) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) | `—` (queue-consolidation work) | Reconcile README, TRD, traceability, ADR maturity, CHANGELOG, preferred-merge declarations, and exact protected-main evidence. |
-| GAP-015 | There was no canonical live product/operator-gap register tied to documentation validation. | `active-PR` | landing vehicle | `e65cd66` (the register and validator are implemented-main; this refresh keeps the volatile queue current) | [PR #217](https://github.com/ContextualWisdomLab/TEPP/pull/217); [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) is the merged authority; closed [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179) is not a second register | `79df32c73b260838fd3d0bfed3e84ff3e58e4b28` | Land this refresh after exact-head checks and independent review, then regenerate it whenever protected-main or the live queue changes. |
+| GAP-015 | There was no canonical live product/operator-gap register tied to documentation validation. | `implemented-main` (register + validator); this refresh is the live maintenance slice | register refresh | `5c8599442e85` (register and validator are implemented-main; this snapshot refresh keeps the volatile queue current) | [PR #217](https://github.com/ContextualWisdomLab/TEPP/pull/217) merged; [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) is the merged authority; closed [PR #179](https://github.com/ContextualWisdomLab/TEPP/pull/179) is not a second register | `—` (each refresh PR carries its own current head at merge time) | Land each refresh after exact-head checks and independent review, then regenerate it whenever protected-main or the live queue changes. |
+| GAP-018 | The #215 consolidation vehicle landed with two uncovered production branches in `persistence_postgres` label validation and three uncovered Python arcs in `scripts/check_coverage.py`. | `active-PR` | coverage repair | `5c8599442e85` (gates still enforce 100%; the gaps are test debt, not weakened gates) | [PR #219](https://github.com/ContextualWisdomLab/TEPP/pull/219) | branch `fix/coverage-union-gaps-post215` | Exact red-to-green cases: uppercase-label clause for entity/project validators, blank-history comma-scan arcs, escaped-char-literal scanner arc. Closure requires exact-head Checks plus independent review on protected main. |
 | GAP-016 | Hourly PR maintenance used an older central scheduler revision whose per-repository sweep budgets could amplify the queued review workload. | `active-PR` | operability hardening | `e65cd66` (caller pin before central budget hardening) | [PR #177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `580d45206536` | The change pins a verified central revision immutably; closure still requires exact-head hosted Checks, resolved threads, and independent review. |
 | GAP-017 | Accepted analysis runs have a terminal DTO, and cutoff-safe execution exists only on the #157 head after stacked PR #178 merged into that branch. | `active-PR` | product vertical | `e65cd66` (accepted receipt only) | [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) / [PR #157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | `340087494b0a` | Exact availability cutoff, snapshot binding, multiple-membership preservation, digest integrity, redacted no-eligible failure, and realistic end-to-end tests on protected main. Closed stacked PR #178 is not implemented-main. |
 
@@ -245,19 +246,17 @@ because its head can change after this file is committed.
 
 | PR | Current delivery role | Required next action |
 |---:|---|---|
-| [#179](https://github.com/ContextualWisdomLab/TEPP/pull/179) | Duplicate gap-baseline snapshot | Closed as superseded at 2026-08-23T12:39:22Z; do not reopen as a second register. |
-| [#177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | Central scheduler budget-hardening pin | Re-run exact-head Checks and obtain independent review before relying on the hourly caller. |
-| [#165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | Hourly agent routing through contextual-orchestrator | Ensure queue-consolidation policy from #175 prevents unrelated micro-PR growth. |
+| [#219](https://github.com/ContextualWisdomLab/TEPP/pull/219) | Post-#215 branch-coverage repair (two Rust label-validation branches, three Python scanner arcs) | Exact-head Checks plus independent review, then merge before the next coverage-gated slice. |
 | [#157](https://github.com/ContextualWisdomLab/TEPP/pull/157) | Terminal result contract for #156, including folded cutoff-safe execution from closed #178 | Complete exact-head review/check gates; keep #156 open until protected-main verification. |
-| [#180](https://github.com/ContextualWisdomLab/TEPP/pull/180) | Hide raw provider exception details | Review/check gates; do not weaken fail-closed provider handling. |
-| [#153](https://github.com/ContextualWisdomLab/TEPP/pull/153) | Refuse location as entity identity or language | Independent review after exact-head membership tests. |
-| [#48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | Logistic-normal/ILR coordinate slice, including folded stacked #191 TRSL lineage artifacts | Fold into the estimator landing plan; coordinates and lineage artifacts are not candidate-K fitting. |
-| [#51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | VRAM budget/fallback policy types | Resolve requested changes; connect only to a real production kernel under #171. |
-| [#67](https://github.com/ContextualWisdomLab/TEPP/pull/67) | Model-selection gates | Rebase/merge only with an explicit path to real candidate fitting under #167. |
-| [#69](https://github.com/ContextualWisdomLab/TEPP/pull/69) | Interpretation grounding/refusal metrics | Fold into the product interpreter/verifier under #176. |
-| [#71](https://github.com/ContextualWisdomLab/TEPP/pull/71) | Compositional geometry/network pair metrics | Fold into the network estimator under #172. |
-| [#119](https://github.com/ContextualWisdomLab/TEPP/pull/119) | Bounded loading/lag recovery slice | Consolidate into the psychometric engine under #169. |
-| [#181](https://github.com/ContextualWisdomLab/TEPP/pull/181)–[#190](https://github.com/ContextualWisdomLab/TEPP/pull/190), [#192](https://github.com/ContextualWisdomLab/TEPP/pull/192)–[#204](https://github.com/ContextualWisdomLab/TEPP/pull/204) | Draft stacked psychometric T0VAR/drift/standardised recoveries | Keep stacked; do not promote drafts or predecessor heads as protected-main. Closed stacked #191 landed on #48 only. |
+| [#146](https://github.com/ContextualWisdomLab/TEPP/pull/146) | Advanced head of the episode-boundary slice beyond the folded vehicle content | Re-run exact-head Checks on `aac43e83`; land only the delta over protected main. |
+| [#66](https://github.com/ContextualWisdomLab/TEPP/pull/66) | TDT mention-link precision/recall scoring | Re-run exact-head Checks; fold into event-intelligence landing under #170. |
+| [#65](https://github.com/ContextualWisdomLab/TEPP/pull/65) | First-story detection FAR/miss-rate scoring | Re-run exact-head Checks; fold into event-intelligence landing under #170. |
+| [#63](https://github.com/ContextualWisdomLab/TEPP/pull/63) | Refuse TF-IDF/BM25 as inferential weights | Re-run exact-head Checks; connect to estimator weights under #167/#172. |
+| [#62](https://github.com/ContextualWisdomLab/TEPP/pull/62) | Simulation excludes delayed documents before availability | Re-run exact-head Checks; keep temporal eligibility authority intact. |
+| [#58](https://github.com/ContextualWisdomLab/TEPP/pull/58) | Embedded image URIs as positional non-lexical units | Re-run exact-head Checks; feeds GAP-005 image-position evidence. |
+| [#49](https://github.com/ContextualWisdomLab/TEPP/pull/49) | Posterior ESEM input gates with true-parameter RMSE | Re-run exact-head Checks; connect to psychometric engine under #169. |
+| [#48](https://github.com/ContextualWisdomLab/TEPP/pull/48) | Logistic-normal/ALR coordinate slice, including folded stacked #191 TRSL lineage artifacts | Resolve conflict/dirty state onto current main; coordinates and lineage artifacts are not candidate-K fitting. |
+| [#74](https://github.com/ContextualWisdomLab/TEPP/pull/74)–[#218](https://github.com/ContextualWisdomLab/TEPP/pull/218) drafts | Draft stacked temporal/privacy/method/psychometric recoveries | Keep stacked; convert to ready one link at a time from the stack root upward; never promote drafts or predecessor heads as protected-main. Closed stacked #191 landed on #48 only. |
 
 ## Delivery sequence
 

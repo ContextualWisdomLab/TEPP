@@ -123,6 +123,9 @@ mod tests {
             "active;closed".into(),
             "active\\".into(),
             "active\nclosed".into(),
+            // Uppercase bytes pass the alphanumeric gate yet fail the lowercase
+            // gate, so this exercises the final clause of the validation chain.
+            "ACTIVE".into(),
             "s".repeat(129),
         ] {
             assert_eq!(

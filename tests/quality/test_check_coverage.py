@@ -1241,31 +1241,32 @@ class CoverageContractTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "commas.rs"
-            # Lines 211->215 and 212->211: loop skips blank lines and non-matching
-            source.write_text(
-                "fn example() {\n"
-                "    let value = foo(\n"
-                "\n"
-                "        1,\n"
-                "    );\n"
-                "}\n",
-                encoding="utf-8",
-            )
+            # A comma-terminated line whose preceding lines are entirely blank
+            # exhausts the previous-line scan (arcs 211->215 and 212->211).
+            source.write_text("\n\nfoo,\n", encoding="utf-8")
             self.assertTrue(
-                coverage_contract.is_executable_source_line(str(source), 2)
+                coverage_contract.is_executable_source_line(str(source), 3)
             )
 
-            # Line 318->311: while loop with backslash at end of line inside string
-            source.write_text(
-                'fn path() {\n'
-                '    let s = "a\\\n'
-                'b";\n'
-                "}\n",
-                encoding="utf-8",
+            # A blank candidate between the comma line and its previous
+            # non-empty line is skipped by the same scan.
+            source.write_text("bar(\n\n    baz,\n", encoding="utf-8")
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 3)
             )
-            self.assertTrue(
-                coverage_contract.is_executable_source_line(str(source), 2)
-            )
+
+    def test_multiline_string_scanner_covers_escaped_char_literals(self) -> None:
+        """An escaped character inside a char literal keeps the scanner in loop.
+
+        The backslash inside a character literal must clear through the
+        escape-tracking branch so a following quote cannot close the literal
+        early; this exercises the scanner's escaped-character arc (318->311).
+        """
+
+        lines = ["fn f() {", r"    let newline = '\n';", "}"]
+        self.assertFalse(
+            coverage_contract._line_in_multiline_string(lines, 3)
+        )
 
 
 if __name__ == "__main__":  # pragma: no cover
