@@ -187,7 +187,6 @@
 //! later-occasion latent variance is not that observed variance),
 //! recovers the Driver §4.3 predetermined later-occasion variance as
 //! `trait + e^{2 a Δt} p_0 + Q_Δt + (B / a)² v`
-//! (JSS PDF re-opened 2026-08-23T20:20Z; form the evolved free
 //! (JSS PDF re-opened 2026-08-23T05:12Z; form the evolved free
 //! first-occasion variance first, then include the trait, then
 //! include the TI extra variance, then add; trait and
@@ -361,21 +360,6 @@
 //! `(-B / a) · √v / √(trait + p + added)` uses `TRAITVAR` and is
 //! not `asymTIPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
-//! recovers the Driver p. 16 finite-interval standardised
-//! `TIPREDEFFECT` as `A^{-1}[e^{A Δt} − I] B · √v / √(-q / (2 a))`
-//! after forming strictly positive `asymDIFFUSION` and strictly
-//! positive predictor variance (JSS PDF re-opened 2026-08-24T01:20Z;
-//! footnote 4 standardises using only the relevant variance, not the
-//! total; the affecting variance is `TIPREDVAR` `v`; the affected
-//! variance is `asymDIFFUSION`; unstandardised
-//! `A^{-1}[e^{A Δt} − I] B` is defined for a zero coefficient and
-//! for zero predictor variance, and is not the standardised
-//! finite-interval map; zero `asymDIFFUSION` or zero `v` fails
-//! closed; `asymTIPREDEFFECTstd` `(-B / a) · √v / √p` is the
-//! `Δt → ∞` map and is not the finite-interval map;
-//! `A^{-1}[e^{A Δt} − I] B · √v / √(trait + p + added)` uses
-//! `TRAITVAR` and is not the finite-interval map; `TRAITVAR` is not
-//! the standardisation variance),
 //! recovers the Driver p. 16 `TIPREDEFFECTstd` as
 //! `B · √v / √(-q / (2 a))` after forming strictly positive
 //! `asymDIFFUSION` and strictly positive predictor variance
@@ -392,20 +376,6 @@
 //! `B · √v / √(trait + p + added)` uses `TRAITVAR` and is
 //! not `TIPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
-//! recovers the Driver p. 16 `CINTstd` as
-//! `κ / √(-q / (2 a))` after forming strictly positive
-//! `asymDIFFUSION`
-//! (JSS PDF re-opened 2026-08-23T17:10Z; footnote 4 standardises
-//! using only the relevant variance, not the total; `CINT` is the
-//! process intercept of individual, or average individual, dynamics,
-//! so the relevant variance is `asymDIFFUSION`; unstandardised `κ`
-//! is defined for growing `a ≥ 0` and for zero diffusion, and is
-//! not `CINTstd`; zero `asymDIFFUSION` fails closed; the asymptotic
-//! standardisation `(-κ / a) / √p` is not `CINTstd`; the
-//! finite-interval standardisation
-//! `A^{-1}[e^{A Δt} − I] κ / √p` is not `CINTstd`;
-//! `κ / √(trait + p + added)` uses `TRAITVAR` and is
-//! not `CINTstd`; `TRAITVAR` is not the standardisation
 //! recovers the Driver Table 3 / p. 16 `T0TIPREDEFFECTstd` as
 //! `t0_b · √v / √p_0` after forming strictly positive free `T0VAR`
 //! and strictly positive predictor variance
@@ -422,23 +392,6 @@
 //! `t0_b · √v / √(trait + p_0 + added)` uses `TRAITVAR` and is
 //! not `T0TIPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
-//! recovers the Driver Table 3 / p. 16 `T0TDPREDEFFECTstd` as
-//! `t0_m · √v_x / √p_0` after forming strictly positive free `T0VAR`
-//! and strictly positive time-dependent predictor variance
-//! (JSS PDF re-opened 2026-08-23T18:17Z; footnote 4 standardises
-//! using only the relevant variance, not the total; the affecting
-//! variance is `TDPREDVAR` `v_x`, not `TIPREDVAR`; the affected
-//! variance is free first-occasion `T0VAR` `p_0`, not
-//! `asymDIFFUSION`; unstandardised `t0_m` is defined for a zero
-//! coefficient and for zero predictor variance, and is not
-//! `T0TDPREDEFFECTstd`; zero `p_0` or zero `v_x` fails closed;
-//! `T0` is event time, so a non-event clock fails closed; free
-//! `T0VAR` does not require stable `a < 0`; same numbers as
-//! `T0TIPREDEFFECTstd` yield the same product and Table 3 names a
-//! different matrix; `B · √v / √(-q / (2 a))` is not
-//! `T0TDPREDEFFECTstd`; `t0_m · √v_x / √(trait + p_0 + added)` uses
-//! `TRAITVAR` and is not `T0TDPREDEFFECTstd`; `TRAITVAR` is not the
-//! standardisation variance),
 //! recovers the Driver Table 3 / p. 16 / 2017-era
 //! `addedT0TIPREDVAR` as `t0_b² v`
 //! (JSS PDF re-opened 2026-08-23T18:20Z; 2017-era
@@ -490,20 +443,6 @@
 //! `m · √v / √(trait + p + added)` uses `TRAITVAR` and is
 //! not `TDPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
-//! recovers the Driver 2017-era `addedTIPREDVARstd` as
-//! `extra / extra = 1` after strictly positive extra
-//! (JSS PDF re-opened 2026-08-23T21:22Z; 2017-era
-//! `summary.ctsemFit.R` forms
-//! `solve(sqrt(diag(addedTIPREDVAR))) %&% addedTIPREDVAR`;
-//! `OpenMx` `%&%` is the quadratic form; form `(B / a)² v`
-//! first, then the ratio; zero extra fails closed; the
-//! default `ridging = FALSE` does not add `0.0001`;
-//! unstandardised `(B / a)² v` is not this correlation;
-//! `λ² (B / a)² v` is Eq. 5 of the extra and is not this
-//! correlation; `t0_b² v` is `addedT0TIPREDVAR` and is not
-//! this asymptotic extra correlation; `TRAITVAR` is not
-//! the standardisation variance; the printed 2-latent
-//! `addedTIPREDVAR` 2.838 is not this scalar 1),
 //! recovers the Driver Table 3 / p. 16 `T0TDPREDEFFECTstd` as
 //! `t0_m · √v / √p_0` after forming strictly positive free `T0VAR`
 //! and strictly positive time-dependent predictor variance
@@ -534,23 +473,6 @@
 //! recover the same 1; `t0_m · √v / √p_0` is not `T0VARstd`;
 //! `t0_b² v` is not `T0VARstd`; `TRAITVAR` is not the
 //! standardisation variance),
-//! recovers the scalar analog of 2017-era `addedT0TIPREDVAR` for
-//! the first-occasion TD coefficient as `t0_m² v` (JSS PDF
-//! re-opened 2026-08-23T22:13Z; 2017-era `summary.ctsemFit.R` forms
-//! `addedT0TIPREDVAR` as
-//! `T0TIPREDEFFECT %*% TIPREDVAR %*% t(T0TIPREDEFFECT)` and comments
-//! out `TDPREDVAR`; it does not form `addedT0TDPREDVAR`; Table 2
-//! names `T0TDPREDCOV` the first-occasion covariance, not this
-//! extra; Table 3 names `T0TIPREDEFFECT`, not a TD first-occasion
-//! effect matrix; form `t0_m` first, then square, then multiply by
-//! `v`; a zero coefficient or zero predictor variance is exactly
-//! zero; `v < 0` fails closed; `T0` is event time, so a non-event
-//! clock fails closed; free `t0_m` does not require stable
-//! `a < 0`; `t0_b² v` is `addedT0TIPREDVAR` and is not this extra
-//! even when `t0_m = t0_b`; `t0_m · √v / √p_0` is
-//! `T0TDPREDEFFECTstd` and is not this variance; `T0TDPREDCOV` is
-//! the covariance, not `t0_m² v`; free `T0VAR` is not this extra;
-//! `TRAITVAR` is not this extra),
 //! recovers the Driver p. 16 `TRAITVARstd` as the correlation form
 //! `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR` after forming
 //! strictly positive `TRAITVAR` (JSS PDF re-opened 2026-08-23T22:21Z;
@@ -580,16 +502,6 @@
 //! distinct positive `ψ` recover the same 1; `TRAITVARstd`
 //! recovers the same number and remains a distinct named quantity;
 //! `θ` is not `MANIFESTTRAITVARstd`),
-//! recovers Eq. 5 of that analog extra as `λ² t0_m² v` (JSS PDF
-//! re-opened 2026-08-23T22:26Z; form `t0_m² v` first, then
-//! `(λ extra) λ` with `θ = 0`; a zero loading or zero extra is
-//! exactly zero; `v < 0` fails closed; `T0` is event time, so a
-//! non-event clock fails closed; free `t0_m` does not require
-//! stable `a < 0`; `t0_m² v` is the latent extra, not this observed
-//! extra; `λ² p_0 + θ` is first-occasion observed variance, not
-//! this extra; `λ² t0_b² v` is Eq. 5 of `addedT0TIPREDVAR` and is
-//! not this extra even when `t0_m = t0_b`; `MANIFESTVAR` `θ` is
-//! not this extra),
 //! recovers the Driver p. 16 `MANIFESTVARstd` as the
 //! correlation form `solve(sqrt(diag(MANIFESTVAR))) %&%
 //! MANIFESTVAR` after forming strictly positive `MANIFESTVAR`
@@ -704,16 +616,13 @@ pub use cluster_mean::kish_effective_sample_size;
 pub use cluster_mean::recover_cluster_mean_within_between_slopes;
 /// Kish-weighted least-squares slope.
 pub use cluster_mean::recover_kish_weighted_slope;
-/// Higher-order construct class.
-pub use construct::ConstructClass;
-/// Typed invariance evidence required before a latent-mean comparison.
-pub use construct::LatentMeanComparisonEvidence;
-/// Permit latent-mean comparison only on strong/strict typed evidence.
 /// One clustered predictor–outcome pair.
 pub use cluster_mean::ClusteredScore;
 /// Recovered within-cluster, between-cluster, and contextual OLS slopes.
 pub use cluster_mean::WithinBetweenSlopes;
-/// Permit latent-mean comparison only with invariance evidence.
+/// Typed invariance evidence required before a latent-mean comparison.
+pub use construct::LatentMeanComparisonEvidence;
+/// Permit latent-mean comparison only on strong/strict typed evidence.
 pub use construct::compare_latent_means;
 /// Refuse fit-driven reinterpretation as reflective.
 pub use construct::interpret_as_reflective;
@@ -785,14 +694,10 @@ pub use event_time::recover_discrete_time_varying_predictor_effect;
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
 pub use event_time::recover_event_time_discrete_lag_and_log_rate;
-/// Exact scalar Eq. 5 of the analog first-occasion TD extra `λ² t0_m² v`.
-pub use event_time::recover_initial_time_dependent_observed_variance;
 /// Exact scalar carried first-occasion `T0TDPREDEFFECT` `e^{A Δt} t0_m x0`.
 pub use event_time::recover_initial_time_dependent_predictor_carry;
 /// Exact scalar first-occasion `T0TDPREDEFFECT` shift `t0_m x0`.
 pub use event_time::recover_initial_time_dependent_predictor_effect;
-/// Exact scalar analog of 2017-era `addedT0TIPREDVAR` for the first-occasion TD coefficient `t0_m² v`.
-pub use event_time::recover_initial_time_dependent_predictor_variance;
 /// Exact scalar Eq. 5 of 2017-era `addedT0TIPREDVAR` `λ² t0_b² v`.
 pub use event_time::recover_initial_time_independent_observed_variance;
 /// Exact scalar carried first-occasion `T0TIPREDEFFECT` `e^{A Δt} t0_b z`.
@@ -847,14 +752,10 @@ pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 pub use event_time::recover_standardised_asymptotic_diffusion;
 /// Exact scalar p. 16 `asymTIPREDEFFECTstd` `(-B / a) · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_asymptotic_time_independent_predictor_effect;
-/// Exact scalar 2017-era `addedTIPREDVARstd` `extra / extra = 1` after strictly positive extra.
-pub use event_time::recover_standardised_asymptotic_time_independent_predictor_variance;
 /// Exact scalar p. 16 `DIFFUSIONstd` `q / (−q / (2 a)) = −2 a` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_continuous_diffusion;
 /// Exact scalar p. 16 `DRIFTstd` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_continuous_drift;
-/// Exact scalar p. 16 `CINTstd` `κ / √(-q / (2 a))` after strictly positive `asymDIFFUSION`.
-pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `TDPREDEFFECTstd` `m · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_continuous_time_dependent_predictor_effect;
 /// Exact scalar p. 16 `TIPREDEFFECTstd` `B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
@@ -865,9 +766,6 @@ pub use event_time::recover_standardised_discrete_continuous_intercept;
 pub use event_time::recover_standardised_discrete_diffusion;
 /// Exact scalar p. 16 `discreteDRIFTstd` `e^{a Δt}` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_discrete_drift;
-/// Exact scalar p. 16 finite-interval standardised `TIPREDEFFECT` `A^{-1}[e^{A Δt} − I] B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
-pub use event_time::recover_standardised_discrete_time_independent_predictor_effect;
-/// Exact scalar Table 3 / p. 16 `T0TDPREDEFFECTstd` `t0_m · √v_x / √p_0` after strictly positive free `T0VAR` and `TDPREDVAR`.
 /// Exact scalar p. 16 `T0MEANSstd` `μ_0 / √p_0` after strictly positive free `T0VAR`.
 pub use event_time::recover_standardised_initial_latent_mean;
 /// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
@@ -942,8 +840,6 @@ pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_asym
 pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_initial_time_independent_observed_variance;
 /// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as `MANIFESTVAR`.
 pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_measurement_error;
-/// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as 2017-era `addedTIPREDVARstd`.
-pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as stationary observed variance.
 pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_stationary_observed_variance;
 /// Refuse treating §7.2 `addedTIPREDVAR` as p. 16 `TIPREDVARstd`.
@@ -1028,24 +924,6 @@ pub use event_time::refuse_initial_time_dependent_effect_as_continuous_intercept
 pub use event_time::refuse_initial_time_dependent_effect_as_initial_time_independent_effect;
 /// Refuse treating the Table 3 first-occasion TD shift as the Eq. 3 process increment.
 pub use event_time::refuse_initial_time_dependent_effect_as_process_increment;
-/// Refuse treating Eq. 5 of the analog first-occasion TD extra as first-occasion observed variance.
-pub use event_time::refuse_initial_time_dependent_observed_variance_as_initial_observed_variance;
-/// Refuse treating Eq. 5 of the analog first-occasion TD extra as the latent extra.
-pub use event_time::refuse_initial_time_dependent_observed_variance_as_initial_time_dependent_variance;
-/// Refuse treating Eq. 5 of the analog first-occasion TD extra as Eq. 5 of `addedT0TIPREDVAR`.
-pub use event_time::refuse_initial_time_dependent_observed_variance_as_initial_time_independent_observed_variance;
-/// Refuse treating Eq. 5 of the analog first-occasion TD extra as `MANIFESTVAR`.
-pub use event_time::refuse_initial_time_dependent_observed_variance_as_measurement_error;
-/// Refuse treating the first-occasion TD extra as free first-occasion `T0VAR`.
-pub use event_time::refuse_initial_time_dependent_variance_as_initial_latent_variance;
-/// Refuse treating the first-occasion TD extra as Table 2 `T0TDPREDCOV`.
-pub use event_time::refuse_initial_time_dependent_variance_as_initial_time_dependent_covariance;
-/// Refuse treating the first-occasion TD extra as 2017-era `addedT0TIPREDVAR`.
-pub use event_time::refuse_initial_time_dependent_variance_as_initial_time_independent_variance;
-/// Refuse treating the first-occasion TD extra as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
-pub use event_time::refuse_initial_time_dependent_variance_as_standardised_initial_time_dependent_effect;
-/// Refuse treating the first-occasion TD extra as `TRAITVAR`.
-pub use event_time::refuse_initial_time_dependent_variance_as_trait_variance;
 /// Refuse treating the Eq. 3 `T0TIPREDEFFECT` carry as the first-occasion shift.
 pub use event_time::refuse_initial_time_independent_carry_as_initial_effect;
 /// Refuse treating Driver Table 3 `T0TIPREDEFFECT` as the first-occasion shift.
@@ -1070,8 +948,6 @@ pub use event_time::refuse_initial_time_independent_observed_variance_as_measure
 pub use event_time::refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as free first-occasion `T0VAR`.
 pub use event_time::refuse_initial_time_independent_variance_as_initial_latent_variance;
-/// Refuse treating 2017-era `addedT0TIPREDVAR` as 2017-era `addedTIPREDVARstd`.
-pub use event_time::refuse_initial_time_independent_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `T0VARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_initial_latent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
@@ -1196,10 +1072,6 @@ pub use event_time::refuse_predetermined_later_start_later_latent_variance_as_ob
 pub use event_time::refuse_predetermined_later_start_later_latent_variance_as_stationary_later_latent_variance;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
-/// Refuse treating p. 16 `asymTIPREDEFFECTstd` as the finite-interval standardised `TIPREDEFFECT`.
-pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_standardised_discrete_time_independent_effect;
-/// Refuse treating p. 16 `asymCINTstd` as p. 16 `CINTstd`.
-pub use event_time::refuse_standardised_asymptotic_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `asymTIPREDEFFECTstd` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_standardised_continuous_time_independent_effect;
 /// Refuse treating p. 16 `asymTIPREDEFFECTstd` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
@@ -1208,10 +1080,6 @@ pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_st
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion;
 /// Refuse treating continuous `DIFFUSION` standardisation `−2 a` as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
-/// Refuse treating a finite-interval standardised `CINT` as p. 16 `CINTstd`.
-pub use event_time::refuse_standardised_discrete_continuous_intercept_as_standardised_continuous_intercept;
-/// Refuse treating p. 16 `TIPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
-pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating `κ / √p` as p. 16 `asymCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating `κ / √p` as p. 16 `discreteCINTstd`.
@@ -1338,10 +1206,6 @@ pub use event_time::refuse_trait_contaminated_asymptotic_time_independent_effect
 pub use event_time::refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating Driver §7.1 trait-contaminated continuous drift as p. 16 `DRIFTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_drift_as_standardised_continuous_drift;
-/// Refuse treating Driver §7.1 trait-contaminated finite-interval TI effect as the p. 16 standardised finite-interval `TIPREDEFFECT`.
-pub use event_time::refuse_trait_contaminated_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect;
-/// Refuse treating Driver §7.1 trait-contaminated continuous intercept as p. 16 `CINTstd`.
-pub use event_time::refuse_trait_contaminated_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating Driver §7.1 trait-contaminated continuous TD effect as p. 16 `TDPREDEFFECTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated continuous TI effect as p. 16 `TIPREDEFFECTstd`.
@@ -1370,14 +1234,10 @@ pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_sta
 pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion;
 /// Refuse treating unstandardised `asymTIPREDEFFECT` `-B / a` as p. 16 `asymTIPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
-/// Refuse treating unstandardised `addedTIPREDVAR` `(B / a)² v` as 2017-era `addedTIPREDVARstd`.
-pub use event_time::refuse_unstandardised_asymptotic_time_independent_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating unstandardised `DIFFUSION` as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating unstandardised `DRIFT` as p. 16 `DRIFTstd`.
 pub use event_time::refuse_unstandardised_continuous_drift_as_standardised_continuous_drift;
-/// Refuse treating unstandardised `CINT` `κ` as p. 16 `CINTstd`.
-pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `TDPREDEFFECT` `M` as p. 16 `TDPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_continuous_time_dependent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating unstandardised `TIPREDEFFECT` `B` as p. 16 `TIPREDEFFECTstd`.
@@ -1388,10 +1248,6 @@ pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_stand
 pub use event_time::refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating unstandardised `discreteDRIFT` as p. 16 `discreteDRIFTstd`.
 pub use event_time::refuse_unstandardised_discrete_drift_as_standardised_discrete_drift;
-/// Refuse treating unstandardised finite-interval `TIPREDEFFECT` `A^{-1}[e^{A Δt} − I] B` as the p. 16 standardised finite-interval map.
-pub use event_time::refuse_unstandardised_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect;
-/// Indicator coordinate kind.
-pub use indicator::IndicatorKind;
 /// Refuse treating unstandardised `T0MEANS` as p. 16 `T0MEANSstd`.
 pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Refuse treating unstandardised `T0VAR` as p. 16 `T0VARstd`.
