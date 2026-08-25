@@ -23,6 +23,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | TDT link precision/recall | `event_core` | active-PR | this PR | computed precision/recall + RMSE vs always-link | ADR 0016; `docs/research/event-link-detection-calibration.md` |
 | First-story FAR/miss | `event_core` | active-PR | this PR | computed FAR/miss + RMSE vs always-first | ADR 0016; `docs/research/first-story-detection-calibration.md` |
 | Multiple membership | `membership_core` | partial | nested ICC + non-nested refusal | unit + ESS + nested ICC recovery | Task 7 / PR #12 + #25 + this increment |
+| Episode membership containment | `episode_membership` | active-PR | event-time window containment | boundary, inversion, and recovery contracts | ADR 0003 / PR #146 |
 | TDT tracking stability | `event_core` | active-PR | this PR | pair P/R + switch rate + RMSE vs always-one-track | ADR 0016; `docs/research/event-tracking-calibration.md` |
 | CHRONOS schema-slot accuracy | `event_core` | active-PR | this PR | computed slot P/R + RMSE vs always-fill | ADR 0016; `docs/research/chronos-schema-slot-calibration.md` |
 | TDT story segmentation | `event_core` | active-PR | this PR | computed `WindowDiff`/`Pk` + RMSE vs always-cut | ADR 0016; `docs/research/tdt-story-segmentation.md` |
@@ -51,7 +52,8 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Typed membership targets beyond entity/project | `membership_target` | active-PR | PR #131 | refuse collapse + recovery vs entity stand-in for language, episode, template, department, and opportunity pool | ADR 0003 |
 | Bitemporal persistence + live SQL port | `persistence_postgres` | partial | entity/project target SQL on PR #131 | migration contracts + recording transport + session-affine optional PgPool + live CI + tenant RLS + `0005`/`0006` interval/membership contracts + event relation/mention/instance + source-artifact + audit-event + concurrent-write + restore integrity + typed `text_segment` SQL (#37–#44 implemented-main) | Task 8 / PR #16 + #23 + #26 + #27 + #29 + #30–#44 + entity/project SQL |
 | Leakage-safe splits | `corpus_split` | implemented-main | — | cutoff + co-partition tests | Task 9 / PR #17 |
-| Unicode canonical identity | `corpus_split` | active-PR | PR #59 | NFC/NFD and Hangul canonical-equivalence links, duplicate/empty refusal, connected-group co-partition | ADR 0004/0008/0013; `docs/research/unicode-canonical-identity.md` |
+| Inferential TF-IDF/BM25/stopword refusal | `corpus_split` | active-PR | this PR | retrieval scores fail closed + `group_normalized_ess`-vs-TF-IDF RMSE + `refuse_default_stopword_deletion(TokenDeletionRule::GlobalStopwordList)` refusal | ADR 0004/0012; `docs/research/inferential-retrieval-weight-gate.md` |
+| Unicode canonical identity | `corpus_split` | implemented-main | merged PR #59 | NFC/NFD and Hangul canonical-equivalence links, duplicate/empty refusal, connected-group co-partition | ADR 0004/0008/0013; `docs/research/unicode-canonical-identity.md` |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
 | Mention-confidence Brier score | `event_core` | active-PR | calibration vs binary truth | perfect 0 / half 0.25 RMSE | ADR 0003; `docs/research/mention-confidence-brier.md` |

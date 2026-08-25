@@ -1,6 +1,7 @@
 # ADR 0012 — Temporal Relational Shared-Latent Topic Measurement
 
 **Decision status:** Accepted
+**Implementation maturity:** partial — bounded identity, recovery, temporal lineage, network geometry, model-selection, preprocessing, method-effect, and modality gates are implemented across the foundation crates; the TRSL-TM estimator, global topic identity, method effects, and backend interchange remain accepted-target.
 **Implementation maturity:** partial — logistic-normal ALR/ILR coordinates, lexical-weight refusal, statistical/Pareto candidate-`K` gates, stable active/dormant/reactivated topic identity, and the bounded CPU `f64` reference estimator are implemented on the active product branch; `corpus_background`, `topic_lineage`, `network_analysis`, `model_selection`, `stopword_deletion`, `style_source`, `copied_text`, and `modality_source` implement bounded identity and recovery gates implemented-main; method effects, calibrated posterior acceptance, accelerated backends, and backend interchange remain accepted-target until implemented and protected-main integrated
 **Implementation maturity:** partial — `corpus_background`, `topic_lineage`, `network_analysis`, `model_selection`, `stopword_deletion`, `style_source`, `copied_text`, and `modality_source` implement bounded identity and recovery gates; the TRSL-TM estimator, method effects, global topic identity, and backend interchange remain accepted-target.
 **Date:** 2026-08-24  

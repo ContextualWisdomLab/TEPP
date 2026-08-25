@@ -29,6 +29,9 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `outcome_order` IPO event-time order on the active PR | partial |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `summarizes_edge` summary-versus-source identity on the active PR | partial |
 | forward-only transition subgraph | PRD; ADR 0002/0003 | `relation_graph` on protected main; `copy_identity` copy-versus-source identity on the active PR | partial |
+| event ontology/evidence mentions | PRD; ADR 0003 | `event_core` mention/instance separation on protected main; `persistence_postgres` mention SQL implemented-main refuses mention-as-instance; event-instance SQL (#39 implemented-main) refuses inverted windows; full intelligence stack remaining | partial |
+| time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `location_membership` location-versus-entity/language identity on the active PR; multilevel estimators remaining | partial |
+| episode-time membership containment | ADR 0003 | `episode_membership` refuses membership windows outside the episode event-time interval on the active PR | active-PR |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `inferred_status` inferred-versus-observed identity on the active PR; multilevel estimators remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `episode_membership` containment on the active PR; multilevel estimators remaining | partial |
 | time-varying cross-classified multiple membership | PRD; ADR 0003 | `membership_core` network on protected main; `location_membership` location-versus-entity/language identity on the active PR; multilevel estimators remaining | partial |
@@ -59,6 +62,8 @@ The full APA 7th standards/literature register remains `docs/research/standards-
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | `topic_measurement::refuse_lexical_inferential_weight` on the active PR; preprocessing pipeline remaining | partial |
 | TRSL-TM temporal/relational topic posterior and backend compatibility | ADR 0012; ADR 0004 | future `topic_measurement` | accepted-target |
 | global P0 topic identity with activity/dormancy/reactivation | ADR 0012 | future topic lineage/activity state | accepted-target |
+| no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | `corpus_split` inferential-weight gate on the active PR; estimator-side method model remains future | active-PR |
+| report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; `prompt_source` prompt-versus-unique-content identity implemented-main; estimator-side method model remains future | partial |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | future semantic/method-source model | accepted-target |
 | no default stopword deletion / no TF-IDF-BM25 inferential weighting | ADR 0004/0012; PRD/TRD | `stopword_deletion` default-list refusal on the active PR; TF-IDF/BM25 inferential-weight refusal remains accepted-target | partial |
 | report template/section/copied/style/modality method effects | ADR 0004/0012; PRD/TRD | simulation truth factors implemented; estimator-side method model remains future | partial |
