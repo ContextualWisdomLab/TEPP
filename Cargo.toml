@@ -49,8 +49,9 @@ members = [
     "crates/interpretation_gateway",
     "crates/model_selection",
     "crates/checkpoint_authority",
+    "crates/compute_backend",
+    "crates/episode_membership",
     "crates/membership_target",
-
 ]
 default-members = [
     "crates/evidence_core",
@@ -101,8 +102,9 @@ default-members = [
     "crates/interpretation_gateway",
     "crates/model_selection",
     "crates/checkpoint_authority",
+    "crates/compute_backend",
+    "crates/episode_membership",
     "crates/membership_target",
-
 ]
 
 [workspace.package]

@@ -6,6 +6,8 @@
 **Decision status:** Accepted  
 **Implementation maturity:** partial — Rust crates are independently usable; naruon HTTP interchange and loopback live listener (`POST /v1/analysis-runs` and `/v1/exports`, fail-closed table-access, NIM/proxy headers, RFC 3339 cutoff, stream deadline) are on the active PR (not implemented-main); production TLS/`$PORT` and remaining persistence integrations remain accepted-target
 **Date:** 2026-08-10  
+**Implementation maturity:** partial — Rust crates are independently usable; naruon HTTP interchange and loopback live listener (`POST /v1/analysis-runs` and `/v1/exports`, fail-closed table-access, NIM/proxy headers, RFC 3339 cutoff, stream deadline) are on the active PR (not implemented-main); production TLS/`$PORT` and remaining persistence integrations remain accepted-target
+**Date:** 2026-08-10
 **Supersedes:** The broad cross-service ownership wording in ADR 0001. ADR 0001 remains authoritative for Rust-first numerical architecture.
 
 ## Context
