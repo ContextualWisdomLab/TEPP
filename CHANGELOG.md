@@ -65,6 +65,21 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `psychometric_core` posterior-aware structural input gates: construct classification, refusal of raw-proportion Pearson/OLS, explicit ALR-versus-ILR geometry boundaries, CPU `f64` OLS recovery, posterior-draw loading point-estimate averaging without Rubin uncertainty claims, invariance-gated latent-mean comparison, and causal-heuristic refusal (ADR 0005 first production slice; no new migration).
 ### Added
 
+- `topic_measurement` bounded deterministic CPU `f64` TRSL-TM reference estimator: canonical CSR/CSC inputs, cutoff-safe documents, standardized event time, weighted multiple memberships, prevalence covariates, explicit predecessor/successor regularization, multi-seed generalized EM, diagonal Laplace uncertainty, and fitted topic-lineage counts with known-truth RMSE plus exact line/branch coverage (ADR 0012; no persistence or accelerated-backend claim).
+- `topic_measurement` logistic-normal additive log-ratio and sequential Egozcue isometric log-ratio coordinates: fail-closed simplex validation, max-shifted stable ALR/ILR inverses with true-parameter RMSE, pairwise CLR Aitchison distance recovered by ILR Euclidean isometry for valid composition pairs, and refusal of TF-IDF/BM25/keyword scores as inferential topic coordinates (ADR 0012 first production slice; no new migration).
+- Coverage contract now excludes Rust multiline string continuation records emitted by LLVM LCOV, keeping the 100% authored-line gate focused on executable production lines.
+- Coverage source classification now scans Rust normal/raw/byte strings, comments, and character literals with escape-aware state, preserving executable string method calls and ignoring quoted comments.
+- Quality-gate coverage tests now exercise blank-predecessor structural commas and escaped character literals in the authored-line scanner, including the past-EOF fail-closed path.
+- Restored Graham Neubig's correct APA 7 initial in the Liu et al. (2023) prompting-survey register entry after the protected-main rebase.
+- After protected-main consolidation #215, the analysis-run execution decision is recorded as ADR 0022 so it does not collide with ADR 0021 LineageWeave project-history.
+- Registered the analysis-engine gap-closure doctoring in the canonical documentation map so its product and scientific traceability record is discoverable.
+- Authored Rust coverage classification now ignores standalone structural closing parentheses, preventing formatting-only LCOV rows from appearing as uncovered production behavior.
+- `analysis_engine` vertical slice (ADR 0022): bounded Rust execution from an accepted analysis run to either a cutoff-safe readiness result or a validated `tepp.trsl_topic_lineage.v1` artifact from the ADR-0012 estimator. Topic artifacts preserve fitted predecessor/successor edges, connectable-post and lineage counts, request/snapshot/cutoff bindings, SHA-256 identity, and fail-closed non-convergence/tamper behavior with exact line/branch coverage. This remains active-PR evidence and does not claim causal or psychometric authority.
+- Coverage classification preserves the final expression line of multiline Rust `match` guards while respecting preceding-arm boundaries, keeping the 100% authored-line gate conservative.
+- `tepp_api` fail-closed analysis-result boundaries: status constructors reject
+  terminal envelopes that cannot fit the default 64 KiB status limit, and
+  standalone terminal results reject knowledge cutoffs in the future.
+- `tepp_api` request-bound terminal analysis results and typed analysis-run status/read responses: accepted/running states cannot carry measurement evidence, terminal results bind exact request and receipt identities, and succeeded/failed payloads remain digest-bound or content-redacted.
 - `evidence_core` embedded-image units: `data:image/<type>;base64,...` URIs keep their original source spans and media types, and cannot be used as lexical inference text.
 - `persistence_postgres` entity/project target SQL now rejects empty, oversized, or hostile type/status labels before insert; interpolated codes are restricted to lowercase ASCII `snake_case` characters so membership foreign keys remain referentially safe (ADR 0003 / ADR 0013).
 - `persistence_postgres` live SQLx transport retains one pool-backed PostgreSQL connection per session so tenant binding and the following statement share a session, and closes the connection and owned runtime safely from another Tokio runtime (ADR 0013).
@@ -181,7 +196,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 - `tepp_api` purpose-bound provider-payload minimization: time-bounded `PurposeGrant` evaluation, fail-closed expired/not-yet-valid/inverted/cross-tenant/impossible-calendar denial, semantic UTC calendar validation, refusal to copy identity mappings into model-provider payloads or ordinary logs, preservation of opaque analytical identifiers and membership roles (no blanket PII mask), a separately authorized scientific re-identification path, and an internally bound FIPS 180-4 SHA-256 audit digest appended through `ReidentificationAuditSink` before disclosure.
 - `persistence_postgres` backup/restore integrity: restored snapshots stay unusable until tenant, canonical `SHA-256`, knowledge-cutoff eligibility, temporal window order, and append-only triggers revalidate; SQL probes raise `restore integrity failed` (ADR 0013).
 - `persistence_postgres` concurrent document-write stress: atomic revise `DO` block that requires exactly one open `system_to` close, SQLSTATE mapping onto `ConcurrentWriteConflict` / `DuplicateDocumentRecord`, and live multi-session insert/revise/append-only proofs. No new migration number.
-- `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, review/Copilot credential headers, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).
+- `tepp_api` naruon HTTP interchange: versioned `https` POST contracts for analysis-run create and modular export authorization that refuse table-access URLs, provider-specific API-key/secret and review/Copilot credential headers, malformed extra HTTP fields, reserved standard-header redefinition, principal-only export idempotency keys, and lexical inference claims (ADR 0011).
 - `persistence_postgres` audit-event SQL contracts: append-only insert that refuses empty, oversized, or hostile `action_code` values before SQL is rendered.
 - `network_analysis` compositional cluster gates: raw topic proportions cannot be treated as Euclidean coordinates; recovered clusters are scored with label-invariant pair precision and recall against known truth.
 - `persistence_postgres` event-instance SQL contracts: bitemporal insert and as-known-at lookup that refuse inverted valid/system windows and hostile type/lifecycle labels before SQL is rendered.
@@ -247,6 +262,9 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Changed
 
+- ALR and ILR inverse normalization now fails closed when division would turn
+  a representable subnormal weight into a zero simplex part; runtime images
+  are pinned to the reviewed multi-platform Rust and Debian OCI digests.
 - `psychometric_core` scalar forward map `φ(Δt) = exp(a Δt)` now refuses binary64 underflow to `+0`. Voelkle et al. (2012, Eq. 7; ZORA accepted manuscript p. 16) write discrete auto-effects as `e^{a Δt}`, which are strictly positive; `a = ln(φ) / Δt` requires `φ > 0`. Direct overflow already failed closed. The Newton residual path refuses a mapped `+0` the same way.
 - The docstring discovery test compares crate-root names to `EXPECTED_CRATES` instead of a hardcoded count of 10, so `semantic_core` is required and an unapproved extra crate fails closed.
 - The LineageWeave temporal-context read exchange no longer emits a fabricated
@@ -273,6 +291,11 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
   head SHA to that exact-head register, including #201 `6afd650667e1` (RFC 5646
   cited once; first GAP-005 slice, not implemented-main), stacked drafts
   #202–#204, and #164 `ff2e645b1785` as the predecessor register head. Duplicate
+ PR #179 remains closed. Stacked-merged heads and queued Checks are not
+ implemented-main.
+- Rust LCOV quality gating now ignores visibility-qualified function signatures
+  and structural match-arm labels that LLVM reports as zero-hit non-executable
+  lines.
   PR #179 remains closed. Stacked-merged heads and queued Checks are not
   implemented-main.
 - Removed the completed one-shot PR #51 repair job from `docs-quality.yml`; the

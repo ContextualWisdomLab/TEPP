@@ -6,14 +6,24 @@ implemented in Rust.
 
 ## Current implementation state
 
-The current workspace contains 50 independently documented Rust crates. Each
-crate exposes a bounded, tested contract for evidence, temporal semantics,
-event and relation reasoning, membership, persistence, simulation, validation,
-API exchange, compute planning, or evidence-grounded interpretation. Numerical
-and psychometric authority remains on the CPU `f64` reference path; streamed
-accelerator plans must preserve the full observation set and fail closed to the
-reference path when resources or validation are insufficient.
+The repository currently implements 53 independently documented crates rather
+than a full commercial release. The implemented crates include topic measurement
+and the analysis engine; they do not claim a complete commercial estimator,
+operator workspace, or supported release.
 
+- `topic_measurement`: the first production topic-measurement crate. It
+  estimates topic proportions from observed counts, maps those proportions into
+  additive log-ratio coordinates, and keeps posterior uncertainty attached so
+  later psychometric models do not treat raw topic proportions as ordinary
+  Euclidean indicators.
+- `analysis_engine`: the first production analysis-run crate. It assembles one
+  cutoff-safe run from a validated design, documented evidence graph, and
+  estimator contract; persists the run with the six TEPP clocks; and emits a
+  typed terminal result. The crate does not claim buyer-visible product
+  completeness.
+
+```text
+crates/analysis_engine
 These are production contracts, not a claim that the complete commercial
 estimator, operator workspace, or supported release already exists. Read the
 [product and technical gap baseline](docs/product-technical-gap-baseline.md)
@@ -38,19 +48,39 @@ crates/assertion_clock
 crates/available_clock
 crates/checkpoint_authority
 crates/citation_edge
+crates/compute_backend
+crates/copied_text
+crates/copy_identity
+crates/corpus_background
+crates/corpus_split
+crates/cutoff_clock
+crates/derived_sensitivity
+crates/document_clocks
+crates/encrypted_mapping
+crates/episode_membership
+crates/event_clock
 crates/evidence_core
 crates/semantic_core
 crates/temporal_core
 crates/event_core
-crates/relation_graph
-crates/membership_core
-crates/persistence_postgres
-crates/corpus_split
-crates/tepp_simulation
-crates/validation_core
-crates/tepp_api
+crates/evidence_core
+crates/inferred_status
+crates/intake_authorization
+crates/interpretation_gateway
 crates/location_membership
+crates/longitudinal_core
+crates/membership_core
+crates/membership_target
+crates/modality_source
+crates/model_selection
+crates/network_analysis
+crates/operational_log
+crates/outcome_order
+crates/payload_bound
+crates/persistence_postgres
+crates/prediction_contradiction
 crates/prompt_source
+crates/provider_receipt
 crates/corpus_background
 crates/modality_source
 crates/copied_text
@@ -99,6 +129,7 @@ crates/temporal_core
 crates/tepp_api
 crates/tepp_simulation
 crates/topic_lineage
+crates/topic_measurement
 crates/validation_core
 crates/network_analysis
 crates/interpretation_gateway
@@ -141,6 +172,12 @@ uncovered production behavior.
 - `docs/superpowers/plans/2026-08-05-temporal-event-foundation.md`
 - `docs/research/standards-and-literature.md`
 
+No release, production-readiness, GPU, database, or statistical-recovery claim is
+made by this foundation slice.
+
+The active stacked analysis-engine slice adds a bounded executable readiness path
+from an accepted run to a digest-bound terminal artifact. It is not yet
+implemented-main and does not replace scientific estimator contracts.
 Validated statistical-recovery APIs exist only inside `psychometric_core`: OLS
 loading recovery on already-mapped coordinates, posterior-draw point estimates,
 the Rubin total-variance identity `T = U_bar + (1 + 1/m) B`, CWC/event-time/

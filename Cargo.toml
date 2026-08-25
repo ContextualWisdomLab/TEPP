@@ -53,6 +53,8 @@ members = [
     "crates/compute_backend",
     "crates/episode_membership",
     "crates/membership_target",
+    "crates/topic_measurement",
+    "crates/analysis_engine",
     "crates/psychometric_core",
 ]
 default-members = [
@@ -108,6 +110,8 @@ default-members = [
     "crates/compute_backend",
     "crates/episode_membership",
     "crates/membership_target",
+    "crates/topic_measurement",
+    "crates/analysis_engine",
     "crates/psychometric_core",
 ]
 

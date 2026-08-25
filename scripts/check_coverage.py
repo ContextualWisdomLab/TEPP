@@ -217,10 +217,10 @@ def is_executable_source_line(
     """Return whether *line_number* in *source_path* is an executable source line.
 
     LLVM LCOV sometimes emits zero-count DA records for documentation comments,
-    attributes, pure structural braces, multi-line signatures, literal
-    continuations, expression continuations, and in-file ``#[cfg(test)]``
-    modules. Those records are not evidence of uncovered production behavior
-    and are excluded from the authored-line gate.
+    attributes, pure structural braces, multi-line signatures, Rust multiline
+    string continuations, literal continuations, expression continuations, and
+    in-file ``#[cfg(test)]`` modules. Those records are not evidence of
+    uncovered production behavior and are excluded from the authored-line gate.
 
     When *repository_root* is provided, *source_path* must resolve under that
     root (same fail-closed rule as LCOV ``SF:`` loading).
@@ -241,6 +241,8 @@ def is_executable_source_line(
     if line_number in _cfg_test_module_line_numbers(lines):
         return False
     if _line_in_cfg_not_feature_block(lines, line_number):
+        return False
+    if _line_in_multiline_string_literal(lines, line_number):
         return False
     if _line_in_multiline_string(lines, line_number):
         return False
@@ -264,6 +266,8 @@ def is_executable_source_line(
         "});",
         "Ok(())",
     }:
+        return False
+    if _is_standalone_string_literal(text) or text.startswith("} else"):
         return False
     if text.endswith(" {"):
         type_name = text[:-2]
@@ -291,6 +295,12 @@ def is_executable_source_line(
             return False
         body = text[text.find("{") + 1 : text.rfind("}")].strip()
         return bool(body)
+    # Keep guarded match arms in the authored-line denominator: the guard
+    # executes even though the arm label itself is structural.
+    if text.endswith("=> {") and " if " not in text:
+        if text.startswith("if ") or text.startswith("if("):
+            return True
+        return _is_multiline_match_guard(lines, line_number)
     if text.startswith("pub struct ") or text.startswith("struct "):
         return False
     if text.startswith("pub enum ") or text.startswith("enum "):
@@ -308,6 +318,30 @@ def is_executable_source_line(
         return False
     return True
 
+
+def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
+    """Recognize a guard continued onto the lines immediately before an arm."""
+
+    target_prefix = lines[line_number - 1].strip().partition("=>")[0]
+    brace_depth = target_prefix.count("}") - target_prefix.count("{")
+    guard_found = False
+    boundary_candidate = False
+    for candidate in reversed(lines[: line_number - 1]):
+        stripped = candidate.strip()
+        if brace_depth == 0 and "=>" in stripped:
+            return guard_found and not boundary_candidate
+        if brace_depth == 1 and stripped.endswith("=> {"):
+            boundary_candidate = True
+        brace_depth += stripped.count("}") - stripped.count("{")
+        if (
+            (stripped.startswith("if ") or stripped.startswith("if("))
+            and not stripped.endswith(("}", ";"))
+            and brace_depth == 0
+        ):
+            guard_found = True
+        if stripped.startswith("match "):
+            return guard_found and not boundary_candidate
+    return guard_found and not boundary_candidate
 
 def _is_structural_comma_continuation(
     lines: list[str], line_number: int, text: str
@@ -519,6 +553,138 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
             index = cursor + 1
             continue
         index += 1
+    return False
+
+
+def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
+    """Return whether a line is inside a Rust string continuation.
+
+    The scanner tracks normal strings, raw strings, block comments, and character
+    literals so quotes in comments or literal contents cannot change the state of
+    a later source line.
+    """
+
+    in_string = False
+    raw_hashes: int | None = None
+    block_comment_depth = 0
+    for index, raw in enumerate(lines, start=1):
+        target_continuation = (in_string or raw_hashes is not None) and index == line_number
+        target_closing_cursor: int | None = None
+        target_has_executable_suffix = False
+        cursor = 0
+        while cursor < len(raw):
+            if block_comment_depth > 0:
+                if raw.startswith("/*", cursor):
+                    block_comment_depth += 1
+                    cursor += 2
+                elif raw.startswith("*/", cursor):
+                    block_comment_depth -= 1
+                    cursor += 2
+                else:
+                    cursor += 1
+                continue
+            if raw_hashes is not None:
+                delimiter = '"' + ("#" * raw_hashes)
+                closing = raw.find(delimiter, cursor)
+                if closing == -1:
+                    cursor = len(raw)
+                else:
+                    raw_hashes = None
+                    cursor = closing + len(delimiter)
+                    if target_continuation and target_closing_cursor is None:
+                        target_closing_cursor = cursor
+                continue
+            if in_string:
+                character = raw[cursor]
+                if character == "\\":
+                    cursor += 2
+                elif character == '"':
+                    in_string = False
+                    cursor += 1
+                    if target_continuation and target_closing_cursor is None:
+                        target_closing_cursor = cursor
+                else:
+                    cursor += 1
+                continue
+            if raw[cursor].isspace():
+                cursor += 1
+                continue
+            if raw.startswith("//", cursor):
+                break
+            if raw.startswith("/*", cursor):
+                block_comment_depth += 1
+                cursor += 2
+                continue
+            if target_continuation and target_closing_cursor is not None:
+                if raw[cursor] in ",;)]}":
+                    cursor += 1
+                    continue
+                target_has_executable_suffix = True
+            raw_start = _raw_string_start(raw, cursor)
+            if raw_start is not None:
+                raw_hashes, cursor = raw_start
+                continue
+            if raw[cursor] == '"':
+                in_string = True
+                cursor += 1
+                continue
+            if raw[cursor] == "'":
+                character_end = _character_literal_end(raw, cursor)
+                if character_end is not None:
+                    cursor = character_end
+                    continue
+            cursor += 1
+        if target_continuation:
+            if target_closing_cursor is None:
+                return True
+            return not target_has_executable_suffix
+    return False
+
+
+def _raw_string_start(line: str, cursor: int) -> tuple[int, int] | None:
+    """Return ``(hash_count, next_cursor)`` for a Rust raw-string opener."""
+
+    if line.startswith("br", cursor):
+        prefix_end = cursor + 2
+    elif line.startswith("r", cursor):
+        prefix_end = cursor + 1
+    else:
+        return None
+    hash_end = prefix_end
+    while hash_end < len(line) and line[hash_end] == "#":
+        hash_end += 1
+    if hash_end < len(line) and line[hash_end] == '"':
+        return hash_end - prefix_end, hash_end + 1
+    return None
+
+
+def _character_literal_end(line: str, cursor: int) -> int | None:
+    """Return the cursor after a one-line Rust character literal, if present."""
+
+    candidate = cursor + 1
+    if candidate >= len(line):
+        return None
+    if line[candidate] == "\\":
+        candidate += 2
+    else:
+        candidate += 1
+    if candidate < len(line) and line[candidate] == "'":
+        return candidate + 1
+    return None
+
+
+def _is_standalone_string_literal(text: str) -> bool:
+    """Return whether *text* is only a normal string literal and punctuation."""
+    if not text.startswith('"'):
+        return False
+    escaped = False
+    for index, character in enumerate(text[1:], start=1):
+        if character == '"' and not escaped:
+            return text[index + 1 :].strip() in {"", ",", ";"}
+        if character == "\\":
+            escaped = not escaped
+        else:
+            escaped = False
     return False
 
 
