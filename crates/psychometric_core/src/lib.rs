@@ -490,6 +490,20 @@
 //! `m · √v / √(trait + p + added)` uses `TRAITVAR` and is
 //! not `TDPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
+//! recovers the Driver 2017-era `addedTIPREDVARstd` as
+//! `extra / extra = 1` after strictly positive extra
+//! (JSS PDF re-opened 2026-08-23T21:22Z; 2017-era
+//! `summary.ctsemFit.R` forms
+//! `solve(sqrt(diag(addedTIPREDVAR))) %&% addedTIPREDVAR`;
+//! `OpenMx` `%&%` is the quadratic form; form `(B / a)² v`
+//! first, then the ratio; zero extra fails closed; the
+//! default `ridging = FALSE` does not add `0.0001`;
+//! unstandardised `(B / a)² v` is not this correlation;
+//! `λ² (B / a)² v` is Eq. 5 of the extra and is not this
+//! correlation; `t0_b² v` is `addedT0TIPREDVAR` and is not
+//! this asymptotic extra correlation; `TRAITVAR` is not
+//! the standardisation variance; the printed 2-latent
+//! `addedTIPREDVAR` 2.838 is not this scalar 1),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -661,6 +675,8 @@ pub use event_time::recover_predetermined_later_start_later_latent_variance;
 pub use event_time::recover_predetermined_later_start_later_observed_variance;
 /// Exact scalar p. 16 `asymTIPREDEFFECTstd` `(-B / a) · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_asymptotic_time_independent_predictor_effect;
+/// Exact scalar 2017-era `addedTIPREDVARstd` `extra / extra = 1` after strictly positive extra.
+pub use event_time::recover_standardised_asymptotic_time_independent_predictor_variance;
 /// Exact scalar p. 16 `DIFFUSIONstd` `q / (−q / (2 a)) = −2 a` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_continuous_diffusion;
 /// Exact scalar p. 16 `DRIFTstd` after strictly positive `asymDIFFUSION`.
@@ -737,6 +753,8 @@ pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_asym
 pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_initial_time_independent_observed_variance;
 /// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as `MANIFESTVAR`.
 pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_measurement_error;
+/// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as 2017-era `addedTIPREDVARstd`.
+pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as stationary observed variance.
 pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_stationary_observed_variance;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymTIPREDEFFECT`.
@@ -843,6 +861,8 @@ pub use event_time::refuse_initial_time_independent_observed_variance_as_measure
 pub use event_time::refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as free first-occasion `T0VAR`.
 pub use event_time::refuse_initial_time_independent_variance_as_initial_latent_variance;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as 2017-era `addedTIPREDVARstd`.
+pub use event_time::refuse_initial_time_independent_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as `TRAITVAR`.
@@ -1105,6 +1125,8 @@ pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 /// Refuse treating unstandardised `asymTIPREDEFFECT` `-B / a` as p. 16 `asymTIPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_asymptotic_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
+/// Refuse treating unstandardised `addedTIPREDVAR` `(B / a)² v` as 2017-era `addedTIPREDVARstd`.
+pub use event_time::refuse_unstandardised_asymptotic_time_independent_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating unstandardised `DIFFUSION` as p. 16 `DIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating unstandardised `DRIFT` as p. 16 `DRIFTstd`.
