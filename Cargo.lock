@@ -976,6 +976,14 @@ version = "0.1.0"
 [[package]]
 name = "model_selection"
 version = "0.1.0"
+dependencies = [
+ "corpus_split",
+ "membership_core",
+ "relation_graph",
+ "temporal_core",
+ "topic_measurement",
+ "uuid",
+]
 
 [[package]]
 name = "network_analysis"

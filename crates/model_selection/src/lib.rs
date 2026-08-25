@@ -4,18 +4,27 @@
 #![allow(clippy::cast_precision_loss)]
 //! Statistical and Pareto candidate-`K` gates for TRSL-TM model selection.
 //!
-//! Model selection uses held-out log-likelihood and complexity before any
-//! blinded LLM review. An LLM vote may recommend among statistically
-//! admissible candidates but never defines the numerical optimum (ADR 0012).
+//! Model selection fits each candidate `K` with the CPU `f64` reference
+//! estimator and scores the actual mixture likelihood and parameter count
+//! before any blinded LLM review. An LLM vote may recommend among
+//! statistically admissible candidates but never defines the numerical
+//! optimum (ADR 0012).
 
 mod candidate;
 mod error;
+mod fitted;
 mod gate;
 
 /// One candidate `K` with statistical or LLM-only support.
 pub use candidate::ModelCandidate;
 /// Fail-closed model-selection errors.
 pub use error::ModelSelectionError;
+/// Seeds, iteration budget, and candidate topic counts for fitted selection.
+pub use fitted::FittedCandidateKConfig;
+/// Fit each candidate `K` and select from the actual statistical diagnostics.
+pub use fitted::select_fitted_candidate_k;
+/// Build a statistical candidate from one actual fitted model.
+pub use fitted::statistical_candidate_from_fit;
 /// Select the admissible candidate `K` from a Pareto-filtered statistical front.
 pub use gate::select_candidate_k;
 /// RMSE of selected `K` replications against known truth.

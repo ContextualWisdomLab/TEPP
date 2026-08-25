@@ -124,11 +124,13 @@ Yang, X., Zhao, H., Phung, D., Buntine, W., & Du, L. (2025). LLM reading tea lea
 
 Akaike, H. (1974). A new look at the statistical model identification. *IEEE Transactions on Automatic Control, 19*(6), 716–723. https://doi.org/10.1109/TAC.1974.1100705
 
+Schwarz, G. (1978). Estimating the dimension of a model. *The Annals of Statistics, 6*(2), 461–464. https://doi.org/10.1214/aos/1176344136
+
 Burnham, K. P., & Anderson, D. R. (2002). *Model selection and multimodel inference: A practical information-theoretic approach* (2nd ed.). Springer.
 
 Deb, K., Pratap, A., Agarwal, S., Meyarivan, T. (2002). A fast and elitist multiobjective genetic algorithm: NSGA-II. *IEEE Transactions on Evolutionary Computation, 6*(2), 182–197. https://doi.org/10.1109/4235.996017
 
-LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. The current `model_selection` crate performs statistical/Pareto gating; candidate blinding and blinded LLM review remain accepted-target extensions and are not executed by this crate. Pareto-filtered held-out log-likelihood and complexity admit a candidate `K`; an LLM vote cannot define the numerical optimum. `interpretation_gateway` records judgments as hypothetical proposals that must cite evidence spans and cannot become estimator results or observed facts.
+LLM evaluation complements but never replaces predictive, posterior, stability, alignment, fairness, recovery, and human-validation evidence. The current `model_selection` crate fits each candidate `K` with the CPU `f64` reference and applies statistical/Pareto gating to those fitted diagnostics; candidate blinding and blinded LLM review remain accepted-target extensions and are not executed by this crate. Pareto-filtered in-sample mixture log-likelihood and Schwarz (1978) complexity `ℓ − (p ln N)/2` admit a candidate `K`; an LLM vote cannot define the numerical optimum. The fitted path copies the ADR 0012 / `topic_measurement` reference hyperparameters rather than inventing a second set. `interpretation_gateway` records judgments as hypothetical proposals that must cite evidence spans and cannot become estimator results or observed facts.
 
 ## Compositional data, correlation, and clusters
 
