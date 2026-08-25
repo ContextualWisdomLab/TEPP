@@ -361,6 +361,21 @@
 //! `(-B / a) · √v / √(trait + p + added)` uses `TRAITVAR` and is
 //! not `asymTIPREDEFFECTstd`; `TRAITVAR` is not the standardisation
 //! variance),
+//! recovers the Driver p. 16 finite-interval standardised
+//! `TIPREDEFFECT` as `A^{-1}[e^{A Δt} − I] B · √v / √(-q / (2 a))`
+//! after forming strictly positive `asymDIFFUSION` and strictly
+//! positive predictor variance (JSS PDF re-opened 2026-08-24T01:20Z;
+//! footnote 4 standardises using only the relevant variance, not the
+//! total; the affecting variance is `TIPREDVAR` `v`; the affected
+//! variance is `asymDIFFUSION`; unstandardised
+//! `A^{-1}[e^{A Δt} − I] B` is defined for a zero coefficient and
+//! for zero predictor variance, and is not the standardised
+//! finite-interval map; zero `asymDIFFUSION` or zero `v` fails
+//! closed; `asymTIPREDEFFECTstd` `(-B / a) · √v / √p` is the
+//! `Δt → ∞` map and is not the finite-interval map;
+//! `A^{-1}[e^{A Δt} − I] B · √v / √(trait + p + added)` uses
+//! `TRAITVAR` and is not the finite-interval map; `TRAITVAR` is not
+//! the standardisation variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -529,6 +544,8 @@ pub use event_time::recover_standardised_continuous_drift;
 pub use event_time::recover_standardised_discrete_diffusion;
 /// Exact scalar p. 16 `discreteDRIFTstd` `e^{a Δt}` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_discrete_drift;
+/// Exact scalar p. 16 finite-interval standardised `TIPREDEFFECT` `A^{-1}[e^{A Δt} − I] B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
+pub use event_time::recover_standardised_discrete_time_independent_predictor_effect;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
@@ -783,6 +800,8 @@ pub use event_time::refuse_predetermined_later_start_later_latent_variance_as_ob
 pub use event_time::refuse_predetermined_later_start_later_latent_variance_as_stationary_later_latent_variance;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
+/// Refuse treating p. 16 `asymTIPREDEFFECTstd` as the finite-interval standardised `TIPREDEFFECT`.
+pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_standardised_discrete_time_independent_effect;
 /// Refuse treating continuous `DIFFUSION` standardisation `−2 a` as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating p. 16 `discreteDIFFUSIONstd` `1 − exp(2 a Δt)` as p. 16 `DIFFUSIONstd`.
@@ -879,6 +898,8 @@ pub use event_time::refuse_trait_contaminated_asymptotic_time_independent_effect
 pub use event_time::refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating Driver §7.1 trait-contaminated continuous drift as p. 16 `DRIFTstd`.
 pub use event_time::refuse_trait_contaminated_continuous_drift_as_standardised_continuous_drift;
+/// Refuse treating Driver §7.1 trait-contaminated finite-interval TI effect as the p. 16 standardised finite-interval `TIPREDEFFECT`.
+pub use event_time::refuse_trait_contaminated_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect;
 /// Refuse treating Driver §7.1 trait-contaminated process noise as p. 16 `discreteDIFFUSIONstd`.
 pub use event_time::refuse_trait_contaminated_process_noise_as_standardised_discrete_diffusion;
 /// Refuse treating Driver §7.1 trait-plus-state autocorrelation as p. 16 `discreteDRIFTstd`.
@@ -903,6 +924,8 @@ pub use event_time::refuse_unstandardised_continuous_drift_as_standardised_conti
 pub use event_time::refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating unstandardised `discreteDRIFT` as p. 16 `discreteDRIFTstd`.
 pub use event_time::refuse_unstandardised_discrete_drift_as_standardised_discrete_drift;
+/// Refuse treating unstandardised finite-interval `TIPREDEFFECT` `A^{-1}[e^{A Δt} − I] B` as the p. 16 standardised finite-interval map.
+pub use event_time::refuse_unstandardised_discrete_time_independent_effect_as_standardised_discrete_time_independent_effect;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.
