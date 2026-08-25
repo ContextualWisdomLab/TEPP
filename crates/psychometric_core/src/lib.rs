@@ -504,6 +504,23 @@
 //! this asymptotic extra correlation; `TRAITVAR` is not
 //! the standardisation variance; the printed 2-latent
 //! `addedTIPREDVAR` 2.838 is not this scalar 1),
+//! recovers the Driver Table 3 / p. 16 `T0TDPREDEFFECTstd` as
+//! `t0_m · √v / √p_0` after forming strictly positive free `T0VAR`
+//! and strictly positive time-dependent predictor variance
+//! (JSS PDF re-opened 2026-08-23T21:34Z; footnote 4 standardises
+//! using only the relevant variance, not the total; the affecting
+//! variance is TD predictor variance `v`, not `TIPREDVAR`; the
+//! affected variance is free first-occasion `T0VAR` `p_0`, not
+//! `asymDIFFUSION`; unstandardised `t0_m` is defined for a zero
+//! coefficient and for zero predictor variance, and is not
+//! `T0TDPREDEFFECTstd`; zero `p_0` or zero `v` fails closed; `T0`
+//! is event time, so a non-event clock fails closed; free `T0VAR`
+//! does not require stable `a < 0`; `m · √v / √(-q / (2 a))` is
+//! not `T0TDPREDEFFECTstd`; `t0_b · √v / √p_0` is not
+//! `T0TDPREDEFFECTstd` even when `t0_m = t0_b`;
+//! `t0_m · √v / √(trait + p_0 + added)` uses `TRAITVAR` and is
+//! not `T0TDPREDEFFECTstd`; `TRAITVAR` is not the standardisation
+//! variance),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -694,6 +711,7 @@ pub use event_time::recover_standardised_discrete_drift;
 /// Exact scalar p. 16 finite-interval standardised `TIPREDEFFECT` `A^{-1}[e^{A Δt} − I] B · √v / √(-q / (2 a))` after strictly positive `asymDIFFUSION` and `v`.
 pub use event_time::recover_standardised_discrete_time_independent_predictor_effect;
 /// Exact scalar Table 3 / p. 16 `T0TDPREDEFFECTstd` `t0_m · √v_x / √p_0` after strictly positive free `T0VAR` and `TDPREDVAR`.
+/// Exact scalar Table 3 / p. 16 `T0TDPREDEFFECTstd` `t0_m · √v / √p_0` after strictly positive free `T0VAR` and `v`.
 pub use event_time::recover_standardised_initial_time_dependent_predictor_effect;
 /// Exact scalar Table 3 / p. 16 `T0TIPREDEFFECTstd` `t0_b · √v / √p_0` after strictly positive free `T0VAR` and `v`.
 pub use event_time::recover_standardised_initial_time_independent_predictor_effect;
@@ -993,6 +1011,8 @@ pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_dis
 pub use event_time::refuse_standardised_discrete_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `TIPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
 pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_dependent_effect;
+/// Refuse treating p. 16 `TDPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
+pub use event_time::refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating p. 16 `TIPREDEFFECTstd` as p. 16 `TDPREDEFFECTstd`.
 pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect;
 /// Refuse treating p. 16 `TIPREDEFFECTstd` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.

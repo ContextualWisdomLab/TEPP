@@ -184,6 +184,7 @@ use psychometric_core::{
     refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
     refuse_standardised_discrete_continuous_intercept_as_standardised_continuous_intercept,
     refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_dependent_effect,
+    refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect,
     refuse_standardised_continuous_time_independent_effect_as_standardised_continuous_time_dependent_effect,
     refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_independent_effect,
     refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion,
@@ -5054,6 +5055,137 @@ fn standardised_continuous_time_dependent_effect_is_not_unstandardised_or_trait_
     );
     assert_eq!(
         refuse_trait_variance_as_standardisation_variance(trait_variance, within),
+        Err(psychometric_core::PsychometricError::TraitVarianceIsNotStandardisationVariance)
+    );
+}
+
+#[allow(clippy::too_many_lines)]
+#[test]
+fn standardised_initial_time_dependent_effect_is_not_unstandardised_or_trait_contaminated() {
+    let initial_variance = 1.6_f64;
+    let coefficient = 0.3_f64;
+    let predictor_variance = 1.0_f64;
+    let recovered = recover_standardised_initial_time_dependent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        initial_variance,
+        LagClock::EventTime,
+    )
+    .expect("T0TDPREDEFFECTstd");
+    assert!(
+        (recovered - coefficient * predictor_variance.sqrt() / initial_variance.sqrt()).abs()
+            < 1e-15,
+        "Driver et al. (2017, Table 3 / footnote 4): T0TDPREDEFFECTstd is t0_m·√v/√p_0"
+    );
+    let larger_p0 = recover_standardised_initial_time_dependent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        6.4,
+        LagClock::EventTime,
+    )
+    .expect("T0TDPREDEFFECTstd p_0=6.4");
+    assert!((larger_p0 - recovered).abs() > 1e-3);
+    let continuous = recover_standardised_continuous_time_dependent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        0.4,
+        -0.5,
+        LagClock::EventTime,
+    )
+    .expect("TDPREDEFFECTstd");
+    assert!(
+        (continuous - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16 / Table 3): TDPREDEFFECTstd is not T0TDPREDEFFECTstd"
+    );
+    let t0_tipred = recover_standardised_initial_time_independent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        initial_variance,
+        LagClock::EventTime,
+    )
+    .expect("T0TIPREDEFFECTstd");
+    assert_eq!(
+        t0_tipred.to_bits(),
+        recovered.to_bits(),
+        "Driver et al. (2017, Table 3): equal numbers when t0_m=t0_b are still distinct named quantities"
+    );
+    let trait_variance = 1.0_f64;
+    let total = recover_trait_plus_state_latent_variance(trait_variance, initial_variance)
+        .expect("trait+state var");
+    let contaminated = coefficient * predictor_variance.sqrt() / total.sqrt();
+    assert!(
+        (contaminated - recovered).abs() > 1e-3,
+        "Driver et al. (2017, footnote 4 / §7.1): TRAITVAR contaminates the affected SD"
+    );
+    assert_eq!(
+        recover_standardised_initial_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            0.0,
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositiveInitialLatentVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_initial_time_dependent_predictor_effect(
+            coefficient,
+            0.0,
+            initial_variance,
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositivePredictorVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_initial_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            initial_variance,
+            LagClock::SystemTime
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+            coefficient,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+            continuous,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedContinuousTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect(
+            t0_tipred,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedInitialTimeIndependentEffectIsNotStandardisedInitialTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_trait_contaminated_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+            contaminated,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_trait_variance_as_standardisation_variance(trait_variance, initial_variance),
         Err(psychometric_core::PsychometricError::TraitVarianceIsNotStandardisationVariance)
     );
 }
