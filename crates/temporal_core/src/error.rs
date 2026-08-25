@@ -24,6 +24,10 @@ pub enum TemporalError {
     UnsupportedWireVersion,
     /// A JSON wire record declared a different nominal clock type.
     ClockTypeMismatch,
+    /// Availability is unknown or open-ended and can extend past the cutoff.
+    UncertainAvailability,
+    /// The latest possible availability instant is after the knowledge cutoff.
+    IneligibleAtCutoff,
 }
 
 impl fmt::Display for TemporalError {
@@ -40,6 +44,8 @@ impl fmt::Display for TemporalError {
             Self::InvalidWirePayload => "invalid temporal wire payload",
             Self::UnsupportedWireVersion => "unsupported temporal wire version",
             Self::ClockTypeMismatch => "temporal clock type mismatch",
+            Self::UncertainAvailability => "uncertain availability fails closed at cutoff",
+            Self::IneligibleAtCutoff => "availability is ineligible at knowledge cutoff",
         };
         formatter.write_str(message)
     }
