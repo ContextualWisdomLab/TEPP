@@ -813,6 +813,27 @@ pub enum PsychometricError {
     /// `TIPREDEFFECTstd`. Footnote 4 uses only `asymDIFFUSION`,
     /// not `TRAITVAR`.
     TraitContaminatedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeIndependentEffect,
+    /// Driver p. 16 `CINTstd` was requested with a non-positive
+    /// within-subject variance. Footnote 4 standardises the process
+    /// intercept using only strictly positive `asymDIFFUSION`.
+    StandardisedContinuousInterceptRequiresPositiveWithinSubjectVariance,
+    /// Driver Table 2 unstandardised `CINT` `κ` was treated as p. 16
+    /// `CINTstd`. Unstandardised `κ` is defined for growing or
+    /// zero-diffusion processes; standardised `CINT` is not.
+    UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept,
+    /// Driver Table 2 `asymCINTstd` `(-κ / a) / √(-q / (2 a))` was
+    /// treated as p. 16 `CINTstd`. The asymptotic map is the total
+    /// change, not the continuous intercept.
+    StandardisedAsymptoticContinuousInterceptIsNotStandardisedContinuousIntercept,
+    /// Driver finite-interval standardised `CINT`
+    /// `A^{-1}[e^{A Δt} − I] κ / √p` was treated as p. 16 `CINTstd`.
+    /// The discrete increment depends on the event interval; the
+    /// continuous intercept does not.
+    StandardisedDiscreteContinuousInterceptIsNotStandardisedContinuousIntercept,
+    /// Driver §7.1 trait-contaminated continuous intercept
+    /// `κ / √(trait + p + added)` was treated as p. 16 `CINTstd`.
+    /// Footnote 4 uses only `asymDIFFUSION`, not `TRAITVAR`.
+    TraitContaminatedContinuousInterceptIsNotStandardisedContinuousIntercept,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1425,6 +1446,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::TraitContaminatedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeIndependentEffect => {
                 "trait-contaminated continuous time-independent predictor effect is not standardised continuous time-independent predictor effect"
+            }
+            Self::StandardisedContinuousInterceptRequiresPositiveWithinSubjectVariance => {
+                "standardised continuous intercept requires strictly positive within-subject variance"
+            }
+            Self::UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept => {
+                "unstandardised continuous intercept is not standardised continuous intercept"
+            }
+            Self::StandardisedAsymptoticContinuousInterceptIsNotStandardisedContinuousIntercept => {
+                "standardised asymptotic continuous intercept is not standardised continuous intercept"
+            }
+            Self::StandardisedDiscreteContinuousInterceptIsNotStandardisedContinuousIntercept => {
+                "standardised discrete continuous intercept is not standardised continuous intercept"
+            }
+            Self::TraitContaminatedContinuousInterceptIsNotStandardisedContinuousIntercept => {
+                "trait-contaminated continuous intercept is not standardised continuous intercept"
             }
         };
         formatter.write_str(message)
@@ -2443,6 +2479,35 @@ mod tests {
             PsychometricError::TraitContaminatedContinuousTimeIndependentEffectIsNotStandardisedContinuousTimeIndependentEffect
                 .to_string(),
             "trait-contaminated continuous time-independent predictor effect is not standardised continuous time-independent predictor effect"
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_intercept_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedContinuousInterceptRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised continuous intercept requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousInterceptIsNotStandardisedContinuousIntercept
+                .to_string(),
+            "unstandardised continuous intercept is not standardised continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticContinuousInterceptIsNotStandardisedContinuousIntercept
+                .to_string(),
+            "standardised asymptotic continuous intercept is not standardised continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteContinuousInterceptIsNotStandardisedContinuousIntercept
+                .to_string(),
+            "standardised discrete continuous intercept is not standardised continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedContinuousInterceptIsNotStandardisedContinuousIntercept
+                .to_string(),
+            "trait-contaminated continuous intercept is not standardised continuous intercept"
         );
     }
 }
