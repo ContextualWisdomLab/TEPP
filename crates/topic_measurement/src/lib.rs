@@ -30,6 +30,8 @@ pub use coordinates::isometric_log_ratio;
 pub use error::TopicMeasurementError;
 /// Refuse lexical retrieval weights as inferential coordinates.
 pub use lexical::refuse_lexical_inferential_weight;
+/// Identified joint precision in document-major ALR coordinate order.
+pub use reference::JointCoordinatePrecision;
 /// Posterior uncertainty representation retained by a fitted reference model.
 pub use reference::PosteriorApproximation;
 /// One admitted structural prevalence feature.
