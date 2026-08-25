@@ -167,7 +167,7 @@ pub fn statistical_candidate_from_fit(
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
     let parameters = free_parameter_count(model)?;
     let log_tokens = tokens.ln();
-    if !log_tokens.is_finite() || log_tokens < 0.0 {
+    if log_tokens < 0.0 {
         return Err(ModelSelectionError::InvalidDiagnostic);
     }
     let penalty = parameters * log_tokens;
