@@ -1,0 +1,17 @@
+[package]
+name = "derived_sensitivity"
+description = "Derived topic, factor, and relation outputs inherit source sensitivity."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[lints]
+workspace = true
