@@ -1,5 +1,21 @@
 # Product and Technical Gap Baseline
 
+## 2026-08-25 Event Lineage anchor contract slice
+
+- Exact base: protected `main` `cf0e0ad74d23c5d2e0e33d389bb0bb4d37067c31`.
+- This branch publishes TEPP's strict request identity and
+  `tepp.lineage_criterion_anchor.v1` accepted/rejected artifact contract.
+- The buyer-visible integrity gain is fail-closed: LineageWeave cannot promote
+  fast-mlsirm's internal response structure into calibrated Event Lineage
+  weights without an exact TEPP-authored criterion result.
+- Remaining product gap: the registered TEPP criterion estimator and terminal
+  artifact delivery are not implemented by this contract slice. Until they
+  exist and pass scientific recovery/validity gates, production activation
+  remains unavailable; the consumer must not invent a substitute.
+- Acceptance evidence for this slice: complete `tepp_api` tests, warning-free
+  clippy, strict unknown-field/provenance rejection, schema and ADR/API
+  traceability, followed by exact-head protected checks and independent review.
+
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 **Snapshot:** 2026-08-25T04:24:53Z
