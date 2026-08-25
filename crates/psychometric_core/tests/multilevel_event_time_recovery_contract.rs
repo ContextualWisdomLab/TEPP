@@ -638,19 +638,11 @@ fn time_varying_predictor_equation_fourteen_intervals_fail_closed() {
 #[test]
 fn time_varying_predictor_equation_fourteen_numeric_inputs_fail_closed() {
     assert_eq!(
-        recover_discrete_time_varying_predictor_effect(
-            f64::NAN,
-            1.0,
-            LagClock::EventTime
-        ),
+        recover_discrete_time_varying_predictor_effect(f64::NAN, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
-        recover_discrete_time_varying_predictor_effect(
-            1e308,
-            10.0,
-            LagClock::EventTime
-        ),
+        recover_discrete_time_varying_predictor_effect(1e308, 10.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }
@@ -1555,12 +1547,9 @@ fn time_dependent_impulse_recovers_driver_equation_three_fourth_summand() {
     let intercept_effect =
         recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
             .expect("cint");
-    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
-        effect,
-        delta,
-        LagClock::EventTime,
-    )
-    .expect("eq14");
+    let equation_fourteen =
+        recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
+            .expect("eq14");
     assert!((impulse - intercept_effect).abs() > 1e-3);
     assert!((impulse - equation_fourteen).abs() > 1e-3);
     assert_eq!(
@@ -1584,24 +1573,11 @@ fn time_dependent_impulse_refuses_overflow_and_non_event_clocks() {
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
-        recover_discrete_latent_mean_with_impulse(
-            1.0,
-            -0.5,
-            0.3,
-            0.4,
-            2.0,
-            LagClock::SystemTime
-        ),
+        recover_discrete_latent_mean_with_impulse(1.0, -0.5, 0.3, 0.4, 2.0, LagClock::SystemTime),
         Err(PsychometricError::EventTimeRequired)
     );
     assert_eq!(
-        recover_discrete_latent_mean_with_impulse(
-            1e308,
-            0.0,
-            1e308,
-            1.0,
-            LagClock::EventTime
-        ),
+        recover_discrete_latent_mean_with_impulse(1e308, 0.0, 1e308, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
@@ -1876,12 +1852,9 @@ fn time_independent_predictor_recovers_driver_equation_three_second_summand() {
         recover_discrete_continuous_intercept_effect(effect, drift, delta, LagClock::EventTime)
             .expect("cint");
     let impulse = recover_time_dependent_predictor_impulse(effect, predictor).expect("tdpred");
-    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
-        effect,
-        delta,
-        LagClock::EventTime,
-    )
-    .expect("eq14");
+    let equation_fourteen =
+        recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
+            .expect("eq14");
     assert!(rmse(&[increment], &[intercept_effect]) > rmse(&[expected], &[increment]));
     assert!(rmse(&[increment], &[impulse]) > rmse(&[expected], &[increment]));
     assert!(rmse(&[increment], &[equation_fourteen]) > rmse(&[expected], &[increment]));
@@ -2947,12 +2920,9 @@ fn time_dependent_impulse_carry_recovers_driver_equation_one_two_dissipation() {
         LagClock::EventTime,
     )
     .expect("tipred");
-    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
-        effect,
-        delta,
-        LagClock::EventTime,
-    )
-    .expect("eq14");
+    let equation_fourteen =
+        recover_discrete_time_varying_predictor_effect(effect, delta, LagClock::EventTime)
+            .expect("eq14");
     assert!(rmse(&[carry], &[impulse]) > rmse(&[expected], &[carry]));
     assert!(rmse(&[carry], &[intercept_effect]) > rmse(&[expected], &[carry]));
     assert!(rmse(&[carry], &[time_independent]) > rmse(&[expected], &[carry]));
@@ -3021,13 +2991,7 @@ fn time_dependent_impulse_carry_refuses_overflow_and_non_event_clocks() {
         Err(PsychometricError::EventTimeRequired)
     );
     assert_eq!(
-        recover_time_dependent_predictor_impulse_carry(
-            0.4,
-            3.0,
-            -0.5,
-            2.0,
-            LagClock::EventTime
-        ),
+        recover_time_dependent_predictor_impulse_carry(0.4, 3.0, -0.5, 2.0, LagClock::EventTime),
         Err(PsychometricError::NonPositiveInterval)
     );
     assert_eq!(
@@ -3054,13 +3018,7 @@ fn time_dependent_impulse_carry_refuses_overflow_and_non_event_clocks() {
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
-        recover_time_dependent_predictor_impulse_carry(
-            1.0,
-            1_000.0,
-            2.0,
-            1.0,
-            LagClock::EventTime
-        ),
+        recover_time_dependent_predictor_impulse_carry(1.0, 1_000.0, 2.0, 1.0, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }
@@ -4645,11 +4603,7 @@ fn asymptotic_time_independent_variance_refuses_unstable_drift_and_non_event_clo
         Ok(0.0)
     );
     assert_eq!(
-        recover_asymptotic_time_independent_predictor_variance(
-            1.0,
-            -1e-308,
-            LagClock::EventTime
-        ),
+        recover_asymptotic_time_independent_predictor_variance(1.0, -1e-308, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
@@ -4956,14 +4910,7 @@ fn stationary_initial_observed_mean_refuses_unstable_drift_and_non_event_clocks(
         Err(PsychometricError::AsymptoticContinuousInterceptRequiresStableDrift)
     );
     assert_eq!(
-        recover_stationary_initial_observed_mean(
-            2.0,
-            0.0,
-            -0.225,
-            1.0,
-            0.5,
-            LagClock::EventTime
-        ),
+        recover_stationary_initial_observed_mean(2.0, 0.0, -0.225, 1.0, 0.5, LagClock::EventTime),
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
     assert_eq!(
@@ -5087,22 +5034,11 @@ fn stationary_initial_latent_variance_refuses_unstable_drift_and_non_event_clock
         Ok(0.0)
     );
     assert_eq!(
-        recover_stationary_initial_latent_variance(
-            f64::NAN,
-            0.4,
-            0.0,
-            -0.5,
-            LagClock::EventTime
-        ),
+        recover_stationary_initial_latent_variance(f64::NAN, 0.4, 0.0, -0.5, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
-        recover_stationary_initial_latent_variance(
-            f64::MAX,
-            0.0,
-            -0.5,
-            LagClock::EventTime
-        ),
+        recover_stationary_initial_latent_variance(f64::MAX, 0.0, -0.5, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
     assert_eq!(
@@ -5455,13 +5391,7 @@ fn stationary_lagged_latent_covariance_refuses_unstable_drift_and_non_event_cloc
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
     assert_eq!(
-        recover_stationary_lagged_latent_covariance(
-            0.0,
-            1.0,
-            0.0,
-            1.0,
-            LagClock::EventTime
-        ),
+        recover_stationary_lagged_latent_covariance(0.0, 1.0, 0.0, 1.0, LagClock::EventTime),
         Ok(0.0)
     );
 }
@@ -5787,14 +5717,7 @@ fn stationary_later_latent_variance_refuses_unstable_drift_and_non_event_clocks(
         Err(PsychometricError::StationaryVarianceRequiresStableDrift)
     );
     assert_eq!(
-        recover_stationary_later_latent_variance(
-            0.0,
-            -0.225,
-            1.0,
-            0.5,
-            1.0,
-            LagClock::EventTime
-        ),
+        recover_stationary_later_latent_variance(0.0, -0.225, 1.0, 0.5, 1.0, LagClock::EventTime),
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
     assert_eq!(
@@ -6184,13 +6107,7 @@ fn predetermined_later_latent_variance_refuses_non_event_clocks_and_keeps_growin
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
     assert_eq!(
-        recover_predetermined_later_latent_variance(
-            0.0,
-            1.0,
-            0.0,
-            1.0,
-            LagClock::EventTime
-        ),
+        recover_predetermined_later_latent_variance(0.0, 1.0, 0.0, 1.0, LagClock::EventTime),
         Ok(0.0)
     );
 }
@@ -6569,14 +6486,9 @@ fn predetermined_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_gro
     )
     .expect("growing carry");
     assert!(growing > 2.0);
-    let brownian = recover_predetermined_lagged_latent_covariance(
-        0.0,
-        2.0,
-        0.0,
-        1.0,
-        LagClock::EventTime,
-    )
-    .expect("Brownian a=0");
+    let brownian =
+        recover_predetermined_lagged_latent_covariance(0.0, 2.0, 0.0, 1.0, LagClock::EventTime)
+            .expect("Brownian a=0");
     assert!((brownian - 2.0).abs() < 1e-12);
     assert_eq!(
         recover_predetermined_lagged_latent_covariance(
@@ -6590,13 +6502,7 @@ fn predetermined_lagged_latent_covariance_refuses_non_event_clocks_and_keeps_gro
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
     assert_eq!(
-        recover_predetermined_lagged_latent_covariance(
-            0.0,
-            1.0,
-            0.0,
-            1.0,
-            LagClock::EventTime
-        ),
+        recover_predetermined_lagged_latent_covariance(0.0, 1.0, 0.0, 1.0, LagClock::EventTime),
         Ok(0.0)
     );
 }
@@ -6973,13 +6879,7 @@ fn predetermined_initial_latent_variance_refuses_non_event_clocks_and_keeps_unst
             .expect("Brownian a=0");
     assert!((brownian - 2.0).abs() < 1e-12);
     assert_eq!(
-        recover_predetermined_initial_latent_variance(
-            0.0,
-            -0.225,
-            1.0,
-            0.5,
-            LagClock::EventTime
-        ),
+        recover_predetermined_initial_latent_variance(0.0, -0.225, 1.0, 0.5, LagClock::EventTime),
         Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
     );
     assert_eq!(
