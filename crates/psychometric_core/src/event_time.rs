@@ -12292,9 +12292,16 @@ mod tests {
             ),
             Ok(loading * evolved)
         );
-        let zero_evolved =
-            recover_discrete_observed_mean(loading, 0.0, 0.0, 0.0, manifest_mean, delta, LagClock::EventTime)
-                .expect("zero-mu");
+        let zero_evolved = recover_discrete_observed_mean(
+            loading,
+            0.0,
+            0.0,
+            0.0,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("zero-mu");
         assert!((zero_evolved - manifest_mean).abs() < 1e-15);
         let integrator = recover_discrete_observed_mean(
             loading,
@@ -12509,7 +12516,15 @@ mod tests {
             Err(PsychometricError::EventTimeRequired)
         );
         assert_eq!(
-            recover_discrete_latent_mean_with_impulse(1e308, 0.0, 1e308, 0.0, 0.0, 1.0, LagClock::EventTime),
+            recover_discrete_latent_mean_with_impulse(
+                1e308,
+                0.0,
+                1e308,
+                0.0,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
@@ -13418,6 +13433,7 @@ mod tests {
                 original,
                 extra,
                 2.0,
+                0.0,
                 LagClock::EventTime
             ),
             Err(PsychometricError::NonPositiveInterval)
@@ -14560,7 +14576,14 @@ mod tests {
             Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
         );
         assert_eq!(
-            recover_stationary_initial_latent_variance(0.0, 0.0, 0.0, 1.0, 0.0, LagClock::EventTime),
+            recover_stationary_initial_latent_variance(
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
             Ok(0.0)
         );
         assert_eq!(
@@ -15825,9 +15848,12 @@ mod tests {
             recover_stationary_later_observed_variance(
                 loading,
                 0.0,
+                0.0,
+                0.0,
                 1.0,
                 0.0,
                 event_delta,
+                0.0,
                 0.0,
                 LagClock::EventTime,
             ),
@@ -15963,6 +15989,7 @@ mod tests {
                 0.0,
                 1.0,
                 0.0,
+                0.0,
                 LagClock::EventTime
             ),
             Err(PsychometricError::StationaryVarianceRequiresStableDrift)
@@ -15971,10 +15998,12 @@ mod tests {
             recover_stationary_later_observed_variance(
                 2.0,
                 0.0,
+                0.0,
                 -0.225,
                 1.0,
                 0.5,
                 1.0,
+                0.0,
                 0.0,
                 LagClock::EventTime
             ),
@@ -15983,6 +16012,8 @@ mod tests {
         assert_eq!(
             recover_stationary_later_observed_variance(
                 2.0,
+                0.0,
+                0.0,
                 0.0,
                 1.0,
                 0.0,
@@ -15999,8 +16030,10 @@ mod tests {
                 1.0,
                 0.4,
                 0.0,
+                0.0,
                 -0.5,
                 1.0,
+                0.0,
                 0.0,
                 LagClock::EventTime
             ),
@@ -16011,8 +16044,11 @@ mod tests {
                 2.0,
                 f64::MAX,
                 0.0,
+                0.0,
+                0.0,
                 -0.5,
                 1.0,
+                0.0,
                 0.0,
                 LagClock::EventTime
             ),
@@ -16338,6 +16374,7 @@ mod tests {
                 2.0,
                 0.4,
                 0.0,
+                0.0,
                 -0.5,
                 1.0,
                 LagClock::EventTime
@@ -16357,6 +16394,7 @@ mod tests {
         assert_eq!(
             recover_predetermined_later_latent_variance(
                 f64::MAX,
+                0.0,
                 0.0,
                 1.0,
                 f64::MAX,
@@ -16950,17 +16988,16 @@ mod tests {
             ),
             Ok(0.0)
         );
-        let brownian =
-            recover_predetermined_lagged_latent_covariance(
-                0.0,
-                2.0,
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-                LagClock::EventTime,
-            )
-            .expect("Brownian a=0");
+        let brownian = recover_predetermined_lagged_latent_covariance(
+            0.0,
+            2.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("Brownian a=0");
         assert!((brownian - 2.0).abs() < 1e-12);
         assert_eq!(
             recover_predetermined_lagged_latent_covariance(
@@ -19117,7 +19154,13 @@ mod tests {
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
-            recover_initial_time_independent_predictor_carry(1.0, 1e308, 10.0, 1.0, LagClock::EventTime),
+            recover_initial_time_independent_predictor_carry(
+                1.0,
+                1e308,
+                10.0,
+                1.0,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
@@ -19761,7 +19804,13 @@ mod tests {
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
-            recover_initial_time_dependent_predictor_carry(1.0, 1e308, 10.0, 1.0, LagClock::EventTime),
+            recover_initial_time_dependent_predictor_carry(
+                1.0,
+                1e308,
+                10.0,
+                1.0,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
         assert_eq!(
@@ -20174,6 +20223,8 @@ mod tests {
         assert_eq!(
             recover_predetermined_initial_latent_variance(
                 0.0,
+                0.0,
+                0.0,
                 predictor_variance,
                 0.0,
                 LagClock::EventTime
@@ -20192,6 +20243,8 @@ mod tests {
         assert!((trait_only - trait_variance).abs() < 1e-15);
         let unstable_trait = recover_predetermined_initial_latent_variance(
             trait_variance,
+            0.0,
+            0.0,
             0.0,
             0.5,
             LagClock::EventTime,
@@ -20289,6 +20342,7 @@ mod tests {
         assert_eq!(
             recover_predetermined_initial_latent_variance(
                 0.0,
+                0.0,
                 -0.225,
                 1.0,
                 0.5,
@@ -20297,12 +20351,25 @@ mod tests {
             Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
         );
         assert_eq!(
-            recover_predetermined_initial_latent_variance(0.0, 0.0, 0.0, 1.0, 0.0, LagClock::EventTime),
+            recover_predetermined_initial_latent_variance(
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
             Ok(0.0)
         );
-        let brownian =
-            recover_predetermined_initial_latent_variance(0.0, 2.0, 0.0, 0.0, 0.0, LagClock::EventTime)
-                .expect("Brownian a=0");
+        let brownian = recover_predetermined_initial_latent_variance(
+            0.0,
+            2.0,
+            0.0,
+            0.0,
+            0.0,
+            LagClock::EventTime,
+        )
+        .expect("Brownian a=0");
         assert!((brownian - 2.0).abs() < 1e-12);
         assert_eq!(
             recover_predetermined_initial_latent_variance(
@@ -21328,6 +21395,8 @@ mod tests {
         let trait_only = recover_predetermined_later_start_later_latent_variance(
             trait_variance,
             0.0,
+            0.0,
+            0.0,
             predictor_variance,
             0.0,
             start_delta,
@@ -21504,6 +21573,8 @@ mod tests {
         assert_eq!(
             recover_predetermined_later_start_later_latent_variance(
                 0.0,
+                0.0,
+                0.0,
                 -0.225,
                 1.0,
                 0.5,
@@ -21518,7 +21589,9 @@ mod tests {
             2.0,
             0.4,
             0.0,
+            0.0,
             0.5,
+            1.0,
             1.0,
             LagClock::EventTime,
         )
