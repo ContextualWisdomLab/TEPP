@@ -3,7 +3,7 @@
 **Status:** Accepted target operating baseline with current maturity explicit.  
 **Last reviewed:** 2026-08-13
 
-TEPP is still an implementation-stage research/product platform. Protected main currently contains the Rust workspace/evidence foundation; PR #5/#6 add temporal foundations. Database, model fitting, GPU, services, visual analytics, and production deployment are later targets. This guide defines the operating evidence those stages must satisfy rather than claiming they already exist.
+TEPP is still an implementation-stage research/product platform. Protected main currently contains the Rust workspace/evidence foundation plus implemented-main temporal primitives (merged PRs #8 and #9). Superseded PRs #5 and #6 are historical lineage only. Database adapters are partial; model fitting, GPU, services, visual analytics, and production deployment are later targets. This guide defines the operating evidence those stages must satisfy rather than claiming they already exist. Unmerged or draft PRs are not implemented-main claims.
 
 ## Operating principles
 
@@ -51,6 +51,8 @@ Before admitting a GPU job, estimate budget and reserve margin. On OOM: classify
 LLM-backed semantic/interpreter functions use strict bounded requests and cached/versioned results where appropriate. Provider failure may retry only under bounded policy, route through contextual-orchestrator when configured, or return deferred/unresolved evidence. It must not corrupt deterministic/statistical results or expose credentials/source beyond approved policy.
 
 ## Database target recovery
+
+Migration `0007` (active PR) contracts policy-driven retention, legal-hold blocked deletion completion, evidence tombstones without raw-source restore, deletion requests bound to the cited policy, and analysis exclusion only for `logical_revocation`/`identity_tombstone`; live PostgreSQL evidence remains pending exact-head CI.
 
 Before PostgreSQL becomes production state, prove migrations and rollback, tenant isolation/RLS, temporal/lineage constraints, idempotency/concurrency, backup/restore, retention/deletion, and reconstruction from immutable artifacts. Concurrent document first-insert and revise stress is implemented-main. `persistence_postgres::mark_restored_state_usable` and `assert_restore_integrity` are the current fail-closed restore gate (active PR): they revalidate tenant identity, canonical digests, same-tenant knowledge-cutoff eligibility, temporal window order, and enabled append-only triggers. They do not yet revalidate relation-aware splits or full lineage graphs; those remain separate post-restore scientific steps. The gate does not replace operator `pg_dump`/`pg_restore` runbooks.
 

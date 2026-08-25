@@ -14,6 +14,12 @@ pub enum CorpusSplitError {
     DuplicateDocumentIdentity,
     /// Split proportions or seeds were invalid.
     InvalidSplitConfiguration,
+    /// A document body was empty and has no Unicode identity.
+    EmptyCanonicalText,
+    /// A retrieval ranking score was treated as an inferential estimator weight.
+    InferentialRetrievalWeight,
+    /// Global stopword deletion was proposed as the default preprocessing rule.
+    DefaultStopwordDeletion,
 }
 
 impl fmt::Display for CorpusSplitError {
@@ -23,6 +29,9 @@ impl fmt::Display for CorpusSplitError {
             Self::UnavailableAtCutoff => "document unavailable at knowledge cutoff",
             Self::DuplicateDocumentIdentity => "duplicate document identity",
             Self::InvalidSplitConfiguration => "invalid split configuration",
+            Self::EmptyCanonicalText => "empty canonical text",
+            Self::InferentialRetrievalWeight => "retrieval score is not an inferential weight",
+            Self::DefaultStopwordDeletion => "global stopword deletion is not the default rule",
         };
         formatter.write_str(message)
     }
@@ -51,6 +60,18 @@ mod tests {
         assert_eq!(
             CorpusSplitError::InvalidSplitConfiguration.to_string(),
             "invalid split configuration"
+        );
+        assert_eq!(
+            CorpusSplitError::EmptyCanonicalText.to_string(),
+            "empty canonical text"
+        );
+        assert_eq!(
+            CorpusSplitError::InferentialRetrievalWeight.to_string(),
+            "retrieval score is not an inferential weight"
+        );
+        assert_eq!(
+            CorpusSplitError::DefaultStopwordDeletion.to_string(),
+            "global stopword deletion is not the default rule"
         );
     }
 }

@@ -15,17 +15,33 @@
 //! contracts chain immutable run identities to those manifests. Typed
 //! membership-assignment SQL (migration `0006`) replaces the polymorphic 0001 stub so documents
 //! can belong to multiple entities and projects without atomistic collapse.
+//! Typed `text_segment` SQL persists exact UTF-8 byte spans and cutoff-eligible
+//! document lookups so segment-level membership is not raw SQL.
+//! Entity and project target SQL refuse empty, oversized, or hostile labels
+//! before `INSERT`, so membership foreign keys cannot be seeded from raw
+//! attacker-controlled type or status strings.
+//! Entity and project target SQL refuse empty, oversized, or hostile labels
+//! before `INSERT`, so membership foreign keys cannot be seeded from raw
+//! attacker-controlled type or status strings. Typed `text_segment` SQL
+//! persists exact UTF-8 byte spans and cutoff-eligible document lookups so
+//! segment-level membership is not raw SQL.
 //! Concurrent document revises use one transactional `DO` block that requires
 //! exactly one open row to close, and live `SQLx` maps racing SQLSTATEs onto
 //! typed conflict errors. Restore integrity probes refuse to mark analytical
 //! state usable until tenant, digest, cutoff, temporal windows, and append-only
-//! triggers revalidate.
+//! triggers revalidate. Retention, deletion, and legal-hold SQL (migration
+//! `0007`) records policy-driven lifecycle without restoring tombstoned
+//! evidence or completing a deletion under an active hold. Analysis exclusion
+//! is kind-aligned, and deletion requests bind to the cited policy.
+//! `audit_event` inserts call `operational_log::try_record` so source text,
+//! source identity, and blanket-mask grants cannot become SQL.
 
 mod artifact_sql;
 mod concurrent_write;
 mod cutoff;
 mod document_sql;
 mod document_store;
+mod entity_sql;
 mod error;
 mod instance_sql;
 mod live_pool;
@@ -36,8 +52,11 @@ mod mention_sql;
 mod migration;
 mod model_run_sql;
 mod naming;
+mod project_sql;
 mod relation_sql;
 mod restore_integrity;
+mod retention_sql;
+mod segment_sql;
 mod sql_session;
 mod sqlx_gate;
 #[cfg(feature = "live-sqlx")]
@@ -80,12 +99,22 @@ pub use document_sql::insert_document_sql;
 pub use document_sql::revise_document_atomic_sql;
 /// Render revise close+insert SQL pair.
 pub use document_sql::revise_document_sqls;
+/// Closed operational-log action for an inspected `audit_event` append.
+pub use document_store::ACTION_AUDIT_EVENT_APPEND;
 /// Append-only audit event.
 pub use document_store::AuditEvent;
+/// Source payloads inspected before an `audit_event` insert.
+pub use document_store::AuditSourceInspection;
 /// Bitemporal document version.
 pub use document_store::DocumentRecord;
 /// In-memory bitemporal document store.
 pub use document_store::DocumentStore;
+/// Typed entity membership-target row.
+pub use entity_sql::EntityRecord;
+/// Render insert SQL for a validated entity record.
+pub use entity_sql::insert_entity_record_sql;
+/// Render selection SQL for an entity record by primary key.
+pub use entity_sql::select_entity_record_by_id_sql;
 /// Migration SQL contract violations.
 pub use error::MigrationContractError;
 /// Fail-closed persistence domain errors.
@@ -150,6 +179,12 @@ pub use model_run_sql::select_model_artifacts_by_run_sql;
 pub use model_run_sql::select_model_run_by_id_sql;
 /// Multi-word `snake_case` database object naming.
 pub use naming::is_multi_word_snake_case;
+/// Typed project membership-target row.
+pub use project_sql::ProjectRecord;
+/// Render insert SQL for a validated project record.
+pub use project_sql::insert_project_record_sql;
+/// Render selection SQL for a project record by primary key.
+pub use project_sql::select_project_record_by_id_sql;
 /// Typed event-relation row bound to the ERD transition vocabulary.
 pub use relation_sql::EventRelationRecord;
 /// Render insert SQL for a validated event relation.
@@ -164,6 +199,40 @@ pub use restore_integrity::backup_scope_tables;
 pub use restore_integrity::mark_restored_state_usable;
 /// SQL probes that fail closed on unusable restored rows.
 pub use restore_integrity::restore_integrity_probe_sqls;
+/// Auditable deletion request row.
+pub use retention_sql::DeletionRequestRecord;
+/// Append-only evidence tombstone row.
+pub use retention_sql::EvidenceTombstoneRecord;
+/// Legal or contractual hold row.
+pub use retention_sql::LegalHoldRecord;
+/// Tenant-scoped retention policy row.
+pub use retention_sql::RetentionPolicyRecord;
+/// Map a lifecycle SQL failure message onto a typed persistence error.
+pub use retention_sql::classify_lifecycle_sql_failure;
+/// Render insert SQL for a completed deletion after hold evaluation.
+pub use retention_sql::insert_completed_deletion_request_sql;
+/// Render insert SQL for a validated deletion request.
+pub use retention_sql::insert_deletion_request_sql;
+/// Render insert SQL for a validated evidence tombstone.
+pub use retention_sql::insert_evidence_tombstone_sql;
+/// Render insert SQL for a validated legal hold.
+pub use retention_sql::insert_legal_hold_sql;
+/// Render insert SQL for a validated retention policy.
+pub use retention_sql::insert_retention_policy_sql;
+/// Render SQL that releases one active legal hold.
+pub use retention_sql::release_legal_hold_sql;
+/// Render active-analysis selection that excludes revoked or tombstoned documents.
+pub use retention_sql::select_active_analysis_document_sql;
+/// Render supersede SQL for a successive retention policy.
+pub use retention_sql::supersede_retention_policy_sql;
+/// Exact-span text segment row.
+pub use segment_sql::TextSegmentRecord;
+/// Render insert SQL for a validated text segment.
+pub use segment_sql::insert_text_segment_sql;
+/// Render selection SQL for a text segment by primary key.
+pub use segment_sql::select_text_segment_by_id_sql;
+/// Render cutoff-eligible text-segment selection for one document.
+pub use segment_sql::select_text_segments_for_document_as_of_sql;
 /// Recording SQL transport for offline contract tests.
 pub use sql_session::RecordingSqlSession;
 /// Live SQL transport contract.

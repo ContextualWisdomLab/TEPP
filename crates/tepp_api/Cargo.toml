@@ -1,6 +1,6 @@
 [package]
 name = "tepp_api"
-description = "Versioned service DTOs, schemas, and export contracts."
+description = "Versioned service DTOs, schemas, export contracts, and loopback naruon HTTP."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,8 +14,19 @@ categories.workspace = true
 publish = false
 
 [dependencies]
+corpus_split = { path = "../corpus_split", version = "0.1.0" }
+jiff = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
+temporal_core = { path = "../temporal_core", version = "0.1.0" }
+uuid = { workspace = true }
+
+[[bin]]
+name = "tepp-loopback"
+path = "src/bin/tepp_loopback.rs"
+test = false
+bench = false
 
 [lints]
 workspace = true

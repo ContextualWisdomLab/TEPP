@@ -7,13 +7,15 @@
 //! records, source spans whose byte, Unicode-scalar, page, and layout
 //! coordinates are validated before entering later temporal or psychometric
 //! layers, and strict versioned JSON wire contracts that reconstruct records
-//! only through the same domain validation boundary.
+//! only through the same domain validation boundary. Embedded `data:image`
+//! units keep their original offsets and are not lexical inference text.
 
 mod artifact;
 mod digest;
 mod document;
 mod error;
 mod identifier;
+mod image_unit;
 mod span;
 mod wire;
 
@@ -27,6 +29,12 @@ pub use document::DocumentRecord;
 pub use error::EvidenceError;
 /// A validated RFC 9562 `UUIDv7` evidence identifier.
 pub use identifier::EvidenceId;
+/// One embedded image located in a document body.
+pub use image_unit::EmbeddedImageUnit;
+/// Locate `data:image` base64 units with exact source spans.
+pub use image_unit::embedded_image_units;
+/// Refuse treating an embedded image URI as lexical inference text.
+pub use image_unit::refuse_base64_image_as_lexical_text;
 /// A validated page-relative location for source evidence.
 pub use span::PageLocation;
 /// An exact byte, Unicode-scalar, and optional page/layout span.

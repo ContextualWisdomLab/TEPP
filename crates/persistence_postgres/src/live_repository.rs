@@ -8,7 +8,8 @@ use crate::document_sql::{
     append_audit_sql, as_known_at_sql, as_valid_at_sql, insert_document_sql,
     revise_document_atomic_sql,
 };
-use crate::document_store::{AuditEvent, DocumentRecord};
+use crate::document_store::{AuditEvent, AuditSourceInspection, DocumentRecord};
+use crate::entity_sql::{EntityRecord, insert_entity_record_sql, select_entity_record_by_id_sql};
 use crate::instance_sql::{
     EventInstanceRecord, insert_event_instance_sql, select_event_instance_as_known_at_sql,
 };
@@ -27,11 +28,25 @@ use crate::model_run_sql::{
     insert_corpus_split_manifest_sql, insert_model_artifact_sql, insert_model_run_sql,
     select_model_artifacts_by_run_sql, select_model_run_by_id_sql,
 };
+use crate::project_sql::{
+    ProjectRecord, insert_project_record_sql, select_project_record_by_id_sql,
+};
 use crate::relation_sql::{EventRelationRecord, insert_event_relation_sql};
 use crate::restore_integrity::restore_integrity_probe_sqls;
+use crate::retention_sql::{
+    DeletionRequestRecord, EvidenceTombstoneRecord, LegalHoldRecord, RetentionPolicyRecord,
+    insert_completed_deletion_request_sql, insert_deletion_request_sql,
+    insert_evidence_tombstone_sql, insert_legal_hold_sql, insert_retention_policy_sql,
+    select_active_analysis_document_sql,
+};
+use crate::segment_sql::{
+    TextSegmentRecord, insert_text_segment_sql, select_text_segment_by_id_sql,
+    select_text_segments_for_document_as_of_sql,
+};
 use crate::sql_session::{SqlSession, apply_sql_batch};
+use crate::tenant_session::set_session_tenant_sql;
 use crate::{MigrationContractError, PersistenceError};
-use temporal_core::{EventTime, SystemTime};
+use temporal_core::{EventTime, KnowledgeCutoff, SystemTime};
 use uuid::Uuid;
 
 /// Fail-closed live document/audit repository backed by [`SqlSession`].
@@ -93,12 +108,23 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         Ok(())
     }
 
+    /// Bind the session tenant GUC before tenant-scoped persistence operations.
+    fn bind_session_tenant(&mut self, tenant_record_id: Uuid) -> Result<(), PersistenceError> {
+        self.session
+            .execute(&set_session_tenant_sql(tenant_record_id))
+    }
+
     /// Insert the first system-time version of a document identity.
+    ///
+    /// The session tenant GUC is bound first so
+    /// `reject_tombstoned_evidence_restore` can fail closed instead of aborting
+    /// a legitimate first insert.
     ///
     /// # Errors
     ///
     /// Returns digest or transport failures.
     pub fn insert(&mut self, record: &DocumentRecord) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_document_sql(record)?;
         self.session.execute(&sql)
     }
@@ -109,6 +135,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// Returns digest, concurrent-write, or transport failures.
     pub fn revise(&mut self, record: &DocumentRecord) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = revise_document_atomic_sql(record)?;
         self.session.execute(&sql)
     }
@@ -149,13 +176,18 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         self.session.execute(&sql)
     }
 
-    /// Append an immutable audit event through SQL.
+    /// Append an immutable audit event through SQL after inspection.
     ///
     /// # Errors
     ///
-    /// Returns action-code validation or transport failures.
-    pub fn append_audit(&mut self, event: &AuditEvent) -> Result<(), PersistenceError> {
-        let sql = append_audit_sql(event)?;
+    /// Returns source-payload, action-code, or transport failures.
+    pub fn append_audit(
+        &mut self,
+        event: &AuditEvent,
+        inspection: AuditSourceInspection<'_>,
+    ) -> Result<(), PersistenceError> {
+        let sql = append_audit_sql(event, inspection)?;
+        self.bind_session_tenant(event.tenant_record_id)?;
         self.session.execute(&sql)
     }
 
@@ -168,6 +200,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &ReproducibilityManifestRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_reproducibility_manifest_sql(record)?;
         self.session.execute(&sql)
     }
@@ -213,6 +246,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &CorpusSplitManifestRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_corpus_split_manifest_sql(record)?;
         self.session.execute(&sql)
     }
@@ -223,6 +257,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
     ///
     /// Returns digest/label validation or transport failures.
     pub fn insert_model_run(&mut self, record: &ModelRunRecord) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_model_run_sql(record)?;
         self.session.execute(&sql)
     }
@@ -236,7 +271,59 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &ModelArtifactRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_model_artifact_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert a typed entity membership target under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns label validation or transport failures.
+    pub fn insert_entity_record(&mut self, record: &EntityRecord) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
+        let sql = insert_entity_record_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up an entity membership target by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_entity_record_by_id(
+        &mut self,
+        entity_record_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_entity_record_by_id_sql(entity_record_id);
+        self.session.execute(&sql)
+    }
+
+    /// Insert a typed project membership target under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns label validation or transport failures.
+    pub fn insert_project_record(
+        &mut self,
+        record: &ProjectRecord,
+    ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
+        let sql = insert_project_record_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up a project membership target by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_project_record_by_id(
+        &mut self,
+        project_record_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_project_record_by_id_sql(project_record_id);
         self.session.execute(&sql)
     }
 
@@ -249,6 +336,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &MembershipAssignmentRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_membership_assignment_sql(record)?;
         self.session.execute(&sql)
     }
@@ -275,6 +363,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &EventRelationRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_event_relation_sql(record)?;
         self.session.execute(&sql)
     }
@@ -289,7 +378,49 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &EventMentionRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_event_mention_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert an exact-span text segment under the active tenant.
+    ///
+    /// # Errors
+    ///
+    /// Returns inverted/negative span validation or transport failures.
+    pub fn insert_text_segment(
+        &mut self,
+        record: &TextSegmentRecord,
+    ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
+        let sql = insert_text_segment_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up one text segment by primary key.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_text_segment_by_id(
+        &mut self,
+        text_segment_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_text_segment_by_id_sql(text_segment_id);
+        self.session.execute(&sql)
+    }
+
+    /// Look up cutoff-eligible text segments for one document identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_text_segments_for_document_as_of(
+        &mut self,
+        document_record_id: Uuid,
+        knowledge_cutoff: &KnowledgeCutoff,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_text_segments_for_document_as_of_sql(document_record_id, knowledge_cutoff);
         self.session.execute(&sql)
     }
 
@@ -302,6 +433,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &EventInstanceRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_event_instance_sql(record)?;
         self.session.execute(&sql)
     }
@@ -333,6 +465,7 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         &mut self,
         record: &SourceArtifactRecord,
     ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
         let sql = insert_source_artifact_sql(record)?;
         self.session.execute(&sql)?;
         let assertion = assert_source_artifact_matches_sql(record)?;
@@ -374,6 +507,93 @@ impl<S: SqlSession> LiveDocumentRepository<S> {
         let sql = select_model_artifacts_by_run_sql(model_run_id);
         self.session.execute(&sql)
     }
+
+    /// Insert a tenant-scoped retention policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns lifecycle validation or transport failures.
+    pub fn insert_retention_policy(
+        &mut self,
+        record: &RetentionPolicyRecord,
+    ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
+        let sql = insert_retention_policy_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert a legal or contractual hold.
+    ///
+    /// # Errors
+    ///
+    /// Returns lifecycle validation or transport failures.
+    pub fn insert_legal_hold(&mut self, record: &LegalHoldRecord) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
+        let sql = insert_legal_hold_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert a deletion request that is not evaluated against holds.
+    ///
+    /// # Errors
+    ///
+    /// Returns lifecycle validation, a cited-policy mismatch, or transport
+    /// failures.
+    pub fn insert_deletion_request(
+        &mut self,
+        record: &DeletionRequestRecord,
+        policy: &RetentionPolicyRecord,
+    ) -> Result<(), PersistenceError> {
+        record.bind_cited_policy(policy)?;
+        self.bind_session_tenant(record.tenant_record_id)?;
+        let sql = insert_deletion_request_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Complete a deletion only when no supplied hold covers the target.
+    ///
+    /// # Errors
+    ///
+    /// Returns lifecycle validation, a cited-policy mismatch,
+    /// [`PersistenceError::LegalHoldBlocksDeletion`], or transport failures.
+    pub fn insert_completed_deletion_request(
+        &mut self,
+        record: &DeletionRequestRecord,
+        policy: &RetentionPolicyRecord,
+        holds: &[LegalHoldRecord],
+    ) -> Result<(), PersistenceError> {
+        record.bind_cited_policy(policy)?;
+        self.bind_session_tenant(record.tenant_record_id)?;
+        let sql = insert_completed_deletion_request_sql(record, holds)?;
+        self.session.execute(&sql)
+    }
+
+    /// Insert an evidence tombstone without raw source text.
+    ///
+    /// # Errors
+    ///
+    /// Returns lifecycle validation, ungoverned-restore, or transport failures.
+    pub fn insert_evidence_tombstone(
+        &mut self,
+        record: &EvidenceTombstoneRecord,
+    ) -> Result<(), PersistenceError> {
+        self.bind_session_tenant(record.tenant_record_id)?;
+        let sql = insert_evidence_tombstone_sql(record)?;
+        self.session.execute(&sql)
+    }
+
+    /// Look up a document only when it remains eligible for active analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns transport failures.
+    pub fn submit_active_analysis_document(
+        &mut self,
+        document_record_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        let sql = select_active_analysis_document_sql(document_record_id);
+        self.session.execute(&sql)
+    }
 }
 
 /// Migration application failures distinguishing contract vs transport errors.
@@ -400,16 +620,17 @@ impl std::error::Error for LiveMigrationError {}
 mod tests {
     use super::{LiveDocumentRepository, LiveMigrationError};
     use crate::artifact_sql::SourceArtifactRecord;
-    use crate::document_store::{AuditEvent, DocumentRecord};
+    use crate::document_store::{AuditEvent, AuditSourceInspection, DocumentRecord};
     use crate::instance_sql::EventInstanceRecord;
     use crate::manifest_sql::ReproducibilityManifestRecord;
     use crate::mention_sql::EventMentionRecord;
     use crate::migration::MigrationCatalog;
     use crate::model_run_sql::{CorpusSplitManifestRecord, ModelArtifactRecord, ModelRunRecord};
     use crate::relation_sql::EventRelationRecord;
+    use crate::segment_sql::TextSegmentRecord;
     use crate::sql_session::RecordingSqlSession;
     use crate::{MigrationContractError, PersistenceError};
-    use temporal_core::{AvailableTime, EventTime, SystemTime};
+    use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff, SystemTime};
 
     fn sample_record() -> DocumentRecord {
         DocumentRecord {
@@ -503,6 +724,71 @@ mod tests {
         }
     }
 
+    fn exercise_entity_project_targets(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let (available, system) = (
+            AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+            SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+        );
+        let entity = crate::EntityRecord {
+            entity_record_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            entity_type_code: "author".into(),
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_entity_record(&entity).expect("entity insert");
+        let executed = repo.session().executed();
+        let entity_bind = executed
+            .iter()
+            .rposition(|sql| sql.contains("tepp.current_tenant_record_id"))
+            .expect("entity insert must bind tenant session");
+        assert!(executed[entity_bind + 1].contains("INSERT INTO entity_record"));
+        repo.submit_entity_record_by_id(entity.entity_record_id)
+            .expect("entity lookup");
+        let mut bad_entity = entity;
+        bad_entity.entity_type_code.clear();
+        assert_eq!(
+            repo.insert_entity_record(&bad_entity),
+            Err(PersistenceError::InvalidEntityRecord)
+        );
+
+        let project = crate::ProjectRecord {
+            project_record_id: uuid::Uuid::from_u128(2),
+            tenant_record_id: uuid::Uuid::nil(),
+            project_status_code: "active".into(),
+            system_time: system,
+            available_time: available,
+        };
+        repo.insert_project_record(&project)
+            .expect("project insert");
+        let executed = repo.session().executed();
+        let project_bind = executed
+            .iter()
+            .rposition(|sql| sql.contains("tepp.current_tenant_record_id"))
+            .expect("project insert must bind tenant session");
+        assert!(executed[project_bind + 1].contains("INSERT INTO project_record"));
+        repo.submit_project_record_by_id(project.project_record_id)
+            .expect("project lookup");
+        let mut bad_project = project;
+        bad_project.project_status_code = "active';x".into();
+        assert_eq!(
+            repo.insert_project_record(&bad_project),
+            Err(PersistenceError::InvalidProjectRecord)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO entity_record"))
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO project_record"))
+        );
+    }
+
     fn exercise_membership_assignment(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
         let membership = sample_membership();
         repo.insert_membership_assignment(&membership)
@@ -551,6 +837,42 @@ mod tests {
                 .executed()
                 .iter()
                 .any(|sql| sql.contains("INSERT INTO event_relation"))
+        );
+    }
+
+    fn exercise_text_segment(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        let segment = TextSegmentRecord {
+            text_segment_id: uuid::Uuid::from_u128(7),
+            tenant_record_id: uuid::Uuid::nil(),
+            document_record_id: uuid::Uuid::from_u128(11),
+            start_byte: 0,
+            end_byte: 5,
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        };
+        repo.insert_text_segment(&segment).expect("segment insert");
+        let executed = repo.session().executed();
+        let segment_bind = executed
+            .iter()
+            .rposition(|sql| sql.contains("tepp.current_tenant_record_id"))
+            .expect("text segment insert must bind tenant session");
+        assert!(executed[segment_bind + 1].contains("INSERT INTO text_segment"));
+        repo.submit_text_segment_by_id(segment.text_segment_id)
+            .expect("segment by id");
+        let cutoff = KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff");
+        repo.submit_text_segments_for_document_as_of(segment.document_record_id, &cutoff)
+            .expect("segments as of");
+        let mut inverted = segment.clone();
+        inverted.end_byte = 0;
+        assert_eq!(
+            repo.insert_text_segment(&inverted),
+            Err(PersistenceError::InvalidTextSegment)
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO text_segment"))
         );
     }
 
@@ -640,6 +962,176 @@ mod tests {
         );
     }
 
+    fn sample_policy() -> crate::RetentionPolicyRecord {
+        crate::RetentionPolicyRecord {
+            retention_policy_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            data_class_code: "raw_source".into(),
+            processing_purpose_code: "psychometric_analysis".into(),
+            retention_period_days: 365,
+            policy_status_code: "active".into(),
+            authority_citation: "adr-0009".into(),
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            system_to: None,
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        }
+    }
+
+    fn sample_hold() -> crate::LegalHoldRecord {
+        crate::LegalHoldRecord {
+            legal_hold_id: uuid::Uuid::from_u128(2),
+            tenant_record_id: uuid::Uuid::nil(),
+            hold_scope_code: "document".into(),
+            held_document_id: Some(uuid::Uuid::nil()),
+            hold_authority_code: "contract".into(),
+            hold_status_code: "active".into(),
+            authority_citation: "hold-authority".into(),
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            system_to: None,
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        }
+    }
+
+    fn sample_deletion() -> crate::DeletionRequestRecord {
+        crate::DeletionRequestRecord {
+            deletion_request_id: uuid::Uuid::from_u128(4),
+            tenant_record_id: uuid::Uuid::nil(),
+            retention_policy_id: uuid::Uuid::nil(),
+            target_document_id: uuid::Uuid::nil(),
+            target_data_class_code: "raw_source".into(),
+            processing_purpose_code: "psychometric_analysis".into(),
+            deletion_kind_code: "identity_tombstone".into(),
+            request_status_code: "blocked_by_hold".into(),
+            legal_hold_id: Some(uuid::Uuid::from_u128(2)),
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        }
+    }
+
+    fn sample_tombstone() -> crate::EvidenceTombstoneRecord {
+        crate::EvidenceTombstoneRecord {
+            evidence_tombstone_id: uuid::Uuid::from_u128(5),
+            tenant_record_id: uuid::Uuid::nil(),
+            tombstoned_document_id: uuid::Uuid::from_u128(9),
+            deletion_request_id: uuid::Uuid::from_u128(4),
+            evidence_digest: "ab".repeat(32),
+            target_data_class_code: "raw_source".into(),
+            deletion_kind_code: "identity_tombstone".into(),
+            reproduction_status_code: "unavailable".into(),
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("a"),
+        }
+    }
+
+    fn exercise_retention_legal_hold(repo: &mut LiveDocumentRepository<RecordingSqlSession>) {
+        repo.insert_retention_policy(&sample_policy())
+            .expect("policy insert");
+        repo.insert_legal_hold(&sample_hold()).expect("hold insert");
+        repo.insert_deletion_request(&sample_deletion(), &sample_policy())
+            .expect("blocked request");
+        let mut completed = sample_deletion();
+        completed.request_status_code = "completed".into();
+        completed.legal_hold_id = None;
+        assert_eq!(
+            repo.insert_completed_deletion_request(&completed, &sample_policy(), &[sample_hold()]),
+            Err(PersistenceError::LegalHoldBlocksDeletion)
+        );
+        repo.insert_completed_deletion_request(&completed, &sample_policy(), &[])
+            .expect("unheld completion");
+        repo.insert_evidence_tombstone(&sample_tombstone())
+            .expect("tombstone");
+        repo.submit_active_analysis_document(uuid::Uuid::nil())
+            .expect("active analysis");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO retention_policy"))
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO legal_hold"))
+        );
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("INSERT INTO evidence_tombstone"))
+        );
+        let mut invalid = sample_policy();
+        invalid.retention_period_days = 0;
+        assert_eq!(
+            repo.insert_retention_policy(&invalid),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+        let mut bad_hold = sample_hold();
+        bad_hold.held_document_id = None;
+        assert_eq!(
+            repo.insert_legal_hold(&bad_hold),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+        let mut bad_request = sample_deletion();
+        bad_request.deletion_kind_code = "hard_delete".into();
+        assert_eq!(
+            repo.insert_deletion_request(&bad_request, &sample_policy()),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+        let mut mismatched_purpose = sample_deletion();
+        mismatched_purpose.processing_purpose_code = "export_fulfillment".into();
+        assert_eq!(
+            repo.insert_deletion_request(&mismatched_purpose, &sample_policy()),
+            Err(PersistenceError::InvalidRetentionLifecycle)
+        );
+        let mut restore = sample_tombstone();
+        restore.reproduction_status_code = "unaffected".into();
+        assert_eq!(
+            repo.insert_evidence_tombstone(&restore),
+            Err(PersistenceError::UngovernedEvidenceRestore)
+        );
+    }
+
+    #[test]
+    fn insert_and_revise_bind_tenant_session_before_document_sql() {
+        let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
+        let record = sample_record();
+        repo.insert(&record).expect("insert");
+        let executed = repo.session().executed();
+        assert!(
+            executed.len() >= 2,
+            "tenant GUC must precede document insert so 0007 restore trigger can run"
+        );
+        let tenant_bind = &executed[0];
+        assert!(
+            tenant_bind.contains("tepp.current_tenant_record_id"),
+            "insert must set the tenant GUC before SQL reaches document_record"
+        );
+        assert!(
+            tenant_bind.contains(&record.tenant_record_id.to_string()),
+            "tenant GUC bind must include the document tenant identity"
+        );
+        assert!(
+            executed[1].contains("INSERT INTO document_record"),
+            "document insert follows tenant bind"
+        );
+
+        let mut revised = record.clone();
+        revised.revision_number = 2;
+        revised.system_from =
+            SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("later system");
+        repo.revise(&revised).expect("revise");
+        let executed = repo.session().executed();
+        let revise_bind = executed
+            .iter()
+            .rposition(|sql| sql.contains("tepp.current_tenant_record_id"))
+            .expect("revise must bind tenant session");
+        assert!(
+            executed[revise_bind + 1].contains("DO $tepp$"),
+            "atomic revise must run after tenant bind"
+        );
+    }
+
     #[test]
     fn live_repository_applies_migrations_and_document_sql() {
         let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
@@ -647,14 +1139,6 @@ mod tests {
         let applied = repo.apply_migrations(&catalog).expect("migrate");
         assert!(applied >= 1);
         assert!(!repo.session().executed().is_empty());
-        repo.assert_restore_integrity()
-            .expect("restore integrity probes");
-        assert!(
-            repo.session()
-                .executed()
-                .iter()
-                .any(|sql| sql.contains("restore integrity failed"))
-        );
 
         repo.insert(&sample_record()).expect("insert");
         let mut revised = sample_record();
@@ -706,11 +1190,22 @@ mod tests {
                 .any(|sql| sql.contains("INSERT INTO reproducibility_manifest"))
         );
         exercise_model_run_chain(&mut repo, &manifest);
+        exercise_entity_project_targets(&mut repo);
         exercise_membership_assignment(&mut repo);
         exercise_event_relation(&mut repo);
         exercise_event_mention(&mut repo);
+        exercise_text_segment(&mut repo);
         exercise_event_instance(&mut repo);
         exercise_source_artifact(&mut repo);
+        exercise_retention_legal_hold(&mut repo);
+        repo.assert_restore_integrity()
+            .expect("restore integrity probes render through the session");
+        assert!(
+            repo.session()
+                .executed()
+                .iter()
+                .any(|sql| sql.contains("restore integrity failed") || sql.contains("tepp_restore"))
+        );
 
         let audit = AuditEvent {
             audit_event_id: uuid::Uuid::nil(),
@@ -719,7 +1214,8 @@ mod tests {
             subject_record_id: uuid::Uuid::nil(),
             recorded_system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
         };
-        repo.append_audit(&audit).expect("audit");
+        repo.append_audit(&audit, AuditSourceInspection::CLEAR)
+            .expect("audit");
 
         let session = repo.into_session();
         assert!(
@@ -734,6 +1230,30 @@ mod tests {
                 .iter()
                 .any(|sql| sql.contains("audit_event"))
         );
+    }
+
+    #[test]
+    fn live_audit_append_refuses_source_text_before_sql() {
+        let mut repo = LiveDocumentRepository::new(RecordingSqlSession::new());
+        let audit = AuditEvent {
+            audit_event_id: uuid::Uuid::nil(),
+            tenant_record_id: uuid::Uuid::nil(),
+            action_code: "insert".into(),
+            subject_record_id: uuid::Uuid::nil(),
+            recorded_system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+        };
+        assert_eq!(
+            repo.append_audit(
+                &audit,
+                AuditSourceInspection {
+                    source_text: Some("source"),
+                    source_identity: None,
+                    blanket_mask: false,
+                },
+            ),
+            Err(PersistenceError::SourceTextNotAuditable)
+        );
+        assert!(repo.into_session().executed().is_empty());
     }
 
     #[test]

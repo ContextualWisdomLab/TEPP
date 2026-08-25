@@ -38,6 +38,14 @@ fn every_temporal_error_has_a_stable_content_redacting_message() {
             TemporalError::ClockTypeMismatch,
             "temporal clock type mismatch",
         ),
+        (
+            TemporalError::UncertainAvailability,
+            "uncertain availability fails closed at cutoff",
+        ),
+        (
+            TemporalError::IneligibleAtCutoff,
+            "availability is ineligible at knowledge cutoff",
+        ),
     ];
 
     for (error, expected) in cases {

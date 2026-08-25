@@ -10,8 +10,10 @@
 mod connected_group;
 mod document;
 mod error;
+mod inferential_weight;
 mod rolling_origin;
 mod snapshot;
+mod unicode_identity;
 mod weights;
 
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -36,12 +38,26 @@ pub use connected_group::build_connected_groups;
 pub use document::CorpusDocument;
 /// Fail-closed corpus-split errors.
 pub use error::CorpusSplitError;
+/// Token-deletion rule that may be proposed before estimation.
+pub use inferential_weight::TokenDeletionRule;
+/// Document or term scoring identity proposed as an estimator input.
+pub use inferential_weight::WeightingScheme;
+/// Refuse global stopword deletion as the default preprocessing rule.
+pub use inferential_weight::refuse_default_stopword_deletion;
+/// Refuse TF-IDF and BM25 as inferential estimator weights.
+pub use inferential_weight::refuse_inferential_retrieval_weight;
 /// Rolling-origin train/test window.
 pub use rolling_origin::RollingOriginWindow;
 /// Build ordered rolling-origin windows.
 pub use rolling_origin::rolling_origin_windows;
 /// Cutoff-filtered corpus snapshot.
 pub use snapshot::CorpusSnapshot;
+/// NFC identity of a UTF-8 document body.
+pub use unicode_identity::CanonicalTextIdentity;
+/// Build leakage links among canonically equivalent bodies.
+pub use unicode_identity::canonical_equivalence_links;
+/// Compare two UTF-8 bodies after NFC.
+pub use unicode_identity::texts_are_canonically_equivalent;
 /// Kish effective sample size.
 pub use weights::effective_sample_size;
 /// Group-normalized observation weights.

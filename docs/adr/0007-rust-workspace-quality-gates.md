@@ -66,7 +66,7 @@ Rollback restores the previous pinned toolchain/workspace policy and reruns the 
 
 The Cargo Team. (n.d.). *Workspaces*. In *The Cargo Book*. Retrieved August 5, 2026, from https://doc.rust-lang.org/cargo/reference/workspaces.html
 
-The Rust Release Team. (2026, July 16). *Announcing Rust 1.97.1*. Rust Blog. https://blog.rust-lang.org/2026/07/16/Rust-1.97.1/
+The Rust Release Team. (2026, August 20). *Announcing Rust 1.98.0*. Rust Blog. https://blog.rust-lang.org/2026/08/20/Rust-1.98.0/
 
 Batchelder, N., & contributors. (2026). *Coverage.py* [Computer software]. https://coverage.readthedocs.io/
 
