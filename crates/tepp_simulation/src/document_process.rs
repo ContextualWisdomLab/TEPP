@@ -1,7 +1,7 @@
 //! Document generation with reporting delays, method effects, and memberships.
 
 use crate::SimulationError;
-use temporal_core::{AvailableTime, DocumentTime, EventTime};
+use temporal_core::{AvailableTime, DocumentTime, EventTime, KnowledgeCutoff};
 use uuid::Uuid;
 
 /// Governed method-effect labels for generated document variants.
@@ -198,6 +198,23 @@ impl SimulatedDocument {
     #[must_use]
     pub fn memberships(&self) -> &[SimulatedMembership] {
         &self.memberships
+    }
+}
+
+/// Refuse a delayed-reporting document whose availability exceeds the cutoff.
+///
+/// # Errors
+///
+/// Returns [`SimulationError::TemporalInvariantViolation`] when
+/// `available_time` is after `cutoff`.
+pub fn refuse_unavailable_document(
+    document: &SimulatedDocument,
+    cutoff: &KnowledgeCutoff,
+) -> Result<(), SimulationError> {
+    if document.available_time().instant() <= cutoff.instant() {
+        Ok(())
+    } else {
+        Err(SimulationError::TemporalInvariantViolation)
     }
 }
 
