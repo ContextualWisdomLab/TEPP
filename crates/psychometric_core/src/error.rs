@@ -926,6 +926,23 @@ pub enum PsychometricError {
     /// treated as `MANIFESTVAR` `θ`. Measurement error is not extra
     /// observed TI variance.
     InitialTimeIndependentObservedVarianceIsNotMeasurementError,
+    /// Driver Eq. 5 of §7.2 `addedTIPREDVAR` `λ² (B / a)² v` was
+    /// treated as the latent extra `(B / a)² v`. The observed extra
+    /// is not the latent extra.
+    AsymptoticTimeIndependentObservedVarianceIsNotAsymptoticTimeIndependentVariance,
+    /// Driver Eq. 5 of §7.2 `addedTIPREDVAR` `λ² (B / a)² v` was
+    /// treated as Eq. 5 of `addedT0TIPREDVAR` `λ² t0_b² v`. The
+    /// asymptotic observed extra uses `-B / a`, not free
+    /// `T0TIPREDEFFECT`.
+    AsymptoticTimeIndependentObservedVarianceIsNotInitialTimeIndependentObservedVariance,
+    /// Driver Eq. 5 of §7.2 `addedTIPREDVAR` `λ² (B / a)² v` was
+    /// treated as stationary observed variance `λ² p + θ`. The extra
+    /// is not the full stationary `Var(y)`.
+    AsymptoticTimeIndependentObservedVarianceIsNotStationaryObservedVariance,
+    /// Driver Eq. 5 of §7.2 `addedTIPREDVAR` `λ² (B / a)² v` was
+    /// treated as `MANIFESTVAR` `θ`. Measurement error is not extra
+    /// observed TI variance.
+    AsymptoticTimeIndependentObservedVarianceIsNotMeasurementError,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1611,6 +1628,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialTimeIndependentObservedVarianceIsNotMeasurementError => {
                 "initial time-independent observed variance is not measurement-error variance"
+            }
+            Self::AsymptoticTimeIndependentObservedVarianceIsNotAsymptoticTimeIndependentVariance => {
+                "asymptotic time-independent observed variance is not asymptotic time-independent predictor variance"
+            }
+            Self::AsymptoticTimeIndependentObservedVarianceIsNotInitialTimeIndependentObservedVariance => {
+                "asymptotic time-independent observed variance is not initial time-independent observed variance"
+            }
+            Self::AsymptoticTimeIndependentObservedVarianceIsNotStationaryObservedVariance => {
+                "asymptotic time-independent observed variance is not stationary observed variance"
+            }
+            Self::AsymptoticTimeIndependentObservedVarianceIsNotMeasurementError => {
+                "asymptotic time-independent observed variance is not measurement-error variance"
             }
         };
         formatter.write_str(message)
@@ -2764,6 +2793,30 @@ mod tests {
             PsychometricError::InitialTimeIndependentObservedVarianceIsNotMeasurementError
                 .to_string(),
             "initial time-independent observed variance is not measurement-error variance"
+        );
+    }
+
+    #[test]
+    fn asymptotic_time_independent_observed_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotAsymptoticTimeIndependentVariance
+                .to_string(),
+            "asymptotic time-independent observed variance is not asymptotic time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotInitialTimeIndependentObservedVariance
+                .to_string(),
+            "asymptotic time-independent observed variance is not initial time-independent observed variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotStationaryObservedVariance
+                .to_string(),
+            "asymptotic time-independent observed variance is not stationary observed variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentObservedVarianceIsNotMeasurementError
+                .to_string(),
+            "asymptotic time-independent observed variance is not measurement-error variance"
         );
     }
 }
