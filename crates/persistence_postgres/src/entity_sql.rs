@@ -123,6 +123,9 @@ mod tests {
             "author;role".into(),
             "author\\".into(),
             "author\nrole".into(),
+            // Uppercase bytes pass the alphanumeric gate yet fail the lowercase
+            // gate, so this exercises the final clause of the validation chain.
+            "AUTHOR".into(),
             "a".repeat(129),
         ] {
             assert_eq!(
