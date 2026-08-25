@@ -342,7 +342,19 @@ mod tests {
                 Err(ModelSelectionError::LexicalWeightForbidden)
             );
         }
+        assert_eq!(
+            FittedCandidateKConfig::new(vec![2], vec![1], 10, 1e-6)
+                .expect("base")
+                .with_hyperparameters(1.0, 0.0, 0.0, 0.05, 0.2)
+                .expect("zero ablation")
+                .seeds()
+                .len(),
+            1
+        );
+    }
 
+    #[test]
+    fn free_parameter_count_refuses_dimension_mismatch() {
         let valid = model(
             vec![vec![0.7, 0.3], vec![0.2, 0.8]],
             vec![vec![0.9, 0.1], vec![0.1, 0.9]],
@@ -408,15 +420,6 @@ mod tests {
                 vec![vec![0.0, 0.0]]
             )),
             Err(ModelSelectionError::InvalidDiagnostic)
-        );
-        assert_eq!(
-            FittedCandidateKConfig::new(vec![2], vec![1], 10, 1e-6)
-                .expect("base")
-                .with_hyperparameters(1.0, 0.0, 0.0, 0.05, 0.2)
-                .expect("zero ablation")
-                .seeds()
-                .len(),
-            1
         );
     }
 }

@@ -349,7 +349,10 @@ fn invalid_fitted_configuration_fails_closed() {
         select_fitted_candidate_k(&separated_topic_input(), &base, "trsl_tm_reference", &[1]),
         Err(ModelSelectionError::NonPositiveCandidateK)
     );
+}
 
+#[test]
+fn statistical_candidate_from_fit_refuses_unusable_diagnostics() {
     let input = separated_topic_input();
     let matching = ReferenceTopicModel {
         seed: 1,
