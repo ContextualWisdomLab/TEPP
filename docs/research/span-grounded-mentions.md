@@ -36,7 +36,7 @@ span-grounded mention as an event instance (Doddington et al., 2004; Allan,
 ## Verification
 
 - `refuse_span_mention_as_instance` always returns `SpanMentionIsNotEventInstance`;
-- `SpanGroundedMention::new` derives the surface from the exact document span;
+- `EventMention::new` derives the surface from the exact document span and is the only mention constructor;
 - availability after cutoff returns `MentionIneligibleAtCutoff`;
 - delayed reporting at or before cutoff is kept;
 - `mention_span_precision` and `mention_span_recall` fail closed on empty or duplicate extents;

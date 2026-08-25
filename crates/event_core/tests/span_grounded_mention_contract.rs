@@ -1,8 +1,8 @@
 //! Span-grounded mentions recover exact ACE extents against known truth.
 
 use event_core::{
-    EventConfidence, EventError, EventEvidenceLayer, MentionEvidenceClocks, MentionReviewStatus,
-    SpanGroundedMention, mention_span_precision, mention_span_recall,
+    EventConfidence, EventError, EventEvidenceLayer, EventMention, MentionEvidenceClocks,
+    MentionReviewStatus, mention_span_precision, mention_span_recall,
     refuse_span_mention_as_instance,
 };
 use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
@@ -45,12 +45,8 @@ fn eligible_clocks() -> MentionEvidenceClocks {
     .expect("eligible clocks")
 }
 
-fn grounded(
-    document: &DocumentRecord,
-    surface: &str,
-    review: MentionReviewStatus,
-) -> SpanGroundedMention {
-    SpanGroundedMention::new(
+fn grounded(document: &DocumentRecord, surface: &str, review: MentionReviewStatus) -> EventMention {
+    EventMention::new(
         document,
         span_for(document, surface),
         EventConfidence::new(0.91).expect("confidence"),
@@ -204,7 +200,7 @@ fn delayed_reporting_before_cutoff_is_kept_and_late_availability_fails_closed() 
         KnowledgeCutoff::parse_rfc3339("2026-03-31T00:00:00Z").expect("cutoff"),
     )
     .expect("delayed but eligible");
-    let mention = SpanGroundedMention::new(
+    let mention = EventMention::new(
         &document,
         span,
         EventConfidence::certain().expect("certain"),
@@ -222,7 +218,7 @@ fn empty_extractor_foreign_span_and_empty_or_duplicate_extent_sets_fail_closed()
     let other = documentary_record();
     let span = span_for(&document, "protest");
     assert_eq!(
-        SpanGroundedMention::new(
+        EventMention::new(
             &document,
             span,
             EventConfidence::certain().expect("certain"),
@@ -234,7 +230,7 @@ fn empty_extractor_foreign_span_and_empty_or_duplicate_extent_sets_fail_closed()
         Err(EventError::EmptyExtractorVersion)
     );
     assert_eq!(
-        SpanGroundedMention::new(
+        EventMention::new(
             &document,
             span,
             EventConfidence::certain().expect("certain"),
@@ -246,7 +242,7 @@ fn empty_extractor_foreign_span_and_empty_or_duplicate_extent_sets_fail_closed()
         Err(EventError::EmptyExtractorVersion)
     );
     assert_eq!(
-        SpanGroundedMention::new(
+        EventMention::new(
             &other,
             span,
             EventConfidence::certain().expect("certain"),

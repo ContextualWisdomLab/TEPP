@@ -1,7 +1,7 @@
-//! Span-grounded mentions stay distinct from promoted event instances.
+//! Span identity, six-clock eligibility, and exact-extent recovery.
 
-use crate::{EventConfidence, EventError, EventEvidenceLayer, EventInstanceId, EventMentionId};
-use evidence_core::{DocumentRecord, EvidenceId, SourceSpan};
+use crate::EventError;
+use evidence_core::SourceSpan;
 use std::collections::BTreeSet;
 use temporal_core::{
     AssertionTime, AvailableTime, DocumentTime, EventTime, KnowledgeCutoff, SystemTime,
@@ -128,131 +128,6 @@ impl MentionEvidenceClocks {
     }
 }
 
-/// A fallible mention grounded in one exact source extent.
-///
-/// The surface form is the document substring selected by the span. The
-/// mention remains observed evidence and cannot promote an instance.
-#[derive(Clone, Debug, PartialEq)]
-pub struct SpanGroundedMention {
-    mention_id: EventMentionId,
-    evidence_id: EvidenceId,
-    surface_form: String,
-    confidence: EventConfidence,
-    source_span: SourceSpan,
-    clocks: MentionEvidenceClocks,
-    extractor_version: String,
-    review_status: MentionReviewStatus,
-}
-
-impl SpanGroundedMention {
-    /// Bind a mention to one validated document span and six-clock evidence.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`EventError::MentionSpanDocumentMismatch`] when the span does
-    /// not belong to `document`, or [`EventError::EmptyExtractorVersion`] when
-    /// the extractor version is empty or whitespace-only.
-    pub fn new(
-        document: &DocumentRecord,
-        source_span: SourceSpan,
-        confidence: EventConfidence,
-        clocks: MentionEvidenceClocks,
-        extractor_version: impl Into<String>,
-        review_status: MentionReviewStatus,
-    ) -> Result<Self, EventError> {
-        if document.id() != source_span.document_id() {
-            return Err(EventError::MentionSpanDocumentMismatch);
-        }
-        let extractor_version = extractor_version.into();
-        if extractor_version.trim().is_empty() {
-            return Err(EventError::EmptyExtractorVersion);
-        }
-        let surface_form =
-            document.text()[source_span.byte_start()..source_span.byte_end()].to_string();
-        Ok(Self {
-            mention_id: EventMentionId::new(),
-            evidence_id: source_span.document_id(),
-            surface_form,
-            confidence,
-            source_span,
-            clocks,
-            extractor_version,
-            review_status,
-        })
-    }
-
-    /// Return the mention identifier.
-    #[must_use]
-    pub const fn mention_id(&self) -> EventMentionId {
-        self.mention_id
-    }
-
-    /// Return the grounding document identifier.
-    #[must_use]
-    pub const fn document_id(&self) -> EvidenceId {
-        self.source_span.document_id()
-    }
-
-    /// Return the grounding evidence identifier.
-    #[must_use]
-    pub const fn evidence_id(&self) -> EvidenceId {
-        self.evidence_id
-    }
-
-    /// Return the exact document substring selected by the span.
-    #[must_use]
-    pub fn surface_form(&self) -> &str {
-        &self.surface_form
-    }
-
-    /// Return mention confidence.
-    #[must_use]
-    pub const fn confidence(&self) -> EventConfidence {
-        self.confidence
-    }
-
-    /// Return the exact source extent.
-    #[must_use]
-    pub const fn source_span(&self) -> SourceSpan {
-        self.source_span
-    }
-
-    /// Return the six-clock evidence.
-    #[must_use]
-    pub const fn clocks(&self) -> MentionEvidenceClocks {
-        self.clocks
-    }
-
-    /// Return the extractor or model version.
-    #[must_use]
-    pub fn extractor_version(&self) -> &str {
-        &self.extractor_version
-    }
-
-    /// Return the review status.
-    #[must_use]
-    pub const fn review_status(&self) -> MentionReviewStatus {
-        self.review_status
-    }
-
-    /// Return the epistemic layer retained by the mention.
-    #[must_use]
-    pub const fn evidence_layer(&self) -> EventEvidenceLayer {
-        EventEvidenceLayer::ObservedMention
-    }
-}
-
-/// Explicit refusal to treat a span-grounded mention as an event instance.
-///
-/// # Errors
-///
-/// Always returns [`EventError::SpanMentionIsNotEventInstance`].
-pub fn refuse_span_mention_as_instance(
-    _mention: &SpanGroundedMention,
-) -> Result<EventInstanceId, EventError> {
-    Err(EventError::SpanMentionIsNotEventInstance)
-}
-
 /// Precision of recovered mention extents against known-truth extents.
 ///
 /// An extent matches when document identity and exact byte bounds agree.
@@ -320,11 +195,13 @@ fn counted_rate(numerator: usize, denominator: usize) -> Result<f64, EventError>
 #[cfg(test)]
 mod tests {
     use super::{
-        MentionEvidenceClocks, MentionReviewStatus, SpanGroundedMention, counted_rate,
-        mention_span_precision, mention_span_recall, refuse_span_mention_as_instance,
-        unique_extent_set,
+        MentionEvidenceClocks, MentionReviewStatus, counted_rate, mention_span_precision,
+        mention_span_recall, unique_extent_set,
     };
-    use crate::{EventConfidence, EventError, EventEvidenceLayer};
+    use crate::{
+        EventConfidence, EventError, EventEvidenceLayer, EventMention,
+        refuse_span_mention_as_instance,
+    };
     use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
     use temporal_core::{
         AssertionTime, AvailableTime, DocumentTime, EventTime, KnowledgeCutoff, SystemTime,
@@ -394,7 +271,7 @@ mod tests {
             KnowledgeCutoff::parse_rfc3339("2026-03-31T00:00:00Z").expect("cutoff")
         );
         let record = document("award filed");
-        let mention = SpanGroundedMention::new(
+        let mention = EventMention::new(
             &record,
             span(&record, "award"),
             EventConfidence::certain().expect("certain"),

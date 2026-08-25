@@ -60,7 +60,7 @@ boundaries above remain the target modular MSA architecture.
 | `semantic_core` | span-grounded semantic units; language is not identity |
 | `location_membership` | location is not entity identity and not a language channel |
 | `temporal_core` | typed clocks, intervals, and temporal reasoning |
-| `event_core` | event instances, span-grounded mentions, roles, provenance, and CHRONOS occurrence-prediction calibration |
+| `event_core` | event instances, span-grounded `EventMention` (the only constructible mention type), roles, provenance, and CHRONOS occurrence-prediction calibration |
 | `relation_graph` | typed relations and forward-transition validation |
 | `membership_core` | time-varying cross-classified multiple membership, Kish ESS, nested ICC with non-nested refusal |
 | `role_contradiction` | customer and competitor cannot occupy the same group |

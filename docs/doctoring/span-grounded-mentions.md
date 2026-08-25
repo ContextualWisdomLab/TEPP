@@ -2,13 +2,14 @@
 
 ## Claim boundary
 
-`SpanGroundedMention` binds a fallible event mention to one exact
-`evidence_core::SourceSpan`, six typed clocks, an extractor/model version, and
-a proposed-or-reviewed inspection status. Exact-extent precision and recall
-are computed against known-truth spans. A reviewed mention is not a promoted
-event instance. This slice does not run TDT tracking, CHRONOS schema
-extraction, interval consistency, persistence, or GraphML/JSON-LD export, and
-it does not close issue #170.
+`EventMention` is the only constructible mention type. It binds a fallible
+event mention to one exact `evidence_core::SourceSpan`, six typed clocks, an
+extractor/model version, and a proposed-or-reviewed inspection status. The
+surface form is the document substring at that span. Exact-extent precision
+and recall are computed against known-truth spans. A reviewed mention is not
+a promoted event instance. This slice does not run TDT tracking, CHRONOS
+schema extraction, interval consistency, persistence, or GraphML/JSON-LD
+export, and it does not close issue #170.
 
 ## Numeric constants
 
