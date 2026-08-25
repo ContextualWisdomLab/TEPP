@@ -178,6 +178,11 @@ mod tests {
         let json = anchor().to_json().expect("serialize");
         let payload = json.strip_suffix('}').expect("object");
         assert!(LineageCriterionAnchor::from_json(&format!("{payload},\"theta\":0.8}}")).is_err());
+
+        let mut semantically_invalid = anchor();
+        semantically_invalid.validated_pair_count = 0;
+        let json = serde_json::to_string(&semantically_invalid).expect("wire shape");
+        assert!(LineageCriterionAnchor::from_json(&json).is_err());
     }
 
     #[test]
