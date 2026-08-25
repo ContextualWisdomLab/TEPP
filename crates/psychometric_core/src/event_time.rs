@@ -310,7 +310,14 @@
 //! free `T0VAR` (2017-era `summary.ctsemFit.R`; JSS PDF re-opened
 //! 2026-08-23T22:06Z). The scalar map is `p_0 / p_0 = 1`.
 //! Unstandardised `T0VAR` is not `T0VARstd`. `T0TDPREDEFFECTstd`
-//! is not `T0VARstd`. `addedT0TIPREDVAR` is not `T0VARstd`. The
+//! is not `T0VARstd`. `addedT0TIPREDVAR` is not `T0VARstd`. Page 16
+//! `TRAITVARstd` is the correlation form
+//! `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR` after strictly
+//! positive `TRAITVAR` (2017-era `summary.ctsemFit.R` forms it only
+//! when `TRAITVAR != 0`; JSS PDF re-opened 2026-08-23T22:21Z). The
+//! scalar map is `trait / trait = 1`. Unstandardised `TRAITVAR` is
+//! not `TRAITVARstd`. `T0VARstd` is not `TRAITVARstd` even when
+//! both equal 1. `addedT0TIPREDVAR` is not `TRAITVARstd`. The
 //! JSS article
 //! `t0_m = t0_b`. Free `T0VAR` does not require `a < 0`. The scalar
 //! analog of 2017-era `addedT0TIPREDVAR` for that first-occasion TD
@@ -2252,6 +2259,121 @@ pub fn refuse_initial_time_dependent_variance_as_trait_variance(
 ) -> Result<f64, PsychometricError> {
     let _ = (initial_time_dependent_variance, trait_variance);
     Err(PsychometricError::InitialTimeDependentVarianceIsNotTraitVariance)
+}
+
+/// Exact scalar p. 16 `TRAITVARstd` after strictly positive `TRAITVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; §7.1, pp. 18–19;
+/// p. 16; footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-23T22:21Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `TRAITVAR` `φ_ξ` the latent trait variance/covariance.
+/// Table 2 sets it `NULL` when there is no trait variance.
+/// Section 7.1 names traits the stable between-subject differences
+/// (unit-level unobserved heterogeneity) and estimates `φ_ξ` of the
+/// intercepts `ξ` across individuals. Page 16 prints standardised
+/// matrices with the suffix `std` when appropriate. The 2017-era
+/// `summary.ctsemFit.R` forms `TRAITVARstd` only when
+/// `TRAITVAR != 0`, as `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR`
+/// when `verbose = TRUE`. `OpenMx` `%&%` is the quadratic form
+/// `t(A) %*% B %*% A`. Unlike `T0VARstd`, that formation uses
+/// `diag(diag(TRAITVAR))` and does not add `diag(c(ridging))`. The
+/// ridge is a `T0VAR` numerical hack and is not this exact map. The
+/// scalar correlation is `trait / trait = 1` after strictly
+/// positive `TRAITVAR`. Form strictly positive `trait` first, then
+/// `1 / √trait`, then `(1 / √trait) trait (1 / √trait)`.
+/// Unstandardised `TRAITVAR` is defined for a zero trait;
+/// standardised `TRAITVAR` is not. Zero `TRAITVAR` skips forming
+/// `TRAITVARstd` in the 2017-era source and fails closed here.
+/// Between-subject variance is an event-time structural quantity,
+/// so a non-event clock fails closed. `TRAITVAR` does not require
+/// stable `a < 0`. Distinct positive `trait` recover the same 1.
+/// `T0VARstd` `p_0 / p_0 = 1` recovers the same number and remains
+/// a distinct named quantity. `addedT0TIPREDVAR` `t0_b² v` is extra
+/// first-occasion TI variance, not this correlation. This is not a
+/// Kalman filter, not a matrix `expm`, not DSEM, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance`]
+/// when `TRAITVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the variance is
+/// non-finite, negative, or the quadratic form overflows.
+pub fn recover_standardised_trait_variance(
+    trait_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !trait_variance.is_finite() || trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if trait_variance == 0.0 {
+        return Err(PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance);
+    }
+    let process_sd = trait_variance.sqrt();
+    let inverse_sd = require_finite(1.0 / process_sd)?;
+    let scaled = require_finite(inverse_sd * trait_variance)?;
+    require_finite(scaled * inverse_sd)
+}
+
+/// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
+///
+/// Unstandardised `TRAITVAR` is defined for a zero trait. Footnote
+/// 4 `TRAITVARstd` requires strictly positive `TRAITVAR`. Equal
+/// numbers when `trait = 1` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance`].
+pub fn refuse_unstandardised_trait_variance_as_standardised_trait_variance(
+    unstandardised_trait_variance: f64,
+    standardised_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_trait_variance, standardised_trait_variance);
+    Err(PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance)
+}
+
+/// Refuse treating p. 16 `T0VARstd` as p. 16 `TRAITVARstd`.
+///
+/// Both scalar correlations equal 1 after strictly positive
+/// variances. `T0VARstd` standardises free first-occasion `T0VAR`.
+/// `TRAITVARstd` standardises between-subject `TRAITVAR`. Equal
+/// numbers remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance`].
+pub fn refuse_standardised_initial_latent_variance_as_standardised_trait_variance(
+    standardised_initial_variance: f64,
+    standardised_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_initial_variance, standardised_trait_variance);
+    Err(PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance)
+}
+
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
+///
+/// `t0_b² v` is extra first-occasion TI variance. `TRAITVARstd` is
+/// the correlation form of between-subject `TRAITVAR`. Those are
+/// not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance`].
+pub fn refuse_initial_time_independent_variance_as_standardised_trait_variance(
+    initial_predictor_variance: f64,
+    standardised_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_predictor_variance, standardised_trait_variance);
+    Err(PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance)
 }
 
 /// Exact scalar 2017-era `addedT0TIPREDVAR` after a first-occasion
@@ -10766,13 +10888,14 @@ mod tests {
         recover_standardised_initial_latent_variance,
         recover_standardised_initial_time_dependent_predictor_effect,
         recover_standardised_initial_time_independent_predictor_effect,
-        recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
-        recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
-        recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
-        recover_stationary_latent_variance, recover_stationary_later_latent_variance,
-        recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
-        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
-        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+        recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
+        recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
+        recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
+        recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
+        recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
+        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+        recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -10848,6 +10971,7 @@ mod tests {
         refuse_initial_time_independent_variance_as_standardised_asymptotic_time_independent_variance,
         refuse_initial_time_independent_variance_as_standardised_initial_latent_variance,
         refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect,
+        refuse_initial_time_independent_variance_as_standardised_trait_variance,
         refuse_initial_time_independent_variance_as_trait_variance,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
@@ -10917,6 +11041,7 @@ mod tests {
         refuse_standardised_discrete_time_dependent_effect_as_standardised_continuous_time_dependent_effect,
         refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect,
         refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect,
+        refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
         refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance,
         refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
@@ -10988,6 +11113,7 @@ mod tests {
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect,
+        refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     };
     use crate::error::PsychometricError;
 
@@ -28211,6 +28337,18 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+        // A non-finite coefficient survives the outer variance gates and must
+        // propagate through the delegated unstandardised recovery.
+        assert_eq!(
+            recover_standardised_asymptotic_time_independent_predictor_effect(
+                f64::NAN,
+                1.0,
+                0.4,
+                log_rate,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
     }
 
     #[test]
@@ -29024,6 +29162,71 @@ mod tests {
         assert_eq!(
             zero_with_overflowing_coefficient.to_bits(),
             0.0_f64.to_bits()
+        );
+    }
+
+    #[test]
+    fn standardised_trait_variance_recovers_driver_table_two_after_positive_traitvar() {
+        // Driver et al. (2017, Table 2 TRAITVAR; §7.1; p. 16 TRAITVARstd;
+        // 2017-era summary.ctsemFit.R): form strictly positive TRAITVAR,
+        // then (1/√trait) trait (1/√trait) = 1. No ridge addend.
+        let trait_variance = 1.6_f64;
+        let recovered = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)
+            .expect("TRAITVARstd");
+        assert!((recovered - 1.0).abs() < 1e-15);
+        let larger_trait = recover_standardised_trait_variance(6.4, LagClock::EventTime)
+            .expect("TRAITVARstd trait=6.4");
+        assert_eq!(larger_trait.to_bits(), recovered.to_bits());
+        let t0var_std =
+            recover_standardised_initial_latent_variance(trait_variance, LagClock::EventTime)
+                .expect("T0VARstd");
+        assert_eq!(t0var_std.to_bits(), recovered.to_bits());
+        let extra =
+            recover_initial_time_independent_predictor_variance(0.3, 4.0, LagClock::EventTime)
+                .expect("addedT0TIPREDVAR");
+        assert!((extra - recovered).abs() > 1e-3);
+        assert_eq!(
+            refuse_unstandardised_trait_variance_as_standardised_trait_variance(
+                trait_variance,
+                recovered
+            ),
+            Err(PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance)
+        );
+        assert_eq!(
+            refuse_standardised_initial_latent_variance_as_standardised_trait_variance(
+                t0var_std, recovered
+            ),
+            Err(PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance)
+        );
+        assert_eq!(
+            refuse_initial_time_independent_variance_as_standardised_trait_variance(
+                extra, recovered
+            ),
+            Err(PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance)
+        );
+    }
+
+    #[test]
+    fn standardised_trait_variance_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_trait_variance(0.0, LagClock::EventTime),
+            Err(PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance)
+        );
+        assert_eq!(
+            recover_standardised_trait_variance(1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_trait_variance(-1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_trait_variance(f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_trait_variance(f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 

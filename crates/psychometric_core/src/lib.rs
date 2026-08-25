@@ -551,6 +551,19 @@
 //! `T0TDPREDEFFECTstd` and is not this variance; `T0TDPREDCOV` is
 //! the covariance, not `t0_m² v`; free `T0VAR` is not this extra;
 //! `TRAITVAR` is not this extra),
+//! recovers the Driver p. 16 `TRAITVARstd` as the correlation form
+//! `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR` after forming
+//! strictly positive `TRAITVAR` (JSS PDF re-opened 2026-08-23T22:21Z;
+//! Table 2, p. 12; §7.1, pp. 18–19; 2017-era `summary.ctsemFit.R`
+//! forms that quadratic only when `TRAITVAR != 0` and `verbose =
+//! TRUE`; `OpenMx` `%&%` is `t(A) %*% B %*% A`; unlike `T0VARstd`
+//! there is no ridge addend; the scalar map is `trait / trait = 1`;
+//! unstandardised `TRAITVAR` is defined for a zero trait and is
+//! not `TRAITVARstd`; zero `TRAITVAR` fails closed; a non-event
+//! clock fails closed; `TRAITVAR` does not require stable `a < 0`;
+//! distinct positive `trait` recover the same 1; `T0VARstd`
+//! recovers the same number and remains a distinct named quantity;
+//! `t0_b² v` is not `TRAITVARstd`),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -749,6 +762,8 @@ pub use event_time::recover_standardised_initial_latent_variance;
 pub use event_time::recover_standardised_initial_time_dependent_predictor_effect;
 /// Exact scalar Table 3 / p. 16 `T0TIPREDEFFECTstd` `t0_b · √v / √p_0` after strictly positive free `T0VAR` and `v`.
 pub use event_time::recover_standardised_initial_time_independent_predictor_effect;
+/// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
+pub use event_time::recover_standardised_trait_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
@@ -929,6 +944,8 @@ pub use event_time::refuse_initial_time_independent_variance_as_standardised_asy
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_initial_latent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
+pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as `TRAITVAR`.
 pub use event_time::refuse_initial_time_independent_variance_as_trait_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
@@ -1073,6 +1090,8 @@ pub use event_time::refuse_standardised_discrete_time_dependent_effect_as_standa
 pub use event_time::refuse_standardised_discrete_time_independent_effect_as_standardised_asymptotic_time_independent_effect;
 /// Refuse treating a finite-interval standardised `TIPREDEFFECT` as p. 16 `TIPREDEFFECTstd`.
 pub use event_time::refuse_standardised_discrete_time_independent_effect_as_standardised_continuous_time_independent_effect;
+/// Refuse treating p. 16 `T0VARstd` as p. 16 `TRAITVARstd`.
+pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_trait_variance;
 /// Refuse treating Table 3 / p. 16 `T0TDPREDEFFECTstd` as p. 16 `T0VARstd`.
 pub use event_time::refuse_standardised_initial_time_dependent_effect_as_standardised_initial_latent_variance;
 /// Refuse treating Table 3 / p. 16 `T0TIPREDEFFECTstd` as Table 3 / p. 16 `T0TDPREDEFFECTstd`.
@@ -1219,6 +1238,8 @@ pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardise
 pub use event_time::refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect;
 /// Refuse treating unstandardised `T0TIPREDEFFECT` `t0_b` as Table 3 / p. 16 `T0TIPREDEFFECTstd`.
 pub use event_time::refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect;
+/// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
+pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.

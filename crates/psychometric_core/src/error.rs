@@ -1066,6 +1066,23 @@ pub enum PsychometricError {
     /// `TRAITVAR`. Section 4.3 `TRAITVAR` is a zero-drift latent
     /// process, not first-occasion TD extra variance.
     InitialTimeDependentVarianceIsNotTraitVariance,
+    /// Driver p. 16 `TRAITVARstd` was requested with a non-positive
+    /// trait variance. The 2017-era correlation form requires
+    /// strictly positive `TRAITVAR` and is not formed when
+    /// `TRAITVAR` is zero.
+    StandardisedTraitVarianceRequiresPositiveTraitVariance,
+    /// Driver Table 2 unstandardised `TRAITVAR` was treated as
+    /// p. 16 `TRAITVARstd`. Unstandardised trait variance is
+    /// defined for a zero trait; standardised `TRAITVAR` is not.
+    UnstandardisedTraitVarianceIsNotStandardisedTraitVariance,
+    /// Driver p. 16 `T0VARstd` was treated as p. 16 `TRAITVARstd`.
+    /// Equal numbers when both correlations equal 1 are still
+    /// distinct named quantities.
+    StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance,
+    /// Driver 2017-era `addedT0TIPREDVAR` `t0_b² v` was treated as
+    /// p. 16 `TRAITVARstd`. Extra first-occasion TI variance is not
+    /// the correlation form of between-subject `TRAITVAR`.
+    InitialTimeIndependentVarianceIsNotStandardisedTraitVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1836,6 +1853,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialTimeDependentVarianceIsNotTraitVariance => {
                 "initial time-dependent predictor variance is not trait variance"
+            }
+            Self::StandardisedTraitVarianceRequiresPositiveTraitVariance => {
+                "standardised trait variance requires strictly positive trait variance"
+            }
+            Self::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance => {
+                "unstandardised trait variance is not standardised trait variance"
+            }
+            Self::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance => {
+                "standardised initial latent variance is not standardised trait variance"
+            }
+            Self::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance => {
+                "initial time-independent predictor variance is not standardised trait variance"
             }
         };
         formatter.write_str(message)
@@ -3148,6 +3177,29 @@ mod tests {
         assert_eq!(
             PsychometricError::InitialTimeDependentVarianceIsNotTraitVariance.to_string(),
             "initial time-dependent predictor variance is not trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_trait_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance.to_string(),
+            "standardised trait variance requires strictly positive trait variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance
+                .to_string(),
+            "unstandardised trait variance is not standardised trait variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance
+                .to_string(),
+            "standardised initial latent variance is not standardised trait variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance
+                .to_string(),
+            "initial time-independent predictor variance is not standardised trait variance"
         );
     }
 }
