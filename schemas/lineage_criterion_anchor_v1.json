@@ -16,7 +16,11 @@
   "properties": {
     "contract_version": { "type": "integer", "const": 1 },
     "anchor_kind_code": { "type": "string", "const": "lineage_pair_criterion" },
-    "estimation_run_id": { "type": "string", "format": "uuid" },
+    "estimation_run_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
     "source_snapshot_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "knowledge_cutoff": { "type": "string", "format": "date-time" },
     "criterion_validity_status": {

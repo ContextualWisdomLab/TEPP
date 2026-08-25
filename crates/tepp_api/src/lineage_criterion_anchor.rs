@@ -101,7 +101,11 @@ impl LineageCriterionAnchor {
             return Err(ApiError::InvalidWirePayload);
         }
         require_nonempty(&self.estimation_run_id)?;
-        uuid::Uuid::parse_str(&self.estimation_run_id).map_err(|_| ApiError::InvalidWirePayload)?;
+        let estimation_run_id = uuid::Uuid::parse_str(&self.estimation_run_id)
+            .map_err(|_| ApiError::InvalidWirePayload)?;
+        if estimation_run_id.hyphenated().to_string() != self.estimation_run_id {
+            return Err(ApiError::InvalidWirePayload);
+        }
         KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff)
             .map_err(|_| ApiError::InvalidWirePayload)?;
         Ok(())
@@ -152,7 +156,7 @@ mod tests {
 
     #[test]
     fn malformed_or_unbound_artifacts_fail_closed() {
-        for mutate in 0..8 {
+        for mutate in 0..9 {
             let mut value = anchor();
             match mutate {
                 0 => value.contract_version = 2,
@@ -162,6 +166,7 @@ mod tests {
                 4 => value.source_snapshot_sha256 = "a".repeat(63),
                 5 => value.estimation_run_id.clear(),
                 6 => value.knowledge_cutoff = "not-a-time".into(),
+                7 => value.estimation_run_id = "018f47e77b5b7cc098c615fdf9e3d9b1".into(),
                 _ => value.validated_pair_count = 0,
             }
             assert!(value.to_json().is_err());

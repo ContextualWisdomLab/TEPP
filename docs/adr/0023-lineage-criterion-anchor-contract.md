@@ -16,6 +16,8 @@ TEPP owns the `tepp.lineage_criterion_anchor.v1` result artifact and the
 request identity. The artifact binds TEPP's accepted or rejected criterion
 decision to one opaque estimation run, immutable snapshot SHA-256, knowledge
 cutoff, and positive validated-pair count.
+The estimation-run identity uses the canonical lowercase, hyphenated UUID
+form in both the executable DTO and the published JSON Schema.
 
 The wire contract does not define an arbitrary correlation threshold, invent a
 theta, or allow LineageWeave to reinterpret a rejection. The registered TEPP
