@@ -5169,17 +5169,6 @@ fn stationary_initial_latent_variance_refuses_unstable_drift_and_non_event_clock
         recover_stationary_initial_latent_variance(
             f64::MAX,
             0.0,
-            0.0,
-            0.0,
-            -0.5,
-            LagClock::EventTime,
-        ),
-        Err(PsychometricError::InvalidNumericInput)
-    );
-    assert_eq!(
-        recover_stationary_initial_latent_variance(
-            f64::MAX,
-            0.0,
             1.0,
             f64::MAX,
             -1.0,

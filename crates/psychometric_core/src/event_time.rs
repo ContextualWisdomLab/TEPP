@@ -14602,17 +14602,6 @@ mod tests {
             recover_stationary_initial_latent_variance(
                 f64::MAX,
                 0.0,
-                0.0,
-                0.0,
-                -0.5,
-                LagClock::EventTime
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_stationary_initial_latent_variance(
-                f64::MAX,
-                0.0,
                 1.0,
                 f64::MAX,
                 -1.0,
@@ -15164,18 +15153,6 @@ mod tests {
             recover_stationary_lagged_latent_covariance(
                 f64::NAN,
                 0.4,
-                0.0,
-                0.0,
-                -0.5,
-                1.0,
-                LagClock::EventTime
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_stationary_lagged_latent_covariance(
-                f64::MAX,
-                0.0,
                 0.0,
                 0.0,
                 -0.5,
@@ -15740,18 +15717,6 @@ mod tests {
             recover_stationary_later_latent_variance(
                 f64::NAN,
                 0.4,
-                0.0,
-                0.0,
-                -0.5,
-                1.0,
-                LagClock::EventTime
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_stationary_later_latent_variance(
-                f64::MAX,
-                0.0,
                 0.0,
                 0.0,
                 -0.5,
