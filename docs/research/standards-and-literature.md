@@ -86,6 +86,10 @@ Box, G. E. P., & Muller, M. E. (1958). A note on the generation of random normal
 
 Salmon, J. K., Moraes, M. A., Dror, R. O., & Shaw, D. E. (2011). Parallel random numbers: As easy as 1, 2, 3. In *Proceedings of 2011 International Conference for High Performance Computing, Networking, Storage and Analysis* (Article 16). Association for Computing Machinery. https://doi.org/10.1145/2063384.2063405
 
+Vehtari, A., Mononen, T., Tolvanen, V., Sivula, T., & Winther, O. (2016). Bayesian leave-one-out cross-validation approximations for Gaussian latent variable models. *Journal of Machine Learning Research, 17*(103), 1–38. https://www.jmlr.org/papers/v17/14-540.html
+
+Zhu, H., Ibrahim, J. G., Cho, H., & Tang, N. (2012). Bayesian case influence measures for statistical models with missing data. *Journal of Computational and Graphical Statistics, 21*(1), 253–271. https://doi.org/10.1198/jcgs.2011.10139
+
 Mimno, D., Wallach, H. M., Naradowsky, J., Smith, D. A., & McCallum, A. (2009). Polylingual topic models. In *Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing* (pp. 880–889). Association for Computational Linguistics.
 
 Roberts, M. E., Stewart, B. M., & Tingley, D. (2019). stm: An R package for structural topic models. *Journal of Statistical Software, 91*(2), 1–40. https://doi.org/10.18637/jss.v091.i02

@@ -12,8 +12,9 @@ use temporal_core::{
     TemporalPrecision,
 };
 use topic_measurement::{
-    PosteriorApproximation, PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModelConfig,
-    SparseMatrix, TopicMeasurementError, fit_reference_topic_model,
+    IndependentTopicAnchor, PosteriorApproximation, PrevalenceFeature, ReferenceTopicInput,
+    ReferenceTopicModelConfig, SparseMatrix, TopicMeasurementError, fit_exact_leave_one_out_refits,
+    fit_reference_topic_model,
 };
 use uuid::Uuid;
 use validation_core::root_mean_square_error;
@@ -221,6 +222,57 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
     assert!(log_likelihood.is_finite());
     let tokens = input.token_count().expect("token count");
     assert!((tokens - 600.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn independent_anchor_drives_actual_exhaustive_document_deletion_refits() {
+    let (snapshot, document_ids, times, memberships, relations) = fixture();
+    let input = ReferenceTopicInput::new(
+        &snapshot,
+        document_ids.clone(),
+        &separated_counts(),
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("input");
+    let config =
+        ReferenceTopicModelConfig::new(2, vec![7, 11], 2_000, 1e-5).expect("configuration");
+    let full = fit_reference_topic_model(&input, &config).expect("full fit");
+    let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
+    let anchor =
+        IndependentTopicAnchor::new(topic_ids.clone(), full.topic_term_probabilities.clone())
+            .expect("independent anchor");
+    assert_eq!(anchor.topic_ids(), topic_ids);
+    assert_eq!(anchor.anchor_id().len(), 64);
+
+    let refits = fit_exact_leave_one_out_refits(&input, &config, &anchor).expect("exact refits");
+    assert_eq!(refits.len(), document_ids.len());
+    for (index, refit) in refits.iter().enumerate() {
+        assert_eq!(refit.excluded_document_id(), document_ids[index]);
+        assert_eq!(refit.anchor_id(), anchor.anchor_id());
+        assert_eq!(refit.alignment_evidence_sha256().len(), 64);
+        assert_eq!(refit.admitted_document_ids().len(), document_ids.len() - 1);
+        assert!(
+            !refit
+                .admitted_document_ids()
+                .contains(&refit.excluded_document_id())
+        );
+        assert_eq!(
+            refit.model().document_topic_proportions.len(),
+            document_ids.len() - 1
+        );
+        assert!(refit.model().objective.is_finite());
+    }
+
+    assert_eq!(
+        IndependentTopicAnchor::new(
+            vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
 }
 
 #[test]
