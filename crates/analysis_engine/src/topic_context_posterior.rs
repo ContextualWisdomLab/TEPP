@@ -1313,8 +1313,7 @@ mod tests {
             "018f3f7a-7b7c-7d00-8000-000000000002"
         );
 
-        let round_tripped =
-            TopicContextPosteriorArtifact::from_json(&json).expect("round-trip");
+        let round_tripped = TopicContextPosteriorArtifact::from_json(&json).expect("round-trip");
         assert_eq!(
             round_tripped.lineage_events[0].event_code, "birth",
             "canonical lineage order survives round-trip"
@@ -1325,5 +1324,4 @@ mod tests {
             "canonical relation order survives round-trip"
         );
     }
-
 }
