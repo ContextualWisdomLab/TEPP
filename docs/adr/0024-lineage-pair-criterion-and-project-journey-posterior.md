@@ -69,6 +69,15 @@ mass, artifact assembly with estimator-bound MLX execution, and hardware parity
 remain unavailable until their owning implementations and receipts pass the
 same gates.
 
+`analysis_engine::fit_exhaustive_case_deletion` is the normative producer
+orchestration prerequisite: it invokes one scientific fitter on `D` and every
+actual `D \ {i}` retained set with mutually domain-separated randomness
+identities, preserving deleted and retained document identities. It performs
+no posterior reweighting or approximation. This runner does not make the topic
+artifact available until a topic likelihood fitter, anchor alignment, incident
+relation/membership removal receipts, and estimator-bound CPU/accelerator
+receipts are connected.
+
 ## Alternatives considered
 
 1. Earliest record as project start — rejected because reporting delay changes
