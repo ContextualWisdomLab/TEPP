@@ -9,12 +9,14 @@
 //! six-clock evidence, extractor version, and review status, and the surface
 //! form is the document substring at that span. Mentions, first-story
 //! detections, TDT detections, and CHRONOS predictions never silently become
-//! instances. Track assignments, story segmentations, CHRONOS schema-slot
-//! predictions, and occurrence forecasts remain measurement or hypothesis
-//! artifacts and cannot promote an instance without an explicit
-//! evidence-backed promotion gate.
+//! instances. [`EventIntelligenceComposition`] is the versioned TDT/CHRONOS
+//! workflow over admitted artifacts; promotion still requires the existing
+//! evidence-backed gate. Track assignments, story segmentations, CHRONOS
+//! schema-slot predictions, and occurrence forecasts remain measurement or
+//! hypothesis artifacts and cannot promote an instance without that gate.
 
 mod confidence;
+mod composition;
 mod criterion_posterior;
 mod error;
 mod event_time_posterior;
@@ -37,6 +39,18 @@ mod track;
 pub use confidence::EventConfidence;
 /// Mean squared error of mention probabilities against binary truth.
 pub use confidence::mention_brier_score;
+/// Versioned TDT/CHRONOS composition over admitted artifacts.
+pub use composition::EventIntelligenceComposition;
+/// Named thresholds and version for one reproducible intelligence run.
+pub use composition::EventIntelligenceWorkflowConfig;
+/// Wire schema version for the unified event-intelligence workflow.
+pub use composition::EVENT_INTELLIGENCE_WORKFLOW_VERSION;
+/// Admit already-extracted TDT/CHRONOS artifacts into one versioned workflow.
+pub use composition::compose_event_intelligence;
+/// Explicit refusal to treat a composition as an event instance.
+pub use composition::refuse_composition_as_instance;
+/// Explicit refusal to treat a composition as a state transition.
+pub use composition::refuse_composition_as_transition;
 /// Identified Jeffreys posterior for independent criterion observations.
 pub use criterion_posterior::CriterionPosterior;
 /// Fail-closed independent criterion posterior errors.
