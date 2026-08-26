@@ -10,6 +10,7 @@
 //! estimation authority; it invokes estimators through their scientific crate
 //! contracts and preserves their artifact meaning.
 
+mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -30,6 +31,11 @@ pub use topic_context_posterior::{
     TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
     TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
     TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue,
+};
+/// Rust-owned independent TDT link-criterion posterior fitting contracts.
+pub use lineage_criterion::{
+    LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
+    fit_lineage_criterion_posteriors,
 };
 /// Topic-lineage artifact and execution contracts from this engine.
 pub use topic_lineage_artifact::{

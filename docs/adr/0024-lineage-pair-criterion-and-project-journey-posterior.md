@@ -1,7 +1,7 @@
 # ADR 0024 — Independent lineage-pair criterion and posterior Project Journey
 
 **Decision status:** Proposed  
-**Implementation maturity:** active-PR — strict producer and consumer wire contracts  
+**Implementation maturity:** active-PR — strict wire contracts and Rust CPU independent-criterion estimator  
 **Date:** 2026-08-26  
 **Supersedes:** None; narrows ADR 0016 and complements ADR 0021.
 
@@ -36,6 +36,13 @@ and transition draw. It has no start stage, earliest-row selection, total
 ordering, rank, or causal status. Multiple predecessors and exact ties remain
 first-class.
 
+For an independently observed binary TDT link criterion, the Rust scientific
+core fits the Bernoulli likelihood with Jeffreys' invariant
+`Beta(1/2, 1/2)` prior and emits posterior mean, variance, and deterministic
+midpoint-quantile quadrature draws. This is not a thresholded channel score.
+It does not turn a CHRONOS forecast into a fact, and it carries rather than
+invents the temporal model's event-time draws.
+
 ## Verification and invariants
 
 - record time never substitutes for event time;
@@ -46,9 +53,10 @@ first-class.
   branches, ties, uncertain relations, backward-edge refusal, anchor ambiguity,
   and hardware-receipt divergence.
 
-This slice validates and publishes already-fitted posterior evidence. It does
-not claim that the TDT/CHRONOS estimator or real GPU execution is complete;
-those require a scientific-crate PR with parameter recovery and hardware parity.
+The Rust CPU independent-criterion estimator has deterministic synthetic
+parameter-recovery tests. Full TDT/CHRONOS temporal inference, artifact
+assembly with actual MLX execution, and hardware parity remain unavailable
+until their owning implementations and receipts pass the same gates.
 
 ## Alternatives considered
 
@@ -93,3 +101,8 @@ Li, M., Li, S., Wang, Z., Huang, L., Cho, K., Ji, H., Han, J., & Voss, C.
 (2021). The future is not one-dimensional: Complex event schema induction by
 graph modeling for event prediction. In *Proceedings of EMNLP 2021* (pp.
 5203–5215). https://doi.org/10.18653/v1/2021.emnlp-main.422
+
+Jeffreys, H. (1946). An invariant form for the prior probability in estimation
+problems. *Proceedings of the Royal Society of London. Series A, Mathematical
+and Physical Sciences, 186*(1007), 453–461.
+https://doi.org/10.1098/rspa.1946.0056

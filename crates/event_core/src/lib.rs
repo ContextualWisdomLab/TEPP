@@ -15,6 +15,7 @@
 //! evidence-backed promotion gate.
 
 mod confidence;
+mod criterion_posterior;
 mod error;
 mod first_story;
 mod identifier;
@@ -34,6 +35,14 @@ mod track;
 pub use confidence::EventConfidence;
 /// Mean squared error of mention probabilities against binary truth.
 pub use confidence::mention_brier_score;
+/// Identified Jeffreys posterior for independent criterion observations.
+pub use criterion_posterior::CriterionPosterior;
+/// Fail-closed independent criterion posterior errors.
+pub use criterion_posterior::CriterionPosteriorError;
+/// Independent binary criterion observation counts.
+pub use criterion_posterior::IndependentCriterionCounts;
+/// Fit the paper-grounded independent criterion posterior on CPU f64.
+pub use criterion_posterior::fit_independent_criterion_posterior;
 /// Fail-closed event-ontology errors.
 pub use error::EventError;
 /// First-story versus follow-up detection label.
