@@ -63,6 +63,7 @@ name = "analysis_engine"
 version = "0.2.0"
 dependencies = [
  "corpus_split",
+ "event_core",
  "membership_core",
  "relation_graph",
  "serde",
