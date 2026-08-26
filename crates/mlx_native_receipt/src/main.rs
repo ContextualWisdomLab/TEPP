@@ -8,26 +8,7 @@
 //! the Rust CPU reference, and emits a receipt only for the device that
 //! actually executed. It is not an Event Lineage estimator receipt.
 
-use serde::Serialize;
-use sha2::{Digest, Sha256};
-
-#[derive(Serialize)]
-struct ProbeReceipt {
-    schema_version: &'static str,
-    backend_code: &'static str,
-    execution_environment_code: &'static str,
-    objective_sha256: String,
-    output_sha256: String,
-    observed_maximum_difference: f64,
-}
-
-fn digest(values: &[f32]) -> String {
-    let mut hasher = Sha256::new();
-    for value in values {
-        hasher.update(value.to_le_bytes());
-    }
-    format!("{:x}", hasher.finalize())
-}
+use mlx_native_receipt::{digest, ProbeReceipt, RECEIPT_SCHEMA_VERSION};
 
 #[cfg(target_os = "macos")]
 fn run() -> Result<ProbeReceipt, Box<dyn std::error::Error>> {
@@ -46,7 +27,7 @@ fn run() -> Result<ProbeReceipt, Box<dyn std::error::Error>> {
     let objective = lhs.iter().chain(&rhs).copied().collect::<Vec<_>>();
     let result = output;
     Ok(ProbeReceipt {
-        schema_version: "tepp.mlx_native_probe_receipt.v1",
+        schema_version: RECEIPT_SCHEMA_VERSION,
         backend_code: "mlx_cpu_macos_native",
         execution_environment_code: "macos_native",
         objective_sha256: digest(&objective),
