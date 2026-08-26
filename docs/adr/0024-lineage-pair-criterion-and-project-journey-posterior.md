@@ -36,6 +36,11 @@ and transition draw. It has no start stage, earliest-row selection, total
 ordering, rank, or causal status. Multiple predecessors and exact ties remain
 first-class.
 
+The Rust CHRONOS relation slice compares common event-time draws directly and
+publishes the complete `before`/`simultaneous`/`after` draw sequence and its
+posterior frequencies. It estimates no timestamp, uses no tolerance or nearest
+date, preserves exact ties, and cannot promote a predicted event into fact.
+
 For an independently observed binary TDT link criterion, the Rust scientific
 core fits the Bernoulli likelihood with Jeffreys' invariant
 `Beta(1/2, 1/2)` prior and emits posterior mean, variance, and deterministic
@@ -53,10 +58,11 @@ invents the temporal model's event-time draws.
   branches, ties, uncertain relations, backward-edge refusal, anchor ambiguity,
   and hardware-receipt divergence.
 
-The Rust CPU independent-criterion estimator has deterministic synthetic
-parameter-recovery tests. Full TDT/CHRONOS temporal inference, artifact
-assembly with actual MLX execution, and hardware parity remain unavailable
-until their owning implementations and receipts pass the same gates.
+The Rust CPU independent-criterion estimator and qualitative temporal-relation
+posterior have deterministic synthetic exact-recovery tests. Event-time draw
+generation, artifact assembly with actual MLX execution, and hardware parity
+remain unavailable until their owning implementations and receipts pass the
+same gates.
 
 ## Alternatives considered
 

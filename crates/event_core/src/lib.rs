@@ -29,6 +29,7 @@ mod role;
 mod schema;
 mod segment;
 mod span_mention;
+mod temporal_relation_posterior;
 mod track;
 
 /// Finite confidence on the closed unit interval.
@@ -151,6 +152,14 @@ pub use span_mention::MentionReviewStatus;
 pub use span_mention::mention_span_precision;
 /// Recall of recovered mention extents against known truth.
 pub use span_mention::mention_span_recall;
+/// Posterior qualitative temporal relation for one common event-time draw.
+pub use temporal_relation_posterior::DrawTemporalRelation;
+/// Posterior relation frequencies derived without a date threshold.
+pub use temporal_relation_posterior::TemporalRelationPosterior;
+/// Fail-closed temporal relation posterior errors.
+pub use temporal_relation_posterior::TemporalRelationPosteriorError;
+/// Derive CHRONOS-compatible qualitative relation draws from common event-time draws.
+pub use temporal_relation_posterior::infer_temporal_relation_posterior;
 /// Assignment of one mention to one hypothesized TDT track.
 pub use track::EventTrackAssignment;
 /// Opaque TDT track identity.

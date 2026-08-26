@@ -11,10 +11,11 @@
   parity receipts. They reject fixed starts, nearest-date substitution,
   unsupported certainty, and consumer repair.
 - Remaining release gap: no protected-main scientific estimator with
-  complete CHRONOS event-time recovery and real macOS-native MLX Metal parity
+  CHRONOS event-time draw generation and real macOS-native MLX Metal parity
   produces these artifacts yet. The Rust CPU independent binary TDT-link
   criterion posterior now has deterministic synthetic parameter-recovery tests,
-  but that bounded estimator is not evidence that calibrated Project Journey or
+  and Rust qualitative relation draws have exact-recovery tests, but those
+  bounded estimators are not evidence that calibrated Project Journey or
   channel-weight results are available.
 - ADR 0025 is the normative Apple Silicon boundary: Rust-owned native MLX
   Metal behind authenticated local transport, exact backend receipts, Linux
