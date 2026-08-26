@@ -161,3 +161,123 @@ fn empty_mentions_and_bad_versions_fail_closed_before_composition() {
         Err(EventError::InvalidWirePayload)
     );
 }
+
+#[test]
+fn compose_refuses_short_first_story_or_track_alignment() {
+    let original = record("award protest later");
+    let award = grounded(&original, "award");
+    let protest = grounded(&original, "protest");
+    let segmentation = StorySegmentation::new(3, vec![false, true]).expect("seg");
+    let mentions = vec![award.clone(), protest.clone()];
+    let labels = vec![FirstStoryLabel::FirstStory, FirstStoryLabel::FollowUp];
+    let tracks = vec![
+        EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+        EventTrackAssignment::new(protest.mention_id(), EventTrackId::from_raw(1)),
+    ];
+    let short_labels = vec![FirstStoryLabel::FirstStory];
+    assert_eq!(
+        compose_event_intelligence(
+            workflow_config(),
+            segmentation.clone(),
+            mentions.clone(),
+            Vec::new(),
+            short_labels,
+            tracks.clone(),
+            Vec::new(),
+            Vec::new(),
+        )
+        .map(|_| ()),
+        Err(EventError::InvalidWirePayload)
+    );
+    let short_tracks = vec![tracks[0]];
+    assert_eq!(
+        compose_event_intelligence(
+            workflow_config(),
+            segmentation,
+            mentions,
+            Vec::new(),
+            labels,
+            short_tracks,
+            Vec::new(),
+            Vec::new(),
+        )
+        .map(|_| ()),
+        Err(EventError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn append_revised_mention_refuses_mismatched_track_then_accepts_match() {
+    let original = record("award protest later");
+    let revised = record("revised award later");
+    let award = grounded(&original, "award");
+    let protest = grounded(&original, "protest");
+    let later = grounded(&revised, "award");
+    let segmentation = StorySegmentation::new(3, vec![false, true]).expect("seg");
+    let mentions = vec![award.clone(), protest.clone()];
+    let labels = vec![FirstStoryLabel::FirstStory, FirstStoryLabel::FollowUp];
+    let tracks = vec![
+        EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+        EventTrackAssignment::new(protest.mention_id(), EventTrackId::from_raw(1)),
+    ];
+    let mut composition = compose_event_intelligence(
+        workflow_config(),
+        segmentation,
+        mentions,
+        Vec::new(),
+        labels,
+        tracks,
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("compose");
+    let mismatched = EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1));
+    assert_eq!(
+        composition.append_revised_mention(later.clone(), FirstStoryLabel::FollowUp, mismatched),
+        Err(EventError::InvalidWirePayload)
+    );
+    composition
+        .append_revised_mention(
+            later.clone(),
+            FirstStoryLabel::FollowUp,
+            EventTrackAssignment::new(later.mention_id(), EventTrackId::from_raw(1)),
+        )
+        .expect("matching append");
+}
+
+#[test]
+fn compose_refuses_foreign_link_with_unknown_left() {
+    let original = record("award protest later");
+    let revised = record("revised award later");
+    let first = grounded(&original, "award");
+    let second = grounded(&revised, "award");
+    let (unknown, known) = if first.mention_id() < second.mention_id() {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    let segmentation = StorySegmentation::new(2, vec![true]).expect("seg");
+    let mentions = vec![known.clone()];
+    let labels = vec![FirstStoryLabel::FirstStory];
+    let tracks = vec![EventTrackAssignment::new(
+        known.mention_id(),
+        EventTrackId::from_raw(1),
+    )];
+    let foreign_left =
+        EventLinkPair::new(unknown.mention_id(), known.mention_id()).expect("foreign left");
+    assert_eq!(foreign_left.left(), unknown.mention_id());
+    assert_eq!(
+        compose_event_intelligence(
+            workflow_config(),
+            segmentation,
+            mentions,
+            vec![foreign_left],
+            labels,
+            tracks,
+            Vec::new(),
+            Vec::new(),
+        )
+        .map(|_| ()),
+        Err(EventError::InvalidWirePayload)
+    );
+}
