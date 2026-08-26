@@ -25,7 +25,9 @@ parameter/draw digests, execution identity, and method-derived numerical parity
 evidence against the Rust CPU f64 reference. `mlx_metal_macos_native` is valid
 only when native Metal execution occurred. Linux and container CI may record
 only `rust_cpu`, `mlx_cpu`, `mlx_cuda`, or `rust_opencl` when that backend
-actually executes; `mlx_opencl` is not a backend. Missing authentication, backend receipt, or
+actually executes. A macOS-native MLX CPU execution records
+`mlx_cpu_macos_native`; it is never relabeled as Metal. `mlx_opencl` is not a
+backend. Missing authentication, backend receipt, or
 parity evidence fails closed.
 
 ## Cross-repository contract
@@ -68,6 +70,8 @@ fallback as Metal.
 
 ## Verification, testing and acceptance
 
+- the native MLX CPU probe executes a known objective, compares its output with
+  the Rust CPU reference, and emits `mlx_cpu_macos_native` only on macOS;
 - macOS hardware E2E proves native MLX Metal execution and receipt binding;
 - container E2E proves authenticated host-gateway/Unix-socket access and that
   Linux cannot emit a Metal receipt;

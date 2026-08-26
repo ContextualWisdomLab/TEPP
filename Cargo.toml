@@ -58,6 +58,7 @@ members = [
     "crates/topic_measurement",
     "crates/psychometric_core",
     "crates/orchestrator_live",
+    "crates/mlx_native_receipt",
 ]
 default-members = [
     "crates/evidence_core",
@@ -117,6 +118,7 @@ default-members = [
     "crates/topic_measurement",
     "crates/psychometric_core",
     "crates/orchestrator_live",
+    "crates/mlx_native_receipt",
 ]
 
 [workspace.package]
