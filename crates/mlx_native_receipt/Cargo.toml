@@ -23,12 +23,5 @@ sha2.workspace = true
 # mlx-sys's default Metal feature even when its own default features are off.
 mlx-sys = { version = "=0.2.0", default-features = false, features = ["accelerate"] }
 
-[lints.rust]
-# Unsafe is isolated to the audited opaque-handle C FFI function; callers and
-# every mathematical operation remain safe Rust.
-unsafe_code = "allow"
-unsafe_op_in_unsafe_fn = "deny"
-
-[lints.clippy]
-all = "deny"
-pedantic = "deny"
+[lints]
+workspace = true

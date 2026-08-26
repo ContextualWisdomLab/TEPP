@@ -1,4 +1,7 @@
 #![deny(missing_docs)]
+// SAFETY: opaque-handle C FFI calls are confined to the probe body below;
+// every mathematical operation remains safe Rust.
+#![allow(unsafe_code)]
 //! macOS-native MLX backend receipt probe.
 //!
 //! This binary executes an identified matrix product on MLX, compares it with

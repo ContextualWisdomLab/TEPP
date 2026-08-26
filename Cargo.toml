@@ -146,7 +146,7 @@ sqlx = { version = "=0.8.6", default-features = false, features = ["runtime-toki
 rustls = { version = "=0.23.43", default-features = false, features = ["std", "tls12", "ring"] }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 missing_docs = "deny"
 warnings = "deny"
 rust_2018_idioms = { level = "deny", priority = -1 }
