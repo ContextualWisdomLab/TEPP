@@ -18,8 +18,8 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-25T10:12:54Z
-**Protected-main evidence:** `c482ccea82692f1cf6bc179f2f827c0861e00b39` (full SHA fetched live before every mutation; merge of [PR #239](https://github.com/ContextualWisdomLab/TEPP/pull/239) at 2026-08-25T09:23:20Z)
+**Snapshot:** 2026-08-26T07:00:00Z
+**Protected-main evidence:** `2f2119dffa26f4823026445bfec8e249804dc93c` (merge of [PR #250](https://github.com/ContextualWisdomLab/TEPP/pull/250) at 2026-08-26T06:30:15Z; restores Driver p.16 `asymCINTstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
 
@@ -43,7 +43,7 @@ GitHub state before any customer, release, certification, or valuation claim.
 | Protected-main SHA | `c482ccea…` (2026-08-25T09:23Z, merge of [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239)) | All as-built claims are bounded to this commit. |
 | Workspace members | 57 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, compute, psychometric-engine, event-intelligence, interpretation, artifact, and visual product boundaries. |
 | Workspace version | `0.2.0` (aligned across every crate manifest by #239) | A version number alone does not establish a supported product release; no signed artifact or support policy exists yet. |
-| Open pull requests | **7** | Near-zero queue: four non-draft slices (#235 v0.2.0 cut, #236 register refresh, #237 lineage anchor contract, #241 final branch-gap coverage) plus three drafts (#240 rustfmt/test-arity repair, #238 image-token coverage arm, #233 span-grounding fold). |
+| Open pull requests | **5** | Active queue: #257 lineage criterion + mlx crate, #256 exact deletion refit, #262 T0MEANSstd (rebased), #264 gap-baseline refresh (this PR), #265 T0VARstd. |
 | Draft pull requests | **3** | The 31-draft psychometric recovery stack fully drained into integration vehicles #231/#232 (both merged 2026-08-25T06:2xZ); remaining drafts are repair and event-intelligence slices, not a stacked chain. |
 | Open product issues | **9** | Issues #166–#167 and #169–#174 plus #176 remain open. Result-contract issue #156, semantic-units issue #168, and queue-consolidation issue #175 are all CLOSED. |
 | Current package version | `0.2.0` | No supported product release is established by the repository version alone; #235 proposes the tagged cut but has not merged. |
@@ -102,14 +102,18 @@ passing-check claim. Re-read the full SHA, current review decision, required
 Checks, and branch rules immediately before every mutation.
 
 | PR | Exact current head | Draft | Base | Title |
+| #256 | `7ad9d9e3a149f03e6a9edb111e35412d5ae24763` | false | feat/topic-exact-loo-refit-cpu | feat(topic): add exact deletion refit prerequisite |
+| #257 | `e616c06a20824f2cdbd425e5c4e39b28fb805f5a` | false | feat/lineage-pair-criterion-producer | feat(api): publish lineage criterion and Project Journey posteriors |
+| #262 | `63e0695e6d83910bb475984126d7c400aac7c109` | false | agent/psychometric-t0-means-std | feat(psychometric): restore Driver p.16 T0MEANSstd on main |
+| #264 | `2439d72a57b4df91bca6f774a84576fb21b8a5c0` | false | docs/gap-baseline-refresh | docs(gap): refresh baseline snapshot for post-#250 state |
+| #265 | `6c9e2cd7de402d0f60a3abed9e78f7aa4da1b863` | false | agent/psychometric-t0-var-std | feat(psychometric): restore Driver p.16 T0VARstd on main |
 |---:|---|:---:|---|---|
-| #233 | `0a86d8d110702c6ec088bd7ec40d70e637300a48` | true | main | Fold span grounding into EventMention (#170 / GAP-007) |
-| #235 | `b3bc508219810c0282f53b0391514950177be923` | false | main | chore(release): cut v0.2.0 — version alignment and psychometric stack restoration |
-| #236 | `0236d3cdb06788967134e66b68e4638c9ebc532d` | false | main | docs(gap): refresh register after stack drain and #230 merge |
-| #237 | `a5e97b50a9a17b196a3825438f1830016e92235e` | false | main | feat(api): publish TEPP lineage criterion anchor contract |
-| #238 | `1521f1d4e905f97c41172f6ee294c369df078710` | true | main | Cover is_image_media_type_token non-image prefix arm |
-| #240 | `1ca11653ae9220229dde760a3ef50b7537118e7d` | true | main | Repair #232 rustfmt and psychometric test arity |
-| #241 | `a12e48c1e61b3af2a288c221ca67e25213fb2f90` | false | main | fix(coverage): close final branch gaps in evidence and network estimators |
+
+
+
+
+
+
 
 Note on #241: the #239 squash-merge landed through its pre-fix head, so #241
 cherry-picks the final coverage-and-semantics commit (dead singleton-guard
