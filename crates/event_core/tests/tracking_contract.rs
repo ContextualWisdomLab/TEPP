@@ -1,10 +1,63 @@
 //! TDT tracks are not instances; pair P/R and switch rate come from truth.
 
 use event_core::{
-    EventConfidence, EventError, EventMentionId, EventTrackAssignment, EventTrackId,
-    EventTrackLabel, decide_track_continue, refuse_track_as_instance, refuse_track_as_transition,
-    tracking_identity_switch_rate, tracking_pair_precision, tracking_pair_recall,
+    EventConfidence, EventError, EventMention, EventMentionId, EventTrackAssignment, EventTrackId,
+    EventTrackLabel, MentionEvidenceClocks, MentionReviewStatus, decide_track_continue,
+    refuse_track_as_instance, refuse_track_as_transition, tracking_identity_switch_rate,
+    tracking_pair_precision, tracking_pair_recall,
 };
+use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
+use temporal_core::{
+    AssertionTime, AvailableTime, DocumentTime, EventTime, KnowledgeCutoff, SystemTime,
+};
+
+const DOCUMENT_TEXT: &str = "alpha bravo charlie delta echo foxtrot golf hotel";
+
+fn documentary_record() -> DocumentRecord {
+    let artifact = SourceArtifact::from_bytes(DOCUMENT_TEXT.as_bytes()).expect("artifact");
+    DocumentRecord::from_text(artifact.id(), DOCUMENT_TEXT).expect("document")
+}
+
+fn span_for(document: &DocumentRecord, surface: &str) -> SourceSpan {
+    let byte_start = document.text().find(surface).expect("surface present");
+    let byte_end = byte_start + surface.len();
+    let scalar_start = document.text()[..byte_start].chars().count();
+    let scalar_end = scalar_start + surface.chars().count();
+    SourceSpan::new(
+        document,
+        byte_start,
+        byte_end,
+        scalar_start,
+        scalar_end,
+        None,
+    )
+    .expect("span")
+}
+
+fn eligible_clocks() -> MentionEvidenceClocks {
+    MentionEvidenceClocks::new(
+        EventTime::parse_rfc3339("2026-03-01T00:00:00Z").expect("event"),
+        AssertionTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("assertion"),
+        DocumentTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("document"),
+        SystemTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("system"),
+        AvailableTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("available"),
+        KnowledgeCutoff::parse_rfc3339("2026-03-31T00:00:00Z").expect("cutoff"),
+    )
+    .expect("eligible clocks")
+}
+
+fn grounded_mention(surface: &str) -> EventMention {
+    let document = documentary_record();
+    EventMention::new(
+        &document,
+        span_for(&document, surface),
+        EventConfidence::new(0.8).expect("confidence"),
+        eligible_clocks(),
+        "ace-extent-extractor/1",
+        MentionReviewStatus::Proposed,
+    )
+    .expect("grounded mention")
+}
 
 fn computed_rmse(truth: &[f64], recovered: &[f64]) -> f64 {
     assert_eq!(truth.len(), recovered.len());
@@ -21,7 +74,7 @@ fn computed_rmse(truth: &[f64], recovered: &[f64]) -> f64 {
 }
 
 fn mention() -> EventMentionId {
-    EventMentionId::new()
+    grounded_mention("alpha").mention_id()
 }
 
 fn assignment(mention_id: EventMentionId, track: u32) -> EventTrackAssignment {

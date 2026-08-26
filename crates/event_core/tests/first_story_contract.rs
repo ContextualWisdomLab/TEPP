@@ -1,9 +1,41 @@
 //! First-story detections are not instances; FAR/miss are computed from truth.
 
 use event_core::{
-    EventConfidence, EventError, EventMentionId, FirstStoryLabel, decide_first_story,
-    first_story_false_alarm_rate, first_story_miss_rate, refuse_first_story_as_instance,
+    EventConfidence, EventError, EventMention, EventMentionId, FirstStoryLabel,
+    MentionEvidenceClocks, MentionReviewStatus, decide_first_story, first_story_false_alarm_rate,
+    first_story_miss_rate, refuse_first_story_as_instance,
 };
+use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
+use temporal_core::{
+    AssertionTime, AvailableTime, DocumentTime, EventTime, KnowledgeCutoff, SystemTime,
+};
+
+fn grounded_mention_id() -> EventMentionId {
+    let text = "first story onset";
+    let artifact = SourceArtifact::from_bytes(text.as_bytes()).expect("artifact");
+    let document = DocumentRecord::from_text(artifact.id(), text).expect("document");
+    let span =
+        SourceSpan::new(&document, 0, text.len(), 0, text.chars().count(), None).expect("span");
+    let clocks = MentionEvidenceClocks::new(
+        EventTime::parse_rfc3339("2026-03-01T00:00:00Z").expect("event"),
+        AssertionTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("assertion"),
+        DocumentTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("document"),
+        SystemTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("system"),
+        AvailableTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("available"),
+        KnowledgeCutoff::parse_rfc3339("2026-03-31T00:00:00Z").expect("cutoff"),
+    )
+    .expect("clocks");
+    EventMention::new(
+        &document,
+        span,
+        EventConfidence::new(0.8).expect("confidence"),
+        clocks,
+        "ace-extent-extractor/1",
+        MentionReviewStatus::Proposed,
+    )
+    .expect("grounded mention")
+    .mention_id()
+}
 
 fn computed_rmse(truth: &[f64], recovered: &[f64]) -> f64 {
     assert_eq!(truth.len(), recovered.len());
@@ -30,7 +62,7 @@ fn decide_all(scores: &[f64], threshold: f64) -> Vec<FirstStoryLabel> {
 #[test]
 fn first_story_detection_cannot_be_cast_to_an_instance() {
     assert_eq!(
-        refuse_first_story_as_instance(EventMentionId::new()),
+        refuse_first_story_as_instance(grounded_mention_id()),
         Err(EventError::FirstStoryIsNotEventInstance)
     );
 }
