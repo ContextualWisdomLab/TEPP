@@ -210,7 +210,7 @@ The CPU `f64` estimator is the numerical reference. CPU acceleration uses bounde
 The GPU layer exposes backend-neutral operations with NVIDIA CUDA as the primary performance path and WGPU/CubeCL or equivalent portable acceleration where justified. Sparse topic-specific kernels may be custom implemented.
 
 On Apple Silicon, MLX Metal executes only in the macOS-native Rust-owned
-service governed by ADR 0024. Compose connects through an authenticated local
+service governed by ADR 0025. Compose connects through an authenticated local
 Unix socket or host-gateway boundary; Colima/Linux never claims Metal. Linux
 portability uses `rust_cpu`, `mlx_cpu`, `mlx_cuda`, or `rust_opencl` only when
 that backend actually executes; `mlx_opencl` is not a valid backend. Every

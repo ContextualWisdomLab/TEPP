@@ -23,7 +23,7 @@ fn pair_artifact() -> LineagePairCriterionPosteriorArtifact {
         objective_sha256: digest('a'),
         parameter_sha256: digest('b'),
         draw_sha256: digest('c'),
-        observed_maximum_difference: if backend == "cpu_f64" { 0.0 } else { 5.0e-9 },
+        observed_maximum_difference: if backend == "rust_cpu" { 0.0 } else { 5.0e-9 },
     };
     LineagePairCriterionPosteriorArtifact {
         schema_version: LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA.into(),
@@ -55,7 +55,9 @@ fn pair_artifact() -> LineagePairCriterionPosteriorArtifact {
             predecessor_record_id: "record-a".into(),
             successor_record_id: "record-b".into(),
             predecessor_record_created_at: "2026-01-03T00:00:00Z".into(),
+            predecessor_available_at: "2026-01-04T00:00:00Z".into(),
             successor_record_created_at: "2026-01-01T00:00:00Z".into(),
+            successor_available_at: "2026-01-05T00:00:00Z".into(),
             predecessor_event_time_draws: vec![
                 "2025-12-01T00:00:00Z".into(),
                 "2025-12-02T00:00:00Z".into(),
@@ -67,7 +69,7 @@ fn pair_artifact() -> LineagePairCriterionPosteriorArtifact {
             criterion_draws: vec![0.35, 0.65],
         }],
         compute_receipts: LineageComputeReceipts {
-            cpu: receipt("cpu_f64"),
+            cpu: receipt("rust_cpu"),
             gpu: receipt("mlx_metal_macos_native"),
             parity_method_code: "producer_method_derived_v1".into(),
             parity_bound: 1.0e-8,
@@ -105,6 +107,19 @@ fn pair_posterior_rejects_temporal_reversal_anchor_ties_and_gpu_divergence() {
     let mut forged_metal = pair_artifact();
     forged_metal.compute_receipts.gpu.execution_environment_code = "linux_container".into();
     assert_eq!(forged_metal.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut duplicate_admission = pair_artifact();
+    duplicate_admission
+        .admitted_pair_ids
+        .push(duplicate_admission.admitted_pair_ids[0].clone());
+    assert_eq!(
+        duplicate_admission.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut future_evidence = pair_artifact();
+    future_evidence.pair_posteriors[0].predecessor_available_at = "2026-08-26T00:00:00Z".into();
+    assert_eq!(future_evidence.to_json(), Err(ApiError::InvalidWirePayload));
 }
 
 fn journey() -> ProjectJourneyPosteriorArtifact {
@@ -113,6 +128,7 @@ fn journey() -> ProjectJourneyPosteriorArtifact {
             event_id: id.into(),
             event_type_code: kind.into(),
             record_created_at: created.into(),
+            available_at: created.into(),
             event_time_draws: vec![first.into(), second.into()],
             evidence_record_ids: vec![format!("evidence-{id}")],
         }
@@ -206,4 +222,27 @@ fn journey_refuses_backward_transition_and_fixed_start_status() {
     let mut fixed_start = journey();
     fixed_start.inference_status = "earliest_record_is_start".into();
     assert_eq!(fixed_start.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut future_evidence = journey();
+    future_evidence.events[0].available_at = "2026-08-26T00:00:00Z".into();
+    assert_eq!(future_evidence.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut invalid_relation_evidence = journey();
+    invalid_relation_evidence.relations[0].evidence_record_ids = vec![" ".into()];
+    assert_eq!(
+        invalid_relation_evidence.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut cyclic = journey();
+    cyclic.events[0].event_time_draws = cyclic.events[3].event_time_draws.clone();
+    cyclic.relations.push(ProjectJourneyRelationPosterior {
+        relation_id: "cycle".into(),
+        predecessor_event_id: "bid".into(),
+        successor_event_id: "request".into(),
+        relation_type_code: "precedes".into(),
+        relation_draws: vec![true, false],
+        evidence_record_ids: vec!["cycle-evidence".into()],
+    });
+    assert_eq!(cyclic.to_json(), Err(ApiError::InvalidWirePayload));
 }

@@ -1,7 +1,7 @@
-# ADR 0023 — Independent lineage-pair criterion and posterior Project Journey
+# ADR 0024 — Independent lineage-pair criterion and posterior Project Journey
 
 **Decision status:** Proposed  
-**Implementation maturity:** active PR — strict producer and consumer wire contracts  
+**Implementation maturity:** active-PR — strict producer and consumer wire contracts  
 **Date:** 2026-08-26  
 **Supersedes:** None; narrows ADR 0016 and complements ADR 0021.
 
@@ -36,7 +36,7 @@ and transition draw. It has no start stage, earliest-row selection, total
 ordering, rank, or causal status. Multiple predecessors and exact ties remain
 first-class.
 
-## Invariants and verification
+## Verification and invariants
 
 - record time never substitutes for event time;
 - present transition draws never move backward in event time;
@@ -73,7 +73,7 @@ receipt on Apple Silicon is unavailable; recovery is replay from
 the owning fitted run; no consumer repair is permitted. Only opaque identities
 and digests cross the contract.
 
-## Compatibility and rollback
+## Rollback and compatibility
 
 Both schemas are additive. Existing deterministic project history v1 is not
 reinterpreted as posterior Journey evidence. Rollback disables the new adapter

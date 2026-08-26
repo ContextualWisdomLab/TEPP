@@ -14,7 +14,7 @@
   true-parameter recovery and real macOS-native MLX Metal parity produces these artifacts yet.
   Therefore this slice is a machine-readable producer boundary, not evidence
   that calibrated journey or channel-weight results are available.
-- ADR 0024 is the normative Apple Silicon boundary: Rust-owned native MLX
+- ADR 0025 is the normative Apple Silicon boundary: Rust-owned native MLX
   Metal behind authenticated local transport, exact backend receipts, Linux
   `rust_cpu`/`mlx_cpu`/`mlx_cuda`/`rust_opencl` portability, and fail-closed
   parity. The native service and hardware E2E remain a release gap.

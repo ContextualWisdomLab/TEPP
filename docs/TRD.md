@@ -90,7 +90,7 @@ Production Rust line and branch coverage are exactly 100%; public API rustdoc is
   Colima/Linux never claims Metal execution. Rust owns all arithmetic; CPU f64
   is a tested portability reference/fallback. This active slice is wire production from an
   already-fitted run; estimator recovery and real MLX parity remain separate
-  acceptance gates. ADR 0024 normatively owns host authentication,
+  acceptance gates. ADR 0025 normatively owns host authentication,
   actual-backend receipts, parity, fallback, operability, tests, and rollback.
 
 ## References
