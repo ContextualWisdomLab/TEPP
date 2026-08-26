@@ -1,7 +1,7 @@
-# ADR 0024 — macOS-native Rust-owned MLX Metal execution boundary
+# ADR 0025 — macOS-native Rust-owned MLX Metal execution boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** contract-active / service-target  
+**Implementation maturity:** accepted-target — contract active, native service pending  
 **Date:** 2026-08-26  
 **Supersedes:** None; specializes ADR 0001 and ADR 0006 for Apple Silicon.
 
@@ -66,7 +66,7 @@ terminal for that accelerated attempt. A caller may explicitly replay on the
 Rust CPU f64 portability path and records a new receipt; it never relabels the
 fallback as Metal.
 
-## Testing and acceptance
+## Verification, testing and acceptance
 
 - macOS hardware E2E proves native MLX Metal execution and receipt binding;
 - container E2E proves authenticated host-gateway/Unix-socket access and that

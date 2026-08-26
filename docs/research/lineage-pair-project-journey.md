@@ -2,23 +2,26 @@
 
 ## Scope
 
-This note supports ADR 0023's evidence-state and temporal-graph contract. It
+This note supports ADR 0024's evidence-state and temporal-graph contract. It
 does not establish an implemented TDT/CHRONOS estimator, causal identification,
 or a universal project lifecycle.
 
 ## Synthesis
 
-Allan's TDT task family separates segmentation, link detection, first-story
-detection, detection, and tracking. A relatedness channel therefore cannot be
-its own independent criterion, and one thresholded similarity response cannot
-stand in for posterior event identity.
+Allan (2002) separates the TDT task family into segmentation, link detection,
+first-story detection, detection, and tracking. From that separation, TEPP
+decides that a relatedness channel cannot be its own independent criterion and
+that one thresholded similarity response cannot stand in for posterior event
+identity; those are ADR 0024 design constraints, not claims made by Allan.
 
-CHRONOS reasons over qualitative temporal relations and consistency rather than
-reducing uncertain evidence to the date on which a record was stored. Li et al.
-model complex event schemas as graphs and explicitly reject a one-dimensional
-next-event view. Together these sources support a posterior partial-order DAG
-with multiple predecessors, branches, hypothetical relations, and distinct
-record/event clocks; they do not license causal interpretation.
+Anagnostopoulos et al. (2013) describe CHRONOS reasoning over qualitative
+temporal relations and consistency. Li et al. (2021) model complex event
+schemas as graphs rather than a one-dimensional next-event sequence. TEPP
+infers from those sources that its product contract should preserve a
+posterior partial-order DAG, multiple predecessors, branches, hypothetical
+relations, and distinct record/event clocks. Those structures are TEPP's ADR
+0024 design, not direct findings of either source, and they do not license a
+causal interpretation.
 
 ## Contract implications
 

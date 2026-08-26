@@ -4,7 +4,7 @@
 //! Directed relations are supplied as posterior draws, so multiple
 //! predecessors, branches, transitions, and exact ties remain representable.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,8 @@ pub struct ProjectJourneyEventPosterior {
     pub event_type_code: String,
     /// Record creation instant, not an event-time substitute.
     pub record_created_at: String,
+    /// Instant at which this evidence became available to the analysis.
+    pub available_at: String,
     /// Posterior event-time draws in the artifact's common draw order.
     pub event_time_draws: Vec<String>,
     /// Opaque authorized source-evidence identities.
@@ -117,9 +119,13 @@ impl ProjectJourneyPosteriorArtifact {
             return Err(ApiError::InvalidWirePayload);
         }
         for event in &self.events {
+            let available_at = parse_time(&event.available_at);
+            let cutoff = parse_time(&self.knowledge_cutoff);
             if !identifier(&event.event_id)
                 || !allowed_event_type(&event.event_type_code)
                 || parse_time(&event.record_created_at).is_none()
+                || available_at.is_none()
+                || available_at > cutoff
                 || event.event_time_draws.len() != self.draw_count
                 || event
                     .event_time_draws
@@ -158,6 +164,10 @@ impl ProjectJourneyPosteriorArtifact {
                 || !identifier(&edge.relation_type_code)
                 || edge.relation_draws.len() != self.draw_count
                 || edge.evidence_record_ids.is_empty()
+                || edge
+                    .evidence_record_ids
+                    .iter()
+                    .any(|value| !identifier(value))
             {
                 return Err(ApiError::InvalidWirePayload);
             }
@@ -172,8 +182,50 @@ impl ProjectJourneyPosteriorArtifact {
                 }
             }
         }
+        if (0..self.draw_count).any(|draw| !draw_is_acyclic(&self.events, &self.relations, draw)) {
+            return Err(ApiError::InvalidWirePayload);
+        }
         Ok(())
     }
+}
+
+fn draw_is_acyclic(
+    events: &[ProjectJourneyEventPosterior],
+    relations: &[ProjectJourneyRelationPosterior],
+    draw: usize,
+) -> bool {
+    let indices = events
+        .iter()
+        .enumerate()
+        .map(|(index, event)| (event.event_id.as_str(), index))
+        .collect::<BTreeMap<_, _>>();
+    let mut indegree = vec![0_usize; events.len()];
+    let mut successors = vec![Vec::new(); events.len()];
+    for relation in relations
+        .iter()
+        .filter(|relation| relation.relation_draws[draw])
+    {
+        let predecessor = indices[relation.predecessor_event_id.as_str()];
+        let successor = indices[relation.successor_event_id.as_str()];
+        successors[predecessor].push(successor);
+        indegree[successor] += 1;
+    }
+    let mut queue = indegree
+        .iter()
+        .enumerate()
+        .filter_map(|(index, degree)| (*degree == 0).then_some(index))
+        .collect::<VecDeque<_>>();
+    let mut visited = 0_usize;
+    while let Some(node) = queue.pop_front() {
+        visited += 1;
+        for successor in &successors[node] {
+            indegree[*successor] -= 1;
+            if indegree[*successor] == 0 {
+                queue.push_back(*successor);
+            }
+        }
+    }
+    visited == events.len()
 }
 
 fn identifier(value: &str) -> bool {

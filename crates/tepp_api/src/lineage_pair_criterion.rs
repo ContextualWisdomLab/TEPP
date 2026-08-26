@@ -64,7 +64,7 @@ pub struct LineageDrawProvenance {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LineageComputeReceipt {
-    /// Backend code, exactly `cpu_f64` or `mlx_metal_macos_native` as position requires.
+    /// Backend code, exactly `rust_cpu` or `mlx_metal_macos_native` as position requires.
     pub backend_code: String,
     /// Actual execution environment, such as `macos_native` or `linux_container`.
     pub execution_environment_code: String,
@@ -104,8 +104,12 @@ pub struct LineagePairCriterionPosterior {
     pub successor_record_id: String,
     /// Predecessor record creation instant, distinct from event time.
     pub predecessor_record_created_at: String,
+    /// Instant at which predecessor evidence became available.
+    pub predecessor_available_at: String,
     /// Successor record creation instant, distinct from event time.
     pub successor_record_created_at: String,
+    /// Instant at which successor evidence became available.
+    pub successor_available_at: String,
     /// Predecessor event-time posterior draws.
     pub predecessor_event_time_draws: Vec<String>,
     /// Successor event-time posterior draws.
@@ -192,6 +196,7 @@ impl LineagePairCriterionPosteriorArtifact {
             || draws < 2
             || !identifier(&self.draw_provenance.seed_domain)
             || pair_ids != admitted
+            || admitted.len() != self.admitted_pair_ids.len()
             || pair_ids.len() != self.pair_posteriors.len()
             || self.anchor_basis.alignment_status != "unique"
             || self.anchor_basis.tie_count != 0
@@ -202,8 +207,9 @@ impl LineagePairCriterionPosteriorArtifact {
         {
             return Err(ApiError::InvalidWirePayload);
         }
+        let cutoff = parse_time(&self.knowledge_cutoff).expect("validated cutoff");
         for pair in &self.pair_posteriors {
-            if !valid_pair(pair, draws) {
+            if !valid_pair(pair, draws, cutoff) {
                 return Err(ApiError::InvalidWirePayload);
             }
         }
@@ -253,7 +259,7 @@ fn valid_receipt(value: &LineageComputeReceipt) -> bool {
 fn valid_receipts(value: &LineageComputeReceipts) -> bool {
     valid_receipt(&value.cpu)
         && valid_receipt(&value.gpu)
-        && value.cpu.backend_code == "cpu_f64"
+        && value.cpu.backend_code == "rust_cpu"
         && valid_accelerator_backend(&value.gpu)
         && value.cpu.objective_sha256 == value.gpu.objective_sha256
         && identifier(&value.parity_method_code)
@@ -273,13 +279,19 @@ fn valid_accelerator_backend(receipt: &LineageComputeReceipt) -> bool {
     }
 }
 
-fn valid_pair(pair: &LineagePairCriterionPosterior, draws: usize) -> bool {
+fn valid_pair(pair: &LineagePairCriterionPosterior, draws: usize, cutoff: Timestamp) -> bool {
+    let predecessor_available_at = parse_time(&pair.predecessor_available_at);
+    let successor_available_at = parse_time(&pair.successor_available_at);
     if !canonical_uuid(&pair.pair_id)
         || !identifier(&pair.predecessor_record_id)
         || !identifier(&pair.successor_record_id)
         || pair.predecessor_record_id == pair.successor_record_id
         || parse_time(&pair.predecessor_record_created_at).is_none()
         || parse_time(&pair.successor_record_created_at).is_none()
+        || predecessor_available_at.is_none()
+        || successor_available_at.is_none()
+        || predecessor_available_at.is_some_and(|value| value > cutoff)
+        || successor_available_at.is_some_and(|value| value > cutoff)
         || pair.predecessor_event_time_draws.len() != draws
         || pair.successor_event_time_draws.len() != draws
         || pair.criterion_draws.len() != draws
