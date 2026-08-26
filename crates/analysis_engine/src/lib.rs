@@ -10,6 +10,7 @@
 //! estimation authority; it invokes estimators through their scientific crate
 //! contracts and preserves their artifact meaning.
 
+mod lineage_criterion;
 mod topic_lineage_artifact;
 
 use serde::Serialize;
@@ -24,6 +25,11 @@ use tepp_api::{
 };
 use topic_measurement::TopicMeasurementError;
 
+/// Rust-owned independent TDT link-criterion posterior fitting contracts.
+pub use lineage_criterion::{
+    LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
+    fit_lineage_criterion_posteriors,
+};
 /// Topic-lineage artifact and execution contracts from this engine.
 pub use topic_lineage_artifact::{
     TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,

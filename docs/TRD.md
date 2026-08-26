@@ -85,12 +85,17 @@ Production Rust line and branch coverage are exactly 100%; public API rustdoc is
 - Both strict JSON contracts reject unknown fields, mixed cardinalities,
   backward transition draws, missing evidence, ambiguous anchors, and
   method-derived parity failure.
+- `event_core::fit_independent_criterion_posterior` is the Rust CPU reference
+  for independently observed binary TDT link criteria. `analysis_engine`
+  preserves exact pair identity and temporal draw arrays while fitting this
+  Jeffreys posterior; it does not infer event dates from record order.
 - Apple Silicon acceleration uses a macOS-native Rust-owned MLX Metal service.
   Compose calls it through authenticated Unix-socket or host-gateway transport;
-  Colima/Linux never claims Metal execution. Rust owns all arithmetic; CPU f64
-  is a tested portability reference/fallback. This active slice is wire production from an
-  already-fitted run; estimator recovery and real MLX parity remain separate
-  acceptance gates. ADR 0025 normatively owns host authentication,
+  Colima/Linux never claims Metal execution. Rust owns all arithmetic;
+  `rust_cpu` f64 is a tested portability reference/fallback. The independent
+  criterion CPU estimator is implemented; full temporal posterior production,
+  artifact assembly, and real MLX parity remain separate acceptance gates.
+  ADR 0025 normatively owns host authentication,
   actual-backend receipts, parity, fallback, operability, tests, and rollback.
 
 ## References

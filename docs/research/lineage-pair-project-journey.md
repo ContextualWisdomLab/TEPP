@@ -3,8 +3,9 @@
 ## Scope
 
 This note supports ADR 0024's evidence-state and temporal-graph contract. It
-does not establish an implemented TDT/CHRONOS estimator, causal identification,
-or a universal project lifecycle.
+also supports the implemented independent binary TDT-link criterion posterior,
+but does not establish completed CHRONOS event-time inference, causal
+identification, or a universal project lifecycle.
 
 ## Synthesis
 
@@ -23,6 +24,12 @@ relations, and distinct record/event clocks. Those structures are TEPP's ADR
 0024 design, not direct findings of either source, and they do not license a
 causal interpretation.
 
+For independently observed binary link outcomes, Jeffreys' invariant prior for
+the Bernoulli parameter yields the identified `Beta(s + 1/2, n - s + 1/2)`
+posterior. TEPP transports posterior uncertainty using deterministic
+midpoint-quantile quadrature draws; these are neither channel-derived weights
+nor binary decisions (Jeffreys, 1946).
+
 ## Contract implications
 
 - preserve complete criterion and event-time draws;
@@ -36,6 +43,11 @@ causal interpretation.
 
 Allan, J. (Ed.). (2002). *Topic detection and tracking: Event-based information
 organization*. Kluwer Academic Publishers.
+
+Jeffreys, H. (1946). An invariant form for the prior probability in estimation
+problems. *Proceedings of the Royal Society of London. Series A, Mathematical
+and Physical Sciences, 186*(1007), 453–461.
+https://doi.org/10.1098/rspa.1946.0056
 
 Anagnostopoulos, E., Batsakis, S., & Petrakis, E. G. M. (2013). CHRONOS: A
 reasoning engine for qualitative temporal information in OWL. *Procedia
