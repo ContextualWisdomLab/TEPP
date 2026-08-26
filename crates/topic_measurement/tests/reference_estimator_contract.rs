@@ -12,8 +12,8 @@ use temporal_core::{
     TemporalPrecision,
 };
 use topic_measurement::{
-    PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModelConfig, SparseMatrix,
-    fit_reference_topic_model,
+    PosteriorApproximation, PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModelConfig,
+    SparseMatrix, TopicMeasurementError, fit_reference_topic_model,
 };
 use uuid::Uuid;
 use validation_core::root_mean_square_error;
@@ -140,7 +140,7 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
     let counts = separated_counts();
     let input = ReferenceTopicInput::new(
         &snapshot,
-        document_ids,
+        document_ids.clone(),
         &counts,
         &times,
         None,
@@ -158,6 +158,32 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
         .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
         .expect("hyperparameters");
     let result = fit_reference_topic_model(&input, &config).expect("converged fit");
+    assert_eq!(
+        result.posterior_approximation(),
+        PosteriorApproximation::DiagonalLaplace
+    );
+    assert_eq!(
+        result.joint_coordinate_precision(),
+        Err(TopicMeasurementError::JointPosteriorUnavailable)
+    );
+    let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
+    let precision = input
+        .build_joint_coordinate_precision(&result, &config, topic_ids.clone())
+        .expect("joint precision");
+    assert_eq!(
+        precision.approximation(),
+        PosteriorApproximation::JointGaussNewtonLaplace
+    );
+    assert_eq!(precision.document_ids(), document_ids);
+    assert_eq!(precision.topic_ids(), topic_ids);
+    assert_eq!(precision.values().len(), 6);
+    assert_eq!(precision.coordinate_means().len(), 6);
+    assert!(precision.values().iter().enumerate().all(|(row, values)| {
+        values.iter().enumerate().all(|(column, value)| {
+            value.is_finite() && (value - precision.values()[column][row]).abs() < f64::EPSILON
+        })
+    }));
+    assert!(precision.values()[0][1] < 0.0);
     assert!(result.objective.is_finite());
     assert!(result.iterations <= 2_000);
     assert_eq!(result.connected_post_count, 6);
