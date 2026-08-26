@@ -19,7 +19,7 @@
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 **Snapshot:** 2026-08-26T07:00:00Z
-**Protected-main evidence:** `c519a0dc` (merge of [PR #250](https://github.com/ContextualWisdomLab/TEPP/pull/250) at 2026-08-26T06:30:15Z; restores Driver p.16 `asymCINTstd`)
+**Protected-main evidence:** `c519a0dcdb372e3e442fb7111d3eb5f3d96f8a6d` (merge of [PR #250](https://github.com/ContextualWisdomLab/TEPP/pull/250) at 2026-08-26T06:30:15Z; restores Driver p.16 `asymCINTstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
 
@@ -43,7 +43,7 @@ GitHub state before any customer, release, certification, or valuation claim.
 | Protected-main SHA | `c482ccea…` (2026-08-25T09:23Z, merge of [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239)) | All as-built claims are bounded to this commit. |
 | Workspace members | 57 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, compute, psychometric-engine, event-intelligence, interpretation, artifact, and visual product boundaries. |
 | Workspace version | `0.2.0` (aligned across every crate manifest by #239) | A version number alone does not establish a supported product release; no signed artifact or support policy exists yet. |
-| Open pull requests | **4** | Active non-draft queue: #247 temporal topic posterior producer contract (coverage fixed), #257 lineage criterion + Project Journey posteriors + mlx_native_receipt crate registration, #256 exact deletion refit prerequisite (coverage fix needed), #262 T0MEANSstd restoration (auto-merge queued). |
+| Open pull requests | **5** | Active queue: #257 lineage criterion + mlx crate, #256 exact deletion refit, #262 T0MEANSstd (rebased), #264 gap-baseline refresh (this PR), #265 T0VARstd. |
 | Draft pull requests | **3** | The 31-draft psychometric recovery stack fully drained into integration vehicles #231/#232 (both merged 2026-08-25T06:2xZ); remaining drafts are repair and event-intelligence slices, not a stacked chain. |
 | Open product issues | **9** | Issues #166–#167 and #169–#174 plus #176 remain open. Result-contract issue #156, semantic-units issue #168, and queue-consolidation issue #175 are all CLOSED. |
 | Current package version | `0.2.0` | No supported product release is established by the repository version alone; #235 proposes the tagged cut but has not merged. |
