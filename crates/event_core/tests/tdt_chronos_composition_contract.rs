@@ -9,11 +9,12 @@ use event_core::{
     EventConfidence, EventError, EventEvidenceLayer, EventIntelligenceWorkflowConfig,
     EventLinkPair, EventMention, EventRoleKind, EventTrackAssignment, EventTrackId,
     FirstStoryLabel, MentionEvidenceClocks, MentionReviewStatus, OccurrenceTruth,
-    SchemaSlotAssignment, StorySegmentation, admit_state_transition, chronos_prediction_brier_score,
-    compose_event_intelligence, event_link_precision, event_link_recall,
-    first_story_false_alarm_rate, first_story_miss_rate, mention_span_precision, mention_span_recall,
-    refuse_composition_as_instance, refuse_composition_as_transition, schema_slot_precision,
-    schema_slot_recall, story_pk, story_window_diff, tracking_pair_precision, tracking_pair_recall,
+    SchemaSlotAssignment, StorySegmentation, admit_state_transition,
+    chronos_prediction_brier_score, compose_event_intelligence, event_link_precision,
+    event_link_recall, first_story_false_alarm_rate, first_story_miss_rate, mention_span_precision,
+    mention_span_recall, refuse_composition_as_instance, refuse_composition_as_transition,
+    schema_slot_precision, schema_slot_recall, story_pk, story_window_diff,
+    tracking_pair_precision, tracking_pair_recall,
 };
 use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
 use temporal_core::{
@@ -21,7 +22,8 @@ use temporal_core::{
 };
 
 const STORY_A: &str = "The procurement office awarded the river-crossing contract on 1 March 2026 after the earlier protest was withdrawn.";
-const STORY_A_NOISY: &str = "Procurement office awarded river-crossing contract 1 March 2026; earlier protest withdrawn.";
+const STORY_A_NOISY: &str =
+    "Procurement office awarded river-crossing contract 1 March 2026; earlier protest withdrawn.";
 const STORY_A_REVISED: &str = "Revised notice: the procurement office awarded the river-crossing contract on 1 March 2026 after the earlier protest was withdrawn.";
 
 fn record(text: &str) -> DocumentRecord {
@@ -112,8 +114,7 @@ impl KnownTruthFixture {
             "2026-03-02T09:00:00Z",
             0.91,
         );
-        let protest_original =
-            grounded(&original, "protest", "2026-03-02T09:00:00Z", 0.88);
+        let protest_original = grounded(&original, "protest", "2026-03-02T09:00:00Z", 0.88);
         let award_noisy = grounded(
             &noisy,
             "awarded river-crossing contract",
@@ -186,7 +187,10 @@ fn composition_recovers_known_truth_metrics_and_refuses_promotion() {
         FirstStoryLabel::FollowUp,
     ];
     let track_assignments = vec![
-        EventTrackAssignment::new(fixture.award_original.mention_id(), EventTrackId::from_raw(1)),
+        EventTrackAssignment::new(
+            fixture.award_original.mention_id(),
+            EventTrackId::from_raw(1),
+        ),
         EventTrackAssignment::new(
             fixture.protest_original.mention_id(),
             EventTrackId::from_raw(1),
@@ -234,23 +238,24 @@ fn composition_recovers_known_truth_metrics_and_refuses_promotion() {
     assert!((track_precision - 1.0).abs() < f64::EPSILON);
     assert!((track_recall - 1.0).abs() < f64::EPSILON);
 
-    let miss = first_story_miss_rate(&first_story_labels, composition.first_story_labels())
-        .expect("miss");
+    let miss =
+        first_story_miss_rate(&first_story_labels, composition.first_story_labels()).expect("miss");
     let far = first_story_false_alarm_rate(&first_story_labels, composition.first_story_labels())
         .expect("far");
     assert!(miss.abs() < f64::EPSILON);
     assert!(far.abs() < f64::EPSILON);
 
     let slot_precision =
-        schema_slot_precision(&schema_slots, composition.schema_slot_assignments()).expect("slot p");
+        schema_slot_precision(&schema_slots, composition.schema_slot_assignments())
+            .expect("slot p");
     let slot_recall =
         schema_slot_recall(&schema_slots, composition.schema_slot_assignments()).expect("slot r");
     assert!((slot_precision - 1.0).abs() < f64::EPSILON);
     assert!((slot_recall - 1.0).abs() < f64::EPSILON);
 
     let outcomes = [OccurrenceTruth::Occurred];
-    let brier =
-        chronos_prediction_brier_score(composition.occurrence_forecasts(), &outcomes).expect("brier");
+    let brier = chronos_prediction_brier_score(composition.occurrence_forecasts(), &outcomes)
+        .expect("brier");
     let expected_brier = (0.75_f64 - 1.0).powi(2);
     assert!((brier - expected_brier).abs() < 1e-15);
 
