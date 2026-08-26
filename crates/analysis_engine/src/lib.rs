@@ -27,12 +27,6 @@ use tepp_api::{
 };
 use topic_measurement::TopicMeasurementError;
 
-/// Bounded posterior topic-context producer contract and record types.
-pub use topic_context_posterior::{
-    TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
-    TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
-    TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue,
-};
 /// One document admitted to exhaustive case-deletion fitting.
 pub use case_deletion_refit::CaseDeletionDocument;
 /// Fit context with independent seed-domain provenance.
@@ -51,6 +45,12 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Bounded posterior topic-context producer contract and record types.
+pub use topic_context_posterior::{
+    TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
+    TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
+    TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue,
 };
 /// Topic-lineage artifact and execution contracts from this engine.
 pub use topic_lineage_artifact::{
