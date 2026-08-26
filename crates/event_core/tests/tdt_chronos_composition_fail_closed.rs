@@ -281,3 +281,77 @@ fn compose_refuses_foreign_link_with_unknown_left() {
         Err(EventError::InvalidWirePayload)
     );
 }
+
+#[test]
+fn composition_exposes_stored_config_and_version() {
+    let original = record("award protest later");
+    let award = grounded(&original, "award");
+    let protest = grounded(&original, "protest");
+    let segmentation = StorySegmentation::new(3, vec![false, true]).expect("seg");
+    let mentions = vec![award.clone(), protest.clone()];
+    let labels = vec![FirstStoryLabel::FirstStory, FirstStoryLabel::FollowUp];
+    let tracks = vec![
+        EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+        EventTrackAssignment::new(protest.mention_id(), EventTrackId::from_raw(1)),
+    ];
+    let composition = compose_event_intelligence(
+        workflow_config(),
+        segmentation,
+        mentions,
+        Vec::new(),
+        labels,
+        tracks,
+        Vec::new(),
+        Vec::new(),
+    )
+    .expect("compose");
+    assert_eq!(
+        composition.config_version(),
+        EVENT_INTELLIGENCE_WORKFLOW_VERSION
+    );
+    let config = composition.config();
+    assert_eq!(config.version(), EVENT_INTELLIGENCE_WORKFLOW_VERSION);
+    assert_eq!(config.link_threshold(), half());
+    assert_eq!(config.first_story_threshold(), half());
+    assert_eq!(config.track_threshold(), half());
+    assert_eq!(config.schema_threshold(), half());
+    assert_eq!(config.boundary_threshold(), half());
+    assert_eq!(config.forecast_threshold(), half());
+}
+
+#[test]
+fn compose_refuses_foreign_link_with_unknown_right() {
+    let original = record("award protest later");
+    let revised = record("revised award later");
+    let first = grounded(&original, "award");
+    let second = grounded(&revised, "award");
+    let (known, unknown) = if first.mention_id() < second.mention_id() {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    let segmentation = StorySegmentation::new(2, vec![true]).expect("seg");
+    let mentions = vec![known.clone()];
+    let labels = vec![FirstStoryLabel::FirstStory];
+    let tracks = vec![EventTrackAssignment::new(
+        known.mention_id(),
+        EventTrackId::from_raw(1),
+    )];
+    let foreign_right =
+        EventLinkPair::new(known.mention_id(), unknown.mention_id()).expect("foreign right");
+    assert_eq!(foreign_right.right(), unknown.mention_id());
+    assert_eq!(
+        compose_event_intelligence(
+            workflow_config(),
+            segmentation,
+            mentions,
+            vec![foreign_right],
+            labels,
+            tracks,
+            Vec::new(),
+            Vec::new(),
+        )
+        .map(|_| ()),
+        Err(EventError::InvalidWirePayload)
+    );
+}
