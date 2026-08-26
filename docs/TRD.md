@@ -93,6 +93,11 @@ Production Rust line and branch coverage are exactly 100%; public API rustdoc is
   posterior mass over unique event-clock atoms into canonical complete draws.
   It performs no date inference, probability repair, or nearest-date fallback;
   atom/mass estimation remains an owning temporal-model responsibility.
+- `analysis_engine::fit_exhaustive_case_deletion` runs the identical fitter on
+  the full admitted corpus and all actual one-document deletions, with distinct
+  seed domains and exact retained-set receipts. It is producer orchestration,
+  not a substitute likelihood; the topic case-deletion wire remains unavailable
+  until the scientific topic fitter and anchor/parity receipts are connected.
 - Apple Silicon acceleration uses a macOS-native Rust-owned MLX Metal service.
   Compose calls it through authenticated Unix-socket or host-gateway transport;
   Colima/Linux never claims Metal execution. Rust owns all arithmetic;

@@ -10,6 +10,7 @@
 //! estimation authority; it invokes estimators through their scientific crate
 //! contracts and preserves their artifact meaning.
 
+mod case_deletion_refit;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -32,6 +33,20 @@ pub use topic_context_posterior::{
     TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
     TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue,
 };
+/// One document admitted to exhaustive case-deletion fitting.
+pub use case_deletion_refit::CaseDeletionDocument;
+/// Fit context with independent seed-domain provenance.
+pub use case_deletion_refit::CaseDeletionFitContext;
+/// Generic scientific fitter invoked for full and actual deleted corpora.
+pub use case_deletion_refit::CaseDeletionRefitter;
+/// One actual deleted-data posterior fit.
+pub use case_deletion_refit::DeletedDocumentRefit;
+/// Fail-closed exhaustive case-deletion error.
+pub use case_deletion_refit::ExhaustiveCaseDeletionError;
+/// Exhaustive full and deleted-data posterior fits.
+pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
+/// Fit the full corpus and every actual one-document deletion.
+pub use case_deletion_refit::fit_exhaustive_case_deletion;
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,

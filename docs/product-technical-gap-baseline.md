@@ -29,6 +29,11 @@
   the event-time atoms/mass from admitted evidence and binding the estimator's
   own MLX receipt remain open; record time and nearest-date substitution stay
   prohibited.
+- `analysis_engine` now executes exhaustive actual `D \ {i}` fitter calls and
+  retains full/deleted seed-domain and corpus identities. The remaining gap is
+  the scientific temporal topic fitter plus unique anchor alignment, incident
+  relation/membership deletion, artifact assembly, and estimator-bound backend
+  parity; the runner alone does not publish case-deletion influence.
 
 ## 2026-08-25 Event Lineage anchor contract slice
 
