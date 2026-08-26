@@ -1682,6 +1682,135 @@ pub fn refuse_asymptotic_standardised_continuous_intercept_as_standardised_discr
     )
 }
 
+/// Exact scalar p. 16 `asymCINTstd` after strictly positive
+/// `asymDIFFUSION`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; p. 16;
+/// footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF re-opened
+/// 2026-08-25T18:25Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// print standardised matrices with the suffix `std` when appropriate.
+/// Footnote 4 standardises using only the relevant variance, not the
+/// total. `CINT` is the process intercept of individual, or average
+/// individual, dynamics, so that relevant variance is within-subject
+/// `asymDIFFUSION` `p = −q / (2 a)`. The 2017-era
+/// `summary.ctsemFit.R` forms `asymCINT` whenever `verbose = TRUE`,
+/// as `-solve(DRIFT) %*% CINT`. That source does not form an
+/// `asymCINTstd` matrix; the scalar map here is the footnote 4
+/// standardisation of that named asymptotic intercept:
+/// `(-κ / a) / √p`. Form strictly positive `p` first, then the
+/// asymptotic intercept, then divide by `√p`. A zero intercept is
+/// exactly zero after that positive SD. Unstandardised `asymCINT` is
+/// defined for a zero process; standardised `asymCINT` is not. Zero
+/// `q` has no positive process SD and fails closed. Lasting
+/// `asymDIFFUSION` requires stable `a < 0`. A non-event clock fails
+/// closed. `κ / √p` is `CINTstd` and is not this total-change map.
+/// `A^{-1}[e^{A Δt} − I] κ / √p` is `discreteCINTstd` and depends on
+/// the event interval. This is not a Kalman filter, not a matrix
+/// `expm`, not DSEM, not `CINTstd`, not `discreteCINTstd`, and not
+/// ctsem estimation.
+///
+/// # Errors
+///
+/// Propagates [`recover_stationary_latent_variance`] and
+/// [`recover_asymptotic_continuous_intercept`]. Returns
+/// [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::StationaryVarianceRequiresStableDrift`]
+/// when the log-rate is not strictly negative,
+/// [`PsychometricError::StandardisedAsymptoticContinuousInterceptRequiresPositiveStationaryVariance`]
+/// when `asymDIFFUSION` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite or the mapped ratio overflows. Negative intercepts
+/// remain valid signed effects.
+pub fn recover_standardised_asymptotic_continuous_intercept(
+    continuous_intercept: f64,
+    continuous_diffusion: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let stationary = recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?;
+    if stationary == 0.0 {
+        return Err(
+            PsychometricError::StandardisedAsymptoticContinuousInterceptRequiresPositiveStationaryVariance,
+        );
+    }
+    let asymptotic =
+        recover_asymptotic_continuous_intercept(continuous_intercept, log_rate, clock)?;
+    if asymptotic == 0.0 {
+        return Ok(0.0);
+    }
+    let process_sd = stationary.sqrt();
+    require_finite(asymptotic / process_sd)
+}
+
+/// Refuse treating unstandardised `asymCINT` as p. 16
+/// `asymCINTstd`.
+///
+/// Unstandardised asymptotic intercept is defined for a zero
+/// process. Footnote 4 `asymCINTstd` requires strictly positive
+/// `asymDIFFUSION`. Equal numbers when `p = 1` are still distinct
+/// named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedAsymptoticContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept`].
+pub fn refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+    unstandardised_asymptotic_intercept: f64,
+    standardised_asymptotic_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_asymptotic_intercept,
+        standardised_asymptotic_intercept,
+    );
+    Err(PsychometricError::UnstandardisedAsymptoticContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept)
+}
+
+/// Refuse treating p. 16 `CINTstd` as p. 16 `asymCINTstd`.
+///
+/// `κ / √p` is the continuous intercept. `(-κ / a) / √p` is the
+/// standardised total change. Equal numbers when `a = −1` remain
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept`].
+pub fn refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+    standardised_continuous_intercept: f64,
+    standardised_asymptotic_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_continuous_intercept,
+        standardised_asymptotic_intercept,
+    );
+    Err(
+        PsychometricError::StandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept,
+    )
+}
+
+/// Refuse treating p. 16 `discreteCINTstd` as p. 16 `asymCINTstd`.
+///
+/// `A^{-1}[e^{A Δt} − I] κ / √p` depends on the event interval.
+/// `(-κ / a) / √p` is the `Δt → ∞` limit.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept`].
+pub fn refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+    discrete_standardised_intercept: f64,
+    standardised_asymptotic_intercept: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        discrete_standardised_intercept,
+        standardised_asymptotic_intercept,
+    );
+    Err(
+        PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept,
+    )
+}
+
 /// Exact scalar discrete latent mean from Driver Equation 3.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
@@ -5938,6 +6067,7 @@ mod tests {
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
         recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+        recover_standardised_asymptotic_continuous_intercept,
         recover_standardised_continuous_intercept,
         recover_standardised_discrete_continuous_intercept, recover_standardised_manifest_mean,
         recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
@@ -5966,6 +6096,7 @@ mod tests {
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+        refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
         refuse_evolved_observed_mean_as_extra_process_observed_mean,
@@ -6024,6 +6155,7 @@ mod tests {
         refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance,
+        refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
@@ -6066,6 +6198,7 @@ mod tests {
         refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
+        refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
@@ -14797,6 +14930,153 @@ mod tests {
                 0.5,
                 -1.0,
                 1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_asymptotic_continuous_intercept_recovers_driver_page_sixteen_after_positive_p()
+    {
+        // Driver et al. (2017, p. 16 asymCINTstd; Table 2; footnote 4;
+        // Eq. 3; 2017-era summary.ctsemFit.R asymCINT): form strictly
+        // positive p = −q / (2 a), then (−κ / a) / √p.
+        let intercept = 0.4_f64;
+        let diffusion = 0.8_f64;
+        let log_rate = -0.5_f64;
+        let recovered = recover_standardised_asymptotic_continuous_intercept(
+            intercept,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymCINTstd");
+        let stationary =
+            recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+                .expect("p");
+        let asymptotic =
+            recover_asymptotic_continuous_intercept(intercept, log_rate, LagClock::EventTime)
+                .expect("asymCINT");
+        let expected = asymptotic / stationary.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let continuous_std = intercept / stationary.sqrt();
+        assert!((continuous_std - recovered).abs() > 1e-3);
+        let discrete = recover_discrete_continuous_intercept_effect(
+            intercept,
+            log_rate,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("discreteCINT")
+            / stationary.sqrt();
+        assert!((discrete - recovered).abs() > 1e-3);
+        let later = recover_discrete_continuous_intercept_effect(
+            intercept,
+            log_rate,
+            2.5,
+            LagClock::EventTime,
+        )
+        .expect("discreteCINT Δt=2.5")
+            / stationary.sqrt();
+        assert!((later - recovered).abs() > 1e-3);
+        assert!((later - discrete).abs() > 1e-3);
+        let zero = recover_standardised_asymptotic_continuous_intercept(
+            0.0,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("zero CINT");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative = recover_standardised_asymptotic_continuous_intercept(
+            -intercept,
+            diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("signed asymCINTstd");
+        assert!((negative + expected).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+                asymptotic, recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedAsymptoticContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept
+            )
+        );
+        assert_eq!(
+            refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+                continuous_std, recovered
+            ),
+            Err(
+                PsychometricError::StandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept
+            )
+        );
+        assert_eq!(
+            refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept(
+                discrete, recovered
+            ),
+            Err(
+                PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept
+            )
+        );
+    }
+
+    #[test]
+    fn standardised_asymptotic_continuous_intercept_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_asymptotic_continuous_intercept(
+                0.4,
+                0.0,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedAsymptoticContinuousInterceptRequiresPositiveStationaryVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_continuous_intercept(
+                0.4,
+                0.8,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_continuous_intercept(
+                0.4,
+                0.8,
+                -0.5,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_continuous_intercept(
+                0.4,
+                -0.8,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_continuous_intercept(
+                f64::NAN,
+                0.8,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_continuous_intercept(
+                f64::MAX,
+                0.5,
+                -1.0,
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
