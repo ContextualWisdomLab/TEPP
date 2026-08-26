@@ -1,5 +1,24 @@
 # Product and Technical Gap Baseline
 
+## 2026-08-26 Pair criterion and Project Journey posterior slice
+
+- Active branch publishes strict Rust artifacts for
+  `tepp.lineage_pair_criterion_posterior.v2` and
+  `tepp.project_journey_posterior.v1`.
+- The contracts preserve continuous criterion/event-time draws, distinct
+  record time, multiple predecessors, branches, transitions, exact ties,
+  TDT/CHRONOS provenance, unique anchor alignment, and method-derived CPU/MLX
+  parity receipts. They reject fixed starts, nearest-date substitution,
+  unsupported certainty, and consumer repair.
+- Remaining release gap: no protected-main scientific estimator with
+  true-parameter recovery and real macOS-native MLX Metal parity produces these artifacts yet.
+  Therefore this slice is a machine-readable producer boundary, not evidence
+  that calibrated journey or channel-weight results are available.
+- ADR 0024 is the normative Apple Silicon boundary: Rust-owned native MLX
+  Metal behind authenticated local transport, exact backend receipts, Linux
+  `rust_cpu`/`mlx_cpu`/`mlx_cuda`/`rust_opencl` portability, and fail-closed
+  parity. The native service and hardware E2E remain a release gap.
+
 ## 2026-08-25 Event Lineage anchor contract slice
 
 - Exact base: protected `main` `cf0e0ad74d23c5d2e0e33d389bb0bb4d37067c31`.
