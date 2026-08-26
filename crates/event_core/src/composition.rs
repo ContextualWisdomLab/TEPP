@@ -118,8 +118,9 @@ impl EventIntelligenceWorkflowConfig {
 /// The composition itself is never [`EventEvidenceLayer::PromotedTransition`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct EventIntelligenceComposition {
-    config_version: u16,
     config: EventIntelligenceWorkflowConfig,
+    envelope_layer: EventEvidenceLayer,
+    hypothesis_layer: EventEvidenceLayer,
     mentions: Vec<EventMention>,
     segmentation: StorySegmentation,
     links: Vec<EventLinkPair>,
@@ -133,7 +134,7 @@ impl EventIntelligenceComposition {
     /// Return the workflow configuration version stored with this composition.
     #[must_use]
     pub const fn config_version(&self) -> u16 {
-        self.config_version
+        self.config.version()
     }
 
     /// Return the validated workflow configuration.
@@ -191,13 +192,13 @@ impl EventIntelligenceComposition {
     /// hypotheses. The composition itself is never a promoted transition.
     #[must_use]
     pub const fn evidence_layer(&self) -> EventEvidenceLayer {
-        EventEvidenceLayer::TdtDetection
+        self.envelope_layer
     }
 
     /// Epistemic layer retained by composed CHRONOS schema/forecast artifacts.
     #[must_use]
     pub const fn chronos_evidence_layer(&self) -> EventEvidenceLayer {
-        EventEvidenceLayer::ChronosPrediction
+        self.hypothesis_layer
     }
 
     /// Append a later-arriving revised-document mention without rewriting earlier
@@ -250,7 +251,10 @@ pub fn compose_event_intelligence(
     if mentions.is_empty() {
         return Err(EventError::InvalidWirePayload);
     }
-    if first_story_labels.len() != mentions.len() || track_assignments.len() != mentions.len() {
+    if first_story_labels.len() != mentions.len() {
+        return Err(EventError::InvalidWirePayload);
+    }
+    if track_assignments.len() != mentions.len() {
         return Err(EventError::InvalidWirePayload);
     }
     let mention_ids: Vec<_> = mentions.iter().map(EventMention::mention_id).collect();
@@ -265,13 +269,17 @@ pub fn compose_event_intelligence(
     for link in &links {
         let left_known = mention_ids.iter().any(|id| *id == link.left());
         let right_known = mention_ids.iter().any(|id| *id == link.right());
-        if !left_known || !right_known {
+        if !left_known {
+            return Err(EventError::InvalidWirePayload);
+        }
+        if !right_known {
             return Err(EventError::InvalidWirePayload);
         }
     }
     Ok(EventIntelligenceComposition {
-        config_version: config.version(),
         config,
+        envelope_layer: EventEvidenceLayer::TdtDetection,
+        hypothesis_layer: EventEvidenceLayer::ChronosPrediction,
         mentions,
         segmentation,
         links,
@@ -302,4 +310,301 @@ pub fn refuse_composition_as_transition(
     _composition: &EventIntelligenceComposition,
 ) -> Result<(), EventError> {
     Err(EventError::IntelligenceWorkflowIsNotStateTransition)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        EVENT_INTELLIGENCE_WORKFLOW_VERSION, EventIntelligenceWorkflowConfig,
+        compose_event_intelligence, refuse_composition_as_instance,
+        refuse_composition_as_transition,
+    };
+    use crate::{
+        EventConfidence, EventError, EventEvidenceLayer, EventLinkPair, EventMention,
+        EventTrackAssignment, EventTrackId, FirstStoryLabel, MentionEvidenceClocks,
+        MentionReviewStatus, StorySegmentation,
+    };
+    use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
+    use temporal_core::{
+        AssertionTime, AvailableTime, DocumentTime, EventTime, KnowledgeCutoff, SystemTime,
+    };
+
+    fn record(text: &str) -> DocumentRecord {
+        let artifact = SourceArtifact::from_bytes(text.as_bytes()).expect("artifact");
+        DocumentRecord::from_text(artifact.id(), text).expect("document")
+    }
+
+    fn span_for(document: &DocumentRecord, surface: &str) -> SourceSpan {
+        let byte_start = document.text().find(surface).expect("surface present");
+        let byte_end = byte_start + surface.len();
+        let scalar_start = document.text()[..byte_start].chars().count();
+        let scalar_end = scalar_start + surface.chars().count();
+        SourceSpan::new(
+            document,
+            byte_start,
+            byte_end,
+            scalar_start,
+            scalar_end,
+            None,
+        )
+        .expect("span")
+    }
+
+    fn clocks() -> MentionEvidenceClocks {
+        MentionEvidenceClocks::new(
+            EventTime::parse_rfc3339("2026-03-01T12:00:00Z").expect("event"),
+            AssertionTime::parse_rfc3339("2026-03-02T09:00:00Z").expect("assertion"),
+            DocumentTime::parse_rfc3339("2026-03-02T09:00:00Z").expect("document"),
+            SystemTime::parse_rfc3339("2026-03-02T09:00:00Z").expect("system"),
+            AvailableTime::parse_rfc3339("2026-03-02T09:00:00Z").expect("available"),
+            KnowledgeCutoff::parse_rfc3339("2026-03-31T00:00:00Z").expect("cutoff"),
+        )
+        .expect("clocks")
+    }
+
+    fn grounded(document: &DocumentRecord, surface: &str) -> EventMention {
+        EventMention::new(
+            document,
+            span_for(document, surface),
+            EventConfidence::new(0.9).expect("confidence"),
+            clocks(),
+            "ace-extent-extractor/1",
+            MentionReviewStatus::Proposed,
+        )
+        .expect("grounded mention")
+    }
+
+    fn half() -> EventConfidence {
+        EventConfidence::new(0.5).expect("half")
+    }
+
+    fn workflow_config() -> EventIntelligenceWorkflowConfig {
+        EventIntelligenceWorkflowConfig::new(
+            EVENT_INTELLIGENCE_WORKFLOW_VERSION,
+            half(),
+            half(),
+            half(),
+            half(),
+            half(),
+            half(),
+        )
+        .expect("workflow config")
+    }
+
+    #[test]
+    fn workflow_config_rejects_empty_and_unsupported_versions() {
+        assert_eq!(
+            EventIntelligenceWorkflowConfig::new(0, half(), half(), half(), half(), half(), half()),
+            Err(EventError::InvalidWirePayload)
+        );
+        assert_eq!(
+            EventIntelligenceWorkflowConfig::new(
+                99,
+                half(),
+                half(),
+                half(),
+                half(),
+                half(),
+                half()
+            ),
+            Err(EventError::UnsupportedWireVersion)
+        );
+        let config = workflow_config();
+        assert_eq!(config.version(), EVENT_INTELLIGENCE_WORKFLOW_VERSION);
+        assert_eq!(config.link_threshold(), half());
+        assert_eq!(config.first_story_threshold(), half());
+        assert_eq!(config.track_threshold(), half());
+        assert_eq!(config.schema_threshold(), half());
+        assert_eq!(config.boundary_threshold(), half());
+        assert_eq!(config.forecast_threshold(), half());
+    }
+
+    #[test]
+    fn compose_refuses_empty_mentions_and_stream_misalignment() {
+        let original = record("award protest later");
+        let award = grounded(&original, "award");
+        let protest = grounded(&original, "protest");
+        let segmentation = StorySegmentation::new(3, vec![false, true]).expect("seg");
+        let mentions = vec![award.clone(), protest.clone()];
+        let labels = vec![FirstStoryLabel::FirstStory, FirstStoryLabel::FollowUp];
+        let tracks = vec![
+            EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+            EventTrackAssignment::new(protest.mention_id(), EventTrackId::from_raw(1)),
+        ];
+        assert_eq!(
+            compose_event_intelligence(
+                workflow_config(),
+                segmentation.clone(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+            )
+            .map(|_| ()),
+            Err(EventError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_event_intelligence(
+                workflow_config(),
+                segmentation.clone(),
+                mentions.clone(),
+                Vec::new(),
+                vec![FirstStoryLabel::FirstStory],
+                tracks.clone(),
+                Vec::new(),
+                Vec::new(),
+            )
+            .map(|_| ()),
+            Err(EventError::InvalidWirePayload)
+        );
+        assert_eq!(
+            compose_event_intelligence(
+                workflow_config(),
+                segmentation,
+                mentions,
+                Vec::new(),
+                labels,
+                vec![tracks[0]],
+                Vec::new(),
+                Vec::new(),
+            )
+            .map(|_| ()),
+            Err(EventError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn compose_refuses_unknown_tracks_and_foreign_links() {
+        let original = record("award protest later");
+        let revised = record("revised award later");
+        let award = grounded(&original, "award");
+        let protest = grounded(&original, "protest");
+        let later = grounded(&revised, "award");
+        let segmentation = StorySegmentation::new(3, vec![false, true]).expect("seg");
+        let mentions = vec![award.clone(), protest.clone()];
+        let labels = vec![FirstStoryLabel::FirstStory, FirstStoryLabel::FollowUp];
+        let tracks = vec![
+            EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+            EventTrackAssignment::new(protest.mention_id(), EventTrackId::from_raw(1)),
+        ];
+        let stranger = EventTrackAssignment::new(later.mention_id(), EventTrackId::from_raw(9));
+        assert_eq!(
+            compose_event_intelligence(
+                workflow_config(),
+                segmentation.clone(),
+                mentions.clone(),
+                Vec::new(),
+                labels.clone(),
+                vec![tracks[0], stranger],
+                Vec::new(),
+                Vec::new(),
+            )
+            .map(|_| ()),
+            Err(EventError::InvalidWirePayload)
+        );
+        let foreign_right =
+            EventLinkPair::new(award.mention_id(), later.mention_id()).expect("foreign right");
+        assert_eq!(
+            compose_event_intelligence(
+                workflow_config(),
+                segmentation.clone(),
+                mentions.clone(),
+                vec![foreign_right],
+                labels.clone(),
+                tracks.clone(),
+                Vec::new(),
+                Vec::new(),
+            )
+            .map(|_| ()),
+            Err(EventError::InvalidWirePayload)
+        );
+        let foreign_left =
+            EventLinkPair::new(later.mention_id(), award.mention_id()).expect("foreign left");
+        assert_eq!(
+            compose_event_intelligence(
+                workflow_config(),
+                segmentation,
+                mentions,
+                vec![foreign_left],
+                labels,
+                tracks,
+                Vec::new(),
+                Vec::new(),
+            )
+            .map(|_| ()),
+            Err(EventError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn compose_exposes_layers_and_refuses_mismatched_append() {
+        let original = record("award protest later");
+        let revised = record("revised award later");
+        let award = grounded(&original, "award");
+        let protest = grounded(&original, "protest");
+        let later = grounded(&revised, "award");
+        let segmentation = StorySegmentation::new(3, vec![false, true]).expect("seg");
+        let mentions = vec![award.clone(), protest.clone()];
+        let labels = vec![FirstStoryLabel::FirstStory, FirstStoryLabel::FollowUp];
+        let tracks = vec![
+            EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+            EventTrackAssignment::new(protest.mention_id(), EventTrackId::from_raw(1)),
+        ];
+        let mut composition = compose_event_intelligence(
+            workflow_config(),
+            segmentation,
+            mentions,
+            Vec::new(),
+            labels,
+            tracks,
+            Vec::new(),
+            Vec::new(),
+        )
+        .expect("compose");
+        assert_eq!(
+            composition.config_version(),
+            EVENT_INTELLIGENCE_WORKFLOW_VERSION
+        );
+        assert_eq!(composition.config(), workflow_config());
+        assert_eq!(
+            composition.evidence_layer(),
+            EventEvidenceLayer::TdtDetection
+        );
+        assert_eq!(
+            composition.chronos_evidence_layer(),
+            EventEvidenceLayer::ChronosPrediction
+        );
+        assert_eq!(composition.mentions().len(), 2);
+        assert!(composition.links().is_empty());
+        assert_eq!(composition.first_story_labels().len(), 2);
+        assert_eq!(composition.track_assignments().len(), 2);
+        assert!(composition.schema_slot_assignments().is_empty());
+        assert!(composition.occurrence_forecasts().is_empty());
+        let mismatched = EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1));
+        assert_eq!(
+            composition.append_revised_mention(
+                later.clone(),
+                FirstStoryLabel::FollowUp,
+                mismatched
+            ),
+            Err(EventError::InvalidWirePayload)
+        );
+        composition
+            .append_revised_mention(
+                later.clone(),
+                FirstStoryLabel::FollowUp,
+                EventTrackAssignment::new(later.mention_id(), EventTrackId::from_raw(1)),
+            )
+            .expect("matching append");
+        assert_eq!(
+            refuse_composition_as_instance(&composition),
+            Err(EventError::IntelligenceWorkflowIsNotEventInstance)
+        );
+        assert_eq!(
+            refuse_composition_as_transition(&composition),
+            Err(EventError::IntelligenceWorkflowIsNotStateTransition)
+        );
+    }
 }
