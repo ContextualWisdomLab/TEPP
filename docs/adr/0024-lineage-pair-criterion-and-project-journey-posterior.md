@@ -40,6 +40,10 @@ The Rust CHRONOS relation slice compares common event-time draws directly and
 publishes the complete `before`/`simultaneous`/`after` draw sequence and its
 posterior frequencies. It estimates no timestamp, uses no tolerance or nearest
 date, preserves exact ties, and cannot promote a predicted event into fact.
+An owning estimator may hand the Rust core an identified discrete event-time
+posterior as unique atoms with integer multiplicities. The core canonicalizes
+and materializes that mass exactly; zero mass and duplicate atoms fail closed.
+This operation does not estimate atom locations or posterior mass.
 
 For an independently observed binary TDT link criterion, the Rust scientific
 core fits the Bernoulli likelihood with Jeffreys' invariant
@@ -58,9 +62,10 @@ invents the temporal model's event-time draws.
   branches, ties, uncertain relations, backward-edge refusal, anchor ambiguity,
   and hardware-receipt divergence.
 
-The Rust CPU independent-criterion estimator and qualitative temporal-relation
-posterior have deterministic synthetic exact-recovery tests. Event-time draw
-generation, artifact assembly with actual MLX execution, and hardware parity
+The Rust CPU independent-criterion estimator, exact event-time posterior
+materializer, and qualitative temporal-relation posterior have deterministic
+synthetic exact-recovery tests. Estimation of event-time atom locations and
+mass, artifact assembly with estimator-bound MLX execution, and hardware parity
 remain unavailable until their owning implementations and receipts pass the
 same gates.
 

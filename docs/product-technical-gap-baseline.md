@@ -24,6 +24,11 @@
 - `mlx_native_receipt` provides a macOS-only, Rust-owned MLX CPU execution
   probe. Its receipt proves only the stated matrix objective and cannot be
   reused as an Event Lineage estimator or Metal receipt.
+- `event_core` now materializes producer-identified discrete event-time mass
+  into canonical complete draws and recovers synthetic mass exactly. Inferring
+  the event-time atoms/mass from admitted evidence and binding the estimator's
+  own MLX receipt remain open; record time and nearest-date substitution stay
+  prohibited.
 
 ## 2026-08-25 Event Lineage anchor contract slice
 
