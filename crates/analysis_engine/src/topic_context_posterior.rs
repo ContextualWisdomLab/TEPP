@@ -481,11 +481,12 @@ impl TopicContextPosteriorArtifact {
                     .is_some_and(|target| !topic_ids.contains(target))
                 || match event.event_code.as_str() {
                     "birth" | "retirement" => event.target_topic_id.is_some(),
-                    "split" | "merge" => event
+                    // Only "split"/"merge" remain; their target must be None
+                    // or self-referencing.
+                    _ => !event
                         .target_topic_id
                         .as_deref()
-                        .is_none_or(|target| target == event.source_topic_id),
-                    _ => true,
+                        .is_some_and(|target| target != event.source_topic_id),
                 }
                 || event_time > cutoff
                 || !digest(&event.evidence_sha256)
@@ -1245,4 +1246,84 @@ mod tests {
         }
         assert_eq!(oversized.to_json(), Err(AnalysisEngineError::LimitExceeded));
     }
+
+    #[test]
+    fn canonicalises_out_of_order_lineage_and_relation_sorts() {
+        let mut value = artifact();
+        let topic_a = value.topic_ids[0].clone();
+        let topic_b = value.topic_ids[1].clone();
+
+        // birth/retirement require no target; split/merge may self-reference.
+        let event_later = TopicLineageEvent {
+            event_code: "retirement".into(),
+            source_topic_id: topic_b.clone(),
+            target_topic_id: None,
+            event_time: "2026-07-20T00:00:00Z".into(),
+            evidence_sha256: "b".repeat(64),
+            evidence_resource_id: "evidence-lineage-later".into(),
+            provenance_assertion_id: "provenance-lineage-later".into(),
+        };
+        let event_earlier = TopicLineageEvent {
+            event_code: "birth".into(),
+            source_topic_id: topic_a.clone(),
+            target_topic_id: None,
+            event_time: "2026-07-10T00:00:00Z".into(),
+            evidence_sha256: "a".repeat(64),
+            evidence_resource_id: "evidence-lineage-earlier".into(),
+            provenance_assertion_id: "provenance-lineage-earlier".into(),
+        };
+
+        let relation_later = TopicDocumentRelation {
+            source_document_id: "018f3f7a-7b7c-7d00-8000-000000000002".into(),
+            target_document_id: "018f3f7a-7b7c-7d00-8000-000000000001".into(),
+            relation_kind_code: "event_lineage_precedes".into(),
+            event_time: "2026-07-20T00:00:00Z".into(),
+            evidence_sha256: "d".repeat(64),
+            evidence_resource_id: "evidence-relation-later".into(),
+            provenance_assertion_id: "provenance-relation-later".into(),
+        };
+        let relation_earlier = TopicDocumentRelation {
+            source_document_id: "018f3f7a-7b7c-7d00-8000-000000000001".into(),
+            target_document_id: "018f3f7a-7b7c-7d00-8000-000000000002".into(),
+            relation_kind_code: "event_lineage_precedes".into(),
+            event_time: "2026-07-10T00:00:00Z".into(),
+            evidence_sha256: "c".repeat(64),
+            evidence_resource_id: "evidence-relation-earlier".into(),
+            provenance_assertion_id: "provenance-relation-earlier".into(),
+        };
+
+        value.lineage_events = vec![event_later, event_earlier];
+        value.document_relations = vec![relation_later, relation_earlier];
+        let json = value.to_json().expect("canonical serialisation");
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("valid json");
+
+        let events = parsed["lineage_events"].as_array().expect("events array");
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0]["event_code"], "birth");
+        assert_eq!(events[1]["event_code"], "retirement");
+
+        let relations = parsed["document_relations"].as_array().expect("relations");
+        assert_eq!(relations.len(), 2);
+        assert_eq!(
+            relations[0]["source_document_id"],
+            "018f3f7a-7b7c-7d00-8000-000000000001"
+        );
+        assert_eq!(
+            relations[1]["source_document_id"],
+            "018f3f7a-7b7c-7d00-8000-000000000002"
+        );
+
+        let round_tripped =
+            TopicContextPosteriorArtifact::from_json(&json).expect("round-trip");
+        assert_eq!(
+            round_tripped.lineage_events[0].event_code, "birth",
+            "canonical lineage order survives round-trip"
+        );
+        assert_eq!(
+            round_tripped.document_relations[0].source_document_id,
+            "018f3f7a-7b7c-7d00-8000-000000000001",
+            "canonical relation order survives round-trip"
+        );
+    }
+
 }

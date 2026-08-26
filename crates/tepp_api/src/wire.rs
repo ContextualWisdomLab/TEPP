@@ -163,4 +163,18 @@ mod tests {
             Err(ApiError::UnsupportedContractVersion)
         );
     }
+
+    #[test]
+    fn limited_writer_flush_is_a_no_op() {
+        use std::io::Write;
+        let mut writer = super::LimitedWriter {
+            bytes: Vec::new(),
+            maximum_bytes: 64,
+            limit_exceeded: false,
+        };
+        writer.write_all(b"hello").expect("small write succeeds");
+        writer.flush().expect("flush on healthy writer is Ok");
+        assert_eq!(writer.bytes, b"hello");
+        assert!(!writer.limit_exceeded);
+    }
 }
