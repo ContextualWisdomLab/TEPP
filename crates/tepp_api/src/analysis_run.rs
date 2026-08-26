@@ -18,6 +18,9 @@ pub const DEFAULT_ANALYSIS_RUN_BYTE_LIMIT: usize = 64 * 1024;
 /// Supported analysis-run status/read contract version.
 pub const ANALYSIS_RUN_STATUS_CONTRACT_VERSION: u16 = 1;
 
+/// Versioned analysis-run status/read path served by the TEPP HTTP boundary.
+pub const ANALYSIS_RUN_STATUS_PATH: &str = "/v1/analysis-runs";
+
 /// Request to create a durable analysis run.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
