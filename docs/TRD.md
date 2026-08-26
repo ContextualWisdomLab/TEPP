@@ -73,6 +73,26 @@ Documents and LLM outputs are untrusted data. Live model tests use `NVIDIA_NIM_A
 
 Production Rust line and branch coverage are exactly 100%; public API rustdoc is complete; format/build/Clippy/tests/rustdoc/supply-chain/security gates are warning-free/current-head. Releases additionally require validated migrations/rollback, SBOM/provenance, reproducible artifacts, current protected-head review/security, CHANGELOG/version consistency, operational recovery, and no unresolved scientific blocker.
 
+## 14. Event Lineage criterion and Project Journey posterior contracts
+
+- `tepp.lineage_pair_criterion_posterior.v2` binds exact pair identities,
+  continuous independent-criterion and event-time draws, run/snapshot/cutoff,
+  TDT/CHRONOS configuration, unique anchor alignment, and CPU/MLX receipts.
+- `tepp.project_journey_posterior.v1` is a posterior DAG with no fixed start or
+  total order. It preserves multiple predecessors, branches, transitions,
+  exact ties, relation uncertainty, evidence ids, and record/event clock
+  separation.
+- Both strict JSON contracts reject unknown fields, mixed cardinalities,
+  backward transition draws, missing evidence, ambiguous anchors, and
+  method-derived parity failure.
+- Apple Silicon acceleration uses a macOS-native Rust-owned MLX Metal service.
+  Compose calls it through authenticated Unix-socket or host-gateway transport;
+  Colima/Linux never claims Metal execution. Rust owns all arithmetic; CPU f64
+  is a tested portability reference/fallback. This active slice is wire production from an
+  already-fitted run; estimator recovery and real MLX parity remain separate
+  acceptance gates. ADR 0024 normatively owns host authentication,
+  actual-backend receipts, parity, fallback, operability, tests, and rollback.
+
 ## References
 
 The full APA 7th register is [`docs/research/standards-and-literature.md`](research/standards-and-literature.md). Method claims in this TRD use:

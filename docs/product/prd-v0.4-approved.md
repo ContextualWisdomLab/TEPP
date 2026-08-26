@@ -34,6 +34,8 @@ Representative questions include:
 - Which input states precede process or intervention states, and which outcomes follow?
 - Are apparent changes substantive, lexical, semantic, compositional, reporting, or measurement drift?
 - Which conclusions remain stable across seeds, posterior draws, model families, languages, and hardware backends?
+- Which evidence-grounded predecessor branches form a project's journey when
+  record creation order differs from uncertain event time?
 
 ## 3. Input contract
 
@@ -181,6 +183,12 @@ The event ontology treats events as first-class entities with time, place, agent
 
 CHRONOS-style neural/symbolic extraction proposes event schemas, arguments, complex-event instances, and next-event candidates. A separate temporal reasoner derives implied interval relations, rejects contradictions, and preserves evidence provenance. Psychometric validation evaluates mention reliability, schema structure, tracking reliability, and forecast calibration.
 
+Project Journey is a posterior event DAG, not a fixed lifecycle or earliest-row
+timeline. It may include prior-project, customer-request, procurement-notice,
+direct/negotiated-bid, external-sensing, internal-discussion, and lead evidence;
+record time and event time remain distinct, and multiple predecessors,
+branches, transitions, exact ties, and uncertainty are retained.
+
 ## 12. LLM responsibilities
 
 LLMs may propose semantic units, concept mappings, candidate-model reviews, topic/cluster labels, explanations, and event-schema hypotheses. They do not perform authoritative numerical estimation or bypass statistical gates.
@@ -200,6 +208,13 @@ Production mathematical and psychometric arithmetic is implemented in Rust. Pyth
 The CPU `f64` estimator is the numerical reference. CPU acceleration uses bounded fixed worker pools, sparse CSR/CSC data, thread-local sufficient statistics, deterministic reductions where required, and controls to prevent BLAS/thread-pool oversubscription.
 
 The GPU layer exposes backend-neutral operations with NVIDIA CUDA as the primary performance path and WGPU/CubeCL or equivalent portable acceleration where justified. Sparse topic-specific kernels may be custom implemented.
+
+On Apple Silicon, MLX Metal executes only in the macOS-native Rust-owned
+service governed by ADR 0024. Compose connects through an authenticated local
+Unix socket or host-gateway boundary; Colima/Linux never claims Metal. Linux
+portability uses `rust_cpu`, `mlx_cpu`, `mlx_cuda`, or `rust_opencl` only when
+that backend actually executes; `mlx_opencl` is not a valid backend. Every
+accelerated result carries numerical-parity provenance against CPU f64.
 
 The VRAM controller:
 
