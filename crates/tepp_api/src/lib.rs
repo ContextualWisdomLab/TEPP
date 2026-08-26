@@ -13,6 +13,7 @@
 
 mod analysis_result;
 mod analysis_run;
+mod analysis_run_status_http;
 mod analysis_run_live;
 mod authorization;
 mod corpus_split_manifest;
@@ -52,6 +53,10 @@ pub use analysis_result::terminal_result_matches_request;
 pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
 /// Analysis-run status/read contract version constant.
 pub use analysis_run::ANALYSIS_RUN_STATUS_CONTRACT_VERSION;
+pub use analysis_run::ANALYSIS_RUN_STATUS_PATH;
+pub use analysis_run_status_http::{
+    ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange,
+};
 /// Accepted analysis-run response.
 pub use analysis_run::AnalysisRunAccepted;
 /// Analysis-run create request.
