@@ -1754,6 +1754,7 @@ dependencies = [
  "corpus_split",
  "membership_core",
  "relation_graph",
+ "sha2",
  "temporal_core",
  "uuid",
  "validation_core",

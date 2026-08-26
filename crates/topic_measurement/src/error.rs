@@ -21,6 +21,8 @@ pub enum TopicMeasurementError {
     NonFiniteEstimate,
     /// No seeded initialization converged within the bounded iteration budget.
     DidNotConverge,
+    /// The fitted result does not retain a joint posterior precision matrix.
+    JointPosteriorUnavailable,
 }
 
 impl fmt::Display for TopicMeasurementError {
@@ -33,6 +35,7 @@ impl fmt::Display for TopicMeasurementError {
             Self::InvalidModelInput => "invalid topic model input",
             Self::NonFiniteEstimate => "non-finite topic estimate",
             Self::DidNotConverge => "topic estimator did not converge",
+            Self::JointPosteriorUnavailable => "joint topic posterior is unavailable",
         };
         formatter.write_str(message)
     }
@@ -73,6 +76,10 @@ mod tests {
         assert_eq!(
             TopicMeasurementError::DidNotConverge.to_string(),
             "topic estimator did not converge"
+        );
+        assert_eq!(
+            TopicMeasurementError::JointPosteriorUnavailable.to_string(),
+            "joint topic posterior is unavailable"
         );
     }
 }
