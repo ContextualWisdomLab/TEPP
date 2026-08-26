@@ -236,10 +236,7 @@ impl EventIntelligenceComposition {
 /// assignment cites an unknown mention. Propagates config version errors from
 /// [`EventIntelligenceWorkflowConfig::new`] when the supplied config is reused
 /// only after validation (callers must construct config first).
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the eight arguments are the audited TDT then CHRONOS admission sequence"
-)]
+#[allow(clippy::too_many_arguments, reason = "audited TDT/CHRONOS sequence")]
 pub fn compose_event_intelligence(
     config: EventIntelligenceWorkflowConfig,
     segmentation: StorySegmentation,
