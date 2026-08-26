@@ -56,6 +56,16 @@ pub enum EventError {
     PredictionIsNotEventInstance,
     /// An unknown occurrence-truth label was supplied.
     UnknownOccurrenceTruth,
+    /// A span-grounded mention was treated as an event instance.
+    SpanMentionIsNotEventInstance,
+    /// Mention availability is after the knowledge cutoff.
+    MentionIneligibleAtCutoff,
+    /// The extractor or model version was empty or whitespace-only.
+    EmptyExtractorVersion,
+    /// The mention span does not belong to the supplied document.
+    MentionSpanDocumentMismatch,
+    /// An unknown mention-review status name was supplied.
+    UnknownMentionReviewStatus,
 }
 
 impl fmt::Display for EventError {
@@ -94,6 +104,11 @@ impl fmt::Display for EventError {
             Self::UnknownStoryBoundaryLabel => "unknown story boundary label",
             Self::PredictionIsNotEventInstance => "CHRONOS prediction is not an event instance",
             Self::UnknownOccurrenceTruth => "unknown occurrence truth label",
+            Self::SpanMentionIsNotEventInstance => "span-grounded mention is not an event instance",
+            Self::MentionIneligibleAtCutoff => "mention availability is after the knowledge cutoff",
+            Self::EmptyExtractorVersion => "empty extractor version",
+            Self::MentionSpanDocumentMismatch => "mention span does not belong to the document",
+            Self::UnknownMentionReviewStatus => "unknown mention review status",
         };
         formatter.write_str(message)
     }
@@ -106,6 +121,7 @@ mod tests {
     use super::EventError;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn error_messages_are_stable() {
         for (error, message) in [
             (
@@ -198,6 +214,23 @@ mod tests {
             (
                 EventError::UnknownOccurrenceTruth,
                 "unknown occurrence truth label",
+            ),
+            (
+                EventError::SpanMentionIsNotEventInstance,
+                "span-grounded mention is not an event instance",
+            ),
+            (
+                EventError::MentionIneligibleAtCutoff,
+                "mention availability is after the knowledge cutoff",
+            ),
+            (EventError::EmptyExtractorVersion, "empty extractor version"),
+            (
+                EventError::MentionSpanDocumentMismatch,
+                "mention span does not belong to the document",
+            ),
+            (
+                EventError::UnknownMentionReviewStatus,
+                "unknown mention review status",
             ),
         ] {
             assert_eq!(error.to_string(), message);

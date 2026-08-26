@@ -4,15 +4,15 @@
 //!
 //! TEPP separates **fallible event mentions** grounded in evidence from
 //! **versioned event instances** used for temporal state, multilevel membership,
-//! and scientific estimation. Mentions and first-story detections never
-//! silently become instances, and TDT detections and CHRONOS predictions
-//! remain measurement or hypothesis artifacts until independently promoted.
-//! and scientific estimation. Mentions never silently become instances. TDT
-//! detections and CHRONOS predictions remain measurement or hypothesis
-//! artifacts until independently promoted. Track assignments, story
-//! segmentations, CHRONOS schema-slot predictions, and occurrence forecasts
-//! remain measurement or hypothesis artifacts and cannot promote an instance
-//! without an explicit evidence-backed promotion gate.
+//! and scientific estimation. [`EventMention`] is the only constructible
+//! mention type: it cites one exact source extent, document identity,
+//! six-clock evidence, extractor version, and review status, and the surface
+//! form is the document substring at that span. Mentions, first-story
+//! detections, TDT detections, and CHRONOS predictions never silently become
+//! instances. Track assignments, story segmentations, CHRONOS schema-slot
+//! predictions, and occurrence forecasts remain measurement or hypothesis
+//! artifacts and cannot promote an instance without an explicit
+//! evidence-backed promotion gate.
 
 mod confidence;
 mod error;
@@ -27,6 +27,7 @@ mod registry;
 mod role;
 mod schema;
 mod segment;
+mod span_mention;
 mod track;
 
 /// Finite confidence on the closed unit interval.
@@ -81,8 +82,10 @@ pub use link::event_link_recall;
 pub use link::refuse_event_link_as_instance;
 /// Explicit refusal to treat a TDT link as a state transition.
 pub use link::refuse_event_link_as_transition;
-/// Fallible textual event mention.
+/// Fallible textual event mention grounded in one exact source extent.
 pub use mention::EventMention;
+/// Explicit refusal to treat a span-grounded mention as an instance.
+pub use mention::refuse_span_mention_as_instance;
 /// One CHRONOS occurrence forecast that remains hypothetical.
 pub use prediction::ChronosOccurrenceForecast;
 /// Opaque CHRONOS occurrence-prediction identity.
@@ -131,6 +134,14 @@ pub use segment::story_boundary_recall;
 pub use segment::story_pk;
 /// Pevzner–Hearst `WindowDiff` against a known-truth segmentation.
 pub use segment::story_window_diff;
+/// Six-clock evidence bound to one mention.
+pub use span_mention::MentionEvidenceClocks;
+/// Proposed-versus-reviewed mention inspection status.
+pub use span_mention::MentionReviewStatus;
+/// Precision of recovered mention extents against known truth.
+pub use span_mention::mention_span_precision;
+/// Recall of recovered mention extents against known truth.
+pub use span_mention::mention_span_recall;
 /// Assignment of one mention to one hypothesized TDT track.
 pub use track::EventTrackAssignment;
 /// Opaque TDT track identity.

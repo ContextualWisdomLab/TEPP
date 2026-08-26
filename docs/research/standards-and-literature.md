@@ -213,6 +213,8 @@ Chambers, N., & Jurafsky, D. (2009). Unsupervised learning of narrative schemas 
 
 Doddington, G., Mitchell, A., Przybocki, M., Ramshaw, L., Strassel, S., & Weischedel, R. (2004). The Automatic Content Extraction (ACE) program—Tasks, data, and evaluation. In *Proceedings of the Fourth International Conference on Language Resources and Evaluation (LREC’04)* (pp. 837–840). European Language Resources Association.
 
+TEPP uses exact ACE mention-extent identity `(document, byte_start, byte_end)` for span-grounded event mentions. A system extent that does not match a reference extent is a miss or false alarm; review status is not instance promotion (Doddington et al., 2004; Allan, 2002).
+
 TEPP uses interval and partial-order reasoning, bitemporal availability, leakage-safe cutoffs, TDT segmentation/link/detection/first-story/tracking tasks (Allan, 2002), qualitative temporal reasoning (Anagnostopoulos et al., 2013), and separate neural/symbolic event-schema and narrative participant-slot layers (Chambers & Jurafsky, 2009). Under [ADR 0016](../adr/0016-tdt-chronos-event-intelligence-boundary.md), predicted schema-slot fills stay hypothetical until independently promoted; this is a TEPP policy boundary, not a literature result.
 Brier, G. W. (1950). Verification of forecasts expressed in terms of probability. *Monthly Weather Review, 78*(1), 1–3. https://doi.org/10.1175/1520-0493(1950)078<0001:VOFEIT>2.0.CO;2
 

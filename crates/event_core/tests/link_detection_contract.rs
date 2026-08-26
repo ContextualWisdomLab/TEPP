@@ -1,10 +1,66 @@
 //! TDT link detections are not instances; precision/recall come from truth.
 
 use event_core::{
-    EventConfidence, EventError, EventLinkLabel, EventLinkPair, EventMentionId, decide_event_link,
-    event_link_precision, event_link_recall, refuse_event_link_as_instance,
-    refuse_event_link_as_transition,
+    EventConfidence, EventError, EventLinkLabel, EventLinkPair, EventMention, EventMentionId,
+    MentionEvidenceClocks, MentionReviewStatus, decide_event_link, event_link_precision,
+    event_link_recall, refuse_event_link_as_instance, refuse_event_link_as_transition,
 };
+use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
+use temporal_core::{
+    AssertionTime, AvailableTime, DocumentTime, EventTime, KnowledgeCutoff, SystemTime,
+};
+
+const DOCUMENT_TEXT: &str = "alpha bravo charlie delta echo foxtrot";
+
+fn documentary_record() -> DocumentRecord {
+    let artifact = SourceArtifact::from_bytes(DOCUMENT_TEXT.as_bytes()).expect("artifact");
+    DocumentRecord::from_text(artifact.id(), DOCUMENT_TEXT).expect("document")
+}
+
+fn span_for(document: &DocumentRecord, surface: &str) -> SourceSpan {
+    let byte_start = document.text().find(surface).expect("surface present");
+    let byte_end = byte_start + surface.len();
+    let scalar_start = document.text()[..byte_start].chars().count();
+    let scalar_end = scalar_start + surface.chars().count();
+    SourceSpan::new(
+        document,
+        byte_start,
+        byte_end,
+        scalar_start,
+        scalar_end,
+        None,
+    )
+    .expect("span")
+}
+
+fn eligible_clocks() -> MentionEvidenceClocks {
+    MentionEvidenceClocks::new(
+        EventTime::parse_rfc3339("2026-03-01T00:00:00Z").expect("event"),
+        AssertionTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("assertion"),
+        DocumentTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("document"),
+        SystemTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("system"),
+        AvailableTime::parse_rfc3339("2026-03-02T00:00:00Z").expect("available"),
+        KnowledgeCutoff::parse_rfc3339("2026-03-31T00:00:00Z").expect("cutoff"),
+    )
+    .expect("eligible clocks")
+}
+
+fn grounded_mention(surface: &str) -> EventMention {
+    let document = documentary_record();
+    EventMention::new(
+        &document,
+        span_for(&document, surface),
+        EventConfidence::new(0.8).expect("confidence"),
+        eligible_clocks(),
+        "ace-extent-extractor/1",
+        MentionReviewStatus::Proposed,
+    )
+    .expect("grounded mention")
+}
+
+fn mention_id(surface: &str) -> EventMentionId {
+    grounded_mention(surface).mention_id()
+}
 
 fn computed_rmse(truth: &[f64], recovered: &[f64]) -> f64 {
     assert_eq!(truth.len(), recovered.len());
@@ -26,8 +82,8 @@ fn pair(left: EventMentionId, right: EventMentionId) -> EventLinkPair {
 
 #[test]
 fn event_link_detection_cannot_be_cast_to_an_instance_or_transition() {
-    let left = EventMentionId::new();
-    let right = EventMentionId::new();
+    let left = mention_id("alpha");
+    let right = mention_id("bravo");
     let link = pair(left, right);
     assert_eq!(
         refuse_event_link_as_instance(link),
@@ -41,10 +97,10 @@ fn event_link_detection_cannot_be_cast_to_an_instance_or_transition() {
 
 #[test]
 fn precision_and_recall_are_computed_from_known_truth_pairs() {
-    let a = EventMentionId::new();
-    let b = EventMentionId::new();
-    let c = EventMentionId::new();
-    let d = EventMentionId::new();
+    let a = mention_id("alpha");
+    let b = mention_id("bravo");
+    let c = mention_id("charlie");
+    let d = mention_id("delta");
     let truth = [pair(a, b), pair(b, c)];
     let calibrated = [pair(a, b)];
     let always_link = [pair(a, b), pair(b, c), pair(c, d), pair(a, d)];
@@ -79,13 +135,13 @@ fn calibrated_link_scores_have_lower_rmse_than_always_link() {
 
 #[test]
 fn pair_helpers_fail_closed_on_self_links_empty_and_missing_sets() {
-    let mention = EventMentionId::new();
+    let mention = mention_id("echo");
     assert_eq!(
         EventLinkPair::new(mention, mention),
         Err(EventError::InvalidWirePayload)
     );
-    let a = EventMentionId::new();
-    let b = EventMentionId::new();
+    let a = mention_id("alpha");
+    let b = mention_id("bravo");
     let truth = [pair(a, b)];
     assert_eq!(
         event_link_precision(&truth, &[]),
@@ -125,8 +181,8 @@ fn labels_round_trip_and_threshold_is_inclusive() {
         EventLinkLabel::Unlinked
     );
 
-    let left = EventMentionId::new();
-    let right = EventMentionId::new();
+    let left = mention_id("echo");
+    let right = mention_id("foxtrot");
     assert_eq!(pair(left, right), pair(right, left));
     assert_ne!(pair(left, right).left(), pair(left, right).right());
 }

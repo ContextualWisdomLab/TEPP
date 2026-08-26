@@ -19,6 +19,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Six-clock temporal | `temporal_core` | implemented-main | `document_clocks` omitted assertion/document time | unit + wire | Task 3 / PR #8; document-row clocks on this PR |
 | Knowledge-cutoff identity | `cutoff_clock` | active-PR | this PR | recovered cutoff flags vs availability-time stand-in | ADR 0002 |
 | Allen path-consistency | `temporal_core` | implemented-main | — | unit + budget tests | Task 4 / PR #9 |
+| Span-grounded mentions | `event_core` | active-PR | this PR | `EventMention` is the only constructible mention type; exact-extent P/R + occupancy RMSE vs whole-document | ADR 0016; `docs/research/span-grounded-mentions.md` |
 | Event mention/instance | `event_core` | partial | — | unit + fail-closed promotion | Task 5 / PR #13 |
 | TDT link precision/recall | `event_core` | active-PR | this PR | computed precision/recall + RMSE vs always-link | ADR 0016; `docs/research/event-link-detection-calibration.md` |
 | First-story FAR/miss | `event_core` | active-PR | this PR | computed FAR/miss + RMSE vs always-first | ADR 0016; `docs/research/first-story-detection-calibration.md` |
