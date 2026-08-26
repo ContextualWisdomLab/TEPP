@@ -564,6 +564,27 @@ pub enum PsychometricError {
     /// mean using free `T0VAR`, not process-dynamics
     /// `asymDIFFUSION`.
     WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean,
+    /// Driver p. 16 `T0VARstd` was requested with a non-positive
+    /// first-occasion variance. Footnote 4 standardisation of the
+    /// 2017-era `T0VAR` matrix requires strictly positive free
+    /// `T0VAR`.
+    StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance,
+    /// Driver Table 2 unstandardised `T0VAR` `p_0` was treated as
+    /// p. 16 `T0VARstd`. Unstandardised `p_0` is defined for a zero
+    /// first-occasion variance; standardised `T0VAR` is not.
+    UnstandardisedInitialLatentVarianceIsNotStandardisedInitialLatentVariance,
+    /// Driver p. 16 `T0MEANSstd` was treated as p. 16 `T0VARstd`.
+    /// Equal numbers when `μ_0 = √p_0` are still distinct named
+    /// quantities. `T0VARstd` is the correlation form of free
+    /// `T0VAR`; `T0MEANSstd` is the first-occasion mean.
+    StandardisedInitialLatentMeanIsNotStandardisedInitialLatentVariance,
+    /// Driver p. 16 `asymDIFFUSIONstd` was treated as p. 16
+    /// `T0VARstd`. Equal numbers of 1 after a strictly positive
+    /// relevant variance are still distinct named quantities.
+    /// `T0VARstd` is the correlation form of free `T0VAR`;
+    /// `asymDIFFUSIONstd` is the correlation form of process-
+    /// dynamics `asymDIFFUSION`.
+    StandardisedAsymptoticDiffusionIsNotStandardisedInitialLatentVariance,
     /// Driver p. 16 `discreteCINTstd` was requested without a strictly
     /// positive `asymDIFFUSION`. Footnote 4 standardises using only the
     /// relevant variance; zero `q` has no positive process SD.
@@ -1029,6 +1050,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean => {
                 "within-subject scaled initial latent mean is not standardised initial latent mean"
+            }
+            Self::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance => {
+                "standardised initial latent variance requires strictly positive initial latent variance"
+            }
+            Self::UnstandardisedInitialLatentVarianceIsNotStandardisedInitialLatentVariance => {
+                "unstandardised initial latent variance is not standardised initial latent variance"
+            }
+            Self::StandardisedInitialLatentMeanIsNotStandardisedInitialLatentVariance => {
+                "standardised initial latent mean is not standardised initial latent variance"
+            }
+            Self::StandardisedAsymptoticDiffusionIsNotStandardisedInitialLatentVariance => {
+                "standardised asymptotic diffusion is not standardised initial latent variance"
             }
             Self::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance => {
                 "standardised discrete continuous intercept requires strictly positive stationary within-subject variance"
@@ -1742,6 +1775,30 @@ mod tests {
             PsychometricError::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean
                 .to_string(),
             "within-subject scaled initial latent mean is not standardised initial latent mean"
+        );
+    }
+
+    #[test]
+    fn standardised_initial_latent_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance
+                .to_string(),
+            "standardised initial latent variance requires strictly positive initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedInitialLatentVarianceIsNotStandardisedInitialLatentVariance
+                .to_string(),
+            "unstandardised initial latent variance is not standardised initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentMeanIsNotStandardisedInitialLatentVariance
+                .to_string(),
+            "standardised initial latent mean is not standardised initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticDiffusionIsNotStandardisedInitialLatentVariance
+                .to_string(),
+            "standardised asymptotic diffusion is not standardised initial latent variance"
         );
     }
 
