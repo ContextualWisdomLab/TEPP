@@ -21,6 +21,9 @@
   Metal behind authenticated local transport, exact backend receipts, Linux
   `rust_cpu`/`mlx_cpu`/`mlx_cuda`/`rust_opencl` portability, and fail-closed
   parity. The native service and hardware E2E remain a release gap.
+- `mlx_native_receipt` provides a macOS-only, Rust-owned MLX CPU execution
+  probe. Its receipt proves only the stated matrix objective and cannot be
+  reused as an Event Lineage estimator or Metal receipt.
 
 ## 2026-08-25 Event Lineage anchor contract slice
 
