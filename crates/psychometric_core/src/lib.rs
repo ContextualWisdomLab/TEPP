@@ -224,6 +224,16 @@
 //! fails closed; a non-event clock fails closed; `a ≥ 0` fails
 //! closed; `κ / √p` is not this total-change map; `discreteCINTstd`
 //! depends on `Δt` and is not this map),
+//! recovers the Driver p. 16 `T0VARstd` as `p_0 / p_0 = 1` after
+//! strictly positive free `T0VAR` (footnote 4 uses only the
+//! relevant first-occasion variance, not process-dynamics
+//! `asymDIFFUSION`; 2017-era `summary.ctsemFit.R` forms `T0VARstd`
+//! as `solve(sqrt(diag(T0VAR))) %&% T0VAR`; `OpenMx` `%&%` is
+//! `t(A) %*% B %*% A`; default ridge is 0; unstandardised `p_0` is
+//! defined for a zero first-occasion variance and is not that map;
+//! `μ_0 / √p_0` is `T0MEANSstd` and is not that map even when
+//! `μ_0 = √p_0`; `p / p = 1` is `asymDIFFUSIONstd` and is not that
+//! map even when both equal 1; JSS PDF re-opened 2026-08-26T07:17Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -370,6 +380,8 @@ pub use event_time::recover_standardised_continuous_intercept;
 pub use event_time::recover_standardised_discrete_continuous_intercept;
 /// Exact scalar p. 16 `T0MEANSstd` `μ_0 / √p_0`.
 pub use event_time::recover_standardised_initial_latent_mean;
+/// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
+pub use event_time::recover_standardised_initial_latent_variance;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
@@ -564,10 +576,14 @@ pub use event_time::refuse_observed_scaled_manifest_mean_as_standardised_manifes
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
+/// Refuse treating p. 16 `asymDIFFUSIONstd` as `T0VARstd`.
+pub use event_time::refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance;
 /// Refuse treating p. 16 `CINTstd` as `asymCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating p. 16 `T0MEANSstd` as `T0VARstd`.
+pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance;
 /// Refuse treating p. 16 `T0VARstd` as `T0MEANSstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
@@ -662,6 +678,8 @@ pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_c
 pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Refuse treating unstandardised `T0MEANS` as `T0MEANSstd`.
 pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean;
+/// Refuse treating unstandardised `T0VAR` as `T0VARstd`.
+pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance;
 /// Refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.

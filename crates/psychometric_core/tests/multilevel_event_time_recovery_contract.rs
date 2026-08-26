@@ -36,7 +36,8 @@ use psychometric_core::{
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_continuous_intercept, recover_standardised_discrete_continuous_intercept,
-    recover_standardised_initial_latent_mean, recover_standardised_manifest_mean,
+    recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
+    recover_standardised_manifest_mean,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
     recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
     recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -5978,6 +5979,31 @@ fn standardised_initial_latent_mean_recovers_driver_page_sixteen_after_positive_
 }
 
 #[test]
+fn standardised_initial_latent_variance_recovers_driver_table_two_correlation() {
+    let initial_variance = 1.6_f64;
+    let recovered =
+        recover_standardised_initial_latent_variance(initial_variance, LagClock::EventTime)
+            .expect("T0VARstd");
+    let recovered_error = (recovered - 1.0).abs();
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, p. 16 T0VARstd): RMSE {recovered_error} for p_0 / p_0 = 1"
+    );
+    let larger_p0 = recover_standardised_initial_latent_variance(6.4, LagClock::EventTime)
+        .expect("T0VARstd p_0=6.4");
+    assert_eq!(
+        larger_p0.to_bits(),
+        recovered.to_bits(),
+        "Driver et al. (2017, p. 16): distinct positive T0VAR recover the same T0VARstd"
+    );
+    let unstandardised_error = (initial_variance - 1.0).abs();
+    assert!(
+        unstandardised_error > recovered_error,
+        "Driver et al. (2017, p. 16): unstandardised T0VAR RMSE {unstandardised_error} must exceed T0VARstd RMSE {recovered_error}"
+    );
+}
+
+#[test]
 fn standardised_initial_latent_mean_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
     assert_eq!(
         recover_standardised_initial_latent_mean(0.8, 1.6, LagClock::AssertionTime),
@@ -5994,6 +6020,24 @@ fn standardised_initial_latent_mean_refuses_non_event_clocks_and_does_not_keep_z
     let zero =
         recover_standardised_initial_latent_mean(0.0, 1.6, LagClock::EventTime).expect("zero mean");
     assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+}
+
+#[test]
+fn standardised_initial_latent_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
+    assert_eq!(
+        recover_standardised_initial_latent_variance(1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_initial_latent_variance(1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_initial_latent_variance(0.0, LagClock::EventTime),
+        Err(
+            PsychometricError::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance
+        )
+    );
 }
 
 #[test]
