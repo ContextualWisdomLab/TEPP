@@ -113,6 +113,7 @@ class WorkspaceContractTests(unittest.TestCase):
             'rust-version = "1.98.0"': 'rust-version = "1.96.0"',
             'license = "Apache-2.0"': 'license = "MIT"',
             'unsafe_code = "forbid"': 'unsafe_code = "allow"',
+            'unsafe_code = "deny"': 'unsafe_code = "allow"',
             'missing_docs = "deny"': 'missing_docs = "warn"',
             'warnings = "deny"': 'warnings = "warn"',
         }
@@ -167,7 +168,7 @@ class WorkspaceContractTests(unittest.TestCase):
             "missing_docs is not explicitly denied",
             "placeholder production APIs",
             "package identity contract test",
-            "temporal_core/Cargo.toml is missing",
+            "crates/temporal_core/Cargo.toml is missing",
         )
         for fragment in expected_fragments:
             self.assertTrue(
