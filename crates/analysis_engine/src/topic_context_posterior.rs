@@ -483,10 +483,10 @@ impl TopicContextPosteriorArtifact {
                     "birth" | "retirement" => event.target_topic_id.is_some(),
                     // Only "split"/"merge" remain; their target must be None
                     // or self-referencing.
-                    _ => !event
+                    _ => event
                         .target_topic_id
                         .as_deref()
-                        .is_some_and(|target| target != event.source_topic_id),
+                        .is_none_or(|target| target == event.source_topic_id),
                 }
                 || event_time > cutoff
                 || !digest(&event.evidence_sha256)
