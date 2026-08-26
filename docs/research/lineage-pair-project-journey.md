@@ -3,8 +3,9 @@
 ## Scope
 
 This note supports ADR 0024's evidence-state and temporal-graph contract. It
-also supports the implemented independent binary TDT-link criterion posterior,
-but does not establish completed CHRONOS event-time inference, causal
+also supports the implemented independent binary TDT-link criterion posterior
+and exact materialization of an already identified discrete event-time
+posterior, but does not establish completed CHRONOS atom/mass inference, causal
 identification, or a universal project lifecycle.
 
 ## Synthesis
