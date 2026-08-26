@@ -207,6 +207,16 @@
 //! that map; `κ / √p` is `CINTstd` and is not that map;
 //! `(-κ / a) / √p` is `asymCINTstd` and is not that map; JSS PDF
 //! re-opened 2026-08-25T11:57Z),
+//! recovers the Driver p. 16 `asymCINTstd` as `(-κ / a) / √p` after
+//! strictly positive `asymDIFFUSION` (JSS PDF re-opened
+//! 2026-08-26T00:20Z; p. 16; footnote 4; Eq. 3; Table 2; 2017-era
+//! `summary.ctsemFit.R` forms unstandardised `asymCINT` whenever
+//! `verbose = TRUE` as `-solve(DRIFT) %*% CINT`; that source does
+//! not form an `asymCINTstd` matrix; unstandardised `asymCINT` is
+//! defined for a zero process and is not `asymCINTstd`; zero `q`
+//! fails closed; a non-event clock fails closed; `a ≥ 0` fails
+//! closed; `κ / √p` is not this total-change map; `discreteCINTstd`
+//! depends on `Δt` and is not this map),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -345,6 +355,8 @@ pub use event_time::recover_manifest_observed_mean;
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
+/// Exact scalar p. 16 `asymCINTstd` `(-κ / a) / √p` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 /// Exact scalar p. 16 `CINTstd` `κ / √p`.
 pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
@@ -419,6 +431,8 @@ pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating p. 16 `discreteCINTstd` as `asymCINTstd`.
+pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating evolved `τ + λ μ_t` as the after-t0 extra-process observed mean.
@@ -541,6 +555,8 @@ pub use event_time::refuse_observed_scaled_manifest_mean_as_standardised_manifes
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
+/// Refuse treating p. 16 `CINTstd` as `asymCINTstd`.
+pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
@@ -627,6 +643,8 @@ pub use event_time::refuse_trait_variance_as_process_noise;
 pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 /// Refuse a time-varying predictor whose sampling and constancy intervals differ.
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
+/// Refuse treating unstandardised `asymCINT` as `asymCINTstd`.
+pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.

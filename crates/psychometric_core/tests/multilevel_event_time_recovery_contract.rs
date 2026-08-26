@@ -34,6 +34,7 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_continuous_intercept, recover_standardised_discrete_continuous_intercept,
     recover_standardised_manifest_mean, recover_stationary_initial_latent_mean,
     recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
@@ -6041,5 +6042,95 @@ fn standardised_discrete_continuous_intercept_refuses_non_event_clocks_and_does_
         LagClock::EventTime,
     )
     .expect("zero CINT");
+    assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+}
+
+#[test]
+fn standardised_asymptotic_continuous_intercept_recovers_driver_page_sixteen_after_positive_p() {
+    let intercept = 0.4_f64;
+    let diffusion = 0.8_f64;
+    let log_rate = -0.5_f64;
+    let recovered = recover_standardised_asymptotic_continuous_intercept(
+        intercept,
+        diffusion,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymCINTstd");
+    let stationary =
+        recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime).expect("p");
+    let expected = (-intercept / log_rate) / stationary.sqrt();
+    let error = (recovered - expected).abs();
+    assert!(
+        error < 1e-15,
+        "Driver et al. (2017, p. 16 asymCINTstd): RMSE {error} for (−κ / a) / √p"
+    );
+    let continuous_std = intercept / stationary.sqrt();
+    let continuous_rmse = (continuous_std - expected).abs();
+    assert!(
+        error < continuous_rmse,
+        "Driver et al. (2017, p. 16): κ / √p RMSE {continuous_rmse} must exceed asymCINTstd RMSE {error}"
+    );
+    let discrete =
+        recover_discrete_continuous_intercept_effect(intercept, log_rate, 1.0, LagClock::EventTime)
+            .expect("discreteCINT")
+            / stationary.sqrt();
+    let discrete_rmse = (discrete - expected).abs();
+    assert!(
+        error < discrete_rmse,
+        "Driver et al. (2017, p. 16): discreteCINTstd RMSE {discrete_rmse} must exceed asymCINTstd RMSE {error}"
+    );
+    let later =
+        recover_discrete_continuous_intercept_effect(intercept, log_rate, 2.5, LagClock::EventTime)
+            .expect("discreteCINT Δt=2.5")
+            / stationary.sqrt();
+    assert!(
+        (later - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): a later event interval changes discreteCINTstd and not asymCINTstd"
+    );
+    let negative = recover_standardised_asymptotic_continuous_intercept(
+        -intercept,
+        diffusion,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("negative signed asymCINTstd");
+    assert!((negative + expected).abs() < 1e-15);
+}
+
+#[test]
+fn standardised_asymptotic_continuous_intercept_refuses_non_event_clocks_and_does_not_keep_zero_q()
+{
+    assert_eq!(
+        recover_standardised_asymptotic_continuous_intercept(
+            0.4,
+            0.8,
+            -0.5,
+            LagClock::AssertionTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_continuous_intercept(
+            0.4,
+            0.8,
+            -0.5,
+            LagClock::KnowledgeCutoff
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_continuous_intercept(0.4, 0.0, -0.5, LagClock::EventTime),
+        Err(
+            PsychometricError::StandardisedAsymptoticContinuousInterceptRequiresPositiveStationaryVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_asymptotic_continuous_intercept(0.4, 0.8, 0.5, LagClock::EventTime),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    let zero =
+        recover_standardised_asymptotic_continuous_intercept(0.0, 0.8, -0.5, LagClock::EventTime)
+            .expect("zero CINT");
     assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
 }
