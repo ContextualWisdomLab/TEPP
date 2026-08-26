@@ -67,18 +67,19 @@ pub fn infer_temporal_relation_posterior(
         .collect::<Vec<_>>();
     let total_u32 = u32::try_from(relation_draws.len())
         .map_err(|_| TemporalRelationPosteriorError::DrawCountMismatch)?;
-    let probability = |relation| {
+    let probability = |relation| -> Result<f64, TemporalRelationPosteriorError> {
         let count = relation_draws
             .iter()
             .filter(|value| **value == relation)
             .count();
-        let count_u32 = u32::try_from(count).expect("count is bounded by converted draw length");
-        f64::from(count_u32) / f64::from(total_u32)
+        let count_u32 =
+            u32::try_from(count).map_err(|_| TemporalRelationPosteriorError::DrawCountMismatch)?;
+        Ok(f64::from(count_u32) / f64::from(total_u32))
     };
     Ok(TemporalRelationPosterior {
-        before_probability: probability(DrawTemporalRelation::Before),
-        simultaneous_probability: probability(DrawTemporalRelation::Simultaneous),
-        after_probability: probability(DrawTemporalRelation::After),
+        before_probability: probability(DrawTemporalRelation::Before)?,
+        simultaneous_probability: probability(DrawTemporalRelation::Simultaneous)?,
+        after_probability: probability(DrawTemporalRelation::After)?,
         relation_draws,
     })
 }
