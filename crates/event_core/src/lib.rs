@@ -17,6 +17,7 @@
 mod confidence;
 mod criterion_posterior;
 mod error;
+mod event_time_posterior;
 mod first_story;
 mod identifier;
 mod instance;
@@ -46,6 +47,14 @@ pub use criterion_posterior::IndependentCriterionCounts;
 pub use criterion_posterior::fit_independent_criterion_posterior;
 /// Fail-closed event-ontology errors.
 pub use error::EventError;
+/// Exact discrete event-time posterior atom.
+pub use event_time_posterior::EventTimePosteriorAtom;
+/// Complete canonical event-time posterior draws.
+pub use event_time_posterior::EventTimePosteriorDraws;
+/// Fail-closed event-time posterior errors.
+pub use event_time_posterior::EventTimePosteriorError;
+/// Materialize a producer-owned discrete event-time posterior exactly.
+pub use event_time_posterior::materialize_event_time_posterior;
 /// First-story versus follow-up detection label.
 pub use first_story::FirstStoryLabel;
 /// Threshold a first-story probability into a detection label.

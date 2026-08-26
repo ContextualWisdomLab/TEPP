@@ -89,6 +89,10 @@ Production Rust line and branch coverage are exactly 100%; public API rustdoc is
   for independently observed binary TDT link criteria. `analysis_engine`
   preserves exact pair identity and temporal draw arrays while fitting this
   Jeffreys posterior; it does not infer event dates from record order.
+- `event_core::materialize_event_time_posterior` converts identified integer
+  posterior mass over unique event-clock atoms into canonical complete draws.
+  It performs no date inference, probability repair, or nearest-date fallback;
+  atom/mass estimation remains an owning temporal-model responsibility.
 - Apple Silicon acceleration uses a macOS-native Rust-owned MLX Metal service.
   Compose calls it through authenticated Unix-socket or host-gateway transport;
   Colima/Linux never claims Metal execution. Rust owns all arithmetic;
