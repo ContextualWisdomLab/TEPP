@@ -199,6 +199,13 @@
 //! unstandardised `τ` is defined for a zero residual and is not
 //! that map; `θ / θ = 1` is `MANIFESTVARstd` and is not that map
 //! even when `τ = √θ`; JSS PDF re-opened 2026-08-25T11:32Z),
+//! recovers the Driver p. 16 `T0MEANSstd` as `μ_0 / √p_0` after
+//! strictly positive free `T0VAR` (footnote 4 uses only the
+//! relevant first-occasion variance, not process-dynamics
+//! `asymDIFFUSION`; unstandardised `μ_0` is defined for a zero
+//! first-occasion variance and is not that map; `p_0 / p_0 = 1`
+//! is `T0VARstd` and is not that map even when `μ_0 = √p_0`; JSS
+//! PDF re-opened 2026-08-26T04:09Z),
 //! recovers the Driver p. 16 `discreteCINTstd` as
 //! `A^{-1}[e^{A Δt} − I] κ / √p` after strictly positive
 //! `asymDIFFUSION` `p = −q / (2 a)` (footnote 4 uses only the
@@ -361,6 +368,8 @@ pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
 pub use event_time::recover_standardised_discrete_continuous_intercept;
+/// Exact scalar p. 16 `T0MEANSstd` `μ_0 / √p_0`.
+pub use event_time::recover_standardised_initial_latent_mean;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
@@ -559,6 +568,8 @@ pub use event_time::refuse_process_noise_as_unconditional_variance;
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating p. 16 `T0VARstd` as `T0MEANSstd`.
+pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -649,8 +660,12 @@ pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_sta
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
 pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating unstandardised `T0MEANS` as `T0MEANSstd`.
+pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
+/// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
+pub use event_time::refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.
