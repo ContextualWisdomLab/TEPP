@@ -1509,6 +1509,128 @@ pub fn refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean(
     Err(PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean)
 }
 
+/// Exact scalar p. 16 `T0MEANSstd` after strictly positive free
+/// `T0VAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; p. 16; footnote
+/// 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF re-opened
+/// 2026-08-26T04:09Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `T0MEANS` the latent process means at the first time point
+/// `T0`. Page 16 prints standardised matrices with the suffix
+/// `std` when appropriate. Footnote 4: standardisations use only
+/// the relevant variance, not the total. The first-occasion
+/// relevant variance is free `T0VAR` `p_0`, not within-subject
+/// `asymDIFFUSION` `-q / (2 a)`, because Table 2 is the first
+/// occasion, not the process dynamics. The 2017-era
+/// `summary.ctsemFit.R` forms unstandardised `T0MEANS` as
+/// `OpenMx::mxEval(T0MEANS, mxobj, compute=TRUE)`. That source
+/// does not form a `T0MEANSstd` matrix; the scalar map here is
+/// the footnote 4 standardisation of that named first-occasion
+/// mean: `μ_0 / √p_0`. Form strictly positive `p_0` first, then
+/// divide `μ_0` by `√p_0`. A zero mean is exactly zero.
+/// Unstandardised `T0MEANS` is defined for a zero first-occasion
+/// variance; standardised `T0MEANS` is not. Zero `p_0` has no
+/// positive SD and fails closed. `T0` is an event-time occasion,
+/// so a non-event clock fails closed. Free `T0MEANS` does not
+/// require stable `a < 0`. `T0VARstd` `p_0 / p_0 = 1` recovers
+/// the same number when `μ_0 = √p_0` and remains a distinct
+/// named quantity. `μ_0 / √asymDIFFUSION` uses process-dynamics
+/// variance and is not this first-occasion map. This is not a
+/// Kalman filter, not a matrix `expm`, not DSEM, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedInitialLatentMeanRequiresPositiveInitialLatentVariance`]
+/// when `T0VAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the mean is
+/// non-finite, the variance is non-finite or negative, or the
+/// mapped ratio overflows. Negative means remain valid signed
+/// locations.
+pub fn recover_standardised_initial_latent_mean(
+    initial_latent_mean: f64,
+    initial_latent_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !initial_latent_variance.is_finite() || initial_latent_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_latent_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedInitialLatentMeanRequiresPositiveInitialLatentVariance,
+        );
+    }
+    let mean = require_finite(initial_latent_mean)?;
+    if mean == 0.0 {
+        return Ok(0.0);
+    }
+    let process_sd = initial_latent_variance.sqrt();
+    require_finite(mean / process_sd)
+}
+
+/// Refuse treating unstandardised `T0MEANS` as p. 16
+/// `T0MEANSstd`.
+///
+/// Free `T0MEANS` `μ_0` is defined for a zero first-occasion
+/// variance. Footnote 4 `T0MEANSstd` requires strictly positive
+/// `p_0`. Equal numbers when `p_0 = 1` are still distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedInitialLatentMeanIsNotStandardisedInitialLatentMean`].
+pub fn refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean(
+    unstandardised_initial_mean: f64,
+    standardised_initial_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_initial_mean, standardised_initial_mean);
+    Err(PsychometricError::UnstandardisedInitialLatentMeanIsNotStandardisedInitialLatentMean)
+}
+
+/// Refuse treating p. 16 `T0VARstd` as p. 16 `T0MEANSstd`.
+///
+/// Both scalar maps equal 1 when `μ_0 = √p_0`. `T0VARstd` is
+/// the correlation form of free `T0VAR`. `T0MEANSstd` is the
+/// first-occasion mean. Equal numbers remain distinct named
+/// quantities. This crate does not currently export
+/// `T0VARstd`; the refuse still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedInitialLatentMean`].
+pub fn refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean(
+    standardised_initial_variance: f64,
+    standardised_initial_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_initial_variance, standardised_initial_mean);
+    Err(PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedInitialLatentMean)
+}
+
+/// Refuse treating `μ_0 / √asymDIFFUSION` as p. 16 `T0MEANSstd`.
+///
+/// Footnote 4 first-occasion standardisation uses free `T0VAR`,
+/// not process-dynamics `asymDIFFUSION`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean`].
+pub fn refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean(
+    within_subject_scaled_mean: f64,
+    standardised_initial_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (within_subject_scaled_mean, standardised_initial_mean);
+    Err(PsychometricError::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean)
+}
+
 /// Exact scalar discrete intercept increment from Driver Equation 3.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
@@ -6069,7 +6191,8 @@ mod tests {
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
         recover_standardised_asymptotic_continuous_intercept,
         recover_standardised_continuous_intercept,
-        recover_standardised_discrete_continuous_intercept, recover_standardised_manifest_mean,
+        recover_standardised_discrete_continuous_intercept,
+        recover_standardised_initial_latent_mean, recover_standardised_manifest_mean,
         recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
         recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
         recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -6157,6 +6280,7 @@ mod tests {
         refuse_process_noise_as_unconditional_variance,
         refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -6201,7 +6325,9 @@ mod tests {
         refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
+        refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
     };
     use crate::error::PsychometricError;
 
@@ -14717,7 +14843,9 @@ mod tests {
         assert!((observed_scaled - recovered).abs() > 1e-3);
         // T0MEANSstd μ_0/√p_0 recovers the same number when τ = μ_0
         // and θ = p_0 and remains a distinct named quantity.
-        let matching_t0 = mean / measurement_error.sqrt();
+        let matching_t0 =
+            recover_standardised_initial_latent_mean(mean, measurement_error, LagClock::EventTime)
+                .expect("T0MEANSstd matching numbers");
         assert!((matching_t0 - recovered).abs() < 1e-15);
         let zero = recover_standardised_manifest_mean(0.0, measurement_error, LagClock::EventTime)
             .expect("zero MANIFESTMEANS");
@@ -14857,6 +14985,101 @@ mod tests {
         assert_eq!(
             recover_standardised_manifest_mean(f64::MAX, 1e-4, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput),
+        );
+    }
+
+    #[test]
+    fn standardised_initial_latent_mean_recovers_driver_page_sixteen_after_positive_p0() {
+        // Driver et al. (2017, p. 16 T0MEANSstd; Table 2; footnote 4;
+        // 2017-era summary.ctsemFit.R T0MEANS): form strictly
+        // positive free T0VAR p_0, then μ_0 / √p_0. Relevant
+        // variance is p_0, not asymDIFFUSION.
+        let mean = 0.8_f64;
+        let initial_variance = 1.6_f64;
+        let recovered =
+            recover_standardised_initial_latent_mean(mean, initial_variance, LagClock::EventTime)
+                .expect("T0MEANSstd");
+        let expected = mean / initial_variance.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let larger_p0 = recover_standardised_initial_latent_mean(mean, 6.4, LagClock::EventTime)
+            .expect("T0MEANSstd p_0=6.4");
+        assert!((larger_p0 - recovered).abs() > 1e-3);
+        assert!(larger_p0.abs() < recovered.abs());
+        let unit = recover_standardised_initial_latent_mean(
+            initial_variance.sqrt(),
+            initial_variance,
+            LagClock::EventTime,
+        )
+        .expect("T0MEANSstd μ_0=√p_0");
+        // T0VARstd is p_0/p_0 = 1 after strictly positive p_0. Equal
+        // numbers when μ_0 = √p_0 remain distinct named quantities.
+        let variance_std = 1.0_f64;
+        assert!((unit - variance_std).abs() < 1e-15);
+        let within = recover_stationary_latent_variance(0.4, -0.25, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        let within_scaled = mean / within.sqrt();
+        assert!((within_scaled - recovered).abs() > 1e-3);
+        let zero =
+            recover_standardised_initial_latent_mean(0.0, initial_variance, LagClock::EventTime)
+                .expect("zero T0MEANS");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative =
+            recover_standardised_initial_latent_mean(-mean, initial_variance, LagClock::EventTime)
+                .expect("negative signed T0MEANSstd");
+        assert!((negative + expected).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean(
+                mean, recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedInitialLatentMeanIsNotStandardisedInitialLatentMean
+            )
+        );
+        assert_eq!(
+            refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean(
+                variance_std, unit
+            ),
+            Err(
+                PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedInitialLatentMean
+            )
+        );
+        assert_eq!(
+            refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean(
+                within_scaled, recovered
+            ),
+            Err(
+                PsychometricError::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean
+            )
+        );
+    }
+
+    #[test]
+    fn standardised_initial_latent_mean_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_initial_latent_mean(0.8, 0.0, LagClock::EventTime),
+            Err(
+                PsychometricError::StandardisedInitialLatentMeanRequiresPositiveInitialLatentVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_initial_latent_mean(0.8, 1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_initial_latent_mean(0.8, -1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_latent_mean(f64::NAN, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_latent_mean(0.8, f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_latent_mean(f64::MAX, 1e-4, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 

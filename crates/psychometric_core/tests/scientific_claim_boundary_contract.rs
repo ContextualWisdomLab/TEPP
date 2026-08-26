@@ -31,14 +31,14 @@ use psychometric_core::{
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_continuous_intercept, recover_standardised_discrete_continuous_intercept,
-    recover_standardised_manifest_mean, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_initial_latent_mean, recover_standardised_manifest_mean,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -115,6 +115,7 @@ use psychometric_core::{
     refuse_process_noise_as_unconditional_variance,
     refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+    refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
     refuse_standardised_manifest_variance_as_standardised_manifest_mean,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -158,7 +159,9 @@ use psychometric_core::{
     refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
+    refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
+    refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
 };
 
 #[test]
@@ -3143,6 +3146,79 @@ fn standardised_manifest_mean_is_not_unstandardised_or_total_observed_scale() {
     assert_eq!(
         recover_standardised_manifest_mean(mean, measurement_error, LagClock::DocumentTime),
         Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn standardised_initial_latent_mean_is_not_unstandardised_or_t0varstd() {
+    let mean = 0.8_f64;
+    let initial_variance = 1.6_f64;
+    let recovered =
+        recover_standardised_initial_latent_mean(mean, initial_variance, LagClock::EventTime)
+            .expect("T0MEANSstd");
+    let expected = mean / initial_variance.sqrt();
+    assert!(
+        (recovered - expected).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 / footnote 4): T0MEANSstd is μ_0 / √p_0"
+    );
+    assert!(
+        (recovered - mean).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): unstandardised T0MEANS is not T0MEANSstd"
+    );
+    let unit = recover_standardised_initial_latent_mean(
+        initial_variance.sqrt(),
+        initial_variance,
+        LagClock::EventTime,
+    )
+    .expect("T0MEANSstd μ_0=√p_0");
+    assert!(
+        (unit - 1.0).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): μ_0 / √p_0 equals 1 when μ_0 = √p_0"
+    );
+    let within =
+        recover_stationary_latent_variance(0.4, -0.25, LagClock::EventTime).expect("asymDIFFUSION");
+    let within_scaled = mean / within.sqrt();
+    assert!(
+        (within_scaled - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): μ_0 / √asymDIFFUSION is not T0MEANSstd"
+    );
+    let larger = recover_standardised_initial_latent_mean(mean, 6.4, LagClock::EventTime)
+        .expect("T0MEANSstd p_0=6.4");
+    assert!((larger - recovered).abs() > 1e-3);
+    let zero = recover_standardised_initial_latent_mean(0.0, initial_variance, LagClock::EventTime)
+        .expect("zero T0MEANS");
+    assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(
+        recover_standardised_initial_latent_mean(mean, 0.0, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedInitialLatentMeanRequiresPositiveInitialLatentVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_initial_latent_mean(mean, initial_variance, LagClock::DocumentTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean(
+            mean, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedInitialLatentMeanIsNotStandardisedInitialLatentMean
+        )
+    );
+    assert_eq!(
+        refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean(1.0, unit),
+        Err(
+            psychometric_core::PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedInitialLatentMean
+        )
+    );
+    assert_eq!(
+        refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean(
+            within_scaled, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::WithinSubjectScaledInitialLatentMeanIsNotStandardisedInitialLatentMean
+        )
     );
 }
 
