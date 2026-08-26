@@ -155,7 +155,7 @@ class WorkspaceContractTests(unittest.TestCase):
             "workspace edition",
             "workspace rust-version",
             "workspace license",
-            "forbid unsafe_code",
+            "deny unsafe_code",
             "deny missing_docs",
             "deny warnings",
             "package.name",

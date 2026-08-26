@@ -1,0 +1,27 @@
+[package]
+name = "mlx_native_receipt"
+description = "macOS-native MLX execution receipt probe for TEPP."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = false
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Use the C contract directly because mlx-rs 0.25.3 unconditionally enables
+# mlx-sys's default Metal feature even when its own default features are off.
+mlx-sys = { version = "=0.2.0", default-features = false, features = ["accelerate"] }
+
+[lints]
+workspace = true

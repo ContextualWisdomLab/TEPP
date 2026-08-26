@@ -1,5 +1,40 @@
 # Product and Technical Gap Baseline
 
+## 2026-08-26 Pair criterion and Project Journey posterior slice
+
+- Active branch publishes strict Rust artifacts for
+  `tepp.lineage_pair_criterion_posterior.v2` and
+  `tepp.project_journey_posterior.v1`.
+- The contracts preserve continuous criterion/event-time draws, distinct
+  record time, multiple predecessors, branches, transitions, exact ties,
+  TDT/CHRONOS provenance, unique anchor alignment, and method-derived CPU/MLX
+  parity receipts. They reject fixed starts, nearest-date substitution,
+  unsupported certainty, and consumer repair.
+- Remaining release gap: no protected-main scientific estimator with
+  CHRONOS event-time draw generation and real macOS-native MLX Metal parity
+  produces these artifacts yet. The Rust CPU independent binary TDT-link
+  criterion posterior now has deterministic synthetic parameter-recovery tests,
+  and Rust qualitative relation draws have exact-recovery tests, but those
+  bounded estimators are not evidence that calibrated Project Journey or
+  channel-weight results are available.
+- ADR 0025 is the normative Apple Silicon boundary: Rust-owned native MLX
+  Metal behind authenticated local transport, exact backend receipts, Linux
+  `rust_cpu`/`mlx_cpu`/`mlx_cuda`/`rust_opencl` portability, and fail-closed
+  parity. The native service and hardware E2E remain a release gap.
+- `mlx_native_receipt` provides a macOS-only, Rust-owned MLX CPU execution
+  probe. Its receipt proves only the stated matrix objective and cannot be
+  reused as an Event Lineage estimator or Metal receipt.
+- `event_core` now materializes producer-identified discrete event-time mass
+  into canonical complete draws and recovers synthetic mass exactly. Inferring
+  the event-time atoms/mass from admitted evidence and binding the estimator's
+  own MLX receipt remain open; record time and nearest-date substitution stay
+  prohibited.
+- `analysis_engine` now executes exhaustive actual `D \ {i}` fitter calls and
+  retains full/deleted seed-domain and corpus identities. The remaining gap is
+  the scientific temporal topic fitter plus unique anchor alignment, incident
+  relation/membership deletion, artifact assembly, and estimator-bound backend
+  parity; the runner alone does not publish case-deletion influence.
+
 ## 2026-08-25 Event Lineage anchor contract slice
 
 - Exact base: protected `main` `cf0e0ad74d23c5d2e0e33d389bb0bb4d37067c31`.

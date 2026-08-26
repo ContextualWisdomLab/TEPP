@@ -73,6 +73,40 @@ Documents and LLM outputs are untrusted data. Live model tests use `NVIDIA_NIM_A
 
 Production Rust line and branch coverage are exactly 100%; public API rustdoc is complete; format/build/Clippy/tests/rustdoc/supply-chain/security gates are warning-free/current-head. Releases additionally require validated migrations/rollback, SBOM/provenance, reproducible artifacts, current protected-head review/security, CHANGELOG/version consistency, operational recovery, and no unresolved scientific blocker.
 
+## 14. Event Lineage criterion and Project Journey posterior contracts
+
+- `tepp.lineage_pair_criterion_posterior.v2` binds exact pair identities,
+  continuous independent-criterion and event-time draws, run/snapshot/cutoff,
+  TDT/CHRONOS configuration, unique anchor alignment, and CPU/MLX receipts.
+- `tepp.project_journey_posterior.v1` is a posterior DAG with no fixed start or
+  total order. It preserves multiple predecessors, branches, transitions,
+  exact ties, relation uncertainty, evidence ids, and record/event clock
+  separation.
+- Both strict JSON contracts reject unknown fields, mixed cardinalities,
+  backward transition draws, missing evidence, ambiguous anchors, and
+  method-derived parity failure.
+- `event_core::fit_independent_criterion_posterior` is the Rust CPU reference
+  for independently observed binary TDT link criteria. `analysis_engine`
+  preserves exact pair identity and temporal draw arrays while fitting this
+  Jeffreys posterior; it does not infer event dates from record order.
+- `event_core::materialize_event_time_posterior` converts identified integer
+  posterior mass over unique event-clock atoms into canonical complete draws.
+  It performs no date inference, probability repair, or nearest-date fallback;
+  atom/mass estimation remains an owning temporal-model responsibility.
+- `analysis_engine::fit_exhaustive_case_deletion` runs the identical fitter on
+  the full admitted corpus and all actual one-document deletions, with distinct
+  seed domains and exact retained-set receipts. It is producer orchestration,
+  not a substitute likelihood; the topic case-deletion wire remains unavailable
+  until the scientific topic fitter and anchor/parity receipts are connected.
+- Apple Silicon acceleration uses a macOS-native Rust-owned MLX Metal service.
+  Compose calls it through authenticated Unix-socket or host-gateway transport;
+  Colima/Linux never claims Metal execution. Rust owns all arithmetic;
+  `rust_cpu` f64 is a tested portability reference/fallback. The independent
+  criterion CPU estimator is implemented; full temporal posterior production,
+  artifact assembly, and real MLX parity remain separate acceptance gates.
+  ADR 0025 normatively owns host authentication,
+  actual-backend receipts, parity, fallback, operability, tests, and rollback.
+
 ## References
 
 The full APA 7th register is [`docs/research/standards-and-literature.md`](research/standards-and-literature.md). Method claims in this TRD use:

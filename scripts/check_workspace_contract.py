@@ -71,6 +71,7 @@ EXPECTED_CRATES: tuple[str, ...] = (
     "topic_measurement",
     "psychometric_core",
     "orchestrator_live",
+    "mlx_native_receipt",
 )
 
 REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
@@ -141,8 +142,8 @@ def validate_workspace(root: Path) -> list[str]:
         errors.append("workspace rust-version must be 1.98.0")
     if package_defaults.get("license") != "Apache-2.0":
         errors.append("workspace license must be Apache-2.0")
-    if rust_lints.get("unsafe_code") != "forbid":
-        errors.append("workspace must forbid unsafe_code")
+    if rust_lints.get("unsafe_code") != "deny":
+        errors.append("workspace must deny unsafe_code")
     if rust_lints.get("missing_docs") != "deny":
         errors.append("workspace must deny missing_docs")
     if rust_lints.get("warnings") != "deny":

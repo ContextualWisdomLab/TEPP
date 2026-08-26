@@ -20,12 +20,14 @@ mod envelope;
 mod error;
 mod export;
 mod lineage_criterion_anchor;
+mod lineage_pair_criterion;
 mod lineageweave_http;
 mod live_http;
 mod naruon_http;
 mod naruon_live;
 mod orchestration;
 mod project_history;
+mod project_journey;
 mod provider_payload;
 mod temporal_context;
 mod wire;
@@ -109,6 +111,24 @@ pub use lineage_criterion_anchor::LINEAGE_CRITERION_OUTPUT_PROFILE;
 pub use lineage_criterion_anchor::LINEAGE_CRITERION_RESULT_SCHEMA;
 /// Versioned TEPP criterion-validity artifact for one Event Lineage weight run.
 pub use lineage_criterion_anchor::LineageCriterionAnchor;
+/// Default bounded posterior artifact size.
+pub use lineage_pair_criterion::DEFAULT_LINEAGE_PAIR_CRITERION_BYTE_LIMIT;
+/// Exact pair-criterion posterior schema consumed by fast-mlsirm.
+pub use lineage_pair_criterion::LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA;
+/// Independent anchor basis for pair-criterion interpretation.
+pub use lineage_pair_criterion::LineageAnchorBasis;
+/// CPU or GPU execution receipt.
+pub use lineage_pair_criterion::LineageComputeReceipt;
+/// Method-derived CPU/GPU parity receipts.
+pub use lineage_pair_criterion::LineageComputeReceipts;
+/// Posterior draw-generation provenance.
+pub use lineage_pair_criterion::LineageDrawProvenance;
+/// One pair's criterion and event-time posterior draws.
+pub use lineage_pair_criterion::LineagePairCriterionPosterior;
+/// Complete TEPP pair-criterion producer artifact.
+pub use lineage_pair_criterion::LineagePairCriterionPosteriorArtifact;
+/// TDT/CHRONOS temporal inference provenance.
+pub use lineage_pair_criterion::LineageTemporalProvenance;
 /// Published `LineageWeave` modular-consumer identity.
 pub use lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
 /// Published Naruon modular-consumer identity.
@@ -201,6 +221,16 @@ pub use project_history::ProjectHistoryProjection;
 pub use project_history::ProjectHistoryRequest;
 /// Build a cutoff-safe project-history projection.
 pub use project_history::project_history_projection;
+/// Maximum posterior Project Journey artifact size.
+pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
+/// Exact posterior Project Journey schema identity.
+pub use project_journey::PROJECT_JOURNEY_POSTERIOR_SCHEMA;
+/// One evidence-grounded journey event with event-time draws.
+pub use project_journey::ProjectJourneyEventPosterior;
+/// Complete posterior Project Journey graph.
+pub use project_journey::ProjectJourneyPosteriorArtifact;
+/// One posterior temporal dependency, branch, or transition.
+pub use project_journey::ProjectJourneyRelationPosterior;
 /// Elevated re-identification result.
 pub use provider_payload::DisclosedIdentityMapping;
 /// Separately protected identity mapping.

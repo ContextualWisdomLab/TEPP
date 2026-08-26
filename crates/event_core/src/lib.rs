@@ -15,7 +15,9 @@
 //! evidence-backed promotion gate.
 
 mod confidence;
+mod criterion_posterior;
 mod error;
+mod event_time_posterior;
 mod first_story;
 mod identifier;
 mod instance;
@@ -28,14 +30,31 @@ mod role;
 mod schema;
 mod segment;
 mod span_mention;
+mod temporal_relation_posterior;
 mod track;
 
 /// Finite confidence on the closed unit interval.
 pub use confidence::EventConfidence;
 /// Mean squared error of mention probabilities against binary truth.
 pub use confidence::mention_brier_score;
+/// Identified Jeffreys posterior for independent criterion observations.
+pub use criterion_posterior::CriterionPosterior;
+/// Fail-closed independent criterion posterior errors.
+pub use criterion_posterior::CriterionPosteriorError;
+/// Independent binary criterion observation counts.
+pub use criterion_posterior::IndependentCriterionCounts;
+/// Fit the paper-grounded independent criterion posterior on CPU f64.
+pub use criterion_posterior::fit_independent_criterion_posterior;
 /// Fail-closed event-ontology errors.
 pub use error::EventError;
+/// Exact discrete event-time posterior atom.
+pub use event_time_posterior::EventTimePosteriorAtom;
+/// Complete canonical event-time posterior draws.
+pub use event_time_posterior::EventTimePosteriorDraws;
+/// Fail-closed event-time posterior errors.
+pub use event_time_posterior::EventTimePosteriorError;
+/// Materialize a producer-owned discrete event-time posterior exactly.
+pub use event_time_posterior::materialize_event_time_posterior;
 /// First-story versus follow-up detection label.
 pub use first_story::FirstStoryLabel;
 /// Threshold a first-story probability into a detection label.
@@ -142,6 +161,14 @@ pub use span_mention::MentionReviewStatus;
 pub use span_mention::mention_span_precision;
 /// Recall of recovered mention extents against known truth.
 pub use span_mention::mention_span_recall;
+/// Posterior qualitative temporal relation for one common event-time draw.
+pub use temporal_relation_posterior::DrawTemporalRelation;
+/// Posterior relation frequencies derived without a date threshold.
+pub use temporal_relation_posterior::TemporalRelationPosterior;
+/// Fail-closed temporal relation posterior errors.
+pub use temporal_relation_posterior::TemporalRelationPosteriorError;
+/// Derive CHRONOS-compatible qualitative relation draws from common event-time draws.
+pub use temporal_relation_posterior::infer_temporal_relation_posterior;
 /// Assignment of one mention to one hypothesized TDT track.
 pub use track::EventTrackAssignment;
 /// Opaque TDT track identity.
