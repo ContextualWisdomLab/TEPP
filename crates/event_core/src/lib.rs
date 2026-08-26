@@ -15,8 +15,8 @@
 //! schema-slot predictions, and occurrence forecasts remain measurement or
 //! hypothesis artifacts and cannot promote an instance without that gate.
 
-mod confidence;
 mod composition;
+mod confidence;
 mod criterion_posterior;
 mod error;
 mod event_time_posterior;
@@ -35,22 +35,22 @@ mod span_mention;
 mod temporal_relation_posterior;
 mod track;
 
-/// Finite confidence on the closed unit interval.
-pub use confidence::EventConfidence;
-/// Mean squared error of mention probabilities against binary truth.
-pub use confidence::mention_brier_score;
+/// Wire schema version for the unified event-intelligence workflow.
+pub use composition::EVENT_INTELLIGENCE_WORKFLOW_VERSION;
 /// Versioned TDT/CHRONOS composition over admitted artifacts.
 pub use composition::EventIntelligenceComposition;
 /// Named thresholds and version for one reproducible intelligence run.
 pub use composition::EventIntelligenceWorkflowConfig;
-/// Wire schema version for the unified event-intelligence workflow.
-pub use composition::EVENT_INTELLIGENCE_WORKFLOW_VERSION;
 /// Admit already-extracted TDT/CHRONOS artifacts into one versioned workflow.
 pub use composition::compose_event_intelligence;
 /// Explicit refusal to treat a composition as an event instance.
 pub use composition::refuse_composition_as_instance;
 /// Explicit refusal to treat a composition as a state transition.
 pub use composition::refuse_composition_as_transition;
+/// Finite confidence on the closed unit interval.
+pub use confidence::EventConfidence;
+/// Mean squared error of mention probabilities against binary truth.
+pub use confidence::mention_brier_score;
 /// Identified Jeffreys posterior for independent criterion observations.
 pub use criterion_posterior::CriterionPosterior;
 /// Fail-closed independent criterion posterior errors.
