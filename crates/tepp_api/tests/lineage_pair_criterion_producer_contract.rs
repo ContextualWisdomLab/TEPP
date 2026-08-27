@@ -246,3 +246,201 @@ fn journey_refuses_backward_transition_and_fixed_start_status() {
     });
     assert_eq!(cyclic.to_json(), Err(ApiError::InvalidWirePayload));
 }
+
+#[test]
+fn pair_posterior_accepts_linux_accelerator_backends_and_rejects_unknown() {
+    for backend in ["mlx_cpu", "mlx_cuda", "rust_opencl"] {
+        let mut artifact = pair_artifact();
+        artifact.compute_receipts.gpu.backend_code = backend.into();
+        artifact.compute_receipts.gpu.execution_environment_code = "linux_container".into();
+        artifact
+            .to_json()
+            .unwrap_or_else(|_| panic!("{backend} on linux_container must be admitted"));
+    }
+
+    let mut unknown = pair_artifact();
+    unknown.compute_receipts.gpu.backend_code = "unknown_backend".into();
+    assert_eq!(unknown.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut forged_cpu = pair_artifact();
+    forged_cpu.compute_receipts.gpu.backend_code = "mlx_cpu".into();
+    forged_cpu.compute_receipts.gpu.execution_environment_code = "macos_native".into();
+    assert_eq!(forged_cpu.to_json(), Err(ApiError::InvalidWirePayload));
+}
+
+#[test]
+fn journey_accepts_every_evidence_grounded_event_type() {
+    const EVENT_TYPES: &[&str] = &[
+        "prior_project",
+        "customer_request",
+        "procurement_notice",
+        "direct_bid",
+        "negotiated_bid",
+        "external_sensing",
+        "internal_discussion",
+        "lead",
+        "design",
+        "production",
+        "delivery",
+        "trial_operation",
+        "operation",
+        "claim",
+        "rebid",
+        "other_evidence_grounded_event",
+    ];
+    for event_type in EVENT_TYPES {
+        let mut artifact = journey();
+        artifact.events[0].event_type_code = (*event_type).into();
+        artifact
+            .to_json()
+            .unwrap_or_else(|_| panic!("{event_type} must remain an admitted journey event"));
+    }
+}
+
+#[test]
+fn journey_rejects_duplicate_event_and_relation_identities() {
+    let mut duplicate_event = journey();
+    duplicate_event.events[1].event_id = duplicate_event.events[0].event_id.clone();
+    assert_eq!(duplicate_event.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut duplicate_relation = journey();
+    duplicate_relation.relations[1].relation_id =
+        duplicate_relation.relations[0].relation_id.clone();
+    assert_eq!(
+        duplicate_relation.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn pair_posterior_rejects_each_contract_violation() {
+    let reject = |mutate: fn(&mut LineagePairCriterionPosteriorArtifact)| {
+        let mut artifact = pair_artifact();
+        mutate(&mut artifact);
+        assert_eq!(artifact.to_json(), Err(ApiError::InvalidWirePayload));
+    };
+
+    reject(|artifact| artifact.schema_version = "tepp.invalid".into());
+    reject(|artifact| artifact.estimation_run_id = "not-a-uuid".into());
+    reject(|artifact| artifact.tepp_run_id = "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b1".to_uppercase());
+    reject(|artifact| artifact.source_snapshot_sha256 = "D".repeat(64));
+    reject(|artifact| artifact.knowledge_cutoff = "not-a-timestamp".into());
+    reject(|artifact| artifact.channel_codes.clear());
+    reject(|artifact| artifact.channel_codes.push("temporal".into()));
+    reject(|artifact| artifact.channel_codes[0] = " temporal".into());
+    reject(|artifact| artifact.draw_provenance.draw_count = 1);
+    reject(|artifact| artifact.draw_provenance.seed_domain.clear());
+    reject(|artifact| artifact.draw_provenance.seed_domain = "x".repeat(257));
+    reject(|artifact| {
+        artifact.admitted_pair_ids = vec!["018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b9".into()];
+    });
+    reject(|artifact| artifact.anchor_basis.alignment_status = "ambiguous".into());
+    reject(|artifact| artifact.anchor_basis.basis_id = "not-a-uuid".into());
+    reject(|artifact| artifact.anchor_basis.basis_sha256.push('g'));
+    reject(|artifact| artifact.temporal_provenance.method_code = "LEXICAL".into());
+    reject(|artifact| artifact.temporal_provenance.configuration_sha256 = "0".repeat(63));
+    reject(|artifact| artifact.temporal_provenance.event_clock_code = " clock ".into());
+    reject(|artifact| artifact.temporal_provenance.temporal_dependency_sha256 = "G".repeat(64));
+    reject(|artifact| {
+        artifact
+            .temporal_provenance
+            .branch_transition_sha256
+            .clear()
+    });
+    reject(|artifact| artifact.compute_receipts.cpu.backend_code.clear());
+    reject(|artifact| artifact.compute_receipts.cpu.execution_environment_code = " env".into());
+    reject(|artifact| artifact.compute_receipts.cpu.objective_sha256 = "1".repeat(63));
+    reject(|artifact| artifact.compute_receipts.cpu.parameter_sha256 = "h".repeat(64));
+    reject(|artifact| artifact.compute_receipts.cpu.draw_sha256 = "A".repeat(64));
+    reject(|artifact| artifact.compute_receipts.gpu.observed_maximum_difference = f64::NAN);
+    reject(|artifact| artifact.compute_receipts.gpu.observed_maximum_difference = -1.0);
+    reject(|artifact| artifact.compute_receipts.cpu.backend_code = "openblas".into());
+    reject(|artifact| artifact.compute_receipts.gpu.objective_sha256 = digest('9'));
+    reject(|artifact| artifact.compute_receipts.parity_method_code.clear());
+    reject(|artifact| artifact.compute_receipts.parity_bound = f64::NAN);
+    reject(|artifact| artifact.compute_receipts.parity_bound = 0.0);
+    reject(|artifact| artifact.compute_receipts.cpu.observed_maximum_difference = 1.0e-12);
+    reject(|artifact| artifact.pair_posteriors[0].pair_id = "not-a-uuid".into());
+    reject(|artifact| artifact.pair_posteriors[0].predecessor_record_id.clear());
+    reject(|artifact| artifact.pair_posteriors[0].successor_record_id = " successor".into());
+    reject(|artifact| {
+        artifact.pair_posteriors[0].successor_record_id =
+            artifact.pair_posteriors[0].predecessor_record_id.clone();
+    });
+    reject(|artifact| {
+        artifact.pair_posteriors[0].predecessor_record_created_at = "nope".into();
+    });
+    reject(|artifact| artifact.pair_posteriors[0].successor_record_created_at = "nope".into());
+    reject(|artifact| artifact.pair_posteriors[0].predecessor_available_at = "nope".into());
+    reject(|artifact| artifact.pair_posteriors[0].successor_available_at = "nope".into());
+    reject(|artifact| {
+        artifact.pair_posteriors[0].successor_available_at = "2026-08-26T00:00:00Z".into();
+    });
+    reject(|artifact| {
+        artifact.pair_posteriors[0]
+            .predecessor_event_time_draws
+            .pop()
+    });
+    reject(|artifact| artifact.pair_posteriors[0].successor_event_time_draws.pop());
+    reject(|artifact| artifact.pair_posteriors[0].criterion_draws.pop());
+    reject(|artifact| artifact.pair_posteriors[0].criterion_draws[0] = f64::NAN);
+    reject(|artifact| artifact.pair_posteriors[0].criterion_draws[1] = 1.25);
+    reject(|artifact| {
+        artifact.pair_posteriors[0].predecessor_event_time_draws[1] = "not-a-time".into();
+    });
+
+    let mut numeric = pair_artifact();
+    numeric.source_snapshot_sha256 = digest('1');
+    numeric.anchor_basis.basis_sha256 = digest('2');
+    numeric.temporal_provenance.configuration_sha256 = digest('3');
+    numeric.temporal_provenance.temporal_dependency_sha256 = digest('4');
+    numeric.temporal_provenance.branch_transition_sha256 = digest('5');
+    numeric.compute_receipts.cpu.objective_sha256 = digest('6');
+    numeric.compute_receipts.gpu.objective_sha256 = digest('6');
+    numeric.compute_receipts.cpu.parameter_sha256 = digest('7');
+    numeric.compute_receipts.gpu.parameter_sha256 = digest('8');
+    numeric.compute_receipts.cpu.draw_sha256 = digest('9');
+    numeric.compute_receipts.gpu.draw_sha256 = digest('0');
+    numeric
+        .to_json()
+        .expect("digit digests must remain valid lowercase hex");
+}
+
+#[test]
+fn journey_rejects_each_contract_violation() {
+    let reject = |mutate: fn(&mut ProjectJourneyPosteriorArtifact)| {
+        let mut artifact = journey();
+        mutate(&mut artifact);
+        assert_eq!(artifact.to_json(), Err(ApiError::InvalidWirePayload));
+    };
+
+    reject(|artifact| artifact.schema_version = "tepp.invalid".into());
+    reject(|artifact| artifact.tepp_run_id.clear());
+    reject(|artifact| artifact.source_snapshot_sha256 = "A".repeat(64));
+    reject(|artifact| artifact.knowledge_cutoff = "not-a-timestamp".into());
+    reject(|artifact| artifact.draw_count = 1);
+    reject(|artifact| artifact.events.clear());
+    reject(|artifact| artifact.events[0].event_id.clear());
+    reject(|artifact| artifact.events[0].event_type_code = "unlisted_event".into());
+    reject(|artifact| artifact.events[0].record_created_at = "nope".into());
+    reject(|artifact| artifact.events[0].event_time_draws.pop());
+    reject(|artifact| artifact.events[0].event_time_draws[0] = "nope".into());
+    reject(|artifact| artifact.events[0].evidence_record_ids.clear());
+    reject(|artifact| artifact.events[0].evidence_record_ids[0] = " ".into());
+    reject(|artifact| artifact.relations[0].relation_id.clear());
+    reject(|artifact| artifact.relations[0].predecessor_event_id = "missing".into());
+    reject(|artifact| artifact.relations[0].successor_event_id = "missing".into());
+    reject(|artifact| {
+        artifact.relations[0].successor_event_id =
+            artifact.relations[0].predecessor_event_id.clone();
+    });
+    reject(|artifact| artifact.relations[0].relation_type_code.clear());
+    reject(|artifact| artifact.relations[0].relation_draws.pop());
+    reject(|artifact| artifact.relations[0].evidence_record_ids.clear());
+
+    let mut numeric = journey();
+    numeric.source_snapshot_sha256 = digest('3');
+    numeric
+        .to_json()
+        .expect("digit snapshot digest must remain valid");
+}
