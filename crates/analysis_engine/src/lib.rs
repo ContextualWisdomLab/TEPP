@@ -337,8 +337,7 @@ pub fn execute_analysis_run(
     // future bound change cannot wrap membership totals silently.
     let eligible_evidence_count = eligible.len() as u64;
     let eligible_membership_count = eligible.iter().try_fold(0_u64, |sum, unit| {
-        sum.checked_add(u64::from(unit.membership_count))
-            .ok_or(AnalysisEngineError::ArithmeticOverflow)
+        add_membership_count(sum, unit.membership_count)
     })?;
     let (earliest, latest) = eligible.iter().fold(
         (eligible[0].event_time, eligible[0].event_time),
@@ -379,6 +378,11 @@ pub fn execute_analysis_run(
     })
 }
 
+fn add_membership_count(sum: u64, membership_count: u32) -> Result<u64, AnalysisEngineError> {
+    sum.checked_add(u64::from(membership_count))
+        .ok_or(AnalysisEngineError::ArithmeticOverflow)
+}
+
 /// Require the accepted receipt to carry the request's idempotency identity.
 fn require_receipt_identity(
     request: &AnalysisRunRequest,
@@ -409,7 +413,7 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, TopicMeasurementError, execute_analysis_run,
+        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -683,6 +687,13 @@ mod tests {
         }
         let converted: AnalysisEngineError = ApiError::InvalidWirePayload.into();
         assert_eq!(converted.to_string(), "invalid API wire payload");
+        let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
+        assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        assert_eq!(
+            add_membership_count(u64::MAX, 1),
+            Err(AnalysisEngineError::ArithmeticOverflow)
+        );
+        assert_eq!(add_membership_count(0, 4), Ok(4));
     }
 
     #[test]

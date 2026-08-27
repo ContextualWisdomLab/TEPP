@@ -89,6 +89,28 @@ pub fn fit_independent_criterion_posterior(
     })
 }
 
+fn finite_or_numerical_failure(value: f64) -> Result<f64, CriterionPosteriorError> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(CriterionPosteriorError::NumericalFailure)
+    }
+}
+
+#[cfg(test)]
+fn unit_interval_or_numerical_failure(value: f64) -> Result<f64, CriterionPosteriorError> {
+    if value.is_finite() && (0.0..=1.0).contains(&value) {
+        Ok(value)
+    } else {
+        Err(CriterionPosteriorError::NumericalFailure)
+    }
+}
+
+fn lift_continued_fraction_term(value: f64) -> f64 {
+    const TINY: f64 = 1.0e-300;
+    if value.abs() < TINY { TINY } else { value }
+}
+
 fn beta_quantile(probability: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosteriorError> {
     let mut lower = 0.0_f64;
     let mut upper = 1.0_f64;
@@ -115,6 +137,11 @@ fn regularized_beta(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPoste
     if x >= 1.0 {
         return Ok(1.0);
     }
+    // NIST DLMF 8.17.4: I_x(1,1) = x (uniform CDF). Use the closed form so the
+    // continued-fraction path cannot lose the exact identity in last-bit noise.
+    if alpha.to_bits() == 1.0_f64.to_bits() && beta.to_bits() == 1.0_f64.to_bits() {
+        return finite_or_numerical_failure(x);
+    }
     let log_scale = log_gamma(alpha + beta) - log_gamma(alpha) - log_gamma(beta)
         + alpha * x.ln()
         + beta * (-x).ln_1p();
@@ -127,24 +154,17 @@ fn regularized_beta(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPoste
     } else {
         1.0 - scale * beta_fraction(1.0 - x, beta, alpha)? / beta
     };
-    if value.is_finite() {
-        Ok(value.clamp(0.0, 1.0))
-    } else {
-        Err(CriterionPosteriorError::NumericalFailure)
-    }
+    Ok(finite_or_numerical_failure(value)?.clamp(0.0, 1.0))
 }
 
 fn beta_fraction(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosteriorError> {
-    const TINY: f64 = 1.0e-300;
     const EPSILON: f64 = 8.0 * f64::EPSILON;
     let qab = alpha + beta;
     let qap = alpha + 1.0;
     let qam = alpha - 1.0;
     let mut c = 1.0;
     let mut d = 1.0 - qab * x / qap;
-    if d.abs() < TINY {
-        d = TINY;
-    }
+    d = lift_continued_fraction_term(d);
     d = 1.0 / d;
     let mut result = d;
     for iteration in 1..=512 {
@@ -152,24 +172,16 @@ fn beta_fraction(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosterio
         let twice = 2.0 * m;
         let mut coefficient = m * (beta - m) * x / ((qam + twice) * (alpha + twice));
         d = 1.0 + coefficient * d;
-        if d.abs() < TINY {
-            d = TINY;
-        }
+        d = lift_continued_fraction_term(d);
         c = 1.0 + coefficient / c;
-        if c.abs() < TINY {
-            c = TINY;
-        }
+        c = lift_continued_fraction_term(c);
         d = 1.0 / d;
         result *= d * c;
         coefficient = -(alpha + m) * (qab + m) * x / ((alpha + twice) * (qap + twice));
         d = 1.0 + coefficient * d;
-        if d.abs() < TINY {
-            d = TINY;
-        }
+        d = lift_continued_fraction_term(d);
         c = 1.0 + coefficient / c;
-        if c.abs() < TINY {
-            c = TINY;
-        }
+        c = lift_continued_fraction_term(c);
         d = 1.0 / d;
         let delta = d * c;
         result *= delta;
@@ -208,7 +220,10 @@ fn log_gamma(value: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        CriterionPosteriorError, beta_fraction, beta_quantile, log_gamma, regularized_beta,
+        CriterionPosteriorError, IndependentCriterionCounts, beta_fraction, beta_quantile,
+        finite_or_numerical_failure, fit_independent_criterion_posterior,
+        lift_continued_fraction_term, log_gamma, regularized_beta,
+        unit_interval_or_numerical_failure,
     };
 
     #[test]
@@ -236,6 +251,104 @@ mod tests {
             Err(CriterionPosteriorError::NumericalFailure)
         );
         assert!(log_gamma(0.25).is_finite());
+        assert_eq!(
+            regularized_beta(0.5, 1.0e308, 1.0e308),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        let _ = beta_fraction(1.0, 1.0, 1.0);
+        assert_eq!(unit_interval_or_numerical_failure(0.25), Ok(0.25));
+        assert_eq!(
+            unit_interval_or_numerical_failure(f64::INFINITY),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        assert_eq!(
+            unit_interval_or_numerical_failure(-0.25),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        assert_eq!(finite_or_numerical_failure(1.5), Ok(1.5));
+        assert_eq!(
+            finite_or_numerical_failure(f64::NAN),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        assert_eq!(
+            lift_continued_fraction_term(0.0).to_bits(),
+            1.0e-300f64.to_bits()
+        );
+        assert_eq!(
+            lift_continued_fraction_term(2.0).to_bits(),
+            2.0f64.to_bits()
+        );
+        assert_eq!(
+            lift_continued_fraction_term(-2.0).to_bits(),
+            (-2.0f64).to_bits()
+        );
+        assert_eq!(regularized_beta(0.75, 1.0, 1.0), Ok(0.75));
+        // NIST DLMF 8.17.5: I_x(1,b)=1-(1-x)^b and I_x(a,1)=x^a. These
+        // take the continued-fraction path (alpha=1,beta!=1 and vice versa).
+        let ix_one_two = regularized_beta(0.75, 1.0, 2.0).expect("I_x(1,2)");
+        let ix_two_one = regularized_beta(0.75, 2.0, 1.0).expect("I_x(2,1)");
+        assert!((ix_one_two - 0.9375).abs() < 8.0 * f64::EPSILON);
+        assert!((ix_two_one - 0.5625).abs() < 8.0 * f64::EPSILON);
+    }
+
+    #[test]
+    fn overflow_draw_count_fails_closed_before_allocation() {
+        assert_eq!(
+            fit_independent_criterion_posterior(
+                IndependentCriterionCounts {
+                    successes: 1,
+                    trials: 2,
+                },
+                (u32::MAX as usize).saturating_add(1),
+            ),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        assert_eq!(
+            fit_independent_criterion_posterior(
+                IndependentCriterionCounts {
+                    successes: 1,
+                    trials: 0,
+                },
+                8,
+            ),
+            Err(CriterionPosteriorError::EmptyObservations)
+        );
+        assert_eq!(
+            fit_independent_criterion_posterior(
+                IndependentCriterionCounts {
+                    successes: 3,
+                    trials: 2,
+                },
+                8,
+            ),
+            Err(CriterionPosteriorError::SuccessesExceedTrials)
+        );
+        assert_eq!(
+            fit_independent_criterion_posterior(
+                IndependentCriterionCounts {
+                    successes: 1,
+                    trials: 2,
+                },
+                1,
+            ),
+            Err(CriterionPosteriorError::InsufficientDraws)
+        );
+        let posterior = fit_independent_criterion_posterior(
+            IndependentCriterionCounts {
+                successes: 3,
+                trials: 4,
+            },
+            8,
+        )
+        .expect("identified Jeffreys posterior");
+        assert!((posterior.mean - (3.5 / 5.0)).abs() < 1e-12);
+        assert_eq!(posterior.plausible_values.len(), 8);
+        assert!(
+            posterior
+                .plausible_values
+                .windows(2)
+                .all(|pair| pair[0] <= pair[1])
+        );
     }
 
     #[test]

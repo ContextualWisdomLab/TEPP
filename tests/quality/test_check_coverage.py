@@ -221,6 +221,85 @@ class CoverageContractTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "incomplete: 1/2"):
                 coverage_contract.validate_report(uncovered_false, ["branches"])
 
+
+    def test_live_sqlx_transport_branches_do_not_reenter_unique_fold(self) -> None:
+        """sqlx_live.rs arms stay outside the unique-site branch contract.
+
+        cargo llvm-cov already ignores that filename, but the JSON file
+        arrays can still carry its live-server success-path arms. The fold
+        must drop them so the gate matches the documented transport ignore.
+        """
+
+        self.assertTrue(
+            coverage_contract.is_live_sqlx_transport_source(
+                "/home/runner/work/TEPP/TEPP/crates/persistence_postgres/src/sqlx_live.rs"
+            )
+        )
+        self.assertTrue(coverage_contract.is_live_sqlx_transport_source("sqlx_live.rs"))
+        self.assertFalse(
+            coverage_contract.is_live_sqlx_transport_source(
+                "crates/event_core/src/criterion_posterior.rs"
+            )
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            mixed = self.write_report(
+                temporary,
+                {
+                    "data": [
+                        {
+                            "totals": {
+                                "lines": {"count": 1, "covered": 1},
+                                "branches": {"count": 8, "covered": 2},
+                            },
+                            "files": [
+                                {
+                                    "filename": (
+                                        "crates/persistence_postgres/src/sqlx_live.rs"
+                                    ),
+                                    "branches": [
+                                        [25, 1, 25, 8, 0, 0, 0, 0, 4],
+                                        [88, 1, 88, 8, 1, 0, 0, 0, 4],
+                                    ],
+                                },
+                                {
+                                    "filename": "crates/event_core/src/criterion_posterior.rs",
+                                    "branches": [[108, 1, 108, 8, 2, 3, 0, 0, 4]],
+                                },
+                            ],
+                        }
+                    ]
+                },
+            )
+            self.assertEqual(
+                coverage_contract.validate_report(mixed, ["branches"]),
+                ["branches coverage: PASS (2/2, 100%)"],
+            )
+
+            only_live = self.write_report(
+                temporary,
+                {
+                    "data": [
+                        {
+                            "totals": {
+                                "lines": {"count": 1, "covered": 1},
+                                "branches": {"count": 2, "covered": 2},
+                            },
+                            "files": [
+                                {
+                                    "filename": "sqlx_live.rs",
+                                    "branches": [[25, 1, 25, 8, 0, 0, 0, 0, 4]],
+                                }
+                            ],
+                        }
+                    ]
+                },
+            )
+            self.assertEqual(
+                coverage_contract.validate_report(only_live, ["branches"]),
+                ["branches coverage: PASS (2/2, 100%)"],
+            )
+
     def test_malformed_unique_branch_records_fail_closed(self) -> None:
         """Absent filenames, short tuples, and non-integer counts are rejected."""
 

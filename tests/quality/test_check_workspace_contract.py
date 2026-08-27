@@ -167,7 +167,7 @@ class WorkspaceContractTests(unittest.TestCase):
             "missing_docs is not explicitly denied",
             "placeholder production APIs",
             "package identity contract test",
-            "temporal_core/Cargo.toml is missing",
+            "crates/temporal_core/Cargo.toml is missing",
         )
         for fragment in expected_fragments:
             self.assertTrue(
