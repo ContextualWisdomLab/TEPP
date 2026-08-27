@@ -1,11 +1,11 @@
 //! Fail-closed TDT/CHRONOS composition paths stay refuse-first.
 
 use event_core::{
-    compose_event_intelligence, decide_event_link, decide_first_story, decide_schema_slot,
-    decide_story_boundary, decide_track_continue, EventConfidence, EventError,
+    EVENT_INTELLIGENCE_WORKFLOW_VERSION, EventConfidence, EventError,
     EventIntelligenceWorkflowConfig, EventLinkPair, EventMention, EventTrackAssignment,
     EventTrackId, FirstStoryLabel, MentionEvidenceClocks, MentionReviewStatus, StorySegmentation,
-    EVENT_INTELLIGENCE_WORKFLOW_VERSION,
+    compose_event_intelligence, decide_event_link, decide_first_story, decide_schema_slot,
+    decide_story_boundary, decide_track_continue,
 };
 use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
 use temporal_core::{
