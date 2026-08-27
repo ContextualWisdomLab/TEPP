@@ -279,6 +279,8 @@ mod branch_coverage_tests {
         assert!(!identifier(" padded "));
         assert!(!digest(&"Z".repeat(64)));
         assert!(!digest(&"a".repeat(63)));
+        assert!(digest(&"0".repeat(64)));
+        assert!(digest(&"0123456789abcdef".repeat(4)));
         assert!(parse_time("2026-08-25T00:00:00Z").is_some());
         assert!(parse_time("not-a-time").is_none());
     }

@@ -314,7 +314,8 @@ fn valid_pair(pair: &LineagePairCriterionPosterior, draws: usize, cutoff: Timest
 mod branch_coverage_tests {
     use super::{
         LineageAnchorBasis, LineageComputeReceipt, LineageComputeReceipts,
-        LineageDrawProvenance, LineagePairCriterionPosterior, LineagePairCriterionPosteriorArtifact,
+        LineageDrawProvenance, LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA,
+        LineagePairCriterionPosterior, LineagePairCriterionPosteriorArtifact,
         LineageTemporalProvenance, ApiError, digest, identifier, valid_accelerator_backend,
         valid_pair, valid_receipt, valid_receipts, valid_temporal_provenance,
     };
@@ -366,7 +367,7 @@ mod branch_coverage_tests {
 
     fn artifact() -> LineagePairCriterionPosteriorArtifact {
         LineagePairCriterionPosteriorArtifact {
-            schema_version: "tepp.lineage_pair_criterion_posterior.v1".into(),
+            schema_version: LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA.into(),
             estimation_run_id: "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b1".into(),
             tepp_run_id: "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b2".into(),
             source_snapshot_sha256: "d".repeat(64),
@@ -555,6 +556,10 @@ mod branch_coverage_tests {
         unparsed_available.predecessor_available_at = "not-a-time".into();
         assert!(!valid_pair(&unparsed_available, 2, cutoff));
 
+        let mut unparsed_successor_available = posterior();
+        unparsed_successor_available.successor_available_at = "not-a-time".into();
+        assert!(!valid_pair(&unparsed_successor_available, 2, cutoff));
+
         let mut short_draws = posterior();
         short_draws.successor_event_time_draws.pop();
         assert!(!valid_pair(&short_draws, 2, cutoff));
@@ -603,6 +608,10 @@ mod branch_coverage_tests {
         let mut dirty_clock = artifact();
         dirty_clock.temporal_provenance.event_clock_code = "  clock  ".into();
         assert_eq!(dirty_clock.to_json(), Err(ApiError::InvalidWirePayload));
+
+        let mut nonunique_alignment = artifact();
+        nonunique_alignment.anchor_basis.alignment_status = "stale".into();
+        assert_eq!(nonunique_alignment.to_json(), Err(ApiError::InvalidWirePayload));
 
         let mut unknown_backend = artifact();
         unknown_backend.compute_receipts.gpu.backend_code = "tp_mixture_mlx".into();
