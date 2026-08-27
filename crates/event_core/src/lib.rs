@@ -14,6 +14,9 @@
 //! evidence-backed gate. Track assignments, story segmentations, CHRONOS
 //! schema-slot predictions, and occurrence forecasts remain measurement or
 //! hypothesis artifacts and cannot promote an instance without that gate.
+//! Bounded Allen/CHRONOS interval consistency
+//! ([`IntervalConsistencyNetwork`]) derives implications and rejects
+//! contradictions without claiming unrestricted global satisfiability.
 
 mod composition;
 mod confidence;
@@ -24,6 +27,7 @@ mod first_story;
 mod identifier;
 mod instance;
 mod intelligence;
+mod interval_consistency;
 mod link;
 mod mention;
 mod prediction;
@@ -47,6 +51,14 @@ pub use composition::compose_event_intelligence;
 pub use composition::refuse_composition_as_instance;
 /// Explicit refusal to treat a composition as a state transition.
 pub use composition::refuse_composition_as_transition;
+/// Bounded CHRONOS-style interval-consistency network for event intelligence.
+pub use interval_consistency::IntervalConsistencyNetwork;
+/// Summary of one successful bounded interval-consistency closure.
+pub use interval_consistency::IntervalConsistencyReport;
+/// Explicit refusal to treat bounded path consistency as unrestricted SAT.
+pub use interval_consistency::refuse_interval_consistency_as_unrestricted_satisfiability;
+/// Explicit refusal to promote an interval contradiction into an instance.
+pub use interval_consistency::refuse_interval_contradiction_as_instance;
 /// Finite confidence on the closed unit interval.
 pub use confidence::EventConfidence;
 /// Mean squared error of mention probabilities against binary truth.
