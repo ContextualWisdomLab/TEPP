@@ -36,16 +36,17 @@ use psychometric_core::{
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
-    recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
-    recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_manifest_trait_variance, recover_standardised_trait_variance,
-    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
-    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
-    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
-    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
-    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_standardised_discrete_continuous_intercept, recover_standardised_discrete_drift,
+    recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
+    recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
+    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
+    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
+    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
+    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
+    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -156,9 +157,12 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_trait_plus_state_autocorrelation_as_standardised_discrete_drift,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
-    refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
+    refuse_trait_variance_as_process_noise, refuse_trait_variance_as_standardisation_variance,
+    refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
+    refuse_unstandardised_discrete_drift_as_standardised_discrete_drift,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
 };
@@ -6247,7 +6251,86 @@ fn standardised_manifest_trait_variance_refuses_non_event_clocks_and_does_not_ke
 }
 
 #[test]
+fn standardised_discrete_drift_recovers_driver_page_sixteen_footnote_four() {
+    let diffusion = 0.4_f64;
+    let log_rate = -0.5_f64;
+    let event_delta = 1.0_f64;
+    let recovered =
+        recover_standardised_discrete_drift(diffusion, log_rate, event_delta, LagClock::EventTime)
+            .expect("discreteDRIFTstd");
+    let unstandardised =
+        recover_discrete_lag_from_log_rate(log_rate, event_delta, LagClock::EventTime)
+            .expect("discreteDRIFT");
+    let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    assert!(within > 0.0);
+    assert!((recovered - (log_rate * event_delta).exp()).abs() < 1e-15);
+    assert!((recovered - unstandardised).abs() < 1e-15);
+    let two_and_a_half =
+        recover_standardised_discrete_drift(diffusion, log_rate, 2.5, LagClock::EventTime)
+            .expect("discreteDRIFTstd Δt=2.5");
+    assert!((two_and_a_half - (log_rate * 2.5).exp()).abs() < 1e-15);
+    let trait_variance = 1.0_f64;
+    let lagged = recover_trait_plus_state_lagged_covariance(
+        trait_variance,
+        within,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("trait+state lag");
+    let total =
+        recover_trait_plus_state_latent_variance(trait_variance, within).expect("trait+state var");
+    let contaminated = lagged / total;
+    assert!((contaminated - recovered).abs() > 1e-3);
+    assert_eq!(
+        refuse_unstandardised_discrete_drift_as_standardised_discrete_drift(
+            unstandardised,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedDiscreteDriftIsNotStandardisedDiscreteDrift)
+    );
+    assert_eq!(
+        refuse_trait_plus_state_autocorrelation_as_standardised_discrete_drift(
+            contaminated,
+            recovered
+        ),
+        Err(PsychometricError::TraitPlusStateAutocorrelationIsNotStandardisedDiscreteDrift)
+    );
+    assert_eq!(
+        refuse_trait_variance_as_standardisation_variance(trait_variance, within),
+        Err(PsychometricError::TraitVarianceIsNotStandardisationVariance)
+    );
+}
 
+#[test]
+fn standardised_discrete_drift_refuses_non_event_clocks_and_does_not_keep_growing_or_zero_diffusion()
+ {
+    assert_eq!(
+        recover_standardised_discrete_drift(0.4, -0.5, 1.0, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_discrete_drift(0.4, -0.5, 0.0, LagClock::EventTime),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    let growing =
+        recover_discrete_lag_from_log_rate(0.5, 1.0, LagClock::EventTime).expect("growing a>0");
+    assert!(growing.is_finite() && growing > 1.0);
+    assert_eq!(
+        recover_standardised_discrete_drift(0.4, 0.5, 1.0, LagClock::EventTime),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    let zero_q =
+        recover_discrete_lag_from_log_rate(-0.5, 1.0, LagClock::EventTime).expect("e^{aΔt} at q=0");
+    assert!(zero_q.is_finite() && zero_q > 0.0);
+    assert_eq!(
+        recover_standardised_discrete_drift(0.0, -0.5, 1.0, LagClock::EventTime),
+        Err(PsychometricError::StandardisedDiscreteDriftRequiresPositiveWithinSubjectVariance)
+    );
+}
+
+#[test]
 fn standardised_discrete_continuous_intercept_recovers_driver_page_sixteen_after_positive_p() {
     let intercept = 0.4_f64;
     let diffusion = 0.8_f64;
