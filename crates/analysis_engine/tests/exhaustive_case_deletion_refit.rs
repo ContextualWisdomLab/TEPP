@@ -110,21 +110,39 @@ fn invalid_corpora_fail_before_fitting() {
 }
 
 #[test]
-fn empty_or_padded_document_identities_and_empty_seed_fail_closed() {
+fn runner_rejects_each_invalid_input_clause() {
+    let mut single = documents();
+    single.pop();
+    single.pop();
     assert_eq!(
-        fit_exhaustive_case_deletion(&documents(), "", &MeanFitter),
+        fit_exhaustive_case_deletion(&single, "seed", &MeanFitter),
         Err(ExhaustiveCaseDeletionError::InvalidInput)
     );
-    let mut empty_id = documents();
-    empty_id[0].document_id.clear();
+
+    let empty_seed = fit_exhaustive_case_deletion(&documents(), "", &MeanFitter);
+    assert_eq!(empty_seed, Err(ExhaustiveCaseDeletionError::InvalidInput));
+
+    let padded_seed = fit_exhaustive_case_deletion(&documents(), " seed ", &MeanFitter);
+    assert_eq!(padded_seed, Err(ExhaustiveCaseDeletionError::InvalidInput));
+
+    let mut duplicate_documents = documents();
+    duplicate_documents[1].document_id = "document-a".into();
     assert_eq!(
-        fit_exhaustive_case_deletion(&empty_id, "run", &MeanFitter),
+        fit_exhaustive_case_deletion(&duplicate_documents, "seed", &MeanFitter),
         Err(ExhaustiveCaseDeletionError::InvalidInput)
     );
-    let mut padded_id = documents();
-    padded_id[1].document_id = " document-b ".into();
+
+    let mut empty_identity = documents();
+    empty_identity[0].document_id = String::new();
     assert_eq!(
-        fit_exhaustive_case_deletion(&padded_id, "run", &MeanFitter),
+        fit_exhaustive_case_deletion(&empty_identity, "seed", &MeanFitter),
+        Err(ExhaustiveCaseDeletionError::InvalidInput)
+    );
+
+    let mut padded_identity = documents();
+    padded_identity[0].document_id = " document ".into();
+    assert_eq!(
+        fit_exhaustive_case_deletion(&padded_identity, "seed", &MeanFitter),
         Err(ExhaustiveCaseDeletionError::InvalidInput)
     );
 }

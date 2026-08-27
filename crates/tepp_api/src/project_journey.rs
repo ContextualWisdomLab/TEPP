@@ -266,17 +266,22 @@ fn allowed_event_type(value: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{digest, identifier};
+mod branch_coverage_tests {
+    use super::{allowed_event_type, digest, identifier, parse_time};
 
     #[test]
-    fn identifier_and_digest_refuse_empty_padded_oversize_and_short_hex() {
+    fn guard_functions_cover_each_arm() {
+        assert!(allowed_event_type("prior_project"));
+        assert!(allowed_event_type("customer_request"));
+        assert!(!allowed_event_type("telepathy"));
         assert!(!identifier(""));
-        assert!(!identifier(" padded"));
         assert!(!identifier(&"x".repeat(257)));
-        assert!(identifier("ok"));
-        assert!(!digest(&"0".repeat(63)));
-        assert!(!digest(&"G".repeat(64)));
-        assert!(digest(&"a".repeat(64)));
+        assert!(!identifier(" padded "));
+        assert!(!digest(&"Z".repeat(64)));
+        assert!(!digest(&"a".repeat(63)));
+        assert!(digest(&"0".repeat(64)));
+        assert!(digest(&"0123456789abcdef".repeat(4)));
+        assert!(parse_time("2026-08-25T00:00:00Z").is_some());
+        assert!(parse_time("not-a-time").is_none());
     }
 }

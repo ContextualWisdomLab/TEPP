@@ -53,7 +53,7 @@ pub use analysis_result::terminal_result_matches_request;
 pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
 /// Analysis-run status/read contract version constant.
 pub use analysis_run::ANALYSIS_RUN_STATUS_CONTRACT_VERSION;
-/// Stable HTTP path template for analysis-run status reads.
+/// Analysis-run status HTTP exchange sink path for caller-scoped probes.
 pub use analysis_run::ANALYSIS_RUN_STATUS_PATH;
 /// Accepted analysis-run response.
 pub use analysis_run::AnalysisRunAccepted;
@@ -71,7 +71,7 @@ pub use analysis_run::requests_are_idempotent_matches;
 pub use analysis_run::require_status_binding;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
-/// Analysis-run status path identity bound and Naruon status exchange helper.
+/// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
 /// Corpus-split leakage-audit contract version.
 pub use corpus_split_manifest::CORPUS_SPLIT_MANIFEST_CONTRACT_VERSION;
