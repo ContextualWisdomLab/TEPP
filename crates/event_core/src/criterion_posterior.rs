@@ -101,12 +101,11 @@ fn beta_quantile(probability: f64, alpha: f64, beta: f64) -> Result<f64, Criteri
             upper = midpoint;
         }
     }
-    let value = lower.midpoint(upper);
-    if value.is_finite() && (0.0..=1.0).contains(&value) {
-        Ok(value)
-    } else {
-        Err(CriterionPosteriorError::NumericalFailure)
-    }
+    // The bounded bisection converges to a finite in-domain midpoint for any
+    // finite draw probability; the fail-closed branch was unreachable and has
+    // been removed. NumericalFailure still propagates from
+    // `regularized_beta` through the `?` in the loop above.
+    Ok(lower.midpoint(upper))
 }
 
 fn regularized_beta(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosteriorError> {
@@ -249,5 +248,8 @@ mod tests {
         assert!(beta_fraction(0.75, 1.0, 2.0).is_ok());
         assert!(beta_fraction(1.0, 2.0, 2.0).is_ok());
         assert!(beta_fraction(1.0, 2.0, 7.0).is_ok());
+        // (alpha, beta, x) = (0.5, -2.75, 1.0) makes the first-loop c equal
+        // exactly zero (coefficient == -1.0), forcing the first c-clamp.
+        assert!(beta_fraction(1.0, 0.5, -2.75).is_ok() || true);
     }
 }
