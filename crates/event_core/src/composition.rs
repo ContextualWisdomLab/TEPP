@@ -207,7 +207,8 @@ impl EventIntelligenceComposition {
     /// # Errors
     ///
     /// Returns [`EventError::InvalidWirePayload`] when the track assignment does
-    /// not cite the appended mention identity.
+    /// not cite the appended mention identity, or when that identity is already
+    /// admitted.
     pub fn append_revised_mention(
         &mut self,
         mention: EventMention,
@@ -215,6 +216,13 @@ impl EventIntelligenceComposition {
         track_assignment: EventTrackAssignment,
     ) -> Result<(), EventError> {
         if track_assignment.mention_id() != mention.mention_id() {
+            return Err(EventError::InvalidWirePayload);
+        }
+        if self
+            .mentions
+            .iter()
+            .any(|existing| existing.mention_id() == mention.mention_id())
+        {
             return Err(EventError::InvalidWirePayload);
         }
         self.mentions.push(mention);
@@ -233,8 +241,9 @@ impl EventIntelligenceComposition {
 /// # Errors
 ///
 /// Returns [`EventError::InvalidWirePayload`] when mentions are empty, when
-/// first-story or track streams are not length-aligned to mentions, or when a
-/// track assignment is not index-aligned to the matching mention identity.
+/// mention identities are not unique, when first-story or track streams are
+/// not length-aligned to mentions, or when a track assignment is not
+/// index-aligned to the matching mention identity.
 /// Propagates config version errors from
 /// [`EventIntelligenceWorkflowConfig::new`] when the supplied config is reused
 /// only after validation (callers must construct config first).
@@ -259,6 +268,11 @@ pub fn compose_event_intelligence(
         return Err(EventError::InvalidWirePayload);
     }
     let mention_ids: Vec<_> = mentions.iter().map(EventMention::mention_id).collect();
+    for (index, mention_id) in mention_ids.iter().enumerate() {
+        if mention_ids[..index].iter().any(|prior| prior == mention_id) {
+            return Err(EventError::InvalidWirePayload);
+        }
+    }
     for (mention, assignment) in mentions.iter().zip(&track_assignments) {
         if mention.mention_id() != assignment.mention_id() {
             return Err(EventError::InvalidWirePayload);
@@ -313,9 +327,9 @@ pub fn refuse_composition_as_transition(
 #[cfg(test)]
 mod tests {
     use super::{
-        EVENT_INTELLIGENCE_WORKFLOW_VERSION, EventIntelligenceWorkflowConfig,
         compose_event_intelligence, refuse_composition_as_instance,
-        refuse_composition_as_transition,
+        refuse_composition_as_transition, EventIntelligenceWorkflowConfig,
+        EVENT_INTELLIGENCE_WORKFLOW_VERSION,
     };
     use crate::{
         EventConfidence, EventError, EventEvidenceLayer, EventLinkPair, EventMention,
