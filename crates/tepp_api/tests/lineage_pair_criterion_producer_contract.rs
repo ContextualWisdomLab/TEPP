@@ -411,6 +411,23 @@ fn pair_posterior_rejects_each_contract_violation() {
 }
 
 #[test]
+fn pair_posterior_rejects_duplicate_pairs_and_non_uuid_admitted_identity() {
+    let mut duplicate_pairs = pair_artifact();
+    duplicate_pairs
+        .pair_posteriors
+        .push(duplicate_pairs.pair_posteriors[0].clone());
+    assert_eq!(duplicate_pairs.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut admitted_non_uuid = pair_artifact();
+    admitted_non_uuid.pair_posteriors[0].pair_id = "not-a-uuid".into();
+    admitted_non_uuid.admitted_pair_ids = vec!["not-a-uuid".into()];
+    assert_eq!(
+        admitted_non_uuid.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
 fn journey_rejects_each_contract_violation() {
     let reject = |mutate: fn(&mut ProjectJourneyPosteriorArtifact)| {
         let mut artifact = journey();
@@ -427,6 +444,8 @@ fn journey_rejects_each_contract_violation() {
     reject(|artifact| artifact.events[0].event_id.clear());
     reject(|artifact| artifact.events[0].event_type_code = "unlisted_event".into());
     reject(|artifact| artifact.events[0].record_created_at = "nope".into());
+    reject(|artifact| artifact.events[0].available_at = "nope".into());
+    reject(|artifact| artifact.source_snapshot_sha256 = "0".repeat(63));
     reject(|artifact| {
         artifact.events[0].event_time_draws.pop();
     });
