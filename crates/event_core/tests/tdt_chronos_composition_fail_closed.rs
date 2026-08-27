@@ -193,11 +193,41 @@ fn compose_refuses_short_first_story_or_track_alignment() {
     assert_eq!(
         compose_event_intelligence(
             workflow_config(),
+            segmentation.clone(),
+            mentions.clone(),
+            Vec::new(),
+            labels.clone(),
+            short_tracks,
+            Vec::new(),
+            Vec::new(),
+        )
+        .map(|_| ()),
+        Err(EventError::InvalidWirePayload)
+    );
+    let duplicate_tracks = vec![tracks[0], tracks[0]];
+    assert_eq!(
+        compose_event_intelligence(
+            workflow_config(),
+            segmentation.clone(),
+            mentions.clone(),
+            Vec::new(),
+            labels.clone(),
+            duplicate_tracks,
+            Vec::new(),
+            Vec::new(),
+        )
+        .map(|_| ()),
+        Err(EventError::InvalidWirePayload)
+    );
+    let reversed_tracks = vec![tracks[1], tracks[0]];
+    assert_eq!(
+        compose_event_intelligence(
+            workflow_config(),
             segmentation,
             mentions,
             Vec::new(),
             labels,
-            short_tracks,
+            reversed_tracks,
             Vec::new(),
             Vec::new(),
         )
