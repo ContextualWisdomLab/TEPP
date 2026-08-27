@@ -612,7 +612,6 @@ pub enum PsychometricError {
     /// process-dynamics `asymDIFFUSION`; `TIPREDVARstd` is the
     /// correlation form of `TIPREDVAR`.
     StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion,
-<<<<<<< HEAD
 
     /// Driver p. 16 `TRAITVARstd` was requested with a non-positive
     /// trait variance. The 2017-era source skips forming
@@ -634,8 +633,6 @@ pub enum PsychometricError {
     /// the correlation form of between-subject `TRAITVAR`.
     InitialTimeIndependentVarianceIsNotStandardisedTraitVariance,
 
-=======
->>>>>>> origin/main
     /// Driver p. 16 `discreteCINTstd` was requested without a strictly
     /// positive `asymDIFFUSION`. Footnote 4 standardises using only the
     /// relevant variance; zero `q` has no positive process SD.
@@ -1129,7 +1126,6 @@ impl fmt::Display for PsychometricError {
             Self::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion => {
                 "standardised time-independent predictor variance is not standardised asymptotic diffusion"
             }
-<<<<<<< HEAD
             Self::StandardisedTraitVarianceRequiresPositiveTraitVariance => {
                 "standardised trait variance requires strictly positive trait variance"
             }
@@ -1142,8 +1138,9 @@ impl fmt::Display for PsychometricError {
             Self::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance => {
                 "initial time-independent predictor variance is not standardised trait variance"
             }
-=======
->>>>>>> origin/main
+
+
+
             Self::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance => {
                 "standardised discrete continuous intercept requires strictly positive stationary within-subject variance"
             }
@@ -1913,7 +1910,6 @@ mod tests {
     }
 
     #[test]
-<<<<<<< HEAD
     fn standardised_trait_variance_boundary_messages_are_stable() {
         assert_eq!(
             PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance.to_string(),
@@ -1937,8 +1933,7 @@ mod tests {
     }
 
     #[test]
-=======
->>>>>>> origin/main
+
     fn standardised_discrete_continuous_intercept_boundary_messages_are_stable() {
         assert_eq!(
             PsychometricError::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance
