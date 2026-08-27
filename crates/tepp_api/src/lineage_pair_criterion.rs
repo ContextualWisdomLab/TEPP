@@ -313,11 +313,11 @@ fn valid_pair(pair: &LineagePairCriterionPosterior, draws: usize, cutoff: Timest
 #[cfg(test)]
 mod branch_coverage_tests {
     use super::{
-        LineageAnchorBasis, LineageComputeReceipt, LineageComputeReceipts,
-        LineageDrawProvenance, LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA,
+        ApiError, LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA, LineageAnchorBasis,
+        LineageComputeReceipt, LineageComputeReceipts, LineageDrawProvenance,
         LineagePairCriterionPosterior, LineagePairCriterionPosteriorArtifact,
-        LineageTemporalProvenance, ApiError, digest, identifier, valid_accelerator_backend,
-        valid_pair, valid_receipt, valid_receipts, valid_temporal_provenance,
+        LineageTemporalProvenance, digest, identifier, valid_accelerator_backend, valid_pair,
+        valid_receipt, valid_receipts, valid_temporal_provenance,
     };
 
     fn receipt(backend: &str) -> LineageComputeReceipt {
@@ -585,21 +585,30 @@ mod branch_coverage_tests {
     fn artifact_validator_rejects_each_remaining_clause() {
         let mut duplicate_channels = artifact();
         duplicate_channels.channel_codes.push("temporal".into());
-        assert_eq!(duplicate_channels.to_json(), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            duplicate_channels.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
 
         let mut extra_posterior_ids = artifact();
         extra_posterior_ids.admitted_pair_ids = vec![
             "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into(),
             "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b9".into(),
         ];
-        assert_eq!(extra_posterior_ids.to_json(), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            extra_posterior_ids.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
 
         let mut duplicated_admission = artifact();
         duplicated_admission.admitted_pair_ids = vec![
             "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into(),
             "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into(),
         ];
-        assert_eq!(duplicated_admission.to_json(), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            duplicated_admission.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
 
         let mut dropped_pair = artifact();
         dropped_pair.pair_posteriors = vec![];
@@ -611,7 +620,10 @@ mod branch_coverage_tests {
 
         let mut nonunique_alignment = artifact();
         nonunique_alignment.anchor_basis.alignment_status = "stale".into();
-        assert_eq!(nonunique_alignment.to_json(), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            nonunique_alignment.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
 
         let mut unknown_backend = artifact();
         unknown_backend.compute_receipts.gpu.backend_code = "tp_mixture_mlx".into();

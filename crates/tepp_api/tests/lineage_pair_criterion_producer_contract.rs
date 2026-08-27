@@ -290,7 +290,10 @@ fn pair_posterior_rejects_each_remaining_invalid_clause() {
 
     let mut missing_posterior = pair_artifact();
     missing_posterior.admitted_pair_ids = vec![];
-    assert_eq!(missing_posterior.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        missing_posterior.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut bad_basis_id = pair_artifact();
     bad_basis_id.anchor_basis.basis_id = "not-a-uuid".into();
@@ -313,7 +316,10 @@ fn pair_posterior_rejects_each_remaining_invalid_clause() {
     assert_eq!(bad_parity.to_json(), Err(ApiError::InvalidWirePayload));
 
     let mut cpu_difference = pair_artifact();
-    cpu_difference.compute_receipts.cpu.observed_maximum_difference = 1.0e-9;
+    cpu_difference
+        .compute_receipts
+        .cpu
+        .observed_maximum_difference = 1.0e-9;
     assert_eq!(cpu_difference.to_json(), Err(ApiError::InvalidWirePayload));
 
     let mut bad_pair_id = pair_artifact();
@@ -330,7 +336,10 @@ fn pair_posterior_rejects_each_remaining_invalid_clause() {
 
     let mut mismatched_draw_len = pair_artifact();
     mismatched_draw_len.pair_posteriors[0].criterion_draws = vec![0.35];
-    assert_eq!(mismatched_draw_len.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        mismatched_draw_len.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 }
 
 #[test]
@@ -364,20 +373,33 @@ fn journey_rejects_every_remaining_invalid_clause() {
     assert_eq!(orphan.to_json(), Err(ApiError::InvalidWirePayload));
 
     let mut duplicate_event = journey();
-    duplicate_event.events.push(duplicate_event.events[0].clone());
+    duplicate_event
+        .events
+        .push(duplicate_event.events[0].clone());
     assert_eq!(duplicate_event.to_json(), Err(ApiError::InvalidWirePayload));
 
     let mut duplicate_relation = journey();
-    duplicate_relation.relations.push(duplicate_relation.relations[0].clone());
-    assert_eq!(duplicate_relation.to_json(), Err(ApiError::InvalidWirePayload));
+    duplicate_relation
+        .relations
+        .push(duplicate_relation.relations[0].clone());
+    assert_eq!(
+        duplicate_relation.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut bad_event_identity = journey();
     bad_event_identity.events[1].event_id = "has whitespace".into();
-    assert_eq!(bad_event_identity.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        bad_event_identity.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut short_relation_draws = journey();
     short_relation_draws.relations[0].relation_draws = vec![true];
-    assert_eq!(short_relation_draws.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        short_relation_draws.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut empty_relation_evidence = journey();
     empty_relation_evidence.relations[0].evidence_record_ids = vec![];
@@ -400,7 +422,10 @@ fn journey_rejects_every_remaining_invalid_clause() {
 
     let mut invalid_evidence = journey();
     invalid_evidence.events[1].evidence_record_ids = vec!["  padded  ".into()];
-    assert_eq!(invalid_evidence.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        invalid_evidence.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 }
 
 #[test]
@@ -458,15 +483,24 @@ fn journey_accepts_every_sanctioned_event_type_and_rejects_unknown_kinds() {
 fn journey_rejects_each_single_clause_violation() {
     let mut dirty_event_identity = journey();
     dirty_event_identity.events[0].event_id = "  padded  ".into();
-    assert_eq!(dirty_event_identity.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        dirty_event_identity.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut unparsed_created = journey();
     unparsed_created.events[1].record_created_at = "not-a-time".into();
-    assert_eq!(unparsed_created.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        unparsed_created.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut unparsed_available = journey();
     unparsed_available.events[1].available_at = "not-a-time".into();
-    assert_eq!(unparsed_available.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        unparsed_available.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut short_draws = journey();
     short_draws.events[1].event_time_draws.pop();
@@ -478,17 +512,29 @@ fn journey_rejects_each_single_clause_violation() {
 
     let mut missing_event_evidence = journey();
     missing_event_evidence.events[1].evidence_record_ids = vec![];
-    assert_eq!(missing_event_evidence.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        missing_event_evidence.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut bad_relation_identity = journey();
     bad_relation_identity.relations[0].relation_id = "".into();
-    assert_eq!(bad_relation_identity.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        bad_relation_identity.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut dangling_successor = journey();
     dangling_successor.relations[0].successor_event_id = "ghost".into();
-    assert_eq!(dangling_successor.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        dangling_successor.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 
     let mut padded_relation_type = journey();
     padded_relation_type.relations[0].relation_type_code = " arrives ".into();
-    assert_eq!(padded_relation_type.to_json(), Err(ApiError::InvalidWirePayload));
+    assert_eq!(
+        padded_relation_type.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
 }
