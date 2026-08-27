@@ -1,11 +1,11 @@
 //! Synthetic contracts for independent pair evidence and branching journeys.
 
 use tepp_api::{
-    ApiError, LineageAnchorBasis, LineageComputeReceipt, LineageComputeReceipts,
-    LineageDrawProvenance, LineagePairCriterionPosterior, LineagePairCriterionPosteriorArtifact,
-    LineageTemporalProvenance, ProjectJourneyEventPosterior, ProjectJourneyPosteriorArtifact,
-    ProjectJourneyRelationPosterior, LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA,
-    PROJECT_JOURNEY_POSTERIOR_SCHEMA,
+    ApiError, LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA, LineageAnchorBasis, LineageComputeReceipt,
+    LineageComputeReceipts, LineageDrawProvenance, LineagePairCriterionPosterior,
+    LineagePairCriterionPosteriorArtifact, LineageTemporalProvenance,
+    PROJECT_JOURNEY_POSTERIOR_SCHEMA, ProjectJourneyEventPosterior,
+    ProjectJourneyPosteriorArtifact, ProjectJourneyRelationPosterior,
 };
 
 fn digest(character: char) -> String {
