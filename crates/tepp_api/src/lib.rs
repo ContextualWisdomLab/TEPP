@@ -13,8 +13,8 @@
 
 mod analysis_result;
 mod analysis_run;
-mod analysis_run_status_http;
 mod analysis_run_live;
+mod analysis_run_status_http;
 mod authorization;
 mod corpus_split_manifest;
 mod envelope;
@@ -55,10 +55,6 @@ pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
 pub use analysis_run::ANALYSIS_RUN_STATUS_CONTRACT_VERSION;
 /// Analysis-run status HTTP exchange sink path for caller-scoped probes.
 pub use analysis_run::ANALYSIS_RUN_STATUS_PATH;
-/// Analysis-run status HTTP exchange re-exports.
-pub use analysis_run_status_http::{
-    ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange,
-};
 /// Accepted analysis-run response.
 pub use analysis_run::AnalysisRunAccepted;
 /// Analysis-run create request.
@@ -75,6 +71,8 @@ pub use analysis_run::requests_are_idempotent_matches;
 pub use analysis_run::require_status_binding;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
+/// Analysis-run status HTTP exchange re-exports.
+pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
 /// Corpus-split leakage-audit contract version.
 pub use corpus_split_manifest::CORPUS_SPLIT_MANIFEST_CONTRACT_VERSION;
 /// Versioned corpus-split leakage-audit manifest.

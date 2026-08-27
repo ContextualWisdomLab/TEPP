@@ -10,7 +10,7 @@
 
 use mlx_native_receipt::ProbeReceipt;
 #[cfg(target_os = "macos")]
-use mlx_native_receipt::{digest, RECEIPT_SCHEMA_VERSION};
+use mlx_native_receipt::{RECEIPT_SCHEMA_VERSION, digest};
 
 #[cfg(target_os = "macos")]
 fn run() -> Result<ProbeReceipt, Box<dyn std::error::Error>> {
