@@ -398,6 +398,8 @@ pub use event_time::recover_standardised_initial_latent_mean;
 pub use event_time::recover_standardised_initial_latent_variance;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
+/// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
+pub use event_time::recover_standardised_trait_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
@@ -548,6 +550,8 @@ pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
 pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating first-occasion TI observed mean as the first-occasion TD observed mean.
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
+pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.
@@ -604,6 +608,8 @@ pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_init
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `T0VARstd` as `T0MEANSstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
+/// Refuse treating p. 16 `T0VARstd` as `TRAITVARstd`.
+pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_trait_variance;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
@@ -704,6 +710,8 @@ pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_in
 pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance;
 /// Refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
+/// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
+pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
 pub use event_time::refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Indicator coordinate kind.
