@@ -233,8 +233,9 @@ impl EventIntelligenceComposition {
 /// # Errors
 ///
 /// Returns [`EventError::InvalidWirePayload`] when mentions are empty, when
-/// first-story or track streams are not aligned to mentions, or when a track
-/// assignment cites an unknown mention. Propagates config version errors from
+/// first-story or track streams are not length-aligned to mentions, or when a
+/// track assignment is not index-aligned to the matching mention identity.
+/// Propagates config version errors from
 /// [`EventIntelligenceWorkflowConfig::new`] when the supplied config is reused
 /// only after validation (callers must construct config first).
 #[allow(clippy::too_many_arguments, reason = "audited TDT/CHRONOS sequence")]
@@ -258,11 +259,8 @@ pub fn compose_event_intelligence(
         return Err(EventError::InvalidWirePayload);
     }
     let mention_ids: Vec<_> = mentions.iter().map(EventMention::mention_id).collect();
-    for assignment in &track_assignments {
-        if !mention_ids
-            .iter()
-            .any(|mention_id| *mention_id == assignment.mention_id())
-        {
+    for (mention, assignment) in mentions.iter().zip(&track_assignments) {
+        if mention.mention_id() != assignment.mention_id() {
             return Err(EventError::InvalidWirePayload);
         }
     }
