@@ -252,9 +252,18 @@ mod tests {
             finite_or_numerical_failure(f64::NAN),
             Err(CriterionPosteriorError::NumericalFailure)
         );
-        assert_eq!(lift_continued_fraction_term(0.0), 1.0e-300);
-        assert_eq!(lift_continued_fraction_term(2.0), 2.0);
-        assert_eq!(lift_continued_fraction_term(-2.0), -2.0);
+        assert_eq!(
+            lift_continued_fraction_term(0.0).to_bits(),
+            1.0e-300f64.to_bits()
+        );
+        assert_eq!(
+            lift_continued_fraction_term(2.0).to_bits(),
+            2.0f64.to_bits()
+        );
+        assert_eq!(
+            lift_continued_fraction_term(-2.0).to_bits(),
+            (-2.0f64).to_bits()
+        );
         assert_eq!(regularized_beta(0.75, 1.0, 1.0), Ok(0.75));
     }
 
