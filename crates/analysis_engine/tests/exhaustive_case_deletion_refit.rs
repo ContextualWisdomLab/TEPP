@@ -108,3 +108,23 @@ fn invalid_corpora_fail_before_fitting() {
         Err(ExhaustiveCaseDeletionError::Fit("synthetic refusal"))
     );
 }
+
+#[test]
+fn empty_or_padded_document_identities_and_empty_seed_fail_closed() {
+    assert_eq!(
+        fit_exhaustive_case_deletion(&documents(), "", &MeanFitter),
+        Err(ExhaustiveCaseDeletionError::InvalidInput)
+    );
+    let mut empty_id = documents();
+    empty_id[0].document_id.clear();
+    assert_eq!(
+        fit_exhaustive_case_deletion(&empty_id, "run", &MeanFitter),
+        Err(ExhaustiveCaseDeletionError::InvalidInput)
+    );
+    let mut padded_id = documents();
+    padded_id[1].document_id = " document-b ".into();
+    assert_eq!(
+        fit_exhaustive_case_deletion(&padded_id, "run", &MeanFitter),
+        Err(ExhaustiveCaseDeletionError::InvalidInput)
+    );
+}
