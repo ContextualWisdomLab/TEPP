@@ -132,6 +132,11 @@ fn regularized_beta(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPoste
     if x >= 1.0 {
         return Ok(1.0);
     }
+    // NIST DLMF 8.17.4: I_x(1,1) = x (uniform CDF). Use the closed form so the
+    // continued-fraction path cannot lose the exact identity in last-bit noise.
+    if alpha.to_bits() == 1.0_f64.to_bits() && beta.to_bits() == 1.0_f64.to_bits() {
+        return finite_or_numerical_failure(x);
+    }
     let log_scale = log_gamma(alpha + beta) - log_gamma(alpha) - log_gamma(beta)
         + alpha * x.ln()
         + beta * (-x).ln_1p();
