@@ -1,11 +1,11 @@
 //! Synthetic contracts for independent pair evidence and branching journeys.
 
 use tepp_api::{
-    ApiError, LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA, LineageAnchorBasis, LineageComputeReceipt,
-    LineageComputeReceipts, LineageDrawProvenance, LineagePairCriterionPosterior,
-    LineagePairCriterionPosteriorArtifact, LineageTemporalProvenance,
-    PROJECT_JOURNEY_POSTERIOR_SCHEMA, ProjectJourneyEventPosterior,
-    ProjectJourneyPosteriorArtifact, ProjectJourneyRelationPosterior,
+    ApiError, LineageAnchorBasis, LineageComputeReceipt, LineageComputeReceipts,
+    LineageDrawProvenance, LineagePairCriterionPosterior, LineagePairCriterionPosteriorArtifact,
+    LineageTemporalProvenance, ProjectJourneyEventPosterior, ProjectJourneyPosteriorArtifact,
+    ProjectJourneyRelationPosterior, LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA,
+    PROJECT_JOURNEY_POSTERIOR_SCHEMA,
 };
 
 fn digest(character: char) -> String {
@@ -379,10 +379,14 @@ fn pair_posterior_rejects_each_contract_violation() {
     reject(|artifact| {
         artifact.pair_posteriors[0]
             .predecessor_event_time_draws
-            .pop()
+            .pop();
     });
-    reject(|artifact| artifact.pair_posteriors[0].successor_event_time_draws.pop());
-    reject(|artifact| artifact.pair_posteriors[0].criterion_draws.pop());
+    reject(|artifact| {
+        artifact.pair_posteriors[0].successor_event_time_draws.pop();
+    });
+    reject(|artifact| {
+        artifact.pair_posteriors[0].criterion_draws.pop();
+    });
     reject(|artifact| artifact.pair_posteriors[0].criterion_draws[0] = f64::NAN);
     reject(|artifact| artifact.pair_posteriors[0].criterion_draws[1] = 1.25);
     reject(|artifact| {
@@ -423,7 +427,9 @@ fn journey_rejects_each_contract_violation() {
     reject(|artifact| artifact.events[0].event_id.clear());
     reject(|artifact| artifact.events[0].event_type_code = "unlisted_event".into());
     reject(|artifact| artifact.events[0].record_created_at = "nope".into());
-    reject(|artifact| artifact.events[0].event_time_draws.pop());
+    reject(|artifact| {
+        artifact.events[0].event_time_draws.pop();
+    });
     reject(|artifact| artifact.events[0].event_time_draws[0] = "nope".into());
     reject(|artifact| artifact.events[0].evidence_record_ids.clear());
     reject(|artifact| artifact.events[0].evidence_record_ids[0] = " ".into());
@@ -435,7 +441,9 @@ fn journey_rejects_each_contract_violation() {
             artifact.relations[0].predecessor_event_id.clone();
     });
     reject(|artifact| artifact.relations[0].relation_type_code.clear());
-    reject(|artifact| artifact.relations[0].relation_draws.pop());
+    reject(|artifact| {
+        artifact.relations[0].relation_draws.pop();
+    });
     reject(|artifact| artifact.relations[0].evidence_record_ids.clear());
 
     let mut numeric = journey();
