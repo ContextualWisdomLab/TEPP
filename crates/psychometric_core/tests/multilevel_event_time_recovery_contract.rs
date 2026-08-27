@@ -38,6 +38,7 @@ use psychometric_core::{
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
     recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
+<<<<<<< HEAD
     recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
     recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
     recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
@@ -46,6 +47,15 @@ use psychometric_core::{
     recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
     recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
     recover_within_residual_event_time_log_rate,
+=======
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+>>>>>>> origin/main
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -6078,6 +6088,7 @@ fn standardised_asymptotic_diffusion_recovers_driver_page_sixteen_correlation() 
 }
 
 #[test]
+<<<<<<< HEAD
 fn standardised_trait_variance_recovers_driver_table_two_correlation() {
     let trait_variance = 1.6_f64;
     let recovered = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)
@@ -6131,6 +6142,8 @@ fn standardised_trait_variance_recovers_driver_table_two_correlation() {
 }
 
 #[test]
+=======
+>>>>>>> origin/main
 fn standardised_asymptotic_diffusion_refuses_non_event_clocks_and_does_not_keep_zero_q() {
     assert_eq!(
         recover_standardised_asymptotic_diffusion(0.4, -0.25, LagClock::AssertionTime),
@@ -6151,6 +6164,7 @@ fn standardised_asymptotic_diffusion_refuses_non_event_clocks_and_does_not_keep_
 }
 
 #[test]
+<<<<<<< HEAD
 fn standardised_trait_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
     assert_eq!(
         recover_standardised_trait_variance(1.6, LagClock::AssertionTime),
@@ -6167,6 +6181,8 @@ fn standardised_trait_variance_refuses_non_event_clocks_and_does_not_keep_zero_v
 }
 
 #[test]
+=======
+>>>>>>> origin/main
 fn standardised_discrete_continuous_intercept_recovers_driver_page_sixteen_after_positive_p() {
     let intercept = 0.4_f64;
     let diffusion = 0.8_f64;

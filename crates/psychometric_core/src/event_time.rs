@@ -1795,6 +1795,7 @@ pub fn refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_v
 /// currently export `DIFFUSIONstd` or `TIPREDVARstd`; the refuse
 /// still names those quantities. This is not a Kalman filter, not a
 /// matrix `expm`, not DSEM, and not ctsem estimation.
+<<<<<<< HEAD
 /// Exact scalar p. 16 `TRAITVARstd` after strictly positive `TRAITVAR`.
 ///
 /// Driver, Oud, and Voelkle (2017, Table 2, p. 12; §7.1, pp. 18–19;
@@ -1834,6 +1835,8 @@ pub fn refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_v
 /// export `addedT0TIPREDVAR`; the refuse still names that quantity.
 /// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
 /// not ctsem estimation.
+=======
+>>>>>>> origin/main
 ///
 /// # Errors
 ///
@@ -1869,6 +1872,7 @@ pub fn recover_standardised_asymptotic_diffusion(
 /// Unstandardised `p` is defined for a zero process. Footnote 4
 /// `asymDIFFUSIONstd` requires strictly positive `asymDIFFUSION`.
 /// Equal numbers when `p = 1` are still distinct named quantities.
+<<<<<<< HEAD
 /// [`PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance`]
 /// when `TRAITVAR` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when the variance is
@@ -1904,6 +1908,8 @@ pub fn recover_standardised_trait_variance(
 /// Unstandardised `TRAITVAR` is defined for a zero trait. Footnote
 /// 4 `TRAITVARstd` requires strictly positive `TRAITVAR`. Equal
 /// numbers when `trait = 1` are still distinct named quantities.
+=======
+>>>>>>> origin/main
 ///
 /// # Errors
 ///
@@ -1927,6 +1933,7 @@ pub fn refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_dif
 /// process-dynamics `asymDIFFUSION`. `T0VARstd` is the correlation
 /// form of free first-occasion `T0VAR`. Equal numbers remain
 /// distinct named quantities.
+<<<<<<< HEAD
 /// [`PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance`].
 ///
 /// # Errors
@@ -1946,6 +1953,8 @@ pub fn refuse_unstandardised_trait_variance_as_standardised_trait_variance(
 /// variances. `T0VARstd` standardises free first-occasion `T0VAR`.
 /// `TRAITVARstd` standardises between-subject `TRAITVAR`. Equal
 /// numbers remain distinct named quantities.
+=======
+>>>>>>> origin/main
 ///
 /// # Errors
 ///
@@ -1995,6 +2004,7 @@ pub fn refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffu
 /// correlation form of `TIPREDVAR`. Equal numbers remain distinct
 /// named quantities. This crate does not currently export
 /// `TIPREDVARstd`; the refuse still names that quantity.
+<<<<<<< HEAD
 /// [`PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance`].
 ///
 /// # Errors
@@ -2014,6 +2024,8 @@ pub fn refuse_standardised_initial_latent_variance_as_standardised_trait_varianc
 /// the correlation form of between-subject `TRAITVAR`. Those are
 /// not the same map. This crate does not currently export
 /// `addedT0TIPREDVAR`; the refuse still names that quantity.
+=======
+>>>>>>> origin/main
 ///
 /// # Errors
 ///
@@ -2032,6 +2044,7 @@ pub fn refuse_standardised_time_independent_predictor_variance_as_standardised_a
     )
 }
 
+<<<<<<< HEAD
 /// Refuse treating p. 16 `TRAITVARstd` as p. 16
 /// `asymDIFFUSIONstd`-style trait variance misuse.
 ///
@@ -2048,6 +2061,8 @@ pub fn refuse_initial_time_independent_variance_as_standardised_trait_variance(
     Err(PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance)
 }
 
+=======
+>>>>>>> origin/main
 /// Exact scalar discrete intercept increment from Driver Equation 3.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
@@ -15670,6 +15685,7 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
     fn standardised_trait_variance_recovers_driver_table_two_after_positive_traitvar() {
         // Driver et al. (2017, Table 2 TRAITVAR; §7.1; p. 16 TRAITVARstd;
         // 2017-era summary.ctsemFit.R): form strictly positive TRAITVAR,
@@ -15711,6 +15727,8 @@ mod tests {
     }
 
     #[test]
+=======
+>>>>>>> origin/main
     fn standardised_asymptotic_diffusion_fails_closed_when_unstandardised_is_defined() {
         assert_eq!(
             recover_standardised_asymptotic_diffusion(0.0, -0.25, LagClock::EventTime),
@@ -15749,6 +15767,7 @@ mod tests {
     }
 
     #[test]
+<<<<<<< HEAD
     fn standardised_trait_variance_fails_closed_when_unstandardised_is_defined() {
         assert_eq!(
             recover_standardised_trait_variance(0.0, LagClock::EventTime),
@@ -15773,6 +15792,8 @@ mod tests {
     }
 
     #[test]
+=======
+>>>>>>> origin/main
     fn standardised_discrete_continuous_intercept_fails_closed_when_unstandardised_is_defined() {
         assert_eq!(
             recover_standardised_discrete_continuous_intercept(
