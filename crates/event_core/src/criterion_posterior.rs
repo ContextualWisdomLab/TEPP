@@ -270,6 +270,12 @@ mod tests {
             (-2.0f64).to_bits()
         );
         assert_eq!(regularized_beta(0.75, 1.0, 1.0), Ok(0.75));
+        // NIST DLMF 8.17.5: I_x(1,b)=1-(1-x)^b and I_x(a,1)=x^a. These
+        // take the continued-fraction path (alpha=1,beta!=1 and vice versa).
+        let ix_one_two = regularized_beta(0.75, 1.0, 2.0).expect("I_x(1,2)");
+        let ix_two_one = regularized_beta(0.75, 2.0, 1.0).expect("I_x(2,1)");
+        assert!((ix_one_two - 0.9375).abs() < 8.0 * f64::EPSILON);
+        assert!((ix_two_one - 0.5625).abs() < 8.0 * f64::EPSILON);
     }
 
     #[test]
