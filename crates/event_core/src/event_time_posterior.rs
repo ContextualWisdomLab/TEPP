@@ -63,17 +63,34 @@ pub fn materialize_event_time_posterior(
         return Err(EventTimePosteriorError::DuplicateEventTime);
     }
     let draw_count = ordered.iter().try_fold(0_usize, |total, atom| {
-        let multiplicity = usize::try_from(atom.multiplicity)
-            .map_err(|_| EventTimePosteriorError::DrawCountOverflow)?;
-        total
-            .checked_add(multiplicity)
-            .ok_or(EventTimePosteriorError::DrawCountOverflow)
+        add_atom_mass(total, atom.multiplicity)
     })?;
     let mut draws = Vec::with_capacity(draw_count);
     for atom in ordered {
-        let multiplicity = usize::try_from(atom.multiplicity)
-            .map_err(|_| EventTimePosteriorError::DrawCountOverflow)?;
-        draws.extend(std::iter::repeat_n(atom.event_time, multiplicity));
+        draws.extend(std::iter::repeat_n(
+            atom.event_time,
+            usize::from(atom.multiplicity),
+        ));
     }
     Ok(EventTimePosteriorDraws { draws })
+}
+
+fn add_atom_mass(total: usize, multiplicity: u32) -> Result<usize, EventTimePosteriorError> {
+    total
+        .checked_add(usize::from(multiplicity))
+        .ok_or(EventTimePosteriorError::DrawCountOverflow)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EventTimePosteriorError, add_atom_mass};
+
+    #[test]
+    fn overflowing_draw_count_fails_closed() {
+        assert_eq!(
+            add_atom_mass(usize::MAX, 1),
+            Err(EventTimePosteriorError::DrawCountOverflow)
+        );
+        assert_eq!(add_atom_mass(0, 3), Ok(3));
+    }
 }
