@@ -209,7 +209,8 @@ fn log_gamma(value: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        CriterionPosteriorError, beta_fraction, beta_quantile, log_gamma, regularized_beta,
+        CriterionPosteriorError, IndependentCriterionCounts, beta_fraction, beta_quantile,
+        fit_independent_criterion_posterior, log_gamma, regularized_beta,
     };
 
     #[test]
@@ -229,5 +230,70 @@ mod tests {
             Err(CriterionPosteriorError::NumericalFailure)
         );
         assert!(log_gamma(0.25).is_finite());
+        assert_eq!(
+            regularized_beta(0.5, 1.0e308, 1.0e308),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        let _ = beta_fraction(1.0, 1.0, 1.0);
+    }
+
+    #[test]
+    fn overflow_draw_count_fails_closed_before_allocation() {
+        assert_eq!(
+            fit_independent_criterion_posterior(
+                IndependentCriterionCounts {
+                    successes: 1,
+                    trials: 2,
+                },
+                (u32::MAX as usize).saturating_add(1),
+            ),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        assert_eq!(
+            fit_independent_criterion_posterior(
+                IndependentCriterionCounts {
+                    successes: 1,
+                    trials: 0,
+                },
+                8,
+            ),
+            Err(CriterionPosteriorError::EmptyObservations)
+        );
+        assert_eq!(
+            fit_independent_criterion_posterior(
+                IndependentCriterionCounts {
+                    successes: 3,
+                    trials: 2,
+                },
+                8,
+            ),
+            Err(CriterionPosteriorError::SuccessesExceedTrials)
+        );
+        assert_eq!(
+            fit_independent_criterion_posterior(
+                IndependentCriterionCounts {
+                    successes: 1,
+                    trials: 2,
+                },
+                1,
+            ),
+            Err(CriterionPosteriorError::InsufficientDraws)
+        );
+        let posterior = fit_independent_criterion_posterior(
+            IndependentCriterionCounts {
+                successes: 3,
+                trials: 4,
+            },
+            8,
+        )
+        .expect("identified Jeffreys posterior");
+        assert!((posterior.mean - (3.5 / 5.0)).abs() < 1e-12);
+        assert_eq!(posterior.plausible_values.len(), 8);
+        assert!(
+            posterior
+                .plausible_values
+                .windows(2)
+                .all(|pair| pair[0] <= pair[1])
+        );
     }
 }
