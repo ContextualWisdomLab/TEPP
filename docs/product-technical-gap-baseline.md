@@ -1,6 +1,6 @@
 # Product and Technical Gap Baseline
 
-## 2026-08-27 Driver p.16 standardised-map recovery queue
+## 2026-08-27 Driver p.16 standardised-map recovery queue (three landed)
 
 - Five Driver p.16 `std`-family estimator restorations remain individually
   reviewable open PRs against protected `c7cf34b8`: `asymDIFFUSIONstd` (#267),
@@ -66,8 +66,8 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-27T07:35:00Z
-**Protected-main evidence:** `c7cf34b84d087904bdcb4604479dda2ed8cfcf77` (merge of [PR #266](https://github.com/ContextualWisdomLab/TEPP/pull/266) at 2026-08-26T12:40Z)
+**Snapshot:** 2026-08-27T14:40:00Z
+**Protected-main evidence:** `9cd1b263926c456e8c56424c43679d3611310ddb` (merge of [PR #269](https://github.com/ContextualWisdomLab/TEPP/pull/269) TDT/CHRONOS composition at 2026-08-27T14:35Z, on top of #268 TRAITVARstd)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
 
@@ -91,7 +91,7 @@ GitHub state before any customer, release, certification, or valuation claim.
 | Protected-main SHA | `c7cf34b84d087904bdcb4604479dda2ed8cfcf77` (2026-08-26T12:40Z, merge of [#266](https://github.com/ContextualWisdomLab/TEPP/pull/266)) | All as-built claims are bounded to this commit. |
 | Workspace members | 58 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, compute, psychometric-engine, event-intelligence, interpretation, artifact, and visual product boundaries. |
 | Workspace version | `0.2.0` (aligned across every crate manifest) | A version number alone does not establish a supported product release; no signed artifact or support policy exists yet. |
-| Open pull requests | **7** | Active queue: #267 asymDIFFUSIONstd, #268 TRAITVARstd, #269 TDT/CHRONOS composition, #270 MANIFESTTRAITVARstd, #271 MANIFESTVARstd, #272 TIPREDVARstd, #273 gap-baseline refresh (this PR). |
+| Open pull requests | **3** | Active queue: #270 MANIFESTTRAITVARstd, #271 MANIFESTVARstd, #272 TIPREDVARstd. |
 | Draft pull requests | **0** | No drafts are open at this snapshot; the previously referenced repair and life-cycle orchestration drafts are closed. |
 | Open product issues | **9** | Issues #166–#167 and #169–#174 plus #176 remain open. Result-contract issue #156, semantic-units issue #168, queue-consolidation issue #175, and lineage-consumer issue #155 are all CLOSED. |
 | Current package version | `0.2.0` | No supported product release is established by the repository version alone; the tagged cut remains queued. |
@@ -157,13 +157,9 @@ passing-check claim. Re-read the full SHA, current review decision, required
 Checks, and branch rules immediately before every mutation.
 
 | PR | Exact current head | Draft | Base | Title |
-| #273 | `7f6c8a5a4351b4a8d0cfa5b7d2eaadfae71c7a9a` | false | main | docs(gap): refresh baseline snapshot for post-c7cf34b state |
-| #272 | `3234f5034ee6677aa324eddfbde1adbb431dad57` | false | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
-| #271 | `c21e90b1047c5f1221142e70f3ad0ea5d75c0704` | false | main | feat(psychometric): restore Driver p.16 MANIFESTVARstd θ/θ=1 on main |
-| #270 | `2b855a4fd3c3206e48338d61a473008921dddbe3` | false | main | feat(psychometric): restore Driver p.16 MANIFESTTRAITVARstd ψ/ψ=1 on main |
-| #269 | `438d9ef38a86907f0f8f4a9ed1da87f71dde8e9e` | false | main | feat(event): compose TDT and CHRONOS as one versioned workflow |
-| #268 | `ae90cc53cfb3fc1564a6b6d2ee19d231034bdc38` | false | main | feat(psychometric): restore Driver p.16 TRAITVARstd trait/trait=1 on main |
-| #267 | `a7c805af22ca9a1b908ae8c699e9ee920b552541` | false | main | feat(psychometric): restore Driver p.16 asymDIFFUSIONstd p/p=1 on main |
+| #272 | `eff029c809d2e3227c8fb31e42348464268ce511` | false | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
+| #271 | `6033582cb060f3ad7b32a4f9ece16d642727393e` | false | main | feat(psychometric): restore Driver p.16 MANIFESTVARstd θ/θ=1 on main |
+| #270 | `b4b51f135eb653b4b39241da4a64b89dd7abfc73` | false | main | feat(psychometric): restore Driver p.16 MANIFESTTRAITVARstd ψ/ψ=1 on main |
 |---:|---|:---:|---|---|
 
 
