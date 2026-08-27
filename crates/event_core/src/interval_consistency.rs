@@ -180,5 +180,166 @@ impl IntervalConsistencyNetwork {
 ///
 /// Always returns
 /// [`EventError::IntervalConsistencyIsNotUnrestrictedSatisfiability`].
+pub fn refuse_interval_consistency_as_unrestricted_satisfiability(
+    _report: &IntervalConsistencyReport,
+) -> Result<(), EventError> {
+    Err(EventError::IntervalConsistencyIsNotUnrestrictedSatisfiability)
+}
 
-// ... continued in next commit
+/// Explicit refusal to promote an interval contradiction into an event instance.
+///
+/// # Errors
+///
+/// Always returns [`EventError::IntervalContradictionIsNotEventInstance`].
+pub fn refuse_interval_contradiction_as_instance(
+    _error: EventError,
+) -> Result<EventInstanceId, EventError> {
+    Err(EventError::IntervalContradictionIsNotEventInstance)
+}
+
+fn from_closure_report(report: ClosureReport) -> IntervalConsistencyReport {
+    IntervalConsistencyReport {
+        revisions: report.revisions(),
+        propagation_steps: report.propagation_steps(),
+    }
+}
+
+fn map_reasoner_error(error: TemporalReasonerError) -> EventError {
+    match error {
+        TemporalReasonerError::InvalidLimits => EventError::IntervalConsistencyInvalidLimits,
+        TemporalReasonerError::UnknownVariable => EventError::IntervalConsistencyUnknownVariable,
+        TemporalReasonerError::EmptyRelationSet => EventError::IntervalConsistencyEmptyRelationSet,
+        TemporalReasonerError::LimitExceeded(_) => EventError::IntervalConsistencyLimitExceeded,
+        TemporalReasonerError::Contradiction(_) => EventError::IntervalConsistencyContradiction,
+        _ => EventError::InvalidWirePayload,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        IntervalConsistencyNetwork, refuse_interval_consistency_as_unrestricted_satisfiability,
+        refuse_interval_contradiction_as_instance,
+    };
+    use crate::EventError;
+    use temporal_core::{
+        AllenRelation, EventTime, RelationSet, TemporalBoundary, TemporalInterval,
+        TemporalPrecision,
+    };
+
+    fn closed(start: &str, end: &str) -> TemporalInterval<EventTime> {
+        TemporalInterval::bounded(
+            TemporalBoundary::Included(EventTime::parse_rfc3339(start).expect("start")),
+            TemporalBoundary::Included(EventTime::parse_rfc3339(end).expect("end")),
+            TemporalPrecision::Second,
+        )
+        .expect("proper closed interval")
+    }
+
+    #[test]
+    fn quantitative_before_chain_narrows_and_refuses_sat_claim() {
+        let mut network = IntervalConsistencyNetwork::with_limits(8, 16, 256).expect("limits");
+        let a = network.add_variable().expect("a");
+        let b = network.add_variable().expect("b");
+        let c = network.add_variable().expect("c");
+        let early = closed("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
+        let mid = closed("2026-01-03T00:00:00Z", "2026-01-04T00:00:00Z");
+        let late = closed("2026-01-05T00:00:00Z", "2026-01-06T00:00:00Z");
+        let (ab, _) = network
+            .assert_quantitative_allen_relation(a, b, &early, &mid)
+            .expect("a before b");
+        let (bc, _) = network
+            .assert_quantitative_allen_relation(b, c, &mid, &late)
+            .expect("b before c");
+        assert_eq!(ab, AllenRelation::Before);
+        assert_eq!(bc, AllenRelation::Before);
+        let report = network.close().expect("path consistent");
+        assert!(report.propagation_steps() > 0);
+        let ac = network.relation_set(a, c).expect("a to c");
+        assert!(ac.contains(AllenRelation::Before));
+        assert!(!ac.contains(AllenRelation::After));
+        assert_eq!(
+            refuse_interval_consistency_as_unrestricted_satisfiability(&report),
+            Err(EventError::IntervalConsistencyIsNotUnrestrictedSatisfiability)
+        );
+    }
+
+    #[test]
+    fn qualitative_before_and_after_contradict_and_refuse_instance() {
+        let mut network = IntervalConsistencyNetwork::with_limits(4, 8, 64).expect("limits");
+        let left = network.add_variable().expect("left");
+        let right = network.add_variable().expect("right");
+        network
+            .assert_qualitative_relations(
+                left,
+                right,
+                RelationSet::singleton(AllenRelation::Before),
+            )
+            .expect("before");
+        let conflict = network.assert_qualitative_relations(
+            left,
+            right,
+            RelationSet::singleton(AllenRelation::After),
+        );
+        assert_eq!(conflict, Err(EventError::IntervalConsistencyContradiction));
+        assert_eq!(
+            refuse_interval_contradiction_as_instance(
+                EventError::IntervalConsistencyContradiction
+            ),
+            Err(EventError::IntervalContradictionIsNotEventInstance)
+        );
+    }
+
+    #[test]
+    fn zero_limits_and_open_intervals_fail_closed() {
+        assert_eq!(
+            IntervalConsistencyNetwork::with_limits(0, 1, 1).map(|_| ()),
+            Err(EventError::IntervalConsistencyInvalidLimits)
+        );
+        let mut network = IntervalConsistencyNetwork::with_limits(2, 2, 8).expect("limits");
+        let left = network.add_variable().expect("left");
+        let right = network.add_variable().expect("right");
+        let open = TemporalInterval::bounded(
+            TemporalBoundary::Excluded(EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s")),
+            TemporalBoundary::Included(EventTime::parse_rfc3339("2026-01-02T00:00:00Z").expect("e")),
+            TemporalPrecision::Second,
+        )
+        .expect("open lower");
+        let closed = closed("2026-01-03T00:00:00Z", "2026-01-04T00:00:00Z");
+        assert_eq!(
+            network
+                .assert_quantitative_allen_relation(left, right, &open, &closed)
+                .map(|_| ()),
+            Err(EventError::IntervalConsistencyRequiresProperBoundedInterval)
+        );
+        assert_eq!(
+            network
+                .assert_qualitative_relations(left, right, RelationSet::empty())
+                .map(|_| ()),
+            Err(EventError::IntervalConsistencyEmptyRelationSet)
+        );
+    }
+
+    #[test]
+    fn path_composition_detects_indirect_contradiction() {
+        // Allen (1983) / CHRONOS path consistency: A before B, B before C, and
+        // A after C is impossible after composition.
+        let mut network = IntervalConsistencyNetwork::with_limits(8, 16, 512).expect("limits");
+        let a = network.add_variable().expect("a");
+        let b = network.add_variable().expect("b");
+        let c = network.add_variable().expect("c");
+        network
+            .assert_qualitative_relations(a, b, RelationSet::singleton(AllenRelation::Before))
+            .expect("a before b");
+        network
+            .assert_qualitative_relations(b, c, RelationSet::singleton(AllenRelation::Before))
+            .expect("b before c");
+        network
+            .assert_qualitative_relations(a, c, RelationSet::singleton(AllenRelation::After))
+            .expect("direct after accepted until closure");
+        assert_eq!(
+            network.close().map(|_| ()),
+            Err(EventError::IntervalConsistencyContradiction)
+        );
+    }
+}
