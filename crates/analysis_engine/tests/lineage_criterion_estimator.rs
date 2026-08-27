@@ -70,3 +70,26 @@ fn rust_path_rejects_identity_draw_and_criterion_failures() {
         ))
     );
 }
+
+#[test]
+fn rust_path_rejects_empty_padded_oversized_and_predecessor_mismatch() {
+    assert_eq!(
+        fit_lineage_criterion_posteriors(&[observation("", 1, 2)], 32),
+        Err(LineageCriterionFitError::InvalidPairIdentity)
+    );
+    assert_eq!(
+        fit_lineage_criterion_posteriors(&[observation(" pair ", 1, 2)], 32),
+        Err(LineageCriterionFitError::InvalidPairIdentity)
+    );
+    assert_eq!(
+        fit_lineage_criterion_posteriors(&[observation(&"p".repeat(257), 1, 2)], 32),
+        Err(LineageCriterionFitError::InvalidPairIdentity)
+    );
+
+    let mut predecessor_short = observation("pair", 1, 2);
+    predecessor_short.predecessor_event_time_draws.pop();
+    assert_eq!(
+        fit_lineage_criterion_posteriors(&[predecessor_short], 32),
+        Err(LineageCriterionFitError::TemporalDrawMismatch)
+    );
+}
