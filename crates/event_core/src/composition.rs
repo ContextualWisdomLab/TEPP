@@ -327,9 +327,9 @@ pub fn refuse_composition_as_transition(
 #[cfg(test)]
 mod tests {
     use super::{
+        EVENT_INTELLIGENCE_WORKFLOW_VERSION, EventIntelligenceWorkflowConfig,
         compose_event_intelligence, refuse_composition_as_instance,
-        refuse_composition_as_transition, EventIntelligenceWorkflowConfig,
-        EVENT_INTELLIGENCE_WORKFLOW_VERSION,
+        refuse_composition_as_transition,
     };
     use crate::{
         EventConfidence, EventError, EventEvidenceLayer, EventLinkPair, EventMention,
