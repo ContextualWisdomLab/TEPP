@@ -1,11 +1,11 @@
 //! Fail-closed TDT/CHRONOS composition paths stay refuse-first.
 
 use event_core::{
-    EVENT_INTELLIGENCE_WORKFLOW_VERSION, EventConfidence, EventError,
+    compose_event_intelligence, decide_event_link, decide_first_story, decide_schema_slot,
+    decide_story_boundary, decide_track_continue, EventConfidence, EventError,
     EventIntelligenceWorkflowConfig, EventLinkPair, EventMention, EventTrackAssignment,
     EventTrackId, FirstStoryLabel, MentionEvidenceClocks, MentionReviewStatus, StorySegmentation,
-    compose_event_intelligence, decide_event_link, decide_first_story, decide_schema_slot,
-    decide_story_boundary, decide_track_continue,
+    EVENT_INTELLIGENCE_WORKFLOW_VERSION,
 };
 use evidence_core::{DocumentRecord, SourceArtifact, SourceSpan};
 use temporal_core::{
@@ -223,11 +223,30 @@ fn compose_refuses_short_first_story_or_track_alignment() {
     assert_eq!(
         compose_event_intelligence(
             workflow_config(),
+            segmentation.clone(),
+            mentions.clone(),
+            Vec::new(),
+            labels.clone(),
+            reversed_tracks,
+            Vec::new(),
+            Vec::new(),
+        )
+        .map(|_| ()),
+        Err(EventError::InvalidWirePayload)
+    );
+    let duplicate_mentions = vec![award.clone(), award.clone()];
+    let duplicate_mention_tracks = vec![
+        EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+        EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+    ];
+    assert_eq!(
+        compose_event_intelligence(
+            workflow_config(),
             segmentation,
-            mentions,
+            duplicate_mentions,
             Vec::new(),
             labels,
-            reversed_tracks,
+            duplicate_mention_tracks,
             Vec::new(),
             Vec::new(),
         )
@@ -261,6 +280,14 @@ fn append_revised_mention_refuses_mismatched_track_then_accepts_match() {
         Vec::new(),
     )
     .expect("compose");
+    assert_eq!(
+        composition.append_revised_mention(
+            award.clone(),
+            FirstStoryLabel::FollowUp,
+            EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1)),
+        ),
+        Err(EventError::InvalidWirePayload)
+    );
     let mismatched = EventTrackAssignment::new(award.mention_id(), EventTrackId::from_raw(1));
     assert_eq!(
         composition.append_revised_mention(later.clone(), FirstStoryLabel::FollowUp, mismatched),
