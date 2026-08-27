@@ -88,19 +88,15 @@ mod tests {
 
     #[test]
     fn percent_encodes_unsafe_characters_in_run_id() {
-        let exchange = naruon_analysis_run_status_exchange(
-            "https://tepp.example.com",
-            "run/../../etc",
-            "key",
-        )
-        .expect("unsafe chars are encoded not rejected");
+        let exchange =
+            naruon_analysis_run_status_exchange("https://tepp.example.com", "run/../../etc", "key")
+                .expect("unsafe chars are encoded not rejected");
         assert!(exchange.target_url.contains("run%2F..%2F..%2Fetc"));
     }
 
     #[test]
     fn refuses_http_origin() {
-        let result =
-            naruon_analysis_run_status_exchange("http://tepp.example.com", "run-1", "k");
+        let result = naruon_analysis_run_status_exchange("http://tepp.example.com", "run-1", "k");
         assert_eq!(result.unwrap_err(), ApiError::InvalidWirePayload);
     }
 
