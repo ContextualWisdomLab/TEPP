@@ -97,6 +97,7 @@ fn finite_or_numerical_failure(value: f64) -> Result<f64, CriterionPosteriorErro
     }
 }
 
+#[cfg(test)]
 fn unit_interval_or_numerical_failure(value: f64) -> Result<f64, CriterionPosteriorError> {
     if value.is_finite() && (0.0..=1.0).contains(&value) {
         Ok(value)
