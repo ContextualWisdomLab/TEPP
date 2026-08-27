@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 pub const RECEIPT_SCHEMA_VERSION: &str = "mlx_native_receipt.v1";
 
 /// Canonical JSON payload for one identified MLX execution receipt.
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct ProbeReceipt {
     /// Wire schema version tag.
     pub schema_version: &'static str,

@@ -295,6 +295,10 @@ mod tests {
         );
         assert!((mention_span_recall(&[award], &[award]).expect("r") - 1.0).abs() < f64::EPSILON);
         assert_eq!(unique_extent_set(&[]), Err(EventError::InvalidWirePayload));
+        assert_eq!(
+            unique_extent_set(&[award, award]),
+            Err(EventError::InvalidWirePayload)
+        );
         assert_eq!(counted_rate(0, 0), Err(EventError::InvalidWirePayload));
         assert_eq!(
             counted_rate(usize::MAX, 1),

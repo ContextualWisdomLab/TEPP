@@ -15967,6 +15967,7 @@ mod tests {
     }
 
     #[test]
+
     fn standardised_trait_variance_fails_closed_when_unstandardised_is_defined() {
         assert_eq!(
             recover_standardised_trait_variance(0.0, LagClock::EventTime),

@@ -66,6 +66,10 @@ pub enum EventError {
     MentionSpanDocumentMismatch,
     /// An unknown mention-review status name was supplied.
     UnknownMentionReviewStatus,
+    /// A TDT/CHRONOS composition was treated as an event instance.
+    IntelligenceWorkflowIsNotEventInstance,
+    /// A TDT/CHRONOS composition was treated as a state transition.
+    IntelligenceWorkflowIsNotStateTransition,
 }
 
 impl fmt::Display for EventError {
@@ -109,6 +113,12 @@ impl fmt::Display for EventError {
             Self::EmptyExtractorVersion => "empty extractor version",
             Self::MentionSpanDocumentMismatch => "mention span does not belong to the document",
             Self::UnknownMentionReviewStatus => "unknown mention review status",
+            Self::IntelligenceWorkflowIsNotEventInstance => {
+                "intelligence workflow is not an event instance"
+            }
+            Self::IntelligenceWorkflowIsNotStateTransition => {
+                "intelligence workflow is not a state transition"
+            }
         };
         formatter.write_str(message)
     }
@@ -231,6 +241,14 @@ mod tests {
             (
                 EventError::UnknownMentionReviewStatus,
                 "unknown mention review status",
+            ),
+            (
+                EventError::IntelligenceWorkflowIsNotEventInstance,
+                "intelligence workflow is not an event instance",
+            ),
+            (
+                EventError::IntelligenceWorkflowIsNotStateTransition,
+                "intelligence workflow is not a state transition",
             ),
         ] {
             assert_eq!(error.to_string(), message);

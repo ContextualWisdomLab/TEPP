@@ -415,6 +415,7 @@ pub use event_time::recover_standardised_initial_latent_variance;
 pub use event_time::recover_standardised_manifest_mean;
 /// Exact scalar p. 16 `MANIFESTTRAITVARstd` `ψ / ψ = 1` after strictly positive `MANIFESTTRAITVAR`.
 pub use event_time::recover_standardised_manifest_trait_variance;
+
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
@@ -733,6 +734,7 @@ pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardise
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
 /// Refuse treating unstandardised `MANIFESTTRAITVAR` as `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance;
+
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.

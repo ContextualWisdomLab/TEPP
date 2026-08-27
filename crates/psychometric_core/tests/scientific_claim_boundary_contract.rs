@@ -3451,6 +3451,7 @@ fn standardised_manifest_trait_variance_is_not_unstandardised_traitstd_or_measur
 }
 
 #[test]
+
 fn standardised_trait_variance_is_not_unstandardised_or_t0varstd() {
     let trait_variance = 1.6_f64;
     let recovered = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)

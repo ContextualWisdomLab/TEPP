@@ -6212,6 +6212,7 @@ fn standardised_manifest_trait_variance_recovers_driver_table_two_correlation() 
 }
 
 #[test]
+
 fn standardised_trait_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
     assert_eq!(
         recover_standardised_trait_variance(1.6, LagClock::AssertionTime),
