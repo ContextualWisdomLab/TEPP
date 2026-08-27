@@ -11,6 +11,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ### Added
 
 - **Analysis engine**: deterministic end-to-end analysis-run execution with cutoff-safe eligibility, immutable evidence binding, and reproducibility manifests (`analysis_engine` crate).
+- **Restore Driver p.16 `MANIFESTVARstd`**: `recover_standardised_manifest_variance` maps `θ / θ = 1` with strictly positive `MANIFESTVAR`, refusing unstandardised manifest-variance, `MANIFESTTRAITVARstd`, and Equation 5 `Var(y)` substitutions (`psychometric_core`).
 - **Posterior network estimator**: cross-draw Pearson correlations in ILR space, jackknife SE and CI, Benjamini–Hochberg FDR edge admission, nonparametric bootstrap stability, greedy modularity consensus clustering (`network_analysis` crate).
 - **Topic measurement reference estimator**: bounded deterministic CPU `f64` TRSL-TM fitting with ALR/ILR coordinates, Aitchison distance, and lexical-inferential-weight refusal gates (`topic_measurement` crate).
 - **Psychometric core**: Driver et al. (2017) SDE discrete-time recovery suite including drift, diffusion, T0VAR, TIPRED/TDPRED effects, standardised parameters, trait/state variance decomposition, and observed-indicator mapping — 18 K lines of production Rust with true-parameter RMSE tests.
