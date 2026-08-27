@@ -21,36 +21,24 @@ fail-closed no-op. A dry run may print the task contract without credentials.
 When a PR or issue exists, normal review → repair → exact-head Checks → merge
 governance owns the hour. The scheduler does not create a competing branch.
 
-Current executable queue while drafts remain open:
+Current executable queue (2026-08-27T10:20Z snapshot; live state supersedes):
 
-1. Review the predicted-versus-observed Allen coverage gate
-   (`prediction_contradiction`). `refuse_promotion` requires coverage.
-   A pull-request number is never landable coverage authority. Keep
-   PR #93, PR #94, PR #97, PR #101, PR #102, PR #104, PR #108, PR #109,
-   PR #111, and PR #112 unmerged: #93/#94 still accept unmatched
-   predicted mass from `refuse_promotion`, #97 still names PR #94 as a
-   landable authority pointer, #101/#102 still name a draft as the
-   landable gate, #104 omits later citation-repair drafts from the
-   unmerged set, #108 still treats #104 as landable, #109 still omits
-   #108, #111 still omits the naruon PR #107 lock, and #112 still
-   accepts inverted landable-gate sentences and a presence-only naruon
-   pointer.
-2. Next buyer-visible slices, in order: naruon live HTTP loopback (PR #107;
-   keep PR #87 and PR #105 unmerged),
-   `text_segment` SQL contracts on existing migration `0006`, retention and
-   legal-hold migration `0007` (PR #45), foundation known-truth recovery
-   study, then CHRONOS forecast Brier calibration (PR #85).
-3. Do not open a competing hourly proposal until the open-PR inventory is
-   empty. Prefer reviewing, repairing, and merging only after independent
-   approval and exact-head required checks. Keep PR #93, PR #94, PR #97,
-   PR #101, PR #102, PR #104, PR #108, PR #109, PR #111, and PR #112
-   unmerged.
-Current preferred next gap after the open-PR queue drains: persist the
-accepted ERD `document_record` foreign key on `text_segment` once `#45`
-releases migration `0007`. Do not allocate that number from another lane.
-Until then, land `#90` (production TLS bind policy), `#97` (prediction
-coverage gate), and `#45` (retention/`0007`) rather than opening a fourth
-writer for the same tables.
+1. Land the regression-fix authoring PR first: #274 restores the tepp_api
+   rustdoc contract, macOS-gates the mlx_native_receipt imports, closes the
+   branch/line coverage arms the #257/#266 slices left open (new tests and a
+   provably-dead-clause removal), and repairs the stale workspace contract
+   fixture. Merge only after exact-head required Checks and independent
+   approval.
+2. Then the open Driver p.16 `std`-family restorations
+   #267/#268/#270/#271/#272, the TDT/CHRONOS composition #269, and the gap
+   baseline refresh #273 — each after a rerun on the fixed main base.
+3. Do not open a competing hourly proposal while the open-PR inventory is
+   non-empty; review → repair → exact-head Checks → merge governs the hour.
+
+Preferred buyer-visible gaps once the queue drains: GAP-169 longitudinal
+ESEM/DSEM composition beyond the recovered `std`-family, GAP-007 calibrated
+TDT/CHRONOS workflow evidence, GAP-010 Storybook/tokens workspace
+definitions with Figma, and GAP-011 multi-tenant release evidence.
 
 ## Required repository configuration
 

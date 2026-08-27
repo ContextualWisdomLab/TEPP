@@ -1,5 +1,18 @@
 # Product and Technical Gap Baseline
 
+## 2026-08-27 Driver p.16 standardised-map recovery queue
+
+- Five Driver p.16 `std`-family estimator restorations remain individually
+  reviewable open PRs against protected `c7cf34b8`: `asymDIFFUSIONstd` (#267),
+  `TRAITVARstd` (#268), `MANIFESTTRAITVARstd` (#270), `MANIFESTVARstd` (#271),
+  and `TIPREDVARstd` (#272). Each is a small slice and lands only after
+  exact-head checks and independent review.
+- The TDT/CHRONOS composition (#269) folds the two event-intelligence bounded
+  gates into one versioned workflow. It remains an active-PR slice: queued or
+  passing Checks do not promote it to implemented-main.
+- This register refresh (PR #273) is itself open; snapshot facts were fetched
+  live at 2026-08-27T07:35:00Z against protected main `c7cf34b8`.
+
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
 
 - Active branch publishes strict Rust artifacts for
@@ -53,8 +66,8 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-26T07:00:00Z
-**Protected-main evidence:** `2f2119dffa26f4823026445bfec8e249804dc93c` (merge of [PR #250](https://github.com/ContextualWisdomLab/TEPP/pull/250) at 2026-08-26T06:30:15Z; restores Driver p.16 `asymCINTstd`)
+**Snapshot:** 2026-08-27T07:35:00Z
+**Protected-main evidence:** `c7cf34b84d087904bdcb4604479dda2ed8cfcf77` (merge of [PR #266](https://github.com/ContextualWisdomLab/TEPP/pull/266) at 2026-08-26T12:40Z)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
 
@@ -75,35 +88,41 @@ GitHub state before any customer, release, certification, or valuation claim.
 
 | Signal | Snapshot evidence | Delivery implication |
 |---|---:|---|
-| Protected-main SHA | `c482ccea…` (2026-08-25T09:23Z, merge of [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239)) | All as-built claims are bounded to this commit. |
-| Workspace members | 57 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, compute, psychometric-engine, event-intelligence, interpretation, artifact, and visual product boundaries. |
-| Workspace version | `0.2.0` (aligned across every crate manifest by #239) | A version number alone does not establish a supported product release; no signed artifact or support policy exists yet. |
-| Open pull requests | **5** | Active queue: #257 lineage criterion + mlx crate, #256 exact deletion refit, #262 T0MEANSstd (rebased), #264 gap-baseline refresh (this PR), #265 T0VARstd. |
-| Draft pull requests | **3** | The 31-draft psychometric recovery stack fully drained into integration vehicles #231/#232 (both merged 2026-08-25T06:2xZ); remaining drafts are repair and event-intelligence slices, not a stacked chain. |
-| Open product issues | **9** | Issues #166–#167 and #169–#174 plus #176 remain open. Result-contract issue #156, semantic-units issue #168, and queue-consolidation issue #175 are all CLOSED. |
-| Current package version | `0.2.0` | No supported product release is established by the repository version alone; #235 proposes the tagged cut but has not merged. |
+| Protected-main SHA | `c7cf34b84d087904bdcb4604479dda2ed8cfcf77` (2026-08-26T12:40Z, merge of [#266](https://github.com/ContextualWisdomLab/TEPP/pull/266)) | All as-built claims are bounded to this commit. |
+| Workspace members | 58 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, compute, psychometric-engine, event-intelligence, interpretation, artifact, and visual product boundaries. |
+| Workspace version | `0.2.0` (aligned across every crate manifest) | A version number alone does not establish a supported product release; no signed artifact or support policy exists yet. |
+| Open pull requests | **7** | Active queue: #267 asymDIFFUSIONstd, #268 TRAITVARstd, #269 TDT/CHRONOS composition, #270 MANIFESTTRAITVARstd, #271 MANIFESTVARstd, #272 TIPREDVARstd, #273 gap-baseline refresh (this PR). |
+| Draft pull requests | **0** | No drafts are open at this snapshot; the previously referenced repair and life-cycle orchestration drafts are closed. |
+| Open product issues | **9** | Issues #166–#167 and #169–#174 plus #176 remain open. Result-contract issue #156, semantic-units issue #168, queue-consolidation issue #175, and lineage-consumer issue #155 are all CLOSED. |
+| Current package version | `0.2.0` | No supported product release is established by the repository version alone; the tagged cut remains queued. |
 
 The pull-request counts come from the live GitHub search at this snapshot. The
 full exact-head classification lives in this register; re-read live GitHub
 state immediately before every mutation. Passing or queued Checks on an open PR never
 promote that PR to implemented-main.
 
-### Post-#239 state note
+### Post-#239/#266 state note
 
-[#239](https://github.com/ContextualWisdomLab/TEPP/pull/239) merged as squash
-`c482ccea` and landed two things operators must know:
+[#239](https://github.com/ContextualWisdomLab/TEPP/pull/239) (`c482ccea`) and
+[#266](https://github.com/ContextualWisdomLab/TEPP/pull/266) (`c7cf34b8`) merged
+as squash and landed things operators must know:
 
-1. **network_analysis estimator repairs before consumer dependence:** exact
-   two-sided Fisher z-transform p-values replace pseudo-p-values; fail-closed
-   guard ordering for non-finite correlations and short samples; negative-effect
-   edges excluded from the whole consensus perturbation pipeline; explicit
-   validated `edge_drop_probability`; bounds-safe admission helpers; and exact
-   red-to-green branch cases. This advances GAP-009's estimator core beyond the
-   #230 merge (`a69eb3e2`) it builds on.
+1. **network_analysis estimator repairs and provider-owned analysis-run status
+   HTTP exchange:** exact two-sided Fisher z-transform p-values replace
+   pseudo-p-values; fail-closed guard ordering for non-finite correlations and
+   short samples; negative-effect edges excluded from the whole consensus
+   perturbation pipeline; explicit validated `edge_drop_probability`;
+   bounds-safe admission helpers; and the provider-owned status/read HTTP
+   exchange for caller-scoped analysis-run probes. This advances GAP-009's
+   estimator core beyond the #230 merge (`a69eb3e2`) it builds on.
 2. **Workspace version alignment 0.1.0 → 0.2.0** across every crate manifest,
    matching the CHANGELOG `[0.2.0] - 2026-08-25` entry. The version bump is not
    itself a release: no tag, signed artifact, SBOM/provenance bundle, or support
    policy exists yet ([GAP-011](#operator-gap-register)).
+3. **Driver p.16 `std`-family restorations continue on protected main:** the
+   Driver et al. (2017) SDE discrete-time recovery suite drained through
+   #231/#232 was extended by `T0MEANSstd` (#262) and `T0VARstd` (#265); the
+   remaining `std`-family restorations stay open as #267/#268/#270/#271/#272.
 
 ### Queue-consolidation progress (GAP-012) — COMPLETE (issue #175 closed)
 
@@ -124,24 +143,27 @@ All previously queued slices landed on protected main through:
    2026-08-25T06:24Z), and network-repair/version-alignment
    [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239).
 
-The residual seven open PRs are new forward work (release cut, register refresh,
-API anchor contract, coverage completion, event-intelligence fold), not backlog.
+The residual open PRs are new forward work (register refresh #273, release cut,
+API anchor contract, coverage completion, event-intelligence fold, and the
+`std`-family psychometric restorations #267/#268/#270/#271/#272), not backlog.
 
 ## Snapshot open pull-request evidence
 
 The following exact-head register was fetched live from GitHub at
-2026-08-25T10:12:54Z against protected main `c482ccea`. Review decisions,
+2026-08-27T07:35:00Z against protected main `c7cf34b8`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
 Checks, and branch rules immediately before every mutation.
 
 | PR | Exact current head | Draft | Base | Title |
-| #256 | `7ad9d9e3a149f03e6a9edb111e35412d5ae24763` | false | feat/topic-exact-loo-refit-cpu | feat(topic): add exact deletion refit prerequisite |
-| #257 | `e616c06a20824f2cdbd425e5c4e39b28fb805f5a` | false | feat/lineage-pair-criterion-producer | feat(api): publish lineage criterion and Project Journey posteriors |
-| #262 | `63e0695e6d83910bb475984126d7c400aac7c109` | false | agent/psychometric-t0-means-std | feat(psychometric): restore Driver p.16 T0MEANSstd on main |
-| #264 | `2439d72a57b4df91bca6f774a84576fb21b8a5c0` | false | docs/gap-baseline-refresh | docs(gap): refresh baseline snapshot for post-#250 state |
-| #265 | `6c9e2cd7de402d0f60a3abed9e78f7aa4da1b863` | false | agent/psychometric-t0-var-std | feat(psychometric): restore Driver p.16 T0VARstd on main |
+| #273 | `7f6c8a5a4351b4a8d0cfa5b7d2eaadfae71c7a9a` | false | main | docs(gap): refresh baseline snapshot for post-c7cf34b state |
+| #272 | `3234f5034ee6677aa324eddfbde1adbb431dad57` | false | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
+| #271 | `c21e90b1047c5f1221142e70f3ad0ea5d75c0704` | false | main | feat(psychometric): restore Driver p.16 MANIFESTVARstd θ/θ=1 on main |
+| #270 | `2b855a4fd3c3206e48338d61a473008921dddbe3` | false | main | feat(psychometric): restore Driver p.16 MANIFESTTRAITVARstd ψ/ψ=1 on main |
+| #269 | `438d9ef38a86907f0f8f4a9ed1da87f71dde8e9e` | false | main | feat(event): compose TDT and CHRONOS as one versioned workflow |
+| #268 | `ae90cc53cfb3fc1564a6b6d2ee19d231034bdc38` | false | main | feat(psychometric): restore Driver p.16 TRAITVARstd trait/trait=1 on main |
+| #267 | `a7c805af22ca9a1b908ae8c699e9ee920b552541` | false | main | feat(psychometric): restore Driver p.16 asymDIFFUSIONstd p/p=1 on main |
 |---:|---|:---:|---|---|
 
 
@@ -177,8 +199,8 @@ and does not treat queued or passing Checks as shipped protected-main behavior.
 
 ## Protected-main as-built baseline
 
-Protected `main` contains 57 unique Rust crate boundaries in the current
-workspace manifest (as of `c482ccea`). The `members` and `default-members`
+Protected `main` contains 58 unique Rust crate boundaries in the current
+workspace manifest (as of `c7cf34b8`). The `members` and `default-members`
 arrays enumerate the same crate set for distinct Cargo commands; the
 unique-crate count is the authoritative modularity measure.
 The core boundaries include:
@@ -200,6 +222,7 @@ psychometric_core
 analysis_engine
 interpretation_gateway
 compute_backend
+mlx_native_receipt
 ```
 
 The traceability ledger records meaningful protected-main implementation in
@@ -209,8 +232,11 @@ splits, validation metrics, simulations, PostgreSQL slices, versioned API/export
 contracts, orchestration routing, privacy authorization, release-evidence
 generation, the CPU topic-measurement reference estimator, the repaired
 posterior network estimator (#230 + #239), the Driver et al. (2017) SDE
-recovery suite (#231/#232), the deterministic analysis-run execution engine,
-the loopback interpretation gateway, and VRAM-policy compute types.
+recovery suite (#231/#232) and its `T0MEANSstd`/`T0VARstd` restorations
+(#262/#265), the deterministic analysis-run execution engine, the loopback
+interpretation gateway, the provider-owned analysis-run status/read HTTP
+exchange (#266), the macOS-native MLX CPU receipt probe
+(`mlx_native_receipt`), and VRAM-policy compute types.
 
 Protected `main` does **not** yet establish the complete approved product. In
 particular, it does not contain the full multilingual semantic pipeline beyond
@@ -237,10 +263,10 @@ the coordinated visual workspace, or a supported multi-tenant release.
 | GAP-009 | Topic association and cluster outputs lacked posterior-valid estimation, uncertainty, edge stability, and consensus communities. | `partial` (estimator core + repairs landed; Leiden consensus + buyer workflow remain) | product vertical | `a69eb3e2` (posterior log-ratio edge estimator merged from [PR #230](https://github.com/ContextualWisdomLab/TEPP/pull/230)) advanced by [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239) (`c482ccea`): exact two-sided Fisher z-transform p-values driving Benjamini–Hochberg admission (Benjamini & Hochberg, 1995), percentile-bootstrap credible intervals and selection fractions (Efron, 1979), fail-closed guard ordering for non-finite correlations and short samples, negative-effect edges excluded from the whole consensus perturbation pipeline, explicit validated `edge_drop_probability`, bounds-safe admission helpers | [#172](https://github.com/ContextualWisdomLab/TEPP/issues/172) | — (#241 carries two dead-guard removals) | Remaining closure evidence: repeated Leiden consensus replacing the union-find stand-in (Traag et al., 2019), known-truth network/cluster recovery at production scale, and reproducible exports wired into the end-to-end run (#166). |
 | GAP-010 | Operators lack coordinated accessible visual analytics and exact-value export workflows. | `accepted-target` | product vertical | `e65cd66` (no visual workspace) | [#173](https://github.com/ContextualWisdomLab/TEPP/issues/173) | `—` (Figma work not started) | Real Figma File ID in ADR, Storybook/design tokens, ten PRD views, exact-value tables, accessible interaction/print/PDF states, provenance, and source-consistent exports. |
 | GAP-011 | TEPP is not yet an operable multi-tenant service or supported release. | `accepted-target` | product vertical | `e65cd66` (library contracts only) | [#174](https://github.com/ContextualWisdomLab/TEPP/issues/174) | `—` (issue program; no current implementation PR) | Durable queue/storage, OIDC/RLS/purpose controls, OpenTelemetry/SLOs, load/recovery, migrations, signed release/SBOM/provenance, assurance evidence, and support policy. |
-| GAP-012 | The 71-PR queue obscured authority, repeatedly staled exact-head evidence, and fragmented product boundaries. | `implemented-main` (consolidation complete) | closed | `c482ccea` (#239 merged 2026-08-25T09:23Z); [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) CLOSED; queue drained from 71 through #215, the hourly scheduler, vehicles #231/#232, and individual passes | — | — | Residual queue is seven forward-work PRs (release cut, register refresh, API anchor contract, coverage completion, event-intelligence fold); no backlog remains. Exact-head discipline stays enforced by this register's refresh rule. |
+| GAP-012 | The 71-PR queue obscured authority, repeatedly staled exact-head evidence, and fragmented product boundaries. | `implemented-main` (consolidation complete) | closed | `c7cf34b8` (#239 merged 2026-08-25T09:23Z; #266 merged 2026-08-26T12:40Z); [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) CLOSED; queue drained from 58 through #215, the hourly scheduler, vehicles #231/#232, and individual passes | — | — | Residual open queue is forward work (register refresh #273, event-intelligence fold #269, `std`-family psychometric restorations #267/#268/#270/#271/#272); no backlog remains. Exact-head discipline stays enforced by this register's refresh rule. |
 | GAP-013 | Evidence-grounded LLM interpretation is routed but not executed and validated as a production interpreter/verifier port. | `partial` | active integration | `e65cd66` lineage (routing and refusal contracts implemented-main; loopback interpretation POSTs landed via #92/#107) | [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176), [PR #69](https://github.com/ContextualWisdomLab/TEPP/pull/69), [PR #165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `8e4a3ca9cc80` / `34083c3f5d66` | Contextual-orchestrator execution, evidence citations, verifier refusals, comparable-budget ablations, provider eligibility/fallback, abstention, live/offline contract tests, and no numerical-authority escalation. |
-| GAP-014 | README/TRD and some PR descriptions lag protected-main and live queue reality. | `partial` | documentation drift | Documentation synchronized to `c482ccea` through register refreshes including this file and [#236](https://github.com/ContextualWisdomLab/TEPP/pull/236) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) (closed) | — | Remaining: reconcile README/TRD crate counts to 57, retire CHANGELOG `[Unreleased]` bullets superseded by the v0.2.0 entry (duplicated gate-integrity bullets and the now-landed network_analysis repair bullet), and keep ADR maturity current. |
-| GAP-015 | There was no canonical live product/operator-gap register tied to documentation validation. | `implemented-main` (register + validator); this refresh is the live maintenance slice | register refresh | `c482ccea` (register and validator are implemented-main; this snapshot refresh keeps the volatile queue current) | [PR #217](https://github.com/ContextualWisdomLab/TEPP/pull/217) merged; [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) is the merged authority; open [#236](https://github.com/ContextualWisdomLab/TEPP/pull/236) is a parallel refresh whose base predates #239 | `—` (each refresh PR carries its own current head at merge time) | Land each refresh after exact-head checks and independent review, then regenerate it whenever protected-main or the live queue changes. Rebase or supersede #236 against `c482ccea` so only one refresh authority lands per queue state. |
+| GAP-014 | README/TRD and some PR descriptions lag protected-main and live queue reality. | `partial` | documentation drift | Documentation synchronized to `c7cf34b8` through register refreshes including this file (#273) | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) (closed) | — | Remaining: reconcile README/TRD crate counts to 58, retire CHANGELOG `[Unreleased]` bullets superseded by the v0.2.0 entry, and keep ADR maturity current. |
+| GAP-015 | There was no canonical live product/operator-gap register tied to documentation validation. | `implemented-main` (register + validator); this refresh is the live maintenance slice | register refresh | `c7cf34b8` (register and validator are implemented-main; this snapshot refresh keeps the volatile queue current) | [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) is the merged authority; this refresh is [#273](https://github.com/ContextualWisdomLab/TEPP/pull/273) | `7f6c8a5a4351b4a8d0cfa5b7d2eaadfae71c7a9a` | Land each refresh after exact-head checks and independent review, then regenerate it whenever protected-main or the live queue changes. Only one refresh authority lands per queue state. |
 | GAP-016 | Hourly PR maintenance used an older central scheduler revision whose per-repository sweep budgets could amplify the queued review workload. | `active-PR` | operability hardening | `e65cd66` (caller pin before central budget hardening) | [PR #177](https://github.com/ContextualWisdomLab/TEPP/pull/177) | `580d45206536` | The change pins a verified central revision immutably; closure still requires exact-head hosted Checks, resolved threads, and independent review. With the queue near zero the urgency is low but the slice remains unlanded. |
 | GAP-017 | Accepted analysis runs have a terminal DTO and cutoff-safe execution on protected main after #157 merged. | `implemented-main` | closed on protected main | [PR #157](https://github.com/ContextualWisdomLab/TEPP/pull/157) merged 2026-08-25T02:53Z carrying the terminal result contract and folded cutoff-safe execution from closed stacked PR #178 | [#156](https://github.com/ContextualWisdomLab/TEPP/issues/156) (closed) / [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) | — | Exact availability cutoff, snapshot binding, multiple-membership preservation, digest integrity, redacted no-eligible failure, and realistic end-to-end tests are protected-main behavior; remaining E2E composition work belongs to #166. |
 | GAP-018 | Coverage debt: the #219 repair landed, and #239 added 27 exact branch cases, leaving two dead-guard semantics points queued on [#241](https://github.com/ContextualWisdomLab/TEPP/pull/241). | `active-PR` | coverage completion | `5c8599442e85` lineage + #219 (merged 2026-08-25T03:17Z) + #239 (`c482ccea`): gates enforce 100% unique production arms; remaining items are dead-branch removals in `network_analysis::consensus` and `evidence_core::image_unit` | [PR #241](https://github.com/ContextualWisdomLab/TEPP/pull/241) | `a12e48c1e61b` | Merge #241 after exact-head Checks plus independent review so protected main carries the final semantics cleanup; two provably-dead singleton guards and an unreachable let-else are the last known items. |
@@ -270,14 +296,13 @@ committed.
 
 | PR | Current delivery role | Required next action |
 |---:|---|---|
-| [#235](https://github.com/ContextualWisdomLab/TEPP/pull/235) | Tagged v0.2.0 release cut over the aligned workspace (#239 already aligned versions on main) | Exact-head Checks plus independent review; verify tag/artifact/SBOM evidence before treating 0.2.0 as a supported release (#174). |
-| [#236](https://github.com/ContextualWisdomLab/TEPP/pull/236) | Register refresh against pre-#239 base `cf0e0ad7` | Rebase onto `c482ccea` or supersede against this file so only one post-#239 refresh authority lands. |
-| [#237](https://github.com/ContextualWisdomLab/TEPP/pull/237) | TEPP lineage criterion anchor contract for API consumers | Exact-head Checks plus independent review; keep versioned consumer contracts intact (GAP-002). |
-| [#241](https://github.com/ContextualWisdomLab/TEPP/pull/241) | Final branch-gap coverage cherry-pick after the #239 squash-merge (dead singleton guards, unreachable let-else) | Merge before further network/evidence coverage-gated slices; exact-head Checks plus review (GAP-018). |
-| [#240](https://github.com/ContextualWisdomLab/TEPP/pull/240) | Draft repair of #232 rustfmt and psychometric test-arity fallout | Convert from draft once the repair is complete; land before or with the next psychometric slice. |
-| [#238](https://github.com/ContextualWisdomLab/TEPP/pull/238) | Draft coverage of `is_image_media_type_token` non-image prefix arm | Fold into #241 or land independently after exact-head Checks; do not let it stale behind #241. |
-| [#233](https://github.com/ContextualWisdomLab/TEPP/pull/233) | Draft fold of span grounding into EventMention (#170 / GAP-007) | Keep as event-intelligence forward work; convert when #170 landing sequence resumes. |
-
+| [#273](https://github.com/ContextualWisdomLab/TEPP/pull/273) | Live gap-baseline refresh to protected `c7cf34b8` (GAP-015 maintenance slice) | Exact-head Required Checks must pass on the current head plus independent review before merge; re-dispatch superseded exact-head evidence. |
+| [#272](https://github.com/ContextualWisdomLab/TEPP/pull/272) | Driver p.16 `TIPREDVARstd` restore (GAP-006 recovery family) | Exact-head Required Checks must pass on the current head plus independent review before merge; re-dispatch superseded exact-head evidence. |
+| [#271](https://github.com/ContextualWisdomLab/TEPP/pull/271) | Driver p.16 `MANIFESTVARstd` restore (GAP-006 recovery family) | Exact-head Required Checks must pass on the current head plus independent review before merge; re-dispatch superseded exact-head evidence. |
+| [#270](https://github.com/ContextualWisdomLab/TEPP/pull/270) | Driver p.16 `MANIFESTTRAITVARstd` restore (GAP-006 recovery family) | Exact-head Required Checks must pass on the current head plus independent review before merge; re-dispatch superseded exact-head evidence. |
+| [#269](https://github.com/ContextualWisdomLab/TEPP/pull/269) | Calibrated workflow composition: fold TDT detection and CHRONOS schema/forecast reasoning into one versioned product workflow (GAP-007) | Exact-head Required Checks must pass on the current head plus independent review before merge; re-dispatch superseded exact-head evidence. |
+| [#268](https://github.com/ContextualWisdomLab/TEPP/pull/268) | Driver p.16 `TRAITVARstd` restore (GAP-006 recovery family) | Exact-head Required Checks must pass on the current head plus independent review before merge; re-dispatch superseded exact-head evidence. |
+| [#267](https://github.com/ContextualWisdomLab/TEPP/pull/267) | Driver p.16 `asymDIFFUSIONstd` restore (GAP-006 recovery family) | Exact-head Required Checks must pass on the current head plus independent review before merge; re-dispatch superseded exact-head evidence. |
 ## Delivery sequence
 
 The dependency-aware product order is (✓ = landed on protected main):
@@ -286,13 +311,13 @@ The dependency-aware product order is (✓ = landed on protected main):
 2. ✓ **Finish live result contracts:** #156/#157 merged; the LineageWeave consumer parent #155 is implemented-main.
 3. ✓ **Build validated multilingual evidence (first slice):** #168 closed COMPLETED 2026-08-24 with span units implemented-main from #201; remaining alignment/invariance evidence tracks product completion under #166/#169.
 4. **Build the CPU topic estimator:** #167 — reference estimator landed, full Bayesian/candidate-K fitting remains.
-5. **Build event intelligence and posterior networks:** #170 and #172 — network estimator core plus #239 repairs landed; Leiden consensus, buyer workflow, and event-intelligence calibration remain (#233 queued).
-6. **Build the posterior-aware longitudinal psychometric engine:** #169 — recovery stack landed via #231/#232; engine composition remains.
+5. **Build event intelligence and posterior networks:** #170 and #172 — network estimator core plus #239 repairs landed; Leiden consensus, buyer workflow, and event-intelligence calibration remain; the calibration compositional fold is open (#269).
+6. **Build the posterior-aware longitudinal psychometric engine:** #169 — recovery stack landed via #231/#232 plus #262/#265; remaining Driver p.16 `std`-family restorations are open as #267/#268/#270/#271/#272, and engine composition remains.
 7. **Accelerate real kernels with parity:** #171.
 8. **Complete the durable end-to-end run:** #166 — terminal-result lifecycle and analysis-run execution engine are implemented-main; full E2E validation remains.
 9. **Execute and validate interpretation:** #176.
 10. **Design and implement the operator workspace:** #173.
-11. **Productionize and release:** #174 — v0.2.0 version alignment landed (#239); tagged cut pending on #235.
+11. **Productionize and release:** #174 — v0.2.0 version alignment landed (#239); tagged cut remains pending.
 
 Stacking is appropriate where public contracts make dependencies explicit.
 Stacking is not a reason to leave multiple unexplained implementation authorities
