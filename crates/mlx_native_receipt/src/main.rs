@@ -100,13 +100,17 @@ fn run() -> Result<ProbeReceipt, Box<dyn std::error::Error>> {
     Err("macOS-native MLX receipt unavailable on this host".into())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let receipt = run()?;
-    println!("{}", serde_json::to_string(&receipt)?);
+fn emit_receipt(receipt: &ProbeReceipt) -> Result<(), Box<dyn std::error::Error>> {
+    println!("{}", serde_json::to_string(receipt)?);
     Ok(())
 }
 
-#[cfg(all(test, target_os = "macos"))]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    emit_receipt(&run()?)
+}
+
+#[cfg(test)]
+#[cfg(target_os = "macos")]
 mod tests {
     use super::run;
 
@@ -121,5 +125,35 @@ mod tests {
         );
         assert_eq!(receipt.objective_sha256.len(), 64);
         assert_eq!(receipt.output_sha256.len(), 64);
+    }
+}
+
+#[cfg(test)]
+#[cfg(not(target_os = "macos"))]
+mod tests {
+    use super::{emit_receipt, run};
+    use mlx_native_receipt::{ProbeReceipt, RECEIPT_SCHEMA_VERSION};
+
+    #[test]
+    fn linux_host_refuses_macos_native_mlx_receipt() {
+        let error = run().expect_err("linux host must refuse the macOS-native probe");
+        assert!(
+            error
+                .to_string()
+                .contains("macOS-native MLX receipt unavailable")
+        );
+    }
+
+    #[test]
+    fn linux_host_emits_a_constructed_receipt_without_running_mlx() {
+        let receipt = ProbeReceipt {
+            schema_version: RECEIPT_SCHEMA_VERSION,
+            backend_code: "mlx_cpu_macos_native",
+            execution_environment_code: "macos_native",
+            objective_sha256: "a".repeat(64),
+            output_sha256: "b".repeat(64),
+            observed_maximum_difference: 0.0,
+        };
+        emit_receipt(&receipt).expect("receipt JSON must serialize");
     }
 }
