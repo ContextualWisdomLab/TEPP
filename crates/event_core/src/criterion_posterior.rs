@@ -89,6 +89,27 @@ pub fn fit_independent_criterion_posterior(
     })
 }
 
+fn finite_or_numerical_failure(value: f64) -> Result<f64, CriterionPosteriorError> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(CriterionPosteriorError::NumericalFailure)
+    }
+}
+
+fn unit_interval_or_numerical_failure(value: f64) -> Result<f64, CriterionPosteriorError> {
+    if value.is_finite() && (0.0..=1.0).contains(&value) {
+        Ok(value)
+    } else {
+        Err(CriterionPosteriorError::NumericalFailure)
+    }
+}
+
+fn lift_continued_fraction_term(value: f64) -> f64 {
+    const TINY: f64 = 1.0e-300;
+    if value.abs() < TINY { TINY } else { value }
+}
+
 fn beta_quantile(probability: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosteriorError> {
     let mut lower = 0.0_f64;
     let mut upper = 1.0_f64;
@@ -101,12 +122,7 @@ fn beta_quantile(probability: f64, alpha: f64, beta: f64) -> Result<f64, Criteri
             upper = midpoint;
         }
     }
-    let value = lower.midpoint(upper);
-    if value.is_finite() && (0.0..=1.0).contains(&value) {
-        Ok(value)
-    } else {
-        Err(CriterionPosteriorError::NumericalFailure)
-    }
+    unit_interval_or_numerical_failure(lower.midpoint(upper))
 }
 
 fn regularized_beta(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosteriorError> {
@@ -128,24 +144,17 @@ fn regularized_beta(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPoste
     } else {
         1.0 - scale * beta_fraction(1.0 - x, beta, alpha)? / beta
     };
-    if value.is_finite() {
-        Ok(value.clamp(0.0, 1.0))
-    } else {
-        Err(CriterionPosteriorError::NumericalFailure)
-    }
+    Ok(finite_or_numerical_failure(value)?.clamp(0.0, 1.0))
 }
 
 fn beta_fraction(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosteriorError> {
-    const TINY: f64 = 1.0e-300;
     const EPSILON: f64 = 8.0 * f64::EPSILON;
     let qab = alpha + beta;
     let qap = alpha + 1.0;
     let qam = alpha - 1.0;
     let mut c = 1.0;
     let mut d = 1.0 - qab * x / qap;
-    if d.abs() < TINY {
-        d = TINY;
-    }
+    d = lift_continued_fraction_term(d);
     d = 1.0 / d;
     let mut result = d;
     for iteration in 1..=512 {
@@ -153,24 +162,16 @@ fn beta_fraction(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosterio
         let twice = 2.0 * m;
         let mut coefficient = m * (beta - m) * x / ((qam + twice) * (alpha + twice));
         d = 1.0 + coefficient * d;
-        if d.abs() < TINY {
-            d = TINY;
-        }
+        d = lift_continued_fraction_term(d);
         c = 1.0 + coefficient / c;
-        if c.abs() < TINY {
-            c = TINY;
-        }
+        c = lift_continued_fraction_term(c);
         d = 1.0 / d;
         result *= d * c;
         coefficient = -(alpha + m) * (qab + m) * x / ((alpha + twice) * (qap + twice));
         d = 1.0 + coefficient * d;
-        if d.abs() < TINY {
-            d = TINY;
-        }
+        d = lift_continued_fraction_term(d);
         c = 1.0 + coefficient / c;
-        if c.abs() < TINY {
-            c = TINY;
-        }
+        c = lift_continued_fraction_term(c);
         d = 1.0 / d;
         let delta = d * c;
         result *= delta;
@@ -210,7 +211,9 @@ fn log_gamma(value: f64) -> f64 {
 mod tests {
     use super::{
         CriterionPosteriorError, IndependentCriterionCounts, beta_fraction, beta_quantile,
-        fit_independent_criterion_posterior, log_gamma, regularized_beta,
+        finite_or_numerical_failure, fit_independent_criterion_posterior,
+        lift_continued_fraction_term, log_gamma, regularized_beta,
+        unit_interval_or_numerical_failure,
     };
 
     #[test]
@@ -235,6 +238,24 @@ mod tests {
             Err(CriterionPosteriorError::NumericalFailure)
         );
         let _ = beta_fraction(1.0, 1.0, 1.0);
+        assert_eq!(unit_interval_or_numerical_failure(0.25), Ok(0.25));
+        assert_eq!(
+            unit_interval_or_numerical_failure(f64::INFINITY),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        assert_eq!(
+            unit_interval_or_numerical_failure(-0.25),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        assert_eq!(finite_or_numerical_failure(1.5), Ok(1.5));
+        assert_eq!(
+            finite_or_numerical_failure(f64::NAN),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
+        assert_eq!(lift_continued_fraction_term(0.0), 1.0e-300);
+        assert_eq!(lift_continued_fraction_term(2.0), 2.0);
+        assert_eq!(lift_continued_fraction_term(-2.0), -2.0);
+        assert_eq!(regularized_beta(0.75, 1.0, 1.0), Ok(0.75));
     }
 
     #[test]
