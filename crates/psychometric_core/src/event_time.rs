@@ -1834,7 +1834,6 @@ pub fn refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_v
 /// export `addedT0TIPREDVAR`; the refuse still names that quantity.
 /// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
 /// not ctsem estimation.
-
 ///
 /// # Errors
 ///
@@ -1905,7 +1904,6 @@ pub fn recover_standardised_trait_variance(
 /// Unstandardised `TRAITVAR` is defined for a zero trait. Footnote
 /// 4 `TRAITVARstd` requires strictly positive `TRAITVAR`. Equal
 /// numbers when `trait = 1` are still distinct named quantities.
-
 ///
 /// # Errors
 ///
@@ -1948,7 +1946,6 @@ pub fn refuse_unstandardised_trait_variance_as_standardised_trait_variance(
 /// variances. `T0VARstd` standardises free first-occasion `T0VAR`.
 /// `TRAITVARstd` standardises between-subject `TRAITVAR`. Equal
 /// numbers remain distinct named quantities.
-
 ///
 /// # Errors
 ///
@@ -2017,7 +2014,6 @@ pub fn refuse_standardised_initial_latent_variance_as_standardised_trait_varianc
 /// the correlation form of between-subject `TRAITVAR`. Those are
 /// not the same map. This crate does not currently export
 /// `addedT0TIPREDVAR`; the refuse still names that quantity.
-
 ///
 /// # Errors
 ///
