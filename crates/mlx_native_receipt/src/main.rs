@@ -8,7 +8,9 @@
 //! the Rust CPU reference, and emits a receipt only for the device that
 //! actually executed. It is not an Event Lineage estimator receipt.
 
-use mlx_native_receipt::{digest, ProbeReceipt, RECEIPT_SCHEMA_VERSION};
+use mlx_native_receipt::ProbeReceipt;
+#[cfg(target_os = "macos")]
+use mlx_native_receipt::{RECEIPT_SCHEMA_VERSION, digest};
 
 #[cfg(target_os = "macos")]
 fn run() -> Result<ProbeReceipt, Box<dyn std::error::Error>> {

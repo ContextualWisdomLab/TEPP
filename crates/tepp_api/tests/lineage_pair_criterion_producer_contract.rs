@@ -246,3 +246,295 @@ fn journey_refuses_backward_transition_and_fixed_start_status() {
     });
     assert_eq!(cyclic.to_json(), Err(ApiError::InvalidWirePayload));
 }
+
+#[test]
+fn pair_posterior_rejects_each_remaining_invalid_clause() {
+    let mut bad_schema = pair_artifact();
+    bad_schema.schema_version = "tepp.lineage_pair_criterion_posterior.v9".into();
+    assert_eq!(bad_schema.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_estimation = pair_artifact();
+    bad_estimation.estimation_run_id = "not-a-uuid".into();
+    assert_eq!(bad_estimation.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_tepp_run = pair_artifact();
+    bad_tepp_run.tepp_run_id = "not-a-uuid".into();
+    assert_eq!(bad_tepp_run.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_snapshot = pair_artifact();
+    bad_snapshot.source_snapshot_sha256 = "abc".into();
+    assert_eq!(bad_snapshot.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_cutoff = pair_artifact();
+    bad_cutoff.knowledge_cutoff = "yesterday".into();
+    assert_eq!(bad_cutoff.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut empty_channels = pair_artifact();
+    empty_channels.channel_codes = vec![];
+    assert_eq!(empty_channels.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut dirty_channel = pair_artifact();
+    dirty_channel.channel_codes.push(" bad ".into());
+    assert_eq!(dirty_channel.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_seed_domain = pair_artifact();
+    bad_seed_domain.draw_provenance.seed_domain = "  padded ".into();
+    assert_eq!(bad_seed_domain.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut extra_posterior = pair_artifact();
+    extra_posterior.admitted_pair_ids = vec![
+        "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into(),
+        "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b9".into(),
+    ];
+    assert_eq!(extra_posterior.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut missing_posterior = pair_artifact();
+    missing_posterior.admitted_pair_ids = vec![];
+    assert_eq!(
+        missing_posterior.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut bad_basis_id = pair_artifact();
+    bad_basis_id.anchor_basis.basis_id = "not-a-uuid".into();
+    assert_eq!(bad_basis_id.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_basis_sha = pair_artifact();
+    bad_basis_sha.anchor_basis.basis_sha256 = "xyz".into();
+    assert_eq!(bad_basis_sha.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_provenance = pair_artifact();
+    bad_provenance.temporal_provenance.method_code = "garbage".into();
+    assert_eq!(bad_provenance.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_backend = pair_artifact();
+    bad_backend.compute_receipts.cpu.backend_code = "python".into();
+    assert_eq!(bad_backend.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_parity = pair_artifact();
+    bad_parity.compute_receipts.parity_bound = 0.0;
+    assert_eq!(bad_parity.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut cpu_difference = pair_artifact();
+    cpu_difference
+        .compute_receipts
+        .cpu
+        .observed_maximum_difference = 1.0e-9;
+    assert_eq!(cpu_difference.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_pair_id = pair_artifact();
+    bad_pair_id.pair_posteriors[0].pair_id = "not-a-uuid".into();
+    assert_eq!(bad_pair_id.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut same_records = pair_artifact();
+    same_records.pair_posteriors[0].successor_record_id = "record-a".into();
+    assert_eq!(same_records.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut too_few_draws = pair_artifact();
+    too_few_draws.draw_provenance.draw_count = 1;
+    assert_eq!(too_few_draws.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut mismatched_draw_len = pair_artifact();
+    mismatched_draw_len.pair_posteriors[0].criterion_draws = vec![0.35];
+    assert_eq!(
+        mismatched_draw_len.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn journey_rejects_every_remaining_invalid_clause() {
+    let mut bad_schema = journey();
+    bad_schema.schema_version = "tepp.project_journey_posterior.v2".into();
+    assert_eq!(bad_schema.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_run_id = journey();
+    bad_run_id.tepp_run_id = " a ".into();
+    assert_eq!(bad_run_id.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_snapshot = journey();
+    bad_snapshot.source_snapshot_sha256 = "x".into();
+    assert_eq!(bad_snapshot.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_cutoff = journey();
+    bad_cutoff.knowledge_cutoff = "later".into();
+    assert_eq!(bad_cutoff.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut one_draw = journey();
+    one_draw.draw_count = 1;
+    assert_eq!(one_draw.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_status = journey();
+    bad_status.inference_status = "causal".into();
+    assert_eq!(bad_status.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut orphan = journey();
+    orphan.events = vec![];
+    assert_eq!(orphan.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut duplicate_event = journey();
+    duplicate_event
+        .events
+        .push(duplicate_event.events[0].clone());
+    assert_eq!(duplicate_event.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut duplicate_relation = journey();
+    duplicate_relation
+        .relations
+        .push(duplicate_relation.relations[0].clone());
+    assert_eq!(
+        duplicate_relation.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut bad_event_identity = journey();
+    bad_event_identity.events[1].event_id = "has whitespace".into();
+    assert_eq!(
+        bad_event_identity.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut short_relation_draws = journey();
+    short_relation_draws.relations[0].relation_draws = vec![true];
+    assert_eq!(
+        short_relation_draws.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut empty_relation_evidence = journey();
+    empty_relation_evidence.relations[0].evidence_record_ids = vec![];
+    assert_eq!(
+        empty_relation_evidence.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut dangling_predecessor = journey();
+    dangling_predecessor.relations[0].predecessor_event_id = "ghost".into();
+    assert_eq!(
+        dangling_predecessor.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut self_relation = journey();
+    self_relation.relations[0].successor_event_id = "request".into();
+    self_relation.relations[0].relation_id = "self-loop".into();
+    assert_eq!(self_relation.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut invalid_evidence = journey();
+    invalid_evidence.events[1].evidence_record_ids = vec!["  padded  ".into()];
+    assert_eq!(
+        invalid_evidence.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn journey_accepts_every_sanctioned_event_type_and_rejects_unknown_kinds() {
+    for event_type in [
+        "prior_project",
+        "customer_request",
+        "procurement_notice",
+        "direct_bid",
+        "negotiated_bid",
+        "external_sensing",
+        "internal_discussion",
+        "lead",
+        "design",
+        "production",
+        "delivery",
+        "trial_operation",
+        "operation",
+        "claim",
+        "rebid",
+        "other_evidence_grounded_event",
+    ] {
+        let single = ProjectJourneyPosteriorArtifact {
+            schema_version: PROJECT_JOURNEY_POSTERIOR_SCHEMA.into(),
+            tepp_run_id: "journey-run-type".into(),
+            source_snapshot_sha256: digest('a'),
+            knowledge_cutoff: "2026-08-25T00:00:00Z".into(),
+            draw_count: 2,
+            inference_status: "posterior_temporal_relation_not_causal".into(),
+            events: vec![ProjectJourneyEventPosterior {
+                event_id: "single-event".into(),
+                event_type_code: event_type.into(),
+                record_created_at: "2026-03-03T00:00:00Z".into(),
+                available_at: "2026-03-03T00:00:00Z".into(),
+                event_time_draws: vec![
+                    "2026-01-01T00:00:00Z".into(),
+                    "2026-01-02T00:00:00Z".into(),
+                ],
+                evidence_record_ids: vec!["evidence-single".into()],
+            }],
+            relations: vec![],
+        };
+        assert!(
+            single.to_json().is_ok(),
+            "sanctioned event type {event_type} must be accepted"
+        );
+    }
+
+    let mut unknown = journey();
+    unknown.events[1].event_type_code = "telepathy".into();
+    assert_eq!(unknown.to_json(), Err(ApiError::InvalidWirePayload));
+}
+
+#[test]
+fn journey_rejects_each_single_clause_violation() {
+    let mut dirty_event_identity = journey();
+    dirty_event_identity.events[0].event_id = "  padded  ".into();
+    assert_eq!(
+        dirty_event_identity.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut unparsed_created = journey();
+    unparsed_created.events[1].record_created_at = "not-a-time".into();
+    assert_eq!(
+        unparsed_created.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut unparsed_available = journey();
+    unparsed_available.events[1].available_at = "not-a-time".into();
+    assert_eq!(
+        unparsed_available.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut short_draws = journey();
+    short_draws.events[1].event_time_draws.pop();
+    assert_eq!(short_draws.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut drawn_garbage = journey();
+    drawn_garbage.events[1].event_time_draws[0] = "garbage".into();
+    assert_eq!(drawn_garbage.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut missing_event_evidence = journey();
+    missing_event_evidence.events[1].evidence_record_ids = vec![];
+    assert_eq!(
+        missing_event_evidence.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut bad_relation_identity = journey();
+    bad_relation_identity.relations[0].relation_id = String::new();
+    assert_eq!(
+        bad_relation_identity.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut dangling_successor = journey();
+    dangling_successor.relations[0].successor_event_id = "ghost".into();
+    assert_eq!(
+        dangling_successor.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut padded_relation_type = journey();
+    padded_relation_type.relations[0].relation_type_code = " arrives ".into();
+    assert_eq!(
+        padded_relation_type.to_json(),
+        Err(ApiError::InvalidWirePayload)
+    );
+}

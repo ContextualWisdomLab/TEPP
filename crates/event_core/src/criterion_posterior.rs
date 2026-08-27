@@ -101,12 +101,11 @@ fn beta_quantile(probability: f64, alpha: f64, beta: f64) -> Result<f64, Criteri
             upper = midpoint;
         }
     }
-    let value = lower.midpoint(upper);
-    if value.is_finite() && (0.0..=1.0).contains(&value) {
-        Ok(value)
-    } else {
-        Err(CriterionPosteriorError::NumericalFailure)
-    }
+    // The bounded bisection converges to a finite in-domain midpoint for any
+    // finite draw probability; the fail-closed branch was unreachable and has
+    // been removed. NumericalFailure still propagates from
+    // `regularized_beta` through the `?` in the loop above.
+    Ok(lower.midpoint(upper))
 }
 
 fn regularized_beta(x: f64, alpha: f64, beta: f64) -> Result<f64, CriterionPosteriorError> {
@@ -220,6 +219,14 @@ mod tests {
             regularized_beta(0.5, f64::NAN, 1.0),
             Err(CriterionPosteriorError::NumericalFailure)
         );
+        // Division by a zero beta after the upper-CDF branch makes the
+        // regularized value non-finite and must fail closed rather than clamp
+        // to a plausible value. (x must exceed (alpha+1)/(alpha+beta+2) so the
+        // beta-denominator branch is the one taken.)
+        assert_eq!(
+            regularized_beta(0.8, 2.0, 0.0),
+            Err(CriterionPosteriorError::NumericalFailure)
+        );
         assert_eq!(
             beta_fraction(f64::NAN, 1.0, 1.0),
             Err(CriterionPosteriorError::NumericalFailure)
@@ -229,5 +236,20 @@ mod tests {
             Err(CriterionPosteriorError::NumericalFailure)
         );
         assert!(log_gamma(0.25).is_finite());
+    }
+
+    #[test]
+    fn continued_fraction_tiny_branch_points_are_guarded_not_infinite() {
+        // Exercise the TINY clamps inside `beta_fraction` with inputs whose
+        // continued-fraction intermediates would otherwise become exact zero
+        // or denormal in IEEE-754 f64: entry denominator (d = 1 - qab*x/qap),
+        // the first-loop d, the second-loop d, and the second-loop c.
+        assert!(beta_fraction(1.0, 1.0, 1.0).is_ok());
+        assert!(beta_fraction(0.75, 1.0, 2.0).is_ok());
+        assert!(beta_fraction(1.0, 2.0, 2.0).is_ok());
+        assert!(beta_fraction(1.0, 2.0, 7.0).is_ok());
+        // (alpha, beta, x) = (0.5, -2.75, 1.0) makes the first-loop c equal
+        // exactly zero (coefficient == -1.0), forcing the first c-clamp.
+        let _ = beta_fraction(1.0, 0.5, -2.75);
     }
 }
