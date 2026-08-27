@@ -53,7 +53,9 @@ pub use analysis_result::terminal_result_matches_request;
 pub use analysis_run::ANALYSIS_RUN_CONTRACT_VERSION;
 /// Analysis-run status/read contract version constant.
 pub use analysis_run::ANALYSIS_RUN_STATUS_CONTRACT_VERSION;
+/// Analysis-run status HTTP exchange sink path for caller-scoped probes.
 pub use analysis_run::ANALYSIS_RUN_STATUS_PATH;
+/// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{
     ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange,
 };
