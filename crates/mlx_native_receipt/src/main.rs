@@ -101,6 +101,9 @@ fn run() -> Result<ProbeReceipt, Box<dyn std::error::Error>> {
 }
 
 fn emit_receipt(receipt: &ProbeReceipt) -> Result<(), Box<dyn std::error::Error>> {
+    if !receipt.observed_maximum_difference.is_finite() {
+        return Err("observed_maximum_difference must be finite".into());
+    }
     println!("{}", serde_json::to_string(receipt)?);
     Ok(())
 }
@@ -196,5 +199,14 @@ mod tests {
             observed_maximum_difference: f64::NAN,
         };
         emit_receipt(&receipt).expect_err("NaN must fail closed on JSON emit");
+        let infinite = ProbeReceipt {
+            schema_version: RECEIPT_SCHEMA_VERSION,
+            backend_code: "mlx_cpu_macos_native",
+            execution_environment_code: "macos_native",
+            objective_sha256: "a".repeat(64),
+            output_sha256: "b".repeat(64),
+            observed_maximum_difference: f64::INFINITY,
+        };
+        emit_receipt(&infinite).expect_err("Infinity must fail closed on JSON emit");
     }
 }
