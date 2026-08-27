@@ -345,7 +345,7 @@ fn pair_posterior_rejects_each_contract_violation() {
         artifact
             .temporal_provenance
             .branch_transition_sha256
-            .clear()
+            .clear();
     });
     reject(|artifact| artifact.compute_receipts.cpu.backend_code.clear());
     reject(|artifact| artifact.compute_receipts.cpu.execution_environment_code = " env".into());
