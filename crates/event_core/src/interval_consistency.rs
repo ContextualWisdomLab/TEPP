@@ -254,6 +254,8 @@ mod tests {
         assert_eq!(ab, AllenRelation::Before);
         assert_eq!(bc, AllenRelation::Before);
         let report = network.close().expect("path consistent");
+        assert!(report.changed());
+        assert!(report.revisions() > 0);
         assert!(report.propagation_steps() > 0);
         let ac = network.relation_set(a, c).expect("a to c");
         assert!(ac.contains(AllenRelation::Before));
@@ -283,9 +285,7 @@ mod tests {
         );
         assert_eq!(conflict, Err(EventError::IntervalConsistencyContradiction));
         assert_eq!(
-            refuse_interval_contradiction_as_instance(
-                EventError::IntervalConsistencyContradiction
-            ),
+            refuse_interval_contradiction_as_instance(EventError::IntervalConsistencyContradiction),
             Err(EventError::IntervalContradictionIsNotEventInstance)
         );
     }
@@ -296,12 +296,24 @@ mod tests {
             IntervalConsistencyNetwork::with_limits(0, 1, 1).map(|_| ()),
             Err(EventError::IntervalConsistencyInvalidLimits)
         );
+        assert_eq!(
+            IntervalConsistencyNetwork::with_limits(1, 0, 1).map(|_| ()),
+            Err(EventError::IntervalConsistencyInvalidLimits)
+        );
+        assert_eq!(
+            IntervalConsistencyNetwork::with_limits(1, 1, 0).map(|_| ()),
+            Err(EventError::IntervalConsistencyInvalidLimits)
+        );
         let mut network = IntervalConsistencyNetwork::with_limits(2, 2, 8).expect("limits");
         let left = network.add_variable().expect("left");
         let right = network.add_variable().expect("right");
         let open = TemporalInterval::bounded(
-            TemporalBoundary::Excluded(EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s")),
-            TemporalBoundary::Included(EventTime::parse_rfc3339("2026-01-02T00:00:00Z").expect("e")),
+            TemporalBoundary::Excluded(
+                EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("s"),
+            ),
+            TemporalBoundary::Included(
+                EventTime::parse_rfc3339("2026-01-02T00:00:00Z").expect("e"),
+            ),
             TemporalPrecision::Second,
         )
         .expect("open lower");
@@ -340,6 +352,78 @@ mod tests {
         assert_eq!(
             network.close().map(|_| ()),
             Err(EventError::IntervalConsistencyContradiction)
+        );
+    }
+
+    #[test]
+    fn foreign_variable_capacity_and_quiet_close_fail_closed() {
+        let mut local = IntervalConsistencyNetwork::with_limits(1, 1, 8).expect("limits");
+        let mut foreign = IntervalConsistencyNetwork::with_limits(2, 2, 8).expect("foreign");
+        let local_var = local.add_variable().expect("local");
+        assert_eq!(
+            local.add_variable().map(|_| ()),
+            Err(EventError::IntervalConsistencyLimitExceeded)
+        );
+        let foreign_var = foreign.add_variable().expect("foreign");
+        assert_eq!(
+            local.relation_set(foreign_var, local_var).map(|_| ()),
+            Err(EventError::IntervalConsistencyUnknownVariable)
+        );
+        assert_eq!(
+            local
+                .assert_qualitative_relations(
+                    local_var,
+                    foreign_var,
+                    RelationSet::singleton(AllenRelation::Before),
+                )
+                .map(|_| ()),
+            Err(EventError::IntervalConsistencyUnknownVariable)
+        );
+        local
+            .assert_qualitative_relations(
+                local_var,
+                local_var,
+                RelationSet::singleton(AllenRelation::Equals),
+            )
+            .expect("self equals");
+        assert_eq!(
+            local
+                .assert_qualitative_relations(
+                    local_var,
+                    local_var,
+                    RelationSet::singleton(AllenRelation::Equals),
+                )
+                .map(|_| ()),
+            Err(EventError::IntervalConsistencyLimitExceeded)
+        );
+
+        let mut pair = IntervalConsistencyNetwork::with_limits(2, 2, 8).expect("pair");
+        let left = pair.add_variable().expect("left");
+        let right = pair.add_variable().expect("right");
+        pair.assert_qualitative_relations(
+            left,
+            right,
+            RelationSet::singleton(AllenRelation::Before),
+        )
+        .expect("before");
+        let quiet = pair.close().expect("two-node close has no middle");
+        assert!(!quiet.changed());
+        assert_eq!(quiet.revisions(), 0);
+        assert_eq!(quiet.propagation_steps(), 0);
+
+        let mut tight = IntervalConsistencyNetwork::with_limits(8, 16, 1).expect("tight");
+        let a = tight.add_variable().expect("a");
+        let b = tight.add_variable().expect("b");
+        let c = tight.add_variable().expect("c");
+        tight
+            .assert_qualitative_relations(a, b, RelationSet::singleton(AllenRelation::Before))
+            .expect("a before b");
+        tight
+            .assert_qualitative_relations(b, c, RelationSet::singleton(AllenRelation::Before))
+            .expect("b before c");
+        assert_eq!(
+            tight.close().map(|_| ()),
+            Err(EventError::IntervalConsistencyLimitExceeded)
         );
     }
 }
