@@ -250,6 +250,6 @@ mod tests {
         assert!(beta_fraction(1.0, 2.0, 7.0).is_ok());
         // (alpha, beta, x) = (0.5, -2.75, 1.0) makes the first-loop c equal
         // exactly zero (coefficient == -1.0), forcing the first c-clamp.
-        assert!(beta_fraction(1.0, 0.5, -2.75).is_ok() || true);
+        let _ = beta_fraction(1.0, 0.5, -2.75);
     }
 }

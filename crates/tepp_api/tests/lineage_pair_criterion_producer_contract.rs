@@ -453,3 +453,42 @@ fn journey_accepts_every_sanctioned_event_type_and_rejects_unknown_kinds() {
     unknown.events[1].event_type_code = "telepathy".into();
     assert_eq!(unknown.to_json(), Err(ApiError::InvalidWirePayload));
 }
+
+#[test]
+fn journey_rejects_each_single_clause_violation() {
+    let mut dirty_event_identity = journey();
+    dirty_event_identity.events[0].event_id = "  padded  ".into();
+    assert_eq!(dirty_event_identity.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut unparsed_created = journey();
+    unparsed_created.events[1].record_created_at = "not-a-time".into();
+    assert_eq!(unparsed_created.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut unparsed_available = journey();
+    unparsed_available.events[1].available_at = "not-a-time".into();
+    assert_eq!(unparsed_available.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut short_draws = journey();
+    short_draws.events[1].event_time_draws.pop();
+    assert_eq!(short_draws.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut drawn_garbage = journey();
+    drawn_garbage.events[1].event_time_draws[0] = "garbage".into();
+    assert_eq!(drawn_garbage.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut missing_event_evidence = journey();
+    missing_event_evidence.events[1].evidence_record_ids = vec![];
+    assert_eq!(missing_event_evidence.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut bad_relation_identity = journey();
+    bad_relation_identity.relations[0].relation_id = "".into();
+    assert_eq!(bad_relation_identity.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut dangling_successor = journey();
+    dangling_successor.relations[0].successor_event_id = "ghost".into();
+    assert_eq!(dangling_successor.to_json(), Err(ApiError::InvalidWirePayload));
+
+    let mut padded_relation_type = journey();
+    padded_relation_type.relations[0].relation_type_code = " arrives ".into();
+    assert_eq!(padded_relation_type.to_json(), Err(ApiError::InvalidWirePayload));
+}

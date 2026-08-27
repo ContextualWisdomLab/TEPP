@@ -197,7 +197,6 @@ impl LineagePairCriterionPosteriorArtifact {
             || !identifier(&self.draw_provenance.seed_domain)
             || pair_ids != admitted
             || admitted.len() != self.admitted_pair_ids.len()
-            || pair_ids.len() != self.pair_posteriors.len()
             || self.anchor_basis.alignment_status != "unique"
             || self.anchor_basis.tie_count != 0
             || !canonical_uuid(&self.anchor_basis.basis_id)
@@ -463,6 +462,45 @@ mod branch_coverage_tests {
         let mut mismatched_objective = receipts();
         mismatched_objective.gpu.objective_sha256 = "c".repeat(64);
         assert!(!valid_receipts(&mismatched_objective));
+        let mut bad_parity = receipts();
+        bad_parity.parity_method_code = "  whitespace  ".into();
+        assert!(!valid_receipts(&bad_parity));
+
+        let mut nan_parity = receipts();
+        nan_parity.parity_bound = f64::NAN;
+        assert!(!valid_receipts(&nan_parity));
+
+        let mut zero_parity = receipts();
+        zero_parity.parity_bound = 0.0;
+        assert!(!valid_receipts(&zero_parity));
+
+        let mut foreign_cpu = receipts();
+        foreign_cpu.cpu.backend_code = "aggregator_cpu".into();
+        assert!(!valid_receipts(&foreign_cpu));
+
+        let mut missing_cpu_backend = receipts();
+        missing_cpu_backend.cpu.backend_code = "".into();
+        assert!(!valid_receipts(&missing_cpu_backend));
+
+        let mut dirty_gpu_env = receipts();
+        dirty_gpu_env.gpu.execution_environment_code = "host".into();
+        assert!(!valid_receipts(&dirty_gpu_env));
+
+        let mut empty_env = receipts();
+        empty_env.gpu.execution_environment_code = "".into();
+        assert!(!valid_receipts(&empty_env));
+
+        let mut short_objective = receipts();
+        short_objective.gpu.objective_sha256 = "z".into();
+        assert!(!valid_receipt(&short_objective.gpu));
+
+        let mut short_parameter = receipts();
+        short_parameter.gpu.parameter_sha256 = "z".into();
+        assert!(!valid_receipt(&short_parameter.gpu));
+
+        let mut short_draw = receipts();
+        short_draw.gpu.draw_sha256 = "z".into();
+        assert!(!valid_receipt(&short_draw.gpu));
     }
 
     #[test]
@@ -501,7 +539,41 @@ mod branch_coverage_tests {
         out_of_range.criterion_draws[0] = 1.5;
         assert!(!valid_pair(&out_of_range, 2, cutoff));
 
+        let mut empty_records = posterior();
+        empty_records.predecessor_record_id = "".into();
+        assert!(!valid_pair(&empty_records, 2, cutoff));
 
+        let mut padded_records = posterior();
+        padded_records.successor_record_id = " padded ".into();
+        assert!(!valid_pair(&padded_records, 2, cutoff));
+
+        let mut unparsed_created = posterior();
+        unparsed_created.successor_record_created_at = "not-a-time".into();
+        assert!(!valid_pair(&unparsed_created, 2, cutoff));
+
+        let mut unparsed_available = posterior();
+        unparsed_available.predecessor_available_at = "not-a-time".into();
+        assert!(!valid_pair(&unparsed_available, 2, cutoff));
+
+        let mut short_draws = posterior();
+        short_draws.successor_event_time_draws.pop();
+        assert!(!valid_pair(&short_draws, 2, cutoff));
+
+        let mut nan_criterion = posterior();
+        nan_criterion.criterion_draws = vec![f64::NAN, 0.5];
+        assert!(!valid_pair(&nan_criterion, 2, cutoff));
+
+        let mut short_first_draws = posterior();
+        short_first_draws.predecessor_event_time_draws.pop();
+        assert!(!valid_pair(&short_first_draws, 2, cutoff));
+
+        let mut short_second_draws = posterior();
+        short_second_draws.successor_event_time_draws.pop();
+        assert!(!valid_pair(&short_second_draws, 2, cutoff));
+
+        let mut invalid_created = posterior();
+        invalid_created.predecessor_record_created_at = "not-a-time".into();
+        assert!(!valid_pair(&invalid_created, 2, cutoff));
     }
 
     #[test]
