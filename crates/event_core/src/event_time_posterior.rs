@@ -69,21 +69,24 @@ pub fn materialize_event_time_posterior(
     for atom in ordered {
         draws.extend(std::iter::repeat_n(
             atom.event_time,
-            usize::from(atom.multiplicity),
+            usize::try_from(atom.multiplicity)
+                .map_err(|_| EventTimePosteriorError::DrawCountOverflow)?,
         ));
     }
     Ok(EventTimePosteriorDraws { draws })
 }
 
 fn add_atom_mass(total: usize, multiplicity: u32) -> Result<usize, EventTimePosteriorError> {
+    let mass =
+        usize::try_from(multiplicity).map_err(|_| EventTimePosteriorError::DrawCountOverflow)?;
     total
-        .checked_add(usize::from(multiplicity))
+        .checked_add(mass)
         .ok_or(EventTimePosteriorError::DrawCountOverflow)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{EventTimePosteriorError, add_atom_mass};
+    use super::{add_atom_mass, EventTimePosteriorError};
 
     #[test]
     fn overflowing_draw_count_fails_closed() {
