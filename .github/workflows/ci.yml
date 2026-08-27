@@ -145,6 +145,10 @@ jobs:
         run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
       - name: Generate exact line coverage with region diagnostics
         id: line-report
+        # mlx_native_receipt is excluded exactly like sqlx_live.rs: it is a
+        # macOS/MLX-only device receipt probe whose success path cannot
+        # execute on the Linux coverage runner (see ADR 0025). Its macOS
+        # behaviour is covered by the crate's cfg(macos) tests.
         run: cargo llvm-cov --workspace --all-features --json --output-path coverage.json --ignore-filename-regex 'sqlx_live\.rs|mlx_native_receipt'
       - name: Export exact authored line coverage
         run: cargo llvm-cov report --lcov --output-path coverage.lcov --ignore-filename-regex 'sqlx_live\.rs|mlx_native_receipt'
