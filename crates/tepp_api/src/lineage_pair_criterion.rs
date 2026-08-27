@@ -480,7 +480,7 @@ mod branch_coverage_tests {
         assert!(!valid_receipts(&foreign_cpu));
 
         let mut missing_cpu_backend = receipts();
-        missing_cpu_backend.cpu.backend_code = "".into();
+        missing_cpu_backend.cpu.backend_code = String::new();
         assert!(!valid_receipts(&missing_cpu_backend));
 
         let mut dirty_gpu_env = receipts();
@@ -488,7 +488,7 @@ mod branch_coverage_tests {
         assert!(!valid_receipts(&dirty_gpu_env));
 
         let mut empty_env = receipts();
-        empty_env.gpu.execution_environment_code = "".into();
+        empty_env.gpu.execution_environment_code = String::new();
         assert!(!valid_receipts(&empty_env));
 
         let mut short_objective = receipts();
@@ -541,7 +541,7 @@ mod branch_coverage_tests {
         assert!(!valid_pair(&out_of_range, 2, cutoff));
 
         let mut empty_records = posterior();
-        empty_records.predecessor_record_id = "".into();
+        empty_records.predecessor_record_id = String::new();
         assert!(!valid_pair(&empty_records, 2, cutoff));
 
         let mut padded_records = posterior();

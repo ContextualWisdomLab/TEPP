@@ -518,7 +518,7 @@ fn journey_rejects_each_single_clause_violation() {
     );
 
     let mut bad_relation_identity = journey();
-    bad_relation_identity.relations[0].relation_id = "".into();
+    bad_relation_identity.relations[0].relation_id = String::new();
     assert_eq!(
         bad_relation_identity.to_json(),
         Err(ApiError::InvalidWirePayload)

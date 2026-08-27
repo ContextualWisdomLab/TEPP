@@ -133,7 +133,7 @@ fn runner_rejects_each_invalid_input_clause() {
     );
 
     let mut empty_identity = documents();
-    empty_identity[0].document_id = "".into();
+    empty_identity[0].document_id = String::new();
     assert_eq!(
         fit_exhaustive_case_deletion(&empty_identity, "seed", &MeanFitter),
         Err(ExhaustiveCaseDeletionError::InvalidInput)
