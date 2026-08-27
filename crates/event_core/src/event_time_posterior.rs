@@ -86,7 +86,7 @@ fn add_atom_mass(total: usize, multiplicity: u32) -> Result<usize, EventTimePost
 
 #[cfg(test)]
 mod tests {
-    use super::{add_atom_mass, EventTimePosteriorError};
+    use super::{EventTimePosteriorError, add_atom_mass};
 
     #[test]
     fn overflowing_draw_count_fails_closed() {
