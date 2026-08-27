@@ -264,3 +264,19 @@ fn allowed_event_type(value: &str) -> bool {
             | "other_evidence_grounded_event"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{digest, identifier};
+
+    #[test]
+    fn identifier_and_digest_refuse_empty_padded_oversize_and_short_hex() {
+        assert!(!identifier(""));
+        assert!(!identifier(" padded"));
+        assert!(!identifier(&"x".repeat(257)));
+        assert!(identifier("ok"));
+        assert!(!digest(&"0".repeat(63)));
+        assert!(!digest(&"G".repeat(64)));
+        assert!(digest(&"a".repeat(64)));
+    }
+}
