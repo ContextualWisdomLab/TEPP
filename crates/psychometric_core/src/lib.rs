@@ -234,6 +234,18 @@
 //! `μ_0 / √p_0` is `T0MEANSstd` and is not that map even when
 //! `μ_0 = √p_0`; `p / p = 1` is `asymDIFFUSIONstd` and is not that
 //! map even when both equal 1; JSS PDF re-opened 2026-08-26T07:17Z),
+//! recovers the Driver p. 16 `asymDIFFUSIONstd` as `p / p = 1` after
+//! strictly positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4
+//! uses only the relevant within-subject variance; 2017-era
+//! `summary.ctsemFit.R` forms `asymDIFFUSIONstd` as
+//! `solve(sqrt(diag(asymDIFFUSION))) %&% asymDIFFUSION`; `OpenMx`
+//! `%&%` is `t(A) %*% B %*% A`; default ridge is 0; unstandardised
+//! `p` is defined for a zero process and is not that map; `p_0 / p_0
+//! = 1` is `T0VARstd` and is not that map even when both equal 1;
+//! `q / p = −2 a` is `DIFFUSIONstd` and is not that map; `v / v = 1`
+//! is `TIPREDVARstd` and is not that map even when both equal 1;
+//! zero `q` fails closed; a non-event clock fails closed; `a ≥ 0`
+//! fails closed; JSS PDF re-opened 2026-08-26T17:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -374,6 +386,8 @@ pub use event_time::recover_manifest_observed_variance;
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 /// Exact scalar p. 16 `asymCINTstd` `(-κ / a) / √p` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_asymptotic_continuous_intercept;
+/// Exact scalar p. 16 `asymDIFFUSIONstd` `p / p = 1` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_asymptotic_diffusion;
 /// Exact scalar p. 16 `CINTstd` `κ / √p`.
 pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
@@ -578,16 +592,22 @@ pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 pub use event_time::refuse_process_noise_as_unconditional_variance;
 /// Refuse treating p. 16 `asymDIFFUSIONstd` as `T0VARstd`.
 pub use event_time::refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance;
+/// Refuse treating p. 16 `DIFFUSIONstd` as `asymDIFFUSIONstd`.
+pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `CINTstd` as `asymCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
 /// Refuse treating p. 16 `T0MEANSstd` as `T0VARstd`.
 pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance;
+/// Refuse treating p. 16 `T0VARstd` as `asymDIFFUSIONstd`.
+pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `T0VARstd` as `T0MEANSstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
+/// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
+pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymTIPREDEFFECT`.
@@ -672,6 +692,8 @@ pub use event_time::refuse_trait_variance_as_stationary_within_subject;
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 /// Refuse treating unstandardised `asymCINT` as `asymCINTstd`.
 pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
+/// Refuse treating unstandardised `asymDIFFUSION` as `asymDIFFUSIONstd`.
+pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
