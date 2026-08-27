@@ -6509,7 +6509,34 @@ fn standardised_manifest_variance_refuses_non_event_clocks_and_does_not_keep_zer
         Err(PsychometricError::EventTimeRequired)
     );
     assert_eq!(
+        recover_standardised_manifest_variance(-0.4, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_manifest_variance(f64::NAN, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_manifest_variance(f64::INFINITY, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
         recover_standardised_manifest_variance(0.0, LagClock::EventTime),
         Err(PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance)
+    );
+}
+
+#[test]
+fn manifest_variance_std_clock_path_is_runtime_opaque() {
+    let clocks = [
+        LagClock::SystemTime,
+        LagClock::DocumentTime,
+        LagClock::AssertionTime,
+    ];
+    let non_event_index = std::process::id() as usize % clocks.len();
+    let non_event = clocks[non_event_index];
+    assert_eq!(
+        recover_standardised_manifest_variance(0.4, non_event),
+        Err(PsychometricError::EventTimeRequired)
     );
 }
