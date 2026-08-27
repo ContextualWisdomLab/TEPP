@@ -197,7 +197,6 @@ impl LineagePairCriterionPosteriorArtifact {
             || !identifier(&self.draw_provenance.seed_domain)
             || pair_ids != admitted
             || admitted.len() != self.admitted_pair_ids.len()
-            || pair_ids.len() != self.pair_posteriors.len()
             || self.anchor_basis.alignment_status != "unique"
             || self.anchor_basis.tie_count != 0
             || !canonical_uuid(&self.anchor_basis.basis_id)
@@ -309,4 +308,329 @@ fn valid_pair(pair: &LineagePairCriterionPosterior, draws: usize, cutoff: Timest
                 && criterion.is_finite()
                 && (0.0..=1.0).contains(criterion)
         })
+}
+
+#[cfg(test)]
+mod branch_coverage_tests {
+    use super::{
+        ApiError, LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA, LineageAnchorBasis,
+        LineageComputeReceipt, LineageComputeReceipts, LineageDrawProvenance,
+        LineagePairCriterionPosterior, LineagePairCriterionPosteriorArtifact,
+        LineageTemporalProvenance, digest, identifier, valid_accelerator_backend, valid_pair,
+        valid_receipt, valid_receipts, valid_temporal_provenance,
+    };
+
+    fn receipt(backend: &str) -> LineageComputeReceipt {
+        LineageComputeReceipt {
+            backend_code: backend.into(),
+            execution_environment_code: if backend == "mlx_metal_macos_native" {
+                "macos_native".into()
+            } else {
+                "linux_container".into()
+            },
+            objective_sha256: "a".repeat(64),
+            parameter_sha256: "b".repeat(64),
+            draw_sha256: "c".repeat(64),
+            observed_maximum_difference: if backend == "rust_cpu" { 0.0 } else { 5.0e-9 },
+        }
+    }
+
+    fn receipts() -> LineageComputeReceipts {
+        LineageComputeReceipts {
+            cpu: receipt("rust_cpu"),
+            gpu: receipt("mlx_metal_macos_native"),
+            parity_method_code: "producer_method_derived_v1".into(),
+            parity_bound: 1.0e-8,
+        }
+    }
+
+    fn posterior() -> LineagePairCriterionPosterior {
+        LineagePairCriterionPosterior {
+            pair_id: "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into(),
+            predecessor_record_id: "record-a".into(),
+            successor_record_id: "record-b".into(),
+            predecessor_record_created_at: "2026-01-03T00:00:00Z".into(),
+            predecessor_available_at: "2026-01-04T00:00:00Z".into(),
+            successor_record_created_at: "2026-01-01T00:00:00Z".into(),
+            successor_available_at: "2026-01-05T00:00:00Z".into(),
+            predecessor_event_time_draws: vec![
+                "2025-12-01T00:00:00Z".into(),
+                "2025-12-02T00:00:00Z".into(),
+            ],
+            successor_event_time_draws: vec![
+                "2025-12-10T00:00:00Z".into(),
+                "2025-12-11T00:00:00Z".into(),
+            ],
+            criterion_draws: vec![0.35, 0.65],
+        }
+    }
+
+    fn artifact() -> LineagePairCriterionPosteriorArtifact {
+        LineagePairCriterionPosteriorArtifact {
+            schema_version: LINEAGE_PAIR_CRITERION_POSTERIOR_SCHEMA.into(),
+            estimation_run_id: "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b1".into(),
+            tepp_run_id: "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b2".into(),
+            source_snapshot_sha256: "d".repeat(64),
+            knowledge_cutoff: "2026-08-25T00:00:00Z".into(),
+            channel_codes: vec!["temporal".into(), "text".into()],
+            admitted_pair_ids: vec!["018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into()],
+            anchor_basis: LineageAnchorBasis {
+                basis_id: "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b4".into(),
+                basis_sha256: "e".repeat(64),
+                alignment_status: "unique".into(),
+                tie_count: 0,
+            },
+            temporal_provenance: LineageTemporalProvenance {
+                method_code: "TDT_CHRONOS_JOINT".into(),
+                configuration_sha256: "f".repeat(64),
+                event_clock_code: "event_valid_time".into(),
+                temporal_dependency_sha256: "1".repeat(64),
+                branch_transition_sha256: "2".repeat(64),
+            },
+            draw_provenance: LineageDrawProvenance {
+                seed_domain: "independent-lineage-criterion".into(),
+                draw_count: 2,
+            },
+            pair_posteriors: vec![posterior()],
+            compute_receipts: receipts(),
+        }
+    }
+
+    #[test]
+    fn identifiers_and_digests_fail_closed_on_each_guard_arm() {
+        assert!(!identifier(""));
+        assert!(!identifier(&"x".repeat(257)));
+        assert!(!identifier(" padded "));
+        assert!(!digest(&"X".repeat(64)));
+        assert!(!digest(&"a".repeat(63)));
+    }
+
+    #[test]
+    fn temporal_provenance_rejects_each_guard_arm() {
+        let mut base = LineageTemporalProvenance {
+            method_code: "TDT_CHRONOS_JOINT".into(),
+            configuration_sha256: "f".repeat(64),
+            event_clock_code: "event_valid_time".into(),
+            temporal_dependency_sha256: "1".repeat(64),
+            branch_transition_sha256: "2".repeat(64),
+        };
+        assert!(valid_temporal_provenance(&base));
+        base.method_code = "garbage".into();
+        assert!(!valid_temporal_provenance(&base));
+        base.method_code = "TDT".into();
+        base.configuration_sha256 = "z".into();
+        assert!(!valid_temporal_provenance(&base));
+        base.configuration_sha256 = "f".repeat(64);
+        base.event_clock_code = "  a  ".into();
+        assert!(!valid_temporal_provenance(&base));
+        base.event_clock_code = "event_valid_time".into();
+        base.temporal_dependency_sha256 = "q".into();
+        assert!(!valid_temporal_provenance(&base));
+    }
+
+    #[test]
+    fn receipts_reject_each_guard_arm_and_backend_rules() {
+        assert!(valid_receipts(&receipts()));
+        assert!(valid_accelerator_backend(&receipt("mlx_cpu")));
+        assert!(valid_accelerator_backend(&receipt("mlx_cuda")));
+        assert!(valid_accelerator_backend(&receipt("rust_opencl")));
+
+        let mut wrong_env = receipt("mlx_cpu");
+        wrong_env.execution_environment_code = "macos_native".into();
+        assert!(!valid_accelerator_backend(&wrong_env));
+
+        let mut unknown = receipt("garbage");
+        unknown.observed_maximum_difference = 0.0;
+        assert!(!valid_accelerator_backend(&unknown));
+
+        let mut bad_reference = receipt("rust_cpu");
+        bad_reference.observed_maximum_difference = 1.0e-9;
+        assert!(!valid_receipts(&LineageComputeReceipts {
+            cpu: bad_reference,
+            gpu: receipt("mlx_metal_macos_native"),
+            parity_method_code: "producer_method_derived_v1".into(),
+            parity_bound: 1.0e-8,
+        }));
+
+        let mut nan = receipt("rust_cpu");
+        nan.observed_maximum_difference = f64::NAN;
+        assert!(!valid_receipt(&nan));
+
+        let mut divergent = receipts();
+        divergent.gpu.observed_maximum_difference = 1.0e-7;
+        assert!(!valid_receipts(&divergent));
+
+        let mut mismatched_objective = receipts();
+        mismatched_objective.gpu.objective_sha256 = "c".repeat(64);
+        assert!(!valid_receipts(&mismatched_objective));
+        let mut bad_parity = receipts();
+        bad_parity.parity_method_code = "  whitespace  ".into();
+        assert!(!valid_receipts(&bad_parity));
+
+        let mut nan_parity = receipts();
+        nan_parity.parity_bound = f64::NAN;
+        assert!(!valid_receipts(&nan_parity));
+
+        let mut zero_parity = receipts();
+        zero_parity.parity_bound = 0.0;
+        assert!(!valid_receipts(&zero_parity));
+
+        let mut foreign_cpu = receipts();
+        foreign_cpu.cpu.backend_code = "aggregator_cpu".into();
+        assert!(!valid_receipts(&foreign_cpu));
+
+        let mut missing_cpu_backend = receipts();
+        missing_cpu_backend.cpu.backend_code = String::new();
+        assert!(!valid_receipts(&missing_cpu_backend));
+
+        let mut dirty_gpu_env = receipts();
+        dirty_gpu_env.gpu.execution_environment_code = "host".into();
+        assert!(!valid_receipts(&dirty_gpu_env));
+
+        let mut empty_env = receipts();
+        empty_env.gpu.execution_environment_code = String::new();
+        assert!(!valid_receipts(&empty_env));
+
+        let mut short_objective = receipts();
+        short_objective.gpu.objective_sha256 = "z".into();
+        assert!(!valid_receipt(&short_objective.gpu));
+
+        let mut short_parameter = receipts();
+        short_parameter.gpu.parameter_sha256 = "z".into();
+        assert!(!valid_receipt(&short_parameter.gpu));
+
+        let mut short_draw = receipts();
+        short_draw.gpu.draw_sha256 = "z".into();
+        assert!(!valid_receipt(&short_draw.gpu));
+    }
+
+    #[test]
+    fn pair_validator_rejects_each_clause() {
+        let cutoff = "2026-08-25T00:00:00Z".parse().expect("timestamp");
+
+        let mut nonuuid = posterior();
+        nonuuid.pair_id = "not-a-uuid".into();
+        assert!(!valid_pair(&nonuuid, 2, cutoff));
+
+        let mut same = posterior();
+        same.successor_record_id = "record-a".into();
+        assert!(!valid_pair(&same, 2, cutoff));
+
+        let mut unavailable = posterior();
+        unavailable.predecessor_record_created_at = "bad".into();
+        assert!(!valid_pair(&unavailable, 2, cutoff));
+
+        let mut future = posterior();
+        future.successor_available_at = "2026-12-01T00:00:00Z".into();
+        assert!(!valid_pair(&future, 2, cutoff));
+
+        let mut short = posterior();
+        short.criterion_draws = vec![0.5];
+        assert!(!valid_pair(&short, 2, cutoff));
+
+        let mut unparsed_draw = posterior();
+        unparsed_draw.predecessor_event_time_draws[0] = "not-a-time".into();
+        assert!(!valid_pair(&unparsed_draw, 2, cutoff));
+
+        let mut reversed = posterior();
+        reversed.predecessor_event_time_draws[0] = "2025-12-20T00:00:00Z".into();
+        assert!(!valid_pair(&reversed, 2, cutoff));
+
+        let mut out_of_range = posterior();
+        out_of_range.criterion_draws[0] = 1.5;
+        assert!(!valid_pair(&out_of_range, 2, cutoff));
+
+        let mut empty_records = posterior();
+        empty_records.predecessor_record_id = String::new();
+        assert!(!valid_pair(&empty_records, 2, cutoff));
+
+        let mut padded_records = posterior();
+        padded_records.successor_record_id = " padded ".into();
+        assert!(!valid_pair(&padded_records, 2, cutoff));
+
+        let mut unparsed_created = posterior();
+        unparsed_created.successor_record_created_at = "not-a-time".into();
+        assert!(!valid_pair(&unparsed_created, 2, cutoff));
+
+        let mut unparsed_available = posterior();
+        unparsed_available.predecessor_available_at = "not-a-time".into();
+        assert!(!valid_pair(&unparsed_available, 2, cutoff));
+
+        let mut unparsed_successor_available = posterior();
+        unparsed_successor_available.successor_available_at = "not-a-time".into();
+        assert!(!valid_pair(&unparsed_successor_available, 2, cutoff));
+
+        let mut short_draws = posterior();
+        short_draws.successor_event_time_draws.pop();
+        assert!(!valid_pair(&short_draws, 2, cutoff));
+
+        let mut nan_criterion = posterior();
+        nan_criterion.criterion_draws = vec![f64::NAN, 0.5];
+        assert!(!valid_pair(&nan_criterion, 2, cutoff));
+
+        let mut short_first_draws = posterior();
+        short_first_draws.predecessor_event_time_draws.pop();
+        assert!(!valid_pair(&short_first_draws, 2, cutoff));
+
+        let mut short_second_draws = posterior();
+        short_second_draws.successor_event_time_draws.pop();
+        assert!(!valid_pair(&short_second_draws, 2, cutoff));
+
+        let mut invalid_created = posterior();
+        invalid_created.predecessor_record_created_at = "not-a-time".into();
+        assert!(!valid_pair(&invalid_created, 2, cutoff));
+    }
+
+    #[test]
+    fn artifact_validator_rejects_each_remaining_clause() {
+        let mut duplicate_channels = artifact();
+        duplicate_channels.channel_codes.push("temporal".into());
+        assert_eq!(
+            duplicate_channels.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut extra_posterior_ids = artifact();
+        extra_posterior_ids.admitted_pair_ids = vec![
+            "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into(),
+            "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b9".into(),
+        ];
+        assert_eq!(
+            extra_posterior_ids.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut duplicated_admission = artifact();
+        duplicated_admission.admitted_pair_ids = vec![
+            "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into(),
+            "018f47e7-7b5b-7cc0-98c6-15fdf9e3d9b3".into(),
+        ];
+        assert_eq!(
+            duplicated_admission.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut dropped_pair = artifact();
+        dropped_pair.pair_posteriors = vec![];
+        assert_eq!(dropped_pair.to_json(), Err(ApiError::InvalidWirePayload));
+
+        let mut dirty_clock = artifact();
+        dirty_clock.temporal_provenance.event_clock_code = "  clock  ".into();
+        assert_eq!(dirty_clock.to_json(), Err(ApiError::InvalidWirePayload));
+
+        let mut nonunique_alignment = artifact();
+        nonunique_alignment.anchor_basis.alignment_status = "stale".into();
+        assert_eq!(
+            nonunique_alignment.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut unknown_backend = artifact();
+        unknown_backend.compute_receipts.gpu.backend_code = "tp_mixture_mlx".into();
+        assert_eq!(unknown_backend.to_json(), Err(ApiError::InvalidWirePayload));
+
+        let mut bad_pair_id = artifact();
+        bad_pair_id.pair_posteriors[0].pair_id = "not-a-uuid".into();
+        assert_eq!(bad_pair_id.to_json(), Err(ApiError::InvalidWirePayload));
+    }
 }
