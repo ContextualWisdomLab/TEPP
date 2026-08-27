@@ -246,6 +246,21 @@
 //! is `TIPREDVARstd` and is not that map even when both equal 1;
 //! zero `q` fails closed; a non-event clock fails closed; `a ≥ 0`
 //! fails closed; JSS PDF re-opened 2026-08-26T17:20Z),
+//! recovers the Driver p. 16 `MANIFESTTRAITVARstd` as `ψ / ψ = 1`
+//! after strictly positive `MANIFESTTRAITVAR` (Table 2 names
+//! `MANIFESTTRAITVAR` `Ψ_τ`; §7.1 names manifest traits stable
+//! individual differences in indicator levels, distinct from
+//! process-level `TRAITVAR`; 2017-era `summary.ctsemFit.R` forms
+//! `MANIFESTTRAITVARstd` only when `MANIFESTTRAITVAR != 0` as
+//! `solve(sqrt(diag(MANIFESTTRAITVAR) + ridging)) %&%
+//! MANIFESTTRAITVAR`; unlike `TRAITVARstd` that formation adds
+//! ridging; the default ridge is 0; unstandardised
+//! `MANIFESTTRAITVAR` is defined for a zero trait and is not that
+//! map; `trait / trait = 1` is `TRAITVARstd` and is not that map
+//! even when both equal 1; `θ` is `MANIFESTVAR` and is not that
+//! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
+//! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
+//! JSS PDF re-opened 2026-08-27T14:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -398,6 +413,9 @@ pub use event_time::recover_standardised_initial_latent_mean;
 pub use event_time::recover_standardised_initial_latent_variance;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
+/// Exact scalar p. 16 `MANIFESTTRAITVARstd` `ψ / ψ = 1` after strictly positive `MANIFESTTRAITVAR`.
+pub use event_time::recover_standardised_manifest_trait_variance;
+
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
@@ -584,6 +602,8 @@ pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
 pub use event_time::refuse_measurement_error_as_observed_variance;
+/// Refuse treating Table 2 `MANIFESTVAR` `θ` as p. 16 `MANIFESTTRAITVARstd`.
+pub use event_time::refuse_measurement_error_as_standardised_manifest_trait_variance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of lagged §4.3 stationary `T0VAR`.
 pub use event_time::refuse_measurement_error_as_stationary_lagged_observed_covariance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of later-occasion §4.3 stationary `T0VAR`.
@@ -614,6 +634,8 @@ pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
+/// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
+pub use event_time::refuse_standardised_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymTIPREDEFFECT`.
@@ -710,6 +732,9 @@ pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_in
 pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance;
 /// Refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
+/// Refuse treating unstandardised `MANIFESTTRAITVAR` as `MANIFESTTRAITVARstd`.
+pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance;
+
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
