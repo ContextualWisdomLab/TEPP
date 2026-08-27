@@ -1760,6 +1760,149 @@ pub fn refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_v
     Err(PsychometricError::StandardisedAsymptoticDiffusionIsNotStandardisedInitialLatentVariance)
 }
 
+/// Exact scalar p. 16 `TIPREDVARstd` after strictly positive
+/// `TIPREDVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 3, p. 13; p. 16;
+/// footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-27T00:20Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `TIPREDVAR` the time-independent predictors
+/// variance/covariance. Page 16 prints standardised matrices with
+/// the suffix `std` when appropriate. The printed example on p. 16
+/// is `discreteDRIFTstd`, not `TIPREDVARstd`. Footnote 4:
+/// standardisations use only the relevant variance, not the total.
+/// The 2017-era `summary.ctsemFit.R` forms `TIPREDVARstd` as
+/// `solve(sqrt(diag(TIPREDVAR) + ridging)) %&% TIPREDVAR` when
+/// `verbose = TRUE` and `n.TIpred > 0`. `OpenMx` `%&%` is the
+/// quadratic form `t(A) %*% B %*% A`. Unlike `TRAITVARstd`, that
+/// formation adds `diag(c(ridging), n.TIpred)`. The default
+/// `ridging = FALSE` adds 0, not `0.0001`; that ridge is a
+/// numerical hack and is not this exact map. The 2017-era source
+/// assigns `dimnames(TIPREDVARstd)` to `TIpredNames`; that
+/// assignment matches the `n.TIpred × n.TIpred` matrix and is this
+/// map. The scalar correlation is `v / v = 1` after strictly
+/// positive `TIPREDVAR`. Form strictly positive `v` first, then
+/// `1 / √v`, then `(1 / √v) v (1 / √v)`. Unstandardised
+/// `TIPREDVAR` is defined for a zero predictor; standardised
+/// `TIPREDVAR` is not. Zero `v` makes `solve(sqrt(0))` fail in the
+/// 2017-era source and fails closed here. Unlike `TRAITVAR` /
+/// `MANIFESTTRAITVAR`, that source does not skip forming
+/// `TIPREDVARstd` when `v = 0`. Predictor variance is an
+/// event-time structural quantity, so a non-event clock fails
+/// closed. `TIPREDVAR` does not require stable `a < 0`. Distinct
+/// positive `v` recover the same 1. `MANIFESTVARstd` `θ / θ = 1`
+/// recovers the same number and remains a distinct named quantity.
+/// This crate does not currently export `MANIFESTVARstd`; the
+/// refuse still names that quantity. Section 7.2 `addedTIPREDVAR`
+/// `(B / a)² v` is extra process variance, not this correlation.
+/// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
+/// not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance`]
+/// when `TIPREDVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the variance is
+/// non-finite, negative, or the quadratic form overflows.
+pub fn recover_standardised_time_independent_predictor_variance(
+    time_independent_predictor_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !time_independent_predictor_variance.is_finite() || time_independent_predictor_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if time_independent_predictor_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance,
+        );
+    }
+    let process_sd = time_independent_predictor_variance.sqrt();
+    let inverse_sd = require_finite(1.0 / process_sd)?;
+    let scaled = require_finite(inverse_sd * time_independent_predictor_variance)?;
+    require_finite(scaled * inverse_sd)
+}
+
+/// Refuse treating unstandardised `TIPREDVAR` as p. 16
+/// `TIPREDVARstd`.
+///
+/// Free `TIPREDVAR` `v` is defined for a zero predictor. Footnote
+/// 4 `TIPREDVARstd` requires strictly positive `v`. Equal numbers
+/// when `v = 1` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
+pub fn refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+    unstandardised_predictor_variance: f64,
+    standardised_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_predictor_variance,
+        standardised_predictor_variance,
+    );
+    Err(
+        PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance,
+    )
+}
+
+/// Refuse treating p. 16 `MANIFESTVARstd` as p. 16 `TIPREDVARstd`.
+///
+/// Both scalar maps equal 1 after a strictly positive relevant
+/// variance. `TIPREDVARstd` is the correlation form of
+/// `TIPREDVAR`. `MANIFESTVARstd` is the correlation form of
+/// residual `MANIFESTVAR`. Equal numbers remain distinct named
+/// quantities. This crate does not currently export
+/// `MANIFESTVARstd`; the refuse still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
+pub fn refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance(
+    standardised_manifest_variance: f64,
+    standardised_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_manifest_variance,
+        standardised_predictor_variance,
+    );
+    Err(
+        PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance,
+    )
+}
+
+/// Refuse treating §7.2 `addedTIPREDVAR` as p. 16 `TIPREDVARstd`.
+///
+/// `(B / a)² v` is extra process variance accounted for by a
+/// time-independent predictor. `TIPREDVARstd` is the correlation
+/// form of `TIPREDVAR`. Equal numbers remain distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
+pub fn refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+    asymptotic_predictor_variance: f64,
+    standardised_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        asymptotic_predictor_variance,
+        standardised_predictor_variance,
+    );
+    Err(
+        PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance,
+    )
+}
+
 /// Exact scalar discrete intercept increment from Driver Equation 3.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
@@ -6321,9 +6464,9 @@ mod tests {
         recover_standardised_asymptotic_continuous_intercept,
         recover_standardised_continuous_intercept,
         recover_standardised_discrete_continuous_intercept,
-        recover_standardised_initial_latent_mean,
-        recover_standardised_initial_latent_variance,
+        recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
         recover_standardised_manifest_mean,
+        recover_standardised_time_independent_predictor_variance,
         recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
         recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
         recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -6344,6 +6487,7 @@ mod tests {
         refuse_asymptotic_time_independent_effect_as_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_discrete_effect,
         refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
+        refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance,
         refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
         refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
         refuse_asymptotic_time_independent_variance_as_trait_variance,
@@ -6415,6 +6559,7 @@ mod tests {
         refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance,
         refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
+        refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
         refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -6461,6 +6606,7 @@ mod tests {
         refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
+        refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
     };
     use crate::error::PsychometricError;
@@ -15294,6 +15440,102 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_initial_latent_variance(f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_time_independent_predictor_variance_recovers_driver_table_three_after_positive_tipredvar()
+     {
+        // Driver et al. (2017, Table 3 TIPREDVAR; p. 16 TIPREDVARstd;
+        // footnote 4; 2017-era summary.ctsemFit.R): form strictly
+        // positive TIPREDVAR v, then (1/√v) v (1/√v) = 1. Relevant
+        // variance is TIPREDVAR, not addedTIPREDVAR.
+        let predictor_variance = 1.6_f64;
+        let recovered = recover_standardised_time_independent_predictor_variance(
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("TIPREDVARstd");
+        assert!((recovered - 1.0).abs() < 1e-15);
+        let larger_v =
+            recover_standardised_time_independent_predictor_variance(6.4, LagClock::EventTime)
+                .expect("TIPREDVARstd v=6.4");
+        assert_eq!(larger_v.to_bits(), recovered.to_bits());
+        let unit_v =
+            recover_standardised_time_independent_predictor_variance(1.0, LagClock::EventTime)
+                .expect("TIPREDVARstd v=1");
+        assert_eq!(unit_v.to_bits(), recovered.to_bits());
+        // MANIFESTVARstd is θ/θ = 1 after strictly positive
+        // MANIFESTVAR. Equal 1 remains a distinct named quantity.
+        // This crate does not currently export MANIFESTVARstd.
+        let manifest_std = 1.0_f64;
+        assert!((manifest_std - recovered).abs() < 1e-15);
+        // addedTIPREDVAR is (B/a)² v after stable a < 0. That extra
+        // is not the correlation form of TIPREDVAR.
+        let added = recover_asymptotic_time_independent_predictor_variance(
+            0.5,
+            predictor_variance,
+            -0.25,
+            LagClock::EventTime,
+        )
+        .expect("addedTIPREDVAR");
+        assert!((added - recovered).abs() > 1e-3);
+        assert_eq!(
+            refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+                predictor_variance,
+                recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance
+            )
+        );
+        assert_eq!(
+            refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance(
+                manifest_std,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance
+            )
+        );
+        assert_eq!(
+            refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+                added,
+                recovered
+            ),
+            Err(
+                PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance
+            )
+        );
+    }
+
+    #[test]
+    fn standardised_time_independent_predictor_variance_fails_closed_when_unstandardised_is_defined()
+     {
+        assert_eq!(
+            recover_standardised_time_independent_predictor_variance(0.0, LagClock::EventTime),
+            Err(
+                PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_time_independent_predictor_variance(1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_time_independent_predictor_variance(-1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_time_independent_predictor_variance(f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_time_independent_predictor_variance(
+                f64::INFINITY,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
     }

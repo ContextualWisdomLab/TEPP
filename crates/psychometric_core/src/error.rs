@@ -617,6 +617,27 @@ pub enum PsychometricError {
     /// `A^{-1}[e^{A Δt} − I] κ / √p` was treated as `asymCINTstd`.
     /// A finite event interval is not the `Δt → ∞` intercept change.
     DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept,
+    /// Driver p. 16 `TIPREDVARstd` was requested with a non-positive
+    /// time-independent predictor variance. Footnote 4
+    /// standardisation of the 2017-era `TIPREDVAR` matrix requires
+    /// strictly positive `TIPREDVAR`.
+    StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance,
+    /// Driver Table 3 unstandardised `TIPREDVAR` `v` was treated as
+    /// p. 16 `TIPREDVARstd`. Unstandardised `v` is defined for a
+    /// zero predictor; standardised `TIPREDVAR` is not.
+    UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance,
+    /// Driver p. 16 `MANIFESTVARstd` was treated as p. 16
+    /// `TIPREDVARstd`. Equal numbers of 1 after a strictly positive
+    /// relevant variance are still distinct named quantities.
+    /// `TIPREDVARstd` is the correlation form of `TIPREDVAR`;
+    /// `MANIFESTVARstd` is the correlation form of residual
+    /// `MANIFESTVAR`.
+    StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance,
+    /// Driver §7.2 `addedTIPREDVAR` `(B / a)² v` was treated as
+    /// p. 16 `TIPREDVARstd`. Extra process variance accounted for
+    /// by a time-independent predictor is not the correlation form
+    /// of `TIPREDVAR`.
+    AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1086,6 +1107,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept => {
                 "discrete standardised continuous intercept is not standardised asymptotic continuous intercept"
+            }
+            Self::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance => {
+                "standardised time-independent predictor variance requires strictly positive time-independent predictor variance"
+            }
+            Self::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance => {
+                "unstandardised time-independent predictor variance is not standardised time-independent predictor variance"
+            }
+            Self::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance => {
+                "standardised manifest variance is not standardised time-independent predictor variance"
+            }
+            Self::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance => {
+                "asymptotic time-independent predictor variance is not standardised time-independent predictor variance"
             }
         };
         formatter.write_str(message)
@@ -1847,6 +1880,30 @@ mod tests {
             PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept
                 .to_string(),
             "discrete standardised continuous intercept is not standardised asymptotic continuous intercept"
+        );
+    }
+
+    #[test]
+    fn standardised_time_independent_predictor_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance
+                .to_string(),
+            "standardised time-independent predictor variance requires strictly positive time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance
+                .to_string(),
+            "unstandardised time-independent predictor variance is not standardised time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance
+                .to_string(),
+            "standardised manifest variance is not standardised time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance
+                .to_string(),
+            "asymptotic time-independent predictor variance is not standardised time-independent predictor variance"
         );
     }
 }

@@ -234,6 +234,18 @@
 //! `μ_0 / √p_0` is `T0MEANSstd` and is not that map even when
 //! `μ_0 = √p_0`; `p / p = 1` is `asymDIFFUSIONstd` and is not that
 //! map even when both equal 1; JSS PDF re-opened 2026-08-26T07:17Z),
+//! recovers the Driver p. 16 `TIPREDVARstd` as `v / v = 1` after
+//! strictly positive `TIPREDVAR` (footnote 4 uses only the
+//! relevant predictor variance; 2017-era `summary.ctsemFit.R`
+//! forms `TIPREDVARstd` as
+//! `solve(sqrt(diag(TIPREDVAR))) %&% TIPREDVAR` when
+//! `verbose = TRUE` and `n.TIpred > 0`; `OpenMx` `%&%` is
+//! `t(A) %*% B %*% A`; default ridge is 0; `dimnames` are
+//! `TIpredNames`; unstandardised `v` is defined for a zero
+//! predictor and is not that map; `θ / θ = 1` is `MANIFESTVARstd`
+//! and is not that map even when both equal 1; `(B / a)² v` is
+//! `addedTIPREDVAR` and is not that correlation; JSS PDF re-opened
+//! 2026-08-27T00:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -384,6 +396,8 @@ pub use event_time::recover_standardised_initial_latent_mean;
 pub use event_time::recover_standardised_initial_latent_variance;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
+/// Exact scalar p. 16 `TIPREDVARstd` `v / v = 1` after strictly positive `TIPREDVAR`.
+pub use event_time::recover_standardised_time_independent_predictor_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
 pub use event_time::recover_stationary_initial_latent_mean;
 /// Exact scalar §4.3 / p. 16 stationary `T0VAR` `trait + −q / (2 a) + (B / a)² v`.
@@ -438,6 +452,8 @@ pub use event_time::refuse_asymptotic_time_independent_effect_as_continuous_inte
 pub use event_time::refuse_asymptotic_time_independent_effect_as_discrete_effect;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `M x`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_time_dependent_impulse;
+/// Refuse treating §7.2 `addedTIPREDVAR` as p. 16 `TIPREDVARstd`.
+pub use event_time::refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymTIPREDEFFECT`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_effect;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymDIFFUSION`.
@@ -588,6 +604,8 @@ pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_init
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
+/// Refuse treating p. 16 `MANIFESTVARstd` as `TIPREDVARstd`.
+pub use event_time::refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
 pub use event_time::refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymTIPREDEFFECT`.
@@ -682,6 +700,8 @@ pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_in
 pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance;
 /// Refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
+/// Refuse treating unstandardised `TIPREDVAR` as `TIPREDVARstd`.
+pub use event_time::refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
 pub use event_time::refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Indicator coordinate kind.

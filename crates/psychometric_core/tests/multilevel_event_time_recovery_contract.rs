@@ -37,7 +37,7 @@ use psychometric_core::{
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_continuous_intercept, recover_standardised_discrete_continuous_intercept,
     recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
-    recover_standardised_manifest_mean,
+    recover_standardised_manifest_mean, recover_standardised_time_independent_predictor_variance,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
     recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
     recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -6036,6 +6036,65 @@ fn standardised_initial_latent_variance_refuses_non_event_clocks_and_does_not_ke
         recover_standardised_initial_latent_variance(0.0, LagClock::EventTime),
         Err(
             PsychometricError::StandardisedInitialLatentVarianceRequiresPositiveInitialLatentVariance
+        )
+    );
+}
+
+#[test]
+fn standardised_time_independent_predictor_variance_recovers_driver_table_three_correlation() {
+    let predictor_variance = 1.6_f64;
+    let recovered = recover_standardised_time_independent_predictor_variance(
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("TIPREDVARstd");
+    let recovered_error = (recovered - 1.0).abs();
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, p. 16 TIPREDVARstd): RMSE {recovered_error} for v / v = 1"
+    );
+    let larger_v =
+        recover_standardised_time_independent_predictor_variance(6.4, LagClock::EventTime)
+            .expect("TIPREDVARstd v=6.4");
+    assert_eq!(
+        larger_v.to_bits(),
+        recovered.to_bits(),
+        "Driver et al. (2017, p. 16): distinct positive TIPREDVAR recover the same TIPREDVARstd"
+    );
+    let unstandardised_error = (predictor_variance - 1.0).abs();
+    assert!(
+        unstandardised_error > recovered_error,
+        "Driver et al. (2017, p. 16): unstandardised TIPREDVAR RMSE {unstandardised_error} must exceed TIPREDVARstd RMSE {recovered_error}"
+    );
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        0.5,
+        predictor_variance,
+        -0.25,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let added_error = (added - 1.0).abs();
+    assert!(
+        added_error > recovered_error,
+        "Driver et al. (2017, §7.2): addedTIPREDVAR RMSE {added_error} must exceed TIPREDVARstd RMSE {recovered_error}"
+    );
+}
+
+#[test]
+fn standardised_time_independent_predictor_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance()
+ {
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(0.0, LagClock::EventTime),
+        Err(
+            PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance
         )
     );
 }

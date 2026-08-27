@@ -32,7 +32,7 @@ use psychometric_core::{
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_continuous_intercept, recover_standardised_discrete_continuous_intercept,
     recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
-    recover_standardised_manifest_mean,
+    recover_standardised_manifest_mean, recover_standardised_time_independent_predictor_variance,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
     recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
     recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -53,6 +53,7 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
     refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
+    refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance,
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
@@ -120,6 +121,7 @@ use psychometric_core::{
     refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance,
     refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
     refuse_standardised_manifest_variance_as_standardised_manifest_mean,
+    refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
     refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -165,6 +167,7 @@ use psychometric_core::{
     refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
     refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
+    refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
 };
 
@@ -3286,6 +3289,88 @@ fn standardised_initial_latent_variance_is_not_unstandardised_mean_or_asymptotic
     );
     assert_eq!(
         recover_standardised_initial_latent_variance(initial_variance, LagClock::DocumentTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn standardised_time_independent_predictor_variance_is_not_unstandardised_manifest_or_added() {
+    let predictor_variance = 1.6_f64;
+    let recovered = recover_standardised_time_independent_predictor_variance(
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("TIPREDVARstd");
+    assert!(
+        (recovered - 1.0).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 / 2017-era summary.ctsemFit.R): TIPREDVARstd is v/v = 1"
+    );
+    let larger_v =
+        recover_standardised_time_independent_predictor_variance(6.4, LagClock::EventTime)
+            .expect("TIPREDVARstd v=6.4");
+    assert_eq!(
+        larger_v.to_bits(),
+        recovered.to_bits(),
+        "Driver et al. (2017, p. 16): distinct positive TIPREDVAR recover the same TIPREDVARstd"
+    );
+    assert!(
+        (recovered - predictor_variance).abs() > 1e-3,
+        "Driver et al. (2017, Table 3): unstandardised TIPREDVAR is not TIPREDVARstd"
+    );
+    let manifest_std = 1.0_f64;
+    assert!(
+        (manifest_std - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): MANIFESTVARstd equals 1 after strictly positive MANIFESTVAR"
+    );
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        0.5,
+        predictor_variance,
+        -0.25,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    assert!(
+        (added - recovered).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): addedTIPREDVAR is not TIPREDVARstd"
+    );
+    assert_eq!(
+        refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+            predictor_variance,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance
+        )
+    );
+    assert_eq!(
+        refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance(
+            manifest_std,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+            added,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(0.0, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(
+            predictor_variance,
+            LagClock::DocumentTime
+        ),
         Err(psychometric_core::PsychometricError::EventTimeRequired)
     );
 }
