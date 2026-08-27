@@ -70,6 +70,22 @@ pub enum EventError {
     IntelligenceWorkflowIsNotEventInstance,
     /// A TDT/CHRONOS composition was treated as a state transition.
     IntelligenceWorkflowIsNotStateTransition,
+    /// Interval-consistency resource limits were zero.
+    IntervalConsistencyInvalidLimits,
+    /// An interval variable identifier does not belong to this network.
+    IntervalConsistencyUnknownVariable,
+    /// An asserted qualitative relation set was empty.
+    IntervalConsistencyEmptyRelationSet,
+    /// A configured interval-consistency resource maximum was exceeded.
+    IntervalConsistencyLimitExceeded,
+    /// Path consistency proved that no Allen relation remains possible.
+    IntervalConsistencyContradiction,
+    /// Quantitative Allen classification received a nonproper interval.
+    IntervalConsistencyRequiresProperBoundedInterval,
+    /// Bounded path consistency was treated as unrestricted global SAT.
+    IntervalConsistencyIsNotUnrestrictedSatisfiability,
+    /// An interval contradiction was treated as an event instance.
+    IntervalContradictionIsNotEventInstance,
 }
 
 impl fmt::Display for EventError {
@@ -118,6 +134,30 @@ impl fmt::Display for EventError {
             }
             Self::IntelligenceWorkflowIsNotStateTransition => {
                 "intelligence workflow is not a state transition"
+            }
+            Self::IntervalConsistencyInvalidLimits => {
+                "invalid interval consistency limits"
+            }
+            Self::IntervalConsistencyUnknownVariable => {
+                "unknown interval consistency variable"
+            }
+            Self::IntervalConsistencyEmptyRelationSet => {
+                "interval consistency relation set is empty"
+            }
+            Self::IntervalConsistencyLimitExceeded => {
+                "interval consistency resource limit exceeded"
+            }
+            Self::IntervalConsistencyContradiction => {
+                "interval consistency network is contradictory"
+            }
+            Self::IntervalConsistencyRequiresProperBoundedInterval => {
+                "interval consistency requires proper bounded intervals"
+            }
+            Self::IntervalConsistencyIsNotUnrestrictedSatisfiability => {
+                "interval consistency is not unrestricted satisfiability"
+            }
+            Self::IntervalContradictionIsNotEventInstance => {
+                "interval contradiction is not an event instance"
             }
         };
         formatter.write_str(message)
@@ -249,6 +289,38 @@ mod tests {
             (
                 EventError::IntelligenceWorkflowIsNotStateTransition,
                 "intelligence workflow is not a state transition",
+            ),
+            (
+                EventError::IntervalConsistencyInvalidLimits,
+                "invalid interval consistency limits",
+            ),
+            (
+                EventError::IntervalConsistencyUnknownVariable,
+                "unknown interval consistency variable",
+            ),
+            (
+                EventError::IntervalConsistencyEmptyRelationSet,
+                "interval consistency relation set is empty",
+            ),
+            (
+                EventError::IntervalConsistencyLimitExceeded,
+                "interval consistency resource limit exceeded",
+            ),
+            (
+                EventError::IntervalConsistencyContradiction,
+                "interval consistency network is contradictory",
+            ),
+            (
+                EventError::IntervalConsistencyRequiresProperBoundedInterval,
+                "interval consistency requires proper bounded intervals",
+            ),
+            (
+                EventError::IntervalConsistencyIsNotUnrestrictedSatisfiability,
+                "interval consistency is not unrestricted satisfiability",
+            ),
+            (
+                EventError::IntervalContradictionIsNotEventInstance,
+                "interval contradiction is not an event instance",
             ),
         ] {
             assert_eq!(error.to_string(), message);
