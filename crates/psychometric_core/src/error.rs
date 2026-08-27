@@ -644,6 +644,28 @@ pub enum PsychometricError {
     /// `A^{-1}[e^{A Δt} − I] κ / √p` was treated as `asymCINTstd`.
     /// A finite event interval is not the `Δt → ∞` intercept change.
     DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept,
+    /// Driver p. 16 `MANIFESTTRAITVARstd` was requested with a
+    /// non-positive manifest-trait variance. The 2017-era source
+    /// skips forming `MANIFESTTRAITVARstd` when
+    /// `MANIFESTTRAITVAR == 0`; footnote 4 standardisation requires
+    /// strictly positive `MANIFESTTRAITVAR`.
+    StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance,
+    /// Driver Table 2 unstandardised `MANIFESTTRAITVAR` was treated
+    /// as p. 16 `MANIFESTTRAITVARstd`. Unstandardised manifest-trait
+    /// variance is defined for a zero trait; standardised
+    /// `MANIFESTTRAITVAR` is not.
+    UnstandardisedManifestTraitVarianceIsNotStandardisedManifestTraitVariance,
+    /// Driver p. 16 `TRAITVARstd` was treated as p. 16
+    /// `MANIFESTTRAITVARstd`. Equal numbers when both correlations
+    /// equal 1 are still distinct named quantities.
+    /// `MANIFESTTRAITVARstd` is the correlation form of
+    /// indicator-level `MANIFESTTRAITVAR`; `TRAITVARstd` is the
+    /// correlation form of process-level `TRAITVAR`.
+    StandardisedTraitVarianceIsNotStandardisedManifestTraitVariance,
+    /// Driver Table 2 `MANIFESTVAR` `θ` was treated as p. 16
+    /// `MANIFESTTRAITVARstd`. Measurement error is not the
+    /// correlation form of indicator-level trait variance.
+    MeasurementErrorIsNotStandardisedManifestTraitVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1128,6 +1150,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept => {
                 "discrete standardised continuous intercept is not standardised asymptotic continuous intercept"
+            }
+            Self::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance => {
+                "standardised manifest-trait variance requires strictly positive manifest-trait variance"
+            }
+            Self::UnstandardisedManifestTraitVarianceIsNotStandardisedManifestTraitVariance => {
+                "unstandardised manifest-trait variance is not standardised manifest-trait variance"
+            }
+            Self::StandardisedTraitVarianceIsNotStandardisedManifestTraitVariance => {
+                "standardised trait variance is not standardised manifest-trait variance"
+            }
+            Self::MeasurementErrorIsNotStandardisedManifestTraitVariance => {
+                "measurement error is not standardised manifest-trait variance"
             }
         };
         formatter.write_str(message)
@@ -1918,6 +1952,29 @@ mod tests {
             PsychometricError::DiscreteStandardisedContinuousInterceptIsNotStandardisedAsymptoticContinuousIntercept
                 .to_string(),
             "discrete standardised continuous intercept is not standardised asymptotic continuous intercept"
+        );
+    }
+
+    #[test]
+    fn standardised_manifest_trait_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance
+                .to_string(),
+            "standardised manifest-trait variance requires strictly positive manifest-trait variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedManifestTraitVarianceIsNotStandardisedManifestTraitVariance
+                .to_string(),
+            "unstandardised manifest-trait variance is not standardised manifest-trait variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTraitVarianceIsNotStandardisedManifestTraitVariance
+                .to_string(),
+            "standardised trait variance is not standardised manifest-trait variance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
+            "measurement error is not standardised manifest-trait variance"
         );
     }
 }

@@ -33,13 +33,14 @@ use psychometric_core::{
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
     recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
-    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
-    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
-    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
-    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
-    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
-    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
+    recover_standardised_manifest_trait_variance, recover_stationary_initial_latent_mean,
+    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
+    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
+    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
+    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
+    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
+    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -110,6 +111,7 @@ use psychometric_core::{
     refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
+    refuse_measurement_error_as_standardised_manifest_trait_variance,
     refuse_measurement_error_as_stationary_lagged_observed_covariance,
     refuse_measurement_error_as_stationary_later_observed_variance,
     refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
@@ -123,6 +125,7 @@ use psychometric_core::{
     refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
     refuse_standardised_manifest_variance_as_standardised_manifest_mean,
     refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
+    refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
     refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -169,6 +172,7 @@ use psychometric_core::{
     refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
     refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
+    refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
 };
 
@@ -3375,6 +3379,71 @@ fn standardised_asymptotic_diffusion_is_not_unstandardised_t0var_or_diffusion_ra
     assert_eq!(
         recover_standardised_asymptotic_diffusion(diffusion, 0.25, LagClock::EventTime),
         Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+}
+
+#[test]
+fn standardised_manifest_trait_variance_is_not_unstandardised_traitstd_or_measurement_error() {
+    let manifest_trait = 1.6_f64;
+    let recovered =
+        recover_standardised_manifest_trait_variance(manifest_trait, LagClock::EventTime)
+            .expect("MANIFESTTRAITVARstd");
+    assert!(
+        (recovered - 1.0).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 / 2017-era summary.ctsemFit.R): MANIFESTTRAITVARstd is ψ/ψ = 1"
+    );
+    let larger_psi = recover_standardised_manifest_trait_variance(6.4, LagClock::EventTime)
+        .expect("MANIFESTTRAITVARstd ψ=6.4");
+    assert!(
+        (larger_psi - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): distinct positive MANIFESTTRAITVAR recover the same MANIFESTTRAITVARstd"
+    );
+    let trait_std = 1.0_f64;
+    assert!(
+        (trait_std - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): TRAITVARstd and MANIFESTTRAITVARstd equal 1 and remain distinct named quantities"
+    );
+    let measurement_error = 0.4_f64;
+    assert!(
+        (measurement_error - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): MANIFESTVAR θ is not MANIFESTTRAITVARstd"
+    );
+    assert!((manifest_trait - recovered).abs() > 1e-3);
+    assert_eq!(
+        recover_standardised_manifest_trait_variance(0.0, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_manifest_trait_variance(manifest_trait, LagClock::DocumentTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance(
+            manifest_trait,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedManifestTraitVarianceIsNotStandardisedManifestTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_standardised_trait_variance_as_standardised_manifest_trait_variance(
+            trait_std, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedTraitVarianceIsNotStandardisedManifestTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_measurement_error_as_standardised_manifest_trait_variance(
+            measurement_error,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance
+        )
     );
 }
 
