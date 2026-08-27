@@ -135,12 +135,8 @@ impl fmt::Display for EventError {
             Self::IntelligenceWorkflowIsNotStateTransition => {
                 "intelligence workflow is not a state transition"
             }
-            Self::IntervalConsistencyInvalidLimits => {
-                "invalid interval consistency limits"
-            }
-            Self::IntervalConsistencyUnknownVariable => {
-                "unknown interval consistency variable"
-            }
+            Self::IntervalConsistencyInvalidLimits => "invalid interval consistency limits",
+            Self::IntervalConsistencyUnknownVariable => "unknown interval consistency variable",
             Self::IntervalConsistencyEmptyRelationSet => {
                 "interval consistency relation set is empty"
             }
