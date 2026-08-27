@@ -585,6 +585,33 @@ pub enum PsychometricError {
     /// `asymDIFFUSIONstd` is the correlation form of process-
     /// dynamics `asymDIFFUSION`.
     StandardisedAsymptoticDiffusionIsNotStandardisedInitialLatentVariance,
+    /// Driver p. 16 `asymDIFFUSIONstd` was requested without a
+    /// strictly positive `asymDIFFUSION`. Footnote 4
+    /// standardisation of the 2017-era `asymDIFFUSION` matrix
+    /// requires strictly positive `−q / (2 a)`.
+    StandardisedAsymptoticDiffusionRequiresPositiveStationaryVariance,
+    /// Driver p. 16 unstandardised `asymDIFFUSION` `p` was treated
+    /// as `asymDIFFUSIONstd`. Unstandardised `p` is defined for a
+    /// zero process; standardised `asymDIFFUSION` is not.
+    UnstandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticDiffusion,
+    /// Driver p. 16 `T0VARstd` was treated as p. 16
+    /// `asymDIFFUSIONstd`. Equal numbers of 1 after a strictly
+    /// positive relevant variance are still distinct named
+    /// quantities. `asymDIFFUSIONstd` is the correlation form of
+    /// process-dynamics `asymDIFFUSION`; `T0VARstd` is the
+    /// correlation form of free `T0VAR`.
+    StandardisedInitialLatentVarianceIsNotStandardisedAsymptoticDiffusion,
+    /// Driver p. 16 `DIFFUSIONstd` `q / p = −2 a` was treated as
+    /// `asymDIFFUSIONstd`. The continuous-diffusion ratio is not
+    /// the correlation form of `asymDIFFUSION`.
+    StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion,
+    /// Driver p. 16 `TIPREDVARstd` was treated as p. 16
+    /// `asymDIFFUSIONstd`. Equal numbers of 1 after a strictly
+    /// positive relevant variance are still distinct named
+    /// quantities. `asymDIFFUSIONstd` is the correlation form of
+    /// process-dynamics `asymDIFFUSION`; `TIPREDVARstd` is the
+    /// correlation form of `TIPREDVAR`.
+    StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion,
     /// Driver p. 16 `discreteCINTstd` was requested without a strictly
     /// positive `asymDIFFUSION`. Footnote 4 standardises using only the
     /// relevant variance; zero `q` has no positive process SD.
@@ -1083,6 +1110,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::StandardisedAsymptoticDiffusionIsNotStandardisedInitialLatentVariance => {
                 "standardised asymptotic diffusion is not standardised initial latent variance"
+            }
+            Self::StandardisedAsymptoticDiffusionRequiresPositiveStationaryVariance => {
+                "standardised asymptotic diffusion requires strictly positive stationary within-subject variance"
+            }
+            Self::UnstandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticDiffusion => {
+                "unstandardised asymptotic diffusion is not standardised asymptotic diffusion"
+            }
+            Self::StandardisedInitialLatentVarianceIsNotStandardisedAsymptoticDiffusion => {
+                "standardised initial latent variance is not standardised asymptotic diffusion"
+            }
+            Self::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion => {
+                "standardised continuous diffusion is not standardised asymptotic diffusion"
+            }
+            Self::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion => {
+                "standardised time-independent predictor variance is not standardised asymptotic diffusion"
             }
             Self::StandardisedDiscreteContinuousInterceptRequiresPositiveStationaryVariance => {
                 "standardised discrete continuous intercept requires strictly positive stationary within-subject variance"
@@ -1832,6 +1874,35 @@ mod tests {
             PsychometricError::StandardisedAsymptoticDiffusionIsNotStandardisedInitialLatentVariance
                 .to_string(),
             "standardised asymptotic diffusion is not standardised initial latent variance"
+        );
+    }
+
+    #[test]
+    fn standardised_asymptotic_diffusion_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticDiffusionRequiresPositiveStationaryVariance
+                .to_string(),
+            "standardised asymptotic diffusion requires strictly positive stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticDiffusion
+                .to_string(),
+            "unstandardised asymptotic diffusion is not standardised asymptotic diffusion"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedAsymptoticDiffusion
+                .to_string(),
+            "standardised initial latent variance is not standardised asymptotic diffusion"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion
+                .to_string(),
+            "standardised continuous diffusion is not standardised asymptotic diffusion"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion
+                .to_string(),
+            "standardised time-independent predictor variance is not standardised asymptotic diffusion"
         );
     }
 
