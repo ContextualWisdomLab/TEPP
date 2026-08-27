@@ -1795,7 +1795,6 @@ pub fn refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_v
 /// currently export `DIFFUSIONstd` or `TIPREDVARstd`; the refuse
 /// still names those quantities. This is not a Kalman filter, not a
 /// matrix `expm`, not DSEM, and not ctsem estimation.
-
 /// Exact scalar p. 16 `TRAITVARstd` after strictly positive `TRAITVAR`.
 ///
 /// Driver, Oud, and Voelkle (2017, Table 2, p. 12; §7.1, pp. 18–19;
@@ -1835,7 +1834,6 @@ pub fn refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_v
 /// export `addedT0TIPREDVAR`; the refuse still names that quantity.
 /// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
 /// not ctsem estimation.
-
 ///
 /// # Errors
 ///
@@ -1871,11 +1869,17 @@ pub fn recover_standardised_asymptotic_diffusion(
 /// Unstandardised `p` is defined for a zero process. Footnote 4
 /// `asymDIFFUSIONstd` requires strictly positive `asymDIFFUSION`.
 /// Equal numbers when `p = 1` are still distinct named quantities.
-
 /// [`PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance`]
 /// when `TRAITVAR` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when the variance is
 /// non-finite, negative, or the quadratic form overflows.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event
+/// clock, [`PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance`]
+/// when `TRAITVAR` is zero, and [`PsychometricError::InvalidNumericInput`]
+/// for a non-finite or negative variance.
 pub fn recover_standardised_trait_variance(
     trait_variance: f64,
     clock: LagClock,
@@ -1900,7 +1904,6 @@ pub fn recover_standardised_trait_variance(
 /// Unstandardised `TRAITVAR` is defined for a zero trait. Footnote
 /// 4 `TRAITVARstd` requires strictly positive `TRAITVAR`. Equal
 /// numbers when `trait = 1` are still distinct named quantities.
-
 ///
 /// # Errors
 ///
@@ -1924,8 +1927,11 @@ pub fn refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_dif
 /// process-dynamics `asymDIFFUSION`. `T0VARstd` is the correlation
 /// form of free first-occasion `T0VAR`. Equal numbers remain
 /// distinct named quantities.
-
 /// [`PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance`].
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance`].
 pub fn refuse_unstandardised_trait_variance_as_standardised_trait_variance(
     unstandardised_trait_variance: f64,
     standardised_trait_variance: f64,
@@ -1940,7 +1946,6 @@ pub fn refuse_unstandardised_trait_variance_as_standardised_trait_variance(
 /// variances. `T0VARstd` standardises free first-occasion `T0VAR`.
 /// `TRAITVARstd` standardises between-subject `TRAITVAR`. Equal
 /// numbers remain distinct named quantities.
-
 ///
 /// # Errors
 ///
@@ -1990,8 +1995,11 @@ pub fn refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffu
 /// correlation form of `TIPREDVAR`. Equal numbers remain distinct
 /// named quantities. This crate does not currently export
 /// `TIPREDVARstd`; the refuse still names that quantity.
-
 /// [`PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance`].
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance`].
 pub fn refuse_standardised_initial_latent_variance_as_standardised_trait_variance(
     standardised_initial_variance: f64,
     standardised_trait_variance: f64,
@@ -2006,7 +2014,6 @@ pub fn refuse_standardised_initial_latent_variance_as_standardised_trait_varianc
 /// the correlation form of between-subject `TRAITVAR`. Those are
 /// not the same map. This crate does not currently export
 /// `addedT0TIPREDVAR`; the refuse still names that quantity.
-
 ///
 /// # Errors
 ///
@@ -2029,6 +2036,10 @@ pub fn refuse_standardised_time_independent_predictor_variance_as_standardised_a
 /// `asymDIFFUSIONstd`-style trait variance misuse.
 ///
 /// [`PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance`].
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance`].
 pub fn refuse_initial_time_independent_variance_as_standardised_trait_variance(
     initial_predictor_variance: f64,
     standardised_trait_variance: f64,
