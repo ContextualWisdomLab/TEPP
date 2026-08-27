@@ -105,8 +105,21 @@ fn emit_receipt(receipt: &ProbeReceipt) -> Result<(), Box<dyn std::error::Error>
     Ok(())
 }
 
+/// Emit a receipt from an already-evaluated probe result.
+fn execute_probe_from(
+    result: Result<ProbeReceipt, Box<dyn std::error::Error>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    emit_receipt(&result?)
+}
+
+/// Run the host probe and emit one receipt, or fail closed.
+fn execute_probe() -> Result<(), Box<dyn std::error::Error>> {
+    execute_probe_from(run())
+}
+
+#[cfg(not(test))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    emit_receipt(&run()?)
+    execute_probe()
 }
 
 #[cfg(test)]
@@ -125,6 +138,8 @@ mod tests {
         );
         assert_eq!(receipt.objective_sha256.len(), 64);
         assert_eq!(receipt.output_sha256.len(), 64);
+        super::execute_probe_from(Ok(receipt)).expect("macos receipt must emit");
+        super::execute_probe().expect("macos host must emit the probe");
     }
 }
 
@@ -155,5 +170,31 @@ mod tests {
             observed_maximum_difference: 0.0,
         };
         emit_receipt(&receipt).expect("receipt JSON must serialize");
+        super::execute_probe_from(Ok(receipt)).expect("finite receipt must emit");
+    }
+
+    #[test]
+    fn linux_host_execute_probe_fails_closed() {
+        let error = super::execute_probe().expect_err("linux host must refuse the probe");
+        assert!(
+            error
+                .to_string()
+                .contains("macOS-native MLX receipt unavailable")
+        );
+        let refused = super::execute_probe_from(Err("probe refused".into()));
+        assert!(refused.is_err());
+    }
+
+    #[test]
+    fn linux_host_rejects_non_finite_receipt_json() {
+        let receipt = ProbeReceipt {
+            schema_version: RECEIPT_SCHEMA_VERSION,
+            backend_code: "mlx_cpu_macos_native",
+            execution_environment_code: "macos_native",
+            objective_sha256: "a".repeat(64),
+            output_sha256: "b".repeat(64),
+            observed_maximum_difference: f64::NAN,
+        };
+        emit_receipt(&receipt).expect_err("NaN must fail closed on JSON emit");
     }
 }
