@@ -2570,9 +2570,6 @@ pub fn recover_standardised_discrete_diffusion(
     }
     let process_noise =
         recover_discrete_process_noise(continuous_diffusion, log_rate, event_delta, clock)?;
-    if process_noise == 0.0 {
-        return Ok(0.0);
-    }
     require_finite(process_noise / within)
 }
 
@@ -16582,7 +16579,8 @@ mod tests {
         );
         let growing = recover_discrete_process_noise(0.4, 0.5, event_delta, LagClock::EventTime)
             .expect("growing a>0");
-        assert!(growing.is_finite() && growing > 0.0);
+        assert!(growing.is_finite());
+        assert!(growing > 0.0);
         assert_eq!(
             recover_standardised_discrete_diffusion(0.4, 0.5, event_delta, LagClock::EventTime),
             Err(PsychometricError::StationaryVarianceRequiresStableDrift)
