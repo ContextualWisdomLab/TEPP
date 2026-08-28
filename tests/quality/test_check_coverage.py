@@ -1396,6 +1396,17 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(str(source), 3)
             )
 
+    def test_multiline_call_argument_remains_executable(self) -> None:
+        """A nested call argument cannot disappear from the authored denominator."""
+
+        lines = ["record_value(", "    build_value(),", ")"]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "call_argument.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
+
     def test_multiline_string_scanner_handles_escaped_char_and_past_eof(self) -> None:
         """Escaped char literals keep later lines classified; past-EOF is closed."""
 
