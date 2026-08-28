@@ -23,7 +23,7 @@ pub struct IntervalConsistencyArtifactRelation {
     pub right_event_id: String,
     /// Remaining Allen relations in stable reasoner order.
     pub allen_relations: Vec<AllenRelation>,
-    /// Whether this ordered pair has a direct accepted assertion.
+    /// Whether either orientation of this interval pair has a direct accepted assertion.
     pub observed: bool,
     /// Accepted-assertion ordinals conservatively supporting this result.
     pub support_assertion_ordinals: Vec<usize>,
