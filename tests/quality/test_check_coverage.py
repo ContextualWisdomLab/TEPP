@@ -677,6 +677,8 @@ class CoverageContractTests(unittest.TestCase):
                 "pub(crate) fn crate_visible() {",  # 73 visibility-qualified fn
                 "State::Accepted => {",  # 74 match-arm structure
                 "State::Guarded(value) if valid(value) => {",  # 75 guarded arm is executable
+                ")?;",  # 76 fallible multiline call close
+                ") {",  # 77 multiline condition close
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)

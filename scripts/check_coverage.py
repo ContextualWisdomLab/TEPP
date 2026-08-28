@@ -235,8 +235,10 @@ def is_executable_source_line(
         "}",
         "(",
         ")",
+        ") {",
         "},",
         ");",
+        ")?;",
         "];",
         "();",
         "};",
@@ -310,8 +312,6 @@ def _is_structural_comma_continuation(
     remain executable because their expressions can perform observable work.
     """
 
-    if any(character in text for character in "()=+-*/%<>!&|?"):
-        return False
     previous = ""
     for candidate in reversed(lines[: line_number - 1]):
         if candidate.strip():

@@ -644,6 +644,10 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
         "2026-08-02T00:00:00Z",
     )
     .expect_err("failed fitted selection");
+    assert_eq!(
+        error.to_string(),
+        "no fitted candidate produced a finite diagnostic"
+    );
     let AnalysisEngineError::FittedModelSelection(receipt) = error else {
         panic!("expected reason-bearing fitted selection failure");
     };

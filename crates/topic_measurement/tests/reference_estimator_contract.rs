@@ -651,6 +651,14 @@ fn source_binding_is_snapshot_and_cutoff_bound() {
     let (snapshot, document_ids, times, memberships, relations) = fixture();
     let counts = separated_counts();
     let cutoff = KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff");
+    let covariate = SparseMatrix::from_csc(
+        6,
+        1,
+        vec![0, 6],
+        vec![0, 1, 2, 3, 4, 5],
+        vec![-1.0, -0.5, 0.0, 0.0, 0.5, 1.0],
+    )
+    .expect("covariate");
     let input = ReferenceTopicInput::new_bound(
         &snapshot,
         "snapshot-reference",
@@ -658,7 +666,7 @@ fn source_binding_is_snapshot_and_cutoff_bound() {
         document_ids.clone(),
         &counts,
         &times,
-        None,
+        Some(&covariate),
         &memberships,
         &relations,
     )
@@ -726,6 +734,27 @@ fn source_binding_is_snapshot_and_cutoff_bound() {
             KnowledgeCutoff::parse_rfc3339("2026-01-01T00:00:00Z").expect("early cutoff"),
             document_ids,
             &counts,
+            &times,
+            None,
+            &memberships,
+            &relations,
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn source_binding_reapplies_ordinary_input_validation() {
+    let (snapshot, document_ids, times, memberships, relations) = fixture();
+    let wrong_rows =
+        SparseMatrix::from_csr(2, 4, vec![0, 0, 0], vec![], vec![]).expect("wrong-row counts");
+    assert!(
+        ReferenceTopicInput::new_bound(
+            &snapshot,
+            "snapshot-reference",
+            KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff"),
+            document_ids,
+            &wrong_rows,
             &times,
             None,
             &memberships,
