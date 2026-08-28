@@ -240,7 +240,9 @@ pub fn assemble_topic_context_posterior(
             ))
         })
         .collect::<Result<_, AnalysisEngineError>>()?;
-    if supplied_transitions != expected_transitions {
+    if supplied_transitions.len() != document_relations.len()
+        || supplied_transitions != expected_transitions
+    {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
     let precision = input.build_joint_coordinate_precision(model, config, topic_ids)?;
