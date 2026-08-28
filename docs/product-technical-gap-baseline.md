@@ -12,7 +12,7 @@
 - PR #282 adds a fitted candidate-`K` topic-selection slice, while #283 repairs
   duplicate ADR identities. Both remain branch candidates until exact-head
   checks and qualifying independent review permit protected merge.
-- Snapshot facts were fetched live at 2026-08-28T03:12:01Z against protected
+- Snapshot facts were fetched live at 2026-08-28T03:15:45Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -68,7 +68,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-28T03:12:01Z
+**Snapshot:** 2026-08-28T03:15:45Z
 **Protected-main evidence:** `b03cc378228d5e568fc34970fcb23dc2b452f535` (merge of [PR #271](https://github.com/ContextualWisdomLab/TEPP/pull/271) `MANIFESTVARstd`, on top of #270 `MANIFESTTRAITVARstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
@@ -151,7 +151,7 @@ historic consolidation backlog.
 ## Snapshot open pull-request evidence
 
 The following exact-head register was fetched live from GitHub at
-2026-08-28T03:12:01Z against protected main `b03cc378`. Review decisions,
+2026-08-28T03:15:45Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
@@ -162,9 +162,9 @@ Checks, and branch rules immediately before every mutation.
 | #272 | `aee65c4fd2d24b8d85c3bb435d10145853096d2f` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `868f55cbf3ac5eff8abf3e625efb858da7ea3c5a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `05fb4d9e040c44b59bd3b4f161804214766554de` | false | main | docs(gap): refresh protected-main and three-PR queue |
+| #281 | `f29d5fd4634b1256f17b3e281bbd7cee96b861a3` | false | main | docs(gap): refresh protected-main and six-PR queue |
 | #282 | `165f43987bd6288274964dc3dcb246b622d7f321` | false | main | feat(topic): execute fitted candidate-K selection |
-| #283 | `a3d883d9be27d0af841350414cc4d6417ccfa1bc` | false | main | fix(adr): enforce unique decision identities |
+| #283 | `cad0c26bfe2a5191a76f0ea805673c5b1decd57f` | false | main | fix(adr): enforce unique decision identities |
 
 
 
