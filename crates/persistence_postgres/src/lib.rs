@@ -70,6 +70,8 @@ pub use analysis_run_sql::AnalysisRunRequestRecord;
 pub use analysis_run_sql::AnalysisRunState;
 /// Immutable analysis-run lifecycle event row.
 pub use analysis_run_sql::AnalysisRunStateEventRecord;
+/// Validated durable request and latest status loaded for worker execution.
+pub use analysis_run_sql::AnalysisRunWorkerSnapshot;
 /// Render an idempotent analysis-run request insert.
 pub use analysis_run_sql::insert_analysis_run_request_sql;
 /// Render an append-only analysis-run lifecycle insert.

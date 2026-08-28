@@ -15,9 +15,10 @@ use persistence_postgres::{
     ModelRunRecord, PersistenceError, ProjectRecord, ReproducibilityManifestRecord,
     RetentionPolicyRecord, SqlSession, TextSegmentRecord, apply_sql_batch,
     assume_app_runtime_role_sql, clear_session_tenant_sql, insert_analysis_run_request_sql,
-    insert_analysis_run_state_event_sql, insert_entity_record_sql, insert_project_record_sql,
-    model_artifact_from_analysis_result, open_live_sqlx_pool, require_live_sqlx_config,
-    reset_app_runtime_role_sql, select_active_analysis_document_sql, set_session_tenant_sql,
+    insert_analysis_run_state_event_sql, insert_entity_record_sql, insert_model_artifact_sql,
+    insert_project_record_sql, model_artifact_from_analysis_result, open_live_sqlx_pool,
+    require_live_sqlx_config, reset_app_runtime_role_sql, select_active_analysis_document_sql,
+    set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -202,6 +203,23 @@ fn prove_durable_analysis_run(
     repo.session_mut()
         .execute(&insert)
         .expect("identical retry");
+    assert!(
+        repo.session_mut()
+            .try_lock_analysis_run(tenant_record_id, record.analysis_run_id)
+            .expect("worker lock")
+    );
+    let accepted_snapshot = repo
+        .session_mut()
+        .load_analysis_run(tenant_record_id, record.analysis_run_id)
+        .expect("load accepted run");
+    assert_eq!(accepted_snapshot.request_record, record);
+    assert_eq!(
+        accepted_snapshot.status.run_state,
+        tepp_api::AnalysisRunStatusState::Accepted
+    );
+    repo.session_mut()
+        .unlock_analysis_run(tenant_record_id, record.analysis_run_id)
+        .expect("worker unlock");
 
     let mut conflicting = request.clone();
     conflicting.snapshot_id = "different-snapshot".into();
@@ -234,6 +252,14 @@ fn prove_durable_analysis_run(
     repo.session_mut()
         .execute(&terminal_sql)
         .expect("terminal append");
+    assert_eq!(
+        repo.session_mut()
+            .load_analysis_run(tenant_record_id, record.analysis_run_id)
+            .expect("load terminal run")
+            .status
+            .run_state,
+        tepp_api::AnalysisRunStatusState::Failed
+    );
     assert!(repo.session_mut().execute(&terminal_sql).is_err());
 
     prove_successful_analysis_run(
@@ -304,8 +330,6 @@ fn prove_successful_analysis_run(
         available,
     )
     .expect("persistable analysis artifact");
-    repo.insert_model_artifact(&persisted_artifact)
-        .expect("insert analysis result artifact");
     let successful_status = AnalysisRunStatus::terminal(
         &successful_request,
         &successful_receipt,
@@ -322,12 +346,21 @@ fn prove_successful_analysis_run(
         system_time: system,
         available_time: available,
     };
+    let artifact_sql =
+        insert_model_artifact_sql(&persisted_artifact).expect("analysis result artifact SQL");
+    let event_sql = insert_analysis_run_state_event_sql(&successful_record, &successful_event)
+        .expect("successful terminal SQL");
     repo.session_mut()
-        .execute(
-            &insert_analysis_run_state_event_sql(&successful_record, &successful_event)
-                .expect("successful terminal SQL"),
-        )
-        .expect("successful terminal append");
+        .execute_transaction(&[artifact_sql, event_sql])
+        .expect("atomic artifact and terminal append");
+    assert_eq!(
+        repo.session_mut()
+            .load_analysis_run(tenant_record_id, successful_record.analysis_run_id)
+            .expect("load successful run")
+            .status
+            .run_state,
+        tepp_api::AnalysisRunStatusState::Succeeded
+    );
 }
 
 fn prove_document_insert_revise_and_audit(
