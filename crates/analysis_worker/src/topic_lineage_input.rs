@@ -24,6 +24,9 @@ const MAX_DOCUMENTS: usize = 10_000;
 const MAX_VOCABULARY: usize = 100_000;
 const MAX_SEEDS: usize = 32;
 const MAX_FIT_CELLS: usize = 1_000_000_000;
+const MAX_ITERATIONS: usize = 100_000;
+const MAX_NNZ: usize = 100_000;
+const MAX_GRAPH_RECORDS: usize = 10_000;
 
 /// One document row in the bounded scientific input.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -157,6 +160,28 @@ pub struct ValidatedTopicLineageInput {
     pub config: ReferenceTopicModelConfig,
 }
 
+#[derive(Serialize)]
+struct CanonicalModelConfig {
+    schema_version: &'static str,
+    model_contract_version: &'static str,
+    output_profile: &'static str,
+    topic_count: usize,
+    maximum_iterations: usize,
+    tolerance: f64,
+    prior_variance: f64,
+    relation_strength: f64,
+    ridge: f64,
+    topic_smoothing: f64,
+    step_size: f64,
+}
+
+#[derive(Serialize)]
+struct CanonicalSeedManifest<'seed> {
+    schema_version: &'static str,
+    seed_domain: &'static str,
+    seeds: &'seed [u64],
+}
+
 impl TopicLineageWorkerInput {
     /// Parse and size-bound untrusted JSON.
     ///
@@ -186,6 +211,31 @@ impl TopicLineageWorkerInput {
         Ok(format!("{:x}", Sha256::digest(bytes)))
     }
 
+    pub(crate) fn configuration_digest(&self) -> Result<String, AnalysisWorkerError> {
+        let model = &self.model;
+        digest(&CanonicalModelConfig {
+            schema_version: "tepp.topic_lineage_model_config.v1",
+            model_contract_version: analysis_engine::TOPIC_LINEAGE_MODEL_CONTRACT_VERSION,
+            output_profile: analysis_engine::TOPIC_LINEAGE_OUTPUT_PROFILE,
+            topic_count: model.topic_count,
+            maximum_iterations: model.maximum_iterations,
+            tolerance: model.tolerance,
+            prior_variance: model.prior_variance,
+            relation_strength: model.relation_strength,
+            ridge: model.ridge,
+            topic_smoothing: model.topic_smoothing,
+            step_size: model.step_size,
+        })
+    }
+
+    pub(crate) fn seed_manifest_digest(&self) -> Result<String, AnalysisWorkerError> {
+        digest(&CanonicalSeedManifest {
+            schema_version: "tepp.topic_lineage_seed_manifest.v1",
+            seed_domain: "reference_topic_model_restart",
+            seeds: &self.model.seeds,
+        })
+    }
+
     /// Validate cutoff/provenance/domain contracts and build existing estimator types.
     ///
     /// # Errors
@@ -206,6 +256,14 @@ impl TopicLineageWorkerInput {
             || self.model.topic_count > self.document_term.columns
             || self.model.seeds.is_empty()
             || self.model.seeds.len() > MAX_SEEDS
+            || self.model.maximum_iterations > MAX_ITERATIONS
+            || self.document_term.indices.len() > MAX_NNZ
+            || self
+                .covariates
+                .as_ref()
+                .is_some_and(|matrix| matrix.indices.len() > MAX_NNZ)
+            || self.memberships.len() > MAX_GRAPH_RECORDS
+            || self.relations.len() > MAX_GRAPH_RECORDS
             || self.model.seeds.iter().collect::<BTreeSet<_>>().len() != self.model.seeds.len()
             || self
                 .documents
@@ -213,6 +271,7 @@ impl TopicLineageWorkerInput {
                 .checked_mul(self.document_term.columns)
                 .and_then(|cells| cells.checked_mul(self.model.topic_count))
                 .and_then(|cells| cells.checked_mul(self.model.seeds.len()))
+                .and_then(|cells| cells.checked_mul(self.model.maximum_iterations))
                 .is_none_or(|cells| cells > MAX_FIT_CELLS)
         {
             return Err(AnalysisWorkerError::InvalidInput);
@@ -367,6 +426,11 @@ impl TopicLineageWorkerInput {
     }
 }
 
+fn digest(value: &impl Serialize) -> Result<String, AnalysisWorkerError> {
+    let bytes = serde_json::to_vec(value).map_err(|_| AnalysisWorkerError::InvalidInput)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
 fn sparse(input: &TopicSparseInput, rows: usize) -> Result<SparseMatrix, AnalysisWorkerError> {
     SparseMatrix::from_csr(
         rows,
@@ -387,7 +451,9 @@ fn require_provenance(
         .map_err(|_| AnalysisWorkerError::InvalidInput)?;
     if available.instant() > cutoff.instant()
         || digest.len() != 64
-        || !digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || !digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
         return Err(AnalysisWorkerError::InvalidInput);
     }
@@ -395,7 +461,7 @@ fn require_provenance(
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::{
         TOPIC_LINEAGE_WORKER_INPUT_VERSION, TopicDocumentInput, TopicLineageWorkerInput,
         TopicMembershipInput, TopicModelInput, TopicRelationInput, TopicSparseInput,
@@ -405,7 +471,7 @@ mod tests {
     use temporal_core::KnowledgeCutoff;
     use uuid::Uuid;
 
-    fn fixture() -> TopicLineageWorkerInput {
+    pub(crate) fn fixture() -> TopicLineageWorkerInput {
         let documents = (1_u128..=4)
             .map(|value| TopicDocumentInput {
                 document_id: Uuid::from_u128(value),
@@ -482,6 +548,11 @@ mod tests {
         let validated = input.validate(cutoff).expect("validated");
         assert_eq!(validated.input.document_count(), 4);
         assert_eq!(validated.input.vocabulary_size(), 4);
+        let mut numeric_digest = fixture();
+        numeric_digest.memberships[0].evidence_sha256 = "01".repeat(32);
+        numeric_digest.scientific_input_sha256 =
+            numeric_digest.scientific_digest().expect("digest");
+        assert!(numeric_digest.validate(cutoff).is_ok());
 
         let mut future = fixture();
         future.memberships[0].available_time = "2026-08-02T00:00:00Z".into();
@@ -490,5 +561,128 @@ mod tests {
             future.validate(cutoff),
             Err(AnalysisWorkerError::InvalidInput)
         ));
+        let mut short_digest = fixture();
+        short_digest.memberships[0].evidence_sha256 = "ab".into();
+        short_digest.scientific_input_sha256 = short_digest.scientific_digest().expect("digest");
+        assert!(short_digest.validate(cutoff).is_err());
+        let mut noncanonical_digest = fixture();
+        noncanonical_digest.memberships[0].evidence_sha256 = "AB".repeat(32);
+        noncanonical_digest.scientific_input_sha256 =
+            noncanonical_digest.scientific_digest().expect("digest");
+        assert!(noncanonical_digest.validate(cutoff).is_err());
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn untrusted_topic_input_covers_every_bound_and_structural_rejection() {
+        let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
+        let valid = fixture();
+        let json = serde_json::to_string(&valid).expect("json");
+        assert_eq!(
+            TopicLineageWorkerInput::from_json(&json).expect("parse"),
+            valid
+        );
+        assert_eq!(
+            TopicLineageWorkerInput::from_json("{}"),
+            Err(AnalysisWorkerError::InvalidInput)
+        );
+        assert_eq!(
+            TopicLineageWorkerInput::from_json(&"x".repeat(crate::MAX_WORKER_INPUT_BYTES + 1)),
+            Err(AnalysisWorkerError::InvalidInput)
+        );
+
+        let reject = |mut input: TopicLineageWorkerInput| {
+            input.scientific_input_sha256 = input.scientific_digest().expect("digest");
+            assert!(matches!(
+                input.validate(cutoff),
+                Err(AnalysisWorkerError::InvalidInput)
+            ));
+        };
+        let mut input = fixture();
+        input.contract_version += 1;
+        reject(input);
+        let mut input = fixture();
+        input.scientific_input_sha256 = "0".repeat(64);
+        assert!(input.validate(cutoff).is_err());
+        let mut input = fixture();
+        input.documents.truncate(1);
+        reject(input);
+        let mut input = fixture();
+        input
+            .documents
+            .resize_with(super::MAX_DOCUMENTS + 1, || TopicDocumentInput {
+                document_id: Uuid::nil(),
+                event_time: "2026-07-01T00:00:00Z".into(),
+                available_time: "2026-07-01T00:00:00Z".into(),
+            });
+        reject(input);
+        let mut input = fixture();
+        input.document_term.columns = super::MAX_VOCABULARY + 1;
+        reject(input);
+        let mut input = fixture();
+        input.model.topic_count = 1;
+        reject(input);
+        let mut input = fixture();
+        input.model.topic_count = input.document_term.columns + 1;
+        reject(input);
+        let mut input = fixture();
+        input.model.seeds.clear();
+        reject(input);
+        let mut input = fixture();
+        input.model.seeds = (0..=super::MAX_SEEDS as u64).collect();
+        reject(input);
+        let mut input = fixture();
+        input.model.maximum_iterations = super::MAX_ITERATIONS + 1;
+        reject(input);
+        let mut input = fixture();
+        input.document_term.indices.resize(super::MAX_NNZ + 1, 0);
+        reject(input);
+        let mut input = fixture();
+        input.covariates = Some(TopicSparseInput {
+            columns: 1,
+            offsets: vec![0; input.documents.len() + 1],
+            indices: vec![0; super::MAX_NNZ + 1],
+            values: vec![0.0; super::MAX_NNZ + 1],
+        });
+        reject(input);
+        let mut input = fixture();
+        input
+            .memberships
+            .resize(super::MAX_GRAPH_RECORDS + 1, input.memberships[0].clone());
+        reject(input);
+        let mut input = fixture();
+        input
+            .relations
+            .resize(super::MAX_GRAPH_RECORDS + 1, input.relations[0].clone());
+        reject(input);
+        let mut input = fixture();
+        input.model.seeds = vec![7, 7];
+        reject(input);
+        let mut input = fixture();
+        input.document_term.columns = super::MAX_VOCABULARY;
+        input.model.topic_count = super::MAX_VOCABULARY;
+        input.model.seeds = (0..super::MAX_SEEDS as u64).collect();
+        input.model.maximum_iterations = super::MAX_ITERATIONS;
+        reject(input);
+
+        let mut input = fixture();
+        input.documents[1].document_id = input.documents[0].document_id;
+        reject(input);
+        let mut input = fixture();
+        input.memberships[0].document_id = Uuid::from_u128(999);
+        reject(input);
+        let mut input = fixture();
+        input
+            .memberships
+            .retain(|membership| membership.document_id != Uuid::from_u128(1));
+        reject(input);
+        let mut input = fixture();
+        input.relations.push(input.relations[0].clone());
+        reject(input);
+        let mut input = fixture();
+        for relation in &mut input.relations {
+            relation.kind = "references".into();
+        }
+        reject(input);
     }
 }

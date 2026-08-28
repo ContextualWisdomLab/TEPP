@@ -8,7 +8,8 @@ pub use topic_lineage_input::{TopicLineageWorkerInput, ValidatedTopicLineageInpu
 
 use analysis_engine::{
     ANALYSIS_ARTIFACT_SCHEMA_VERSION, AnalysisArtifact, AnalysisCorpus, AnalysisEvidenceUnit,
-    AnalysisExecution, execute_analysis_run,
+    AnalysisExecution, TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE,
+    execute_analysis_run, execute_topic_lineage_run,
 };
 use persistence_postgres::{
     AnalysisRunState, AnalysisRunStateEventRecord, AnalysisWorkerStore, ModelRunRecord,
@@ -18,8 +19,11 @@ use persistence_postgres::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fmt};
-use temporal_core::{AvailableTime, EventTime, SystemTime};
-use tepp_api::{AnalysisRunStatus, AnalysisRunStatusState, AnalysisRunTerminalState};
+use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff, SystemTime};
+use tepp_api::{
+    AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState,
+    AnalysisRunTerminalResult, AnalysisRunTerminalState,
+};
 use uuid::Uuid;
 
 /// Version of the canonical worker-input envelope.
@@ -204,6 +208,47 @@ pub fn execute_one<S: AnalysisWorkerStore>(
     runtime_identity: &WorkerRuntimeIdentity,
     completed_at: &str,
 ) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
+    execute_input(
+        store,
+        tenant_record_id,
+        analysis_run_id,
+        WorkerInput::Evidence(input),
+        runtime_identity,
+        completed_at,
+    )
+}
+
+/// Execute or resume one durable CPU `f64` topic-lineage run.
+///
+/// # Errors
+///
+/// Returns a typed lock, trust-boundary, support, persistence, or estimator error.
+pub fn execute_topic_lineage_one<S: AnalysisWorkerStore>(
+    store: &mut S,
+    tenant_record_id: Uuid,
+    analysis_run_id: Uuid,
+    input: &TopicLineageWorkerInput,
+    runtime_identity: &WorkerRuntimeIdentity,
+    completed_at: &str,
+) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
+    execute_input(
+        store,
+        tenant_record_id,
+        analysis_run_id,
+        WorkerInput::TopicLineage(input),
+        runtime_identity,
+        completed_at,
+    )
+}
+
+fn execute_input<S: AnalysisWorkerStore>(
+    store: &mut S,
+    tenant_record_id: Uuid,
+    analysis_run_id: Uuid,
+    input: WorkerInput<'_>,
+    runtime_identity: &WorkerRuntimeIdentity,
+    completed_at: &str,
+) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
     store
         .bind_worker_tenant(tenant_record_id)
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
@@ -233,7 +278,7 @@ fn execute_locked<S: AnalysisWorkerStore>(
     store: &mut S,
     tenant_record_id: Uuid,
     analysis_run_id: Uuid,
-    input: &AnalysisWorkerInput,
+    input: WorkerInput<'_>,
     runtime_identity: &WorkerRuntimeIdentity,
     completed_at: &str,
 ) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
@@ -250,26 +295,20 @@ fn execute_locked<S: AnalysisWorkerStore>(
         });
     }
     let request = &snapshot.request_record.request;
-    if request.model_contract_version != SUPPORTED_MODEL_CONTRACT
-        || request.output_profile != SUPPORTED_OUTPUT_PROFILE
-    {
+    if !input.supports(request) {
         return Err(AnalysisWorkerError::UnsupportedRequest);
     }
-    let input_digest = input.evidence_digest()?;
+    let input_digest = input.digest()?;
     let manifest = store
-        .load_worker_manifest(
-            tenant_record_id,
-            input.reproducibility_manifest_id,
-            &input_digest,
-        )
+        .load_worker_manifest(tenant_record_id, input.manifest_id(), &input_digest)
         .map_err(|error| match error {
             PersistenceError::InvalidContentDigest => AnalysisWorkerError::InvalidInput,
             _ => AnalysisWorkerError::ExecutionFailed,
         })?;
     let cutoff = AvailableTime::parse_rfc3339(&request.knowledge_cutoff)
         .map_err(|_| AnalysisWorkerError::InvalidInput)?;
-    if input.snapshot_id != request.snapshot_id
-        || input.evidence_snapshot_sha256 != input_digest
+    if input.snapshot_id() != request.snapshot_id
+        || input.claimed_digest() != input_digest
         || cutoff.instant() != manifest.knowledge_cutoff.instant()
         || runtime_identity.code_commit_sha != manifest.code_commit_sha
         || runtime_identity.dependency_lock_digest != manifest.dependency_lock_digest
@@ -280,6 +319,7 @@ fn execute_locked<S: AnalysisWorkerStore>(
         SystemTime::parse_rfc3339(completed_at).map_err(|_| AnalysisWorkerError::InvalidInput)?;
     let completed_available = AvailableTime::parse_rfc3339(completed_at)
         .map_err(|_| AnalysisWorkerError::InvalidInput)?;
+    let prepared = input.prepare(request)?;
     if snapshot.status.run_state == AnalysisRunStatusState::Accepted {
         let running = AnalysisRunStateEventRecord {
             analysis_run_state_event_id: Uuid::now_v7(),
@@ -301,14 +341,8 @@ fn execute_locked<S: AnalysisWorkerStore>(
         .request_record
         .accepted()
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
-    let execution = execute_analysis_run(
-        request,
-        &accepted,
-        &input.corpus()?,
-        completed_at.to_owned(),
-    )
-    .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
-    publish_execution(
+    let execution = prepared.execute(request, &accepted, completed_at)?;
+    publish_prepared_execution(
         store,
         tenant_record_id,
         analysis_run_id,
@@ -321,6 +355,166 @@ fn execute_locked<S: AnalysisWorkerStore>(
     )
 }
 
+#[derive(Clone, Copy)]
+enum WorkerInput<'input> {
+    Evidence(&'input AnalysisWorkerInput),
+    TopicLineage(&'input TopicLineageWorkerInput),
+}
+
+impl<'input> WorkerInput<'input> {
+    fn supports(self, request: &AnalysisRunRequest) -> bool {
+        match self {
+            Self::Evidence(_) => {
+                request.model_contract_version == SUPPORTED_MODEL_CONTRACT
+                    && request.output_profile == SUPPORTED_OUTPUT_PROFILE
+            }
+            Self::TopicLineage(_) => {
+                request.model_contract_version == TOPIC_LINEAGE_MODEL_CONTRACT_VERSION
+                    && request.output_profile == TOPIC_LINEAGE_OUTPUT_PROFILE
+            }
+        }
+    }
+
+    fn manifest_id(self) -> Uuid {
+        match self {
+            Self::Evidence(input) => input.reproducibility_manifest_id,
+            Self::TopicLineage(input) => input.reproducibility_manifest_id,
+        }
+    }
+
+    fn snapshot_id(self) -> &'input str {
+        match self {
+            Self::Evidence(input) => &input.snapshot_id,
+            Self::TopicLineage(input) => &input.snapshot_id,
+        }
+    }
+
+    fn claimed_digest(self) -> &'input str {
+        match self {
+            Self::Evidence(input) => &input.evidence_snapshot_sha256,
+            Self::TopicLineage(input) => &input.scientific_input_sha256,
+        }
+    }
+
+    fn digest(self) -> Result<String, AnalysisWorkerError> {
+        match self {
+            Self::Evidence(input) => input.evidence_digest(),
+            Self::TopicLineage(input) => input.scientific_digest(),
+        }
+    }
+
+    fn prepare(
+        self,
+        request: &AnalysisRunRequest,
+    ) -> Result<PreparedWorkerInput, AnalysisWorkerError> {
+        match self {
+            Self::Evidence(input) => Ok(PreparedWorkerInput::Evidence(input.corpus()?)),
+            Self::TopicLineage(input) => {
+                let cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+                    .map_err(|_| AnalysisWorkerError::InvalidInput)?;
+                let validated = input.validate(cutoff)?;
+                Ok(PreparedWorkerInput::TopicLineage {
+                    snapshot_id: input.snapshot_id.clone(),
+                    cutoff,
+                    input: Box::new(validated.input),
+                    config: validated.config,
+                    configuration_digest: input.configuration_digest()?,
+                    random_seed_manifest_digest: input.seed_manifest_digest()?,
+                })
+            }
+        }
+    }
+}
+
+enum PreparedWorkerInput {
+    Evidence(AnalysisCorpus),
+    TopicLineage {
+        snapshot_id: String,
+        cutoff: KnowledgeCutoff,
+        input: Box<topic_measurement::ReferenceTopicInput>,
+        config: topic_measurement::ReferenceTopicModelConfig,
+        configuration_digest: String,
+        random_seed_manifest_digest: String,
+    },
+}
+
+impl PreparedWorkerInput {
+    fn execute(
+        self,
+        request: &AnalysisRunRequest,
+        accepted: &AnalysisRunAccepted,
+        completed_at: &str,
+    ) -> Result<PreparedExecution, AnalysisWorkerError> {
+        match self {
+            Self::Evidence(corpus) => PreparedExecution::from_readiness(
+                execute_analysis_run(request, accepted, &corpus, completed_at.to_owned())
+                    .map_err(|_| AnalysisWorkerError::ExecutionFailed)?,
+            ),
+            Self::TopicLineage {
+                snapshot_id,
+                cutoff,
+                input,
+                config,
+                configuration_digest,
+                random_seed_manifest_digest,
+            } => {
+                let execution = execute_topic_lineage_run(
+                    request,
+                    accepted,
+                    &snapshot_id,
+                    cutoff,
+                    &input,
+                    &config,
+                    completed_at.to_owned(),
+                )
+                .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
+                Ok(PreparedExecution {
+                    artifact_json: Some(
+                        execution
+                            .artifact
+                            .to_json()
+                            .map_err(|_| AnalysisWorkerError::ExecutionFailed)?,
+                    ),
+                    terminal_result: execution.terminal_result,
+                    configuration_digest,
+                    random_seed_manifest_digest,
+                })
+            }
+        }
+    }
+}
+
+struct PreparedExecution {
+    artifact_json: Option<String>,
+    terminal_result: AnalysisRunTerminalResult,
+    configuration_digest: String,
+    random_seed_manifest_digest: String,
+}
+
+impl PreparedExecution {
+    fn from_readiness(execution: AnalysisExecution) -> Result<Self, AnalysisWorkerError> {
+        let artifact_json = execution
+            .artifact
+            .as_ref()
+            .map(AnalysisArtifact::to_json)
+            .transpose()
+            .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
+        if let Some(artifact) = &execution.artifact {
+            debug_assert_eq!(artifact.schema_version, ANALYSIS_ARTIFACT_SCHEMA_VERSION);
+        }
+        Ok(Self {
+            artifact_json,
+            terminal_result: execution.terminal_result,
+            configuration_digest: String::new(),
+            random_seed_manifest_digest: format!(
+                "{:x}",
+                Sha256::digest(b"tepp.deterministic-no-random-seed.v1")
+            ),
+        })
+    }
+}
+
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn publish_execution<S: AnalysisWorkerStore>(
     store: &mut S,
@@ -333,7 +527,49 @@ fn publish_execution<S: AnalysisWorkerStore>(
     completed_available: AvailableTime,
     execution: AnalysisExecution,
 ) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
+    let mut execution = PreparedExecution::from_readiness(execution)?;
+    execution.configuration_digest = request_record.request_payload_sha256.clone();
+    publish_prepared_execution(
+        store,
+        tenant_record_id,
+        analysis_run_id,
+        request_record,
+        manifest,
+        cutoff,
+        completed_system,
+        completed_available,
+        execution,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn publish_prepared_execution<S: AnalysisWorkerStore>(
+    store: &mut S,
+    tenant_record_id: Uuid,
+    analysis_run_id: Uuid,
+    request_record: &persistence_postgres::AnalysisRunRequestRecord,
+    manifest: &ReproducibilityManifestRecord,
+    cutoff: AvailableTime,
+    completed_system: SystemTime,
+    completed_available: AvailableTime,
+    execution: PreparedExecution,
+) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
     let request = &request_record.request;
+    let configuration_digest = if execution.configuration_digest.is_empty() {
+        request_record.request_payload_sha256.clone()
+    } else {
+        execution.configuration_digest.clone()
+    };
+    match (
+        execution.terminal_result.run_state,
+        &execution.artifact_json,
+    ) {
+        (AnalysisRunTerminalState::Succeeded, Some(artifact))
+            if execution.terminal_result.result_sha256.as_deref()
+                == Some(format!("{:x}", Sha256::digest(artifact.as_bytes())).as_str()) => {}
+        (AnalysisRunTerminalState::Failed, None) => {}
+        _ => return Err(AnalysisWorkerError::ExecutionFailed),
+    }
     let accepted = request_record
         .accepted()
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
@@ -355,23 +591,15 @@ fn publish_execution<S: AnalysisWorkerStore>(
     };
     let terminal_sql = insert_analysis_run_state_event_sql(request_record, &terminal)
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
-    let artifact_json = execution
-        .artifact
-        .as_ref()
-        .map(AnalysisArtifact::to_json)
-        .transpose()
-        .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
-    if let Some(artifact) = execution.artifact {
+    let artifact_json = execution.artifact_json;
+    if artifact_json.is_some() {
         let model_run = ModelRunRecord {
             model_run_id: analysis_run_id,
             tenant_record_id,
             reproducibility_manifest_id: manifest.reproducibility_manifest_id,
             corpus_split_manifest_id: None,
-            configuration_digest: request_record.request_payload_sha256.clone(),
-            random_seed_manifest_digest: format!(
-                "{:x}",
-                Sha256::digest(b"tepp.deterministic-no-random-seed.v1")
-            ),
+            configuration_digest,
+            random_seed_manifest_digest: execution.random_seed_manifest_digest,
             engine_version_label: env!("CARGO_PKG_VERSION").to_owned(),
             compute_backend_code: "cpu_f64".to_owned(),
             knowledge_cutoff: cutoff,
@@ -386,7 +614,6 @@ fn publish_execution<S: AnalysisWorkerStore>(
             completed_system,
             completed_available,
         )?;
-        debug_assert_eq!(artifact.schema_version, ANALYSIS_ARTIFACT_SCHEMA_VERSION);
         store
             .execute_worker_transaction(&[
                 insert_model_run_sql(&model_run)?,
@@ -408,7 +635,7 @@ fn publish_execution<S: AnalysisWorkerStore>(
 fn worker_artifact_record(
     tenant_record_id: Uuid,
     model_run_id: Uuid,
-    result: &tepp_api::AnalysisRunTerminalResult,
+    result: &AnalysisRunTerminalResult,
     protected_object_ref: Option<String>,
     system_time: SystemTime,
     available_time: AvailableTime,
@@ -435,7 +662,7 @@ mod tests {
     use super::{
         AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES,
         WORKER_INPUT_CONTRACT_VERSION, WorkerEvidenceUnit, WorkerRuntimeIdentity, execute_one,
-        publish_execution, worker_artifact_record,
+        execute_topic_lineage_one, publish_execution, worker_artifact_record,
     };
     use persistence_postgres::{
         AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError,
@@ -444,7 +671,7 @@ mod tests {
     use temporal_core::{AvailableTime, SystemTime};
     use tepp_api::{
         ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalysisRunStatus,
-        AnalysisRunTerminalResult,
+        AnalysisRunStatusState, AnalysisRunTerminalResult,
     };
     use uuid::Uuid;
 
@@ -506,6 +733,30 @@ mod tests {
         }
     }
 
+    fn topic_snapshot(input: &super::TopicLineageWorkerInput) -> AnalysisRunWorkerSnapshot {
+        let request = AnalysisRunRequest {
+            contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
+            idempotency_key: "topic-worker-idempotency".into(),
+            tenant_workspace_id: "workspace-1".into(),
+            snapshot_id: input.snapshot_id.clone(),
+            knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            model_contract_version: analysis_engine::TOPIC_LINEAGE_MODEL_CONTRACT_VERSION.into(),
+            output_profile: analysis_engine::TOPIC_LINEAGE_OUTPUT_PROFILE.into(),
+        };
+        let request_record = AnalysisRunRequestRecord::from_request(
+            Uuid::nil(),
+            &request,
+            SystemTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("system"),
+            AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available"),
+        )
+        .expect("record");
+        AnalysisRunWorkerSnapshot {
+            status: AnalysisRunStatus::accepted(&request_record.accepted().expect("accepted"))
+                .expect("status"),
+            request_record,
+        }
+    }
+
     #[test]
     #[should_panic(expected = "unknown test state")]
     fn test_snapshot_fixture_rejects_unknown_state() {
@@ -536,6 +787,28 @@ mod tests {
                     dependency_lock_digest: "b".repeat(64),
                     system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("system"),
                     available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z")
+                        .expect("available"),
+                },
+                locked: false,
+                fail_on: None,
+                executed: Vec::new(),
+                transactions: Vec::new(),
+            }
+        }
+
+        fn new_topic(input: &super::TopicLineageWorkerInput) -> Self {
+            Self {
+                snapshot: topic_snapshot(input),
+                manifest: ReproducibilityManifestRecord {
+                    reproducibility_manifest_id: input.reproducibility_manifest_id,
+                    tenant_record_id: Uuid::nil(),
+                    knowledge_cutoff: AvailableTime::parse_rfc3339("2026-08-01T00:00:00Z")
+                        .expect("cutoff"),
+                    evidence_digest: input.scientific_digest().expect("digest"),
+                    code_commit_sha: "a".repeat(40),
+                    dependency_lock_digest: "b".repeat(64),
+                    system_time: SystemTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("system"),
+                    available_time: AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z")
                         .expect("available"),
                 },
                 locked: false,
@@ -654,6 +927,61 @@ mod tests {
     }
 
     #[test]
+    fn topic_lineage_public_path_fits_and_atomically_publishes_the_real_artifact() {
+        let input = super::topic_lineage_input::tests::fixture();
+        let mut unsupported = FakeStore::new_topic(&input);
+        unsupported.snapshot.request_record.request.output_profile = "other".into();
+        let unsupported_run_id = unsupported.snapshot.request_record.analysis_run_id;
+        assert_eq!(
+            execute_topic_lineage_one(
+                &mut unsupported,
+                Uuid::nil(),
+                unsupported_run_id,
+                &input,
+                &identity(),
+                "2026-08-02T00:00:00Z",
+            ),
+            Err(AnalysisWorkerError::UnsupportedRequest)
+        );
+        let mut unsupported = FakeStore::new_topic(&input);
+        unsupported
+            .snapshot
+            .request_record
+            .request
+            .model_contract_version = "other".into();
+        let unsupported_run_id = unsupported.snapshot.request_record.analysis_run_id;
+        assert_eq!(
+            execute_topic_lineage_one(
+                &mut unsupported,
+                Uuid::nil(),
+                unsupported_run_id,
+                &input,
+                &identity(),
+                "2026-08-02T00:00:00Z",
+            ),
+            Err(AnalysisWorkerError::UnsupportedRequest)
+        );
+        let mut store = FakeStore::new_topic(&input);
+        let run_id = store.snapshot.request_record.analysis_run_id;
+        let outcome = execute_topic_lineage_one(
+            &mut store,
+            Uuid::nil(),
+            run_id,
+            &input,
+            &identity(),
+            "2026-08-02T00:00:00Z",
+        )
+        .expect("topic-lineage execution");
+        assert_eq!(outcome.status.run_state, AnalysisRunStatusState::Succeeded);
+        assert!(outcome.artifact_json.as_deref().is_some_and(|artifact| {
+            artifact.contains(analysis_engine::TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION)
+        }));
+        assert_eq!(store.executed.len(), 1);
+        assert_eq!(store.transactions.len(), 1);
+        assert_eq!(store.transactions[0].len(), 3);
+    }
+
+    #[test]
     fn untrusted_input_rejects_every_shape_and_bound_failure() {
         let valid = input().to_json().expect("valid");
         assert_eq!(
@@ -768,6 +1096,53 @@ mod tests {
             execution,
         );
         assert_eq!(result, Err(AnalysisWorkerError::ExecutionFailed));
+        assert!(store.transactions.is_empty());
+
+        let mut execution = analysis_engine::execute_analysis_run(
+            &request_record.request,
+            &accepted,
+            &input.corpus().expect("corpus"),
+            "2026-01-04T00:00:00Z",
+        )
+        .expect("execution");
+        execution.terminal_result.result_sha256 = Some("0".repeat(64));
+        assert_eq!(
+            publish_execution(
+                &mut store,
+                Uuid::nil(),
+                request_record.analysis_run_id,
+                &request_record,
+                &manifest,
+                AvailableTime::parse_rfc3339("2026-01-03T00:00:00Z").expect("cutoff"),
+                completed_system,
+                completed_available,
+                execution,
+            ),
+            Err(AnalysisWorkerError::ExecutionFailed)
+        );
+
+        let mut execution = analysis_engine::execute_analysis_run(
+            &request_record.request,
+            &accepted,
+            &input.corpus().expect("corpus"),
+            "2026-01-04T00:00:00Z",
+        )
+        .expect("execution");
+        execution.terminal_result.result_artifact_id = Some("not-a-uuid".into());
+        assert_eq!(
+            publish_execution(
+                &mut store,
+                Uuid::nil(),
+                request_record.analysis_run_id,
+                &request_record,
+                &manifest,
+                AvailableTime::parse_rfc3339("2026-01-03T00:00:00Z").expect("cutoff"),
+                completed_system,
+                completed_available,
+                execution,
+            ),
+            Err(AnalysisWorkerError::ExecutionFailed)
+        );
         assert!(store.transactions.is_empty());
     }
 

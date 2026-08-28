@@ -79,6 +79,14 @@ membership counts. The worker emits only canonical artifact JSON or the prior
 terminal status. It is not a scheduler, daemon, lease manager, or protected
 object uploader.
 
+The stacked topic-lineage library entrypoint accepts a separately versioned,
+manifest-bound scientific envelope and executes `trsl_tm_cpu_f64_v1` through
+the same lock/recovery/publication pipeline. It rejects future-available
+document, membership, and relation evidence before appending `running`, bounds
+fit work before allocation, and verifies artifact bytes against the terminal
+digest before the atomic transaction. The CLI still accepts only the readiness
+envelope; scheduler-facing topic-lineage selection remains an explicit gap.
+
 Schedulers consume the process exit contract: `0` means completed or terminal
 no-op, `64` means a permanent invocation/input/configuration rejection, and
 `75` means retryable lock contention or infrastructure failure. Standard error
