@@ -10,7 +10,7 @@ use relation_graph::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use temporal_core::{
     AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
     TemporalPrecision,
@@ -23,7 +23,7 @@ pub const TOPIC_LINEAGE_WORKER_INPUT_VERSION: u16 = 1;
 const MAX_DOCUMENTS: usize = 10_000;
 const MAX_VOCABULARY: usize = 100_000;
 const MAX_SEEDS: usize = 32;
-const MAX_FIT_CELLS: usize = 1_000_000_000;
+const MAX_FIT_CELLS: usize = 100_000_000;
 const MAX_ITERATIONS: usize = 100_000;
 const MAX_NNZ: usize = 100_000;
 const MAX_GRAPH_RECORDS: usize = 10_000;
@@ -247,11 +247,20 @@ impl TopicLineageWorkerInput {
         &self,
         cutoff: KnowledgeCutoff,
     ) -> Result<ValidatedTopicLineageInput, AnalysisWorkerError> {
+        let fit_columns = self
+            .document_term
+            .columns
+            .checked_add(self.covariates.as_ref().map_or(0, |matrix| matrix.columns))
+            .ok_or(AnalysisWorkerError::InvalidInput)?;
         if self.contract_version != TOPIC_LINEAGE_WORKER_INPUT_VERSION
             || self.scientific_input_sha256 != self.scientific_digest()?
             || self.documents.len() < 2
             || self.documents.len() > MAX_DOCUMENTS
             || self.document_term.columns > MAX_VOCABULARY
+            || self
+                .covariates
+                .as_ref()
+                .is_some_and(|matrix| matrix.columns > MAX_VOCABULARY)
             || self.model.topic_count < 2
             || self.model.topic_count > self.document_term.columns
             || self.model.seeds.is_empty()
@@ -268,7 +277,7 @@ impl TopicLineageWorkerInput {
             || self
                 .documents
                 .len()
-                .checked_mul(self.document_term.columns)
+                .checked_mul(fit_columns)
                 .and_then(|cells| cells.checked_mul(self.model.topic_count))
                 .and_then(|cells| cells.checked_mul(self.model.seeds.len()))
                 .and_then(|cells| cells.checked_mul(self.model.maximum_iterations))
@@ -279,13 +288,13 @@ impl TopicLineageWorkerInput {
         let mut snapshot = CorpusSnapshot::new();
         let mut document_ids = Vec::with_capacity(self.documents.len());
         let mut event_times = Vec::with_capacity(self.documents.len());
-        let mut document_set = BTreeSet::new();
-        for document in &self.documents {
+        let mut document_index = BTreeMap::new();
+        for (index, document) in self.documents.iter().enumerate() {
             let event = EventTime::parse_rfc3339(&document.event_time)
                 .map_err(|_| AnalysisWorkerError::InvalidInput)?;
             let available = AvailableTime::parse_rfc3339(&document.available_time)
                 .map_err(|_| AnalysisWorkerError::InvalidInput)?;
-            if !document_set.insert(document.document_id) {
+            if document_index.insert(document.document_id, index).is_some() {
                 return Err(AnalysisWorkerError::InvalidInput);
             }
             snapshot
@@ -310,7 +319,7 @@ impl TopicLineageWorkerInput {
                 &assignment.evidence_sha256,
                 cutoff,
             )?;
-            if !document_set.contains(&assignment.document_id) {
+            if !document_index.contains_key(&assignment.document_id) {
                 return Err(AnalysisWorkerError::InvalidInput);
             }
             memberships
@@ -345,13 +354,13 @@ impl TopicLineageWorkerInput {
         let mut relation_keys = BTreeSet::new();
         for relation in &self.relations {
             require_provenance(&relation.available_time, &relation.evidence_sha256, cutoff)?;
-            let source_index = document_ids
-                .iter()
-                .position(|id| *id == relation.source_document_id)
+            let source_index = document_index
+                .get(&relation.source_document_id)
+                .copied()
                 .ok_or(AnalysisWorkerError::InvalidInput)?;
-            let target_index = document_ids
-                .iter()
-                .position(|id| *id == relation.target_document_id)
+            let target_index = document_index
+                .get(&relation.target_document_id)
+                .copied()
                 .ok_or(AnalysisWorkerError::InvalidInput)?;
             let kind = RelationKind::from_wire_name(&relation.kind)
                 .map_err(|_| AnalysisWorkerError::InvalidInput)?;
@@ -643,6 +652,14 @@ pub(super) mod tests {
             offsets: vec![0; input.documents.len() + 1],
             indices: vec![0; super::MAX_NNZ + 1],
             values: vec![0.0; super::MAX_NNZ + 1],
+        });
+        reject(input);
+        let mut input = fixture();
+        input.covariates = Some(TopicSparseInput {
+            columns: super::MAX_VOCABULARY + 1,
+            offsets: vec![0; input.documents.len() + 1],
+            indices: Vec::new(),
+            values: Vec::new(),
         });
         reject(input);
         let mut input = fixture();

@@ -4,6 +4,7 @@
 
 mod topic_lineage_input;
 
+/// Manifest-bound topic-lineage input and its validated estimator arguments.
 pub use topic_lineage_input::{TopicLineageWorkerInput, ValidatedTopicLineageInput};
 
 use analysis_engine::{
