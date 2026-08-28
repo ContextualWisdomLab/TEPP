@@ -68,9 +68,11 @@ impl IntervalConsistencyArtifact {
         {
             return Err(EventError::InvalidWirePayload);
         }
+        let mut ordered_variables = variables.iter().collect::<Vec<_>>();
+        ordered_variables.sort_by(|left, right| left.0.cmp(&right.0));
         let mut relations = Vec::new();
-        for (left_index, (left_identity, left)) in variables.iter().enumerate() {
-            for (right_identity, right) in variables.iter().skip(left_index + 1) {
+        for (left_index, (left_identity, left)) in ordered_variables.iter().enumerate() {
+            for (right_identity, right) in ordered_variables.iter().skip(left_index + 1) {
                 let derived = network.derived_relation(*left, *right)?;
                 if derived.relations() == RelationSet::all() {
                     continue;
