@@ -462,7 +462,7 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         &input,
         &model,
         &config,
-        topic_ids,
+        topic_ids.clone(),
         activity,
         vec![],
         relations,
@@ -477,6 +477,10 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION
     );
     assert_eq!(artifact.posterior_draw_count, 3);
+    assert_eq!(
+        artifact.topic_ids,
+        topic_ids.iter().map(Uuid::to_string).collect::<Vec<_>>()
+    );
     assert_eq!(artifact.plausible_values.len(), 12);
     assert_eq!(artifact.document_relations.len(), 3);
     assert_eq!(

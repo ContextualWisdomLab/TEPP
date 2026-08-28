@@ -156,6 +156,11 @@ pub struct TopicContextPosteriorArtifact {
 
 /// Assemble one complete posterior artifact from a converged CPU `f64` fit.
 ///
+/// `topic_ids` assigns stable identities in the fitted model's exact topic-index
+/// order. The joint-precision producer owns that binding from this point on:
+/// the artifact reads the identities back from the digest-bound draw set rather
+/// than reusing caller memory beside the fitted coordinates.
+///
 /// The function binds the accepted run, immutable snapshot, declared event
 /// clock, stable topics, admitted Event Lineage, organizational membership
 /// provenance, and joint Laplace plausible values. It does not infer missing
@@ -215,8 +220,9 @@ pub fn assemble_topic_context_posterior(
     if supplied_transitions != expected_transitions {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
-    let precision = input.build_joint_coordinate_precision(model, config, topic_ids.clone())?;
+    let precision = input.build_joint_coordinate_precision(model, config, topic_ids)?;
     let draws = precision.draw_joint_gaussian(draw_seed, draw_count)?;
+    let fitted_topic_ids = draws.topic_ids();
     let plausible_values = draws
         .plausible_values()
         .into_iter()
@@ -238,12 +244,9 @@ pub fn assemble_topic_context_posterior(
         posterior_draw_set_id: draws.draw_set_id().to_owned(),
         posterior_draw_count: u64::try_from(draw_count)
             .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
-        topic_count: u64::try_from(topic_ids.len())
+        topic_count: u64::try_from(fitted_topic_ids.len())
             .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
-        topic_ids: topic_ids
-            .into_iter()
-            .map(|topic| topic.to_string())
-            .collect(),
+        topic_ids: fitted_topic_ids.iter().map(Uuid::to_string).collect(),
         activity_intervals,
         lineage_events,
         document_relations,
