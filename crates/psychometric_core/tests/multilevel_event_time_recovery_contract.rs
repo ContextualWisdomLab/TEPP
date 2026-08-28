@@ -38,7 +38,8 @@ use psychometric_core::{
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
     recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_time_independent_predictor_variance,
+    recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
+    recover_standardised_time_independent_predictor_variance, recover_standardised_trait_variance,
     recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
     recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
     recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
@@ -102,6 +103,7 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
+    refuse_initial_time_independent_variance_as_standardised_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -112,10 +114,15 @@ use psychometric_core::{
     refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
+    refuse_measurement_error_as_standardised_manifest_trait_variance,
     refuse_measurement_error_as_stationary_lagged_observed_covariance,
     refuse_measurement_error_as_stationary_later_observed_variance,
+    refuse_observed_variance_as_standardised_manifest_variance,
     refuse_pooled_discrete_lag_across_unequal_intervals,
     refuse_process_noise_as_unconditional_variance,
+    refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
+    refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
+    refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
     refuse_stationary_initial_latent_mean_as_discrete_mean,
@@ -155,6 +162,9 @@ use psychometric_core::{
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
+    refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
+    refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
+    refuse_unstandardised_trait_variance_as_standardised_trait_variance,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -6075,46 +6085,60 @@ fn standardised_asymptotic_diffusion_recovers_driver_page_sixteen_correlation() 
 }
 
 #[test]
-fn standardised_time_independent_predictor_variance_recovers_driver_table_three_correlation() {
-    let predictor_variance = 1.6_f64;
-    let recovered = recover_standardised_time_independent_predictor_variance(
-        predictor_variance,
-        LagClock::EventTime,
-    )
-    .expect("TIPREDVARstd");
+fn standardised_trait_variance_recovers_driver_table_two_correlation() {
+    let trait_variance = 1.6_f64;
+    let recovered = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)
+        .expect("TRAITVARstd");
     let recovered_error = (recovered - 1.0).abs();
     assert!(
         recovered_error < 1e-15,
-        "Driver et al. (2017, p. 16 TIPREDVARstd): RMSE {recovered_error} for v / v = 1"
+        "Driver et al. (2017, p. 16 TRAITVARstd): RMSE {recovered_error} for trait / trait = 1"
     );
-    let larger_v =
-        recover_standardised_time_independent_predictor_variance(6.4, LagClock::EventTime)
-            .expect("TIPREDVARstd v=6.4");
+    let larger_trait = recover_standardised_trait_variance(6.4, LagClock::EventTime)
+        .expect("TRAITVARstd trait=6.4");
+    assert!(
+        (larger_trait - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): distinct positive TRAITVAR recover the same TRAITVARstd"
+    );
+    let t0var_std =
+        recover_standardised_initial_latent_variance(trait_variance, LagClock::EventTime)
+            .expect("T0VARstd");
+    assert!(
+        (t0var_std - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): T0VARstd equals 1 after strictly positive p_0"
+    );
+    let extra = 0.3_f64 * 0.3_f64 * 4.0_f64;
+    let extra_error = (extra - 1.0).abs();
+    assert!(
+        recovered_error < extra_error,
+        "Driver et al. (2017, 2017-era addedT0TIPREDVAR): extra RMSE {extra_error} must exceed TRAITVARstd RMSE {recovered_error}"
+    );
+    let unstandardised_error = (trait_variance - 1.0).abs();
+    assert!(
+        recovered_error < unstandardised_error,
+        "Driver et al. (2017, Table 2): unstandardised TRAITVAR RMSE {unstandardised_error} must exceed TRAITVARstd RMSE {recovered_error}"
+    );
     assert_eq!(
-        larger_v.to_bits(),
-        recovered.to_bits(),
-        "Driver et al. (2017, p. 16): distinct positive TIPREDVAR recover the same TIPREDVARstd"
+        refuse_unstandardised_trait_variance_as_standardised_trait_variance(
+            trait_variance,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance)
     );
-    let unstandardised_error = (predictor_variance - 1.0).abs();
-    assert!(
-        unstandardised_error > recovered_error,
-        "Driver et al. (2017, p. 16): unstandardised TIPREDVAR RMSE {unstandardised_error} must exceed TIPREDVARstd RMSE {recovered_error}"
+    assert_eq!(
+        refuse_standardised_initial_latent_variance_as_standardised_trait_variance(
+            t0var_std, recovered
+        ),
+        Err(PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance)
     );
-    let added = recover_asymptotic_time_independent_predictor_variance(
-        0.5,
-        predictor_variance,
-        -0.25,
-        LagClock::EventTime,
-    )
-    .expect("addedTIPREDVAR");
-    let added_error = (added - 1.0).abs();
-    assert!(
-        added_error > recovered_error,
-        "Driver et al. (2017, §7.2): addedTIPREDVAR RMSE {added_error} must exceed TIPREDVARstd RMSE {recovered_error}"
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_standardised_trait_variance(extra, recovered),
+        Err(PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance)
     );
 }
 
 #[test]
+
 fn standardised_asymptotic_diffusion_refuses_non_event_clocks_and_does_not_keep_zero_q() {
     assert_eq!(
         recover_standardised_asymptotic_diffusion(0.4, -0.25, LagClock::AssertionTime),
@@ -6135,25 +6159,99 @@ fn standardised_asymptotic_diffusion_refuses_non_event_clocks_and_does_not_keep_
 }
 
 #[test]
-fn standardised_time_independent_predictor_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance()
- {
-    assert_eq!(
-        recover_standardised_time_independent_predictor_variance(1.6, LagClock::AssertionTime),
-        Err(PsychometricError::EventTimeRequired)
+fn standardised_manifest_trait_variance_recovers_driver_table_two_correlation() {
+    let manifest_trait = 1.6_f64;
+    let recovered =
+        recover_standardised_manifest_trait_variance(manifest_trait, LagClock::EventTime)
+            .expect("MANIFESTTRAITVARstd");
+    let recovered_error = (recovered - 1.0).abs();
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, p. 16 MANIFESTTRAITVARstd): RMSE {recovered_error} for ψ / ψ = 1"
+    );
+    let larger_psi = recover_standardised_manifest_trait_variance(6.4, LagClock::EventTime)
+        .expect("MANIFESTTRAITVARstd ψ=6.4");
+    assert!(
+        (larger_psi - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): distinct positive MANIFESTTRAITVAR recover the same MANIFESTTRAITVARstd"
+    );
+    let trait_std = 1.0_f64;
+    assert!(
+        (trait_std - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): TRAITVARstd equals 1 after strictly positive TRAITVAR"
+    );
+    let measurement_error = 0.4_f64;
+    let measurement_error_rmse = (measurement_error - 1.0).abs();
+    assert!(
+        recovered_error < measurement_error_rmse,
+        "Driver et al. (2017, Table 2 MANIFESTVAR): θ RMSE {measurement_error_rmse} must exceed MANIFESTTRAITVARstd RMSE {recovered_error}"
+    );
+    let unstandardised_error = (manifest_trait - 1.0).abs();
+    assert!(
+        recovered_error < unstandardised_error,
+        "Driver et al. (2017, Table 2): unstandardised MANIFESTTRAITVAR RMSE {unstandardised_error} must exceed MANIFESTTRAITVARstd RMSE {recovered_error}"
     );
     assert_eq!(
-        recover_standardised_time_independent_predictor_variance(1.6, LagClock::KnowledgeCutoff),
-        Err(PsychometricError::EventTimeRequired)
-    );
-    assert_eq!(
-        recover_standardised_time_independent_predictor_variance(0.0, LagClock::EventTime),
+        refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance(
+            manifest_trait,
+            recovered
+        ),
         Err(
-            PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance
+            PsychometricError::UnstandardisedManifestTraitVarianceIsNotStandardisedManifestTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_standardised_trait_variance_as_standardised_manifest_trait_variance(
+            trait_std, recovered
+        ),
+        Err(PsychometricError::StandardisedTraitVarianceIsNotStandardisedManifestTraitVariance)
+    );
+    assert_eq!(
+        refuse_measurement_error_as_standardised_manifest_trait_variance(
+            measurement_error,
+            recovered
+        ),
+        Err(PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance)
+    );
+}
+
+#[test]
+
+fn standardised_trait_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
+    assert_eq!(
+        recover_standardised_trait_variance(1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_trait_variance(1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_trait_variance(0.0, LagClock::EventTime),
+        Err(PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance)
+    );
+}
+
+#[test]
+fn standardised_manifest_trait_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
+    assert_eq!(
+        recover_standardised_manifest_trait_variance(1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_manifest_trait_variance(1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_manifest_trait_variance(0.0, LagClock::EventTime),
+        Err(
+            PsychometricError::StandardisedManifestTraitVarianceRequiresPositiveManifestTraitVariance
         )
     );
 }
 
 #[test]
+
 fn standardised_discrete_continuous_intercept_recovers_driver_page_sixteen_after_positive_p() {
     let intercept = 0.4_f64;
     let diffusion = 0.8_f64;
@@ -6342,4 +6440,167 @@ fn standardised_asymptotic_continuous_intercept_refuses_non_event_clocks_and_doe
         recover_standardised_asymptotic_continuous_intercept(0.0, 0.8, -0.5, LagClock::EventTime)
             .expect("zero CINT");
     assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+}
+#[test]
+fn standardised_manifest_variance_recovers_driver_table_two_correlation() {
+    let measurement_error = 0.4_f64;
+    let recovered = recover_standardised_manifest_variance(measurement_error, LagClock::EventTime)
+        .expect("MANIFESTVARstd");
+    let recovered_error = (recovered - 1.0).abs();
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, p. 16 MANIFESTVARstd): RMSE {recovered_error} for θ / θ = 1"
+    );
+    let larger_theta = recover_standardised_manifest_variance(1.6, LagClock::EventTime)
+        .expect("MANIFESTVARstd θ=1.6");
+    assert_eq!(
+        larger_theta.to_bits(),
+        recovered.to_bits(),
+        "Driver et al. (2017, p. 16): distinct positive MANIFESTVAR recover the same MANIFESTVARstd"
+    );
+    let manifest_trait_std = 1.0_f64;
+    assert!(
+        (manifest_trait_std - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): MANIFESTTRAITVARstd equals 1 after strictly positive MANIFESTTRAITVAR"
+    );
+    let observed = recover_manifest_observed_variance(2.0, 0.4, measurement_error).expect("Var(y)");
+    let observed_error = (observed - 1.0).abs();
+    assert!(
+        recovered_error < observed_error,
+        "Driver et al. (2017, Eq. 5): Var(y) RMSE {observed_error} must exceed MANIFESTVARstd RMSE {recovered_error}"
+    );
+    let unstandardised_error = (measurement_error - 1.0).abs();
+    assert!(
+        recovered_error < unstandardised_error,
+        "Driver et al. (2017, Table 2): unstandardised MANIFESTVAR RMSE {unstandardised_error} must exceed MANIFESTVARstd RMSE {recovered_error}"
+    );
+    assert_eq!(
+        refuse_unstandardised_manifest_variance_as_standardised_manifest_variance(
+            measurement_error,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance)
+    );
+    assert_eq!(
+        refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance(
+            manifest_trait_std,
+            recovered
+        ),
+        Err(PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance)
+    );
+    assert_eq!(
+        refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
+        Err(PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance)
+    );
+    assert_eq!(
+        recover_standardised_manifest_variance(0.4, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn standardised_manifest_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance() {
+    assert_eq!(
+        recover_standardised_manifest_variance(0.4, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_manifest_variance(0.4, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_manifest_variance(-0.4, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_manifest_variance(f64::NAN, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_manifest_variance(f64::INFINITY, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_standardised_manifest_variance(0.0, LagClock::EventTime),
+        Err(PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance)
+    );
+}
+
+#[test]
+fn manifest_variance_std_clock_path_is_runtime_opaque() {
+    let clocks = [
+        LagClock::SystemTime,
+        LagClock::DocumentTime,
+        LagClock::AssertionTime,
+    ];
+    let non_event_index = std::process::id() as usize % clocks.len();
+    let non_event = clocks[non_event_index];
+    assert_eq!(
+        recover_standardised_manifest_variance(0.4, non_event),
+        Err(PsychometricError::EventTimeRequired)
+    );
+}
+#[test]
+fn standardised_time_independent_predictor_variance_recovers_driver_table_three_correlation() {
+    let predictor_variance = 1.6_f64;
+    let recovered = recover_standardised_time_independent_predictor_variance(
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("TIPREDVARstd");
+    let recovered_error = (recovered - 1.0).abs();
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, p. 16 TIPREDVARstd): RMSE {recovered_error} for v / v = 1"
+    );
+    let larger_v =
+        recover_standardised_time_independent_predictor_variance(6.4, LagClock::EventTime)
+            .expect("TIPREDVARstd v=6.4");
+    assert_eq!(
+        larger_v.to_bits(),
+        recovered.to_bits(),
+        "Driver et al. (2017, p. 16): distinct positive TIPREDVAR recover the same TIPREDVARstd"
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(3.0, LagClock::EventTime)
+            .expect("TIPREDVARstd v=3")
+            .to_bits(),
+        1.0_f64.to_bits()
+    );
+    let unstandardised_error = (predictor_variance - 1.0).abs();
+    assert!(
+        unstandardised_error > recovered_error,
+        "Driver et al. (2017, p. 16): unstandardised TIPREDVAR RMSE {unstandardised_error} must exceed TIPREDVARstd RMSE {recovered_error}"
+    );
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        0.5,
+        predictor_variance,
+        -0.25,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let added_error = (added - 1.0).abs();
+    assert!(
+        added_error > recovered_error,
+        "Driver et al. (2017, §7.2): addedTIPREDVAR RMSE {added_error} must exceed TIPREDVARstd RMSE {recovered_error}"
+    );
+}
+
+#[test]
+fn standardised_time_independent_predictor_variance_refuses_non_event_clocks_and_does_not_keep_zero_variance()
+ {
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_time_independent_predictor_variance(0.0, LagClock::EventTime),
+        Err(
+            PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance
+        )
+    );
 }

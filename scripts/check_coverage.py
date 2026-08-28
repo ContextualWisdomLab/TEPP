@@ -63,6 +63,20 @@ def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int
     return coordinates, true_count, false_count
 
 
+
+def is_live_sqlx_transport_source(filename: str) -> bool:
+    """Return whether *filename* is the live-server SQLx transport source.
+
+    The authored LLVM coverage gate excludes ``sqlx_live.rs`` because a live
+    PostgreSQL server is required for the success path. Unreachable-host
+    failure remains unit-tested. The branch fold must honor the same
+    filename ignore that ``cargo llvm-cov --ignore-filename-regex`` uses,
+    or ignored live-transport arms re-enter the unique-site contract.
+    """
+
+    return Path(filename).name == "sqlx_live.rs"
+
+
 def fold_unique_branch_totals(files: object) -> dict[str, int] | None:
     """Return unique-site True/False arm totals, or None when arrays are absent.
 
@@ -89,6 +103,8 @@ def fold_unique_branch_totals(files: object) -> dict[str, int] | None:
         filename = file_entry.get("filename")
         if not isinstance(filename, str) or not filename:
             raise ValueError("coverage JSON file entry must contain a filename")
+        if is_live_sqlx_transport_source(filename):
+            continue
         for record in records:
             site, true_count, false_count = _parse_branch_record(record)
             saw_records = True
