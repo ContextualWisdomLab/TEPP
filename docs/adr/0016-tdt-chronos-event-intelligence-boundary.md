@@ -1,7 +1,7 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — versioned TDT/CHRONOS composition is executable in `event_core` (segmentation → span-grounded mentions → links → first-story → tracks → schema slots → forecasts), and bounded Allen/CHRONOS interval consistency is executable via `IntervalConsistencyNetwork` over `temporal_core::TemporalReasoner` (path consistency, quantitative singleton classification, qualitative RelationSet assertions, explicit refusal of unrestricted global satisfiability and of promoting contradictions to instances); persistence and JSON/JSON-LD/GraphML exports remain accepted-target  
+**Implementation maturity:** active-PR — versioned TDT/CHRONOS composition is executable in `event_core` (segmentation → span-grounded mentions → links → first-story → tracks → schema slots → forecasts), and bounded Allen/CHRONOS interval consistency is executable via `IntervalConsistencyNetwork` over `temporal_core::TemporalReasoner` (path consistency, quantitative singleton classification, qualitative RelationSet assertions, explicit refusal of unrestricted global satisfiability and of promoting contradictions to instances); persistence and JSON/JSON-LD/GraphML exports remain accepted-target
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 temporal semantics and ADR 0003 event ontology/membership.
 
