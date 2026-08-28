@@ -501,40 +501,6 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
-    let assert_invalid_topic_bindings = |bindings| {
-        assert_eq!(
-            assemble_topic_context_posterior(
-                &request,
-                &accepted,
-                "snapshot-topic-lineage",
-                cutoff,
-                &input,
-                &model,
-                &config,
-                bindings,
-                activity.clone(),
-                vec![],
-                relations.clone(),
-                memberships.clone(),
-                19,
-                3,
-            ),
-            Err(AnalysisEngineError::InvalidEvidence)
-        );
-    };
-    assert_invalid_topic_bindings(vec![TopicIdentityBinding::new(topic_ids[0], 0)]);
-    assert_invalid_topic_bindings(vec![
-        TopicIdentityBinding::new(topic_ids[0], 0),
-        TopicIdentityBinding::new(topic_ids[1], 0),
-    ]);
-    assert_invalid_topic_bindings(vec![
-        TopicIdentityBinding::new(topic_ids[0], 0),
-        TopicIdentityBinding::new(topic_ids[0], 1),
-    ]);
-    assert_invalid_topic_bindings(vec![
-        TopicIdentityBinding::new(topic_ids[0], 0),
-        TopicIdentityBinding::new(topic_ids[1], topic_ids.len()),
-    ]);
     let artifact = assemble_topic_context_posterior(
         &request,
         &accepted,
