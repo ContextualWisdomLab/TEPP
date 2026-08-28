@@ -1491,6 +1491,145 @@ pub fn refuse_standardised_manifest_variance_as_standardised_manifest_mean(
     Err(PsychometricError::StandardisedManifestVarianceIsNotStandardisedManifestMean)
 }
 
+/// Exact scalar p. 16 `MANIFESTVARstd` after strictly positive
+/// `MANIFESTVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; Eq. 5, p. 5;
+/// p. 16; footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-27T14:25Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `MANIFESTVAR` the `n.manifest × n.manifest` Cholesky matrix
+/// of variance/covariance between manifests (i.e., measurement
+/// error). Equation 5 writes `ε ~ N(0, Θ)`. Page 16 prints
+/// standardised matrices with the suffix `std` when appropriate.
+/// The printed example on p. 16 is `discreteDRIFTstd`, not
+/// `MANIFESTVARstd`. Footnote 4: standardisations use only the
+/// relevant variance, not the total. The relevant variance for
+/// that named residual correlation is `MANIFESTVAR` itself. The
+/// 2017-era `summary.ctsemFit.R` forms `MANIFESTVARstd` whenever
+/// `verbose = TRUE`, as
+/// `solve(sqrt(diag(MANIFESTVAR) + ridging)) %&% MANIFESTVAR`.
+/// `OpenMx` `%&%` is the quadratic form `t(A) %*% B %*% A`. Unlike
+/// `TRAITVARstd`, that formation adds
+/// `diag(c(ridging), n.manifest)`. The default `ridging = FALSE`
+/// adds 0, not `0.0001`; that ridge is a numerical hack and is not
+/// this exact map. The 2017-era source assigns
+/// `dimnames(MANIFESTVARstd)` to `latentNames`; the matrix is
+/// `n.manifest × n.manifest`. That assignment is a source bug and
+/// is not this exact map. The scalar correlation is `θ / θ = 1`
+/// after strictly positive `MANIFESTVAR`. Form strictly positive
+/// `θ` first, then `1 / √θ`, then `(1 / √θ) θ (1 / √θ)`.
+/// Unstandardised `MANIFESTVAR` is defined for a zero residual;
+/// standardised `MANIFESTVAR` is not. Zero `θ` makes
+/// `solve(sqrt(0))` fail in the 2017-era source and fails closed
+/// here. Unlike `TRAITVAR` / `MANIFESTTRAITVAR`, that source does
+/// not skip forming `MANIFESTVARstd` when `θ = 0`; the quadratic
+/// still fails. Measurement-error variance is an event-time
+/// structural quantity, so a non-event clock fails closed.
+/// `MANIFESTVAR` does not require stable `a < 0`. Distinct
+/// positive `θ` recover the same 1. `MANIFESTTRAITVARstd`
+/// `ψ / ψ = 1` recovers the same number and remains a distinct
+/// named quantity. This crate does not currently export
+/// `MANIFESTTRAITVARstd`; the refuse still names that quantity.
+/// Equation 5 `λ² Var(η) + θ` is `Var(y)`, not this correlation.
+/// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
+/// not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance`]
+/// when `MANIFESTVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the variance is
+/// non-finite, negative, or the quadratic form overflows.
+pub fn recover_standardised_manifest_variance(
+    measurement_error_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !measurement_error_variance.is_finite() || measurement_error_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if measurement_error_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance,
+        );
+    }
+    let process_sd = measurement_error_variance.sqrt();
+    let inverse_sd = require_finite(1.0 / process_sd)?;
+    let scaled = require_finite(inverse_sd * measurement_error_variance)?;
+    require_finite(scaled * inverse_sd)
+}
+
+/// Refuse treating unstandardised `MANIFESTVAR` as p. 16
+/// `MANIFESTVARstd`.
+///
+/// Unstandardised `Θ` is defined for a zero residual. Footnote 4
+/// `MANIFESTVARstd` requires strictly positive `MANIFESTVAR`. Equal
+/// numbers when `θ = 1` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_unstandardised_manifest_variance_as_standardised_manifest_variance(
+    unstandardised_manifest_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_manifest_variance,
+        standardised_manifest_variance,
+    );
+    Err(PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance)
+}
+
+/// Refuse treating p. 16 `MANIFESTTRAITVARstd` as p. 16
+/// `MANIFESTVARstd`.
+///
+/// Both scalar correlations equal 1 after strictly positive
+/// variances. `MANIFESTTRAITVARstd` standardises indicator-level
+/// trait variance `Ψ_τ`. `MANIFESTVARstd` standardises
+/// contemporaneous measurement error `Θ`. Equal numbers remain
+/// distinct named quantities. This crate does not currently export
+/// `MANIFESTTRAITVARstd`; the refuse still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance(
+    standardised_manifest_trait_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_manifest_trait_variance,
+        standardised_manifest_variance,
+    );
+    Err(PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance)
+}
+
+/// Refuse treating Driver Eq. 5 `Var(y)` as p. 16 `MANIFESTVARstd`.
+///
+/// `λ² Var(η) + θ` is the observed-indicator variance. Table 2
+/// names `MANIFESTVAR` the measurement-error covariance, not
+/// `Var(y)`. The correlation form of `Θ` is not that observed
+/// variance.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance`].
+pub fn refuse_observed_variance_as_standardised_manifest_variance(
+    observed_indicator_variance: f64,
+    standardised_manifest_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (observed_indicator_variance, standardised_manifest_variance);
+    Err(PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance)
+}
+
 /// Refuse treating `τ / √(λ² Var(η) + θ)` as p. 16
 /// `MANIFESTMEANSstd`.
 ///
