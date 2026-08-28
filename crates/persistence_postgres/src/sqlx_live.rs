@@ -108,8 +108,13 @@ impl SqlxTransport {
             LiveSqlCommand::LoadReproducibilityManifest {
                 tenant_record_id,
                 reproducibility_manifest_id,
+                expected_evidence_digest,
             } => self
-                .load_reproducibility_manifest(tenant_record_id, reproducibility_manifest_id)
+                .load_reproducibility_manifest(
+                    tenant_record_id,
+                    reproducibility_manifest_id,
+                    &expected_evidence_digest,
+                )
                 .map(Box::new)
                 .map(LiveSqlResult::ReproducibilityManifest),
         }
@@ -240,8 +245,9 @@ impl SqlxTransport {
         &mut self,
         tenant_record_id: Uuid,
         reproducibility_manifest_id: Uuid,
+        expected_evidence_digest: &str,
     ) -> Result<ReproducibilityManifestRecord, PersistenceError> {
-        const SQL: &str = "SELECT reproducibility_manifest_id::text AS reproducibility_manifest_id, tenant_record_id::text AS tenant_record_id, to_char(knowledge_cutoff AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS knowledge_cutoff, evidence_digest, code_commit_sha, dependency_lock_digest, to_char(system_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS system_time, to_char(available_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS available_time FROM reproducibility_manifest WHERE tenant_record_id = $1::uuid AND reproducibility_manifest_id = $2::uuid";
+        const SQL: &str = "SELECT reproducibility_manifest_id::text AS reproducibility_manifest_id, tenant_record_id::text AS tenant_record_id, to_char(knowledge_cutoff AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS knowledge_cutoff, evidence_digest, code_commit_sha, dependency_lock_digest, to_char(system_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS system_time, to_char(available_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS available_time FROM reproducibility_manifest WHERE tenant_record_id = $1::uuid AND reproducibility_manifest_id = $2::uuid AND evidence_digest = $3";
         let connection = self
             .connection
             .as_mut()
@@ -254,10 +260,12 @@ impl SqlxTransport {
             sqlx::query(SQL)
                 .bind(tenant_record_id.to_string())
                 .bind(reproducibility_manifest_id.to_string())
-                .fetch_one(&mut **connection)
+                .bind(expected_evidence_digest)
+                .fetch_optional(&mut **connection)
                 .await
         })
-        .map_err(|error| map_sqlx_error(&error))?;
+        .map_err(|error| map_sqlx_error(&error))?
+        .ok_or(PersistenceError::InvalidContentDigest)?;
         let record = ReproducibilityManifestRecord {
             reproducibility_manifest_id: parse_manifest_uuid_column(
                 &row,
@@ -280,12 +288,11 @@ impl SqlxTransport {
             )?)
             .map_err(|_| PersistenceError::InvalidContentDigest)?,
         };
-        if record.tenant_record_id != tenant_record_id
-            || record.reproducibility_manifest_id != reproducibility_manifest_id
-        {
-            return Err(PersistenceError::InvalidContentDigest);
-        }
-        record.validate()?;
+        record.validate_load_binding(
+            tenant_record_id,
+            reproducibility_manifest_id,
+            expected_evidence_digest,
+        )?;
         Ok(record)
     }
 }

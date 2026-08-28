@@ -83,6 +83,7 @@ pub(crate) enum LiveSqlCommand {
     LoadReproducibilityManifest {
         tenant_record_id: Uuid,
         reproducibility_manifest_id: Uuid,
+        expected_evidence_digest: String,
     },
 }
 
@@ -258,22 +259,32 @@ impl LiveSqlxPool {
         }
     }
 
-    /// Load and revalidate one tenant-bound reproducibility manifest.
+    /// Load and revalidate one tenant-bound, evidence-bound reproducibility manifest.
     ///
     /// # Errors
     ///
     /// Returns a fail-closed transport or content-validation error when the row
-    /// is absent, malformed, or outside the requested tenant boundary.
+    /// is absent, malformed, outside the requested tenant boundary, or does not
+    /// match the digest the caller computed from its input bytes.
     pub fn load_reproducibility_manifest(
         &mut self,
         tenant_record_id: Uuid,
         reproducibility_manifest_id: Uuid,
+        expected_evidence_digest: &str,
     ) -> Result<ReproducibilityManifestRecord, PersistenceError> {
         match self.run_live_command(LiveSqlCommand::LoadReproducibilityManifest {
             tenant_record_id,
             reproducibility_manifest_id,
+            expected_evidence_digest: expected_evidence_digest.to_owned(),
         })? {
-            LiveSqlResult::ReproducibilityManifest(record) => Ok(*record),
+            LiveSqlResult::ReproducibilityManifest(record) => {
+                record.validate_load_binding(
+                    tenant_record_id,
+                    reproducibility_manifest_id,
+                    expected_evidence_digest,
+                )?;
+                Ok(*record)
+            }
             _ => Err(PersistenceError::SqlExecutionFailed),
         }
     }
@@ -479,7 +490,7 @@ mod tests {
             Err(PersistenceError::InvalidAnalysisRun)
         );
         assert_eq!(
-            live.load_reproducibility_manifest(tenant, run),
+            live.load_reproducibility_manifest(tenant, run, &"ab".repeat(32)),
             Err(PersistenceError::InvalidContentDigest)
         );
         let mut offline = LiveSqlxPool::offline_for_tests(defaults);
@@ -537,9 +548,18 @@ mod tests {
                 .load_reproducibility_manifest(
                     expected_manifest.tenant_record_id,
                     expected_manifest.reproducibility_manifest_id,
+                    &expected_manifest.evidence_digest,
                 )
                 .expect("manifest"),
             expected_manifest
+        );
+        assert_eq!(
+            manifest_loader.load_reproducibility_manifest(
+                expected_manifest.tenant_record_id,
+                expected_manifest.reproducibility_manifest_id,
+                &"ff".repeat(32),
+            ),
+            Err(PersistenceError::InvalidContentDigest)
         );
 
         let mut mismatched = LiveSqlxPool::from_live_executor(
@@ -567,7 +587,7 @@ mod tests {
             Err(PersistenceError::SqlExecutionFailed)
         );
         assert_eq!(
-            mismatched.load_reproducibility_manifest(tenant, run),
+            mismatched.load_reproducibility_manifest(tenant, run, &"ab".repeat(32)),
             Err(PersistenceError::SqlExecutionFailed)
         );
         assert_eq!(
