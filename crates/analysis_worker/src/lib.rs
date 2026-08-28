@@ -662,9 +662,10 @@ impl From<PersistenceError> for AnalysisWorkerError {
 #[cfg(test)]
 mod tests {
     use super::{
-        AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES,
+        AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES, PreparedExecution,
         WORKER_INPUT_CONTRACT_VERSION, WorkerEvidenceUnit, WorkerRuntimeIdentity, execute_one,
-        execute_topic_lineage_one, publish_execution, worker_artifact_record,
+        execute_topic_lineage_one, publish_execution, publish_prepared_execution,
+        worker_artifact_record,
     };
     use persistence_postgres::{
         AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError,
@@ -1167,6 +1168,37 @@ mod tests {
             Err(AnalysisWorkerError::ExecutionFailed)
         );
         assert!(store.transactions.is_empty());
+    }
+
+    #[test]
+    fn prepared_execution_rejects_an_inconsistent_run_identity() {
+        let input = input();
+        let mut store = FakeStore::new("accepted", &input);
+        let request_record = store.snapshot.request_record.clone();
+        let accepted = request_record.accepted().expect("receipt");
+        let execution = analysis_engine::execute_analysis_run(
+            &request_record.request,
+            &accepted,
+            &input.corpus().expect("corpus"),
+            "2026-01-04T00:00:00Z",
+        )
+        .expect("execution");
+        let prepared = PreparedExecution::from_readiness(execution).expect("prepared");
+        let manifest = store.manifest.clone();
+        assert_eq!(
+            publish_prepared_execution(
+                &mut store,
+                Uuid::nil(),
+                Uuid::nil(),
+                &request_record,
+                &manifest,
+                AvailableTime::parse_rfc3339("2026-01-03T00:00:00Z").expect("cutoff"),
+                SystemTime::parse_rfc3339("2026-01-04T00:00:00Z").expect("system"),
+                AvailableTime::parse_rfc3339("2026-01-04T00:00:00Z").expect("available"),
+                prepared,
+            ),
+            Err(AnalysisWorkerError::ExecutionFailed)
+        );
     }
 
     #[test]

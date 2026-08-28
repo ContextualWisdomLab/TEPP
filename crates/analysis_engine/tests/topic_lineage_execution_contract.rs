@@ -248,4 +248,20 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
         execution.terminal_result.failure_code.as_deref(),
         Some("topic_model_did_not_converge")
     );
+    let unstable = ReferenceTopicModelConfig::new(2, vec![1], 10, 1e-12)
+        .expect("config")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, f64::MAX)
+        .expect("finite hyperparameters");
+    assert!(matches!(
+        execute_topic_lineage_run(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &input,
+            &unstable,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::TopicMeasurement(_))
+    ));
 }

@@ -3,13 +3,14 @@
 
 use analysis_worker::{
     AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES, TopicLineageWorkerInput,
-    WorkerRuntimeIdentity, execute_one, execute_topic_lineage_one,
+    WorkerRuntimeIdentity,
 };
-use persistence_postgres::{
-    LiveSqlxConfig, LiveSqlxPoolOptions, PersistenceError, open_live_sqlx_pool,
-};
+use persistence_postgres::{LiveSqlxConfig, PersistenceError};
 use std::{io::Read, process::ExitCode};
 use uuid::Uuid;
+
+mod sqlx_live;
+use sqlx_live::execute_live;
 
 const PERMANENT_EXIT_CODE: u8 = 64;
 const RETRYABLE_EXIT_CODE: u8 = 75;
@@ -33,10 +34,14 @@ enum CliInput {
 }
 
 fn main() -> ExitCode {
-    match run_from_env() {
+    exit_code(run_from_env())
+}
+
+fn exit_code(result: Result<String, Box<dyn std::error::Error>>) -> ExitCode {
+    match result {
         Ok(output) => {
             println!("{output}");
-            ExitCode::SUCCESS
+            ExitCode::from(0)
         }
         Err(error) => {
             let disposition = scheduler_disposition(error.as_ref());
@@ -61,11 +66,15 @@ fn scheduler_disposition(error: &(dyn std::error::Error + 'static)) -> Scheduler
         };
     }
     if let Some(error) = error.downcast_ref::<PersistenceError>() {
-        return match error {
+        return if matches!(
+            error,
             PersistenceError::DatabaseUrlInvalid
-            | PersistenceError::PoolOptionsInvalid
-            | PersistenceError::LiveAdapterNotConfigured => SchedulerDisposition::Permanent,
-            _ => SchedulerDisposition::Retryable,
+                | PersistenceError::PoolOptionsInvalid
+                | PersistenceError::LiveAdapterNotConfigured
+        ) {
+            SchedulerDisposition::Permanent
+        } else {
+            SchedulerDisposition::Retryable
         };
     }
     SchedulerDisposition::Permanent
@@ -84,15 +93,6 @@ fn run_from_env() -> Result<String, Box<dyn std::error::Error>> {
         dependency_lock_digest: std::env::var("TEPP_DEPENDENCY_LOCK_SHA256")?,
     };
     execute_live(&config, &arguments, &input, &runtime_identity).and_then(render_outcome)
-}
-
-#[rustfmt::skip]
-fn execute_live(config: &LiveSqlxConfig, arguments: &CliArguments, input: &CliInput, identity: &WorkerRuntimeIdentity) -> Result<analysis_worker::AnalysisWorkerOutcome, Box<dyn std::error::Error>> {
-    let pool = &mut open_live_sqlx_pool(config, LiveSqlxPoolOptions::production_defaults())?;
-    Ok(match input {
-        CliInput::Evidence(input) => execute_one(pool, arguments.tenant_record_id, arguments.analysis_run_id, input, identity, &arguments.completed_at)?,
-        CliInput::TopicLineage(input) => execute_topic_lineage_one(pool, arguments.tenant_record_id, arguments.analysis_run_id, input, identity, &arguments.completed_at)?,
-    })
 }
 
 fn parse_input(payload: &str) -> Result<CliInput, AnalysisWorkerError> {
@@ -150,14 +150,31 @@ fn render_outcome(
 #[cfg(test)]
 mod tests {
     use super::{
-        CliInput, SchedulerDisposition, parse_arguments, parse_input, render_outcome,
-        render_output, required, scheduler_disposition,
+        CliInput, PERMANENT_EXIT_CODE, RETRYABLE_EXIT_CODE, SchedulerDisposition, exit_code,
+        parse_arguments, parse_input, render_outcome, render_output, required,
+        scheduler_disposition,
     };
     use analysis_worker::{AnalysisWorkerError, AnalysisWorkerOutcome};
     use persistence_postgres::PersistenceError;
     use tepp_api::{AnalysisRunAccepted, AnalysisRunStatus};
 
     const NIL: &str = "00000000-0000-0000-0000-000000000000";
+
+    #[test]
+    fn process_exit_reports_success_and_scheduler_failures() {
+        assert_eq!(
+            exit_code(Ok("done".into())),
+            std::process::ExitCode::SUCCESS
+        );
+        assert_eq!(
+            exit_code(Err(Box::new(AnalysisWorkerError::InvalidInput))),
+            std::process::ExitCode::from(PERMANENT_EXIT_CODE)
+        );
+        assert_eq!(
+            exit_code(Err(Box::new(AnalysisWorkerError::ExecutionFailed))),
+            std::process::ExitCode::from(RETRYABLE_EXIT_CODE)
+        );
+    }
 
     #[test]
     fn arguments_are_exact_and_bounded() {
@@ -252,6 +269,10 @@ mod tests {
         );
         assert_eq!(
             scheduler_disposition(&PersistenceError::LiveAdapterNotConfigured),
+            SchedulerDisposition::Permanent
+        );
+        assert_eq!(
+            scheduler_disposition(&PersistenceError::PoolOptionsInvalid),
             SchedulerDisposition::Permanent
         );
         assert_eq!(

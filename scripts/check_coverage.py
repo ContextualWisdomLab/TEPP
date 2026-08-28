@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from functools import cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -209,7 +210,11 @@ def is_executable_source_line(
             if repository_root is not None
             else Path(source_path)
         )
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = (
+            _source_lines(path)
+            if repository_root is not None
+            else tuple(path.read_text(encoding="utf-8").splitlines())
+        )
     except OSError:
         return True
     # Stale LCOV rows past EOF are instrumentation noise, not production gaps.
@@ -241,6 +246,8 @@ def is_executable_source_line(
         "();",
         "};",
         "});",
+        ")?,",
+        ")?;",
         "Ok(())",
     }:
         return False
@@ -257,6 +264,12 @@ def is_executable_source_line(
     if text.startswith("impl ") or text.startswith("impl<"):
         return False
     if text.startswith(") ->"):
+        return False
+    if text == ") {":
+        return False
+    if text.startswith("let ") and " = " in text and text.endswith(" {"):
+        return False
+    if "::" in text and line_number < len(lines) and lines[line_number].strip().startswith("|"):
         return False
     if text.startswith(
         (
@@ -288,7 +301,7 @@ def is_executable_source_line(
         return False
     if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
-    if text in {"} else {", "else {", "));"} or text.startswith((".", "||", "&&")):
+    if text in {"} else {", "else {", "));"} or text.startswith((".", "|", "&&")):
         return False
     if (
         text.endswith(",")
@@ -300,8 +313,15 @@ def is_executable_source_line(
     return True
 
 
+@cache
+def _source_lines(path: Path) -> tuple[str, ...]:
+    """Read each source file once during one coverage-check process."""
+
+    return tuple(path.read_text(encoding="utf-8").splitlines())
+
+
 def _is_structural_comma_continuation(
-    lines: list[str], line_number: int, text: str
+    lines: Sequence[str], line_number: int, text: str
 ) -> bool:
     """Return whether a comma-terminated line is proven to be structural.
 

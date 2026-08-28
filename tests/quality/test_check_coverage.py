@@ -76,6 +76,44 @@ class CoverageContractTests(unittest.TestCase):
             coverage_contract.validate_kind(zero_totals, "branches"),  # type: ignore[arg-type]
         )
 
+    def test_question_mark_call_closer_is_structural(self) -> None:
+        """LLVM call-closing noise is not an independently executable line."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            for closer in (")?;", ")?,"):
+                source.write_text(
+                    f"fn f() {{\n    call(\n        value,\n    {closer}\n}}\n",
+                    encoding="utf-8",
+                )
+                self.assertFalse(
+                    coverage_contract.is_executable_source_line(str(source), 4)
+                )
+
+    def test_multiline_match_alternatives_are_structural(self) -> None:
+        """Only the terminal match arm carries executable disposition."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                "fn f(value: E) {\n    match value {\n        E::A\n        | E::B\n        | E::C => run(),\n    };\n}\n",
+                encoding="utf-8",
+            )
+            for line in (3, 4):
+                self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+
+    def test_multiline_closer_and_struct_literal_opener_are_structural(self) -> None:
+        """Formatting-only delimiters do not inflate authored coverage."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                "fn f() {\n    if matches!(\n        value,\n        E::A\n    ) {\n        run();\n    }\n    let identity = Identity {\n        value,\n    };\n}\n",
+                encoding="utf-8",
+            )
+            for line in (5, 8):
+                self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+
     def test_incomplete_and_malformed_summaries_fail(self) -> None:
         """Missing, nonnumeric, impossible, and incomplete counts are rejected."""
 
