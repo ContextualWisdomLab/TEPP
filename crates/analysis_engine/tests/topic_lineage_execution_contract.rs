@@ -467,6 +467,34 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
+    let mut duplicate_relations = relations.clone();
+    duplicate_relations.push(relations[0].clone());
+    duplicate_relations
+        .last_mut()
+        .expect("duplicate relation")
+        .evidence_resource_id = "duplicate-relation-evidence".into();
+    assert_eq!(
+        assemble_topic_context_posterior(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &input,
+            &model,
+            &config,
+            vec![
+                TopicIdentityBinding::new(topic_ids[0], 0),
+                TopicIdentityBinding::new(topic_ids[1], 1),
+            ],
+            activity.clone(),
+            vec![],
+            duplicate_relations,
+            memberships.clone(),
+            19,
+            3,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
     let assert_invalid_topic_bindings = |bindings| {
         assert_eq!(
             assemble_topic_context_posterior(
