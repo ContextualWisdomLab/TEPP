@@ -6603,4 +6603,13 @@ fn standardised_time_independent_predictor_variance_refuses_non_event_clocks_and
             PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance
         )
     );
+    for invalid_variance in [f64::NAN, -1.0] {
+        assert_eq!(
+            recover_standardised_time_independent_predictor_variance(
+                invalid_variance,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
 }
