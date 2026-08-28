@@ -126,7 +126,7 @@ fn context_records(
             valid_to: "2026-08-01T00:00:00Z".into(),
         })
         .collect();
-    let relations = [(0, 1), (0, 2), (2, 3)]
+    let relations = [(0, 1), (1, 2), (2, 3)]
         .into_iter()
         .enumerate()
         .map(|(index, (source, target))| TopicDocumentRelation {
@@ -477,6 +477,30 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         TopicIdentityBinding::new(topic_ids[0], 0),
         TopicIdentityBinding::new(topic_ids[1], topic_ids.len()),
     ]);
+    let mut divergent_relations = relations.clone();
+    divergent_relations[1].source_document_id = ids[0].to_string();
+    assert_eq!(
+        assemble_topic_context_posterior(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &input,
+            &model,
+            &config,
+            vec![
+                TopicIdentityBinding::new(topic_ids[0], 0),
+                TopicIdentityBinding::new(topic_ids[1], 1),
+            ],
+            activity.clone(),
+            vec![],
+            divergent_relations,
+            memberships.clone(),
+            19,
+            3,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
     let artifact = assemble_topic_context_posterior(
         &request,
         &accepted,
@@ -539,7 +563,7 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
             .iter()
             .filter(|relation| relation.source_document_id == ids[0].to_string())
             .count(),
-        2
+        1
     );
     assert_eq!(artifact.posterior_draw_set_id.len(), 64);
     let json = artifact.to_json().expect("json");
@@ -719,6 +743,10 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
         "2026-08-02T00:00:00Z",
     )
     .expect_err("failed fitted selection");
+    assert_eq!(
+        error.to_string(),
+        "no fitted candidate produced a finite diagnostic"
+    );
     let AnalysisEngineError::FittedModelSelection(receipt) = error else {
         panic!("expected reason-bearing fitted selection failure");
     };
