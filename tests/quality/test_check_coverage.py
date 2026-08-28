@@ -1245,6 +1245,39 @@ class CoverageContractTests(unittest.TestCase):
             self.assertFalse(coverage_contract.is_executable_source_line(path, 9))
             self.assertFalse(coverage_contract.is_executable_source_line(path, 11))
 
+    def test_line_filter_excludes_split_expression_regions(self) -> None:
+        """LLVM-attributed expression fragments are not independent authored lines."""
+
+        lines = [
+            "    Ok((",
+            "        source,",
+            "    ));",
+            "    let fields = [",
+            "        event.evidence_sha256.as_bytes(),",
+            "    ]",
+            "    let output = values",
+            "        .iter();",
+            "    type Output = (u8, u8);",
+            "    let penalty = total",
+            "        * config.strength",
+            "        / 2.0;",
+            "    _ => event",
+            "        .target(),",
+            "    if invalid",
+            "    {",
+            "        return Err(Error::Invalid);",
+            "    }",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "split.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            for line_number in (1, 2, 5, 6, 9, 11, 12, 13, 17):
+                self.assertFalse(
+                    coverage_contract.is_executable_source_line(
+                        str(source), line_number
+                    )
+                )
+
     def test_line_filter_keeps_inline_functions_and_block_comment_followers(self) -> None:
         """Inline function bodies and code after quoted block comments stay visible."""
 
