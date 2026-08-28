@@ -7,16 +7,15 @@ use analysis_engine::{
     AnalysisExecution, execute_analysis_run,
 };
 use persistence_postgres::{
-    AnalysisRunState, AnalysisRunStateEventRecord, AnalysisRunWorkerSnapshot, LiveSqlxPool,
-    ModelRunRecord, PersistenceError, ReproducibilityManifestRecord,
-    insert_analysis_run_state_event_sql, insert_model_artifact_sql, insert_model_run_sql,
-    model_artifact_from_analysis_result, set_session_tenant_sql,
+    AnalysisRunState, AnalysisRunStateEventRecord, AnalysisWorkerStore, ModelRunRecord,
+    PersistenceError, ReproducibilityManifestRecord, insert_analysis_run_state_event_sql,
+    insert_model_artifact_sql, insert_model_run_sql, model_artifact_from_analysis_result,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fmt};
 use temporal_core::{AvailableTime, EventTime, SystemTime};
-use tepp_api::{AnalysisRunStatus, AnalysisRunStatusState};
+use tepp_api::{AnalysisRunStatus, AnalysisRunStatusState, AnalysisRunTerminalState};
 use uuid::Uuid;
 
 /// Version of the canonical worker-input envelope.
@@ -193,81 +192,7 @@ impl std::error::Error for AnalysisWorkerError {}
 /// # Errors
 ///
 /// Returns a typed lock, trust-boundary, support, persistence, or engine error.
-pub fn execute_one(
-    pool: &mut LiveSqlxPool,
-    tenant_record_id: Uuid,
-    analysis_run_id: Uuid,
-    input: &AnalysisWorkerInput,
-    runtime_identity: &WorkerRuntimeIdentity,
-    completed_at: &str,
-) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
-    execute_one_with_store(
-        pool,
-        tenant_record_id,
-        analysis_run_id,
-        input,
-        runtime_identity,
-        completed_at,
-    )
-}
-
-trait WorkerStore {
-    fn bind_tenant(&mut self, tenant_record_id: Uuid) -> Result<(), PersistenceError>;
-    fn try_lock(&mut self, tenant_record_id: Uuid, run_id: Uuid) -> Result<bool, PersistenceError>;
-    fn unlock(&mut self, tenant_record_id: Uuid, run_id: Uuid) -> Result<(), PersistenceError>;
-    fn load_run(
-        &mut self,
-        tenant_record_id: Uuid,
-        run_id: Uuid,
-    ) -> Result<AnalysisRunWorkerSnapshot, PersistenceError>;
-    fn load_manifest(
-        &mut self,
-        tenant_record_id: Uuid,
-        manifest_id: Uuid,
-    ) -> Result<ReproducibilityManifestRecord, PersistenceError>;
-    fn execute(&mut self, sql: &str) -> Result<(), PersistenceError>;
-    fn execute_transaction(&mut self, statements: &[String]) -> Result<(), PersistenceError>;
-}
-
-impl WorkerStore for LiveSqlxPool {
-    fn bind_tenant(&mut self, tenant_record_id: Uuid) -> Result<(), PersistenceError> {
-        persistence_postgres::SqlSession::execute(self, &set_session_tenant_sql(tenant_record_id))
-    }
-
-    fn try_lock(&mut self, tenant_record_id: Uuid, run_id: Uuid) -> Result<bool, PersistenceError> {
-        self.try_lock_analysis_run(tenant_record_id, run_id)
-    }
-
-    fn unlock(&mut self, tenant_record_id: Uuid, run_id: Uuid) -> Result<(), PersistenceError> {
-        self.unlock_analysis_run(tenant_record_id, run_id)
-    }
-
-    fn load_run(
-        &mut self,
-        tenant_record_id: Uuid,
-        run_id: Uuid,
-    ) -> Result<AnalysisRunWorkerSnapshot, PersistenceError> {
-        self.load_analysis_run(tenant_record_id, run_id)
-    }
-
-    fn load_manifest(
-        &mut self,
-        tenant_record_id: Uuid,
-        manifest_id: Uuid,
-    ) -> Result<ReproducibilityManifestRecord, PersistenceError> {
-        self.load_reproducibility_manifest(tenant_record_id, manifest_id)
-    }
-
-    fn execute(&mut self, sql: &str) -> Result<(), PersistenceError> {
-        persistence_postgres::SqlSession::execute(self, sql)
-    }
-
-    fn execute_transaction(&mut self, statements: &[String]) -> Result<(), PersistenceError> {
-        self.execute_transaction(statements)
-    }
-}
-
-fn execute_one_with_store<S: WorkerStore>(
+pub fn execute_one<S: AnalysisWorkerStore>(
     store: &mut S,
     tenant_record_id: Uuid,
     analysis_run_id: Uuid,
@@ -276,10 +201,10 @@ fn execute_one_with_store<S: WorkerStore>(
     completed_at: &str,
 ) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
     store
-        .bind_tenant(tenant_record_id)
+        .bind_worker_tenant(tenant_record_id)
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
     if !store
-        .try_lock(tenant_record_id, analysis_run_id)
+        .try_worker_lock(tenant_record_id, analysis_run_id)
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?
     {
         return Err(AnalysisWorkerError::AlreadyLocked);
@@ -292,7 +217,7 @@ fn execute_one_with_store<S: WorkerStore>(
         runtime_identity,
         completed_at,
     );
-    let unlocked = store.unlock(tenant_record_id, analysis_run_id);
+    let unlocked = store.unlock_worker_run(tenant_record_id, analysis_run_id);
     match (outcome, unlocked) {
         (Ok(value), Ok(())) => Ok(value),
         (Err(error), _) => Err(error),
@@ -300,7 +225,7 @@ fn execute_one_with_store<S: WorkerStore>(
     }
 }
 
-fn execute_locked<S: WorkerStore>(
+fn execute_locked<S: AnalysisWorkerStore>(
     store: &mut S,
     tenant_record_id: Uuid,
     analysis_run_id: Uuid,
@@ -309,7 +234,7 @@ fn execute_locked<S: WorkerStore>(
     completed_at: &str,
 ) -> Result<AnalysisWorkerOutcome, AnalysisWorkerError> {
     let snapshot = store
-        .load_run(tenant_record_id, analysis_run_id)
+        .load_worker_run(tenant_record_id, analysis_run_id)
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
     if matches!(
         snapshot.status.run_state,
@@ -327,7 +252,7 @@ fn execute_locked<S: WorkerStore>(
         return Err(AnalysisWorkerError::UnsupportedRequest);
     }
     let manifest = store
-        .load_manifest(tenant_record_id, input.reproducibility_manifest_id)
+        .load_worker_manifest(tenant_record_id, input.reproducibility_manifest_id)
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
     let input_digest = input.evidence_digest()?;
     let cutoff = AvailableTime::parse_rfc3339(&request.knowledge_cutoff)
@@ -359,7 +284,7 @@ fn execute_locked<S: WorkerStore>(
         let sql = insert_analysis_run_state_event_sql(&snapshot.request_record, &running)
             .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
         store
-            .execute(&sql)
+            .execute_worker_sql(&sql)
             .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
     }
     let accepted = snapshot
@@ -387,7 +312,7 @@ fn execute_locked<S: WorkerStore>(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn publish_execution<S: WorkerStore>(
+fn publish_execution<S: AnalysisWorkerStore>(
     store: &mut S,
     tenant_record_id: Uuid,
     analysis_run_id: Uuid,
@@ -404,12 +329,9 @@ fn publish_execution<S: WorkerStore>(
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
     let status = AnalysisRunStatus::terminal(request, &accepted, execution.terminal_result.clone())
         .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
-    let terminal_state = match status.run_state {
-        AnalysisRunStatusState::Succeeded => AnalysisRunState::Succeeded,
-        AnalysisRunStatusState::Failed => AnalysisRunState::Failed,
-        AnalysisRunStatusState::Accepted | AnalysisRunStatusState::Running => {
-            return Err(AnalysisWorkerError::ExecutionFailed);
-        }
+    let terminal_state = match execution.terminal_result.run_state {
+        AnalysisRunTerminalState::Succeeded => AnalysisRunState::Succeeded,
+        AnalysisRunTerminalState::Failed => AnalysisRunState::Failed,
     };
     let terminal = AnalysisRunStateEventRecord {
         analysis_run_state_event_id: Uuid::now_v7(),
@@ -456,7 +378,7 @@ fn publish_execution<S: WorkerStore>(
         )?;
         debug_assert_eq!(artifact.schema_version, ANALYSIS_ARTIFACT_SCHEMA_VERSION);
         store
-            .execute_transaction(&[
+            .execute_worker_transaction(&[
                 insert_model_run_sql(&model_run)?,
                 insert_model_artifact_sql(&artifact_record)?,
                 terminal_sql,
@@ -464,7 +386,7 @@ fn publish_execution<S: WorkerStore>(
             .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
     } else {
         store
-            .execute_transaction(&[terminal_sql])
+            .execute_worker_transaction(&[terminal_sql])
             .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
     }
     Ok(AnalysisWorkerOutcome {
@@ -483,8 +405,7 @@ impl From<PersistenceError> for AnalysisWorkerError {
 mod tests {
     use super::{
         AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES,
-        WORKER_INPUT_CONTRACT_VERSION, WorkerEvidenceUnit, WorkerRuntimeIdentity, WorkerStore,
-        execute_one_with_store,
+        WORKER_INPUT_CONTRACT_VERSION, WorkerEvidenceUnit, WorkerRuntimeIdentity, execute_one,
     };
     use persistence_postgres::{
         AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError,
@@ -555,6 +476,12 @@ mod tests {
         }
     }
 
+    #[test]
+    #[should_panic(expected = "unknown test state")]
+    fn test_snapshot_fixture_rejects_unknown_state() {
+        let _ = snapshot("unknown");
+    }
+
     #[derive(Clone)]
     struct FakeStore {
         snapshot: AnalysisRunWorkerSnapshot,
@@ -589,12 +516,12 @@ mod tests {
         }
     }
 
-    impl WorkerStore for FakeStore {
-        fn bind_tenant(&mut self, _: Uuid) -> Result<(), PersistenceError> {
+    impl persistence_postgres::AnalysisWorkerStore for FakeStore {
+        fn bind_worker_tenant(&mut self, _: Uuid) -> Result<(), PersistenceError> {
             fail(self.fail_on, "bind")
         }
 
-        fn try_lock(&mut self, _: Uuid, _: Uuid) -> Result<bool, PersistenceError> {
+        fn try_worker_lock(&mut self, _: Uuid, _: Uuid) -> Result<bool, PersistenceError> {
             fail(self.fail_on, "lock")?;
             if self.locked {
                 Ok(false)
@@ -604,13 +531,13 @@ mod tests {
             }
         }
 
-        fn unlock(&mut self, _: Uuid, _: Uuid) -> Result<(), PersistenceError> {
+        fn unlock_worker_run(&mut self, _: Uuid, _: Uuid) -> Result<(), PersistenceError> {
             fail(self.fail_on, "unlock")?;
             self.locked = false;
             Ok(())
         }
 
-        fn load_run(
+        fn load_worker_run(
             &mut self,
             _: Uuid,
             _: Uuid,
@@ -619,7 +546,7 @@ mod tests {
             Ok(self.snapshot.clone())
         }
 
-        fn load_manifest(
+        fn load_worker_manifest(
             &mut self,
             _: Uuid,
             _: Uuid,
@@ -628,13 +555,16 @@ mod tests {
             Ok(self.manifest.clone())
         }
 
-        fn execute(&mut self, sql: &str) -> Result<(), PersistenceError> {
+        fn execute_worker_sql(&mut self, sql: &str) -> Result<(), PersistenceError> {
             fail(self.fail_on, "execute")?;
             self.executed.push(sql.into());
             Ok(())
         }
 
-        fn execute_transaction(&mut self, statements: &[String]) -> Result<(), PersistenceError> {
+        fn execute_worker_transaction(
+            &mut self,
+            statements: &[String],
+        ) -> Result<(), PersistenceError> {
             fail(self.fail_on, "transaction")?;
             self.transactions.push(statements.to_vec());
             Ok(())
@@ -660,7 +590,7 @@ mod tests {
         store: &mut FakeStore,
         input: &AnalysisWorkerInput,
     ) -> Result<super::AnalysisWorkerOutcome, AnalysisWorkerError> {
-        execute_one_with_store(
+        execute_one(
             store,
             Uuid::nil(),
             store.snapshot.request_record.analysis_run_id,
@@ -789,6 +719,14 @@ mod tests {
     #[test]
     fn lock_support_and_every_binding_fail_closed_without_terminal_publication() {
         let input = input();
+        assert_eq!(
+            AnalysisWorkerError::ExecutionFailed.to_string(),
+            "analysis worker execution failed"
+        );
+        assert_eq!(
+            AnalysisWorkerError::from(PersistenceError::SqlExecutionFailed),
+            AnalysisWorkerError::ExecutionFailed
+        );
         let mut locked = FakeStore::new("accepted", &input);
         locked.locked = true;
         assert_eq!(
@@ -803,19 +741,19 @@ mod tests {
             Err(AnalysisWorkerError::UnsupportedRequest)
         );
 
-        for mutation in 0..5 {
+        let mutations: [fn(&mut FakeStore); 5] = [
+            |store| store.manifest.evidence_digest = "c".repeat(64),
+            |store| store.manifest.code_commit_sha = "d".repeat(40),
+            |store| store.manifest.dependency_lock_digest = "e".repeat(64),
+            |store| {
+                store.manifest.knowledge_cutoff =
+                    AvailableTime::parse_rfc3339("2026-01-02T00:00:00Z").expect("cutoff");
+            },
+            |store| store.snapshot.request_record.request.snapshot_id = "other".into(),
+        ];
+        for mutate in mutations {
             let mut store = FakeStore::new("accepted", &input);
-            match mutation {
-                0 => store.manifest.evidence_digest = "c".repeat(64),
-                1 => store.manifest.code_commit_sha = "d".repeat(40),
-                2 => store.manifest.dependency_lock_digest = "e".repeat(64),
-                3 => {
-                    store.manifest.knowledge_cutoff =
-                        AvailableTime::parse_rfc3339("2026-01-02T00:00:00Z").expect("cutoff");
-                }
-                4 => store.snapshot.request_record.request.snapshot_id = "other".into(),
-                _ => unreachable!(),
-            }
+            mutate(&mut store);
             assert_eq!(
                 run(&mut store, &input),
                 Err(AnalysisWorkerError::InvalidInput)
@@ -853,7 +791,7 @@ mod tests {
         let input = input();
         let mut store = FakeStore::new("accepted", &input);
         assert_eq!(
-            execute_one_with_store(
+            execute_one(
                 &mut store,
                 Uuid::nil(),
                 Uuid::from_u128(1),

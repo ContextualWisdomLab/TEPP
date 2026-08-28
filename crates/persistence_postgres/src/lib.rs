@@ -142,6 +142,8 @@ pub use instance_sql::EventInstanceRecord;
 pub use instance_sql::insert_event_instance_sql;
 /// Render as-known-at selection for one event-instance identity.
 pub use instance_sql::select_event_instance_as_known_at_sql;
+/// Persistence port required by a one-shot durable analysis worker.
+pub use live_pool::AnalysisWorkerStore;
 /// Default pool acquire timeout in milliseconds.
 pub use live_pool::DEFAULT_ACQUIRE_TIMEOUT_MS;
 /// Default maximum pool connections.
