@@ -26,6 +26,7 @@ use tepp_api::{
     ApiError,
 };
 use topic_measurement::TopicMeasurementError;
+use uuid::Uuid;
 
 /// One document admitted to exhaustive case-deletion fitting.
 pub use case_deletion_refit::CaseDeletionDocument;
@@ -354,7 +355,7 @@ pub fn execute_analysis_run(
         latest_event_time: latest.to_rfc3339(),
     };
     artifact.sha256().and_then(move |digest| {
-        let artifact_id = format!("analysis_artifact_{}", &digest[..16]);
+        let artifact_id = artifact_id_from_digest(&digest)?;
         let summary = AnalysisResultSummary {
             analysis_family: "temporal_evidence_readiness".to_owned(),
             evidence_count: eligible_evidence_count,
@@ -402,6 +403,14 @@ fn format_digest(digest: impl AsRef<[u8]>) -> String {
     output
 }
 
+fn artifact_id_from_digest(digest: &str) -> Result<String, AnalysisEngineError> {
+    digest
+        .get(..32)
+        .and_then(|prefix| u128::from_str_radix(prefix, 16).ok())
+        .map(|value| Uuid::from_u128(value).to_string())
+        .ok_or(AnalysisEngineError::SerializationFailure)
+}
+
 fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty()
         && value.len() <= MAX_ANALYSIS_IDENTIFIER_BYTES
@@ -413,7 +422,8 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
+        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, artifact_id_from_digest,
+        execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -487,6 +497,13 @@ mod tests {
         assert_eq!(summary.evidence_count, 2);
         assert_eq!(summary.statistic_count, ANALYSIS_STATISTIC_COUNT);
         assert_eq!(summary.validation_status, "validated");
+        assert!(
+            execution
+                .terminal_result
+                .result_artifact_id
+                .as_deref()
+                .is_some_and(|value| uuid::Uuid::parse_str(value).is_ok())
+        );
         assert!(execution.terminal_result.result_sha256.is_some());
         assert!(execution.terminal_result.to_json().is_ok());
     }
@@ -614,6 +631,16 @@ mod tests {
             AnalysisEngineError::SerializationFailure.to_string(),
             "analysis artifact serialization failed"
         );
+    }
+
+    #[test]
+    fn artifact_identity_refuses_invalid_digests() {
+        for digest in ["short", "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"] {
+            assert_eq!(
+                artifact_id_from_digest(digest),
+                Err(AnalysisEngineError::SerializationFailure)
+            );
+        }
     }
 
     #[test]
