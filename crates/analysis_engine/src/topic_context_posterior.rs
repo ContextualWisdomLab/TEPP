@@ -5,12 +5,16 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use temporal_core::KnowledgeCutoff;
+use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest};
+use topic_measurement::{ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig};
 use uuid::Uuid;
 
-use crate::{AnalysisEngineError, format_digest, valid_identifier};
+use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
 
 /// Exact posterior artifact schema.
 pub const TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION: &str = "tepp.topic_context_posterior.v1";
+/// Analysis-run output profile for the complete topic-context posterior artifact.
+pub const TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE: &str = "topic_context_posterior_v1";
 /// Maximum canonical JSON size.
 pub const TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT: usize = 16 * 1024 * 1024;
 const ENTRY_LIMIT: usize = 1_000_000;
@@ -148,6 +152,92 @@ pub struct TopicContextPosteriorArtifact {
     pub memberships: Vec<TopicContextMembership>,
     /// Fixed interpretation boundary.
     pub inference_status: String,
+}
+
+/// Assemble one complete posterior artifact from a converged CPU `f64` fit.
+///
+/// The function binds the accepted run, immutable snapshot, declared event
+/// clock, stable topics, admitted Event Lineage, organizational membership
+/// provenance, and joint Laplace plausible values. It does not infer missing
+/// lineage or membership records and does not convert topic coordinates into
+/// importance scores.
+///
+/// # Errors
+///
+/// Returns a typed request, snapshot, estimator, arithmetic, provenance, or
+/// artifact-validation error. No partial artifact is returned.
+#[allow(clippy::too_many_arguments)]
+pub fn assemble_topic_context_posterior(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+    snapshot_id: &str,
+    knowledge_cutoff: KnowledgeCutoff,
+    input: &ReferenceTopicInput,
+    model: &ReferenceTopicModel,
+    config: &ReferenceTopicModelConfig,
+    topic_ids: Vec<Uuid>,
+    activity_intervals: Vec<TopicActivityInterval>,
+    lineage_events: Vec<TopicLineageEvent>,
+    document_relations: Vec<TopicDocumentRelation>,
+    memberships: Vec<TopicContextMembership>,
+    draw_seed: u64,
+    draw_count: usize,
+) -> Result<TopicContextPosteriorArtifact, AnalysisEngineError> {
+    request.to_json()?;
+    accepted.to_json()?;
+    require_receipt_identity(request, accepted)?;
+    if request.snapshot_id != snapshot_id {
+        return Err(AnalysisEngineError::SnapshotMismatch);
+    }
+    let binding = input
+        .source_binding()
+        .ok_or(AnalysisEngineError::InvalidEvidence)?;
+    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+        || request.model_contract_version != crate::TOPIC_LINEAGE_MODEL_CONTRACT_VERSION
+        || request.output_profile != TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE
+        || binding.snapshot_id() != snapshot_id
+        || binding.knowledge_cutoff() != knowledge_cutoff.to_rfc3339()
+    {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    let precision = input.build_joint_coordinate_precision(model, config, topic_ids.clone())?;
+    let draws = precision.draw_joint_gaussian(draw_seed, draw_count)?;
+    let plausible_values = draws
+        .plausible_values()
+        .into_iter()
+        .map(|value| TopicPostPlausibleValue {
+            document_id: value.document_id.to_string(),
+            draw_index: value.draw_index,
+            event_time: value.event_time.to_rfc3339(),
+            logistic_normal_coordinates: value.logistic_normal_coordinates,
+        })
+        .collect();
+    let artifact = TopicContextPosteriorArtifact {
+        schema_version: TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION.into(),
+        run_id: accepted.run_id.clone(),
+        snapshot_id: snapshot_id.to_owned(),
+        source_snapshot_sha256: binding.source_snapshot_sha256().to_owned(),
+        knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
+        event_clock_code: "event_time_rfc3339".into(),
+        model_contract_version: crate::TOPIC_LINEAGE_MODEL_CONTRACT_VERSION.into(),
+        posterior_draw_set_id: draws.draw_set_id().to_owned(),
+        posterior_draw_count: u64::try_from(draw_count)
+            .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
+        topic_count: u64::try_from(topic_ids.len())
+            .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
+        topic_ids: topic_ids
+            .into_iter()
+            .map(|topic| topic.to_string())
+            .collect(),
+        activity_intervals,
+        lineage_events,
+        document_relations,
+        plausible_values,
+        memberships,
+        inference_status: "posterior_topic_coordinates_not_importance".into(),
+    };
+    artifact.to_json()?;
+    Ok(artifact)
 }
 
 fn digest(value: &str) -> bool {

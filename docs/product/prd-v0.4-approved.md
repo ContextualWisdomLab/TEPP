@@ -136,10 +136,13 @@ synonym for topic prevalence. The `tepp.topic_context_posterior.v1` contract
 defines publication of a complete digest-bound per-post posterior plausible-
 value draw set, declared event clock, stable topic identities, admitted Event
 Lineage relations, and provenance-bound, time-valid business-unit, PU, team,
-and person memberships. The CPU estimator now emits a deterministic joint
-Laplace draw-set prerequisite, but the complete artifact remains unavailable
-until the analysis layer binds run/snapshot/cutoff, event-clock, activity,
-lineage-evidence, and membership-provenance records.
+and person memberships. The CPU estimator emits a deterministic joint Laplace
+draw set, and the analysis layer now returns the complete artifact only after
+binding the accepted run, snapshot, cutoff, event clock, activity intervals,
+Event Lineage evidence, and membership provenance. Multiple admitted
+predecessors remain separate branch records rather than being reduced to one
+earliest row. Accelerator execution remains unavailable until an actual backend
+produces the parity evidence required by ADR 0001, ADR 0006, and ADR 0025.
 `fast-mlsirm` owns posterior-aware multiple-membership case-deletion influence
 arithmetic and LineageWeave only persists and renders accepted evidence.
 Consumers never threshold posterior coordinates into binary responses.
