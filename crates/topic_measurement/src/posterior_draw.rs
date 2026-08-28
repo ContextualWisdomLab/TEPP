@@ -82,7 +82,7 @@ impl JointPosteriorDrawSet {
     ///
     /// Run, snapshot, cutoff, activity, lineage, and membership provenance are
     /// deliberately absent and must be bound by the analysis layer before a
-    /// complete `tepp.topic_context_posterior.v1` artifact exists.
+    /// complete `tepp.topic_context_posterior.v2` artifact exists.
     ///
     /// # Panics
     ///

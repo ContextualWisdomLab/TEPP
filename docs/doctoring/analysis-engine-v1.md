@@ -15,7 +15,7 @@ GPU performance, HTTP deployment, certification, or customer-wide scale.
 | Terminal completion | `AnalysisRunTerminalResult` is built from the accepted request and receipt | Poll one stable terminal contract instead of treating acceptance as completion |
 | Artifact integrity | Canonical JSON and SHA-256 digest | Verify that a downloaded result matches the published artifact identity |
 | Fitted topic lineage | `topic_measurement` reference fit projected as `tepp.trsl_topic_lineage.v2`, including candidate-fit evidence and separate source/model-input digests | Read predecessor/successor-aware connectable-post and lineage counts without treating association as causation |
-| Posterior topic context | Fit-bound joint Laplace draws assembled as `tepp.topic_context_posterior.v1` with qualified Event Lineage and time-valid BU/PU/team/person membership | Send one complete uncertainty-bearing artifact to the governed influence estimator while retaining multiple predecessor branches |
+| Posterior topic context | Fit-bound joint Laplace draws assembled as `tepp.topic_context_posterior.v2` with qualified Event Lineage and time-valid BU/PU/team/person membership | Send one complete uncertainty-bearing artifact to the governed influence estimator while retaining multiple predecessor branches |
 | Privacy boundary | Artifact contains opaque IDs, counts, and times only | Keep identity mapping in the authorized source boundary |
 
 ## Scientific and standards basis

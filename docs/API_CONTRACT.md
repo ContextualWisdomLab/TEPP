@@ -19,7 +19,7 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | interval relation/reasoner API | `temporal_core` | event/relation validation | implemented-main (`temporal-core/v1`; in-memory reasoner; merged PR #9; Allen, 1983; [`relation_contract.rs`](../crates/temporal_core/tests/relation_contract.rs), [`reasoner_contract.rs`](../crates/temporal_core/tests/reasoner_contract.rs), [`temporal-event-foundation.md`](validation/temporal-event-foundation.md)) |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
-| topic-context posterior plausible values | `analysis_engine` `tepp.topic_context_posterior.v1` | fast-mlsirm, LineageWeave | contract-only active-PR |
+| topic-context posterior plausible values | `analysis_engine` `tepp.topic_context_posterior.v2` | fast-mlsirm, LineageWeave | contract-only active-PR |
 | LLM interpretation provider port | `orchestrator_live` loopback `POST /v1/interpretation-runs` | contextual-orchestrator | partial |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
@@ -116,7 +116,7 @@ Clients retain v1 as historical evidence and rerun its immutable source snapshot
 at the original knowledge cutoff to produce v2; the parser rejects v1 rather
 than inventing missing scientific provenance.
 
-The separate `tepp.topic_context_posterior.v1` artifact carries per-post
+The separate `tepp.topic_context_posterior.v2` artifact carries per-post
 posterior logistic-normal plausible values, a declared event clock, opaque
 stable topic identities, artifact-local coordinate order, topic activity,
 explicit topic-lineage events, admitted Event Lineage document relations, and

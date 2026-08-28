@@ -15,7 +15,7 @@ needs an exact, provenance-bound input rather than hard topic labels.
 
 ## Decision
 
-TEPP owns `tepp.topic_context_posterior.v1`: the exact run, source snapshot
+TEPP owns `tepp.topic_context_posterior.v2`: the exact run, source snapshot
 digest, knowledge cutoff, model contract, declared event clock, posterior draw
 set, opaque stable global topic identities and activity intervals, explicit
 topic-lineage events, admitted Event Lineage document relations, per-post
@@ -99,7 +99,7 @@ records that differ only in time therefore fails closed rather than silently
 collapsing distinct temporal claims.
 
 The analysis layer now assembles a complete
-`tepp.topic_context_posterior.v1` artifact only when the caller supplies the
+`tepp.topic_context_posterior.v2` artifact only when the caller supplies the
 accepted run, bound source snapshot and cutoff, declared event clock, stable
 topic activity, qualified document-lineage evidence, and time-valid membership
 provenance. It derives plausible values from the fit-bound joint precision and

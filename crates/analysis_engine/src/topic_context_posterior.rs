@@ -12,9 +12,9 @@ use uuid::Uuid;
 use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
 
 /// Exact posterior artifact schema.
-pub const TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION: &str = "tepp.topic_context_posterior.v1";
+pub const TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION: &str = "tepp.topic_context_posterior.v2";
 /// Analysis-run output profile for the complete topic-context posterior artifact.
-pub const TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE: &str = "topic_context_posterior_v1";
+pub const TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE: &str = "topic_context_posterior_v2";
 /// Maximum canonical JSON size.
 pub const TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT: usize = 16 * 1024 * 1024;
 const ENTRY_LIMIT: usize = 1_000_000;

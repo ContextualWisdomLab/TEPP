@@ -37,7 +37,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
-- `analysis_engine` now assembles complete `tepp.topic_context_posterior.v1` CPU `f64` artifacts from a converged fit and exact accepted-run evidence, preserving joint Philox plausible values, declared event time, stable topic activity, provenance-bound Event Lineage branches, and time-valid BU/PU/team/person multiple memberships. Missing evidence fails closed, no importance score is inferred, and exact JSON `f64` round trips prevent digest drift; accelerator execution remains unclaimed.
+- `analysis_engine` now assembles complete `tepp.topic_context_posterior.v2` CPU `f64` artifacts from a converged fit and exact accepted-run evidence, preserving joint Philox plausible values, a digest-bound topic basis, declared event time, stable topic activity, provenance-bound Event Lineage branches, and time-valid BU/PU/team/person multiple memberships. Missing evidence fails closed, no importance score is inferred, and exact JSON `f64` round trips prevent digest drift; accelerator execution remains unclaimed.
 
 - `analysis_engine` now runs real fitted candidate-`K` selection before completing a v2 topic-lineage artifact, retaining only the selected CPU `f64` fit while prefix-free digest-binding the complete numerical input and source snapshot, enforcing bounded fit/input work, and recording per-candidate success/failure diagnostics with the winning seed, iterations, objective, and separately non-authoritative LLM recommendations.
 

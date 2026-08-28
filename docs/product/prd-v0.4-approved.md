@@ -132,7 +132,7 @@ The model separates:
 The initial release selects one global topic count across the analysis window and permits activation, dormancy, and reactivation. Explicit topic birth, split, merge, lineage, and retirement are later extensions.
 
 Topic-specific document influence is a downstream psychometric estimand, not a
-synonym for topic prevalence. The `tepp.topic_context_posterior.v1` contract
+synonym for topic prevalence. The `tepp.topic_context_posterior.v2` contract
 defines publication of a complete digest-bound per-post posterior plausible-
 value draw set, declared event clock, stable topic identities, admitted Event
 Lineage relations, and provenance-bound, time-valid business-unit, PU, team,
