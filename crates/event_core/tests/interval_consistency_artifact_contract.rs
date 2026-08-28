@@ -68,6 +68,33 @@ fn derived_branch_is_durable_typed_and_provenance_bearing() {
 }
 
 #[test]
+fn reverse_oriented_assertion_is_observed_in_stable_export_order() {
+    let mut network = IntervalConsistencyNetwork::with_limits(2, 1, 8).expect("limits");
+    let left = network.add_variable().expect("left");
+    let right = network.add_variable().expect("right");
+    network
+        .assert_qualitative_relations(right, left, RelationSet::singleton(AllenRelation::After))
+        .expect("reverse assertion");
+    let artifact = IntervalConsistencyArtifact::from_network(
+        "run-reverse",
+        "snapshot-reverse",
+        DIGEST,
+        &network,
+        &[
+            ("event-left".to_owned(), left),
+            ("event-right".to_owned(), right),
+        ],
+    )
+    .expect("artifact");
+
+    assert!(artifact.relations[0].observed);
+    assert_eq!(
+        artifact.relations[0].allen_relations,
+        vec![AllenRelation::Before]
+    );
+}
+
+#[test]
 #[allow(clippy::too_many_lines)]
 fn artifact_rejects_unbound_or_noncanonical_payloads() {
     let mut network = IntervalConsistencyNetwork::with_limits(2, 1, 8).expect("limits");
@@ -143,6 +170,19 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
     let mut oversized = valid;
     oversized.run_id = "x".repeat(4 * 1024 * 1024);
     assert_eq!(oversized.to_json(), Err(EventError::InvalidWirePayload));
+    assert_eq!(
+        IntervalConsistencyArtifact::from_network(
+            "x".repeat(4 * 1024 * 1024),
+            "snapshot",
+            DIGEST,
+            &network,
+            &[
+                ("event-1".to_owned(), first),
+                ("event-2".to_owned(), second)
+            ]
+        ),
+        Err(EventError::InvalidWirePayload)
+    );
     assert_eq!(
         IntervalConsistencyArtifact::from_json(&"x".repeat(4 * 1024 * 1024 + 1)),
         Err(EventError::InvalidWirePayload)
