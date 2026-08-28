@@ -167,7 +167,7 @@ pub fn insert_analysis_run_request_sql(
         return Err(PersistenceError::InvalidAnalysisRun);
     }
     Ok(format!(
-        "DO $tepp$ DECLARE stored_run_id uuid; stored_digest text; stored_payload text; inserted_count bigint; BEGIN INSERT INTO analysis_run_request (analysis_run_id, tenant_record_id, tenant_workspace_id, idempotency_key, request_contract_version, snapshot_id, knowledge_cutoff, model_contract_version, output_profile, request_payload_sha256, request_payload, system_time, available_time) VALUES ('{}'::uuid, '{}'::uuid, '{}', '{}', {}, '{}', '{}'::timestamptz, '{}', '{}', '{}', '{}', '{}'::timestamptz, '{}'::timestamptz) ON CONFLICT (tenant_record_id, idempotency_key) DO NOTHING; GET DIAGNOSTICS inserted_count = ROW_COUNT; IF inserted_count = 1 THEN INSERT INTO analysis_run_state_event (analysis_run_state_event_id, tenant_record_id, analysis_run_id, state_sequence, run_state_code, system_time, available_time) VALUES ('{}'::uuid, '{}'::uuid, '{}'::uuid, 1, 'accepted', '{}'::timestamptz, '{}'::timestamptz); END IF; SELECT analysis_run_id, request_payload_sha256, request_payload INTO stored_run_id, stored_digest, stored_payload FROM analysis_run_request WHERE tenant_record_id = '{}'::uuid AND idempotency_key = '{}'; IF stored_run_id IS DISTINCT FROM '{}'::uuid OR stored_digest IS DISTINCT FROM '{}' OR stored_payload IS DISTINCT FROM '{}' THEN RAISE EXCEPTION 'analysis-run idempotency conflict' USING ERRCODE = 'unique_violation'; END IF; END $tepp$",
+        "DO $tepp$ DECLARE stored_run_id uuid; stored_digest text; stored_payload text; inserted_count bigint; BEGIN INSERT INTO analysis_run_request (analysis_run_id, tenant_record_id, tenant_workspace_id, idempotency_key, request_contract_version, snapshot_id, knowledge_cutoff, model_contract_version, output_profile, request_payload_sha256, request_payload, system_time, available_time) VALUES ('{}'::uuid, '{}'::uuid, E'{}', E'{}', {}, E'{}', E'{}'::timestamptz, E'{}', E'{}', E'{}', E'{}', '{}'::timestamptz, '{}'::timestamptz) ON CONFLICT (tenant_record_id, idempotency_key) DO NOTHING; GET DIAGNOSTICS inserted_count = ROW_COUNT; IF inserted_count = 1 THEN INSERT INTO analysis_run_state_event (analysis_run_state_event_id, tenant_record_id, analysis_run_id, state_sequence, run_state_code, system_time, available_time) VALUES ('{}'::uuid, '{}'::uuid, '{}'::uuid, 1, 'accepted', '{}'::timestamptz, '{}'::timestamptz); END IF; SELECT analysis_run_id, request_payload_sha256, request_payload INTO stored_run_id, stored_digest, stored_payload FROM analysis_run_request WHERE tenant_record_id = '{}'::uuid AND idempotency_key = E'{}'; IF stored_run_id IS DISTINCT FROM '{}'::uuid OR stored_digest IS DISTINCT FROM E'{}' OR stored_payload IS DISTINCT FROM E'{}' THEN RAISE EXCEPTION 'analysis-run idempotency conflict' USING ERRCODE = 'unique_violation'; END IF; END $tepp$",
         record.analysis_run_id,
         record.tenant_record_id,
         escape(&record.request.tenant_workspace_id),
@@ -237,7 +237,7 @@ pub fn insert_analysis_run_state_event_sql(
                 None => "NULL".to_owned(),
             };
             (
-                format!("'{}'", escape(&payload)),
+                format!("E'{}'", escape(&payload)),
                 artifact_id,
                 optional_literal(result.result_sha256.as_deref()),
                 optional_literal(result.result_schema_version.as_deref()),
@@ -271,11 +271,14 @@ pub fn select_analysis_run_status_sql(tenant_record_id: Uuid, analysis_run_id: U
 }
 
 fn escape(value: &str) -> String {
-    value.replace('\'', "''")
+    value.replace('\\', "\\\\").replace('\'', "''")
 }
 
 fn optional_literal(value: Option<&str>) -> String {
-    value.map_or_else(|| "NULL".to_owned(), |value| format!("'{}'", escape(value)))
+    value.map_or_else(
+        || "NULL".to_owned(),
+        |value| format!("E'{}'", escape(value)),
+    )
 }
 
 fn derived_uuid(tenant_record_id: Uuid, purpose: &str, payload: &str) -> Uuid {

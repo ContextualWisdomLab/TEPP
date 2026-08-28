@@ -81,6 +81,20 @@ fn request_insert_is_exactly_idempotent_and_status_read_is_tenant_scoped() {
         insert_analysis_run_request_sql(&delimiter_record),
         Err(PersistenceError::InvalidAnalysisRun)
     );
+    let mut escaped_request = delimiter_request;
+    escaped_request.output_profile = "folder\\o'clock".into();
+    let escaped_record = AnalysisRunRequestRecord::from_request(
+        Uuid::nil(),
+        &escaped_request,
+        clocks().0,
+        clocks().1,
+    )
+    .expect("escaped request");
+    assert!(
+        insert_analysis_run_request_sql(&escaped_record)
+            .expect("escaped SQL")
+            .contains("E'folder\\\\o''clock'")
+    );
 
     let select = select_analysis_run_status_sql(Uuid::nil(), record.analysis_run_id);
     assert!(!select.contains("r.*"));

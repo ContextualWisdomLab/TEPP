@@ -24,7 +24,8 @@ use std::thread;
 use std::time::Duration;
 use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff, SystemTime};
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalysisRunStatus, AnalysisRunTerminalResult,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisResultSummary, AnalysisRunRequest, AnalysisRunStatus,
+    AnalysisRunTerminalResult,
 };
 use uuid::Uuid;
 
@@ -146,8 +147,15 @@ fn live_postgres_applies_migrations_and_document_sql() {
     repo.submit_reproducibility_manifest_by_id(manifest.reproducibility_manifest_id)
         .expect("select reproducibility_manifest by id");
 
-    exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
-    prove_durable_analysis_run(&mut repo, tenant_record_id, available, system);
+    let model_artifact =
+        exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
+    prove_durable_analysis_run(
+        &mut repo,
+        tenant_record_id,
+        &model_artifact,
+        available,
+        system,
+    );
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
     prove_text_segment_known_span(&mut repo, tenant_record_id, available, system);
     prove_retention_deletion_legal_hold(
@@ -168,6 +176,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
 fn prove_durable_analysis_run(
     repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
     tenant_record_id: Uuid,
+    model_artifact: &ModelArtifactRecord,
     available: AvailableTime,
     system: SystemTime,
 ) {
@@ -226,11 +235,73 @@ fn prove_durable_analysis_run(
         .execute(&terminal_sql)
         .expect("terminal append");
     assert!(repo.session_mut().execute(&terminal_sql).is_err());
+
+    prove_successful_analysis_run(
+        repo,
+        tenant_record_id,
+        model_artifact,
+        request,
+        available,
+        system,
+    );
     assert!(
         repo.session_mut()
             .execute("UPDATE analysis_run_request SET output_profile = 'tampered'")
             .is_err()
     );
+}
+
+fn prove_successful_analysis_run(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    model_artifact: &ModelArtifactRecord,
+    mut successful_request: AnalysisRunRequest,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    successful_request.idempotency_key = "live-analysis-run-2".into();
+    let successful_record = AnalysisRunRequestRecord::from_request(
+        tenant_record_id,
+        &successful_request,
+        system,
+        available,
+    )
+    .expect("successful analysis request");
+    repo.session_mut()
+        .execute(
+            &insert_analysis_run_request_sql(&successful_record).expect("successful request SQL"),
+        )
+        .expect("successful acceptance");
+    let successful_receipt = successful_record.accepted().expect("successful receipt");
+    let successful_result = AnalysisRunTerminalResult::succeeded(
+        &successful_request,
+        &successful_receipt,
+        model_artifact.model_artifact_id.to_string(),
+        model_artifact.artifact_content_digest.clone(),
+        "live-result-v1",
+        "2026-01-02T00:00:00Z",
+        AnalysisResultSummary::new("live_reference", 2, 1, "validated").expect("result summary"),
+    )
+    .expect("successful result");
+    let successful_status =
+        AnalysisRunStatus::terminal(&successful_request, &successful_receipt, successful_result)
+            .expect("successful status");
+    let successful_event = AnalysisRunStateEventRecord {
+        analysis_run_state_event_id: Uuid::now_v7(),
+        tenant_record_id,
+        analysis_run_id: successful_record.analysis_run_id,
+        state_sequence: 2,
+        run_state: AnalysisRunState::Succeeded,
+        terminal_status: Some(successful_status),
+        system_time: system,
+        available_time: available,
+    };
+    repo.session_mut()
+        .execute(
+            &insert_analysis_run_state_event_sql(&successful_record, &successful_event)
+                .expect("successful terminal SQL"),
+        )
+        .expect("successful terminal append");
 }
 
 fn prove_document_insert_revise_and_audit(
@@ -845,7 +916,7 @@ fn exercise_model_run_artifact_chain(
     tenant_record_id: Uuid,
     manifest: &ReproducibilityManifestRecord,
     available: AvailableTime,
-) {
+) -> ModelArtifactRecord {
     let system = SystemTime::parse_rfc3339("2026-02-01T00:00:00Z").expect("sys");
     let split = CorpusSplitManifestRecord {
         corpus_split_manifest_id: Uuid::now_v7(),
@@ -887,6 +958,7 @@ fn exercise_model_run_artifact_chain(
         .expect("select model_run by id");
     repo.submit_model_artifacts_by_run(model_run.model_run_id)
         .expect("select model_artifact by run");
+    artifact
 }
 
 fn live_membership(
