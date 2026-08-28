@@ -1370,6 +1370,20 @@ class CoverageContractTests(unittest.TestCase):
                 lines, 3, "field_name,"
             )
         )
+
+        nested_struct = ["let value = Item {", "nested: Nested {", "field,"]
+        self.assertTrue(
+            coverage_contract._is_structural_comma_continuation(
+                nested_struct, 3, "field,"
+            )
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "receiver.rs"
+            source.write_text("fn call(\nvalue\n.method()\n", encoding="utf-8")
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "call_opener.rs"
             source.write_text("\n".join(lines) + "\n", encoding="utf-8")
