@@ -147,6 +147,9 @@ fn live_postgres_applies_migrations_and_document_sql() {
     .expect("select reproducibility_manifest by digests");
     repo.submit_reproducibility_manifest_by_id(manifest.reproducibility_manifest_id)
         .expect("select reproducibility_manifest by id");
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_record_id))
+        .expect("bind manifest-read tenant");
     assert_eq!(
         repo.session_mut()
             .load_reproducibility_manifest(tenant_record_id, manifest.reproducibility_manifest_id,)
