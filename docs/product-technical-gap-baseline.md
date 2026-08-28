@@ -9,22 +9,19 @@
 - The versioned TDT/CHRONOS composition landed through #269. PR #279 adds a
   bounded Allen/CHRONOS interval-consistency slice; persistence and exports
   remain product gaps under #170.
-- PR #282 adds a fitted candidate-`K` topic-selection slice, while #283 repairs
-  duplicate ADR identities. Both remain branch candidates until exact-head
-  checks and qualifying independent review permit protected merge.
-- PRs #284–#286 merged their topic-context artifact, fitted draw-basis binding,
-  and coverage-gate repair into the open #282 feature branch. The combined
-  candidate is not protected-main authority; #282's moved head requires
-  exact-head checks and independent review.
+- PR #282 merged its fitted candidate-`K` topic-selection slice into #283's
+  feature branch. PR #283 now carries that candidate plus the duplicate-ADR
+  repair; neither capability is protected-main authority before #283 merges.
 - PR #287 adds durable, tenant-isolated analysis-run request and state-event
   persistence for #166. It remains an unmerged branch candidate and does not
   establish an executable end-to-end analysis service on protected main.
-- PR #288 stacks typed durable-run reads, retained-session worker locking, and
-  atomic artifact/terminal publication on #287. It is worker-transport
-  evidence, not yet an executable customer analysis workflow.
-- PR #289 stacks tenant-bound reproducibility-manifest materialization on #288,
-  closing the local-input trust blocker without claiming an executable worker.
-- Snapshot facts were fetched live at 2026-08-28T10:42:38Z against protected
+- PR #288 merged typed durable-run reads, retained-session worker locking, and
+  atomic artifact/terminal publication into #287's feature branch. PR #287 is
+  still unmerged from protected main.
+- PR #289 stacks tenant-bound reproducibility-manifest materialization on that
+  durable-worker branch. PR #290 adds the bounded one-shot executable worker on
+  #289; scheduler leases and protected object ingestion remain product gaps.
+- Snapshot facts were fetched live at 2026-08-28T11:11:10Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -80,7 +77,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-28T10:42:38Z
+**Snapshot:** 2026-08-28T11:11:10Z
 **Protected-main evidence:** `b03cc378228d5e568fc34970fcb23dc2b452f535` (merge of [PR #271](https://github.com/ContextualWisdomLab/TEPP/pull/271) `MANIFESTVARstd`, on top of #270 `MANIFESTTRAITVARstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
@@ -105,7 +102,7 @@ GitHub state before any customer, release, certification, or valuation claim.
 | Protected-main SHA | `b03cc378228d5e568fc34970fcb23dc2b452f535` (2026-08-28T00:39Z, merge of [#271](https://github.com/ContextualWisdomLab/TEPP/pull/271)) | All as-built claims are bounded to this commit. |
 | Workspace members | 58 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, compute, psychometric-engine, event-intelligence, interpretation, artifact, and visual product boundaries. |
 | Workspace version | `0.2.0` (aligned across every crate manifest) | A version number alone does not establish a supported product release; no signed artifact or support policy exists yet. |
-| Open pull requests | **9** | Active queue: #272 `TIPREDVARstd`, #279 interval consistency, #280 `discreteDRIFTstd`, #281 this baseline refresh, #282 fitted candidate-`K` selection with #284–#286 folded into its feature head, #283 ADR identity repair, #287 durable analysis-run persistence, stacked #288 worker transport, and stacked #289 reproducibility-manifest loading. |
+| Open pull requests | **8** | Active queue: #272 `TIPREDVARstd`, #279 interval consistency, #280 `discreteDRIFTstd`, #281 this baseline refresh, #283 ADR identity repair with #282 folded into its feature head, #287 durable analysis-run persistence with #288 folded into its feature head, stacked #289 reproducibility-manifest loading, and stacked #290 bounded executable worker. |
 | Draft pull requests | **1** | Only #272 remains draft. Non-draft state is not approval or merge readiness. |
 | Open product issues | **11** | Issues #166–#167, #169–#174, #176, #275, and #277 remain open. |
 | Current package version | `0.2.0` | No supported product release is established by the repository version alone; the tagged cut remains queued. |
@@ -157,13 +154,13 @@ All previously queued slices landed on protected main through:
    2026-08-25T06:24Z), and network-repair/version-alignment
    [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239).
 
-The residual open PRs are new forward work (#272, #279–#283, and #287–#289), not the
+The residual open PRs are new forward work (#272, #279–#281, #283, #287, and #289–#290), not the
 historic consolidation backlog.
 
 ## Snapshot open pull-request evidence
 
 The following snapshot-head register was fetched live from GitHub at
-2026-08-28T10:42:38Z against protected main `b03cc378`. Review decisions,
+2026-08-28T11:11:10Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
@@ -178,12 +175,11 @@ other rows record the exact live head observed at the snapshot.
 | #272 | `1f37cf4a154734a252b6bf8261748a289c0dd493` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `47611f34e02a831178890f4550221fb4c0d6d61a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `5c8983370d4c7047edb6defde7efeec29280b569` | false | main | docs(gap): refresh protected-main and eight-PR queue |
-| #282 | `b12c4648bec966c69f43d11155f12dc6f8ad2095` | false | fix/unique-adr-identities | fix(topic): version digest-bound posterior schema |
-| #283 | `61be7eb3844b726d97af62051f548c6f28743567` | false | main | fix(adr): enforce unique decision identities |
-| #287 | `34e5da5f9f4d6b060237f1bd5dd1bff8f2ef45aa` | false | main | fix(persistence): persist engine result artifacts |
-| #288 | `62378e2e4cb617d0cd97f1fb6ac4dbeb0abcced2` | false | feat/analysis-run-persistence | fix(persistence): bind loaded status to request |
-| #289 | `152bd8bdd086ce56b4db9b4400ac35b67a9e1873` | false | feat/durable-analysis-worker | feat(persistence): load worker reproducibility manifests |
+| #281 | `54b5e939145a2b0c1ae86610f87cd02d476255a0` | false | main | docs(gap): refresh protected-main and nine-PR queue |
+| #283 | `ada51518878fef05e3b860edf08462964a517d6a` | false | main | fix(adr): enforce unique decision identities |
+| #287 | `12f9a22b21e2c93c95606cd94404587ea01726cd` | false | main | feat(persistence): persist idempotent analysis runs |
+| #289 | `4078e83683c8cdb6ef155873d540cfc7b947ada1` | false | feat/durable-analysis-worker | feat(persistence): load worker reproducibility manifests |
+| #290 | `bbb546ebf7b659adf8f1ba6d72e8d78b0ce72909` | false | feat/one-shot-analysis-worker | feat: execute durable analysis runs |
 
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization
