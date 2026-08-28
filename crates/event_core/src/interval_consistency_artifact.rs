@@ -75,11 +75,14 @@ impl IntervalConsistencyArtifact {
                 if derived.relations() == RelationSet::all() {
                     continue;
                 }
+                let inverse = network.derived_relation(*right, *left)?;
                 relations.push(IntervalConsistencyArtifactRelation {
                     left_event_id: left_identity.clone(),
                     right_event_id: right_identity.clone(),
                     allen_relations: derived.relations().iter().collect(),
-                    observed: derived.is_observed(),
+                    // Observation is orientation-independent even though the
+                    // export retains the stable variable ordering.
+                    observed: derived.is_observed() || inverse.is_observed(),
                     support_assertion_ordinals: derived
                         .support()
                         .iter()
@@ -100,6 +103,7 @@ impl IntervalConsistencyArtifact {
             relations,
         };
         artifact.validate()?;
+        let _canonical_json = artifact.to_json()?;
         Ok(artifact)
     }
 
