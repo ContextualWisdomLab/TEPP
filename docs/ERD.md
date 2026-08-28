@@ -57,6 +57,8 @@ erDiagram
     REPRODUCIBILITY_MANIFEST ||--o{ MODEL_RUN : binds_run
     REPRODUCIBILITY_MANIFEST ||--o{ MODEL_ARTIFACT : governs
     MODEL_RUN ||--o{ MODEL_ARTIFACT : publishes
+    TENANT_RECORD ||--o{ ANALYSIS_RUN_REQUEST : owns
+    ANALYSIS_RUN_REQUEST ||--o{ ANALYSIS_RUN_STATE_EVENT : records
     MODEL_RUN ||--o{ TOPIC_DEFINITION : estimates
     MODEL_RUN ||--o{ TOPIC_SCORE : estimates
     MODEL_RUN ||--o{ VALIDATION_METRIC : reports
@@ -240,6 +242,37 @@ erDiagram
       text artifact_content_hash
       text protected_object_ref
       timestamptz published_at
+    }
+
+    ANALYSIS_RUN_REQUEST {
+      uuid analysis_run_id PK
+      uuid tenant_record_id FK
+      text tenant_workspace_id
+      text idempotency_key UK
+      smallint request_contract_version
+      text snapshot_id
+      timestamptz knowledge_cutoff
+      text model_contract_version
+      text output_profile
+      text request_payload_sha256
+      text request_payload
+      timestamptz system_time
+      timestamptz available_time
+    }
+
+    ANALYSIS_RUN_STATE_EVENT {
+      uuid analysis_run_state_event_id PK
+      uuid tenant_record_id FK
+      uuid analysis_run_id FK
+      bigint state_sequence UK
+      text run_state_code
+      uuid model_artifact_id FK
+      text result_sha256
+      text result_schema_version
+      text failure_code
+      text terminal_payload
+      timestamptz system_time
+      timestamptz available_time
     }
 
     TOPIC_DEFINITION {

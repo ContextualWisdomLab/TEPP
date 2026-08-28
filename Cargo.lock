@@ -1194,8 +1194,10 @@ name = "persistence_postgres"
 version = "0.2.0"
 dependencies = [
  "operational_log",
+ "sha2",
  "sqlx",
  "temporal_core",
+ "tepp_api",
  "tokio",
  "uuid",
 ]

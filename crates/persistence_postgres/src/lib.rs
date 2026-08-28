@@ -36,6 +36,7 @@
 //! `audit_event` inserts call `operational_log::try_record` so source text,
 //! source identity, and blanket-mask grants cannot become SQL.
 
+mod analysis_run_sql;
 mod artifact_sql;
 mod concurrent_write;
 mod cutoff;
@@ -63,6 +64,18 @@ mod sqlx_gate;
 mod sqlx_live;
 mod tenant_session;
 
+/// Immutable canonical analysis-run request row.
+pub use analysis_run_sql::AnalysisRunRequestRecord;
+/// Closed analysis-run lifecycle state.
+pub use analysis_run_sql::AnalysisRunState;
+/// Immutable analysis-run lifecycle event row.
+pub use analysis_run_sql::AnalysisRunStateEventRecord;
+/// Render an idempotent analysis-run request insert.
+pub use analysis_run_sql::insert_analysis_run_request_sql;
+/// Render an append-only analysis-run lifecycle insert.
+pub use analysis_run_sql::insert_analysis_run_state_event_sql;
+/// Render a tenant-bound latest-status read.
+pub use analysis_run_sql::select_analysis_run_status_sql;
 /// Append-only source artifact row.
 pub use artifact_sql::SourceArtifactRecord;
 /// Render a fail-closed stored-row match assertion for a source artifact.

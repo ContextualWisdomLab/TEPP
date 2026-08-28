@@ -7,20 +7,25 @@
 #![cfg(feature = "live-sqlx")]
 
 use persistence_postgres::{
-    AuditEvent, AuditSourceInspection, CorpusSplitManifestRecord, DeletionRequestRecord,
-    DocumentRecord, EntityRecord, EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository,
+    AnalysisRunRequestRecord, AnalysisRunState, AnalysisRunStateEventRecord, AuditEvent,
+    AuditSourceInspection, CorpusSplitManifestRecord, DeletionRequestRecord, DocumentRecord,
+    EntityRecord, EvidenceTombstoneRecord, LegalHoldRecord, LiveDocumentRepository,
     LiveSqlxPoolOptions, MembershipAssignmentRecord, MigrationCatalog, ModelArtifactRecord,
     ModelRunRecord, PersistenceError, ProjectRecord, ReproducibilityManifestRecord,
     RetentionPolicyRecord, SqlSession, TextSegmentRecord, apply_sql_batch,
-    assume_app_runtime_role_sql, clear_session_tenant_sql, insert_entity_record_sql,
-    insert_project_record_sql, open_live_sqlx_pool, require_live_sqlx_config,
-    reset_app_runtime_role_sql, select_active_analysis_document_sql, set_session_tenant_sql,
+    assume_app_runtime_role_sql, clear_session_tenant_sql, insert_analysis_run_request_sql,
+    insert_analysis_run_state_event_sql, insert_entity_record_sql, insert_project_record_sql,
+    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
+    select_active_analysis_document_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
 use std::thread;
 use std::time::Duration;
 use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff, SystemTime};
+use tepp_api::{
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalysisRunStatus, AnalysisRunTerminalResult,
+};
 use uuid::Uuid;
 
 const CONCURRENT_WRITERS: usize = 2;
@@ -142,6 +147,7 @@ fn live_postgres_applies_migrations_and_document_sql() {
         .expect("select reproducibility_manifest by id");
 
     exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
+    prove_durable_analysis_run(&mut repo, tenant_record_id, available, system);
     exercise_typed_membership_assignments(&mut repo, tenant_record_id, available, system);
     prove_text_segment_known_span(&mut repo, tenant_record_id, available, system);
     prove_retention_deletion_legal_hold(
@@ -157,6 +163,74 @@ fn live_postgres_applies_migrations_and_document_sql() {
     apply_sql_timeouts(&mut repo, "3s", "30s");
     prove_concurrent_document_writes(&mut repo);
     prove_tenant_rls_isolation(&mut repo);
+}
+
+fn prove_durable_analysis_run(
+    repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
+    tenant_record_id: Uuid,
+    available: AvailableTime,
+    system: SystemTime,
+) {
+    repo.session_mut()
+        .execute(&set_session_tenant_sql(tenant_record_id))
+        .expect("bind analysis-run tenant");
+    let request = AnalysisRunRequest {
+        contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
+        idempotency_key: "live-analysis-run-1".into(),
+        tenant_workspace_id: "live-workspace".into(),
+        snapshot_id: "live-snapshot".into(),
+        knowledge_cutoff: "2026-01-01T00:00:00Z".into(),
+        model_contract_version: "live-model-v1".into(),
+        output_profile: "live-summary-v1".into(),
+    };
+    let record =
+        AnalysisRunRequestRecord::from_request(tenant_record_id, &request, system, available)
+            .expect("analysis request");
+    let insert = insert_analysis_run_request_sql(&record).expect("analysis insert");
+    repo.session_mut()
+        .execute(&insert)
+        .expect("first acceptance");
+    repo.session_mut()
+        .execute(&insert)
+        .expect("identical retry");
+
+    let mut conflicting = request.clone();
+    conflicting.snapshot_id = "different-snapshot".into();
+    let conflict_record =
+        AnalysisRunRequestRecord::from_request(tenant_record_id, &conflicting, system, available)
+            .expect("conflicting request");
+    let conflict_sql = insert_analysis_run_request_sql(&conflict_record).expect("conflict SQL");
+    assert!(repo.session_mut().execute(&conflict_sql).is_err());
+
+    let accepted = record.accepted().expect("accepted receipt");
+    let result = AnalysisRunTerminalResult::failed(
+        &request,
+        &accepted,
+        "2026-01-02T00:00:00Z",
+        "no_eligible_evidence",
+    )
+    .expect("failed result");
+    let status = AnalysisRunStatus::terminal(&request, &accepted, result).expect("terminal status");
+    let event = AnalysisRunStateEventRecord {
+        analysis_run_state_event_id: Uuid::now_v7(),
+        tenant_record_id,
+        analysis_run_id: record.analysis_run_id,
+        state_sequence: 2,
+        run_state: AnalysisRunState::Failed,
+        terminal_status: Some(status),
+        system_time: system,
+        available_time: available,
+    };
+    let terminal_sql = insert_analysis_run_state_event_sql(&record, &event).expect("terminal SQL");
+    repo.session_mut()
+        .execute(&terminal_sql)
+        .expect("terminal append");
+    assert!(repo.session_mut().execute(&terminal_sql).is_err());
+    assert!(
+        repo.session_mut()
+            .execute("UPDATE analysis_run_request SET output_profile = 'tampered'")
+            .is_err()
+    );
 }
 
 fn prove_document_insert_revise_and_audit(
