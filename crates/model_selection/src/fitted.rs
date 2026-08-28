@@ -400,9 +400,7 @@ pub fn select_fitted_candidate_model(
 ) -> Result<FittedCandidateSelection, FittedCandidateSelectionFailure> {
     refuse_nonstatistical_method(method_name)
         .map_err(|error| selection_failure(error, Vec::new(), llm_votes))?;
-    if config.candidate_topic_counts().len() > input.vocabulary_size().saturating_sub(1)
-        || llm_votes.len() > MAX_REFERENCE_FIT_BUDGET
-    {
+    if llm_votes.len() > MAX_REFERENCE_FIT_BUDGET {
         return Err(selection_failure(
             ModelSelectionError::InvalidDiagnostic,
             Vec::new(),

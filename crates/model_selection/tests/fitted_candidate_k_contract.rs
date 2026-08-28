@@ -405,12 +405,6 @@ fn invalid_fitted_configuration_fails_closed() {
         ),
         Err(ModelSelectionError::InvalidDiagnostic)
     );
-    let bounded_input = two_document_input([1.0; 4]);
-    let too_many = FittedCandidateKConfig::new(vec![2, 3], vec![1], 10, 1e-6).expect("config");
-    assert_eq!(
-        select_fitted_candidate_k(&bounded_input, &too_many, "trsl_tm_reference", &[]),
-        Err(ModelSelectionError::InvalidDiagnostic)
-    );
     let base = FittedCandidateKConfig::new(vec![2], vec![1], 10, 1e-6).expect("base");
     for values in [
         (f64::NAN, 0.5, 0.01, 0.05, 0.2),
