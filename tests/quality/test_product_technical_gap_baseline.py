@@ -22,6 +22,7 @@ def valid_baseline(*, count: int = 1, extra: str = "") -> str:
         "# Product and Technical Gap Baseline\n\n"
         "**Snapshot:** 2026-08-23T12:27:12Z\n"
         f"**Protected-main evidence:** `{VALID_SHA}`\n\n"
+        "Facts fetched live at 2026-08-23T12:27:12Z.\n\n"
         "## Snapshot facts\n\n"
         "| Signal | Snapshot evidence | Delivery implication |\n"
         "|---|---:|---|\n"
@@ -146,6 +147,22 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(AssertionError, "fetched-live evidence"):
+                docs.validate_product_technical_gap_baseline(root)
+
+    def test_snapshot_requires_fetched_live_evidence(self) -> None:
+        """A timestamp without a matching live-fetch claim is insufficient."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline().replace(
+                    "Facts fetched live at 2026-08-23T12:27:12Z.\n\n", ""
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "fetched-live snapshot"):
                 docs.validate_product_technical_gap_baseline(root)
 
     def test_queued_checks_as_implemented_main_fails(self) -> None:

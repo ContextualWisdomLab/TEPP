@@ -395,11 +395,15 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     snapshot_match = SNAPSHOT_STAMP.search(text)
     if snapshot_match is None:
         failures.append("gap baseline lacks a dated UTC snapshot stamp")
-    elif any(
-        match.group("stamp") != snapshot_match.group("stamp")
-        for match in SNAPSHOT_FETCH_STAMP.finditer(text)
-    ):
-        failures.append("gap baseline snapshot stamp does not match fetched-live evidence")
+    else:
+        fetch_stamps = list(SNAPSHOT_FETCH_STAMP.finditer(text))
+        if not fetch_stamps:
+            failures.append("gap baseline lacks fetched-live snapshot evidence")
+        elif any(
+            match.group("stamp") != snapshot_match.group("stamp")
+            for match in fetch_stamps
+        ):
+            failures.append("gap baseline snapshot stamp does not match fetched-live evidence")
     if PROTECTED_MAIN_SHA.search(text) is None:
         failures.append("gap baseline lacks a 40-character protected-main SHA")
     if "Closure evidence" not in text:
