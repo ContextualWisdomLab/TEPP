@@ -467,28 +467,36 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
-    assert_eq!(
-        assemble_topic_context_posterior(
-            &request,
-            &accepted,
-            "snapshot-topic-lineage",
-            cutoff,
-            &input,
-            &model,
-            &config,
-            vec![
-                TopicIdentityBinding::new(topic_ids[0], 0),
-                TopicIdentityBinding::new(topic_ids[1], 0),
-            ],
-            activity.clone(),
-            vec![],
-            relations.clone(),
-            memberships.clone(),
-            19,
-            3,
-        ),
-        Err(AnalysisEngineError::InvalidEvidence)
-    );
+    let assert_invalid_topic_bindings = |bindings| {
+        assert_eq!(
+            assemble_topic_context_posterior(
+                &request,
+                &accepted,
+                "snapshot-topic-lineage",
+                cutoff,
+                &input,
+                &model,
+                &config,
+                bindings,
+                activity.clone(),
+                vec![],
+                relations.clone(),
+                memberships.clone(),
+                19,
+                3,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+    };
+    assert_invalid_topic_bindings(vec![TopicIdentityBinding::new(topic_ids[0], 0)]);
+    assert_invalid_topic_bindings(vec![
+        TopicIdentityBinding::new(topic_ids[0], 0),
+        TopicIdentityBinding::new(topic_ids[1], 0),
+    ]);
+    assert_invalid_topic_bindings(vec![
+        TopicIdentityBinding::new(topic_ids[0], 0),
+        TopicIdentityBinding::new(topic_ids[0], 1),
+    ]);
     let artifact = assemble_topic_context_posterior(
         &request,
         &accepted,
@@ -501,6 +509,26 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
             TopicIdentityBinding::new(topic_ids[1], 1),
             TopicIdentityBinding::new(topic_ids[0], 0),
         ],
+        activity.clone(),
+        vec![],
+        relations.clone(),
+        memberships.clone(),
+        19,
+        3,
+    )
+    .expect("artifact");
+    let swapped_basis_artifact = assemble_topic_context_posterior(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input,
+        &model,
+        &config,
+        vec![
+            TopicIdentityBinding::new(topic_ids[0], 1),
+            TopicIdentityBinding::new(topic_ids[1], 0),
+        ],
         activity,
         vec![],
         relations,
@@ -508,11 +536,15 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         19,
         3,
     )
-    .expect("artifact");
+    .expect("swapped basis artifact");
 
     assert_eq!(
         artifact.schema_version,
         TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION
+    );
+    assert_ne!(
+        artifact.posterior_draw_set_id,
+        swapped_basis_artifact.posterior_draw_set_id
     );
     assert_eq!(artifact.posterior_draw_count, 3);
     assert_eq!(
