@@ -51,7 +51,7 @@ pub use lineage_criterion::{
 pub use topic_context_posterior::{
     TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE,
     TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION, TopicActivityInterval, TopicContextMembership,
-    TopicContextPosteriorArtifact, TopicDocumentRelation, TopicLineageEvent,
+    TopicContextPosteriorArtifact, TopicDocumentRelation, TopicIdentityBinding, TopicLineageEvent,
     TopicPostPlausibleValue, assemble_topic_context_posterior,
 };
 /// Topic-lineage artifact and execution contracts from this engine.

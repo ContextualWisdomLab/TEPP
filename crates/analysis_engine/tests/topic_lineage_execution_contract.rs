@@ -4,8 +4,9 @@ use analysis_engine::{
     AnalysisEngineError, TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE,
     TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
     TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, TopicActivityInterval,
-    TopicContextMembership, TopicDocumentRelation, assemble_topic_context_posterior,
-    execute_selected_topic_lineage_run, execute_topic_lineage_run,
+    TopicContextMembership, TopicDocumentRelation, TopicIdentityBinding,
+    assemble_topic_context_posterior, execute_selected_topic_lineage_run,
+    execute_topic_lineage_run,
 };
 use corpus_split::{CorpusDocument, CorpusSnapshot};
 use membership_core::{
@@ -159,6 +160,15 @@ fn context_records(
     (activity, relations, memberships)
 }
 
+fn topic_bindings(topic_ids: &[Uuid]) -> Vec<TopicIdentityBinding> {
+    topic_ids
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, topic_id)| TopicIdentityBinding::new(topic_id, index))
+        .collect()
+}
+
 #[test]
 fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     let (snapshot, ids, times, memberships, relations) = fixture();
@@ -303,7 +313,7 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
             &input,
             &model,
             &config,
-            topic_ids.clone(),
+            topic_bindings(&topic_ids),
             activity.clone(),
             vec![],
             relations.clone(),
@@ -332,7 +342,7 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
             &input,
             &model,
             &config,
-            topic_ids.clone(),
+            topic_bindings(&topic_ids),
             activity.clone(),
             vec![],
             relations.clone(),
@@ -356,7 +366,7 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
                     &input,
                     &model,
                     &config,
-                    topic_ids.clone(),
+                    topic_bindings(&topic_ids),
                     activity.clone(),
                     vec![],
                     relations.clone(),
@@ -433,6 +443,28 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         "snapshot-topic-lineage",
         foreign_cutoff,
     );
+    assert_eq!(
+        assemble_topic_context_posterior(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &input,
+            &model,
+            &config,
+            vec![
+                TopicIdentityBinding::new(topic_ids[0], 0),
+                TopicIdentityBinding::new(topic_ids[1], 0),
+            ],
+            activity.clone(),
+            vec![],
+            relations.clone(),
+            memberships.clone(),
+            19,
+            3,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
     let artifact = assemble_topic_context_posterior(
         &request,
         &accepted,
@@ -441,7 +473,10 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         &input,
         &model,
         &config,
-        topic_ids.clone(),
+        vec![
+            TopicIdentityBinding::new(topic_ids[1], 1),
+            TopicIdentityBinding::new(topic_ids[0], 0),
+        ],
         activity,
         vec![],
         relations,
