@@ -2,12 +2,14 @@
 
 use analysis_engine::{
     AnalysisEngineError, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
-    TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, execute_topic_lineage_run,
+    TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE,
+    execute_selected_topic_lineage_run, execute_topic_lineage_run,
 };
 use corpus_split::{CorpusDocument, CorpusSnapshot};
 use membership_core::{
     GroupId, MemberId, MembershipAssignment, MembershipNetwork, MembershipRole, MembershipWeight,
 };
+use model_selection::FittedCandidateKConfig;
 use relation_graph::{
     RelationEdge, RelationEndpointId, RelationEvidenceStatus, RelationGraph, RelationKind,
 };
@@ -141,6 +143,7 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     );
     assert_eq!(execution.artifact.connected_post_count, 4);
     assert_eq!(execution.artifact.lineage_count, 2);
+    assert_eq!(execution.artifact.topic_count, 2);
     assert_eq!(execution.artifact.sequence_edges.len(), 2);
     assert_eq!(
         execution.terminal_result.run_state,
@@ -155,6 +158,24 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         Some(TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION)
     );
     assert!(execution.artifact.to_json().is_ok());
+
+    let selection = FittedCandidateKConfig::new(vec![3, 2], vec![7, 11], 2_000, 1e-5)
+        .expect("selection config")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("selection hyperparameters");
+    let selected = execute_selected_topic_lineage_run(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
+        &input,
+        &selection,
+        "trsl_tm_reference",
+        &[3],
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("selected execution");
+    assert_eq!(selected.artifact.topic_count, 2);
 }
 
 #[test]

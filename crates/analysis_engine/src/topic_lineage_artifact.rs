@@ -2,6 +2,7 @@
 
 use std::collections::BTreeSet;
 
+use model_selection::{FittedCandidateKConfig, select_fitted_candidate_model};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use temporal_core::KnowledgeCutoff;
@@ -9,7 +10,7 @@ use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 use topic_measurement::{
-    ReferenceTopicInput, ReferenceTopicModelConfig, fit_reference_topic_model,
+    ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, fit_reference_topic_model,
 };
 use uuid::Uuid;
 
@@ -188,6 +189,60 @@ pub fn execute_topic_lineage_run(
     config: &ReferenceTopicModelConfig,
     completed_at: impl Into<String>,
 ) -> Result<TopicLineageExecution, AnalysisEngineError> {
+    validate_topic_lineage_request(request, accepted, snapshot_id, knowledge_cutoff)?;
+    let model = fit_reference_topic_model(input, config)?;
+    complete_topic_lineage_run(
+        request,
+        accepted,
+        snapshot_id,
+        knowledge_cutoff,
+        input,
+        &model,
+        completed_at,
+    )
+}
+
+/// Select `K` from fitted diagnostics and complete one topic-lineage run.
+///
+/// The winning converged CPU `f64` fit is reused directly. LLM votes may be
+/// recorded as recommenders but cannot create or replace a statistical fit.
+///
+/// # Errors
+///
+/// Returns request-binding, model-selection, estimator, arithmetic, or artifact
+/// validation failures without emitting a completed result.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_selected_topic_lineage_run(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+    snapshot_id: &str,
+    knowledge_cutoff: KnowledgeCutoff,
+    input: &ReferenceTopicInput,
+    selection_config: &FittedCandidateKConfig,
+    method_name: &str,
+    llm_votes: &[u32],
+    completed_at: impl Into<String>,
+) -> Result<TopicLineageExecution, AnalysisEngineError> {
+    validate_topic_lineage_request(request, accepted, snapshot_id, knowledge_cutoff)?;
+    let model = select_fitted_candidate_model(input, selection_config, method_name, llm_votes)
+        .map_err(AnalysisEngineError::ModelSelection)?;
+    complete_topic_lineage_run(
+        request,
+        accepted,
+        snapshot_id,
+        knowledge_cutoff,
+        input,
+        &model,
+        completed_at,
+    )
+}
+
+fn validate_topic_lineage_request(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+    snapshot_id: &str,
+    knowledge_cutoff: KnowledgeCutoff,
+) -> Result<(), AnalysisEngineError> {
     request.to_json()?;
     accepted.to_json()?;
     require_receipt_identity(request, accepted)?;
@@ -200,8 +255,18 @@ pub fn execute_topic_lineage_run(
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
+    Ok(())
+}
 
-    let model = fit_reference_topic_model(input, config)?;
+fn complete_topic_lineage_run(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+    snapshot_id: &str,
+    knowledge_cutoff: KnowledgeCutoff,
+    input: &ReferenceTopicInput,
+    model: &ReferenceTopicModel,
+    completed_at: impl Into<String>,
+) -> Result<TopicLineageExecution, AnalysisEngineError> {
     let topic_count = u64::try_from(model.topic_term_probabilities.len())
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let evidence_count = u64::try_from(input.document_count())

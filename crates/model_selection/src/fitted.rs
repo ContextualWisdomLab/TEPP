@@ -202,8 +202,30 @@ pub fn select_fitted_candidate_k(
     method_name: &str,
     llm_votes: &[u32],
 ) -> Result<u32, ModelSelectionError> {
+    select_fitted_candidate_model(input, config, method_name, llm_votes).and_then(|model| {
+        u32::try_from(model.topic_term_probabilities.len())
+            .map_err(|_| ModelSelectionError::InvalidDiagnostic)
+    })
+}
+
+/// Fit every candidate `K` and return the selected converged CPU `f64` model.
+///
+/// This retains the winning fit so downstream execution does not refit it.
+/// LLM-only votes remain non-statistical recommenders and cannot supply the
+/// returned model.
+///
+/// # Errors
+///
+/// Returns the same typed failures as [`select_fitted_candidate_k`].
+pub fn select_fitted_candidate_model(
+    input: &ReferenceTopicInput,
+    config: &FittedCandidateKConfig,
+    method_name: &str,
+    llm_votes: &[u32],
+) -> Result<ReferenceTopicModel, ModelSelectionError> {
     refuse_nonstatistical_method(method_name)?;
     let mut candidates = Vec::new();
+    let mut fitted_models = Vec::new();
     for &candidate_k in config.candidate_topic_counts() {
         #[allow(clippy::cast_possible_truncation)]
         let topic_count = candidate_k as usize;
@@ -225,6 +247,7 @@ pub fn select_fitted_candidate_k(
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
         if let Ok(model) = fit_reference_topic_model(input, &fit_config) {
             candidates.push(statistical_candidate_from_fit(input, candidate_k, &model)?);
+            fitted_models.push((candidate_k, model));
         }
     }
     for &vote in llm_votes {
@@ -233,7 +256,11 @@ pub fn select_fitted_candidate_k(
     if candidates.is_empty() {
         return Err(ModelSelectionError::NoSuccessfulFit);
     }
-    select_candidate_k(&candidates)
+    let selected_k = select_candidate_k(&candidates)?;
+    fitted_models
+        .into_iter()
+        .find_map(|(candidate_k, model)| (candidate_k == selected_k).then_some(model))
+        .ok_or(ModelSelectionError::LlmVoteIsNotStatisticalAuthority)
 }
 
 fn refuse_nonstatistical_method(method: &str) -> Result<(), ModelSelectionError> {
