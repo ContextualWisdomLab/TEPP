@@ -608,6 +608,30 @@ class AdrIdentityTests(unittest.TestCase):
                 ):
                     documentation.validate_adr_graph()
 
+    def test_adr_index_rejects_conflicting_targets_for_one_number(self) -> None:
+        """Repeated index rows cannot silently redirect one ADR identity."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0026](0026-current.md) | Current | Accepted | partial | note |\n"
+                "| [0026](0026-other.md) | Other | Accepted | partial | note |\n",
+                encoding="utf-8",
+            )
+            (adr_root / "0026-current.md").write_text(
+                "# ADR 0026: Current identity\n",
+                encoding="utf-8",
+            )
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError,
+                    "ADR 0026 has conflicting index targets: "
+                    "0026-current.md, 0026-other.md",
+                ):
+                    documentation.validate_adr_graph()
+
 
 if __name__ == "__main__":
     unittest.main()

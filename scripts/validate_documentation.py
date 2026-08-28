@@ -426,10 +426,18 @@ def validate_adr_graph() -> None:
 
     adr_root = ROOT / "docs" / "adr"
     adr_index = (adr_root / "README.md").read_text(encoding="utf-8")
-    indexed_targets = {
-        match.group("number"): match.group("target")
-        for match in ADR_TABLE_ROW.finditer(adr_index)
-    }
+    indexed_targets: dict[str, str] = {}
+    for match in ADR_TABLE_ROW.finditer(adr_index):
+        number = match.group("number")
+        target = match.group("target")
+        if previous := indexed_targets.get(number):
+            if previous != target:
+                raise AssertionError(
+                    f"ADR {number} has conflicting index targets: "
+                    f"{previous}, {target}"
+                )
+        else:
+            indexed_targets[number] = target
     indexed_numbers = set(indexed_targets)
 
     adr_files: dict[str, Path] = {}
