@@ -208,12 +208,17 @@ fn fitted_diagnostics_select_true_k_over_overspecified_and_llm_only() {
         .expect("fitted statistical selection");
     assert_eq!(selected, 2);
 
-    let receipt = select_fitted_candidate_model(&input, &config, "trsl_tm_reference", &[3])
+    let reverse_config = FittedCandidateKConfig::new(vec![3, 2], vec![7, 11, 19], 2_000, 1e-5)
+        .expect("reverse candidate configuration")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("reverse hyperparameters");
+    let receipt = select_fitted_candidate_model(&input, &reverse_config, "trsl_tm_reference", &[3])
         .expect("selection receipt");
     assert_eq!(receipt.selected_k(), 2);
     assert_eq!(receipt.candidate_outcomes().len(), 2);
     assert_eq!(receipt.llm_recommendations(), &[3]);
     assert_eq!(receipt.method_code(), "trsl_tm_reference_bic_v1");
+    assert_eq!(receipt.into_model().topic_term_probabilities.len(), 2);
 
     let mixed = FittedCandidateKConfig::new(vec![2, 5], vec![7, 11], 2_000, 1e-5)
         .expect("mixed candidate configuration");

@@ -8,7 +8,7 @@ use topic_measurement::{
     fit_reference_topic_model, refuse_lexical_inferential_weight,
 };
 
-use crate::{ModelCandidate, ModelSelectionError, select_candidate_k};
+use crate::{ModelCandidate, ModelSelectionError, gate::StatisticalCandidateFront};
 
 /// ADR 0012 `σ²` prior variance. Identical to `topic_measurement` reference.
 const DEFAULT_PRIOR_VARIANCE: f64 = 1.0;
@@ -169,6 +169,7 @@ pub struct FittedCandidateKConfig {
     ridge: f64,
     topic_smoothing: f64,
     step_size: f64,
+    reference_configs: Vec<ReferenceTopicModelConfig>,
 }
 
 impl FittedCandidateKConfig {
@@ -187,7 +188,7 @@ impl FittedCandidateKConfig {
         maximum_iterations: usize,
         tolerance: f64,
     ) -> Result<Self, ModelSelectionError> {
-        let value = Self {
+        let mut value = Self {
             candidate_topic_counts,
             seeds,
             maximum_iterations,
@@ -197,8 +198,24 @@ impl FittedCandidateKConfig {
             ridge: DEFAULT_RIDGE,
             topic_smoothing: DEFAULT_TOPIC_SMOOTHING,
             step_size: DEFAULT_STEP_SIZE,
+            reference_configs: Vec::new(),
         };
         value.validate()?;
+        value.reference_configs = value
+            .candidate_topic_counts
+            .iter()
+            .map(|candidate_k| {
+                #[allow(clippy::cast_possible_truncation)]
+                let topic_count = *candidate_k as usize;
+                ReferenceTopicModelConfig::new(
+                    topic_count,
+                    value.seeds.clone(),
+                    value.maximum_iterations,
+                    value.tolerance,
+                )
+                .map_err(|_| ModelSelectionError::InvalidDiagnostic)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(value)
     }
 
@@ -217,12 +234,27 @@ impl FittedCandidateKConfig {
         topic_smoothing: f64,
         step_size: f64,
     ) -> Result<Self, ModelSelectionError> {
+        let reference_configs = self
+            .reference_configs
+            .into_iter()
+            .map(|config| {
+                config
+                    .with_hyperparameters(
+                        prior_variance,
+                        relation_strength,
+                        ridge,
+                        topic_smoothing,
+                        step_size,
+                    )
+                    .map_err(|_| ModelSelectionError::InvalidDiagnostic)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         self.prior_variance = prior_variance;
         self.relation_strength = relation_strength;
         self.ridge = ridge;
         self.topic_smoothing = topic_smoothing;
         self.step_size = step_size;
-        self.validate()?;
+        self.reference_configs = reference_configs;
         Ok(self)
     }
 
@@ -266,6 +298,16 @@ impl FittedCandidateKConfig {
         if self.candidate_topic_counts.is_empty() {
             return Err(ModelSelectionError::EmptyCandidateSet);
         }
+        if self.candidate_topic_counts.len() > MAX_REFERENCE_FIT_BUDGET
+            || self
+                .candidate_topic_counts
+                .len()
+                .checked_mul(self.seeds.len())
+                .and_then(|fits| fits.checked_mul(self.maximum_iterations))
+                .is_none_or(|work| work > MAX_REFERENCE_WORKING_CELLS)
+        {
+            return Err(ModelSelectionError::InvalidDiagnostic);
+        }
         let mut seen = BTreeSet::new();
         for &candidate_k in &self.candidate_topic_counts {
             if candidate_k < 2 {
@@ -274,32 +316,6 @@ impl FittedCandidateKConfig {
             if !seen.insert(candidate_k) {
                 return Err(ModelSelectionError::InvalidDiagnostic);
             }
-        }
-        if self.seeds.is_empty()
-            || self.candidate_topic_counts.len() > MAX_REFERENCE_FIT_BUDGET
-            || self.seeds.len() > MAX_REFERENCE_FIT_BUDGET
-            || self.maximum_iterations < 2
-            || self.maximum_iterations > MAX_REFERENCE_FIT_BUDGET
-            || self
-                .candidate_topic_counts
-                .len()
-                .checked_mul(self.seeds.len())
-                .and_then(|fits| fits.checked_mul(self.maximum_iterations))
-                .is_none_or(|work| work > MAX_REFERENCE_WORKING_CELLS)
-            || !self.tolerance.is_finite()
-            || self.tolerance <= 0.0
-            || !self.prior_variance.is_finite()
-            || self.prior_variance <= 0.0
-            || !self.relation_strength.is_finite()
-            || self.relation_strength < 0.0
-            || !self.ridge.is_finite()
-            || self.ridge < 0.0
-            || !self.topic_smoothing.is_finite()
-            || self.topic_smoothing <= 0.0
-            || !self.step_size.is_finite()
-            || self.step_size <= 0.0
-        {
-            return Err(ModelSelectionError::InvalidDiagnostic);
         }
         Ok(())
     }
@@ -393,35 +409,15 @@ pub fn select_fitted_candidate_model(
             llm_votes,
         ));
     }
-    let mut candidates = Vec::new();
     let mut candidate_outcomes = Vec::with_capacity(config.candidate_topic_counts().len());
+    let mut statistical_front: Option<StatisticalCandidateFront> = None;
     let mut selected_model = None;
-    for &candidate_k in config.candidate_topic_counts() {
-        #[allow(clippy::cast_possible_truncation)]
-        let topic_count = candidate_k as usize;
-        let fit_config = ReferenceTopicModelConfig::new(
-            topic_count,
-            config.seeds().to_vec(),
-            config.maximum_iterations(),
-            config.tolerance(),
-        )
-        .and_then(|value| {
-            value.with_hyperparameters(
-                config.prior_variance,
-                config.relation_strength,
-                config.ridge,
-                config.topic_smoothing,
-                config.step_size,
-            )
-        })
-        .map_err(|_| {
-            selection_failure(
-                ModelSelectionError::InvalidDiagnostic,
-                candidate_outcomes.clone(),
-                llm_votes,
-            )
-        })?;
-        match fit_reference_topic_model(input, &fit_config) {
+    for (&candidate_k, fit_config) in config
+        .candidate_topic_counts()
+        .iter()
+        .zip(&config.reference_configs)
+    {
+        match fit_reference_topic_model(input, fit_config) {
             Ok(model) => {
                 let candidate = statistical_candidate_from_fit(input, candidate_k, &model)
                     .map_err(|error| {
@@ -436,10 +432,13 @@ pub fn select_fitted_candidate_model(
                     iterations: Some(model.iterations),
                     objective: Some(model.objective),
                 });
-                candidates.push(candidate);
-                let selected_candidate = select_candidate_k(&candidates).map_err(|error| {
-                    selection_failure(error, candidate_outcomes.clone(), llm_votes)
-                })?;
+                let selected_candidate = if let Some(front) = &mut statistical_front {
+                    front.push(candidate);
+                    front.selected_k()
+                } else {
+                    statistical_front = Some(StatisticalCandidateFront::new(candidate));
+                    candidate_k
+                };
                 if selected_candidate == candidate_k {
                     selected_model = Some((candidate_k, model));
                 }
@@ -456,12 +455,10 @@ pub fn select_fitted_candidate_model(
         }
     }
     for &vote in llm_votes {
-        candidates
-            .push(ModelCandidate::llm_vote_only(vote).map_err(|error| {
-                selection_failure(error, candidate_outcomes.clone(), llm_votes)
-            })?);
+        ModelCandidate::llm_vote_only(vote)
+            .map_err(|error| selection_failure(error, candidate_outcomes.clone(), llm_votes))?;
     }
-    if candidates.is_empty() {
+    if statistical_front.is_none() && llm_votes.is_empty() {
         return Err(selection_failure(
             ModelSelectionError::NoSuccessfulFit,
             candidate_outcomes,
