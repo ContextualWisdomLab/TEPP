@@ -10,7 +10,7 @@ fn executable_reaches_the_fail_closed_live_transport_boundary() {
         contract_version: WORKER_INPUT_CONTRACT_VERSION,
         reproducibility_manifest_id: Uuid::nil(),
         snapshot_id: "snapshot-1".into(),
-        source_snapshot_sha256: String::new(),
+        evidence_snapshot_sha256: String::new(),
         evidence_units: vec![WorkerEvidenceUnit {
             evidence_id: "evidence-1".into(),
             event_time: "2026-08-27T00:00:00Z".into(),
@@ -18,7 +18,7 @@ fn executable_reaches_the_fail_closed_live_transport_boundary() {
             membership_count: 1,
         }],
     };
-    input.source_snapshot_sha256 = input.evidence_digest().expect("digest");
+    input.evidence_snapshot_sha256 = input.evidence_digest().expect("digest");
     let path = std::env::temp_dir().join(format!("tepp-worker-{}.json", Uuid::now_v7()));
     fs::write(&path, input.to_json().expect("input JSON")).expect("temporary input");
 

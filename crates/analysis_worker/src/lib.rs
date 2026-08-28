@@ -52,7 +52,7 @@ pub struct AnalysisWorkerInput {
     /// Immutable snapshot identity matching the accepted request.
     pub snapshot_id: String,
     /// SHA-256 of the canonical snapshot/evidence payload.
-    pub source_snapshot_sha256: String,
+    pub evidence_snapshot_sha256: String,
     /// Bounded identity-free evidence metadata.
     pub evidence_units: Vec<WorkerEvidenceUnit>,
 }
@@ -77,7 +77,7 @@ impl AnalysisWorkerInput {
         Ok(input)
     }
 
-    /// Return canonical JSON used by the reproducibility-manifest digest.
+    /// Return the full canonical worker-input JSON envelope.
     ///
     /// # Errors
     ///
@@ -251,15 +251,21 @@ fn execute_locked<S: AnalysisWorkerStore>(
     {
         return Err(AnalysisWorkerError::UnsupportedRequest);
     }
-    let manifest = store
-        .load_worker_manifest(tenant_record_id, input.reproducibility_manifest_id)
-        .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
     let input_digest = input.evidence_digest()?;
+    let manifest = store
+        .load_worker_manifest(
+            tenant_record_id,
+            input.reproducibility_manifest_id,
+            &input_digest,
+        )
+        .map_err(|error| match error {
+            PersistenceError::InvalidContentDigest => AnalysisWorkerError::InvalidInput,
+            _ => AnalysisWorkerError::ExecutionFailed,
+        })?;
     let cutoff = AvailableTime::parse_rfc3339(&request.knowledge_cutoff)
         .map_err(|_| AnalysisWorkerError::InvalidInput)?;
     if input.snapshot_id != request.snapshot_id
-        || input_digest != manifest.evidence_digest
-        || input.source_snapshot_sha256 != input_digest
+        || input.evidence_snapshot_sha256 != input_digest
         || cutoff.instant() != manifest.knowledge_cutoff.instant()
         || runtime_identity.code_commit_sha != manifest.code_commit_sha
         || runtime_identity.dependency_lock_digest != manifest.dependency_lock_digest
@@ -443,7 +449,7 @@ mod tests {
             contract_version: WORKER_INPUT_CONTRACT_VERSION,
             reproducibility_manifest_id: Uuid::nil(),
             snapshot_id: "snapshot-1".into(),
-            source_snapshot_sha256: String::new(),
+            evidence_snapshot_sha256: String::new(),
             evidence_units: vec![WorkerEvidenceUnit {
                 evidence_id: "evidence-1".into(),
                 event_time: "2026-01-01T00:00:00Z".into(),
@@ -451,7 +457,7 @@ mod tests {
                 membership_count: 2,
             }],
         };
-        input.source_snapshot_sha256 = input.evidence_digest().expect("digest");
+        input.evidence_snapshot_sha256 = input.evidence_digest().expect("digest");
         input
     }
 
@@ -570,8 +576,12 @@ mod tests {
             &mut self,
             _: Uuid,
             _: Uuid,
+            evidence_digest: &str,
         ) -> Result<ReproducibilityManifestRecord, PersistenceError> {
             fail(self.fail_on, "manifest")?;
+            if evidence_digest != self.manifest.evidence_digest {
+                return Err(PersistenceError::InvalidContentDigest);
+            }
             Ok(self.manifest.clone())
         }
 
@@ -783,7 +793,7 @@ mod tests {
     fn scientific_empty_corpus_publishes_only_the_failed_terminal_event() {
         let mut input = input();
         input.evidence_units.clear();
-        input.source_snapshot_sha256 = input.evidence_digest().expect("digest");
+        input.evidence_snapshot_sha256 = input.evidence_digest().expect("digest");
         let mut store = FakeStore::new("accepted", &input);
         let outcome = run(&mut store, &input).expect("scientific failure");
         assert!(outcome.artifact_json.is_none());
@@ -826,7 +836,7 @@ mod tests {
         );
 
         let mut mismatched_source = input.clone();
-        mismatched_source.source_snapshot_sha256 = "f".repeat(64);
+        mismatched_source.evidence_snapshot_sha256 = "f".repeat(64);
         let mut store = FakeStore::new("accepted", &input);
         assert_eq!(
             run(&mut store, &mismatched_source),

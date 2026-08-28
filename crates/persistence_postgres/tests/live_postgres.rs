@@ -152,9 +152,21 @@ fn live_postgres_applies_migrations_and_document_sql() {
         .expect("bind manifest-read tenant");
     assert_eq!(
         repo.session_mut()
-            .load_reproducibility_manifest(tenant_record_id, manifest.reproducibility_manifest_id,)
+            .load_reproducibility_manifest(
+                tenant_record_id,
+                manifest.reproducibility_manifest_id,
+                &manifest.evidence_digest,
+            )
             .expect("load reproducibility manifest"),
         manifest
+    );
+    assert_eq!(
+        repo.session_mut().load_reproducibility_manifest(
+            tenant_record_id,
+            manifest.reproducibility_manifest_id,
+            &"f".repeat(64),
+        ),
+        Err(PersistenceError::InvalidContentDigest)
     );
 
     let model_artifact =
