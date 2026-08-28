@@ -341,6 +341,9 @@ def _is_structural_comma_continuation(
     denominator; every other comma-terminated line remains executable.
     """
 
+    if any(character in text for character in ".()[]=+-*/%<>!&|?"):
+        return False
+
     previous = ""
     for candidate in reversed(lines[: line_number - 1]):
         if candidate.strip():
