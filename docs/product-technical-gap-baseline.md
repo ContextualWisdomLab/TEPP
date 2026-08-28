@@ -21,7 +21,7 @@
 - PR #289 stacks tenant-bound reproducibility-manifest materialization on that
   durable-worker branch. PR #290 adds the bounded one-shot executable worker on
   #289; scheduler leases and protected object ingestion remain product gaps.
-- Snapshot facts were fetched live at 2026-08-28T11:11:10Z against protected
+- Snapshot facts were fetched live at 2026-08-28T11:26:16Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -77,7 +77,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-28T11:11:10Z
+**Snapshot:** 2026-08-28T11:26:16Z
 **Protected-main evidence:** `b03cc378228d5e568fc34970fcb23dc2b452f535` (merge of [PR #271](https://github.com/ContextualWisdomLab/TEPP/pull/271) `MANIFESTVARstd`, on top of #270 `MANIFESTTRAITVARstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
@@ -160,7 +160,7 @@ historic consolidation backlog.
 ## Snapshot open pull-request evidence
 
 The following snapshot-head register was fetched live from GitHub at
-2026-08-28T11:11:10Z against protected main `b03cc378`. Review decisions,
+2026-08-28T11:26:16Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
@@ -175,11 +175,11 @@ other rows record the exact live head observed at the snapshot.
 | #272 | `1f37cf4a154734a252b6bf8261748a289c0dd493` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `47611f34e02a831178890f4550221fb4c0d6d61a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `54b5e939145a2b0c1ae86610f87cd02d476255a0` | false | main | docs(gap): refresh protected-main and nine-PR queue |
+| #281 | `7e0868e0e3bfc3d3c806acebb602b44aa155ec4d` | false | main | docs(gap): refresh protected-main and eight-PR queue |
 | #283 | `ada51518878fef05e3b860edf08462964a517d6a` | false | main | fix(adr): enforce unique decision identities |
 | #287 | `12f9a22b21e2c93c95606cd94404587ea01726cd` | false | main | feat(persistence): persist idempotent analysis runs |
 | #289 | `4078e83683c8cdb6ef155873d540cfc7b947ada1` | false | feat/durable-analysis-worker | feat(persistence): load worker reproducibility manifests |
-| #290 | `bbb546ebf7b659adf8f1ba6d72e8d78b0ce72909` | false | feat/one-shot-analysis-worker | feat: execute durable analysis runs |
+| #290 | `8d7de8f86c7d440dfd18da5008ed0c09409b739d` | false | feat/one-shot-analysis-worker | feat: execute durable analysis runs |
 
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization
