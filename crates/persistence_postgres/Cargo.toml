@@ -28,6 +28,7 @@ sqlx = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
+analysis_engine = { path = "../analysis_engine", version = "0.2.0" }
 uuid.workspace = true
 
 [lints]

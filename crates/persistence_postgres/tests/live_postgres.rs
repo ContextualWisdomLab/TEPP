@@ -6,6 +6,7 @@
 
 #![cfg(feature = "live-sqlx")]
 
+use analysis_engine::{AnalysisCorpus, AnalysisEvidenceUnit, execute_analysis_run};
 use persistence_postgres::{
     AnalysisRunRequestRecord, AnalysisRunState, AnalysisRunStateEventRecord, AuditEvent,
     AuditSourceInspection, CorpusSplitManifestRecord, DeletionRequestRecord, DocumentRecord,
@@ -15,8 +16,8 @@ use persistence_postgres::{
     RetentionPolicyRecord, SqlSession, TextSegmentRecord, apply_sql_batch,
     assume_app_runtime_role_sql, clear_session_tenant_sql, insert_analysis_run_request_sql,
     insert_analysis_run_state_event_sql, insert_entity_record_sql, insert_project_record_sql,
-    open_live_sqlx_pool, require_live_sqlx_config, reset_app_runtime_role_sql,
-    select_active_analysis_document_sql, set_session_tenant_sql,
+    model_artifact_from_analysis_result, open_live_sqlx_pool, require_live_sqlx_config,
+    reset_app_runtime_role_sql, select_active_analysis_document_sql, set_session_tenant_sql,
 };
 use std::sync::mpsc;
 use std::sync::{Arc, Barrier};
@@ -24,8 +25,7 @@ use std::thread;
 use std::time::Duration;
 use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff, SystemTime};
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisResultSummary, AnalysisRunRequest, AnalysisRunStatus,
-    AnalysisRunTerminalResult,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalysisRunStatus, AnalysisRunTerminalResult,
 };
 use uuid::Uuid;
 
@@ -273,19 +273,45 @@ fn prove_successful_analysis_run(
         )
         .expect("successful acceptance");
     let successful_receipt = successful_record.accepted().expect("successful receipt");
-    let successful_result = AnalysisRunTerminalResult::succeeded(
+    let evidence_available = AvailableTime::parse_rfc3339("2025-12-31T00:00:00Z")
+        .expect("eligible evidence availability");
+    let corpus = AnalysisCorpus::new(
+        successful_request.snapshot_id.clone(),
+        vec![
+            AnalysisEvidenceUnit::new(
+                "live-evidence-1",
+                EventTime::parse_rfc3339("2025-12-30T00:00:00Z").expect("event time"),
+                evidence_available,
+                2,
+            )
+            .expect("evidence unit"),
+        ],
+    )
+    .expect("analysis corpus");
+    let execution = execute_analysis_run(
         &successful_request,
         &successful_receipt,
-        model_artifact.model_artifact_id.to_string(),
-        model_artifact.artifact_content_digest.clone(),
-        "live-result-v1",
+        &corpus,
         "2026-01-02T00:00:00Z",
-        AnalysisResultSummary::new("live_reference", 2, 1, "validated").expect("result summary"),
     )
-    .expect("successful result");
-    let successful_status =
-        AnalysisRunStatus::terminal(&successful_request, &successful_receipt, successful_result)
-            .expect("successful status");
+    .expect("successful execution");
+    let persisted_artifact = model_artifact_from_analysis_result(
+        tenant_record_id,
+        model_artifact.model_run_id,
+        &execution.terminal_result,
+        Some("live-analysis-result-object".into()),
+        system,
+        available,
+    )
+    .expect("persistable analysis artifact");
+    repo.insert_model_artifact(&persisted_artifact)
+        .expect("insert analysis result artifact");
+    let successful_status = AnalysisRunStatus::terminal(
+        &successful_request,
+        &successful_receipt,
+        execution.terminal_result,
+    )
+    .expect("successful status");
     let successful_event = AnalysisRunStateEventRecord {
         analysis_run_state_event_id: Uuid::now_v7(),
         tenant_record_id,

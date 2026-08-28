@@ -3,7 +3,8 @@
 use persistence_postgres::{
     AnalysisRunRequestRecord, AnalysisRunState, AnalysisRunStateEventRecord, MigrationCatalog,
     PersistenceError, insert_analysis_run_request_sql, insert_analysis_run_state_event_sql,
-    select_analysis_run_status_sql, validate_migration_catalog,
+    model_artifact_from_analysis_result, select_analysis_run_status_sql,
+    validate_migration_catalog,
 };
 use temporal_core::{AvailableTime, SystemTime};
 use tepp_api::{
@@ -213,6 +214,87 @@ fn terminal_event_is_bound_to_the_exact_durable_request() {
         insert_analysis_run_state_event_sql(&record, &success_event)
             .expect("success SQL")
             .contains("'00000000-0000-0000-0000-00000000002c'::uuid")
+    );
+}
+
+#[test]
+fn succeeded_result_builds_its_referenced_artifact_row() {
+    let record = request_record();
+    let accepted = record.accepted().expect("accepted");
+    let result = AnalysisRunTerminalResult::succeeded(
+        &record.request,
+        &accepted,
+        Uuid::from_u128(44).to_string(),
+        "a".repeat(64),
+        "result-v1",
+        "2026-01-03T00:00:00Z",
+        AnalysisResultSummary::new("trsl", 3, 2, "validated").expect("summary"),
+    )
+    .expect("success result");
+    let (system_time, available_time) = clocks();
+    let artifact = model_artifact_from_analysis_result(
+        record.tenant_record_id,
+        Uuid::from_u128(45),
+        &result,
+        Some("protected/result/44".into()),
+        system_time,
+        available_time,
+    )
+    .expect("artifact row");
+    assert_eq!(artifact.model_artifact_id, Uuid::from_u128(44));
+    assert_eq!(artifact.artifact_content_digest, "a".repeat(64));
+    assert_eq!(artifact.artifact_type_code, "result-v1");
+
+    let failed = AnalysisRunTerminalResult::failed(
+        &record.request,
+        &accepted,
+        "2026-01-03T00:00:00Z",
+        "no_eligible_evidence",
+    )
+    .expect("failed result");
+    assert!(
+        model_artifact_from_analysis_result(
+            record.tenant_record_id,
+            Uuid::from_u128(45),
+            &failed,
+            None,
+            system_time,
+            available_time,
+        )
+        .is_err()
+    );
+    let mutators: [fn(&mut AnalysisRunTerminalResult); 3] = [
+        |value: &mut AnalysisRunTerminalResult| value.result_artifact_id = None,
+        |value: &mut AnalysisRunTerminalResult| value.result_sha256 = None,
+        |value: &mut AnalysisRunTerminalResult| value.result_schema_version = None,
+    ];
+    for mutate in mutators {
+        let mut invalid = result.clone();
+        mutate(&mut invalid);
+        assert!(
+            model_artifact_from_analysis_result(
+                record.tenant_record_id,
+                Uuid::from_u128(45),
+                &invalid,
+                None,
+                system_time,
+                available_time,
+            )
+            .is_err()
+        );
+    }
+    let mut invalid_id = result;
+    invalid_id.result_artifact_id = Some("opaque-artifact".into());
+    assert!(
+        model_artifact_from_analysis_result(
+            record.tenant_record_id,
+            Uuid::from_u128(45),
+            &invalid_id,
+            None,
+            system_time,
+            available_time,
+        )
+        .is_err()
     );
 }
 

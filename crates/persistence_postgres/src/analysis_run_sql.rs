@@ -1,11 +1,11 @@
 //! SQL contracts for durable, idempotent analysis-run receipts and state events.
 
-use crate::PersistenceError;
+use crate::{ModelArtifactRecord, PersistenceError};
 use sha2::{Digest, Sha256};
 use temporal_core::{AvailableTime, SystemTime};
 use tepp_api::{
     AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState,
-    require_status_binding,
+    AnalysisRunTerminalResult, AnalysisRunTerminalState, require_status_binding,
 };
 use uuid::Uuid;
 
@@ -26,6 +26,55 @@ pub struct AnalysisRunRequestRecord {
     pub system_time: SystemTime,
     /// Availability time of the receipt.
     pub available_time: AvailableTime,
+}
+
+/// Build the content-addressed model-artifact row referenced by a succeeded result.
+///
+/// The caller persists this row before appending the succeeded lifecycle event.
+/// The database then enforces both tenant ownership and exact digest equality.
+///
+/// # Errors
+///
+/// Returns [`PersistenceError::InvalidAnalysisRun`] unless `result` is a valid
+/// succeeded result with a UUID artifact identity, digest, and schema version.
+pub fn model_artifact_from_analysis_result(
+    tenant_record_id: Uuid,
+    model_run_id: Uuid,
+    result: &AnalysisRunTerminalResult,
+    protected_object_ref: Option<String>,
+    system_time: SystemTime,
+    available_time: AvailableTime,
+) -> Result<ModelArtifactRecord, PersistenceError> {
+    let (
+        AnalysisRunTerminalState::Succeeded,
+        Some(result_artifact_id),
+        Some(result_sha256),
+        Some(result_schema_version),
+    ) = (
+        result.run_state,
+        result.result_artifact_id.as_deref(),
+        result.result_sha256.as_deref(),
+        result.result_schema_version.as_deref(),
+    )
+    else {
+        return Err(PersistenceError::InvalidAnalysisRun);
+    };
+    result
+        .to_json()
+        .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
+    let record = ModelArtifactRecord {
+        model_artifact_id: Uuid::parse_str(result_artifact_id)
+            .map_err(|_| PersistenceError::InvalidAnalysisRun)?,
+        tenant_record_id,
+        model_run_id,
+        artifact_type_code: result_schema_version.to_owned(),
+        artifact_content_digest: result_sha256.to_owned(),
+        protected_object_ref,
+        system_time,
+        available_time,
+    };
+    record.validate()?;
+    Ok(record)
 }
 
 impl AnalysisRunRequestRecord {

@@ -74,6 +74,8 @@ pub use analysis_run_sql::AnalysisRunStateEventRecord;
 pub use analysis_run_sql::insert_analysis_run_request_sql;
 /// Render an append-only analysis-run lifecycle insert.
 pub use analysis_run_sql::insert_analysis_run_state_event_sql;
+/// Build the persisted artifact row referenced by a succeeded analysis result.
+pub use analysis_run_sql::model_artifact_from_analysis_result;
 /// Render a tenant-bound latest-status read.
 pub use analysis_run_sql::select_analysis_run_status_sql;
 /// Append-only source artifact row.
