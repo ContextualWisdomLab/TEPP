@@ -19,7 +19,7 @@
 - PR #287 adds durable, tenant-isolated analysis-run request and state-event
   persistence for #166. It remains an unmerged branch candidate and does not
   establish an executable end-to-end analysis service on protected main.
-- Snapshot facts were fetched live at 2026-08-28T09:16:46Z against protected
+- Snapshot facts were fetched live at 2026-08-28T09:24:44Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -158,7 +158,7 @@ historic consolidation backlog.
 ## Snapshot open pull-request evidence
 
 The following snapshot-head register was fetched live from GitHub at
-2026-08-28T09:16:46Z against protected main `b03cc378`. Review decisions,
+2026-08-28T09:24:44Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
@@ -173,10 +173,10 @@ other rows record the exact live head observed at the snapshot.
 | #272 | `1f37cf4a154734a252b6bf8261748a289c0dd493` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `47611f34e02a831178890f4550221fb4c0d6d61a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `4fa305804b0a0c629d1e06a0ed291933aee444a9` | false | main | docs(gap): refresh protected-main and eight-PR queue |
+| #281 | `a745f52a060218a8a185970b952383f0570ab5cb` | false | main | docs(gap): refresh protected-main and eight-PR queue |
 | #282 | `8ac238ed1c5fdb16a1339bc4ee747af4ae7ae1fc` | false | main | feat(topic): execute fitted candidate-K selection |
 | #283 | `61be7eb3844b726d97af62051f548c6f28743567` | false | main | fix(adr): enforce unique decision identities |
-| #287 | `f8a1e32701c84da9adc9c99f09b1a49754f9b734` | false | main | feat(persistence): persist idempotent analysis runs |
+| #287 | `1199505824c43d3c43203c8b0fbf1f79fd8e69b0` | false | main | feat(persistence): persist idempotent analysis runs |
 
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization
@@ -263,7 +263,7 @@ the coordinated visual workspace, or a supported multi-tenant release.
 | GAP-008 | GPU support is policy-only; no production estimator kernel has real hardware parity or declared VRAM evidence. | `accepted-target` | product vertical | `e65cd66` (VRAM policy only) | [#171](https://github.com/ContextualWisdomLab/TEPP/issues/171) / [PR #51](https://github.com/ContextualWisdomLab/TEPP/pull/51) | `1801501c4d7c` | Real CUDA/portable backend execution, CPU parity, streamed memory, bounded OOM/fallback, hardware profiles, telemetry, and no skipped-support claim. |
 | GAP-009 | Topic association and cluster outputs lacked posterior-valid estimation, uncertainty, edge stability, and consensus communities. | `partial` (estimator core + repairs landed; Leiden consensus + buyer workflow remain) | product vertical | `a69eb3e2` (posterior log-ratio edge estimator merged from [PR #230](https://github.com/ContextualWisdomLab/TEPP/pull/230)) advanced by [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239) (`c482ccea`): exact two-sided Fisher z-transform p-values driving Benjamini–Hochberg admission (Benjamini & Hochberg, 1995), percentile-bootstrap credible intervals and selection fractions (Efron, 1979), fail-closed guard ordering for non-finite correlations and short samples, negative-effect edges excluded from the whole consensus perturbation pipeline, explicit validated `edge_drop_probability`, bounds-safe admission helpers | [#172](https://github.com/ContextualWisdomLab/TEPP/issues/172) | — | Remaining closure evidence: repeated Leiden consensus replacing the union-find stand-in (Traag et al., 2019), known-truth network/cluster recovery at production scale, and reproducible exports wired into the end-to-end run (#166). |
 | GAP-010 | Operators lack coordinated accessible visual analytics and exact-value export workflows. | `accepted-target` | product vertical | `e65cd66` (no visual workspace) | [#173](https://github.com/ContextualWisdomLab/TEPP/issues/173) | `—` (Figma work not started) | Real Figma File ID in ADR, Storybook/design tokens, ten PRD views, exact-value tables, accessible interaction/print/PDF states, provenance, and source-consistent exports. |
-| GAP-011 | TEPP is not yet an operable multi-tenant service or supported release. | `partial` | product vertical | `e65cd66` (library contracts only); durable tenant-isolated analysis-run requests and append-only state events are an unmerged candidate on #287 | [#174](https://github.com/ContextualWisdomLab/TEPP/issues/174) / [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) / [PR #287](https://github.com/ContextualWisdomLab/TEPP/pull/287) | `f8a1e32701c8` | Land #287 only after exact-head checks and independent review; executable queue workers, OIDC/purpose enforcement, OpenTelemetry/SLOs, load/recovery, signed release/SBOM/provenance, assurance evidence, and support policy remain. |
+| GAP-011 | TEPP is not yet an operable multi-tenant service or supported release. | `partial` | product vertical | `e65cd66` (library contracts only); durable tenant-isolated analysis-run requests and append-only state events are an unmerged candidate on #287 | [#174](https://github.com/ContextualWisdomLab/TEPP/issues/174) / [#166](https://github.com/ContextualWisdomLab/TEPP/issues/166) / [PR #287](https://github.com/ContextualWisdomLab/TEPP/pull/287) | `1199505824c4` | Land #287 only after exact-head checks and independent review; executable queue workers, OIDC/purpose enforcement, OpenTelemetry/SLOs, load/recovery, signed release/SBOM/provenance, assurance evidence, and support policy remain. |
 | GAP-012 | The 71-PR queue obscured authority, repeatedly staled exact-head evidence, and fragmented product boundaries. | `implemented-main` (consolidation complete) | closed | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) CLOSED; queue drained through #215, the hourly scheduler, vehicles #231/#232, and individual passes | — | — | The seven current PRs are bounded forward work; exact-head discipline stays enforced by this register's refresh rule. |
 | GAP-013 | Evidence-grounded LLM interpretation is routed but not executed and validated as a production interpreter/verifier port. | `partial` | active integration | `e65cd66` lineage (routing and refusal contracts implemented-main; loopback interpretation POSTs landed via #92/#107) | [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176), [PR #69](https://github.com/ContextualWisdomLab/TEPP/pull/69), [PR #165](https://github.com/ContextualWisdomLab/TEPP/pull/165) | `8e4a3ca9cc80` / `34083c3f5d66` | Contextual-orchestrator execution, evidence citations, verifier refusals, comparable-budget ablations, provider eligibility/fallback, abstention, live/offline contract tests, and no numerical-authority escalation. |
 | GAP-014 | README/TRD and some PR descriptions can lag protected-main and live queue reality. | `partial` | documentation drift | This register is synchronized to `b03cc378`; documentation validation enforces its structure | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) (closed) | — | Reconcile any remaining README/TRD/CHANGELOG drift and keep ADR maturity current. |
@@ -305,7 +305,7 @@ committed.
 | [#281](https://github.com/ContextualWisdomLab/TEPP/pull/281) | Buyer-visible protected-main and queue baseline refresh (GAP-014/GAP-015) | Refresh this branch snapshot, rerun documentation checks, then obtain qualifying independent approval. |
 | [#282](https://github.com/ContextualWisdomLab/TEPP/pull/282) | Fitted candidate-`K` topic selection plus folded #284–#286 topic-context and coverage work (GAP-004) | Complete restarted workflows on exact head `8ac238ed1c5f` and obtain qualifying independent approval. |
 | [#283](https://github.com/ContextualWisdomLab/TEPP/pull/283) | Unique ADR identity enforcement (documentation authority) | Obtain a current-head OpenCode verdict and qualifying independent approval; all other current-head required checks are terminal-success. |
-| [#287](https://github.com/ContextualWisdomLab/TEPP/pull/287) | Durable tenant-isolated analysis-run persistence for #166 (GAP-011) | Complete restarted checks on exact head `f8a1e32701c8`; obtain qualifying independent approval after all current-head gates pass. |
+| [#287](https://github.com/ContextualWisdomLab/TEPP/pull/287) | Durable tenant-isolated analysis-run persistence for #166 (GAP-011) | Complete restarted checks on exact head `1199505824c4`; obtain qualifying independent approval after all current-head gates pass. |
 
 ## Delivery sequence
 
