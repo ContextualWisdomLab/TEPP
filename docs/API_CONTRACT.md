@@ -133,9 +133,10 @@ Serialization sorts every record collection by its stable identity/time key,
 so input permutations produce the same canonical JSON and SHA-256. The sole
 document-relation kind in v1 is `event_lineage_precedes`; its source document
 event time cannot follow its target document event time.
-The strict DTO/schema is contract-only: the current CPU reference estimator
-does not yet emit posterior draws through this artifact, and no accepted GPU
-or asynchronous producer result exists.
+The CPU reference path emits bound joint posterior draws and materializes the
+complete document-by-draw plausible-value grid through
+`assemble_topic_context_posterior`. No accepted GPU or asynchronous producer
+result exists.
 The JSON Schema is the bounded record-shape contract. Cross-record invariants
 that require joining opaque document identities—at least two distinct
 documents, a complete document-by-draw grid, and all four time-covering

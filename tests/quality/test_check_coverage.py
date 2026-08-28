@@ -685,6 +685,15 @@ class CoverageContractTests(unittest.TestCase):
                 "{",  # 81 standalone function brace
                 "    return Err(Error::Invalid);",  # 82 executable error return
                 "}",  # 83 function close
+                "    return Item {",  # 84 executable return
+                "        field,",  # 85 structural field
+                "        nested: Nested {",  # 86 structural nested literal
+                "            value,",  # 87 structural nested field
+                "        },",  # 88 structural close
+                "    };",  # 89 structural close
+                "    Item {",  # 90 structural implicit-return literal
+                "        field,",  # 91 structural field
+                "    }",  # 92 structural close
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -699,7 +708,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 75, 78, 82}
+            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 75, 78, 82, 84}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -722,6 +731,9 @@ class CoverageContractTests(unittest.TestCase):
                         "DA:62,0",
                         "DA:66,0",
                         "DA:67,0",
+                        "DA:85,0",
+                        "DA:87,0",
+                        "DA:91,0",
                         "DA:1,0",
                         "DA:2,0",
                         "DA:51,0",

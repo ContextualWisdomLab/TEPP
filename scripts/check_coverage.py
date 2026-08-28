@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -254,6 +255,8 @@ def is_executable_source_line(
         type_name = text[:-2]
         if type_name and all(character.isalnum() or character in "_:" for character in type_name):
             return False
+        if not text.startswith("return ") and _opens_struct_literal(text):
+            return False
     if text.startswith("use ") or text.startswith("pub use "):
         return False
     if text.startswith("type "):
@@ -379,7 +382,7 @@ def _is_structural_comma_continuation(
             expression_parenthesis_depth + candidate.count("(") - candidate.count(")"),
         )
         array_depth = max(0, array_depth + candidate.count("[") - candidate.count("]"))
-        if "{" in candidate and (" = " in candidate or "Self {" in candidate):
+        if _opens_struct_literal(candidate):
             struct_literal_depth = max(
                 0, struct_literal_depth + candidate.count("{") - candidate.count("}")
             )
@@ -403,6 +406,21 @@ def _is_structural_comma_continuation(
         or array_depth > 0
         or struct_literal_depth > 0
     )
+
+
+def _opens_struct_literal(candidate: str) -> bool:
+    """Return whether a Rust source line opens a named struct literal."""
+
+    prefix, separator, _ = candidate.rpartition("{")
+    if not separator:
+        return False
+    prefix = prefix.strip()
+    if not prefix:
+        return False
+    if prefix.startswith(("if ", "while ", "for ", "match ", "fn ", "struct ", "enum ")):
+        return False
+    final_token = prefix.rsplit(maxsplit=1)[-1]
+    return re.fullmatch(r"(?:[A-Za-z_]\w*::)*[A-Za-z_]\w*", final_token) is not None
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
