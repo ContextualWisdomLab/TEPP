@@ -57,9 +57,9 @@ fn scheduler_disposition(error: &(dyn std::error::Error + 'static)) -> Scheduler
     }
     if let Some(error) = error.downcast_ref::<PersistenceError>() {
         return match error {
-            PersistenceError::DatabaseUrlInvalid | PersistenceError::PoolOptionsInvalid => {
-                SchedulerDisposition::Permanent
-            }
+            PersistenceError::DatabaseUrlInvalid
+            | PersistenceError::PoolOptionsInvalid
+            | PersistenceError::LiveAdapterNotConfigured => SchedulerDisposition::Permanent,
             _ => SchedulerDisposition::Retryable,
         };
     }
@@ -208,6 +208,10 @@ mod tests {
         }
         assert_eq!(
             scheduler_disposition(&PersistenceError::DatabaseUrlInvalid),
+            SchedulerDisposition::Permanent
+        );
+        assert_eq!(
+            scheduler_disposition(&PersistenceError::LiveAdapterNotConfigured),
             SchedulerDisposition::Permanent
         );
         assert_eq!(
