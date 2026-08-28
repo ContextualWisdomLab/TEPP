@@ -436,6 +436,7 @@ def validate_adr_graph() -> None:
                     f"ADR {number} has conflicting index targets: "
                     f"{previous}, {target}"
                 )
+            raise AssertionError(f"ADR {number} appears more than once in the index")
         else:
             indexed_targets[number] = target
     indexed_numbers = set(indexed_targets)

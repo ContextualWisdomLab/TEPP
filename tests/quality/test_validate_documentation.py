@@ -632,6 +632,28 @@ class AdrIdentityTests(unittest.TestCase):
                 ):
                     documentation.validate_adr_graph()
 
+    def test_adr_index_rejects_repeated_same_target_rows(self) -> None:
+        """One ADR cannot carry multiple index rows or maturity claims."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0026](0026-current.md) | Current | Accepted | partial | note |\n"
+                "| [0026](0026-current.md) | Current | Accepted | active-PR | other |\n",
+                encoding="utf-8",
+            )
+            (adr_root / "0026-current.md").write_text(
+                "# ADR 0026: Current identity\n",
+                encoding="utf-8",
+            )
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError, "ADR 0026 appears more than once in the index"
+                ):
+                    documentation.validate_adr_graph()
+
 
 if __name__ == "__main__":
     unittest.main()
