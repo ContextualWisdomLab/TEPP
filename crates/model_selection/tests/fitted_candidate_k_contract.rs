@@ -6,7 +6,8 @@ use membership_core::{
 };
 use model_selection::{
     FittedCandidateKConfig, ModelSelectionError, select_fitted_candidate_k,
-    selected_k_root_mean_square_error, statistical_candidate_from_fit,
+    select_fitted_candidate_model, selected_k_root_mean_square_error,
+    statistical_candidate_from_fit,
 };
 use relation_graph::{
     RelationEdge, RelationEndpointId, RelationEvidenceStatus, RelationGraph, RelationKind,
@@ -206,6 +207,26 @@ fn fitted_diagnostics_select_true_k_over_overspecified_and_llm_only() {
     let selected = select_fitted_candidate_k(&input, &config, "trsl_tm_reference", &[3])
         .expect("fitted statistical selection");
     assert_eq!(selected, 2);
+
+    let receipt = select_fitted_candidate_model(&input, &config, "trsl_tm_reference", &[3])
+        .expect("selection receipt");
+    assert_eq!(receipt.selected_k(), 2);
+    assert_eq!(receipt.candidate_outcomes().len(), 2);
+    assert_eq!(receipt.llm_recommendations(), &[3]);
+    assert_eq!(receipt.method_code(), "trsl_tm_reference_bic_v1");
+
+    let mixed = FittedCandidateKConfig::new(vec![2, 5], vec![7, 11], 2_000, 1e-5)
+        .expect("mixed candidate configuration");
+    let mixed_receipt = select_fitted_candidate_model(&input, &mixed, "trsl_tm_reference", &[])
+        .expect("mixed receipt");
+    let failed = mixed_receipt.candidate_outcomes()[1];
+    assert_eq!(failed.candidate_k(), 5);
+    assert_eq!(failed.statistical_score(), None);
+    assert_eq!(failed.complexity(), None);
+    assert_eq!(
+        failed.failure(),
+        Some(topic_measurement::TopicMeasurementError::InvalidModelInput)
+    );
 }
 
 #[test]
@@ -232,6 +253,19 @@ fn selected_k_rmse_on_fitted_replications_recovers_true_k() {
 fn failed_and_non_finite_fits_fail_closed() {
     let input = separated_topic_input();
     let exhausted = FittedCandidateKConfig::new(vec![2], vec![1], 2, 1e-12).expect("exhausted");
+    let failure = select_fitted_candidate_model(&input, &exhausted, "trsl_tm_reference", &[])
+        .expect_err("failed selection receipt");
+    assert_eq!(failure.error(), ModelSelectionError::NoSuccessfulFit);
+    assert_eq!(failure.candidate_outcomes().len(), 1);
+    assert!(failure.llm_recommendations().is_empty());
+    assert_eq!(
+        failure.to_string(),
+        ModelSelectionError::NoSuccessfulFit.to_string()
+    );
+    assert_eq!(
+        failure.candidate_outcomes()[0].failure(),
+        Some(topic_measurement::TopicMeasurementError::DidNotConverge)
+    );
     assert_eq!(
         select_fitted_candidate_k(&input, &exhausted, "trsl_tm_reference", &[]),
         Err(ModelSelectionError::NoSuccessfulFit)
@@ -258,6 +292,16 @@ fn failed_and_non_finite_fits_fail_closed() {
         select_fitted_candidate_k(&input, &only_failed_plus_llm, "trsl_tm_reference", &[3]),
         Err(ModelSelectionError::LlmVoteIsNotStatisticalAuthority)
     );
+
+    let fractional = two_document_input([0.1; 4]);
+    let fractional_config =
+        FittedCandidateKConfig::new(vec![2], vec![1], 100, 1e-6).expect("fractional config");
+    assert_eq!(
+        select_fitted_candidate_model(&fractional, &fractional_config, "trsl_tm_reference", &[],)
+            .expect_err("fractional diagnostic failure")
+            .error(),
+        ModelSelectionError::InvalidDiagnostic
+    );
 }
 
 #[test]
@@ -278,6 +322,7 @@ fn lexical_and_llm_label_methods_are_refused() {
         "llm",
         "llm_vote",
         "llm_vote_only",
+        "gpt5",
         "",
     ] {
         assert_eq!(
@@ -288,6 +333,7 @@ fn lexical_and_llm_label_methods_are_refused() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn invalid_fitted_configuration_fails_closed() {
     assert_eq!(
         FittedCandidateKConfig::new(vec![], vec![1], 10, 1e-6),
@@ -321,6 +367,45 @@ fn invalid_fitted_configuration_fails_closed() {
         FittedCandidateKConfig::new(vec![2], vec![1], 10, f64::INFINITY),
         Err(ModelSelectionError::InvalidDiagnostic)
     );
+    assert_eq!(
+        FittedCandidateKConfig::new(
+            vec![2],
+            vec![1; topic_measurement::MAX_REFERENCE_FIT_BUDGET + 1],
+            10,
+            1e-6,
+        ),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
+    assert_eq!(
+        FittedCandidateKConfig::new((2..=2_049).collect(), vec![1, 2], 1_025, 1e-6,),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
+    assert_eq!(
+        FittedCandidateKConfig::new(
+            (2..=u32::try_from(topic_measurement::MAX_REFERENCE_FIT_BUDGET + 2)
+                .expect("bounded budget"))
+                .collect(),
+            vec![1],
+            10,
+            1e-6,
+        ),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
+    assert_eq!(
+        FittedCandidateKConfig::new(
+            vec![2],
+            vec![1],
+            topic_measurement::MAX_REFERENCE_FIT_BUDGET + 1,
+            1e-6,
+        ),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
+    let bounded_input = two_document_input([1.0; 4]);
+    let too_many = FittedCandidateKConfig::new(vec![2, 3], vec![1], 10, 1e-6).expect("config");
+    assert_eq!(
+        select_fitted_candidate_k(&bounded_input, &too_many, "trsl_tm_reference", &[]),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
     let base = FittedCandidateKConfig::new(vec![2], vec![1], 10, 1e-6).expect("base");
     for values in [
         (f64::NAN, 0.5, 0.01, 0.05, 0.2),
@@ -348,6 +433,15 @@ fn invalid_fitted_configuration_fails_closed() {
     assert_eq!(
         select_fitted_candidate_k(&separated_topic_input(), &base, "trsl_tm_reference", &[1]),
         Err(ModelSelectionError::NonPositiveCandidateK)
+    );
+    assert_eq!(
+        select_fitted_candidate_k(
+            &separated_topic_input(),
+            &base,
+            "trsl_tm_reference",
+            &vec![2; topic_measurement::MAX_REFERENCE_FIT_BUDGET + 1],
+        ),
+        Err(ModelSelectionError::InvalidDiagnostic)
     );
 }
 

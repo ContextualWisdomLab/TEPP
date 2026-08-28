@@ -3,8 +3,9 @@
 use std::collections::BTreeSet;
 
 use topic_measurement::{
-    ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, fit_reference_topic_model,
-    refuse_lexical_inferential_weight,
+    MAX_REFERENCE_FIT_BUDGET, MAX_REFERENCE_WORKING_CELLS, ReferenceTopicInput,
+    ReferenceTopicModel, ReferenceTopicModelConfig, TopicMeasurementError,
+    fit_reference_topic_model, refuse_lexical_inferential_weight,
 };
 
 use crate::{ModelCandidate, ModelSelectionError, select_candidate_k};
@@ -19,6 +20,142 @@ const DEFAULT_RIDGE: f64 = 0.01;
 const DEFAULT_TOPIC_SMOOTHING: f64 = 0.05;
 /// Bounded GEM step. Identical to `topic_measurement` reference.
 const DEFAULT_STEP_SIZE: f64 = 0.2;
+
+/// Compact outcome retained for one requested candidate topic count.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FittedCandidateOutcome {
+    candidate_k: u32,
+    statistical_score: Option<f64>,
+    complexity: Option<f64>,
+    failure: Option<TopicMeasurementError>,
+    seed: Option<u64>,
+    iterations: Option<usize>,
+    objective: Option<f64>,
+}
+
+impl FittedCandidateOutcome {
+    /// Return the requested topic count.
+    #[must_use]
+    pub const fn candidate_k(self) -> u32 {
+        self.candidate_k
+    }
+
+    /// Return the finite Schwarz score for a successful fit.
+    #[must_use]
+    pub const fn statistical_score(self) -> Option<f64> {
+        self.statistical_score
+    }
+
+    /// Return the finite free-parameter count for a successful fit.
+    #[must_use]
+    pub const fn complexity(self) -> Option<f64> {
+        self.complexity
+    }
+
+    /// Return the typed estimator failure for an unsuccessful fit.
+    #[must_use]
+    pub const fn failure(self) -> Option<TopicMeasurementError> {
+        self.failure
+    }
+
+    /// Return the stable artifact code for an unsuccessful fit.
+    #[must_use]
+    pub const fn failure_code(self) -> Option<&'static str> {
+        match self.failure {
+            Some(TopicMeasurementError::InvalidModelInput) => Some("invalid_model_input"),
+            Some(TopicMeasurementError::NonFiniteEstimate) => Some("non_finite_estimate"),
+            Some(TopicMeasurementError::DidNotConverge) => Some("did_not_converge"),
+            Some(_) => Some("unsupported_estimator_failure"),
+            None => None,
+        }
+    }
+
+    /// Return the converged seed, iteration count, and objective for a successful fit.
+    #[must_use]
+    pub const fn fit_receipt(self) -> Option<(u64, usize, f64)> {
+        match (self.seed, self.iterations, self.objective) {
+            (Some(seed), Some(iterations), Some(objective)) => Some((seed, iterations, objective)),
+            _ => None,
+        }
+    }
+}
+
+/// Winning fitted model plus bounded, reason-bearing selection evidence.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FittedCandidateSelection {
+    selected_k: u32,
+    model: ReferenceTopicModel,
+    candidate_outcomes: Vec<FittedCandidateOutcome>,
+    llm_recommendations: Vec<u32>,
+}
+
+/// Typed selection failure retaining every completed candidate outcome.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FittedCandidateSelectionFailure {
+    error: ModelSelectionError,
+    candidate_outcomes: Vec<FittedCandidateOutcome>,
+    llm_recommendations: Vec<u32>,
+}
+
+impl FittedCandidateSelectionFailure {
+    /// Return the governing model-selection error.
+    #[must_use]
+    pub const fn error(&self) -> ModelSelectionError {
+        self.error
+    }
+
+    /// Return all candidate outcomes completed before failure.
+    #[must_use]
+    pub fn candidate_outcomes(&self) -> &[FittedCandidateOutcome] {
+        &self.candidate_outcomes
+    }
+
+    /// Return separated non-authoritative LLM recommendations.
+    #[must_use]
+    pub fn llm_recommendations(&self) -> &[u32] {
+        &self.llm_recommendations
+    }
+}
+
+impl std::fmt::Display for FittedCandidateSelectionFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.error.fmt(formatter)
+    }
+}
+
+impl std::error::Error for FittedCandidateSelectionFailure {}
+
+impl FittedCandidateSelection {
+    /// Return the statistically selected topic count.
+    #[must_use]
+    pub const fn selected_k(&self) -> u32 {
+        self.selected_k
+    }
+
+    /// Return the canonical statistical selection method.
+    #[must_use]
+    pub const fn method_code(&self) -> &'static str {
+        "trsl_tm_reference_bic_v1"
+    }
+
+    /// Return all requested candidate outcomes in caller order.
+    #[must_use]
+    pub fn candidate_outcomes(&self) -> &[FittedCandidateOutcome] {
+        &self.candidate_outcomes
+    }
+
+    /// Return separated non-authoritative LLM recommendations.
+    #[must_use]
+    pub fn llm_recommendations(&self) -> &[u32] {
+        &self.llm_recommendations
+    }
+
+    /// Consume the receipt and return the already-selected fitted model.
+    #[must_use]
+    pub fn into_model(self) -> ReferenceTopicModel {
+        self.model
+    }
+}
 
 /// Seeds, iteration budget, and candidate topic counts for fitted selection.
 #[derive(Clone, Debug, PartialEq)]
@@ -113,6 +250,18 @@ impl FittedCandidateKConfig {
         self.tolerance
     }
 
+    /// Return prior, relation, ridge, smoothing, and step controls in that order.
+    #[must_use]
+    pub const fn hyperparameters(&self) -> [f64; 5] {
+        [
+            self.prior_variance,
+            self.relation_strength,
+            self.ridge,
+            self.topic_smoothing,
+            self.step_size,
+        ]
+    }
+
     fn validate(&self) -> Result<(), ModelSelectionError> {
         if self.candidate_topic_counts.is_empty() {
             return Err(ModelSelectionError::EmptyCandidateSet);
@@ -127,7 +276,16 @@ impl FittedCandidateKConfig {
             }
         }
         if self.seeds.is_empty()
+            || self.candidate_topic_counts.len() > MAX_REFERENCE_FIT_BUDGET
+            || self.seeds.len() > MAX_REFERENCE_FIT_BUDGET
             || self.maximum_iterations < 2
+            || self.maximum_iterations > MAX_REFERENCE_FIT_BUDGET
+            || self
+                .candidate_topic_counts
+                .len()
+                .checked_mul(self.seeds.len())
+                .and_then(|fits| fits.checked_mul(self.maximum_iterations))
+                .is_none_or(|work| work > MAX_REFERENCE_WORKING_CELLS)
             || !self.tolerance.is_finite()
             || self.tolerance <= 0.0
             || !self.prior_variance.is_finite()
@@ -202,10 +360,9 @@ pub fn select_fitted_candidate_k(
     method_name: &str,
     llm_votes: &[u32],
 ) -> Result<u32, ModelSelectionError> {
-    select_fitted_candidate_model(input, config, method_name, llm_votes).and_then(|model| {
-        u32::try_from(model.topic_term_probabilities.len())
-            .map_err(|_| ModelSelectionError::InvalidDiagnostic)
-    })
+    select_fitted_candidate_model(input, config, method_name, llm_votes)
+        .map(|selection| selection.selected_k())
+        .map_err(|failure| failure.error())
 }
 
 /// Fit every candidate `K` and return the selected converged CPU `f64` model.
@@ -217,15 +374,33 @@ pub fn select_fitted_candidate_k(
 /// # Errors
 ///
 /// Returns the same typed failures as [`select_fitted_candidate_k`].
+///
+/// # Panics
+///
+/// Panics only if the already-validated fitted-selection configuration cannot
+/// construct its identical reference-estimator configuration, or a converged
+/// reference fit violates its own finite-diagnostic contract.
+#[allow(clippy::too_many_lines)]
 pub fn select_fitted_candidate_model(
     input: &ReferenceTopicInput,
     config: &FittedCandidateKConfig,
     method_name: &str,
     llm_votes: &[u32],
-) -> Result<ReferenceTopicModel, ModelSelectionError> {
-    refuse_nonstatistical_method(method_name)?;
+) -> Result<FittedCandidateSelection, FittedCandidateSelectionFailure> {
+    refuse_nonstatistical_method(method_name)
+        .map_err(|error| selection_failure(error, Vec::new(), llm_votes))?;
+    if config.candidate_topic_counts().len() > input.vocabulary_size().saturating_sub(1)
+        || llm_votes.len() > MAX_REFERENCE_FIT_BUDGET
+    {
+        return Err(selection_failure(
+            ModelSelectionError::InvalidDiagnostic,
+            Vec::new(),
+            llm_votes,
+        ));
+    }
     let mut candidates = Vec::new();
-    let mut fitted_models = Vec::new();
+    let mut candidate_outcomes = Vec::with_capacity(config.candidate_topic_counts().len());
+    let mut selected_model = None;
     for &candidate_k in config.candidate_topic_counts() {
         #[allow(clippy::cast_possible_truncation)]
         let topic_count = candidate_k as usize;
@@ -244,43 +419,92 @@ pub fn select_fitted_candidate_model(
                 config.step_size,
             )
         })
-        .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
-        if let Ok(model) = fit_reference_topic_model(input, &fit_config) {
-            candidates.push(statistical_candidate_from_fit(input, candidate_k, &model)?);
-            fitted_models.push((candidate_k, model));
+        .expect("validated fitted config maps to the identical reference config");
+        match fit_reference_topic_model(input, &fit_config) {
+            Ok(model) => {
+                let candidate = statistical_candidate_from_fit(input, candidate_k, &model)
+                    .map_err(|error| {
+                        selection_failure(error, candidate_outcomes.clone(), llm_votes)
+                    })?;
+                candidate_outcomes.push(FittedCandidateOutcome {
+                    candidate_k,
+                    statistical_score: candidate.held_out_log_likelihood(),
+                    complexity: candidate.complexity(),
+                    failure: None,
+                    seed: Some(model.seed),
+                    iterations: Some(model.iterations),
+                    objective: Some(model.objective),
+                });
+                candidates.push(candidate);
+                if select_candidate_k(&candidates)
+                    .expect("a statistical candidate always has a selected K")
+                    == candidate_k
+                {
+                    selected_model = Some((candidate_k, model));
+                }
+            }
+            Err(failure) => candidate_outcomes.push(FittedCandidateOutcome {
+                candidate_k,
+                statistical_score: None,
+                complexity: None,
+                failure: Some(failure),
+                seed: None,
+                iterations: None,
+                objective: None,
+            }),
         }
     }
     for &vote in llm_votes {
-        candidates.push(ModelCandidate::llm_vote_only(vote)?);
+        candidates
+            .push(ModelCandidate::llm_vote_only(vote).map_err(|error| {
+                selection_failure(error, candidate_outcomes.clone(), llm_votes)
+            })?);
     }
     if candidates.is_empty() {
-        return Err(ModelSelectionError::NoSuccessfulFit);
+        return Err(selection_failure(
+            ModelSelectionError::NoSuccessfulFit,
+            candidate_outcomes,
+            llm_votes,
+        ));
     }
-    let selected_k = select_candidate_k(&candidates)?;
-    fitted_models
-        .into_iter()
-        .find_map(|(candidate_k, model)| (candidate_k == selected_k).then_some(model))
-        .ok_or(ModelSelectionError::LlmVoteIsNotStatisticalAuthority)
+    let selected_k = select_candidate_k(&candidates)
+        .map_err(|error| selection_failure(error, candidate_outcomes.clone(), llm_votes))?;
+    let model = selected_model
+        .filter(|(candidate_k, _)| *candidate_k == selected_k)
+        .map(|(_, model)| model)
+        .ok_or_else(|| {
+            selection_failure(
+                ModelSelectionError::LlmVoteIsNotStatisticalAuthority,
+                candidate_outcomes.clone(),
+                llm_votes,
+            )
+        })?;
+    Ok(FittedCandidateSelection {
+        selected_k,
+        model,
+        candidate_outcomes,
+        llm_recommendations: llm_votes.to_vec(),
+    })
+}
+
+fn selection_failure(
+    error: ModelSelectionError,
+    candidate_outcomes: Vec<FittedCandidateOutcome>,
+    llm_recommendations: &[u32],
+) -> FittedCandidateSelectionFailure {
+    FittedCandidateSelectionFailure {
+        error,
+        candidate_outcomes,
+        llm_recommendations: llm_recommendations.to_vec(),
+    }
 }
 
 fn refuse_nonstatistical_method(method: &str) -> Result<(), ModelSelectionError> {
     refuse_lexical_inferential_weight(method)
         .map_err(|_| ModelSelectionError::LexicalWeightForbidden)?;
-    let folded: String = method
-        .chars()
-        .filter(char::is_ascii_alphanumeric)
-        .flat_map(char::to_lowercase)
-        .collect();
-    if matches!(
-        folded.as_str(),
-        "stopword"
-            | "stopwords"
-            | "stopworddeletion"
-            | "llm"
-            | "llmlabel"
-            | "llmlabels"
-            | "llmvote"
-            | "llmvoteonly"
+    if !matches!(
+        method,
+        "trsl_tm_reference" | "tepp_topic_measurement" | "logistic_normal"
     ) {
         return Err(ModelSelectionError::LexicalWeightForbidden);
     }
@@ -317,9 +541,53 @@ fn free_parameter_count(model: &ReferenceTopicModel) -> Result<f64, ModelSelecti
 
 #[cfg(test)]
 mod tests {
-    use super::{FittedCandidateKConfig, free_parameter_count, refuse_nonstatistical_method};
+    use super::{
+        FittedCandidateKConfig, FittedCandidateOutcome, free_parameter_count,
+        refuse_nonstatistical_method,
+    };
     use crate::ModelSelectionError;
-    use topic_measurement::{PrevalenceFeature, ReferenceTopicModel};
+    use topic_measurement::{PrevalenceFeature, ReferenceTopicModel, TopicMeasurementError};
+
+    #[test]
+    fn fitted_failure_codes_are_stable() {
+        for (failure, code) in [
+            (
+                TopicMeasurementError::InvalidModelInput,
+                "invalid_model_input",
+            ),
+            (
+                TopicMeasurementError::NonFiniteEstimate,
+                "non_finite_estimate",
+            ),
+            (TopicMeasurementError::DidNotConverge, "did_not_converge"),
+            (
+                TopicMeasurementError::InvalidComposition,
+                "unsupported_estimator_failure",
+            ),
+        ] {
+            let outcome = FittedCandidateOutcome {
+                candidate_k: 2,
+                statistical_score: None,
+                complexity: None,
+                failure: Some(failure),
+                seed: None,
+                iterations: None,
+                objective: None,
+            };
+            assert_eq!(outcome.failure_code(), Some(code));
+        }
+        let successful = FittedCandidateOutcome {
+            candidate_k: 2,
+            statistical_score: Some(-1.0),
+            complexity: Some(2.0),
+            failure: None,
+            seed: Some(1),
+            iterations: Some(2),
+            objective: Some(-1.0),
+        };
+        assert_eq!(successful.failure_code(), None);
+        assert_eq!(successful.fit_receipt(), Some((1, 2, -1.0)));
+    }
 
     fn model(
         topic_term_probabilities: Vec<Vec<f64>>,

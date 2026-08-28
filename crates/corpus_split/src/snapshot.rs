@@ -62,6 +62,11 @@ impl CorpusSnapshot {
     pub fn document_ids(&self) -> impl Iterator<Item = Uuid> + '_ {
         self.documents.keys().copied()
     }
+
+    /// Iterate eligible document observations in stable identity order.
+    pub fn documents(&self) -> impl Iterator<Item = &CorpusDocument> {
+        self.documents.values()
+    }
 }
 
 #[cfg(test)]

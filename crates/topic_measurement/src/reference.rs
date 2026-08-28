@@ -5,7 +5,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use corpus_split::CorpusSnapshot;
 use membership_core::{GroupId, MemberId, MembershipNetwork, MembershipRole};
 use relation_graph::RelationGraph;
-use temporal_core::EventTime;
+use sha2::{Digest, Sha256};
+use temporal_core::{EventTime, KnowledgeCutoff};
 use uuid::Uuid;
 
 use crate::{SparseMatrix, TopicMeasurementError, from_additive_log_ratio};
@@ -18,6 +19,11 @@ const DEFAULT_STEP_SIZE: f64 = 0.2;
 // ponytail: dense CPU reference is bounded; use a sparse block precision after
 // CPU parity establishes the exact storage contract.
 const MAX_JOINT_COORDINATES: usize = 4_096;
+/// Maximum seeds, iterations, or candidate controls admitted to one CPU fit.
+pub const MAX_REFERENCE_FIT_BUDGET: usize = 4_096;
+/// Maximum cells in any dense CPU reference-estimator working matrix.
+pub const MAX_REFERENCE_WORKING_CELLS: usize = 4_194_304;
+const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
 
 /// One column in the structural prevalence mean.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -47,6 +53,42 @@ pub struct ReferenceTopicInput {
     design: Vec<Vec<f64>>,
     features: Vec<PrevalenceFeature>,
     transition_pairs: Vec<(usize, usize)>,
+    source_binding: Option<ReferenceTopicSourceBinding>,
+}
+
+/// Immutable source identity attached while constructing a reference input.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReferenceTopicSourceBinding {
+    snapshot_id: String,
+    source_snapshot_sha256: String,
+    model_input_sha256: String,
+    knowledge_cutoff: String,
+}
+
+impl ReferenceTopicSourceBinding {
+    /// Return the opaque snapshot identity.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
+    /// Return the canonical source-snapshot digest.
+    #[must_use]
+    pub fn source_snapshot_sha256(&self) -> &str {
+        &self.source_snapshot_sha256
+    }
+
+    /// Return the canonical digest of the complete validated estimator input.
+    #[must_use]
+    pub fn model_input_sha256(&self) -> &str {
+        &self.model_input_sha256
+    }
+
+    /// Return the canonical cutoff used to admit snapshot documents.
+    #[must_use]
+    pub fn knowledge_cutoff(&self) -> &str {
+        &self.knowledge_cutoff
+    }
 }
 
 impl ReferenceTopicInput {
@@ -76,6 +118,14 @@ impl ReferenceTopicInput {
         if document_count < 2
             || document_term.rows() != document_count
             || document_term.columns() < 2
+            || !input_resources_within_budget(
+                document_count,
+                document_term.nonzero_count(),
+                covariates.map_or(0, SparseMatrix::nonzero_count),
+                memberships.assignment_count(),
+                relations.edge_count(),
+                snapshot.len(),
+            )
             || event_times.len() != document_count
             || document_ids.iter().any(|id| !snapshot.contains(*id))
         {
@@ -112,7 +162,79 @@ impl ReferenceTopicInput {
             design,
             features,
             transition_pairs,
+            source_binding: None,
         })
+    }
+
+    /// Build a validated input bound to an immutable snapshot and cutoff.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] when the snapshot
+    /// identity is empty, any snapshot document exceeds the declared cutoff,
+    /// or the ordinary input contract fails.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_bound(
+        snapshot: &CorpusSnapshot,
+        snapshot_id: impl Into<String>,
+        knowledge_cutoff: KnowledgeCutoff,
+        document_ids: Vec<Uuid>,
+        document_term: &SparseMatrix,
+        event_times: &[EventTime],
+        covariates: Option<&SparseMatrix>,
+        memberships: &MembershipNetwork,
+        relations: &RelationGraph,
+    ) -> Result<Self, TopicMeasurementError> {
+        let snapshot_id = snapshot_id.into();
+        if !input_resources_within_budget(
+            document_ids.len(),
+            document_term.nonzero_count(),
+            covariates.map_or(0, SparseMatrix::nonzero_count),
+            memberships.assignment_count(),
+            relations.edge_count(),
+            snapshot.len(),
+        ) || snapshot_id.trim().is_empty()
+            || snapshot
+                .documents()
+                .any(|document| document.available_time.instant() > knowledge_cutoff.instant())
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        let mut value = Self::new(
+            snapshot,
+            document_ids,
+            document_term,
+            event_times,
+            covariates,
+            memberships,
+            relations,
+        )?;
+        let mut digest = Sha256::new();
+        for document in snapshot.documents() {
+            digest.update(document.document_id.as_bytes());
+            let available = document.available_time.to_rfc3339();
+            digest.update(
+                u64::try_from(available.len())
+                    .map_err(|_| TopicMeasurementError::InvalidModelInput)?
+                    .to_le_bytes(),
+            );
+            digest.update(available.as_bytes());
+        }
+        let source_snapshot_sha256 = hex_digest(digest.finalize());
+        let model_input_sha256 = model_input_digest(&value, &source_snapshot_sha256)?;
+        value.source_binding = Some(ReferenceTopicSourceBinding {
+            snapshot_id,
+            source_snapshot_sha256,
+            model_input_sha256,
+            knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
+        });
+        Ok(value)
+    }
+
+    /// Return immutable source provenance when bound at construction.
+    #[must_use]
+    pub const fn source_binding(&self) -> Option<&ReferenceTopicSourceBinding> {
+        self.source_binding.as_ref()
     }
 
     /// Return the number of modeled documents.
@@ -211,6 +333,127 @@ impl ReferenceTopicInput {
     }
 }
 
+fn input_resources_within_budget(
+    documents: usize,
+    term_nonzeros: usize,
+    covariate_nonzeros: usize,
+    memberships: usize,
+    relations: usize,
+    snapshot_documents: usize,
+) -> bool {
+    documents <= MAX_REFERENCE_FIT_BUDGET
+        && memberships <= MAX_REFERENCE_FIT_BUDGET
+        && [
+            term_nonzeros,
+            covariate_nonzeros,
+            relations,
+            snapshot_documents,
+        ]
+        .into_iter()
+        .all(|count| count <= MAX_REFERENCE_WORKING_CELLS)
+}
+
+fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
+    bytes
+        .as_ref()
+        .iter()
+        .flat_map(|byte| {
+            [
+                char::from(HEX_DIGITS[usize::from(*byte >> 4)]),
+                char::from(HEX_DIGITS[usize::from(*byte & 0x0f)]),
+            ]
+        })
+        .collect()
+}
+
+fn model_input_digest(
+    input: &ReferenceTopicInput,
+    source_snapshot_sha256: &str,
+) -> Result<String, TopicMeasurementError> {
+    let mut digest = Sha256::new();
+    let encode_len =
+        |digest: &mut Sha256, value: usize| digest.update((value as u128).to_le_bytes());
+    let encode_bytes = |digest: &mut Sha256, value: &[u8]| {
+        encode_len(digest, value.len());
+        digest.update(value);
+    };
+    digest.update(b"tepp.reference_topic_input.v2");
+    digest.update(b"source_snapshot");
+    encode_bytes(&mut digest, source_snapshot_sha256.as_bytes());
+    digest.update(b"vocabulary");
+    digest.update(
+        u64::try_from(input.vocabulary_size)
+            .map_err(|_| TopicMeasurementError::InvalidModelInput)?
+            .to_le_bytes(),
+    );
+    digest.update(b"documents");
+    encode_len(&mut digest, input.document_ids.len());
+    for ((document_id, event_time), terms) in input
+        .document_ids
+        .iter()
+        .zip(&input.event_times)
+        .zip(&input.term_rows)
+    {
+        digest.update(b"document");
+        digest.update(document_id.as_bytes());
+        let event_time = event_time.to_rfc3339();
+        encode_bytes(&mut digest, event_time.as_bytes());
+        encode_len(&mut digest, terms.len());
+        for &(term, count) in terms {
+            digest.update(
+                u64::try_from(term)
+                    .map_err(|_| TopicMeasurementError::InvalidModelInput)?
+                    .to_le_bytes(),
+            );
+            digest.update(count.to_bits().to_le_bytes());
+        }
+    }
+    digest.update(b"design");
+    encode_len(&mut digest, input.design.len());
+    for row in &input.design {
+        encode_len(&mut digest, row.len());
+    }
+    digest.update(b"features");
+    encode_len(&mut digest, input.features.len());
+    for (feature_index, feature) in input.features.iter().enumerate() {
+        match feature {
+            PrevalenceFeature::Intercept => digest.update(b"intercept"),
+            PrevalenceFeature::EventTime => digest.update(b"event_time"),
+            PrevalenceFeature::Covariate(index) => {
+                digest.update(b"covariate");
+                digest.update(
+                    u64::try_from(*index)
+                        .map_err(|_| TopicMeasurementError::InvalidModelInput)?
+                        .to_le_bytes(),
+                );
+            }
+            PrevalenceFeature::Membership { role, group_id } => {
+                digest.update(b"membership");
+                encode_bytes(&mut digest, role.wire_name().as_bytes());
+                digest.update(group_id.as_uuid().as_bytes());
+            }
+        }
+        for row in &input.design {
+            digest.update(row[feature_index].to_bits().to_le_bytes());
+        }
+    }
+    digest.update(b"transitions");
+    encode_len(&mut digest, input.transition_pairs.len());
+    for &(source, target) in &input.transition_pairs {
+        digest.update(
+            u64::try_from(source)
+                .map_err(|_| TopicMeasurementError::InvalidModelInput)?
+                .to_le_bytes(),
+        );
+        digest.update(
+            u64::try_from(target)
+                .map_err(|_| TopicMeasurementError::InvalidModelInput)?
+                .to_le_bytes(),
+        );
+    }
+    Ok(hex_digest(digest.finalize()))
+}
+
 fn build_design(
     document_ids: &[Uuid],
     event_times: &[EventTime],
@@ -224,13 +467,16 @@ fn build_design(
         Some(_) => return Err(TopicMeasurementError::InvalidModelInput),
         None => None,
     };
-    let covariate_count = covariate_rows.as_ref().map_or(0, |rows| {
-        rows.iter()
-            .flatten()
-            .map(|(column, _)| *column)
-            .max()
-            .map_or(0, |value| value + 1)
-    });
+    let covariate_count = covariate_rows
+        .as_ref()
+        .map_or(Some(0), |rows| {
+            rows.iter()
+                .flatten()
+                .map(|(column, _)| *column)
+                .max()
+                .map_or(Some(0), |value| value.checked_add(1))
+        })
+        .ok_or(TopicMeasurementError::InvalidModelInput)?;
 
     let active: Vec<_> = document_ids
         .iter()
@@ -243,6 +489,17 @@ fn build_design(
         .map(|assignment| (assignment.role(), assignment.group_id()))
         .collect();
     if membership_keys.is_empty() {
+        return Err(TopicMeasurementError::InvalidModelInput);
+    }
+    let feature_count = 2_usize
+        .checked_add(covariate_count)
+        .and_then(|count| count.checked_add(membership_keys.len()))
+        .ok_or(TopicMeasurementError::InvalidModelInput)?;
+    if feature_count > MAX_REFERENCE_FIT_BUDGET
+        || document_count
+            .checked_mul(feature_count)
+            .is_none_or(|cells| cells > MAX_REFERENCE_WORKING_CELLS)
+    {
         return Err(TopicMeasurementError::InvalidModelInput);
     }
     let membership_columns: BTreeMap<_, _> = membership_keys
@@ -262,7 +519,7 @@ fn build_design(
                 group_id: *group_id,
             }),
     );
-    let mut design = vec![vec![0.0; features.len()]; document_count];
+    let mut design = vec![vec![0.0; feature_count]; document_count];
     for row in 0..document_count {
         design[row][0] = 1.0;
         design[row][1] = standardized_time[row];
@@ -367,10 +624,47 @@ impl ReferenceTopicModelConfig {
         Ok(self)
     }
 
+    /// Return estimator initialization seeds.
+    #[must_use]
+    pub fn seeds(&self) -> &[u64] {
+        &self.seeds
+    }
+
+    /// Return the per-seed iteration budget.
+    #[must_use]
+    pub const fn maximum_iterations(&self) -> usize {
+        self.maximum_iterations
+    }
+
+    /// Return the relative-objective convergence tolerance.
+    #[must_use]
+    pub const fn tolerance(&self) -> f64 {
+        self.tolerance
+    }
+
+    /// Return prior, relation, ridge, smoothing, and step controls in that order.
+    #[must_use]
+    pub const fn hyperparameters(&self) -> [f64; 5] {
+        [
+            self.prior_variance,
+            self.relation_strength,
+            self.ridge,
+            self.topic_smoothing,
+            self.step_size,
+        ]
+    }
+
     fn validate(&self) -> Result<(), TopicMeasurementError> {
         if self.topic_count < 2
             || self.seeds.is_empty()
+            || self.seeds.len() > MAX_REFERENCE_FIT_BUDGET
             || self.maximum_iterations < 2
+            || self.maximum_iterations > MAX_REFERENCE_FIT_BUDGET
+            || self
+                .seeds
+                .len()
+                .checked_mul(self.maximum_iterations)
+                .is_none_or(|work| work > MAX_REFERENCE_WORKING_CELLS)
             || !self.tolerance.is_finite()
             || self.tolerance <= 0.0
             || !self.prior_variance.is_finite()
@@ -702,7 +996,21 @@ pub fn fit_reference_topic_model(
     config: &ReferenceTopicModelConfig,
 ) -> Result<ReferenceTopicModel, TopicMeasurementError> {
     config.validate()?;
-    if config.topic_count > input.vocabulary_size {
+    let coordinate_count = config.topic_count.saturating_sub(1);
+    let dimensions = [
+        (config.topic_count, input.vocabulary_size),
+        (input.document_ids.len(), config.topic_count),
+        (input.document_ids.len(), coordinate_count),
+        (input.features.len(), coordinate_count),
+    ];
+    // ponytail: bounded dense reference path; raise only with measured memory
+    // evidence or replace the working matrices with a parity-tested sparse path.
+    if config.topic_count > input.vocabulary_size
+        || dimensions.into_iter().any(|(rows, columns)| {
+            rows.checked_mul(columns)
+                .is_none_or(|cells| cells > MAX_REFERENCE_WORKING_CELLS)
+        })
+    {
         return Err(TopicMeasurementError::InvalidModelInput);
     }
     let mut best = None;
@@ -1085,12 +1393,16 @@ fn next_unit(state: &mut u64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        FitState, PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModel,
-        ReferenceTopicModelConfig, argmax, bounded_count, build_result, dot, expectation,
-        next_unit, normalize, objective, require_finite, standardize_event_time,
-        validate_positive_definite,
+        FitState, MAX_REFERENCE_FIT_BUDGET, MAX_REFERENCE_WORKING_CELLS, PrevalenceFeature,
+        ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, argmax, bounded_count,
+        build_design, build_result, dot, expectation, input_resources_within_budget, next_unit,
+        normalize, objective, require_finite, standardize_event_time, validate_positive_definite,
     };
     use crate::TopicMeasurementError;
+    use membership_core::{
+        GroupId, MemberId, MembershipAssignment, MembershipNetwork, MembershipRole,
+        MembershipWeight,
+    };
     use temporal_core::EventTime;
     use uuid::Uuid;
 
@@ -1100,6 +1412,24 @@ mod tests {
 
     #[test]
     fn numeric_helpers_are_deterministic_and_fail_closed() {
+        assert!(input_resources_within_budget(2, 2, 0, 1, 0, 2));
+        for oversized in [
+            (MAX_REFERENCE_FIT_BUDGET + 1, 0, 0, 0, 0, 0),
+            (2, MAX_REFERENCE_WORKING_CELLS + 1, 0, 0, 0, 0),
+            (2, 0, MAX_REFERENCE_WORKING_CELLS + 1, 0, 0, 0),
+            (2, 0, 0, MAX_REFERENCE_FIT_BUDGET + 1, 0, 0),
+            (2, 0, 0, 0, MAX_REFERENCE_WORKING_CELLS + 1, 0),
+            (2, 0, 0, 0, 0, MAX_REFERENCE_WORKING_CELLS + 1),
+        ] {
+            assert!(!input_resources_within_budget(
+                oversized.0,
+                oversized.1,
+                oversized.2,
+                oversized.3,
+                oversized.4,
+                oversized.5,
+            ));
+        }
         let mut seed = 1;
         let first = next_unit(&mut seed);
         assert!(first > 0.0);
@@ -1127,6 +1457,34 @@ mod tests {
     }
 
     #[test]
+    fn oversized_document_feature_design_fails_before_dense_allocation() {
+        let document_ids: Vec<_> = (1_u128..=2_049).map(Uuid::from_u128).collect();
+        let event_times: Vec<_> = (0..document_ids.len())
+            .map(|index| event_time(if index % 2 == 0 { 1 } else { 2 }))
+            .collect();
+        let mut memberships = MembershipNetwork::new();
+        for (index, document_id) in document_ids.iter().enumerate() {
+            memberships
+                .insert(
+                    MembershipAssignment::new(
+                        MemberId::from_uuid(*document_id),
+                        GroupId::from_uuid(Uuid::from_u128(10_000 + index as u128)),
+                        MembershipRole::Project,
+                        MembershipWeight::full().expect("full"),
+                        event_time(1),
+                        event_time(9),
+                    )
+                    .expect("membership"),
+                )
+                .expect("unique membership");
+        }
+        assert_eq!(
+            build_design(&document_ids, &event_times, None, &memberships),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+    }
+
+    #[test]
     fn impossible_numeric_states_and_mixed_topic_edges_fail_closed() {
         let input = ReferenceTopicInput {
             document_ids: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
@@ -1136,6 +1494,7 @@ mod tests {
             design: vec![vec![1.0], vec![1.0]],
             features: vec![PrevalenceFeature::Intercept],
             transition_pairs: vec![(0, 1)],
+            source_binding: None,
         };
         let theta = vec![vec![0.5, 0.5], vec![0.5, 0.5]];
         let zero_beta = vec![vec![0.0, 0.0], vec![0.0, 0.0]];
@@ -1226,6 +1585,7 @@ mod tests {
             design: vec![vec![1.0], vec![1.0]],
             features: vec![PrevalenceFeature::Intercept],
             transition_pairs: vec![(0, 1)],
+            source_binding: None,
         }
     }
 
@@ -1335,6 +1695,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn joint_precision_binds_basis_and_rejects_invalid_geometry() {
         let input = scoring_input(vec![vec![(0, 2.0)], vec![(1, 3.0)]], 3);
         let config = ReferenceTopicModelConfig::new(3, vec![1], 10, 1e-6).expect("config");
@@ -1393,6 +1754,7 @@ mod tests {
             design: Vec::new(),
             features: vec![PrevalenceFeature::Intercept],
             transition_pairs: Vec::new(),
+            source_binding: None,
         };
         let two_topic_model = scoring_model(
             vec![vec![0.5, 0.5]; 2],
@@ -1414,6 +1776,7 @@ mod tests {
             design: vec![vec![1.0]; 4_097],
             features: vec![PrevalenceFeature::Intercept],
             transition_pairs: vec![(0, 1)],
+            source_binding: None,
         };
         assert_eq!(
             oversized.build_joint_coordinate_precision(

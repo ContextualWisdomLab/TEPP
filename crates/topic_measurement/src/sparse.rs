@@ -88,7 +88,9 @@ impl SparseMatrix {
         };
         if rows == 0
             || columns == 0
-            || offsets.len() != outer + 1
+            || outer
+                .checked_add(1)
+                .is_none_or(|offset_count| offsets.len() != offset_count)
             || offsets.first() != Some(&0)
             || offsets.last().copied() != Some(indices.len())
             || indices.len() != values.len()
@@ -128,6 +130,12 @@ impl SparseMatrix {
     #[must_use]
     pub const fn columns(&self) -> usize {
         self.columns
+    }
+
+    /// Return the number of explicitly stored finite values.
+    #[must_use]
+    pub const fn nonzero_count(&self) -> usize {
+        self.values.len()
     }
 
     /// Return the compressed orientation.
@@ -172,6 +180,7 @@ mod tests {
                 .expect("csc");
         assert_eq!(csr.rows(), 2);
         assert_eq!(csr.columns(), 3);
+        assert_eq!(csr.nonzero_count(), 3);
         assert_eq!(csr.orientation(), SparseOrientation::Row);
         assert_eq!(csc.orientation(), SparseOrientation::Column);
         assert_eq!(csr.row_entries(), csc.row_entries());
@@ -179,6 +188,10 @@ mod tests {
 
     #[test]
     fn malformed_sparse_storage_fails_closed() {
+        assert_eq!(
+            SparseMatrix::from_csr(usize::MAX, 2, Vec::new(), Vec::new(), Vec::new()),
+            Err(TopicMeasurementError::InvalidSparseMatrix)
+        );
         let error = Err(TopicMeasurementError::InvalidSparseMatrix);
         assert_eq!(SparseMatrix::from_csr(0, 1, vec![0], vec![], vec![]), error);
         assert_eq!(

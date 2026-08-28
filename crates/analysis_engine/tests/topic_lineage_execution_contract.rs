@@ -108,9 +108,11 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0],
     )
     .expect("counts");
-    let input = ReferenceTopicInput::new(
+    let input = ReferenceTopicInput::new_bound(
         &snapshot,
-        ids,
+        "snapshot-topic-lineage",
+        KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
+        ids.clone(),
         &counts,
         &times,
         None,
@@ -145,6 +147,16 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     assert_eq!(execution.artifact.lineage_count, 2);
     assert_eq!(execution.artifact.topic_count, 2);
     assert_eq!(execution.artifact.sequence_edges.len(), 2);
+    assert_eq!(execution.artifact.source_snapshot_sha256.len(), 64);
+    assert_eq!(execution.artifact.model_input_sha256.len(), 64);
+    assert_eq!(
+        execution.artifact.model_contract_version,
+        TOPIC_LINEAGE_MODEL_CONTRACT_VERSION
+    );
+    assert_eq!(
+        execution.artifact.fit_manifest.method_code,
+        "fixed_k_reference_v1"
+    );
     assert_eq!(
         execution.terminal_result.run_state,
         AnalysisRunTerminalState::Succeeded
@@ -159,7 +171,7 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     );
     assert!(execution.artifact.to_json().is_ok());
 
-    let selection = FittedCandidateKConfig::new(vec![3, 2], vec![7, 11], 2_000, 1e-5)
+    let selection = FittedCandidateKConfig::new(vec![5, 2], vec![7, 11], 2_000, 1e-5)
         .expect("selection config")
         .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
         .expect("selection hyperparameters");
@@ -176,16 +188,23 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     )
     .expect("selected execution");
     assert_eq!(selected.artifact.topic_count, 2);
+    assert_eq!(
+        selected.artifact.fit_manifest.method_code,
+        "trsl_tm_reference_bic_v1"
+    );
+    assert_eq!(selected.artifact.fit_manifest.candidate_outcomes.len(), 2);
+    assert_eq!(selected.artifact.fit_manifest.llm_recommendations, vec![3]);
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
     let (snapshot, ids, times, memberships, relations) = fixture();
     let counts = SparseMatrix::from_csr(4, 2, vec![0, 1, 2, 3, 4], vec![0, 0, 1, 1], vec![1.0; 4])
         .expect("counts");
-    let input = ReferenceTopicInput::new(
+    let unbound_input = ReferenceTopicInput::new(
         &snapshot,
-        ids,
+        ids.clone(),
         &counts,
         &times,
         None,
@@ -193,12 +212,37 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
         &relations,
     )
     .expect("input");
+    let input = ReferenceTopicInput::new_bound(
+        &snapshot,
+        "snapshot-topic-lineage",
+        KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
+        ids.clone(),
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("bound input");
     let request = request();
     let accepted =
         AnalysisRunAccepted::new("run-topic-lineage", "accepted", &request.idempotency_key)
             .expect("accepted");
     let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
     let config = ReferenceTopicModelConfig::new(2, vec![1], 2, 1e-12).expect("config");
+
+    assert_eq!(
+        execute_topic_lineage_run(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &unbound_input,
+            &config,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
 
     assert_eq!(
         execute_topic_lineage_run(
@@ -211,6 +255,54 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
             "2026-08-02T00:00:00Z",
         ),
         Err(AnalysisEngineError::SnapshotMismatch)
+    );
+    let other_snapshot_input = ReferenceTopicInput::new_bound(
+        &snapshot,
+        "other-binding",
+        cutoff,
+        ids.clone(),
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("other snapshot binding");
+    assert_eq!(
+        execute_topic_lineage_run(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &other_snapshot_input,
+            &config,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    let other_cutoff_input = ReferenceTopicInput::new_bound(
+        &snapshot,
+        "snapshot-topic-lineage",
+        KnowledgeCutoff::parse_rfc3339("2026-08-02T00:00:00Z").expect("other cutoff"),
+        ids,
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("other cutoff binding");
+    assert_eq!(
+        execute_topic_lineage_run(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &other_cutoff_input,
+            &config,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
     );
     for invalid_request in [
         {
@@ -255,5 +347,28 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
         Err(AnalysisEngineError::TopicMeasurement(
             topic_measurement::TopicMeasurementError::DidNotConverge
         ))
+    );
+
+    let failed_selection =
+        FittedCandidateKConfig::new(vec![5], vec![1], 10, 1e-6).expect("selection config");
+    let error = execute_selected_topic_lineage_run(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input,
+        &failed_selection,
+        "trsl_tm_reference",
+        &[],
+        "2026-08-02T00:00:00Z",
+    )
+    .expect_err("failed fitted selection");
+    let AnalysisEngineError::FittedModelSelection(receipt) = error else {
+        panic!("expected reason-bearing fitted selection failure");
+    };
+    assert_eq!(receipt.candidate_outcomes().len(), 1);
+    assert_eq!(
+        receipt.candidate_outcomes()[0].failure(),
+        Some(topic_measurement::TopicMeasurementError::InvalidModelInput)
     );
 }

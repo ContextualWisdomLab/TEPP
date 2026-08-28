@@ -15,7 +15,7 @@ mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
-use model_selection::ModelSelectionError;
+use model_selection::{FittedCandidateSelectionFailure, ModelSelectionError};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -57,8 +57,8 @@ pub use topic_context_posterior::{
 pub use topic_lineage_artifact::{
     TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
     TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, TopicLineageArtifact,
-    TopicLineageArtifactEdge, TopicLineageExecution, execute_selected_topic_lineage_run,
-    execute_topic_lineage_run,
+    TopicLineageArtifactEdge, TopicLineageCandidateOutcome, TopicLineageExecution,
+    TopicLineageFitManifest, execute_selected_topic_lineage_run, execute_topic_lineage_run,
 };
 
 /// Versioned artifact schema emitted by this engine.
@@ -230,7 +230,7 @@ pub struct AnalysisExecution {
 }
 
 /// Fail-closed errors from the deterministic analysis vertical slice.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AnalysisEngineError {
     /// Request or accepted receipt failed its API contract.
     Api(ApiError),
@@ -250,6 +250,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// Candidate-`K` fitting or statistical selection failed.
     ModelSelection(ModelSelectionError),
+    /// Fitted candidate selection failed with its completed diagnostic receipt.
+    FittedModelSelection(FittedCandidateSelectionFailure),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
 }
@@ -266,6 +268,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::ModelSelection(error) => return error.fmt(formatter),
+            Self::FittedModelSelection(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
         };
         formatter.write_str(message)
