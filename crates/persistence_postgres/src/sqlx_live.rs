@@ -13,7 +13,9 @@ use sha2::{Digest, Sha256};
 use sqlx::{Acquire, Row};
 use std::future::Future;
 use temporal_core::{AvailableTime, SystemTime};
-use tepp_api::{AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState};
+use tepp_api::{
+    AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState, require_status_binding,
+};
 use uuid::Uuid;
 
 /// Open a live `SQLx` pool and wrap it as [`LiveSqlxPool`].
@@ -269,6 +271,8 @@ fn materialize_analysis_run(
         _ => return Err(PersistenceError::InvalidAnalysisRun),
     }
     .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
+    require_status_binding(&request, &accepted, &status)
+        .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
     if matches!(
         (run_state.as_str(), status.run_state),
         ("succeeded", AnalysisRunStatusState::Succeeded)
