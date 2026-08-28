@@ -153,6 +153,30 @@ class CoverageContractTests(unittest.TestCase):
             for line in (2, 3):
                 self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
 
+    def test_new_structural_scanner_branches_are_explicit(self) -> None:
+        """Cover typed alternatives, declaration depth, comments, and escapes."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text("| E::Only => run(),\n", encoding="utf-8")
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 1))
+        self.assertTrue(
+            coverage_contract._is_structural_comma_continuation(
+                ["struct Item {", "    first: u8,", "    second: u8,", "}"],
+                3,
+                "second: u8,",
+            )
+        )
+        self.assertFalse(
+            coverage_contract._is_structural_comma_continuation(
+                ["struct Item {", "    first: u8,", "}", "standalone,"],
+                4,
+                "standalone,",
+            )
+        )
+        self.assertEqual(coverage_contract._rust_code_brace_delta("// {"), 0)
+        self.assertEqual(coverage_contract._rust_code_brace_delta(r'"\"{"'), 0)
+
     def test_incomplete_and_malformed_summaries_fail(self) -> None:
         """Missing, nonnumeric, impossible, and incomplete counts are rejected."""
 
