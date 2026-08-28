@@ -328,8 +328,9 @@ def _is_structural_comma_continuation(
     """Return whether a comma-terminated line is proven to be structural.
 
     A comma can terminate a declaration field, enum variant, function
-    parameter, or ordinary call argument. Operators, calls, and assignments
-    remain executable because their expressions can perform observable work.
+    parameter, or multiline delimiter continuation. Only lines proven to sit
+    in one of those structural contexts are excluded from the authored-line
+    denominator; every other comma-terminated line remains executable.
     """
 
     if any(character in text for character in "()=+-*/%<>!&|?"):
