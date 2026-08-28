@@ -44,6 +44,12 @@ A relation-aware split groups revisions, translations, copied/template-derived v
 
 Missing or mutable referenced artifacts, manifest digest mismatch, stale split identity, inconsistent time precision, cross-tenant references, broken relation components, or migration/restore integrity failures fail closed. Recovery reconstructs from immutable evidence and validates authorization, temporal cutoff, relation-aware split, manifest digests, and model/backend compatibility before analytical state is marked usable.
 
+A worker-side manifest read must carry the evidence digest computed from the
+exact input bytes it is about to process. The persistence adapter binds tenant,
+manifest identity, and that expected digest in the read and revalidates all
+three at the typed return boundary; digest shape validation alone is not
+evidence binding.
+
 ## Security, privacy, and governance impact
 
 Persistence follows ADR 0009 purpose-bound PII rules. Identity mappings, sensitive raw evidence, derived psychometric results, and provider/export artifacts can have different access scopes and retention rules. Backups inherit the same protection and deletion/legal-hold governance as primary data.
