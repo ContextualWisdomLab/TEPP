@@ -22,7 +22,7 @@
   materialization into the durable-worker feature branch. PR #290 carries the
   bounded one-shot executable worker; scheduler leases and protected object
   ingestion remain product gaps.
-- Snapshot facts were fetched live at 2026-08-28T11:31:50Z against protected
+- Snapshot facts were fetched live at 2026-08-28T11:37:15Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -161,7 +161,7 @@ historic consolidation backlog.
 ## Snapshot open pull-request evidence
 
 The following snapshot-head register was fetched live from GitHub at
-2026-08-28T11:31:50Z against protected main `b03cc378`. Review decisions,
+2026-08-28T11:37:15Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
@@ -176,10 +176,10 @@ other rows record the exact live head observed at the snapshot.
 | #272 | `1f37cf4a154734a252b6bf8261748a289c0dd493` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `47611f34e02a831178890f4550221fb4c0d6d61a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `c8ce946c7e879ec6235622a809947496c64c4a66` | false | main | docs(gap): refresh protected-main and eight-PR queue |
+| #281 | `498f5dd8fe1308f2f95dab1c83fcb233e36869ed` | false | main | docs(gap): refresh protected-main and seven-PR queue |
 | #283 | `ada51518878fef05e3b860edf08462964a517d6a` | false | main | fix(adr): enforce unique decision identities |
 | #287 | `12f9a22b21e2c93c95606cd94404587ea01726cd` | false | main | feat(persistence): persist idempotent analysis runs |
-| #290 | `62a9c3fbf88414c6b89cb61714d9fd86ed4b7994` | false | feat/one-shot-analysis-worker | feat: execute durable analysis runs |
+| #290 | `62a9c3fbf88414c6b89cb61714d9fd86ed4b7994` | false | feat/analysis-run-persistence | feat: execute durable analysis runs |
 
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization
