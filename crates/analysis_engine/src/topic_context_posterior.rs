@@ -286,21 +286,19 @@ fn ordered_topic_ids(
     if bindings.len() != topic_count {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
-    let mut ordered = vec![None; topic_count];
+    let mut ordered = BTreeMap::new();
     let mut identities = BTreeSet::new();
     for binding in bindings {
         if binding.model_topic_index >= topic_count
-            || ordered[binding.model_topic_index].is_some()
+            || ordered
+                .insert(binding.model_topic_index, binding.topic_id)
+                .is_some()
             || !identities.insert(binding.topic_id)
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        ordered[binding.model_topic_index] = Some(binding.topic_id);
     }
-    ordered
-        .into_iter()
-        .collect::<Option<Vec<_>>>()
-        .ok_or(AnalysisEngineError::InvalidEvidence)
+    Ok(ordered.into_values().collect())
 }
 
 fn digest(value: &str) -> bool {
