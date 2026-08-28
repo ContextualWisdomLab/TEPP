@@ -200,6 +200,21 @@ pub fn assemble_topic_context_posterior(
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
+    let expected_transitions: BTreeSet<_> = input.transition_document_pairs().collect();
+    let supplied_transitions: BTreeSet<_> = document_relations
+        .iter()
+        .map(|relation| {
+            Ok((
+                Uuid::parse_str(&relation.source_document_id)
+                    .map_err(|_| AnalysisEngineError::InvalidEvidence)?,
+                Uuid::parse_str(&relation.target_document_id)
+                    .map_err(|_| AnalysisEngineError::InvalidEvidence)?,
+            ))
+        })
+        .collect::<Result<_, AnalysisEngineError>>()?;
+    if supplied_transitions != expected_transitions {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
     let precision = input.build_joint_coordinate_precision(model, config, topic_ids.clone())?;
     let draws = precision.draw_joint_gaussian(draw_seed, draw_count)?;
     let plausible_values = draws

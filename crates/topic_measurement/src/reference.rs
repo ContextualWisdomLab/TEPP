@@ -243,6 +243,13 @@ impl ReferenceTopicInput {
         self.document_ids.len()
     }
 
+    /// Return fitted forward-transition endpoints as document identities.
+    pub fn transition_document_pairs(&self) -> impl Iterator<Item = (Uuid, Uuid)> + '_ {
+        self.transition_pairs
+            .iter()
+            .map(|&(source, target)| (self.document_ids[source], self.document_ids[target]))
+    }
+
     /// Return the vocabulary size.
     #[must_use]
     pub const fn vocabulary_size(&self) -> usize {

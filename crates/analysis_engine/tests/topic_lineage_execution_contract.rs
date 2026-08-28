@@ -125,7 +125,7 @@ fn context_records(
             valid_to: "2026-08-01T00:00:00Z".into(),
         })
         .collect();
-    let relations = [(0, 1), (0, 2), (2, 3)]
+    let relations = [(0, 1), (1, 2), (2, 3)]
         .into_iter()
         .enumerate()
         .map(|(index, (source, target))| TopicDocumentRelation {
@@ -433,6 +433,27 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         "snapshot-topic-lineage",
         foreign_cutoff,
     );
+    let mut divergent_relations = relations.clone();
+    divergent_relations[1].source_document_id = ids[0].to_string();
+    assert_eq!(
+        assemble_topic_context_posterior(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &input,
+            &model,
+            &config,
+            topic_ids.clone(),
+            activity.clone(),
+            vec![],
+            divergent_relations,
+            memberships.clone(),
+            19,
+            3,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
     let artifact = assemble_topic_context_posterior(
         &request,
         &accepted,
@@ -464,7 +485,7 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
             .iter()
             .filter(|relation| relation.source_document_id == ids[0].to_string())
             .count(),
-        2
+        1
     );
     assert_eq!(artifact.posterior_draw_set_id.len(), 64);
     let json = artifact.to_json().expect("json");
