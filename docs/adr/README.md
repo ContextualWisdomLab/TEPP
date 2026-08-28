@@ -131,7 +131,6 @@ Use the narrowest owning ADR when decisions overlap:
 - **claim maturity / release evidence:** ADR 0014;
 - **autonomous development/review/merge authority:** ADR 0015;
 - **TDT/CHRONOS event intelligence:** ADR 0016;
-- **accepted-run execution and terminal artifact production:** ADR 0022.
 - **hourly proposal gateway and provider discovery:** ADR 0017.
 - **modular consumer admission / replay identity:** ADR 0018.
 - **project-history wire-size symmetry:** ADR 0019.
