@@ -307,16 +307,21 @@ def is_executable_source_line(
         character in text for character in "()="
     ):
         return False
-    if text.endswith("=> event"):
-        return False
     following = next(
         (candidate.strip() for candidate in lines[line_number:] if candidate.strip()),
         "",
     )
-    if following.startswith(".") and all(
-        character.isalnum() or character in "_:" for character in text
-    ) and _is_structural_comma_continuation(lines, line_number, f"{text},"):
-        return False
+    if following.startswith("."):
+        receiver = text.rsplit("=>", 1)[-1].strip()
+        if all(character.isalnum() or character in "_:" for character in receiver) and (
+            (
+                "=>" in text
+                and " if " not in text
+                and not _is_multiline_match_guard(lines, line_number)
+            )
+            or _is_structural_comma_continuation(lines, line_number, f"{text},")
+        ):
+            return False
     return True
 
 

@@ -1121,6 +1121,7 @@ class CoverageContractTests(unittest.TestCase):
 
             self.assertFalse(coverage_contract.is_executable_source_line(path, 3))
             self.assertTrue(coverage_contract.is_executable_source_line(path, 5))
+
             self.assertTrue(coverage_contract.is_executable_source_line(path, 7))
             self.assertTrue(coverage_contract.is_executable_source_line(path, 8))
 
@@ -1479,6 +1480,27 @@ class CoverageContractTests(unittest.TestCase):
             self.assertTrue(
                 coverage_contract.is_executable_source_line(str(source), 2)
             )
+
+    def test_match_receiver_filter_is_structural_not_identifier_specific(self) -> None:
+        """Only a simple match receiver continued by a method chain is structural."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "match_receiver.rs"
+            source.write_text(
+                "Some(item) => item\n    .method(),\nSome(item) => item\nSome(item) => build_item()\nSome(item) if authorize(item) => item\n    .method(),\n",
+                encoding="utf-8",
+            )
+            path = str(source)
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 1))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 3))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 4))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 5))
+
+            source.write_text(
+                "Some(item)\nif authorize(item)\n=> item\n    .method(),\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 3))
 
     def test_multiline_string_scanner_handles_escaped_char_and_past_eof(self) -> None:
         """Escaped char literals keep later lines classified; past-EOF is closed."""
