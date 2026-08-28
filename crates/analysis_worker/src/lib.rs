@@ -368,7 +368,7 @@ fn publish_execution<S: AnalysisWorkerStore>(
             system_time: completed_system,
             available_time: completed_available,
         };
-        let artifact_record = model_artifact_from_analysis_result(
+        let artifact_record = worker_artifact_record(
             tenant_record_id,
             model_run.model_run_id,
             &execution.terminal_result,
@@ -395,6 +395,25 @@ fn publish_execution<S: AnalysisWorkerStore>(
     })
 }
 
+fn worker_artifact_record(
+    tenant_record_id: Uuid,
+    model_run_id: Uuid,
+    result: &tepp_api::AnalysisRunTerminalResult,
+    protected_object_ref: Option<String>,
+    system_time: SystemTime,
+    available_time: AvailableTime,
+) -> Result<persistence_postgres::ModelArtifactRecord, AnalysisWorkerError> {
+    model_artifact_from_analysis_result(
+        tenant_record_id,
+        model_run_id,
+        result,
+        protected_object_ref,
+        system_time,
+        available_time,
+    )
+    .map_err(AnalysisWorkerError::from)
+}
+
 impl From<PersistenceError> for AnalysisWorkerError {
     fn from(_: PersistenceError) -> Self {
         Self::ExecutionFailed
@@ -406,6 +425,7 @@ mod tests {
     use super::{
         AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES,
         WORKER_INPUT_CONTRACT_VERSION, WorkerEvidenceUnit, WorkerRuntimeIdentity, execute_one,
+        publish_execution, worker_artifact_record,
     };
     use persistence_postgres::{
         AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError,
@@ -681,6 +701,60 @@ mod tests {
             AnalysisWorkerError::from(PersistenceError::SqlExecutionFailed),
             AnalysisWorkerError::ExecutionFailed
         );
+        let failed = snapshot("failed")
+            .status
+            .terminal_result
+            .expect("terminal result");
+        assert_eq!(
+            worker_artifact_record(
+                Uuid::nil(),
+                Uuid::nil(),
+                &failed,
+                None,
+                SystemTime::parse_rfc3339("2026-01-04T00:00:00Z").expect("system"),
+                AvailableTime::parse_rfc3339("2026-01-04T00:00:00Z").expect("available"),
+            ),
+            Err(AnalysisWorkerError::ExecutionFailed)
+        );
+    }
+
+    #[test]
+    fn inconsistent_engine_artifact_and_terminal_result_fail_before_publication() {
+        let input = input();
+        let mut store = FakeStore::new("accepted", &input);
+        let request_record = store.snapshot.request_record.clone();
+        let accepted = request_record.accepted().expect("receipt");
+        let completed_system = SystemTime::parse_rfc3339("2026-01-04T00:00:00Z").expect("system");
+        let completed_available =
+            AvailableTime::parse_rfc3339("2026-01-04T00:00:00Z").expect("available");
+        let mut execution = analysis_engine::execute_analysis_run(
+            &request_record.request,
+            &accepted,
+            &input.corpus().expect("corpus"),
+            "2026-01-04T00:00:00Z",
+        )
+        .expect("execution");
+        execution.terminal_result = AnalysisRunTerminalResult::failed(
+            &request_record.request,
+            &accepted,
+            "2026-01-04T00:00:00Z",
+            "invalid_engine_result",
+        )
+        .expect("failed result");
+        let manifest = store.manifest.clone();
+        let result = publish_execution(
+            &mut store,
+            Uuid::nil(),
+            request_record.analysis_run_id,
+            &request_record,
+            &manifest,
+            AvailableTime::parse_rfc3339("2026-01-03T00:00:00Z").expect("cutoff"),
+            completed_system,
+            completed_available,
+            execution,
+        );
+        assert_eq!(result, Err(AnalysisWorkerError::ExecutionFailed));
+        assert!(store.transactions.is_empty());
     }
 
     #[test]
@@ -739,6 +813,24 @@ mod tests {
         assert_eq!(
             run(&mut unsupported, &input),
             Err(AnalysisWorkerError::UnsupportedRequest)
+        );
+        let mut unsupported_model = FakeStore::new("accepted", &input);
+        unsupported_model
+            .snapshot
+            .request_record
+            .request
+            .model_contract_version = "other".into();
+        assert_eq!(
+            run(&mut unsupported_model, &input),
+            Err(AnalysisWorkerError::UnsupportedRequest)
+        );
+
+        let mut mismatched_source = input.clone();
+        mismatched_source.source_snapshot_sha256 = "f".repeat(64);
+        let mut store = FakeStore::new("accepted", &input);
+        assert_eq!(
+            run(&mut store, &mismatched_source),
+            Err(AnalysisWorkerError::InvalidInput)
         );
 
         let mutations: [fn(&mut FakeStore); 5] = [
