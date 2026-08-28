@@ -1931,48 +1931,9 @@ pub fn refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_v
 /// `q / p = −2 a` is the continuous-diffusion ratio and is not this
 /// correlation. `TIPREDVARstd` `v / v = 1` recovers the same number
 /// and remains a distinct named quantity. This crate does not
-/// currently export `DIFFUSIONstd` or `TIPREDVARstd`; the refuse
-/// still names those quantities. This is not a Kalman filter, not a
-/// matrix `expm`, not DSEM, and not ctsem estimation.
-/// Exact scalar p. 16 `TRAITVARstd` after strictly positive `TRAITVAR`.
-///
-/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; §7.1, pp. 18–19;
-/// p. 16; footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
-/// re-opened 2026-08-26T17:45Z from
-/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
-/// name `TRAITVAR` `φ_ξ` the latent trait variance/covariance.
-/// Table 2 sets it `NULL` when there is no trait variance.
-/// Section 7.1 names traits the stable between-subject differences
-/// (unit-level unobserved heterogeneity) and estimates `φ_ξ` of the
-/// intercepts `ξ` across individuals. Page 16 prints standardised
-/// matrices with the suffix `std` when appropriate. The printed
-/// example on p. 16 is `discreteDRIFTstd`, not `TRAITVARstd`.
-/// Footnote 4: standardisations use only the relevant variance, not
-/// the total. The relevant variance for that named between-subject
-/// correlation is `TRAITVAR`, not free first-occasion `T0VAR` and
-/// not process-dynamics `asymDIFFUSION`. The 2017-era
-/// `summary.ctsemFit.R` forms `TRAITVARstd` only when
-/// `TRAITVAR != 0`, as `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR`
-/// when `verbose = TRUE`. `OpenMx` `%&%` is the quadratic form
-/// `t(A) %*% B %*% A`. Unlike `T0VARstd`, that formation uses
-/// `diag(diag(TRAITVAR))` and does not add `diag(c(ridging))`. The
-/// ridge is a `T0VAR` numerical hack and is not this exact map. The
-/// scalar correlation is `trait / trait = 1` after strictly
-/// positive `TRAITVAR`. Form strictly positive `trait` first, then
-/// `1 / √trait`, then `(1 / √trait) trait (1 / √trait)`.
-/// Unstandardised `TRAITVAR` is defined for a zero trait;
-/// standardised `TRAITVAR` is not. Zero `TRAITVAR` skips forming
-/// `TRAITVARstd` in the 2017-era source and fails closed here.
-/// Between-subject variance is an event-time structural quantity,
-/// so a non-event clock fails closed. `TRAITVAR` does not require
-/// stable `a < 0`. Distinct positive `trait` recover the same 1.
-/// `T0VARstd` `p_0 / p_0 = 1` recovers the same number and remains
-/// a distinct named quantity. This crate already exports
-/// `T0VARstd`. `addedT0TIPREDVAR` `t0_b² v` is extra first-occasion
-/// TI variance, not this correlation. This crate does not currently
-/// export `addedT0TIPREDVAR`; the refuse still names that quantity.
-/// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
-/// not ctsem estimation.
+/// currently export `DIFFUSIONstd`; the refuse still names that
+/// quantity. This is not a Kalman filter, not a matrix `expm`, not
+/// DSEM, and not ctsem estimation.
 ///
 /// # Errors
 ///
@@ -2002,15 +1963,13 @@ pub fn recover_standardised_asymptotic_diffusion(
     require_finite(scaled * inverse_sd)
 }
 
-/// Exact scalar p. 16 `TIPREDVARstd` after strictly positive
-/// `TIPREDVAR`.
+/// Exact scalar p. 16 `TRAITVARstd` after strictly positive `TRAITVAR`.
 ///
-/// Unstandardised `v` is defined for a zero predictor. Footnote 4
-/// `TIPREDVARstd` requires strictly positive `TIPREDVAR`.
-/// [`PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance`]
-/// when `TRAITVAR` is zero, and
-/// [`PsychometricError::InvalidNumericInput`] when the variance is
-/// non-finite, negative, or the quadratic form overflows.
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; §7.1, pp. 18–19;
+/// p. 16; footnote 4) define `TRAITVAR` as between-subject latent
+/// trait variance. Its scalar correlation map is `trait / trait = 1`.
+/// This remains distinct from free first-occasion `T0VAR`, process
+/// `asymDIFFUSION`, and predictor `TIPREDVAR`.
 ///
 /// # Errors
 ///
@@ -2037,11 +1996,11 @@ pub fn recover_standardised_trait_variance(
     require_finite(scaled * inverse_sd)
 }
 
-/// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
+/// Refuse treating unstandardised `asymDIFFUSION` as p. 16
+/// `asymDIFFUSIONstd`.
 ///
-/// Unstandardised `TRAITVAR` is defined for a zero trait. Footnote
-/// 4 `TRAITVARstd` requires strictly positive `TRAITVAR`. Equal
-/// numbers when `trait = 1` are still distinct named quantities.
+/// The stationary process variance and its correlation form are
+/// distinct quantities even when their scalar values coincide.
 ///
 /// # Errors
 ///
@@ -2058,14 +2017,10 @@ pub fn refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_dif
     Err(PsychometricError::UnstandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticDiffusion)
 }
 
-/// Refuse treating p. 16 `T0VARstd` as p. 16 `asymDIFFUSIONstd`.
+/// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 ///
-/// Both scalar maps equal 1 after a strictly positive relevant
-/// variance. `asymDIFFUSIONstd` is the correlation form of
-/// process-dynamics `asymDIFFUSION`. `T0VARstd` is the correlation
-/// form of free first-occasion `T0VAR`. Equal numbers remain
-/// distinct named quantities.
-/// [`PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance`].
+/// Between-subject trait variance and its correlation form are
+/// distinct quantities even when their scalar values coincide.
 ///
 /// # Errors
 ///
@@ -2078,12 +2033,10 @@ pub fn refuse_unstandardised_trait_variance_as_standardised_trait_variance(
     Err(PsychometricError::UnstandardisedTraitVarianceIsNotStandardisedTraitVariance)
 }
 
-/// Refuse treating p. 16 `T0VARstd` as p. 16 `TRAITVARstd`.
+/// Refuse treating p. 16 `T0VARstd` as p. 16 `asymDIFFUSIONstd`.
 ///
-/// Both scalar correlations equal 1 after strictly positive
-/// variances. `T0VARstd` standardises free first-occasion `T0VAR`.
-/// `TRAITVARstd` standardises between-subject `TRAITVAR`. Equal
-/// numbers remain distinct named quantities.
+/// First-occasion variance and stationary process variance are
+/// distinct named quantities even when both correlations equal 1.
 ///
 /// # Errors
 ///
@@ -2124,16 +2077,10 @@ pub fn refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffu
     Err(PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion)
 }
 
-/// Refuse treating p. 16 `TIPREDVARstd` as p. 16
-/// `asymDIFFUSIONstd`.
+/// Refuse treating p. 16 `T0VARstd` as p. 16 `TRAITVARstd`.
 ///
-/// Both scalar maps equal 1 after a strictly positive relevant
-/// variance. `asymDIFFUSIONstd` is the correlation form of
-/// process-dynamics `asymDIFFUSION`. `TIPREDVARstd` is the
-/// correlation form of `TIPREDVAR`. Equal numbers remain distinct
-/// named quantities. This crate does not currently export
-/// `TIPREDVARstd`; the refuse still names that quantity.
-/// [`PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance`].
+/// First-occasion variance and stable between-subject trait variance
+/// are distinct named quantities even when both correlations equal 1.
 ///
 /// # Errors
 ///
@@ -2146,12 +2093,11 @@ pub fn refuse_standardised_initial_latent_variance_as_standardised_trait_varianc
     Err(PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedTraitVariance)
 }
 
-/// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
+/// Refuse treating p. 16 `TIPREDVARstd` as p. 16
+/// `asymDIFFUSIONstd`.
 ///
-/// `t0_b² v` is extra first-occasion TI variance. `TRAITVARstd` is
-/// the correlation form of between-subject `TRAITVAR`. Those are
-/// not the same map. This crate does not currently export
-/// `addedT0TIPREDVAR`; the refuse still names that quantity.
+/// Predictor variance and stationary process variance are distinct
+/// named quantities even when both correlations equal 1.
 ///
 /// # Errors
 ///
@@ -2179,6 +2125,7 @@ pub fn refuse_standardised_time_independent_predictor_variance_as_standardised_a
 /// The scalar map is exactly `v / v = 1`. Unstandardised `v` is
 /// defined for a zero predictor, but `TIPREDVARstd` requires a
 /// strictly positive `TIPREDVAR`.
+///
 /// # Errors
 ///
 /// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock,
@@ -2212,7 +2159,6 @@ pub fn recover_standardised_time_independent_predictor_variance(
 ///
 /// Both scalar maps equal 1 after a strictly positive relevant
 /// variance. Equal numbers remain distinct named quantities.
-/// [`PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
 ///
 /// # Errors
 ///
@@ -2235,7 +2181,6 @@ pub fn refuse_unstandardised_time_independent_predictor_variance_as_standardised
 ///
 /// Both scalar maps equal 1 after a strictly positive relevant
 /// variance. Equal numbers remain distinct named quantities.
-/// [`PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
 ///
 /// # Errors
 ///
