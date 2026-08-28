@@ -9,7 +9,8 @@ use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 use topic_measurement::{
-    ReferenceTopicInput, ReferenceTopicModelConfig, fit_reference_topic_model,
+    ReferenceTopicInput, ReferenceTopicModelConfig, TopicMeasurementError,
+    fit_reference_topic_model,
 };
 use uuid::Uuid;
 
@@ -165,8 +166,8 @@ impl TopicLineageArtifact {
 /// One completed topic-lineage artifact and its request-bound terminal result.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TopicLineageExecution {
-    /// Digest-bound completed model artifact.
-    pub artifact: TopicLineageArtifact,
+    /// Digest-bound completed model artifact, absent for scientific failure.
+    pub artifact: Option<TopicLineageArtifact>,
     /// Terminal result carrying the artifact identity, digest, and schema.
     pub terminal_result: AnalysisRunTerminalResult,
 }
@@ -204,7 +205,22 @@ pub fn execute_topic_lineage_run(
         return Err(AnalysisEngineError::InvalidEvidence);
     }
 
-    let model = fit_reference_topic_model(input, config)?;
+    let completed_at = completed_at.into();
+    let model = match fit_reference_topic_model(input, config) {
+        Ok(model) => model,
+        Err(TopicMeasurementError::DidNotConverge) => {
+            return Ok(TopicLineageExecution {
+                artifact: None,
+                terminal_result: AnalysisRunTerminalResult::failed(
+                    request,
+                    accepted,
+                    completed_at,
+                    "topic_model_did_not_converge",
+                )?,
+            });
+        }
+        Err(error) => return Err(error.into()),
+    };
     let topic_count = u64::try_from(model.topic_term_probabilities.len())
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let evidence_count = u64::try_from(input.document_count())
@@ -265,7 +281,7 @@ pub fn execute_topic_lineage_run(
     );
     let terminal_result = terminal_result?;
     Ok(TopicLineageExecution {
-        artifact,
+        artifact: Some(artifact),
         terminal_result,
     })
 }

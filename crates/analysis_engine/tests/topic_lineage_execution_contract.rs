@@ -134,21 +134,22 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         "2026-08-02T00:00:00Z",
     )
     .expect("execution");
+    let artifact = execution.artifact.as_ref().expect("artifact");
 
     assert_eq!(
-        execution.artifact.schema_version,
+        artifact.schema_version,
         TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION
     );
-    assert_eq!(execution.artifact.connected_post_count, 4);
-    assert_eq!(execution.artifact.lineage_count, 2);
-    assert_eq!(execution.artifact.sequence_edges.len(), 2);
+    assert_eq!(artifact.connected_post_count, 4);
+    assert_eq!(artifact.lineage_count, 2);
+    assert_eq!(artifact.sequence_edges.len(), 2);
     assert_eq!(
         execution.terminal_result.run_state,
         AnalysisRunTerminalState::Succeeded
     );
     assert_eq!(
         execution.terminal_result.result_sha256.as_deref(),
-        Some(execution.artifact.sha256().expect("digest").as_str())
+        Some(artifact.sha256().expect("digest").as_str())
     );
     assert_eq!(
         execution.terminal_result.result_schema_version.as_deref(),
@@ -161,7 +162,7 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
             .as_deref()
             .is_some_and(|value| Uuid::parse_str(value).is_ok())
     );
-    assert!(execution.artifact.to_json().is_ok());
+    assert!(artifact.to_json().is_ok());
 }
 
 #[test]
@@ -228,18 +229,23 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+    let execution = execute_topic_lineage_run(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input,
+        &config,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("scientific terminal failure");
+    assert!(execution.artifact.is_none());
     assert_eq!(
-        execute_topic_lineage_run(
-            &request,
-            &accepted,
-            "snapshot-topic-lineage",
-            cutoff,
-            &input,
-            &config,
-            "2026-08-02T00:00:00Z",
-        ),
-        Err(AnalysisEngineError::TopicMeasurement(
-            topic_measurement::TopicMeasurementError::DidNotConverge
-        ))
+        execution.terminal_result.run_state,
+        AnalysisRunTerminalState::Failed
+    );
+    assert_eq!(
+        execution.terminal_result.failure_code.as_deref(),
+        Some("topic_model_did_not_converge")
     );
 }

@@ -469,13 +469,14 @@ impl PreparedWorkerInput {
                     completed_at.to_owned(),
                 )
                 .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
+                let artifact_json = execution
+                    .artifact
+                    .as_ref()
+                    .map(analysis_engine::TopicLineageArtifact::to_json)
+                    .transpose()
+                    .map_err(|_| AnalysisWorkerError::ExecutionFailed)?;
                 Ok(PreparedExecution {
-                    artifact_json: Some(
-                        execution
-                            .artifact
-                            .to_json()
-                            .map_err(|_| AnalysisWorkerError::ExecutionFailed)?,
-                    ),
+                    artifact_json,
                     terminal_result: execution.terminal_result,
                     configuration_digest,
                     random_seed_manifest_digest,
@@ -980,6 +981,27 @@ mod tests {
         assert_eq!(store.executed.len(), 1);
         assert_eq!(store.transactions.len(), 1);
         assert_eq!(store.transactions[0].len(), 3);
+
+        let mut nonconverging_input = input.clone();
+        nonconverging_input.model.maximum_iterations = 2;
+        nonconverging_input.model.tolerance = 1e-12;
+        nonconverging_input.scientific_input_sha256 = nonconverging_input
+            .scientific_digest()
+            .expect("scientific digest");
+        let mut store = FakeStore::new_topic(&nonconverging_input);
+        let run_id = store.snapshot.request_record.analysis_run_id;
+        let outcome = execute_topic_lineage_one(
+            &mut store,
+            Uuid::nil(),
+            run_id,
+            &nonconverging_input,
+            &identity(),
+            "2026-08-02T00:00:00Z",
+        )
+        .expect("scientific terminal failure");
+        assert_eq!(outcome.status.run_state, AnalysisRunStatusState::Failed);
+        assert!(outcome.artifact_json.is_none());
+        assert_eq!(store.transactions[0].len(), 1);
     }
 
     #[test]
