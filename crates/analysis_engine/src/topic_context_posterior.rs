@@ -158,6 +158,8 @@ pub struct TopicContextPosteriorArtifact {
     pub topic_count: u64,
     /// Stable topic identities in logistic-normal coordinate order.
     pub topic_ids: Vec<String>,
+    /// Digest binding the draw-set identity to the ordered fitted topic basis.
+    pub topic_basis_sha256: String,
     /// Explicit topic-state intervals.
     pub activity_intervals: Vec<TopicActivityInterval>,
     /// Explicit topic lineage events, when present.
@@ -256,6 +258,7 @@ pub fn assemble_topic_context_posterior(
             logistic_normal_coordinates: value.logistic_normal_coordinates,
         })
         .collect();
+    let topic_ids: Vec<_> = fitted_topic_ids.iter().map(Uuid::to_string).collect();
     let artifact = TopicContextPosteriorArtifact {
         schema_version: TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION.into(),
         run_id: accepted.run_id.clone(),
@@ -269,7 +272,8 @@ pub fn assemble_topic_context_posterior(
             .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
         topic_count: u64::try_from(fitted_topic_ids.len())
             .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
-        topic_ids: fitted_topic_ids.iter().map(Uuid::to_string).collect(),
+        topic_basis_sha256: topic_basis_binding(draws.draw_set_id(), &topic_ids),
+        topic_ids,
         activity_intervals,
         lineage_events,
         document_relations,
@@ -321,6 +325,13 @@ fn provenance_binding(fields: &[&[u8]]) -> String {
         digest.update(field);
     }
     format_digest(digest.finalize())
+}
+
+fn topic_basis_binding(draw_set_id: &str, topic_ids: &[String]) -> String {
+    let mut fields = Vec::with_capacity(topic_ids.len() + 1);
+    fields.push(draw_set_id.as_bytes());
+    fields.extend(topic_ids.iter().map(String::as_bytes));
+    provenance_binding(&fields)
 }
 
 fn time(value: &str) -> Option<KnowledgeCutoff> {
@@ -486,6 +497,9 @@ impl TopicContextPosteriorArtifact {
             canonical_time(&self.knowledge_cutoff).ok_or(AnalysisEngineError::InvalidEvidence)?;
         let topic_ids: BTreeSet<&str> = self.topic_ids.iter().map(String::as_str).collect();
         if topic_ids.len() != self.topic_ids.len()
+            || !digest(&self.topic_basis_sha256)
+            || self.topic_basis_sha256
+                != topic_basis_binding(&self.posterior_draw_set_id, &self.topic_ids)
             || self
                 .topic_ids
                 .iter()
@@ -795,7 +809,8 @@ mod tests {
     use super::{
         ENTRY_LIMIT, TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
         TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
-        TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue, within_entry_limits,
+        TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue, topic_basis_binding,
+        within_entry_limits,
     };
 
     macro_rules! invalid {
@@ -811,6 +826,10 @@ mod tests {
             "018f3f7a-7b7c-7d00-8000-000000000001",
             "018f3f7a-7b7c-7d00-8000-000000000002",
         ];
+        let topic_ids = vec![
+            "018f3f7a-7b7c-7d00-8000-000000000101".into(),
+            "018f3f7a-7b7c-7d00-8000-000000000102".into(),
+        ];
         TopicContextPosteriorArtifact {
             schema_version: TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION.into(),
             run_id: "run-1".into(),
@@ -822,10 +841,8 @@ mod tests {
             posterior_draw_set_id: "draw-set-1".into(),
             posterior_draw_count: 2,
             topic_count: 2,
-            topic_ids: vec![
-                "018f3f7a-7b7c-7d00-8000-000000000101".into(),
-                "018f3f7a-7b7c-7d00-8000-000000000102".into(),
-            ],
+            topic_basis_sha256: topic_basis_binding("draw-set-1", &topic_ids),
+            topic_ids,
             activity_intervals: [
                 "018f3f7a-7b7c-7d00-8000-000000000101",
                 "018f3f7a-7b7c-7d00-8000-000000000102",
@@ -961,14 +978,24 @@ mod tests {
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.event_clock_code.clear());
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.model_contract_version.clear());
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.posterior_draw_set_id.clear());
+        invalid!(
+            |value: &mut TopicContextPosteriorArtifact| value.posterior_draw_set_id =
+                "draw-set-2".into()
+        );
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.posterior_draw_count = 0);
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_count = 1);
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_ids.pop());
-        invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_ids[0].clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_basis_sha256.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.topic_ids[0].clear();
+            value.topic_basis_sha256 =
+                topic_basis_binding(&value.posterior_draw_set_id, &value.topic_ids);
+        });
         invalid!(
             |value: &mut TopicContextPosteriorArtifact| value.topic_ids[1] =
                 value.topic_ids[0].clone()
         );
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_ids.swap(0, 1));
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.inference_status.clear());
         assert!(within_entry_limits([ENTRY_LIMIT; 5], ENTRY_LIMIT));
         assert!(!within_entry_limits(

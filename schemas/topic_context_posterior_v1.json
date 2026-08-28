@@ -5,7 +5,7 @@
   "$comment": "This schema validates record shapes. Cross-record completeness (distinct documents, complete document-by-draw grids, and four time-covering membership dimensions per document) is normative Rust domain validation because JSON Schema cannot express those joins without duplicating document identities.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "snapshot_id", "source_snapshot_sha256", "knowledge_cutoff", "event_clock_code", "model_contract_version", "posterior_draw_set_id", "posterior_draw_count", "topic_count", "topic_ids", "activity_intervals", "lineage_events", "document_relations", "plausible_values", "memberships", "inference_status"],
+  "required": ["schema_version", "run_id", "snapshot_id", "source_snapshot_sha256", "knowledge_cutoff", "event_clock_code", "model_contract_version", "posterior_draw_set_id", "posterior_draw_count", "topic_count", "topic_ids", "topic_basis_sha256", "activity_intervals", "lineage_events", "document_relations", "plausible_values", "memberships", "inference_status"],
   "properties": {
     "schema_version": { "const": "tepp.topic_context_posterior.v1" },
     "run_id": { "$ref": "#/$defs/identifier" },
@@ -18,6 +18,7 @@
     "posterior_draw_count": { "$ref": "#/$defs/positive_u64" },
     "topic_count": { "$ref": "#/$defs/topic_count" },
     "topic_ids": { "type": "array", "minItems": 2, "maxItems": 1000000, "uniqueItems": true, "items": { "type": "string", "format": "uuid" } },
+    "topic_basis_sha256": { "$ref": "#/$defs/digest" },
     "activity_intervals": { "type": "array", "maxItems": 1000000, "items": { "$ref": "#/$defs/activity" } },
     "lineage_events": { "type": "array", "maxItems": 1000000, "items": { "$ref": "#/$defs/lineage" } },
     "document_relations": { "type": "array", "maxItems": 1000000, "items": { "$ref": "#/$defs/document_relation" } },
