@@ -295,10 +295,12 @@ def is_executable_source_line(
     if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
     if text in {"} else {", "else {", "));"} or text.startswith(
-        (".", "||", "&&", "/")
+        (".", "||", "&&")
     ):
         return False
-    if text.startswith("*") and "=" not in text:
+    if text.startswith(("/", "*")) and not any(
+        character in text for character in "()="
+    ):
         return False
     if text.endswith("=> event"):
         return False
@@ -329,6 +331,9 @@ def _is_structural_comma_continuation(
     parameter, or ordinary call argument. Operators, calls, and assignments
     remain executable because their expressions can perform observable work.
     """
+
+    if any(character in text for character in "()=+-*/%<>!&|?"):
+        return False
 
     previous = ""
     for candidate in reversed(lines[: line_number - 1]):

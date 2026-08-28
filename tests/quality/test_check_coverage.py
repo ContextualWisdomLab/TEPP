@@ -1277,15 +1277,38 @@ class CoverageContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "split.rs"
             source.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            for line_number in (1, 2, 5, 6, 9, 11, 12, 13):
+            for line_number in (1, 2, 6, 9, 11, 12, 13):
                 self.assertFalse(
                     coverage_contract.is_executable_source_line(
                         str(source), line_number
                     )
                 )
             self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 5)
+            )
+            self.assertTrue(
                 coverage_contract.is_executable_source_line(str(source), 17)
             )
+
+    def test_line_filter_keeps_observable_nested_expressions(self) -> None:
+        """Structural-depth handling cannot hide calls inside expressions."""
+
+        cases = {
+            "array_call": "fn f() {\n let x = [\n  side_effect(),\n ];\n}\n",
+            "tuple_call": "fn f() {\n let x = (\n  side_effect(),\n );\n}\n",
+            "struct_call": "fn f() {\n let x = Item {\n  field: side_effect(),\n };\n}\n",
+            "division_call": "fn f(a: f64) {\n let x = a\n  / denominator();\n}\n",
+            "multiplication_call": "fn f(a: f64) {\n let x = a\n  * multiplier();\n}\n",
+            "array_block_call": "fn f() {\n let x = [\n  { side_effect(); 1 },\n ];\n}\n",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            for name, source_text in cases.items():
+                with self.subTest(name=name):
+                    source = Path(temporary) / f"{name}.rs"
+                    source.write_text(source_text, encoding="utf-8")
+                    self.assertTrue(
+                        coverage_contract.is_executable_source_line(str(source), 3)
+                    )
 
     def test_line_filter_keeps_inline_functions_and_block_comment_followers(self) -> None:
         """Inline function bodies and code after quoted block comments stay visible."""
