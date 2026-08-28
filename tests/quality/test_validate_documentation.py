@@ -566,6 +566,48 @@ class AdrIdentityTests(unittest.TestCase):
                 ):
                     documentation.validate_adr_graph()
 
+    def test_adr_heading_must_match_filename_number(self) -> None:
+        """A unique filename cannot conceal a duplicate semantic ADR identity."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0026](0026-current.md) | Current | Accepted | partial | note |\n",
+                encoding="utf-8",
+            )
+            (adr_root / "0026-current.md").write_text(
+                "# ADR 0025: Duplicate identity\n",
+                encoding="utf-8",
+            )
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError, "ADR 0026 heading does not match its filename"
+                ):
+                    documentation.validate_adr_graph()
+
+    def test_adr_index_target_must_match_numbered_file(self) -> None:
+        """The displayed ADR number cannot link to a different decision file."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0026](0025-existing.md) | Current | Accepted | partial | note |\n",
+                encoding="utf-8",
+            )
+            (adr_root / "0026-current.md").write_text(
+                "# ADR 0026: Current identity\n",
+                encoding="utf-8",
+            )
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError, "ADR 0026 index target does not match 0026-current.md"
+                ):
+                    documentation.validate_adr_graph()
+
 
 if __name__ == "__main__":
     unittest.main()
