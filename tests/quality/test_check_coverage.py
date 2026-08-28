@@ -1519,6 +1519,11 @@ class CoverageContractTests(unittest.TestCase):
     def test_structural_comma_continuation_edge_cases(self) -> None:
         """Exercise structural comma continuation detection edge branches."""
 
+        self.assertFalse(
+            coverage_contract._is_structural_comma_continuation(
+                [], 1, ".side_effect(),"
+            )
+        )
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "commas.rs"
             # A comma-terminated line whose preceding lines are entirely blank
