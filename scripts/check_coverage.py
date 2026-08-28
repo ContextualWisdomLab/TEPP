@@ -294,6 +294,8 @@ def is_executable_source_line(
         return False
     if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
+    if text.endswith(",") and _has_executable_comma_syntax(text):
+        return True
     if text in {"} else {", "else {", "));"} or text.startswith(
         (".", "||", "&&")
     ):
@@ -322,6 +324,12 @@ def is_executable_source_line(
     return True
 
 
+def _has_executable_comma_syntax(text: str) -> bool:
+    """Return whether a comma line contains expression-only syntax."""
+
+    return any(character in text for character in ".()[]=+-*/%<>!&|?")
+
+
 def _is_structural_comma_continuation(
     lines: list[str], line_number: int, text: str
 ) -> bool:
@@ -333,7 +341,7 @@ def _is_structural_comma_continuation(
     denominator; every other comma-terminated line remains executable.
     """
 
-    if any(character in text for character in "()=+-*/%<>!&|?"):
+    if _has_executable_comma_syntax(text):
         return False
 
     previous = ""
@@ -499,6 +507,7 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 ('"', "r\"", "r#", "br\"", "br#")
             )
     return False
+
 
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""

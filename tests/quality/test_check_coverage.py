@@ -1300,6 +1300,10 @@ class CoverageContractTests(unittest.TestCase):
             "division_call": "fn f(a: f64) {\n let x = a\n  / denominator();\n}\n",
             "multiplication_call": "fn f(a: f64) {\n let x = a\n  * multiplier();\n}\n",
             "array_block_call": "fn f() {\n let x = [\n  { side_effect(); 1 },\n ];\n}\n",
+            "dot_call": "fn f() {\n let x = [value\n  .side_effect(),\n ];\n}\n",
+            "dot_await": "fn f() {\n let x = [future\n  .await,\n ];\n}\n",
+            "indexed_value": "fn f() {\n let x = [\n  values[index],\n ];\n}\n",
+            "dereference": "fn f() {\n let x = [\n  *pointer,\n ];\n}\n",
         }
         with tempfile.TemporaryDirectory() as temporary:
             for name, source_text in cases.items():
@@ -1309,6 +1313,25 @@ class CoverageContractTests(unittest.TestCase):
                     self.assertTrue(
                         coverage_contract.is_executable_source_line(str(source), 3)
                     )
+
+    def test_lcov_keeps_uncovered_dot_call_in_authored_denominator(self) -> None:
+        """An uncovered chained call cannot pass as structural punctuation."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "src.rs"
+            source.write_text(
+                "fn f() {\n value\n  .side_effect(),\n covered();\n}\n",
+                encoding="utf-8",
+            )
+            report = self.write_lcov(
+                temporary,
+                "SF:src.rs\nDA:3,0\nDA:4,1\nend_of_record\n",
+            )
+            self.assertEqual(
+                coverage_contract.load_lcov_line_totals(report, root),
+                {"lines": {"count": 2, "covered": 1}},
+            )
 
     def test_line_filter_keeps_inline_functions_and_block_comment_followers(self) -> None:
         """Inline function bodies and code after quoted block comments stay visible."""
