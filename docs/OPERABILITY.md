@@ -79,6 +79,12 @@ membership counts. The worker emits only canonical artifact JSON or the prior
 terminal status. It is not a scheduler, daemon, lease manager, or protected
 object uploader.
 
+Schedulers consume the process exit contract: `0` means completed or terminal
+no-op, `64` means a permanent invocation/input/configuration rejection, and
+`75` means retryable lock contention or infrastructure failure. Standard error
+contains only the matching redacted disposition; retry policy and jitter remain
+owned by the scheduler.
+
 ## Model release/cutover
 
 A model artifact is promoted only after convergence, posterior diagnostics, true-parameter/recovery benchmarks, invariance/fairness/language evidence, uncertainty/calibration, security/privacy, and reproducibility gates meet the versioned policy. Model-selection or LLM review disagreement can require human scientific review.
