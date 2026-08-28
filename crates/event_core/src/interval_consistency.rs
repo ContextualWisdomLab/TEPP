@@ -72,7 +72,7 @@ impl IntervalConsistencyNetwork {
             maximum_constraints,
             maximum_propagation_steps,
         )
-        .map_err(map_reasoner_error)?;
+        .map_err(|error| map_reasoner_error(&error))?;
         Ok(Self {
             reasoner: TemporalReasoner::with_limits(limits),
         })
@@ -85,7 +85,9 @@ impl IntervalConsistencyNetwork {
     /// Returns [`EventError::IntervalConsistencyLimitExceeded`] when the
     /// configured variable capacity is exhausted.
     pub fn add_variable(&mut self) -> Result<TemporalVariableId, EventError> {
-        self.reasoner.add_variable().map_err(map_reasoner_error)
+        self.reasoner
+            .add_variable()
+            .map_err(|error| map_reasoner_error(&error))
     }
 
     /// Assert a nonempty qualitative relation set for an ordered pair.
@@ -105,7 +107,7 @@ impl IntervalConsistencyNetwork {
     ) -> Result<ConstraintId, EventError> {
         self.reasoner
             .assert_relation(left, right, relations)
-            .map_err(map_reasoner_error)
+            .map_err(|error| map_reasoner_error(&error))
     }
 
     /// Classify two proper closed event-time intervals and assert that singleton.
@@ -122,18 +124,12 @@ impl IntervalConsistencyNetwork {
         left_interval: &TemporalInterval<EventTime>,
         right_interval: &TemporalInterval<EventTime>,
     ) -> Result<(AllenRelation, ConstraintId), EventError> {
-        let relation = classify_interval_relation(left_interval, right_interval).map_err(
-            |error| match error {
-                temporal_core::TemporalError::RelationRequiresProperBoundedInterval => {
-                    EventError::IntervalConsistencyRequiresProperBoundedInterval
-                }
-                _ => EventError::InvalidWirePayload,
-            },
-        )?;
+        let relation = classify_interval_relation(left_interval, right_interval)
+            .map_err(|error| map_interval_error(Some(error)))?;
         let constraint = self
             .reasoner
             .assert_relation(left, right, RelationSet::singleton(relation))
-            .map_err(map_reasoner_error)?;
+            .map_err(|error| map_reasoner_error(&error))?;
         Ok((relation, constraint))
     }
 
@@ -147,7 +143,10 @@ impl IntervalConsistencyNetwork {
     /// Returns contradiction or resource-limit errors. Success is not
     /// unrestricted global satisfiability.
     pub fn close(&mut self) -> Result<IntervalConsistencyReport, EventError> {
-        let report = self.reasoner.close().map_err(map_reasoner_error)?;
+        let report = self
+            .reasoner
+            .close()
+            .map_err(|error| map_reasoner_error(&error))?;
         Ok(from_closure_report(report))
     }
 
@@ -165,7 +164,7 @@ impl IntervalConsistencyNetwork {
         self.reasoner
             .relation(left, right)
             .map(|derived| derived.relations())
-            .map_err(map_reasoner_error)
+            .map_err(|error| map_reasoner_error(&error))
     }
 }
 
@@ -204,21 +203,43 @@ fn from_closure_report(report: ClosureReport) -> IntervalConsistencyReport {
     }
 }
 
-fn map_reasoner_error(error: TemporalReasonerError) -> EventError {
+fn map_interval_error(error: Option<temporal_core::TemporalError>) -> EventError {
     match error {
-        TemporalReasonerError::InvalidLimits => EventError::IntervalConsistencyInvalidLimits,
-        TemporalReasonerError::UnknownVariable => EventError::IntervalConsistencyUnknownVariable,
-        TemporalReasonerError::EmptyRelationSet => EventError::IntervalConsistencyEmptyRelationSet,
-        TemporalReasonerError::LimitExceeded(_) => EventError::IntervalConsistencyLimitExceeded,
-        TemporalReasonerError::Contradiction(_) => EventError::IntervalConsistencyContradiction,
-        _ => EventError::InvalidWirePayload,
+        Some(temporal_core::TemporalError::RelationRequiresProperBoundedInterval) => {
+            EventError::IntervalConsistencyRequiresProperBoundedInterval
+        }
+        None | Some(_) => EventError::InvalidWirePayload,
+    }
+}
+
+fn map_reasoner_error(error: &TemporalReasonerError) -> EventError {
+    map_optional_reasoner_error(Some(error))
+}
+
+fn map_optional_reasoner_error(error: Option<&TemporalReasonerError>) -> EventError {
+    match error {
+        Some(TemporalReasonerError::InvalidLimits) => EventError::IntervalConsistencyInvalidLimits,
+        Some(TemporalReasonerError::UnknownVariable) => {
+            EventError::IntervalConsistencyUnknownVariable
+        }
+        Some(TemporalReasonerError::EmptyRelationSet) => {
+            EventError::IntervalConsistencyEmptyRelationSet
+        }
+        Some(TemporalReasonerError::LimitExceeded(_)) => {
+            EventError::IntervalConsistencyLimitExceeded
+        }
+        Some(TemporalReasonerError::Contradiction(_)) => {
+            EventError::IntervalConsistencyContradiction
+        }
+        None | Some(_) => EventError::InvalidWirePayload,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        IntervalConsistencyNetwork, refuse_interval_consistency_as_unrestricted_satisfiability,
+        IntervalConsistencyNetwork, map_interval_error, map_optional_reasoner_error,
+        refuse_interval_consistency_as_unrestricted_satisfiability,
         refuse_interval_contradiction_as_instance,
     };
     use crate::EventError;
@@ -424,6 +445,28 @@ mod tests {
         assert_eq!(
             tight.close().map(|_| ()),
             Err(EventError::IntervalConsistencyLimitExceeded)
+        );
+
+        let mut quantitative =
+            IntervalConsistencyNetwork::with_limits(2, 1, 8).expect("quantitative");
+        let left = quantitative.add_variable().expect("left");
+        let right = quantitative.add_variable().expect("right");
+        let early = closed("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
+        let late = closed("2026-01-03T00:00:00Z", "2026-01-04T00:00:00Z");
+        quantitative
+            .assert_quantitative_allen_relation(left, right, &early, &late)
+            .expect("first quantitative constraint");
+        assert_eq!(
+            quantitative
+                .assert_quantitative_allen_relation(left, right, &early, &late)
+                .map(|_| ()),
+            Err(EventError::IntervalConsistencyLimitExceeded)
+        );
+
+        assert_eq!(map_interval_error(None), EventError::InvalidWirePayload);
+        assert_eq!(
+            map_optional_reasoner_error(None),
+            EventError::InvalidWirePayload
         );
     }
 }
