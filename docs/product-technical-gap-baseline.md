@@ -12,13 +12,11 @@
 - PR #282 adds a fitted candidate-`K` topic-selection slice, while #283 repairs
   duplicate ADR identities. Both remain branch candidates until exact-head
   checks and qualifying independent review permit protected merge.
-- PR #285 merged its fitted draw-basis binding into the open #284 feature
-  branch. The combined topic-context candidate is not protected-main authority;
-  #284's moved head requires exact-head checks and independent review. PR #286
-  is a stacked coverage-classifier correction on #284's branch and likewise
-  remains non-authoritative until independently reviewed and merged through the
-  protected lineage.
-- Snapshot facts were fetched live at 2026-08-28T06:32:50Z against protected
+- PRs #285 and #286 merged their fitted draw-basis binding and coverage-gate
+  repair into the open #284 feature branch. The combined topic-context candidate
+  is not protected-main authority; #284's moved head requires exact-head checks
+  and independent review.
+- Snapshot facts were fetched live at 2026-08-28T06:38:54Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -74,7 +72,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-28T06:32:50Z
+**Snapshot:** 2026-08-28T06:38:54Z
 **Protected-main evidence:** `b03cc378228d5e568fc34970fcb23dc2b452f535` (merge of [PR #271](https://github.com/ContextualWisdomLab/TEPP/pull/271) `MANIFESTVARstd`, on top of #270 `MANIFESTTRAITVARstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
@@ -99,7 +97,7 @@ GitHub state before any customer, release, certification, or valuation claim.
 | Protected-main SHA | `b03cc378228d5e568fc34970fcb23dc2b452f535` (2026-08-28T00:39Z, merge of [#271](https://github.com/ContextualWisdomLab/TEPP/pull/271)) | All as-built claims are bounded to this commit. |
 | Workspace members | 58 unique Rust crates | The repository is modular, but the approved target still lacks complete semantic, compute, psychometric-engine, event-intelligence, interpretation, artifact, and visual product boundaries. |
 | Workspace version | `0.2.0` (aligned across every crate manifest) | A version number alone does not establish a supported product release; no signed artifact or support policy exists yet. |
-| Open pull requests | **8** | Active queue: #272 `TIPREDVARstd`, #279 interval consistency, #280 `discreteDRIFTstd`, #281 this baseline refresh, #282 fitted candidate-`K` selection, #283 ADR identity repair, #284 topic-context artifact assembly with #285 folded into its feature head, and stacked #286 coverage-gate repair. |
+| Open pull requests | **7** | Active queue: #272 `TIPREDVARstd`, #279 interval consistency, #280 `discreteDRIFTstd`, #281 this baseline refresh, #282 fitted candidate-`K` selection, #283 ADR identity repair, and #284 topic-context artifact assembly with #285 and #286 folded into its feature head. |
 | Draft pull requests | **1** | Only #272 remains draft. Non-draft state is not approval or merge readiness. |
 | Open product issues | **11** | Issues #166–#167, #169–#174, #176, #275, and #277 remain open. |
 | Current package version | `0.2.0` | No supported product release is established by the repository version alone; the tagged cut remains queued. |
@@ -151,13 +149,13 @@ All previously queued slices landed on protected main through:
    2026-08-25T06:24Z), and network-repair/version-alignment
    [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239).
 
-The residual open PRs are new forward work (#272 and #279–#284 plus #286), not the
+The residual open PRs are new forward work (#272 and #279–#284), not the
 historic consolidation backlog.
 
 ## Snapshot open pull-request evidence
 
 The following snapshot-head register was fetched live from GitHub at
-2026-08-28T06:32:50Z against protected main `b03cc378`. Review decisions,
+2026-08-28T06:38:54Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
@@ -172,11 +170,10 @@ other rows record the exact live head observed at the snapshot.
 | #272 | `dfc0c8bf2506114428e6074d77fa54f71de35c47` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `868f55cbf3ac5eff8abf3e625efb858da7ea3c5a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `9fe6ef523ebd219181544b94ee48aa089f6f1f12` | false | main | docs(gap): refresh protected-main and eight-PR queue |
+| #281 | `24e5b4a5825e1a58ead4ddc08b80bfa78481ba80` | false | main | docs(gap): refresh protected-main and eight-PR queue |
 | #282 | `6f092138f3eac7e2e29d457b5a2538f669261a98` | false | main | feat(topic): execute fitted candidate-K selection |
 | #283 | `61be7eb3844b726d97af62051f548c6f28743567` | false | main | fix(adr): enforce unique decision identities |
-| #284 | `94ab62ac237e0182ba41db16d80e0aef058cd8fc` | false | feat/topic-lineage-candidate-k | feat(topic): assemble context posterior artifact |
-| #286 | `5917cc9e4b1f4a43ea65efef1fbaebb9309e21e2` | false | feat/topic-context-producer | fix(ci): keep executable expressions in coverage gate |
+| #284 | `5917cc9e4b1f4a43ea65efef1fbaebb9309e21e2` | false | feat/topic-lineage-candidate-k | feat(topic): assemble context posterior artifact |
 
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization
@@ -306,7 +303,6 @@ committed.
 | [#282](https://github.com/ContextualWisdomLab/TEPP/pull/282) | Fitted candidate-`K` topic selection (GAP-004) | Complete newly restarted exact-head workflows after the coverage repair and obtain qualifying independent approval. |
 | [#283](https://github.com/ContextualWisdomLab/TEPP/pull/283) | Unique ADR identity enforcement (documentation authority) | Complete the newly queued exact-head checks and obtain qualifying independent approval. |
 | [#284](https://github.com/ContextualWisdomLab/TEPP/pull/284) | Topic-context posterior artifact assembly stacked on #282 (GAP-004) | Complete the restarted exact-head checks after the classifier repair and obtain qualifying independent approval. |
-| [#286](https://github.com/ContextualWisdomLab/TEPP/pull/286) | Coverage-gate executable-expression repair stacked on #284 | Complete exact-head production-line coverage and obtain central OpenCode review plus qualifying independent approval before folding into #284. |
 
 ## Delivery sequence
 
