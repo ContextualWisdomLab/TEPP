@@ -18,7 +18,7 @@
   is a stacked coverage-classifier correction on #284's branch and likewise
   remains non-authoritative until independently reviewed and merged through the
   protected lineage.
-- Snapshot facts were fetched live at 2026-08-28T06:16:46Z against protected
+- Snapshot facts were fetched live at 2026-08-28T06:32:50Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -74,7 +74,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-28T06:16:46Z
+**Snapshot:** 2026-08-28T06:32:50Z
 **Protected-main evidence:** `b03cc378228d5e568fc34970fcb23dc2b452f535` (merge of [PR #271](https://github.com/ContextualWisdomLab/TEPP/pull/271) `MANIFESTVARstd`, on top of #270 `MANIFESTTRAITVARstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
@@ -156,23 +156,27 @@ historic consolidation backlog.
 
 ## Snapshot open pull-request evidence
 
-The following exact-head register was fetched live from GitHub at
-2026-08-28T06:16:46Z against protected main `b03cc378`. Review decisions,
+The following snapshot-head register was fetched live from GitHub at
+2026-08-28T06:32:50Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
 Checks, and branch rules immediately before every mutation.
 
-| PR | Exact current head | Draft | Base | Title |
+For this baseline PR itself, the recorded SHA is its immediate publication
+parent: the commit containing this table necessarily changes its own head. All
+other rows record the exact live head observed at the snapshot.
+
+| PR | Snapshot head evidence | Draft | Base | Title |
 |---:|---|:---:|---|---|
 | #272 | `dfc0c8bf2506114428e6074d77fa54f71de35c47` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `868f55cbf3ac5eff8abf3e625efb858da7ea3c5a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `ff95071e487864296c2b692fcd10725358f9ac41` | false | main | docs(gap): refresh protected-main and eight-PR queue |
-| #282 | `d559b68737a8990b2fe63b39666e193d23568fea` | false | main | feat(topic): execute fitted candidate-K selection |
-| #283 | `b7580e850d68ce94cca9a3930c93415a7e8361a1` | false | main | fix(adr): enforce unique decision identities |
-| #284 | `8199ec899b66b972a13a59a849cb6c8c93e71a83` | false | feat/topic-lineage-candidate-k | feat(topic): assemble context posterior artifact |
-| #286 | `7459aea0461e29c370c795ee95c3cb249f715c9b` | false | feat/topic-context-producer | fix(ci): keep executable expressions in coverage gate |
+| #281 | `9fe6ef523ebd219181544b94ee48aa089f6f1f12` | false | main | docs(gap): refresh protected-main and eight-PR queue |
+| #282 | `6f092138f3eac7e2e29d457b5a2538f669261a98` | false | main | feat(topic): execute fitted candidate-K selection |
+| #283 | `61be7eb3844b726d97af62051f548c6f28743567` | false | main | fix(adr): enforce unique decision identities |
+| #284 | `94ab62ac237e0182ba41db16d80e0aef058cd8fc` | false | feat/topic-lineage-candidate-k | feat(topic): assemble context posterior artifact |
+| #286 | `5917cc9e4b1f4a43ea65efef1fbaebb9309e21e2` | false | feat/topic-context-producer | fix(ci): keep executable expressions in coverage gate |
 
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization

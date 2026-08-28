@@ -27,7 +27,7 @@ def valid_baseline(*, count: int = 1, extra: str = "") -> str:
         "|---|---:|---|\n"
         f"| Open pull requests | **{count}** | Queue only. |\n\n"
         "## Current open pull-request evidence\n\n"
-        "| PR | Exact current head | Draft | Base | Title |\n"
+        "| PR | Snapshot head evidence | Draft | Base | Title |\n"
         "|---:|---|:---:|---|---|\n"
         f"| #164 | `{VALID_HEAD}` | false | main | docs |\n\n"
         "## Operator-gap register\n\n"
@@ -81,7 +81,7 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
                 docs.validate_documentation_map(root)
 
     def test_valid_fixture_passes_structure_validator(self) -> None:
-        """A dated exact-head register with matching count is accepted."""
+        """A dated snapshot-head register with matching count is accepted."""
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -89,6 +89,22 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_text(valid_baseline(), encoding="utf-8")
             docs.validate_product_technical_gap_baseline(root)
+
+    def test_impossible_exact_self_head_claim_fails(self) -> None:
+        """The register must not claim that its publication parent is its own head."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline().replace(
+                    "Snapshot head evidence", "Exact current head"
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "snapshot-head"):
+                docs.validate_product_technical_gap_baseline(root)
 
     def test_missing_snapshot_sha_closure_or_inventory_fails(self) -> None:
         """Structure validation refuses an undated or uninventoried register."""

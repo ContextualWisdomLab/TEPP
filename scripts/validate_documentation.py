@@ -395,8 +395,8 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
         failures.append("gap baseline lacks a 40-character protected-main SHA")
     if "Closure evidence" not in text:
         failures.append("gap baseline lacks operator-gap closure evidence")
-    if "Exact current head" not in text:
-        failures.append("gap baseline lacks an exact-head open-PR inventory")
+    if "Snapshot head evidence" not in text:
+        failures.append("gap baseline lacks a snapshot-head open-PR inventory")
     if any(
         not _promotion_is_denied(text, match)
         for match in QUEUED_CHECKS_AS_SHIPPED.finditer(text)
