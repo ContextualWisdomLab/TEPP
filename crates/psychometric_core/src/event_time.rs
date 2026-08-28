@@ -2002,12 +2002,11 @@ pub fn recover_standardised_asymptotic_diffusion(
     require_finite(scaled * inverse_sd)
 }
 
-/// Refuse treating unstandardised `asymDIFFUSION` as p. 16
-/// `asymDIFFUSIONstd`.
+/// Exact scalar p. 16 `TIPREDVARstd` after strictly positive
+/// `TIPREDVAR`.
 ///
-/// Unstandardised `p` is defined for a zero process. Footnote 4
-/// `asymDIFFUSIONstd` requires strictly positive `asymDIFFUSION`.
-/// Equal numbers when `p = 1` are still distinct named quantities.
+/// Unstandardised `v` is defined for a zero predictor. Footnote 4
+/// `TIPREDVARstd` requires strictly positive `TIPREDVAR`.
 /// [`PsychometricError::StandardisedTraitVarianceRequiresPositiveTraitVariance`]
 /// when `TRAITVAR` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when the variance is
@@ -2168,6 +2167,113 @@ pub fn refuse_standardised_time_independent_predictor_variance_as_standardised_a
     );
     Err(
         PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion,
+    )
+}
+
+/// Exact scalar p. 16 `TIPREDVARstd` after strictly positive
+/// `TIPREDVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 3, p. 13; p. 16;
+/// footnote 4) define `TIPREDVAR` as the time-independent predictor
+/// variance/covariance and standardise it using its own variance.
+/// The scalar map is exactly `v / v = 1`. Unstandardised `v` is
+/// defined for a zero predictor, but `TIPREDVARstd` requires a
+/// strictly positive `TIPREDVAR`.
+/// [`PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance`]
+/// when `TIPREDVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the variance is
+/// non-finite, negative, or the quadratic form overflows.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock, [`PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance`] when `TIPREDVAR` is zero or negative, and [`PsychometricError::InvalidNumericInput`] for non-finite input.
+pub fn recover_standardised_time_independent_predictor_variance(
+    time_independent_predictor_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !time_independent_predictor_variance.is_finite() || time_independent_predictor_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if time_independent_predictor_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance,
+        );
+    }
+    let predictor_sd = time_independent_predictor_variance.sqrt();
+    let inverse_sd = require_finite(1.0 / predictor_sd)?;
+    require_finite(inverse_sd * time_independent_predictor_variance)?;
+    Ok(1.0)
+}
+
+/// Refuse treating unstandardised `TIPREDVAR` as p. 16
+/// `TIPREDVARstd`.
+///
+/// Both scalar maps equal 1 after a strictly positive relevant
+/// variance. Equal numbers remain distinct named quantities.
+/// [`PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
+pub fn refuse_unstandardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+    unstandardised_predictor_variance: f64,
+    standardised_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_predictor_variance,
+        standardised_predictor_variance,
+    );
+    Err(
+        PsychometricError::UnstandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance,
+    )
+}
+
+/// Refuse treating p. 16 `MANIFESTVARstd` as p. 16
+/// `TIPREDVARstd`.
+///
+/// Both scalar maps equal 1 after a strictly positive relevant
+/// variance. Equal numbers remain distinct named quantities.
+/// [`PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
+pub fn refuse_standardised_manifest_variance_as_standardised_time_independent_predictor_variance(
+    standardised_manifest_variance: f64,
+    standardised_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_manifest_variance,
+        standardised_predictor_variance,
+    );
+    Err(
+        PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeIndependentPredictorVariance,
+    )
+}
+
+/// Refuse treating §7.2 `addedTIPREDVAR` as p. 16
+/// `TIPREDVARstd`.
+///
+/// Extra process variance attributable to a time-independent
+/// predictor is not the correlation form of `TIPREDVAR`.
+///
+/// # Errors
+///
+/// Always returns [`PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance`].
+pub fn refuse_asymptotic_time_independent_predictor_variance_as_standardised_time_independent_predictor_variance(
+    asymptotic_predictor_variance: f64,
+    standardised_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        asymptotic_predictor_variance,
+        standardised_predictor_variance,
+    );
+    Err(
+        PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotStandardisedTimeIndependentPredictorVariance,
     )
 }
 
