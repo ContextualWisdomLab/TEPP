@@ -261,6 +261,25 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver p. 16 `discreteDIFFUSIONstd` as
+//! `Q_Δt / p` after strictly positive `asymDIFFUSION`
+//! `p = −q / (2 a)` (footnote 4 uses only the relevant
+//! within-subject variance; 2017-era `summary.ctsemFit.R`
+//! forms unstandardised `discreteDIFFUSION` whenever
+//! `verbose = TRUE` as `matrix(solve(DRIFTHATCH) %*%
+//! (expm(DRIFTHATCH Δt) − I ⊗ I) %*% rvectorize(DIFFUSION),
+//! nrow = n.latent)`; that source forms `asymDIFFUSIONstd`
+//! and `discreteDRIFTstd` in the same `verbose` block and
+//! does not form a `discreteDIFFUSIONstd` matrix; the scalar
+//! map is `Q_Δt / p = 1 − exp(2 a Δt)` after strictly
+//! positive `p`; unstandardised `Q_Δt` is defined for
+//! growing `a ≥ 0` and for zero diffusion and is not that
+//! map; `q / p = −2 a` is `DIFFUSIONstd` and is not that
+//! map; `Q_Δt / (trait + p + added)` uses the total and is
+//! not that map when `TRAITVAR` is nonzero; zero `q` fails
+//! closed; a non-event clock fails closed; `a ≥ 0` fails
+//! closed; a non-positive event interval fails closed;
+//! JSS PDF re-opened 2026-08-28T13:24Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -407,6 +426,8 @@ pub use event_time::recover_standardised_asymptotic_diffusion;
 pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
 pub use event_time::recover_standardised_discrete_continuous_intercept;
+/// Exact scalar p. 16 `discreteDIFFUSIONstd` `Q_Δt / p` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_discrete_diffusion;
 /// Exact scalar p. 16 `T0MEANSstd` `μ_0 / √p_0`.
 pub use event_time::recover_standardised_initial_latent_mean;
 /// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
@@ -620,6 +641,8 @@ pub use event_time::refuse_process_noise_as_unconditional_variance;
 pub use event_time::refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance;
 /// Refuse treating p. 16 `DIFFUSIONstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion;
+/// Refuse treating p. 16 `DIFFUSIONstd` as `discreteDIFFUSIONstd`.
+pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating p. 16 `CINTstd` as `asymCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
@@ -715,6 +738,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating Driver §7.1 trait-contaminated `Q_Δt / (trait + p + added)` as `discreteDIFFUSIONstd`.
+pub use event_time::refuse_trait_contaminated_discrete_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
@@ -733,6 +758,8 @@ pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_a
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
 pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating unstandardised `discreteDIFFUSION` as `discreteDIFFUSIONstd`.
+pub use event_time::refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion;
 /// Refuse treating unstandardised `T0MEANS` as `T0MEANSstd`.
 pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Refuse treating unstandardised `T0VAR` as `T0VARstd`.
