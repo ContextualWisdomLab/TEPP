@@ -10,6 +10,14 @@ Development Group, 2026b). State events separately use
 event, so competing workers serialize on the durable run identity rather than
 a process-local mutex (PostgreSQL Global Development Group, 2026a).
 
+The one-shot worker uses a session-level advisory lock while computation is in
+flight. PostgreSQL documents that session advisory locks persist until explicit
+release or session end, which supplies crash cleanup without inventing a lease
+table for this single-attempt slice (PostgreSQL Global Development Group,
+2026a). The database lock is coordination only: canonical input SHA-256,
+request cutoff, Git commit, and dependency-lock identities remain separate
+scientific reproducibility gates.
+
 This storage rule grants no scientific authority. The API and analysis engine
 remain responsible for request/result binding, cutoff eligibility, and artifact
 validation.

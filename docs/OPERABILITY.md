@@ -62,6 +62,23 @@ connection loss releases the session advisory lock. Successful artifact and
 terminal-event writes use `execute_transaction`. Infrastructure failure leaves
 the run retryable and must not be converted into a scientific failed result.
 
+The active-PR one-shot invocation is:
+
+```text
+DATABASE_URL=postgresql://... \
+TEPP_CODE_COMMIT_SHA=<exact-git-object> \
+TEPP_DEPENDENCY_LOCK_SHA256=<cargo-lock-sha256> \
+cargo run -p analysis_worker -- \
+  <tenant-record-uuid> <analysis-run-uuid> <bounded-input.json> <completed-at-rfc3339>
+```
+
+The input is strict JSON containing contract version 1, the exact
+reproducibility-manifest UUID, snapshot identity, canonical source-snapshot
+SHA-256, and identity-free evidence IDs/event clocks/availability clocks/
+membership counts. The worker emits only canonical artifact JSON or the prior
+terminal status. It is not a scheduler, daemon, lease manager, or protected
+object uploader.
+
 ## Model release/cutover
 
 A model artifact is promoted only after convergence, posterior diagnostics, true-parameter/recovery benchmarks, invariance/fairness/language evidence, uncertainty/calibration, security/privacy, and reproducibility gates meet the versioned policy. Model-selection or LLM review disagreement can require human scientific review.

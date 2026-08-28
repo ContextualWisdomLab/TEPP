@@ -37,6 +37,16 @@ The engine is deterministic, synchronous, bounded to `100_000` evidence units,
 and CPU-only. Scientific estimators and their Rust CPU `f64`/GPU parity
 contracts remain separate boundaries under ADR 0001 and ADR 0006.
 
+The stacked `analysis_worker` executable composes this engine with the durable
+PostgreSQL lifecycle. It supports only `temporal-evidence-v1` with
+`validation-report`, binds the tenant session before acquiring a retained-
+session advisory lock, and refuses execution unless the canonical evidence
+payload digest, snapshot identity, cutoff, running Git commit, and dependency
+lock digest match the selected reproducibility manifest. Infrastructure and
+input failures remain retryable; only the engine authors a scientific failed
+terminal result. Successful model-run, artifact, and terminal rows commit in
+one database transaction.
+
 For the `trsl_topic_lineage_v1` output profile, the engine may invoke the
 ADR-0012 `topic_measurement` CPU `f64` reference estimator through its validated
 `ReferenceTopicInput`. The engine does not reimplement or reinterpret the
@@ -87,12 +97,17 @@ known-topic corpus, exact request/snapshot/cutoff binding, canonical artifact
 round-trip and digest stability, predecessor/successor count consistency, and
 fail-closed tamper/non-convergence paths.
 
+`analysis_worker` additionally verifies bounded/strict input parsing,
+duplicate-evidence refusal, accepted/running recovery, terminal no-op,
+exclusive locking, manifest/runtime tamper refusal, retryable infrastructure
+failure, and atomic success/failure publication.
+
 The supporting research and APA 7th citations are recorded in
 `docs/doctoring/analysis-engine-v1.md` and the standards register.
 
 ## Rollback and supersession
 
-Rollback removes the `analysis_engine` workspace member and stops publishing
+Rollback removes the `analysis_worker` and `analysis_engine` workspace members and stops publishing
 the readiness artifact while preserving the request and terminal-result DTOs.
 No persisted schema migration is introduced. Supersession requires a new ADR
 if execution changes cutoff semantics, artifact authority, privacy fields, or
