@@ -134,6 +134,20 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "does not match inventory"):
                 docs.validate_product_technical_gap_baseline(root)
 
+    def test_snapshot_stamp_must_match_fetched_live_evidence(self) -> None:
+        """A stale headline timestamp cannot summarize newer fetched evidence."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline(extra="\nFacts fetched live at 2026-08-23T12:28:00Z.\n"),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "fetched-live evidence"):
+                docs.validate_product_technical_gap_baseline(root)
+
     def test_queued_checks_as_implemented_main_fails(self) -> None:
         """Queued Checks must not be promoted to protected-main maturity."""
 

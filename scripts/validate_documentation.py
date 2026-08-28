@@ -72,6 +72,9 @@ PROTECTED_MAIN_SHA = re.compile(
 SNAPSHOT_STAMP = re.compile(
     r"\*\*Snapshot:\*\*\s*(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"
 )
+SNAPSHOT_FETCH_STAMP = re.compile(
+    r"fetched live (?:from GitHub )?at\s+(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"
+)
 INVENTORY_ROW = re.compile(
     r"^\|\s*#(?P<number>\d+)\s*\|\s*`(?P<sha>[0-9a-f]{40})`\s*\|\s*"
     r"(?P<draft>true|false)\s*\|",
@@ -389,8 +392,14 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
         )
     text = path.read_text(encoding="utf-8")
     failures: list[str] = []
-    if SNAPSHOT_STAMP.search(text) is None:
+    snapshot_match = SNAPSHOT_STAMP.search(text)
+    if snapshot_match is None:
         failures.append("gap baseline lacks a dated UTC snapshot stamp")
+    elif any(
+        match.group("stamp") != snapshot_match.group("stamp")
+        for match in SNAPSHOT_FETCH_STAMP.finditer(text)
+    ):
+        failures.append("gap baseline snapshot stamp does not match fetched-live evidence")
     if PROTECTED_MAIN_SHA.search(text) is None:
         failures.append("gap baseline lacks a 40-character protected-main SHA")
     if "Closure evidence" not in text:
