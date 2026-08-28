@@ -94,8 +94,11 @@ QUEUED_CHECKS_ADVERSATIVE = re.compile(
     r"\b(?:but|however|yet|although|though)\b", re.IGNORECASE
 )
 QUEUED_CHECKS_SENTENCE_BREAK = re.compile(r"[.;!?\n]")
-ADR_TABLE_ROW = re.compile(r"^\|\s*\[(?P<number>\d{4})\]", re.MULTILINE)
+ADR_TABLE_ROW = re.compile(
+    r"^\|\s*\[(?P<number>\d{4})\]\((?P<target>[^)]+)\)", re.MULTILINE
+)
 ADR_FILE_NAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
+ADR_TITLE = re.compile(r"^# ADR (?P<number>\d{4})\b", re.MULTILINE)
 ADR_DECISION_STATUS = re.compile(
     r"^\*\*Decision status:\*\*\s*(Accepted|Proposed|Superseded|Rejected)\b",
     re.MULTILINE,
@@ -423,16 +426,39 @@ def validate_adr_graph() -> None:
 
     adr_root = ROOT / "docs" / "adr"
     adr_index = (adr_root / "README.md").read_text(encoding="utf-8")
-    indexed_numbers = {
-        match.group("number") for match in ADR_TABLE_ROW.finditer(adr_index)
-    }
+    indexed_targets: dict[str, str] = {}
+    for match in ADR_TABLE_ROW.finditer(adr_index):
+        number = match.group("number")
+        target = match.group("target")
+        if previous := indexed_targets.get(number):
+            if previous != target:
+                raise AssertionError(
+                    f"ADR {number} has conflicting index targets: "
+                    f"{previous}, {target}"
+                )
+            raise AssertionError(f"ADR {number} appears more than once in the index")
+        else:
+            indexed_targets[number] = target
+    indexed_numbers = set(indexed_targets)
 
     adr_files: dict[str, Path] = {}
+    duplicate_numbers: dict[str, list[Path]] = {}
     for path in sorted(adr_root.glob("[0-9][0-9][0-9][0-9]-*.md")):
         match = ADR_FILE_NAME.fullmatch(path.name)
         if not match:
             raise AssertionError(f"invalid ADR filename: {path.relative_to(ROOT)}")
-        adr_files[match.group("number")] = path
+        number = match.group("number")
+        if previous := adr_files.get(number):
+            duplicate_numbers.setdefault(number, [previous]).append(path)
+        else:
+            adr_files[number] = path
+
+    if duplicate_numbers:
+        rendered = ", ".join(
+            f"{number}={[path.name for path in paths]}"
+            for number, paths in sorted(duplicate_numbers.items())
+        )
+        raise AssertionError(f"duplicate ADR numbers: {rendered}")
 
     file_numbers = set(adr_files)
     if indexed_numbers != file_numbers:
@@ -445,6 +471,11 @@ def validate_adr_graph() -> None:
     failures: list[str] = []
     for number, path in adr_files.items():
         text = path.read_text(encoding="utf-8")
+        title = ADR_TITLE.search(text)
+        if title is None or title.group("number") != number:
+            failures.append(f"ADR {number} heading does not match its filename")
+        if indexed_targets[number] != path.name:
+            failures.append(f"ADR {number} index target does not match {path.name}")
         if ADR_DECISION_STATUS.search(text) is None:
             failures.append(f"ADR {number} lacks a valid Decision status")
         if ADR_IMPLEMENTATION_STATUS.search(text) is None:

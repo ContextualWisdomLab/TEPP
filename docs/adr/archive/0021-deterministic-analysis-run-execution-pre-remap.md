@@ -1,4 +1,8 @@
-# ADR 0021 — Deterministic cutoff-safe analysis-run execution
+# Archived pre-remap draft — Deterministic cutoff-safe analysis-run execution
+
+This historical draft was remapped to canonical ADR 0022 during protected-main
+consolidation. It is retained outside the current numbered ADR registry so it
+cannot collide with ADR 0021, the LineageWeave project-history boundary.
 
 **Decision status:** Accepted
 **Implementation maturity:** active-PR — stacked on PR #157; not implemented-main
