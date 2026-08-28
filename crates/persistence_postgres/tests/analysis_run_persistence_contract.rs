@@ -62,6 +62,25 @@ fn request_insert_is_exactly_idempotent_and_status_read_is_tenant_scoped() {
         record.accepted().expect("receipt").run_id,
         record.analysis_run_id.to_string()
     );
+    let mut wrong_id = record.clone();
+    wrong_id.analysis_run_id = Uuid::from_u128(1);
+    assert_eq!(
+        insert_analysis_run_request_sql(&wrong_id),
+        Err(PersistenceError::InvalidAnalysisRun)
+    );
+    let mut delimiter_request = request;
+    delimiter_request.output_profile = "$tepp$ RAISE EXCEPTION 'escaped';".into();
+    let delimiter_record = AnalysisRunRequestRecord::from_request(
+        Uuid::nil(),
+        &delimiter_request,
+        clocks().0,
+        clocks().1,
+    )
+    .expect("delimiter request is valid before SQL rendering");
+    assert_eq!(
+        insert_analysis_run_request_sql(&delimiter_record),
+        Err(PersistenceError::InvalidAnalysisRun)
+    );
 
     let select = select_analysis_run_status_sql(Uuid::nil(), record.analysis_run_id);
     assert!(select.contains("tenant_record_id = '00000000-0000-0000-0000-000000000000'::uuid"));

@@ -159,8 +159,10 @@ pub fn insert_analysis_run_request_sql(
         record.system_time,
         record.available_time,
     )?;
-    if expected.request_payload != record.request_payload
+    if expected.analysis_run_id != record.analysis_run_id
+        || expected.request_payload != record.request_payload
         || expected.request_payload_sha256 != record.request_payload_sha256
+        || record.request_payload.contains("$tepp$")
     {
         return Err(PersistenceError::InvalidAnalysisRun);
     }
