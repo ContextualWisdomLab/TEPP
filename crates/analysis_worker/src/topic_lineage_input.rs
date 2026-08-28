@@ -561,6 +561,18 @@ pub(super) mod tests {
             rebound.scientific_digest().expect("rebound digest"),
             input.scientific_input_sha256
         );
+        let mut changed_config = input.clone();
+        changed_config.model.ridge *= 2.0;
+        assert_ne!(
+            changed_config.scientific_digest().expect("config digest"),
+            input.scientific_input_sha256
+        );
+        let mut changed_seed = input.clone();
+        changed_seed.model.seeds[0] += 1;
+        assert_ne!(
+            changed_seed.scientific_digest().expect("seed digest"),
+            input.scientific_input_sha256
+        );
         let validated = input.validate(cutoff).expect("validated");
         assert_eq!(validated.input.document_count(), 4);
         assert_eq!(validated.input.vocabulary_size(), 4);

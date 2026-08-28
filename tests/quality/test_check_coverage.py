@@ -102,6 +102,11 @@ class CoverageContractTests(unittest.TestCase):
             for line in (3, 4):
                 self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 5))
+            source.write_text(
+                "fn f() {\n    let mask = Flags::A\n        | Flags::B;\n}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
             source.write_text("fn f() {\n    values.map(|value| transform(value));\n}\n", encoding="utf-8")
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
 
@@ -162,7 +167,11 @@ class CoverageContractTests(unittest.TestCase):
             source.write_text("| E::Only => run(),\n", encoding="utf-8")
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
             source.write_text("| E::Only\n", encoding="utf-8")
-            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 1))
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
+            source.write_text("E::A\n| E::B\nnext();\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
+            source.write_text("E::A\n| E::B\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
         self.assertTrue(
             coverage_contract._is_structural_comma_continuation(
                 ["struct Item {", "    first: u8,", "    second: u8,", "}"],

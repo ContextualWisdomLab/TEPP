@@ -269,13 +269,11 @@ def is_executable_source_line(
         return False
     if text.startswith("let ") and " = " in text and text.endswith(" {"):
         return False
-    if "::" in text and line_number < len(lines) and lines[line_number].strip().startswith("|"):
-        return False
     if (
-        text.startswith("|")
-        and "::" in text
-        and "|" not in text[1:]
-        and "=>" not in text
+        "::" in text
+        and line_number < len(lines)
+        and lines[line_number].strip().startswith("|")
+        and _is_multiline_match_alternative(lines, line_number)
     ):
         return False
     if text.startswith(
@@ -328,6 +326,18 @@ def is_executable_source_line(
     ):
         return False
     return True
+
+
+def _is_multiline_match_alternative(lines: Sequence[str], line_number: int) -> bool:
+    """Return whether consecutive alternatives reach a match-arm arrow."""
+
+    for offset, candidate in enumerate(lines[line_number - 1 :]):
+        text = candidate.strip()
+        if offset > 0 and not text.startswith("|"):
+            return False
+        if "=>" in text:
+            return True
+    return False
 
 
 @cache
