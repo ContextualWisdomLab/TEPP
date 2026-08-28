@@ -590,6 +590,7 @@ mod tests {
         prevalence_coefficients: Vec<Vec<f64>>,
     ) -> ReferenceTopicModel {
         ReferenceTopicModel {
+            model_input_sha256: None,
             seed: 1,
             iterations: 4,
             objective: -1.0,
