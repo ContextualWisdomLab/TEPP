@@ -27,8 +27,6 @@
   ingestion remain gaps.
 - PR #291 merged durable interval-artifact persistence into #279's current
   feature head and closed; #293 remains the dependent authority candidate.
-- Snapshot facts were fetched live at 2026-08-28T15:56:03Z against protected
-  main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
 
@@ -167,8 +165,8 @@ historic consolidation backlog.
 
 ## Snapshot open pull-request evidence
 
-The following snapshot-head register was fetched live from GitHub at
-2026-08-28T15:56:03Z against protected main `b03cc378`. Review decisions,
+The following snapshot-head register belongs to the canonical live snapshot
+above. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
