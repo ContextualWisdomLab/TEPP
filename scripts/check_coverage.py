@@ -295,16 +295,12 @@ def is_executable_source_line(
     if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
     if text in {"} else {", "else {", "));"} or text.startswith(
-        (".", "||", "&&", "*", "/")
+        (".", "||", "&&", "/")
     ):
         return False
-    if text.endswith("=> event"):
+    if text.startswith("*") and "=" not in text:
         return False
-    previous = next(
-        (candidate.strip() for candidate in reversed(lines[: line_number - 1]) if candidate.strip()),
-        "",
-    )
-    if text.startswith("return Err(") and previous == "{":
+    if text.endswith("=> event"):
         return False
     following = next(
         (candidate.strip() for candidate in lines[line_number:] if candidate.strip()),
