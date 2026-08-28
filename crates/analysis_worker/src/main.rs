@@ -2,8 +2,8 @@
 //! One-shot durable TEPP analysis worker executable.
 
 use analysis_worker::{
-    AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES, WorkerRuntimeIdentity,
-    execute_one,
+    AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES, TopicLineageWorkerInput,
+    WorkerRuntimeIdentity, execute_one, execute_topic_lineage_one,
 };
 use persistence_postgres::{
     LiveSqlxConfig, LiveSqlxPoolOptions, PersistenceError, open_live_sqlx_pool,
@@ -25,6 +25,11 @@ struct CliArguments {
     analysis_run_id: Uuid,
     input_path: String,
     completed_at: String,
+}
+
+enum CliInput {
+    Evidence(AnalysisWorkerInput),
+    TopicLineage(Box<TopicLineageWorkerInput>),
 }
 
 fn main() -> ExitCode {
@@ -72,7 +77,7 @@ fn run_from_env() -> Result<String, Box<dyn std::error::Error>> {
     let mut payload = String::new();
     file.take((MAX_WORKER_INPUT_BYTES + 1) as u64)
         .read_to_string(&mut payload)?;
-    let input = AnalysisWorkerInput::from_json(&payload)?;
+    let input = parse_input(&payload)?;
     let config = LiveSqlxConfig::from_env()?;
     let runtime_identity = WorkerRuntimeIdentity {
         code_commit_sha: std::env::var("TEPP_CODE_COMMIT_SHA")?,
@@ -82,8 +87,22 @@ fn run_from_env() -> Result<String, Box<dyn std::error::Error>> {
 }
 
 #[rustfmt::skip]
-fn execute_live(config: &LiveSqlxConfig, arguments: &CliArguments, input: &AnalysisWorkerInput, identity: &WorkerRuntimeIdentity) -> Result<analysis_worker::AnalysisWorkerOutcome, Box<dyn std::error::Error>> {
-    Ok(execute_one(&mut open_live_sqlx_pool(config, LiveSqlxPoolOptions::production_defaults())?, arguments.tenant_record_id, arguments.analysis_run_id, input, identity, &arguments.completed_at)?)
+fn execute_live(config: &LiveSqlxConfig, arguments: &CliArguments, input: &CliInput, identity: &WorkerRuntimeIdentity) -> Result<analysis_worker::AnalysisWorkerOutcome, Box<dyn std::error::Error>> {
+    let pool = &mut open_live_sqlx_pool(config, LiveSqlxPoolOptions::production_defaults())?;
+    Ok(match input {
+        CliInput::Evidence(input) => execute_one(pool, arguments.tenant_record_id, arguments.analysis_run_id, input, identity, &arguments.completed_at)?,
+        CliInput::TopicLineage(input) => execute_topic_lineage_one(pool, arguments.tenant_record_id, arguments.analysis_run_id, input, identity, &arguments.completed_at)?,
+    })
+}
+
+fn parse_input(payload: &str) -> Result<CliInput, AnalysisWorkerError> {
+    AnalysisWorkerInput::from_json(payload)
+        .map(CliInput::Evidence)
+        .or_else(|_| {
+            TopicLineageWorkerInput::from_json(payload)
+                .map(Box::new)
+                .map(CliInput::TopicLineage)
+        })
 }
 
 fn parse_arguments(
@@ -131,8 +150,8 @@ fn render_outcome(
 #[cfg(test)]
 mod tests {
     use super::{
-        SchedulerDisposition, parse_arguments, render_outcome, render_output, required,
-        scheduler_disposition,
+        CliInput, SchedulerDisposition, parse_arguments, parse_input, render_outcome,
+        render_output, required, scheduler_disposition,
     };
     use analysis_worker::{AnalysisWorkerError, AnalysisWorkerOutcome};
     use persistence_postgres::PersistenceError;
@@ -156,6 +175,27 @@ mod tests {
         let mut invalid = ["invalid"].map(str::to_owned).into_iter();
         assert!(parse_arguments(&mut invalid).is_err());
         assert!(required(&mut std::iter::empty(), "value").is_err());
+    }
+
+    #[test]
+    fn input_parser_selects_only_known_versioned_envelopes() {
+        let topic = r#"{
+            "contract_version":1,
+            "reproducibility_manifest_id":"00000000-0000-0000-0000-000000000000",
+            "snapshot_id":"snapshot",
+            "scientific_input_sha256":"",
+            "documents":[],
+            "document_term":{"columns":0,"offsets":[],"indices":[],"values":[]},
+            "covariates":null,
+            "memberships":[],
+            "relations":[],
+            "model":{"topic_count":0,"seeds":[],"maximum_iterations":0,"tolerance":0.0,"prior_variance":0.0,"relation_strength":0.0,"ridge":0.0,"topic_smoothing":0.0,"step_size":0.0}
+        }"#;
+        assert!(matches!(parse_input(topic), Ok(CliInput::TopicLineage(_))));
+        assert!(matches!(
+            parse_input("{}"),
+            Err(AnalysisWorkerError::InvalidInput)
+        ));
     }
 
     #[test]

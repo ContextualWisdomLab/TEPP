@@ -43,6 +43,40 @@ fn executable_reaches_the_fail_closed_live_transport_boundary() {
 }
 
 #[test]
+fn topic_lineage_envelope_reaches_the_same_live_transport_boundary() {
+    let payload = r#"{
+        "contract_version":1,
+        "reproducibility_manifest_id":"00000000-0000-0000-0000-000000000000",
+        "snapshot_id":"snapshot",
+        "scientific_input_sha256":"",
+        "documents":[],
+        "document_term":{"columns":0,"offsets":[],"indices":[],"values":[]},
+        "covariates":null,
+        "memberships":[],
+        "relations":[],
+        "model":{"topic_count":0,"seeds":[],"maximum_iterations":0,"tolerance":0.0,"prior_variance":0.0,"relation_strength":0.0,"ridge":0.0,"topic_smoothing":0.0,"step_size":0.0}
+    }"#;
+    let path = std::env::temp_dir().join(format!("tepp-topic-worker-{}.json", Uuid::now_v7()));
+    fs::write(&path, payload).expect("temporary input");
+    let output = Command::new(env!("CARGO_BIN_EXE_analysis_worker"))
+        .args([
+            Uuid::nil().to_string(),
+            Uuid::nil().to_string(),
+            path.to_string_lossy().into_owned(),
+            "2026-08-28T00:00:00Z".into(),
+        ])
+        .env("DATABASE_URL", "postgres://127.0.0.1:1/tepp_no_listener")
+        .env("TEPP_CODE_COMMIT_SHA", "a".repeat(40))
+        .env("TEPP_DEPENDENCY_LOCK_SHA256", "b".repeat(64))
+        .output()
+        .expect("worker process");
+    fs::remove_file(path).expect("remove temporary input");
+    assert_eq!(output.status.code(), Some(75));
+    assert!(output.stdout.is_empty());
+    assert_eq!(output.stderr, b"analysis_worker: Retryable\n");
+}
+
+#[test]
 fn invalid_invocation_is_permanent_and_redacted() {
     let output = Command::new(env!("CARGO_BIN_EXE_analysis_worker"))
         .arg("not-a-uuid")
