@@ -703,6 +703,28 @@ pub enum PsychometricError {
     /// footnote 4 standardisation variance. `TRAITVAR` is not
     /// `asymDIFFUSION`.
     TraitVarianceIsNotStandardisationVariance,
+    /// Driver p. 16 `MANIFESTVARstd` was requested with a
+    /// non-positive residual `MANIFESTVAR`. Unlike `TRAITVAR` /
+    /// `MANIFESTTRAITVAR`, the 2017-era source still forms
+    /// `MANIFESTVARstd` when `MANIFESTVAR == 0`; `solve(sqrt(0))`
+    /// fails. Footnote 4 standardisation requires strictly
+    /// positive `MANIFESTVAR`.
+    StandardisedManifestVarianceRequiresPositiveManifestVariance,
+    /// Driver Table 2 unstandardised `MANIFESTVAR` `Θ` was treated
+    /// as p. 16 `MANIFESTVARstd`. Unstandardised measurement error
+    /// is defined for a zero residual; standardised `MANIFESTVAR`
+    /// is not.
+    UnstandardisedManifestVarianceIsNotStandardisedManifestVariance,
+    /// Driver p. 16 `MANIFESTTRAITVARstd` was treated as p. 16
+    /// `MANIFESTVARstd`. Equal numbers when both correlations equal
+    /// 1 are still distinct named quantities. `MANIFESTTRAITVAR` is
+    /// indicator-level trait variance; `MANIFESTVAR` is
+    /// contemporaneous measurement error.
+    StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance,
+    /// Driver Eq. 5 observed-indicator variance was treated as p. 16
+    /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
+    /// correlation form of `Θ`.
+    ObservedVarianceIsNotStandardisedManifestVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1226,6 +1248,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::TraitVarianceIsNotStandardisationVariance => {
                 "trait variance is not the standardisation variance"
+            }
+            Self::StandardisedManifestVarianceRequiresPositiveManifestVariance => {
+                "standardised measurement-error variance requires strictly positive measurement-error variance"
+            }
+            Self::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance => {
+                "unstandardised measurement-error variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance => {
+                "standardised manifest-trait variance is not standardised measurement-error variance"
+            }
+            Self::ObservedVarianceIsNotStandardisedManifestVariance => {
+                "observed-indicator variance is not standardised measurement-error variance"
             }
         };
         formatter.write_str(message)

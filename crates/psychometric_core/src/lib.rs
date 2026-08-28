@@ -430,6 +430,8 @@ pub use event_time::recover_standardised_initial_latent_variance;
 pub use event_time::recover_standardised_manifest_mean;
 /// Exact scalar p. 16 `MANIFESTTRAITVARstd` `ψ / ψ = 1` after strictly positive `MANIFESTTRAITVAR`.
 pub use event_time::recover_standardised_manifest_trait_variance;
+/// Exact scalar p. 16 `MANIFESTVARstd` `θ/...` after strictly positive `MANIFESTVAR`.
+pub use event_time::recover_standardised_manifest_variance;
 
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
@@ -645,8 +647,13 @@ pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
 /// Refuse treating p. 16 `T0VARstd` as `TRAITVARstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_trait_variance;
+/// Refuse treating p. 16 `MANIFESTTRAITVARstd` as `MANIFESTVARstd`.
+pub use event_time::refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
+
+/// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
+pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
@@ -755,6 +762,8 @@ pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardise
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
 /// Refuse treating unstandardised `MANIFESTTRAITVAR` as `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance;
+/// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
+pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
 
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
