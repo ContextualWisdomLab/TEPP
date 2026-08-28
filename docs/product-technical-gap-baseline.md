@@ -18,7 +18,7 @@
   is a stacked coverage-classifier correction on #284's branch and likewise
   remains non-authoritative until independently reviewed and merged through the
   protected lineage.
-- Snapshot facts were fetched live at 2026-08-28T06:10:14Z against protected
+- Snapshot facts were fetched live at 2026-08-28T06:13:13Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -74,7 +74,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-28T06:10:14Z
+**Snapshot:** 2026-08-28T06:13:13Z
 **Protected-main evidence:** `b03cc378228d5e568fc34970fcb23dc2b452f535` (merge of [PR #271](https://github.com/ContextualWisdomLab/TEPP/pull/271) `MANIFESTVARstd`, on top of #270 `MANIFESTTRAITVARstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
@@ -157,7 +157,7 @@ historic consolidation backlog.
 ## Snapshot open pull-request evidence
 
 The following exact-head register was fetched live from GitHub at
-2026-08-28T06:10:14Z against protected main `b03cc378`. Review decisions,
+2026-08-28T06:13:13Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
@@ -168,11 +168,11 @@ Checks, and branch rules immediately before every mutation.
 | #272 | `dfc0c8bf2506114428e6074d77fa54f71de35c47` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `868f55cbf3ac5eff8abf3e625efb858da7ea3c5a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `0386eb569946f795718b59e4b58fc10cb068ecbe` | false | main | docs(gap): refresh protected-main and eight-PR queue |
+| #281 | `4bd530747c46a8e9d4e34533fff3f88819b07841` | false | main | docs(gap): refresh protected-main and eight-PR queue |
 | #282 | `d559b68737a8990b2fe63b39666e193d23568fea` | false | main | feat(topic): execute fitted candidate-K selection |
 | #283 | `b7580e850d68ce94cca9a3930c93415a7e8361a1` | false | main | fix(adr): enforce unique decision identities |
 | #284 | `8199ec899b66b972a13a59a849cb6c8c93e71a83` | false | feat/topic-lineage-candidate-k | feat(topic): assemble context posterior artifact |
-| #286 | `74311240ac64dc8240bfdf8ed05dc507d358a143` | false | feat/topic-context-producer | fix(ci): keep executable expressions in coverage gate |
+| #286 | `e16c1a9f311bb92491961fc6323906924f3c621b` | false | feat/topic-context-producer | fix(ci): keep executable expressions in coverage gate |
 
 Review decisions, required Checks, and mergeability remain volatile; re-read
 them immediately before every mutation. This snapshot is not merge authorization
