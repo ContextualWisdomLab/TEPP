@@ -19,7 +19,7 @@
 - PR #287 adds durable, tenant-isolated analysis-run request and state-event
   persistence for #166. It remains an unmerged branch candidate and does not
   establish an executable end-to-end analysis service on protected main.
-- Snapshot facts were fetched live at 2026-08-28T09:30:08Z against protected
+- Snapshot facts were fetched live at 2026-08-28T09:33:28Z against protected
   main `b03cc378228d5e568fc34970fcb23dc2b452f535`.
 
 ## 2026-08-26 Pair criterion and Project Journey posterior slice
@@ -75,7 +75,7 @@
 
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-08-28T09:30:08Z
+**Snapshot:** 2026-08-28T09:33:28Z
 **Protected-main evidence:** `b03cc378228d5e568fc34970fcb23dc2b452f535` (merge of [PR #271](https://github.com/ContextualWisdomLab/TEPP/pull/271) `MANIFESTVARstd`, on top of #270 `MANIFESTTRAITVARstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.
@@ -158,7 +158,7 @@ historic consolidation backlog.
 ## Snapshot open pull-request evidence
 
 The following snapshot-head register was fetched live from GitHub at
-2026-08-28T09:30:08Z against protected main `b03cc378`. Review decisions,
+2026-08-28T09:33:28Z against protected main `b03cc378`. Review decisions,
 required Checks, and mergeability remain volatile; the live GitHub API
 supersedes this snapshot. `draft=false` is not approval, mergeability, or a
 passing-check claim. Re-read the full SHA, current review decision, required
@@ -173,7 +173,7 @@ other rows record the exact live head observed at the snapshot.
 | #272 | `1f37cf4a154734a252b6bf8261748a289c0dd493` | true | main | feat(psychometric): restore Driver p.16 TIPREDVARstd v/v=1 on main |
 | #279 | `47611f34e02a831178890f4550221fb4c0d6d61a` | false | main | feat(event): bounded Allen/CHRONOS interval consistency (#170) |
 | #280 | `fe42aa19f70b398f66ee034b87284e33c0e7db2c` | false | main | feat(psychometric): restore Driver p.16 discreteDRIFTstd on main |
-| #281 | `e1ff78766ed25818e46ecc1b56bcf2d16fc98497` | false | main | docs(gap): refresh protected-main and eight-PR queue |
+| #281 | `659f6f5590b04bce52e5cebdb7c401093e4581a2` | false | main | docs(gap): refresh protected-main and eight-PR queue |
 | #282 | `46ffba042096b8722a2f98d904605b50bc549c0d` | false | main | feat(topic): execute fitted candidate-K selection |
 | #283 | `61be7eb3844b726d97af62051f548c6f28743567` | false | main | fix(adr): enforce unique decision identities |
 | #287 | `1199505824c43d3c43203c8b0fbf1f79fd8e69b0` | false | main | feat(persistence): persist idempotent analysis runs |
