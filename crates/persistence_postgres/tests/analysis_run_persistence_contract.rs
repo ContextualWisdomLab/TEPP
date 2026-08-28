@@ -143,6 +143,11 @@ fn terminal_event_is_bound_to_the_exact_durable_request() {
     let mut other = request_record();
     other.analysis_run_id = Uuid::from_u128(99);
     assert!(insert_analysis_run_state_event_sql(&other, &event).is_err());
+    let cross_tenant = AnalysisRunStateEventRecord {
+        tenant_record_id: Uuid::from_u128(98),
+        ..event.clone()
+    };
+    assert!(insert_analysis_run_state_event_sql(&record, &cross_tenant).is_err());
     let mismatched = AnalysisRunStateEventRecord {
         run_state: AnalysisRunState::Succeeded,
         ..event.clone()
@@ -183,6 +188,9 @@ fn tampered_request_records_fail_before_sql() {
     let mut tampered = request_record();
     tampered.request_payload.push(' ');
     assert!(insert_analysis_run_request_sql(&tampered).is_err());
+    let mut tampered_digest = request_record();
+    tampered_digest.request_payload_sha256 = "0".repeat(64);
+    assert!(insert_analysis_run_request_sql(&tampered_digest).is_err());
     assert_eq!(
         PersistenceError::InvalidAnalysisRun.to_string(),
         "invalid analysis run"
