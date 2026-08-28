@@ -2179,14 +2179,12 @@ pub fn refuse_standardised_time_independent_predictor_variance_as_standardised_a
 /// The scalar map is exactly `v / v = 1`. Unstandardised `v` is
 /// defined for a zero predictor, but `TIPREDVARstd` requires a
 /// strictly positive `TIPREDVAR`.
-/// [`PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance`]
-/// when `TIPREDVAR` is zero, and
-/// [`PsychometricError::InvalidNumericInput`] when the variance is
-/// non-finite, negative, or the quadratic form overflows.
-///
 /// # Errors
 ///
-/// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock, [`PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance`] when `TIPREDVAR` is zero or negative, and [`PsychometricError::InvalidNumericInput`] for non-finite input.
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock,
+/// [`PsychometricError::StandardisedTimeIndependentPredictorVarianceRequiresPositivePredictorVariance`]
+/// when `TIPREDVAR` is zero, and [`PsychometricError::InvalidNumericInput`]
+/// when it is negative or non-finite.
 pub fn recover_standardised_time_independent_predictor_variance(
     time_independent_predictor_variance: f64,
     clock: LagClock,

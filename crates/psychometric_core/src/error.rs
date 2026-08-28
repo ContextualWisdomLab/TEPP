@@ -711,7 +711,7 @@ pub enum PsychometricError {
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
 
-    /// Driver p. 16 `TIPREDVARstd` was requested with a non-positive
+    /// Driver p. 16 `TIPREDVARstd` was requested with a zero
     /// time-independent predictor variance. Footnote 4
     /// standardisation of the 2017-era `TIPREDVAR` matrix requires
     /// strictly positive `TIPREDVAR`.
