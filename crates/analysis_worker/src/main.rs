@@ -2,11 +2,23 @@
 //! One-shot durable TEPP analysis worker executable.
 
 use analysis_worker::{
-    AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES, WorkerRuntimeIdentity, execute_one,
+    AnalysisWorkerError, AnalysisWorkerInput, MAX_WORKER_INPUT_BYTES, WorkerRuntimeIdentity,
+    execute_one,
 };
-use persistence_postgres::{LiveSqlxConfig, LiveSqlxPoolOptions, open_live_sqlx_pool};
-use std::io::Read;
+use persistence_postgres::{
+    LiveSqlxConfig, LiveSqlxPoolOptions, PersistenceError, open_live_sqlx_pool,
+};
+use std::{io::Read, process::ExitCode};
 use uuid::Uuid;
+
+const PERMANENT_EXIT_CODE: u8 = 64;
+const RETRYABLE_EXIT_CODE: u8 = 75;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SchedulerDisposition {
+    Permanent,
+    Retryable,
+}
 
 struct CliArguments {
     tenant_record_id: Uuid,
@@ -15,8 +27,44 @@ struct CliArguments {
     completed_at: String,
 }
 
-#[rustfmt::skip]
-fn main() -> Result<(), Box<dyn std::error::Error>> { run_from_env().map(|output| println!("{output}")) }
+fn main() -> ExitCode {
+    match run_from_env() {
+        Ok(output) => {
+            println!("{output}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            let disposition = scheduler_disposition(error.as_ref());
+            eprintln!("analysis_worker: {disposition:?}");
+            ExitCode::from(match disposition {
+                SchedulerDisposition::Permanent => PERMANENT_EXIT_CODE,
+                SchedulerDisposition::Retryable => RETRYABLE_EXIT_CODE,
+            })
+        }
+    }
+}
+
+fn scheduler_disposition(error: &(dyn std::error::Error + 'static)) -> SchedulerDisposition {
+    if let Some(error) = error.downcast_ref::<AnalysisWorkerError>() {
+        return match error {
+            AnalysisWorkerError::InvalidInput | AnalysisWorkerError::UnsupportedRequest => {
+                SchedulerDisposition::Permanent
+            }
+            AnalysisWorkerError::AlreadyLocked | AnalysisWorkerError::ExecutionFailed => {
+                SchedulerDisposition::Retryable
+            }
+        };
+    }
+    if let Some(error) = error.downcast_ref::<PersistenceError>() {
+        return match error {
+            PersistenceError::DatabaseUrlInvalid | PersistenceError::PoolOptionsInvalid => {
+                SchedulerDisposition::Permanent
+            }
+            _ => SchedulerDisposition::Retryable,
+        };
+    }
+    SchedulerDisposition::Permanent
+}
 
 fn run_from_env() -> Result<String, Box<dyn std::error::Error>> {
     let arguments = parse_arguments(&mut std::env::args().skip(1))?;
@@ -82,8 +130,12 @@ fn render_outcome(
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_arguments, render_outcome, render_output, required};
-    use analysis_worker::AnalysisWorkerOutcome;
+    use super::{
+        SchedulerDisposition, parse_arguments, render_outcome, render_output, required,
+        scheduler_disposition,
+    };
+    use analysis_worker::{AnalysisWorkerError, AnalysisWorkerOutcome};
+    use persistence_postgres::PersistenceError;
     use tepp_api::{AnalysisRunAccepted, AnalysisRunStatus};
 
     const NIL: &str = "00000000-0000-0000-0000-000000000000";
@@ -131,6 +183,40 @@ mod tests {
                 artifact_json: None,
             })
             .is_ok()
+        );
+    }
+
+    #[test]
+    fn scheduler_disposition_separates_permanent_and_retryable_failures() {
+        for error in [
+            AnalysisWorkerError::InvalidInput,
+            AnalysisWorkerError::UnsupportedRequest,
+        ] {
+            assert_eq!(
+                scheduler_disposition(&error),
+                SchedulerDisposition::Permanent
+            );
+        }
+        for error in [
+            AnalysisWorkerError::AlreadyLocked,
+            AnalysisWorkerError::ExecutionFailed,
+        ] {
+            assert_eq!(
+                scheduler_disposition(&error),
+                SchedulerDisposition::Retryable
+            );
+        }
+        assert_eq!(
+            scheduler_disposition(&PersistenceError::DatabaseUrlInvalid),
+            SchedulerDisposition::Permanent
+        );
+        assert_eq!(
+            scheduler_disposition(&PersistenceError::SqlExecutionFailed),
+            SchedulerDisposition::Retryable
+        );
+        assert_eq!(
+            scheduler_disposition(&std::io::Error::other("redacted")),
+            SchedulerDisposition::Permanent
         );
     }
 }

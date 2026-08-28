@@ -37,5 +37,19 @@ fn executable_reaches_the_fail_closed_live_transport_boundary() {
     fs::remove_file(path).expect("remove temporary input");
 
     assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(75));
     assert!(output.stdout.is_empty());
+    assert_eq!(output.stderr, b"analysis_worker: Retryable\n");
+}
+
+#[test]
+fn invalid_invocation_is_permanent_and_redacted() {
+    let output = Command::new(env!("CARGO_BIN_EXE_analysis_worker"))
+        .arg("not-a-uuid")
+        .output()
+        .expect("worker process");
+
+    assert_eq!(output.status.code(), Some(64));
+    assert!(output.stdout.is_empty());
+    assert_eq!(output.stderr, b"analysis_worker: Permanent\n");
 }
