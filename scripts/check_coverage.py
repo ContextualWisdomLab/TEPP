@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from functools import cache
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import AbstractSet, Any, Iterable, Mapping, Sequence
 
 
 def load_totals(path: Path) -> Mapping[str, Any]:
@@ -209,7 +210,11 @@ def is_executable_source_line(
             if repository_root is not None
             else Path(source_path)
         )
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = (
+            _source_lines(path)
+            if repository_root is not None
+            else tuple(path.read_text(encoding="utf-8").splitlines())
+        )
     except OSError:
         return True
     # Stale LCOV rows past EOF are instrumentation noise, not production gaps.
@@ -241,6 +246,8 @@ def is_executable_source_line(
         "();",
         "};",
         "});",
+        ")?,",
+        ")?;",
         "Ok(())",
     }:
         return False
@@ -257,6 +264,17 @@ def is_executable_source_line(
     if text.startswith("impl ") or text.startswith("impl<"):
         return False
     if text.startswith(") ->"):
+        return False
+    if text == ") {":
+        return False
+    if text.startswith("let ") and " = " in text and text.endswith(" {"):
+        return False
+    if (
+        "::" in text
+        and line_number < len(lines)
+        and lines[line_number].strip().startswith("|")
+        and _is_multiline_match_alternative(lines, line_number)
+    ):
         return False
     if text.startswith(
         (
@@ -284,9 +302,19 @@ def is_executable_source_line(
         return _is_multiline_match_guard(lines, line_number)
     if text.startswith("pub struct ") or text.startswith("struct "):
         return False
+    if text == ")," or (
+        text.endswith("(")
+        and "=" not in text
+        and sum(line.count("(") - line.count(")") for line in lines[: line_number - 1]) > 0
+    ):
+        return False
     if text.startswith("pub enum ") or text.startswith("enum "):
         return False
     if text.startswith("Ok(Self") or text in {")}", "})"}:
+        return False
+    if text.endswith(" {") and text.startswith(("Ok(", "return Ok(")):
+        return False
+    if text.endswith(",") and text[:-1].isidentifier() and _inside_struct_literal(lines, line_number):
         return False
     if text in {"} else {", "else {", "));"} or text.startswith((".", "||", "&&")):
         return False
@@ -300,8 +328,27 @@ def is_executable_source_line(
     return True
 
 
+def _is_multiline_match_alternative(lines: Sequence[str], line_number: int) -> bool:
+    """Return whether consecutive alternatives reach a match-arm arrow."""
+
+    for offset, candidate in enumerate(lines[line_number - 1 :]):
+        text = candidate.strip()
+        if offset > 0 and not text.startswith("|"):
+            return False
+        if "=>" in text:
+            return True
+    return False
+
+
+@cache
+def _source_lines(path: Path) -> tuple[str, ...]:
+    """Read each source file once during one coverage-check process."""
+
+    return tuple(path.read_text(encoding="utf-8").splitlines())
+
+
 def _is_structural_comma_continuation(
-    lines: list[str], line_number: int, text: str
+    lines: Sequence[str], line_number: int, text: str
 ) -> bool:
     """Return whether a comma-terminated line is proven to be structural.
 
@@ -310,7 +357,8 @@ def _is_structural_comma_continuation(
     remain executable because their expressions can perform observable work.
     """
 
-    if any(character in text for character in "()=+-*/%<>!&|?"):
+    operator_text = text[1:] if text.startswith("&") and not text.startswith("&&") else text
+    if any(character in operator_text for character in "()=+-*/%<>!&|?"):
         return False
     previous = ""
     for candidate in reversed(lines[: line_number - 1]):
@@ -321,9 +369,11 @@ def _is_structural_comma_continuation(
         return True
 
     declaration_depth = 0
+    expression_depth = 0
     function_parenthesis_depth = 0
     for candidate in lines[: line_number - 1]:
         stripped = candidate.strip()
+        expression_depth += candidate.count("(") - candidate.count(")")
         if declaration_depth:
             declaration_depth += candidate.count("{") - candidate.count("}")
             if declaration_depth <= 0:
@@ -348,7 +398,21 @@ def _is_structural_comma_continuation(
             continue
         if "fn " in stripped and "(" in candidate:
             function_parenthesis_depth = candidate.count("(") - candidate.count(")")
-    return declaration_depth > 0 or function_parenthesis_depth > 0
+    return declaration_depth > 0 or function_parenthesis_depth > 0 or expression_depth > 0
+
+
+def _inside_struct_literal(lines: Sequence[str], line_number: int) -> bool:
+    """Return whether a shorthand field is inside the nearest struct literal."""
+
+    depth = 0
+    for candidate in reversed(lines[: line_number - 1]):
+        depth += candidate.count("}") - candidate.count("{")
+        if depth < 0:
+            opener = candidate.strip()
+            return opener.endswith(" {") and not opener.startswith(
+                ("fn ", "pub fn ", "if ", "else ", "match ", "for ", "while ")
+            )
+    return False
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
@@ -498,13 +562,20 @@ def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     return guard_found
 
 
-def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
+def _cfg_test_module_line_numbers(lines: Sequence[str]) -> AbstractSet[int]:
     """Return line numbers belonging to any ``#[cfg(test)] mod ... { ... }`` block.
 
     Blank lines and further attributes (for example ``#[allow(...)]``) may sit
     between ``#[cfg(test)]`` and the ``mod`` declaration; both belong to the
     module and must not break detection.
     """
+
+    return _cached_cfg_test_module_line_numbers(tuple(lines))
+
+
+@cache
+def _cached_cfg_test_module_line_numbers(lines: tuple[str, ...]) -> frozenset[int]:
+    """Compute immutable test-module membership once per source content."""
 
     test_lines: set[int] = set()
     index = 0
@@ -515,14 +586,21 @@ def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
                 not lines[look].strip() or lines[look].strip().startswith("#[")
             ):
                 look += 1
-            if look < len(lines) and lines[look].strip().startswith("mod "):
+            if look < len(lines) and lines[look].strip().startswith(
+                ("mod ", "pub mod ", "pub(crate) mod ", "pub(super) mod ")
+            ):
                 depth = 0
                 started = False
                 cursor = look
                 while cursor < len(lines):
                     raw = lines[cursor]
-                    depth += raw.count("{") - raw.count("}")
-                    if "{" in raw:
+                    brace_delta = (
+                        0
+                        if _line_in_multiline_string_literal(lines, cursor + 1)
+                        else _rust_code_brace_delta(raw)
+                    )
+                    depth += brace_delta
+                    if brace_delta > 0:
                         started = True
                     test_lines.add(cursor + 1)
                     if started and depth <= 0:
@@ -531,7 +609,32 @@ def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
                 index = cursor + 1
                 continue
         index += 1
-    return test_lines
+    return frozenset(test_lines)
+
+
+def _rust_code_brace_delta(line: str) -> int:
+    """Count braces outside one-line Rust strings, characters, and comments."""
+
+    delta = 0
+    quote: str | None = None
+    escaped = False
+    for index, character in enumerate(line):
+        if quote is None and line[index : index + 2] == "//":
+            break
+        if quote is not None:
+            if character == quote and not escaped:
+                quote = None
+            escaped = character == "\\" and not escaped
+            if character != "\\":
+                escaped = False
+            continue
+        if character in {'"', "'"}:
+            quote = character
+        elif character == "{":
+            delta += 1
+        elif character == "}":
+            delta -= 1
+    return delta
 
 
 def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
@@ -564,7 +667,7 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
     return False
 
 
-def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
+def _line_in_multiline_string_literal(lines: Sequence[str], line_number: int) -> bool:
     """Return whether a line is inside a Rust string continuation.
 
     The scanner tracks normal strings, raw strings, block comments, and character
@@ -572,11 +675,19 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
     a later source line.
     """
 
+    return line_number in _multiline_string_literal_line_numbers(tuple(lines))
+
+
+@cache
+def _multiline_string_literal_line_numbers(lines: tuple[str, ...]) -> frozenset[int]:
+    """Scan Rust string continuations once per immutable source content."""
+
+    continuation_lines: set[int] = set()
     in_string = False
     raw_hashes: int | None = None
     block_comment_depth = 0
     for index, raw in enumerate(lines, start=1):
-        target_continuation = (in_string or raw_hashes is not None) and index == line_number
+        target_continuation = in_string or raw_hashes is not None
         target_closing_cursor: int | None = None
         target_has_executable_suffix = False
         cursor = 0
@@ -644,9 +755,10 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
             cursor += 1
         if target_continuation:
             if target_closing_cursor is None:
-                return True
-            return not target_has_executable_suffix
-    return False
+                continuation_lines.add(index)
+            elif not target_has_executable_suffix:
+                continuation_lines.add(index)
+    return frozenset(continuation_lines)
 
 
 def _raw_string_start(line: str, cursor: int) -> tuple[int, int] | None:

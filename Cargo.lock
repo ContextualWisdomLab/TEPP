@@ -89,12 +89,16 @@ name = "analysis_worker"
 version = "0.2.0"
 dependencies = [
  "analysis_engine",
+ "corpus_split",
+ "membership_core",
  "persistence_postgres",
+ "relation_graph",
  "serde",
  "serde_json",
  "sha2",
  "temporal_core",
  "tepp_api",
+ "topic_measurement",
  "uuid",
 ]
 

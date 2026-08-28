@@ -2073,4 +2073,28 @@ mod tests {
             "measurement error is not standardised manifest-trait variance"
         );
     }
+
+    #[test]
+    fn standardised_manifest_variance_boundary_messages_are_stable() {
+        for (error, message) in [
+            (
+                PsychometricError::StandardisedManifestVarianceRequiresPositiveManifestVariance,
+                "standardised measurement-error variance requires strictly positive measurement-error variance",
+            ),
+            (
+                PsychometricError::UnstandardisedManifestVarianceIsNotStandardisedManifestVariance,
+                "unstandardised measurement-error variance is not standardised measurement-error variance",
+            ),
+            (
+                PsychometricError::StandardisedManifestTraitVarianceIsNotStandardisedManifestVariance,
+                "standardised manifest-trait variance is not standardised measurement-error variance",
+            ),
+            (
+                PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance,
+                "observed-indicator variance is not standardised measurement-error variance",
+            ),
+        ] {
+            assert_eq!(error.to_string(), message);
+        }
+    }
 }

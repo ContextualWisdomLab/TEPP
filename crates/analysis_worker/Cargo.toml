@@ -15,12 +15,16 @@ publish = false
 
 [dependencies]
 analysis_engine = { path = "../analysis_engine", version = "0.2.0" }
+corpus_split = { path = "../corpus_split", version = "0.2.0" }
+membership_core = { path = "../membership_core", version = "0.2.0" }
 persistence_postgres = { path = "../persistence_postgres", version = "0.2.0", features = ["live-sqlx"] }
+relation_graph = { path = "../relation_graph", version = "0.2.0" }
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 temporal_core = { path = "../temporal_core", version = "0.2.0" }
 tepp_api = { path = "../tepp_api", version = "0.2.0" }
+topic_measurement = { path = "../topic_measurement", version = "0.2.0" }
 uuid.workspace = true
 
 [lints]

@@ -76,6 +76,119 @@ class CoverageContractTests(unittest.TestCase):
             coverage_contract.validate_kind(zero_totals, "branches"),  # type: ignore[arg-type]
         )
 
+    def test_question_mark_call_closer_is_structural(self) -> None:
+        """LLVM call-closing noise is not an independently executable line."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            for closer in (")?;", ")?,"):
+                source.write_text(
+                    f"fn f() {{\n    call(\n        value,\n    {closer}\n}}\n",
+                    encoding="utf-8",
+                )
+                self.assertFalse(
+                    coverage_contract.is_executable_source_line(str(source), 4)
+                )
+
+    def test_multiline_match_alternatives_are_structural(self) -> None:
+        """Only the terminal match arm carries executable disposition."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                "fn f(value: E) {\n    match value {\n        E::A\n        | E::B\n        | E::C => run(),\n    };\n}\n",
+                encoding="utf-8",
+            )
+            for line in (3, 4):
+                self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 5))
+            source.write_text(
+                "fn f() {\n    let mask = Flags::A\n        | Flags::B;\n}\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
+            source.write_text("fn f() {\n    values.map(|value| transform(value));\n}\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
+
+    def test_multiline_closer_and_struct_literal_opener_are_structural(self) -> None:
+        """Formatting-only delimiters do not inflate authored coverage."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                "fn f() {\n    if matches!(\n        value,\n        E::A\n    ) {\n        run();\n    }\n    let identity = Identity {\n        value,\n    };\n}\n",
+                encoding="utf-8",
+            )
+            for line in (5, 8):
+                self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+
+    def test_cfg_test_module_ignores_braces_inside_strings(self) -> None:
+        """String interpolation braces cannot terminate a test module early."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                '#[cfg(test)]\npub(super) mod tests {\n    fn fixture() { format!("{value}"); }\n    fn test_only() {}\n}\nfn production() { run(); }\n',
+                encoding="utf-8",
+            )
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 4))
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 6))
+
+    def test_multiline_call_delimiters_and_bare_arguments_are_structural(self) -> None:
+        """A call's punctuation and bare argument rows carry no separate behavior."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                "fn f() {\n    call(\n        &first,\n        Type::new(\n            second,\n        ),\n    );\n}\n",
+                encoding="utf-8",
+            )
+            for line in (3, 4, 6):
+                self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
+
+    def test_result_struct_openers_and_shorthand_fields_are_structural(self) -> None:
+        """Result wrappers and shorthand fields carry no separate branch behavior."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                "fn f(value: u8) {\n    return Ok(Output {\n        value,\n    });\n}\n",
+                encoding="utf-8",
+            )
+            for line in (2, 3):
+                self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+
+    def test_new_structural_scanner_branches_are_explicit(self) -> None:
+        """Cover typed alternatives, declaration depth, comments, and escapes."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text("| E::Only => run(),\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
+            source.write_text("| E::Only\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
+            source.write_text("E::A\n| E::B\nnext();\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
+            source.write_text("E::A\n| E::B\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
+        self.assertTrue(
+            coverage_contract._is_structural_comma_continuation(
+                ["struct Item {", "    first: u8,", "    second: u8,", "}"],
+                3,
+                "second: u8,",
+            )
+        )
+        self.assertFalse(
+            coverage_contract._is_structural_comma_continuation(
+                ["struct Item {", "    first: u8,", "}", "standalone,"],
+                4,
+                "standalone,",
+            )
+        )
+        self.assertEqual(coverage_contract._rust_code_brace_delta("// {"), 0)
+        self.assertEqual(coverage_contract._rust_code_brace_delta(r'"\"{"'), 0)
+
     def test_incomplete_and_malformed_summaries_fail(self) -> None:
         """Missing, nonnumeric, impossible, and incomplete counts are rejected."""
 
