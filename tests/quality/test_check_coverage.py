@@ -1370,6 +1370,11 @@ class CoverageContractTests(unittest.TestCase):
                 lines, 3, "field_name,"
             )
         )
+        self.assertTrue(
+            coverage_contract._is_structural_comma_continuation(
+                [")", "record_value(", "field_name,"], 3, "field_name,"
+            )
+        )
 
         nested_struct = ["let value = Item {", "nested: Nested {", "field,"]
         self.assertTrue(

@@ -370,12 +370,19 @@ def _is_structural_comma_continuation(
         if "fn " in stripped and "(" in candidate:
             function_parenthesis_depth = candidate.count("(") - candidate.count(")")
             continue
-        expression_parenthesis_depth += candidate.count("(") - candidate.count(")")
-        array_depth += candidate.count("[") - candidate.count("]")
+        expression_parenthesis_depth = max(
+            0,
+            expression_parenthesis_depth + candidate.count("(") - candidate.count(")"),
+        )
+        array_depth = max(0, array_depth + candidate.count("[") - candidate.count("]"))
         if "{" in candidate and (" = " in candidate or "Self {" in candidate):
-            struct_literal_depth += candidate.count("{") - candidate.count("}")
+            struct_literal_depth = max(
+                0, struct_literal_depth + candidate.count("{") - candidate.count("}")
+            )
         elif struct_literal_depth:
-            struct_literal_depth += candidate.count("{") - candidate.count("}")
+            struct_literal_depth = max(
+                0, struct_literal_depth + candidate.count("{") - candidate.count("}")
+            )
     return (
         declaration_depth > 0
         or function_parenthesis_depth > 0
