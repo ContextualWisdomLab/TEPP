@@ -90,6 +90,12 @@ impl IntervalConsistencyNetwork {
             .map_err(|error| map_reasoner_error(&error))
     }
 
+    /// Number of event-interval variables currently in this network.
+    #[must_use]
+    pub fn variable_count(&self) -> usize {
+        self.reasoner.variable_count()
+    }
+
     /// Assert a nonempty qualitative relation set for an ordered pair.
     ///
     /// Use this when temporal extents are unknown and only Allen vocabulary is

@@ -7,6 +7,7 @@ use event_core::{
 use temporal_core::{AllenRelation, RelationSet};
 
 const DIGEST: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const CUTOFF: &str = "2026-08-28T00:00:00Z";
 
 fn artifact() -> IntervalConsistencyArtifact {
     let mut network = IntervalConsistencyNetwork::with_limits(3, 3, 128).expect("limits");
@@ -24,6 +25,7 @@ fn artifact() -> IntervalConsistencyArtifact {
         "run<&1",
         "snapshot-1",
         DIGEST,
+        CUTOFF,
         &network,
         &[
             ("event<&1".to_owned(), first),
@@ -39,8 +41,10 @@ fn derived_branch_is_durable_typed_and_provenance_bearing() {
     let artifact = artifact();
     assert_eq!(
         INTERVAL_CONSISTENCY_ARTIFACT_TYPE,
-        "tdt_chronos_interval_consistency_v1"
+        "tdt_chronos_interval_consistency_v2"
     );
+    assert_eq!(artifact.knowledge_cutoff, CUTOFF);
+    assert_eq!(artifact.event_ids, ["event-2", "event-3", "event<&1"]);
     assert_eq!(artifact.relations.len(), 3);
     let derived = artifact
         .relations
@@ -62,6 +66,7 @@ fn derived_branch_is_durable_typed_and_provenance_bearing() {
     let graphml = artifact.to_graphml().expect("graphml");
     assert!(graphml.contains("allen_relations"));
     assert!(graphml.contains(&format!("<data key=\"input_digest\">{DIGEST}</data>")));
+    assert!(graphml.contains(&format!("<data key=\"knowledge_cutoff\">{CUTOFF}</data>")));
     assert!(graphml.contains("<data key=\"observed\">false</data>"));
     assert!(graphml.contains("<data key=\"support\">0,1</data>"));
     assert!(graphml.contains("event&lt;&amp;1"));
@@ -79,6 +84,7 @@ fn reverse_oriented_assertion_is_observed_in_stable_export_order() {
         "run-reverse",
         "snapshot-reverse",
         DIGEST,
+        CUTOFF,
         &network,
         &[
             ("event-left".to_owned(), left),
@@ -91,6 +97,75 @@ fn reverse_oriented_assertion_is_observed_in_stable_export_order() {
     assert_eq!(
         artifact.relations[0].allen_relations,
         vec![AllenRelation::Before]
+    );
+}
+
+#[test]
+fn complete_variable_inventory_preserves_isolated_events() {
+    let mut singleton = IntervalConsistencyNetwork::with_limits(1, 1, 1).expect("limits");
+    let only = singleton.add_variable().expect("only");
+    assert_eq!(
+        IntervalConsistencyArtifact::from_network(
+            "run",
+            "snapshot",
+            DIGEST,
+            CUTOFF,
+            &singleton,
+            &[("event-only".into(), only)]
+        ),
+        Err(EventError::InvalidWirePayload)
+    );
+    let mut network = IntervalConsistencyNetwork::with_limits(3, 1, 8).expect("limits");
+    let first = network.add_variable().expect("first");
+    let second = network.add_variable().expect("second");
+    let isolated = network.add_variable().expect("isolated");
+    network
+        .assert_qualitative_relations(first, second, RelationSet::singleton(AllenRelation::Before))
+        .expect("assertion");
+    assert_eq!(
+        IntervalConsistencyArtifact::from_network(
+            "run",
+            "snapshot",
+            DIGEST,
+            CUTOFF,
+            &network,
+            &[("event-1".into(), first), ("event-2".into(), second)]
+        ),
+        Err(EventError::InvalidWirePayload)
+    );
+    assert_eq!(
+        IntervalConsistencyArtifact::from_network(
+            "run",
+            "snapshot",
+            DIGEST,
+            CUTOFF,
+            &network,
+            &[
+                ("event-1".into(), first),
+                ("event-2".into(), first),
+                ("event-3".into(), isolated),
+            ]
+        ),
+        Err(EventError::InvalidWirePayload)
+    );
+    let artifact = IntervalConsistencyArtifact::from_network(
+        "run",
+        "snapshot",
+        DIGEST,
+        CUTOFF,
+        &network,
+        &[
+            ("event-1".into(), first),
+            ("event-2".into(), second),
+            ("event-isolated".into(), isolated),
+        ],
+    )
+    .expect("complete artifact");
+    assert!(
+        artifact
+            .to_graphml()
+            .expect("graphml")
+            .contains("event-isolated")
     );
 }
 
@@ -108,6 +183,7 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
             "run",
             "snapshot",
             "not-a-digest",
+            CUTOFF,
             &network,
             &[("same".to_owned(), first), ("same".to_owned(), second)]
         ),
@@ -118,6 +194,7 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
             "run",
             "snapshot",
             DIGEST,
+            CUTOFF,
             &network,
             &[("event-1".to_owned(), first)]
         ),
@@ -128,6 +205,7 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
             "run",
             "snapshot",
             DIGEST,
+            CUTOFF,
             &network,
             &[(String::new(), first), ("event-2".to_owned(), second)]
         ),
@@ -149,6 +227,12 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
     invalid_binding.input_digest_sha256 = "bad".to_owned();
     assert_eq!(
         invalid_binding.to_json(),
+        Err(EventError::InvalidWirePayload)
+    );
+    let mut invalid_cutoff = valid.clone();
+    invalid_cutoff.knowledge_cutoff = "not-a-time".to_owned();
+    assert_eq!(
+        invalid_cutoff.to_json(),
         Err(EventError::InvalidWirePayload)
     );
     let mut invalid_relation = valid.clone();
@@ -175,6 +259,7 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
             "x".repeat(4 * 1024 * 1024),
             "snapshot",
             DIGEST,
+            CUTOFF,
             &network,
             &[
                 ("event-1".to_owned(), first),
@@ -188,7 +273,9 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
         Err(EventError::InvalidWirePayload)
     );
 
-    let unconstrained = IntervalConsistencyNetwork::with_limits(2, 1, 8).expect("limits");
+    let mut unconstrained = IntervalConsistencyNetwork::with_limits(2, 1, 8).expect("limits");
+    unconstrained.add_variable().expect("local left");
+    unconstrained.add_variable().expect("local right");
     let mut foreign = IntervalConsistencyNetwork::with_limits(2, 1, 8).expect("foreign");
     let foreign_left = foreign.add_variable().expect("foreign left");
     let foreign_right = foreign.add_variable().expect("foreign right");
@@ -197,6 +284,7 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
             "run",
             "snapshot",
             DIGEST,
+            CUTOFF,
             &unconstrained,
             &[
                 ("event-1".to_owned(), foreign_left),
@@ -214,6 +302,7 @@ fn artifact_rejects_unbound_or_noncanonical_payloads() {
             "run",
             "snapshot",
             DIGEST,
+            CUTOFF,
             &quiet,
             &[
                 ("event-1".to_owned(), quiet_left),
@@ -236,6 +325,21 @@ fn invalid_artifact_variants(
     variants.push(invalid);
     let mut invalid = valid.clone();
     invalid.snapshot_id.clear();
+    variants.push(invalid);
+    let mut invalid = valid.clone();
+    invalid.event_ids.clear();
+    variants.push(invalid);
+    let mut invalid = valid.clone();
+    invalid.event_ids.swap(0, 1);
+    variants.push(invalid);
+    let mut invalid = valid.clone();
+    invalid.event_ids.remove(0);
+    variants.push(invalid);
+    let mut invalid = valid.clone();
+    let missing_right = invalid.relations[0].right_event_id.clone();
+    invalid
+        .event_ids
+        .retain(|identity| identity != &missing_right);
     variants.push(invalid);
     let mut invalid = valid.clone();
     invalid.relations = vec![valid.relations[0].clone(); 100_001];
