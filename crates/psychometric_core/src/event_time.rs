@@ -16558,7 +16558,7 @@ mod tests {
         );
         let growing = recover_discrete_lag_from_log_rate(0.5, event_delta, LagClock::EventTime)
             .expect("growing a>0");
-        assert!(growing.is_finite() && growing > 1.0);
+        assert_eq!(growing, 0.5_f64.exp());
         assert_eq!(
             recover_standardised_discrete_drift(0.4, 0.5, event_delta, LagClock::EventTime),
             Err(PsychometricError::StationaryVarianceRequiresStableDrift)
