@@ -2,6 +2,10 @@
 #![deny(missing_docs)]
 //! One-shot execution for a durable TEPP analysis run.
 
+mod topic_lineage_input;
+
+pub use topic_lineage_input::{TopicLineageWorkerInput, ValidatedTopicLineageInput};
+
 use analysis_engine::{
     ANALYSIS_ARTIFACT_SCHEMA_VERSION, AnalysisArtifact, AnalysisCorpus, AnalysisEvidenceUnit,
     AnalysisExecution, execute_analysis_run,
