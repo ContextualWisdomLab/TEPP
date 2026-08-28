@@ -114,7 +114,8 @@ posterior logistic-normal plausible values, a declared event clock, opaque
 stable topic identities, artifact-local coordinate order, topic activity,
 explicit topic-lineage events, admitted Event Lineage document relations, and
 provenance-bound time-valid business-unit, PU, team, and person memberships.
-The ordered `topic_ids` array defines coordinate order. Each lineage,
+The ordered `topic_ids` array defines coordinate order; `topic_basis_sha256`
+binds that order to `posterior_draw_set_id` and fails closed on relabeling. Each lineage,
 document-relation, or membership assertion identifies its immutable evidence
 resource, provenance assertion, and digest so consumers can materialize
 normalized qualified provenance. It is the only admitted handoff to the

@@ -103,7 +103,8 @@ The analysis layer now assembles a complete
 accepted run, bound source snapshot and cutoff, declared event clock, stable
 topic activity, qualified document-lineage evidence, and time-valid membership
 provenance. It derives plausible values from the fit-bound joint precision and
-validates the completed artifact before returning it. Missing or mismatched
+binds the ordered topic identities to the posterior draw-set identity before
+validating the completed artifact. Missing or mismatched
 records remain unavailable; the assembler does not infer a predecessor, fill a
 membership, or manufacture a topic-lineage event. Multiple outgoing admitted
 predecessor relations remain separate records, so a Project Journey consumer
