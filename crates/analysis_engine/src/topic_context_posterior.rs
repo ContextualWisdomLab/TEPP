@@ -22,6 +22,24 @@ const DIMENSIONS: [&str; 4] = ["business_unit", "process_unit", "team", "person"
 type PosteriorDraws = BTreeMap<Uuid, BTreeSet<u64>>;
 type DocumentEventTimes = BTreeMap<Uuid, KnowledgeCutoff>;
 
+/// Explicit assignment of one stable topic identity to one fitted model index.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct TopicIdentityBinding {
+    topic_id: Uuid,
+    model_topic_index: usize,
+}
+
+impl TopicIdentityBinding {
+    /// Bind a stable topic identity to the fitted model's exact topic index.
+    #[must_use]
+    pub const fn new(topic_id: Uuid, model_topic_index: usize) -> Self {
+        Self {
+            topic_id,
+            model_topic_index,
+        }
+    }
+}
+
 /// One explicit active, dormant, or reactivated interval for a global topic.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -156,10 +174,9 @@ pub struct TopicContextPosteriorArtifact {
 
 /// Assemble one complete posterior artifact from a converged CPU `f64` fit.
 ///
-/// `topic_ids` assigns stable identities in the fitted model's exact topic-index
-/// order. The joint-precision producer owns that binding from this point on:
-/// the artifact reads the identities back from the digest-bound draw set rather
-/// than reusing caller memory beside the fitted coordinates.
+/// `topic_identity_bindings` explicitly maps every stable identity to one fitted
+/// model topic index. The assembler requires a complete index bijection before
+/// the joint-precision producer binds that order into its draw-set digest.
 ///
 /// The function binds the accepted run, immutable snapshot, declared event
 /// clock, stable topics, admitted Event Lineage, organizational membership
@@ -180,7 +197,7 @@ pub fn assemble_topic_context_posterior(
     input: &ReferenceTopicInput,
     model: &ReferenceTopicModel,
     config: &ReferenceTopicModelConfig,
-    topic_ids: Vec<Uuid>,
+    topic_identity_bindings: Vec<TopicIdentityBinding>,
     activity_intervals: Vec<TopicActivityInterval>,
     lineage_events: Vec<TopicLineageEvent>,
     document_relations: Vec<TopicDocumentRelation>,
@@ -205,6 +222,10 @@ pub fn assemble_topic_context_posterior(
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
+    let topic_ids = ordered_topic_ids(
+        topic_identity_bindings,
+        model.topic_term_probabilities.len(),
+    )?;
     let expected_transitions: BTreeSet<_> = input.transition_document_pairs().collect();
     let supplied_transitions: BTreeSet<_> = document_relations
         .iter()
@@ -256,6 +277,30 @@ pub fn assemble_topic_context_posterior(
     };
     artifact.to_json()?;
     Ok(artifact)
+}
+
+fn ordered_topic_ids(
+    bindings: Vec<TopicIdentityBinding>,
+    topic_count: usize,
+) -> Result<Vec<Uuid>, AnalysisEngineError> {
+    if bindings.len() != topic_count {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    let mut ordered = vec![None; topic_count];
+    let mut identities = BTreeSet::new();
+    for binding in bindings {
+        if binding.model_topic_index >= topic_count
+            || ordered[binding.model_topic_index].is_some()
+            || !identities.insert(binding.topic_id)
+        {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        ordered[binding.model_topic_index] = Some(binding.topic_id);
+    }
+    ordered
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or(AnalysisEngineError::InvalidEvidence)
 }
 
 fn digest(value: &str) -> bool {
