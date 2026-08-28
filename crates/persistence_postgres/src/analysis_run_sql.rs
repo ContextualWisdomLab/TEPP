@@ -28,6 +28,15 @@ pub struct AnalysisRunRequestRecord {
     pub available_time: AvailableTime,
 }
 
+/// Fully validated durable request and its latest lifecycle status.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AnalysisRunWorkerSnapshot {
+    /// Canonical persisted request reconstructed from its stored payload.
+    pub request_record: AnalysisRunRequestRecord,
+    /// Latest validated lifecycle status for the request.
+    pub status: AnalysisRunStatus,
+}
+
 /// Build the content-addressed model-artifact row referenced by a succeeded result.
 ///
 /// The caller persists this row before appending the succeeded lifecycle event.

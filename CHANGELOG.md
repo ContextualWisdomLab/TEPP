@@ -11,6 +11,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ### Added
 
 - `persistence_postgres` durable analysis-run receipt slice: canonical request JSON and SHA-256 identity, tenant-scoped idempotency, append-only `accepted → running|succeeded|failed` and `running → succeeded|failed` events, FORCE RLS, database-serialized transitions, rollback SQL, and contract tests (ADR 0013; issue #166 partial, active-PR evidence).
+- `persistence_postgres` worker transport now holds a tenant/run advisory lock on one retained PostgreSQL session, revalidates materialized request digests and terminal bindings, and commits artifact plus terminal-event SQL atomically. PostgreSQL 18 evidence covers accepted/failed/succeeded reads and the atomic success path; the executable worker remains the next stacked slice for issue #166.
 - **Analysis engine**: deterministic end-to-end analysis-run execution with cutoff-safe eligibility, immutable evidence binding, and reproducibility manifests (`analysis_engine` crate).
 - **Restore Driver p.16 `MANIFESTVARstd`**: `recover_standardised_manifest_variance` maps `θ / θ = 1` with strictly positive `MANIFESTVAR`, refusing unstandardised manifest-variance, `MANIFESTTRAITVARstd`, and Equation 5 `Var(y)` substitutions (`psychometric_core`).
 - **Posterior network estimator**: cross-draw Pearson correlations in ILR space, jackknife SE and CI, Benjamini–Hochberg FDR edge admission, nonparametric bootstrap stability, greedy modularity consensus clustering (`network_analysis` crate).
