@@ -83,6 +83,10 @@ fn request_insert_is_exactly_idempotent_and_status_read_is_tenant_scoped() {
     );
 
     let select = select_analysis_run_status_sql(Uuid::nil(), record.analysis_run_id);
+    assert!(!select.contains("r.*"));
+    assert!(!select.contains("e.*"));
+    assert!(select.contains("r.system_time AS request_system_time"));
+    assert!(select.contains("e.system_time AS event_system_time"));
     assert!(select.contains("tenant_record_id = '00000000-0000-0000-0000-000000000000'::uuid"));
     assert!(select.contains("ORDER BY state_sequence DESC LIMIT 1"));
 }
@@ -232,4 +236,16 @@ fn embedded_migration_normalizes_requests_and_append_only_events() {
     assert!(sql.contains("for update"));
     assert!(sql.contains("analysis-run artifact digest mismatch"));
     assert!(sql.contains("analysis_run_state_event_artifact_fk"));
+    assert!(
+        sql.contains(
+            "create unique index concurrently model_artifact_tenant_identity_unique_index"
+        )
+    );
+    assert!(sql.contains("unique using index model_artifact_tenant_identity_unique_index"));
+    assert!(
+        catalog
+            .down_sql()
+            .to_ascii_lowercase()
+            .contains("drop index if exists model_artifact_tenant_identity_unique_index")
+    );
 }

@@ -248,7 +248,7 @@ erDiagram
       uuid analysis_run_id PK
       uuid tenant_record_id FK
       text tenant_workspace_id
-      text idempotency_key UK
+      text idempotency_key
       smallint request_contract_version
       text snapshot_id
       timestamptz knowledge_cutoff
@@ -264,7 +264,7 @@ erDiagram
       uuid analysis_run_state_event_id PK
       uuid tenant_record_id FK
       uuid analysis_run_id FK
-      bigint state_sequence UK
+      bigint state_sequence
       text run_state_code
       uuid model_artifact_id FK
       text result_sha256
@@ -392,6 +392,11 @@ erDiagram
       text reproduction_status_code
     }
 ```
+
+The durable analysis-run tables use composite unique constraints:
+`ANALYSIS_RUN_REQUEST(tenant_record_id, idempotency_key)` scopes retry identity
+to one tenant, and `ANALYSIS_RUN_STATE_EVENT(analysis_run_id, state_sequence)`
+orders events within one run. Neither scalar is globally unique by itself.
 
 ## Temporal/bitemporal invariants
 

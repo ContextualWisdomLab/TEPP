@@ -80,7 +80,9 @@ PostgreSQL serializes event appends on the run row and permits only
 does not itself prove worker restart or backup/restore acceptance.
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
-`failed`. Accepted and running statuses contain no measurement result. A
+`failed`. An accepted run may move to `running` or directly to a terminal state
+when validation or setup finishes before worker execution; a running run may
+move only to a terminal state. Accepted and running statuses contain no measurement result. A
 terminal status contains exactly one request-bound `AnalysisRunTerminalResult`;
 consumers validate its request, receipt, snapshot, cutoff, model, profile, and
 idempotency bindings before treating it as measurement evidence.

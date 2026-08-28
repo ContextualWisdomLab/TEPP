@@ -266,7 +266,7 @@ pub fn insert_analysis_run_state_event_sql(
 #[must_use]
 pub fn select_analysis_run_status_sql(tenant_record_id: Uuid, analysis_run_id: Uuid) -> String {
     format!(
-        "SELECT r.*, e.* FROM analysis_run_request AS r JOIN analysis_run_state_event AS e USING (tenant_record_id, analysis_run_id) WHERE tenant_record_id = '{tenant_record_id}'::uuid AND analysis_run_id = '{analysis_run_id}'::uuid ORDER BY state_sequence DESC LIMIT 1"
+        "SELECT r.analysis_run_id, r.tenant_record_id, r.tenant_workspace_id, r.idempotency_key, r.request_contract_version, r.snapshot_id, r.knowledge_cutoff, r.model_contract_version, r.output_profile, r.request_payload_sha256, r.request_payload, r.system_time AS request_system_time, r.available_time AS request_available_time, e.analysis_run_state_event_id, e.state_sequence, e.run_state_code, e.model_artifact_id, e.result_sha256, e.result_schema_version, e.failure_code, e.terminal_payload, e.system_time AS event_system_time, e.available_time AS event_available_time FROM analysis_run_request AS r JOIN analysis_run_state_event AS e USING (tenant_record_id, analysis_run_id) WHERE tenant_record_id = '{tenant_record_id}'::uuid AND analysis_run_id = '{analysis_run_id}'::uuid ORDER BY state_sequence DESC LIMIT 1"
     )
 }
 

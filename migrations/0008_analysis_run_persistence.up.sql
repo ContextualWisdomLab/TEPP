@@ -1,8 +1,11 @@
 -- Durable analysis-run receipts and append-only lifecycle events (issue 166).
 
+CREATE UNIQUE INDEX CONCURRENTLY model_artifact_tenant_identity_unique_index
+    ON model_artifact (tenant_record_id, model_artifact_id);
+
 ALTER TABLE model_artifact
     ADD CONSTRAINT model_artifact_tenant_identity_unique
-    UNIQUE (tenant_record_id, model_artifact_id);
+    UNIQUE USING INDEX model_artifact_tenant_identity_unique_index;
 
 CREATE TABLE analysis_run_request (
     analysis_run_id uuid PRIMARY KEY,
