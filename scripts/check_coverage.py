@@ -271,7 +271,12 @@ def is_executable_source_line(
         return False
     if "::" in text and line_number < len(lines) and lines[line_number].strip().startswith("|"):
         return False
-    if text.startswith("|") and "::" in text and "|" not in text[1:]:
+    if (
+        text.startswith("|")
+        and "::" in text
+        and "|" not in text[1:]
+        and "=>" not in text
+    ):
         return False
     if text.startswith(
         (

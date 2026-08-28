@@ -101,6 +101,7 @@ class CoverageContractTests(unittest.TestCase):
             )
             for line in (3, 4):
                 self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 5))
             source.write_text("fn f() {\n    values.map(|value| transform(value));\n}\n", encoding="utf-8")
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
 
@@ -159,6 +160,8 @@ class CoverageContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "source.rs"
             source.write_text("| E::Only => run(),\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 1))
+            source.write_text("| E::Only\n", encoding="utf-8")
             self.assertFalse(coverage_contract.is_executable_source_line(str(source), 1))
         self.assertTrue(
             coverage_contract._is_structural_comma_continuation(
