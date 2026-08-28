@@ -28,7 +28,7 @@ fn artifact() -> IntervalConsistencyArtifact {
         CUTOFF,
         &network,
         &[
-            ("event<&1".to_owned(), first),
+            ("event-1<&".to_owned(), first),
             ("event-2".to_owned(), second),
             ("event-3".to_owned(), third),
         ],
@@ -44,13 +44,13 @@ fn derived_branch_is_durable_typed_and_provenance_bearing() {
         "tdt_chronos_interval_consistency_v2"
     );
     assert_eq!(artifact.knowledge_cutoff, CUTOFF);
-    assert_eq!(artifact.event_ids, ["event-2", "event-3", "event<&1"]);
+    assert_eq!(artifact.event_ids, ["event-1<&", "event-2", "event-3"]);
     assert_eq!(artifact.relations.len(), 3);
     let derived = artifact
         .relations
         .iter()
         .find(|relation| {
-            relation.left_event_id == "event<&1" && relation.right_event_id == "event-3"
+            relation.left_event_id == "event-1<&" && relation.right_event_id == "event-3"
         })
         .expect("derived relation");
     assert_eq!(derived.allen_relations, vec![AllenRelation::Before]);
@@ -69,7 +69,7 @@ fn derived_branch_is_durable_typed_and_provenance_bearing() {
     assert!(graphml.contains(&format!("<data key=\"knowledge_cutoff\">{CUTOFF}</data>")));
     assert!(graphml.contains("<data key=\"observed\">false</data>"));
     assert!(graphml.contains("<data key=\"support\">0,1</data>"));
-    assert!(graphml.contains("event&lt;&amp;1"));
+    assert!(graphml.contains("event-1&lt;&amp;"));
 }
 
 #[test]
@@ -167,6 +167,38 @@ fn complete_variable_inventory_preserves_isolated_events() {
             .expect("graphml")
             .contains("event-isolated")
     );
+}
+
+#[test]
+fn caller_variable_order_does_not_change_canonical_artifact() {
+    let expected = artifact();
+    let mut network = IntervalConsistencyNetwork::with_limits(3, 3, 128).expect("limits");
+    let first = network.add_variable().expect("first");
+    let second = network.add_variable().expect("second");
+    let third = network.add_variable().expect("third");
+    network
+        .assert_qualitative_relations(first, second, RelationSet::singleton(AllenRelation::Before))
+        .expect("first assertion");
+    network
+        .assert_qualitative_relations(second, third, RelationSet::singleton(AllenRelation::Before))
+        .expect("second assertion");
+    network.close().expect("closure");
+    let reordered = IntervalConsistencyArtifact::from_network(
+        "run<&1",
+        "snapshot-1",
+        DIGEST,
+        CUTOFF,
+        &network,
+        &[
+            ("event-3".to_owned(), third),
+            ("event-1<&".to_owned(), first),
+            ("event-2".to_owned(), second),
+        ],
+    )
+    .expect("reordered artifact");
+
+    assert_eq!(reordered, expected);
+    assert_eq!(reordered.sha256(), expected.sha256());
 }
 
 #[test]
