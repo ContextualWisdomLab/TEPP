@@ -271,6 +271,8 @@ def is_executable_source_line(
         return False
     if "::" in text and line_number < len(lines) and lines[line_number].strip().startswith("|"):
         return False
+    if text.startswith("|") and "::" in text and "|" not in text[1:]:
+        return False
     if text.startswith(
         (
             "pub fn ",
@@ -307,7 +309,11 @@ def is_executable_source_line(
         return False
     if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
-    if text in {"} else {", "else {", "));"} or text.startswith((".", "|", "&&")):
+    if text.endswith(" {") and text.startswith(("Ok(", "return Ok(")):
+        return False
+    if text.endswith(",") and text[:-1].isidentifier() and _inside_struct_literal(lines, line_number):
+        return False
+    if text in {"} else {", "else {", "));"} or text.startswith((".", "||", "&&")):
         return False
     if (
         text.endswith(",")
@@ -378,6 +384,20 @@ def _is_structural_comma_continuation(
         if "fn " in stripped and "(" in candidate:
             function_parenthesis_depth = candidate.count("(") - candidate.count(")")
     return declaration_depth > 0 or function_parenthesis_depth > 0 or expression_depth > 0
+
+
+def _inside_struct_literal(lines: Sequence[str], line_number: int) -> bool:
+    """Return whether a shorthand field is inside the nearest struct literal."""
+
+    depth = 0
+    for candidate in reversed(lines[: line_number - 1]):
+        depth += candidate.count("}") - candidate.count("{")
+        if depth < 0:
+            opener = candidate.strip()
+            return opener.endswith(" {") and not opener.startswith(
+                ("fn ", "pub fn ", "if ", "else ", "match ", "for ", "while ")
+            )
+    return False
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:

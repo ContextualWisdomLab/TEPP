@@ -101,6 +101,8 @@ class CoverageContractTests(unittest.TestCase):
             )
             for line in (3, 4):
                 self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+            source.write_text("fn f() {\n    values.map(|value| transform(value));\n}\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
 
     def test_multiline_closer_and_struct_literal_opener_are_structural(self) -> None:
         """Formatting-only delimiters do not inflate authored coverage."""
@@ -138,6 +140,18 @@ class CoverageContractTests(unittest.TestCase):
             for line in (3, 4, 6):
                 self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
+
+    def test_result_struct_openers_and_shorthand_fields_are_structural(self) -> None:
+        """Result wrappers and shorthand fields carry no separate branch behavior."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                "fn f(value: u8) {\n    return Ok(Output {\n        value,\n    });\n}\n",
+                encoding="utf-8",
+            )
+            for line in (2, 3):
+                self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
 
     def test_incomplete_and_malformed_summaries_fail(self) -> None:
         """Missing, nonnumeric, impossible, and incomplete counts are rejected."""

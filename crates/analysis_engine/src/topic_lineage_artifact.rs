@@ -208,18 +208,22 @@ pub fn execute_topic_lineage_run(
     let completed_at = completed_at.into();
     let model = match fit_reference_topic_model(input, config) {
         Ok(model) => model,
-        Err(TopicMeasurementError::DidNotConverge) => {
+        Err(error) => {
+            let failure_code = if matches!(error, TopicMeasurementError::DidNotConverge) {
+                "topic_model_did_not_converge"
+            } else {
+                "topic_model_estimation_failed"
+            };
             return Ok(TopicLineageExecution {
                 artifact: None,
                 terminal_result: AnalysisRunTerminalResult::failed(
                     request,
                     accepted,
                     completed_at,
-                    "topic_model_did_not_converge",
+                    failure_code,
                 )?,
             });
         }
-        Err(error) => return Err(error.into()),
     };
     let topic_count = u64::try_from(model.topic_term_probabilities.len())
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
