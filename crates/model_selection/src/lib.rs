@@ -21,8 +21,16 @@ pub use candidate::ModelCandidate;
 pub use error::ModelSelectionError;
 /// Seeds, iteration budget, and candidate topic counts for fitted selection.
 pub use fitted::FittedCandidateKConfig;
+/// Compact reason-bearing outcome for one fitted candidate.
+pub use fitted::FittedCandidateOutcome;
+/// Winning model and bounded evidence for the fitted selection decision.
+pub use fitted::FittedCandidateSelection;
+/// Typed selection failure retaining completed candidate diagnostics.
+pub use fitted::FittedCandidateSelectionFailure;
 /// Fit each candidate `K` and select from the actual statistical diagnostics.
 pub use fitted::select_fitted_candidate_k;
+/// Fit each candidate `K` and retain the selected converged CPU `f64` model.
+pub use fitted::select_fitted_candidate_model;
 /// Build a statistical candidate from one actual fitted model.
 pub use fitted::statistical_candidate_from_fit;
 /// Select the admissible candidate `K` from a Pareto-filtered statistical front.

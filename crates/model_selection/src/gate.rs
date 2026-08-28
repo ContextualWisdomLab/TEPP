@@ -2,6 +2,49 @@
 
 use crate::{ModelCandidate, ModelSelectionError};
 
+/// Non-empty collection of validated statistical candidates.
+pub(crate) struct StatisticalCandidateFront {
+    first_candidate: ModelCandidate,
+    remaining_candidates: Vec<ModelCandidate>,
+}
+
+impl StatisticalCandidateFront {
+    pub(crate) fn new(first: ModelCandidate) -> Self {
+        Self {
+            first_candidate: first,
+            remaining_candidates: Vec::new(),
+        }
+    }
+
+    pub(crate) fn push(&mut self, candidate: ModelCandidate) {
+        self.remaining_candidates.push(candidate);
+    }
+
+    pub(crate) fn selected_k(&self) -> u32 {
+        let all_candidates = || {
+            std::iter::once(self.first_candidate).chain(self.remaining_candidates.iter().copied())
+        };
+        let mut selected = self.first_candidate;
+        for candidate in all_candidates() {
+            if all_candidates().any(|other| other.dominates(candidate)) {
+                continue;
+            }
+            let selected_is_dominated = all_candidates().any(|other| other.dominates(selected));
+            let likelihood_order = candidate
+                .held_out_log_likelihood()
+                .partial_cmp(&selected.held_out_log_likelihood())
+                .unwrap_or(std::cmp::Ordering::Equal);
+            if selected_is_dominated
+                || likelihood_order.is_gt()
+                || (likelihood_order.is_eq() && candidate.candidate_k() < selected.candidate_k())
+            {
+                selected = candidate;
+            }
+        }
+        selected.candidate_k()
+    }
+}
+
 /// Select the unique admissible `K` from a Pareto-filtered statistical front.
 ///
 /// LLM-only candidates are ignored as recommenders and never become the
@@ -18,34 +61,18 @@ pub fn select_candidate_k(candidates: &[ModelCandidate]) -> Result<u32, ModelSel
     if candidates.is_empty() {
         return Err(ModelSelectionError::EmptyCandidateSet);
     }
-    if candidates
+    let mut statistical = candidates
         .iter()
-        .all(|candidate| candidate.is_llm_vote_only())
-    {
+        .copied()
+        .filter(|candidate| candidate.is_statistically_supported());
+    let Some(first) = statistical.next() else {
         return Err(ModelSelectionError::LlmVoteIsNotStatisticalAuthority);
+    };
+    let mut front = StatisticalCandidateFront::new(first);
+    for candidate in statistical {
+        front.push(candidate);
     }
-
-    let statistical: Vec<ModelCandidate> = candidates
-        .iter()
-        .copied()
-        .filter(|candidate| candidate.is_statistically_supported())
-        .collect();
-    let mut front: Vec<ModelCandidate> = statistical
-        .iter()
-        .copied()
-        .filter(|candidate| !statistical.iter().any(|other| other.dominates(*candidate)))
-        .collect();
-    front.sort_by(|left, right| {
-        let ll_ord = right
-            .held_out_log_likelihood()
-            .partial_cmp(&left.held_out_log_likelihood())
-            .unwrap_or(std::cmp::Ordering::Equal);
-        if ll_ord != std::cmp::Ordering::Equal {
-            return ll_ord;
-        }
-        left.candidate_k().cmp(&right.candidate_k())
-    });
-    Ok(front[0].candidate_k())
+    Ok(front.selected_k())
 }
 
 /// RMSE of selected `K` replications against a known-truth topic count.
@@ -91,11 +118,14 @@ mod tests {
             Err(ModelSelectionError::EmptyCandidateSet)
         );
         assert_eq!(select_candidate_k(&[a, b]).expect("tie"), 2);
+        assert_eq!(select_candidate_k(&[b, a]).expect("reverse tie"), 2);
         let higher_likelihood = ModelCandidate::statistical(8, -20.0, 9.0).expect("likelihood");
         assert_eq!(
             select_candidate_k(&[a, higher_likelihood]).expect("likelihood tie-break"),
             8
         );
+        let dominating = ModelCandidate::statistical(3, -20.0, 7.0).expect("dominating");
+        assert_eq!(select_candidate_k(&[a, dominating]).expect("dominated"), 3);
 
         assert_eq!(
             selected_k_root_mean_square_error(&[], 4),

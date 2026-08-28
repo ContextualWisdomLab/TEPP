@@ -15,6 +15,7 @@ mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use model_selection::{FittedCandidateSelectionFailure, ModelSelectionError};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -48,15 +49,17 @@ pub use lineage_criterion::{
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
-    TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
-    TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
-    TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue,
+    TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE,
+    TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION, TopicActivityInterval, TopicContextMembership,
+    TopicContextPosteriorArtifact, TopicDocumentRelation, TopicIdentityBinding, TopicLineageEvent,
+    TopicPostPlausibleValue, assemble_topic_context_posterior,
 };
 /// Topic-lineage artifact and execution contracts from this engine.
 pub use topic_lineage_artifact::{
     TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
     TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, TopicLineageArtifact,
-    TopicLineageArtifactEdge, TopicLineageExecution, execute_topic_lineage_run,
+    TopicLineageArtifactEdge, TopicLineageCandidateOutcome, TopicLineageExecution,
+    TopicLineageFitManifest, execute_selected_topic_lineage_run, execute_topic_lineage_run,
 };
 
 /// Versioned artifact schema emitted by this engine.
@@ -228,7 +231,7 @@ pub struct AnalysisExecution {
 }
 
 /// Fail-closed errors from the deterministic analysis vertical slice.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AnalysisEngineError {
     /// Request or accepted receipt failed its API contract.
     Api(ApiError),
@@ -246,6 +249,10 @@ pub enum AnalysisEngineError {
     LimitExceeded,
     /// A topic-measurement estimator rejected or could not complete the fit.
     TopicMeasurement(TopicMeasurementError),
+    /// Candidate-`K` fitting or statistical selection failed.
+    ModelSelection(ModelSelectionError),
+    /// Fitted candidate selection failed with its completed diagnostic receipt.
+    FittedModelSelection(FittedCandidateSelectionFailure),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
 }
@@ -261,6 +268,8 @@ impl fmt::Display for AnalysisEngineError {
             Self::SerializationFailure => "analysis artifact serialization failed",
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
+            Self::ModelSelection(error) => return error.fmt(formatter),
+            Self::FittedModelSelection(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
         };
         formatter.write_str(message)
@@ -413,7 +422,8 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
+        MAX_EVIDENCE_UNITS, ModelSelectionError, TopicMeasurementError, add_membership_count,
+        execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -676,6 +686,10 @@ mod tests {
             (
                 AnalysisEngineError::TopicMeasurement(TopicMeasurementError::DidNotConverge),
                 "topic estimator did not converge",
+            ),
+            (
+                AnalysisEngineError::ModelSelection(ModelSelectionError::NoSuccessfulFit),
+                "no fitted candidate produced a finite diagnostic",
             ),
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,

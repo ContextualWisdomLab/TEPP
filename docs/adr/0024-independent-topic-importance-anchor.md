@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-25  
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — contract validation and deterministic
-CPU joint Laplace plausible values; no complete producer artifact yet
+**Implementation maturity:** active-PR — contract validation, deterministic CPU
+joint Laplace plausible values, and complete analysis-layer artifact assembly
 **Supersedes:** None; composes ADR 0012 and Event Lineage contracts.
 
 ## Context
@@ -15,7 +15,7 @@ needs an exact, provenance-bound input rather than hard topic labels.
 
 ## Decision
 
-TEPP owns `tepp.topic_context_posterior.v1`: the exact run, source snapshot
+TEPP owns `tepp.topic_context_posterior.v2`: the exact run, source snapshot
 digest, knowledge cutoff, model contract, declared event clock, posterior draw
 set, opaque stable global topic identities and activity intervals, explicit
 topic-lineage events, admitted Event Lineage document relations, per-post
@@ -98,12 +98,23 @@ snapshot, and membership weight where applicable. Reusing one assertion ID for
 records that differ only in time therefore fails closed rather than silently
 collapsing distinct temporal claims.
 
-This still is not a complete `tepp.topic_context_posterior.v1` producer. The
-topic fit binds each admitted event instant but does not own the declared event
-clock identity, source snapshot/run/cutoff identity, activity intervals,
-qualified document-lineage evidence, or time-valid membership provenance. The
-analysis layer must bind those exact records before assembling an artifact;
-absence of any required record remains unavailable.
+The analysis layer now assembles a complete
+`tepp.topic_context_posterior.v2` artifact only when the caller supplies the
+accepted run, bound source snapshot and cutoff, declared event clock, stable
+topic activity, qualified document-lineage evidence, and time-valid membership
+provenance. It derives plausible values from the fit-bound joint precision and
+binds the ordered topic identities to the posterior draw-set identity before
+validating the completed artifact. Missing or mismatched
+records remain unavailable; the assembler does not infer a predecessor, fill a
+membership, or manufacture a topic-lineage event. Multiple outgoing admitted
+predecessor relations remain separate records, so a Project Journey consumer
+can retain branches instead of flattening them into a single timeline.
+
+Canonical JSON enables Serde's IEEE-754 round-trip parser. Without that parser,
+an emitted plausible value can change by one representable `f64` value after a
+JSON reparse, invalidating the artifact digest even though the fit did not
+change. The round-trip feature preserves the exact Rust numerical value across
+serialize/parse/serialize and is covered by a fitted-posterior artifact test.
 
 ## Verification
 
@@ -112,8 +123,10 @@ recovery, RMSE, bias, interval coverage, temporal ordering, graph recovery,
 invariance, posterior diagnostics, leakage-safe splits, CPU worker determinism,
 and actual CPU/GPU parameter and objective parity. A skipped, ignored,
 emulated, or unavailable-device GPU test is not GPU evidence. The current
-CPU-only TRSL-TM estimator does not emit this artifact or satisfy the GPU
-requirement; this contract-only ADR does not claim otherwise.
+CPU-only TRSL-TM estimator and analysis-layer assembler emit the reference
+artifact but do not satisfy the GPU requirement. This ADR does not claim an
+MLX, CUDA, OpenCL, or other accelerator receipt until that backend actually
+runs and passes the governing parity contract.
 
 ## References
 
