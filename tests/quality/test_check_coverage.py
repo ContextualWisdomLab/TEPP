@@ -114,6 +114,31 @@ class CoverageContractTests(unittest.TestCase):
             for line in (5, 8):
                 self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
 
+    def test_cfg_test_module_ignores_braces_inside_strings(self) -> None:
+        """String interpolation braces cannot terminate a test module early."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                '#[cfg(test)]\npub(super) mod tests {\n    fn fixture() { format!("{value}"); }\n    fn test_only() {}\n}\nfn production() { run(); }\n',
+                encoding="utf-8",
+            )
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 4))
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 6))
+
+    def test_multiline_call_delimiters_and_bare_arguments_are_structural(self) -> None:
+        """A call's punctuation and bare argument rows carry no separate behavior."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "source.rs"
+            source.write_text(
+                "fn f() {\n    call(\n        &first,\n        Type::new(\n            second,\n        ),\n    );\n}\n",
+                encoding="utf-8",
+            )
+            for line in (3, 4, 6):
+                self.assertFalse(coverage_contract.is_executable_source_line(str(source), line))
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
+
     def test_incomplete_and_malformed_summaries_fail(self) -> None:
         """Missing, nonnumeric, impossible, and incomplete counts are rejected."""
 

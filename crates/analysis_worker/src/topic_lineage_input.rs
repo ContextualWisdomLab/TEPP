@@ -195,7 +195,7 @@ impl TopicLineageWorkerInput {
         serde_json::from_str(payload).map_err(|_| AnalysisWorkerError::InvalidInput)
     }
 
-    /// Compute the digest over every scientific field except the digest itself.
+    /// Compute the digest over scientific content, independent of manifest identity.
     ///
     /// # Errors
     ///
@@ -203,10 +203,11 @@ impl TopicLineageWorkerInput {
     pub fn scientific_digest(&self) -> Result<String, AnalysisWorkerError> {
         let mut value =
             serde_json::to_value(self).map_err(|_| AnalysisWorkerError::InvalidInput)?;
-        value
+        let object = value
             .as_object_mut()
-            .ok_or(AnalysisWorkerError::InvalidInput)?
-            .remove("scientific_input_sha256");
+            .ok_or(AnalysisWorkerError::InvalidInput)?;
+        object.remove("reproducibility_manifest_id");
+        object.remove("scientific_input_sha256");
         let bytes = serde_json::to_vec(&value).map_err(|_| AnalysisWorkerError::InvalidInput)?;
         Ok(format!("{:x}", Sha256::digest(bytes)))
     }
@@ -553,6 +554,12 @@ pub(super) mod tests {
         assert_eq!(
             input.scientific_input_sha256,
             input.scientific_digest().expect("digest")
+        );
+        let mut rebound = input.clone();
+        rebound.reproducibility_manifest_id = Uuid::from_u128(1);
+        assert_eq!(
+            rebound.scientific_digest().expect("rebound digest"),
+            input.scientific_input_sha256
         );
         let validated = input.validate(cutoff).expect("validated");
         assert_eq!(validated.input.document_count(), 4);
