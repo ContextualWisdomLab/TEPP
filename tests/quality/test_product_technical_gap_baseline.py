@@ -90,8 +90,8 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             path.write_text(valid_baseline(), encoding="utf-8")
             docs.validate_product_technical_gap_baseline(root)
 
-    def test_impossible_exact_self_head_claim_fails(self) -> None:
-        """The register must not claim that its publication parent is its own head."""
+    def test_obsolete_exact_head_header_fails(self) -> None:
+        """The register rejects the obsolete exact-current-head inventory header."""
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -120,7 +120,7 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
                 docs.validate_product_technical_gap_baseline(root)
             with self.assertRaisesRegex(AssertionError, "closure evidence"):
                 docs.validate_product_technical_gap_baseline(root)
-            with self.assertRaisesRegex(AssertionError, "exact-head"):
+            with self.assertRaisesRegex(AssertionError, "snapshot-head"):
                 docs.validate_product_technical_gap_baseline(root)
 
     def test_inventory_count_mismatch_fails(self) -> None:

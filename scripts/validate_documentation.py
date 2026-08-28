@@ -404,7 +404,7 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
         failures.append("gap baseline treats queued Checks as implemented-main")
     inventory = list(INVENTORY_ROW.finditer(text))
     if not inventory:
-        failures.append("gap baseline open-PR inventory has no exact-head rows")
+        failures.append("gap baseline open-PR inventory has no snapshot-head rows")
     count_match = OPEN_PR_COUNT.search(text)
     if count_match is None:
         failures.append("gap baseline lacks an open pull-request count")
