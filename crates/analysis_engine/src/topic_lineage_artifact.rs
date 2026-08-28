@@ -13,7 +13,10 @@ use topic_measurement::{
 };
 use uuid::Uuid;
 
-use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
+use crate::{
+    AnalysisEngineError, artifact_id_from_digest, format_digest, require_receipt_identity,
+    valid_identifier,
+};
 
 /// Versioned schema for a completed TRSL topic-lineage artifact.
 pub const TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION: &str = "tepp.trsl_topic_lineage.v1";
@@ -254,7 +257,7 @@ pub fn execute_topic_lineage_run(
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
-        format!("topic_lineage_artifact_{}", &digest[..16]),
+        artifact_id_from_digest(&digest)?,
         digest,
         TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
         completed_at,

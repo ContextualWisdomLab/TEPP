@@ -154,6 +154,13 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         execution.terminal_result.result_schema_version.as_deref(),
         Some(TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION)
     );
+    assert!(
+        execution
+            .terminal_result
+            .result_artifact_id
+            .as_deref()
+            .is_some_and(|value| Uuid::parse_str(value).is_ok())
+    );
     assert!(execution.artifact.to_json().is_ok());
 }
 
