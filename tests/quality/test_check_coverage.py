@@ -679,6 +679,12 @@ class CoverageContractTests(unittest.TestCase):
                 "State::Guarded(value) if valid(value) => {",  # 75 guarded arm is executable
                 ")?;",  # 76 fallible multiline call close
                 ") {",  # 77 multiline condition close
+                "    *slot = value;",  # 78 executable dereference assignment
+                "fn fail(",  # 79 multiline signature
+                ") -> Result<(), Error>",  # 80 multiline return type
+                "{",  # 81 standalone function brace
+                "    return Err(Error::Invalid);",  # 82 executable error return
+                "}",  # 83 function close
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -693,7 +699,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 75}
+            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 75, 78, 82}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -1271,12 +1277,15 @@ class CoverageContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "split.rs"
             source.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            for line_number in (1, 2, 5, 6, 9, 11, 12, 13, 17):
+            for line_number in (1, 2, 5, 6, 9, 11, 12, 13):
                 self.assertFalse(
                     coverage_contract.is_executable_source_line(
                         str(source), line_number
                     )
                 )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 17)
+            )
 
     def test_line_filter_keeps_inline_functions_and_block_comment_followers(self) -> None:
         """Inline function bodies and code after quoted block comments stay visible."""
