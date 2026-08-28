@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
-use temporal_core::{AllenRelation, RelationSet, TemporalVariableId};
+use temporal_core::{AllenRelation, KnowledgeCutoff, RelationSet, TemporalVariableId};
 
 /// Model-artifact type used by the ADR-0013 persistence chain.
-pub const INTERVAL_CONSISTENCY_ARTIFACT_TYPE: &str = "tdt_chronos_interval_consistency_v1";
-const SCHEMA_VERSION: &str = "tepp.tdt_chronos_interval_consistency.v1";
+pub const INTERVAL_CONSISTENCY_ARTIFACT_TYPE: &str = "tdt_chronos_interval_consistency_v2";
+const SCHEMA_VERSION: &str = "tepp.tdt_chronos_interval_consistency.v2";
 const MAX_RELATIONS: usize = 100_000;
 const MAX_JSON_BYTES: usize = 4 * 1024 * 1024;
 
@@ -41,6 +41,10 @@ pub struct IntervalConsistencyArtifact {
     pub snapshot_id: String,
     /// Lowercase SHA-256 of the exact admitted input bytes.
     pub input_digest_sha256: String,
+    /// Historical evidence-availability cutoff applied to the admitted input.
+    pub knowledge_cutoff: String,
+    /// Complete stable inventory of event identities in the reasoner network.
+    pub event_ids: Vec<String>,
     /// Non-causal observed and closure-derived temporal relations.
     pub relations: Vec<IntervalConsistencyArtifactRelation>,
 }
@@ -57,17 +61,23 @@ impl IntervalConsistencyArtifact {
         run_id: impl Into<String>,
         snapshot_id: impl Into<String>,
         input_digest_sha256: impl Into<String>,
+        knowledge_cutoff: impl Into<String>,
         network: &IntervalConsistencyNetwork,
         variables: &[(String, TemporalVariableId)],
     ) -> Result<Self, EventError> {
         let mut identities = BTreeSet::new();
-        if variables.len() < 2
-            || variables
-                .iter()
-                .any(|(identity, _)| identity.trim().is_empty() || !identities.insert(identity))
+        let mut variable_ids = BTreeSet::new();
+        if variables.len() != network.variable_count()
+            || variables.len() < 2
+            || variables.iter().any(|(identity, variable)| {
+                identity.trim().is_empty()
+                    || !identities.insert(identity)
+                    || !variable_ids.insert(variable)
+            })
         {
             return Err(EventError::InvalidWirePayload);
         }
+        let event_ids = identities.into_iter().cloned().collect();
         let mut ordered_variables = variables.iter().collect::<Vec<_>>();
         ordered_variables.sort_by(|left, right| left.0.cmp(&right.0));
         let mut relations = Vec::new();
@@ -84,7 +94,7 @@ impl IntervalConsistencyArtifact {
                     allen_relations: derived.relations().iter().collect(),
                     // Observation is orientation-independent even though the
                     // export retains the stable variable ordering.
-                    observed: derived.is_observed() || inverse.is_observed(),
+                    observed: derived.is_observed() | inverse.is_observed(),
                     support_assertion_ordinals: derived
                         .support()
                         .iter()
@@ -102,6 +112,8 @@ impl IntervalConsistencyArtifact {
             run_id: run_id.into(),
             snapshot_id: snapshot_id.into(),
             input_digest_sha256: input_digest_sha256.into(),
+            knowledge_cutoff: knowledge_cutoff.into(),
+            event_ids,
             relations,
         };
         artifact.validate()?;
@@ -157,25 +169,21 @@ impl IntervalConsistencyArtifact {
     /// Returns a wire error when the artifact is invalid.
     pub fn to_graphml(&self) -> Result<String, EventError> {
         self.validate()?;
-        let mut nodes = BTreeSet::new();
-        for relation in &self.relations {
-            nodes.insert(&relation.left_event_id);
-            nodes.insert(&relation.right_event_id);
-        }
         let mut output = String::from(
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\">\n<key id=\"schema\" for=\"graph\" attr.name=\"schema_version\" attr.type=\"string\"/>\n<key id=\"snapshot\" for=\"graph\" attr.name=\"snapshot_id\" attr.type=\"string\"/>\n<key id=\"input_digest\" for=\"graph\" attr.name=\"input_digest_sha256\" attr.type=\"string\"/>\n<key id=\"relations\" for=\"edge\" attr.name=\"allen_relations\" attr.type=\"string\"/>\n<key id=\"observed\" for=\"edge\" attr.name=\"observed\" attr.type=\"boolean\"/>\n<key id=\"support\" for=\"edge\" attr.name=\"support_assertion_ordinals\" attr.type=\"string\"/>\n<graph id=\"",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\">\n<key id=\"schema\" for=\"graph\" attr.name=\"schema_version\" attr.type=\"string\"/>\n<key id=\"snapshot\" for=\"graph\" attr.name=\"snapshot_id\" attr.type=\"string\"/>\n<key id=\"input_digest\" for=\"graph\" attr.name=\"input_digest_sha256\" attr.type=\"string\"/>\n<key id=\"knowledge_cutoff\" for=\"graph\" attr.name=\"knowledge_cutoff\" attr.type=\"string\"/>\n<key id=\"relations\" for=\"edge\" attr.name=\"allen_relations\" attr.type=\"string\"/>\n<key id=\"observed\" for=\"edge\" attr.name=\"observed\" attr.type=\"boolean\"/>\n<key id=\"support\" for=\"edge\" attr.name=\"support_assertion_ordinals\" attr.type=\"string\"/>\n<graph id=\"",
         );
         output.push_str(&xml_escape(&self.run_id));
         output.push_str("\" edgedefault=\"directed\">\n");
         writeln!(
             output,
-            "<data key=\"schema\">{}</data><data key=\"snapshot\">{}</data><data key=\"input_digest\">{}</data>",
+            "<data key=\"schema\">{}</data><data key=\"snapshot\">{}</data><data key=\"input_digest\">{}</data><data key=\"knowledge_cutoff\">{}</data>",
             xml_escape(&self.schema_version),
             xml_escape(&self.snapshot_id),
-            self.input_digest_sha256
+            self.input_digest_sha256,
+            xml_escape(&self.knowledge_cutoff)
         )
         .expect("writing to String cannot fail");
-        for node in nodes {
+        for node in &self.event_ids {
             output.push_str("<node id=\"");
             output.push_str(&xml_escape(node));
             output.push_str("\"/>\n");
@@ -192,6 +200,9 @@ impl IntervalConsistencyArtifact {
             || self.run_id.trim().is_empty()
             || self.snapshot_id.trim().is_empty()
             || !valid_digest(&self.input_digest_sha256)
+            || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
+            || self.event_ids.len() < 2
+            || !strictly_increasing(&self.event_ids)
             || self.relations.is_empty()
             || self.relations.len() > MAX_RELATIONS
         {
@@ -209,6 +220,14 @@ impl IntervalConsistencyArtifact {
                 || !strictly_increasing(&relation.allen_relations)
                 || !strictly_increasing(&relation.support_assertion_ordinals)
                 || previous.is_some_and(|old| old >= key)
+                || self
+                    .event_ids
+                    .binary_search(&relation.left_event_id)
+                    .is_err()
+                || self
+                    .event_ids
+                    .binary_search(&relation.right_event_id)
+                    .is_err()
             {
                 return Err(EventError::InvalidWirePayload);
             }

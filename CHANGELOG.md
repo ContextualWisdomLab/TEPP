@@ -10,7 +10,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Added
 
-- **TDT/CHRONOS durable result contract**: canonical typed JSON and deterministic GraphML now export the actual bounded Allen reasoner result, observed/derived status, and conservative accepted-assertion support; canonical payload digest and `tdt_chronos_interval_consistency_v1` type bind the immutable bytes into ADR 0013's append-only `model_artifact` chain.
+- **TDT/CHRONOS durable result contract**: canonical typed JSON and deterministic GraphML now export the complete bounded Allen reasoner scope, historical knowledge cutoff, observed/derived status, and conservative accepted-assertion support; canonical payload digest and `tdt_chronos_interval_consistency_v2` type bind the immutable bytes into ADR 0013's append-only `model_artifact` chain.
 - **Analysis engine**: deterministic end-to-end analysis-run execution with cutoff-safe eligibility, immutable evidence binding, and reproducibility manifests (`analysis_engine` crate).
 - **Restore Driver p.16 `MANIFESTVARstd`**: `recover_standardised_manifest_variance` maps `θ / θ = 1` with strictly positive `MANIFESTVAR`, refusing unstandardised manifest-variance, `MANIFESTTRAITVARstd`, and Equation 5 `Var(y)` substitutions (`psychometric_core`).
 - **Posterior network estimator**: cross-draw Pearson correlations in ILR space, jackknife SE and CI, Benjamini–Hochberg FDR edge admission, nonparametric bootstrap stability, greedy modularity consensus clustering (`network_analysis` crate).

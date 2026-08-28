@@ -481,6 +481,7 @@ mod tests {
             "run-1",
             "snapshot-1",
             "ab".repeat(32),
+            "2026-08-28T00:00:00Z",
             &network,
             &[("event-1".into(), left), ("event-2".into(), right)],
         )

@@ -274,6 +274,12 @@ impl TemporalReasoner {
         }
     }
 
+    /// Number of variables currently owned by this reasoner.
+    #[must_use]
+    pub fn variable_count(&self) -> usize {
+        self.cells.len()
+    }
+
     /// Add one interval variable.
     ///
     /// # Errors

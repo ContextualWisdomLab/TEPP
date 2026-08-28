@@ -22,11 +22,12 @@ TEPP separates three event-intelligence layers:
 Transition edges admitted to the state/input-process-outcome graph remain governed by ADR 0002/0003 and cannot be created merely because TDT/CHRONOS predicts or links two events. Retrospective evidence and schema predictions remain provenance/hypothesis edges until independently promoted.
 
 One completed bounded consistency run is durably published as the canonical
-`tepp.tdt_chronos_interval_consistency.v1` JSON payload. It binds an opaque run,
-snapshot, exact admitted-input SHA-256, stable Allen relation order,
-observed/derived status, and conservative accepted-assertion ordinals. Its
+`tepp.tdt_chronos_interval_consistency.v2` JSON payload. It binds an opaque run,
+snapshot, historical knowledge cutoff, exact admitted-input SHA-256, complete
+event inventory, stable Allen relation order, observed/derived status, and
+conservative accepted-assertion ordinals. Its
 canonical JSON digest and artifact type
-`tdt_chronos_interval_consistency_v1` enter ADR 0013's append-only
+`tdt_chronos_interval_consistency_v2` enter ADR 0013's append-only
 `model_artifact` row; the protected object reference locates the immutable JSON
 bytes. GraphML is a deterministic projection of that same typed payload, not a
 second source of truth and not a causal-transition claim. Loaders must verify
