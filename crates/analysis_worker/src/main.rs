@@ -28,10 +28,14 @@ struct CliArguments {
 }
 
 fn main() -> ExitCode {
-    match run_from_env() {
+    exit_code(run_from_env())
+}
+
+fn exit_code(result: Result<String, Box<dyn std::error::Error>>) -> ExitCode {
+    match result {
         Ok(output) => {
             println!("{output}");
-            ExitCode::SUCCESS
+            ExitCode::from(0)
         }
         Err(error) => {
             let disposition = scheduler_disposition(error.as_ref());
@@ -131,14 +135,30 @@ fn render_outcome(
 #[cfg(test)]
 mod tests {
     use super::{
-        SchedulerDisposition, parse_arguments, render_outcome, render_output, required,
-        scheduler_disposition,
+        PERMANENT_EXIT_CODE, RETRYABLE_EXIT_CODE, SchedulerDisposition, exit_code, parse_arguments,
+        render_outcome, render_output, required, scheduler_disposition,
     };
     use analysis_worker::{AnalysisWorkerError, AnalysisWorkerOutcome};
     use persistence_postgres::PersistenceError;
     use tepp_api::{AnalysisRunAccepted, AnalysisRunStatus};
 
     const NIL: &str = "00000000-0000-0000-0000-000000000000";
+
+    #[test]
+    fn process_exit_reports_success_and_scheduler_failures() {
+        assert_eq!(
+            exit_code(Ok("done".into())),
+            std::process::ExitCode::SUCCESS
+        );
+        assert_eq!(
+            exit_code(Err(Box::new(AnalysisWorkerError::InvalidInput))),
+            std::process::ExitCode::from(PERMANENT_EXIT_CODE)
+        );
+        assert_eq!(
+            exit_code(Err(Box::new(AnalysisWorkerError::ExecutionFailed))),
+            std::process::ExitCode::from(RETRYABLE_EXIT_CODE)
+        );
+    }
 
     #[test]
     fn arguments_are_exact_and_bounded() {
