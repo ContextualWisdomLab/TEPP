@@ -30,18 +30,18 @@ use psychometric_core::{
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_standardised_asymptotic_continuous_intercept,
-    recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
-    recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
-    recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_asymptotic_diffusion, recover_standardised_continuous_diffusion,
+    recover_standardised_continuous_intercept, recover_standardised_discrete_continuous_intercept,
+    recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
+    recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
+    recover_standardised_manifest_variance, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -123,6 +123,7 @@ use psychometric_core::{
     refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
     refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+    refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion,
     refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance,
     refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion,
     refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
@@ -167,11 +168,13 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
+    refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion,
     refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
     refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
@@ -3385,6 +3388,99 @@ fn standardised_asymptotic_diffusion_is_not_unstandardised_t0var_or_diffusion_ra
     );
     assert_eq!(
         recover_standardised_asymptotic_diffusion(diffusion, 0.25, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+}
+
+#[test]
+fn standardised_continuous_diffusion_is_not_unstandardised_discrete_or_trait_contaminated() {
+    let diffusion = 0.4_f64;
+    let log_rate = -0.25_f64;
+    let recovered =
+        recover_standardised_continuous_diffusion(diffusion, log_rate, LagClock::EventTime)
+            .expect("DIFFUSIONstd");
+    let expected = -2.0 * log_rate;
+    assert!(
+        (recovered - expected).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 / footnote 4): DIFFUSIONstd is q / p = −2 a"
+    );
+    let larger_q = recover_standardised_continuous_diffusion(1.6, log_rate, LagClock::EventTime)
+        .expect("DIFFUSIONstd q=1.6");
+    assert!(
+        (larger_q - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): distinct positive DIFFUSION recover the same DIFFUSIONstd"
+    );
+    assert!(
+        (recovered - diffusion).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): unstandardised DIFFUSION is not DIFFUSIONstd"
+    );
+    let stationary =
+        recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime).expect("p");
+    let discrete = recover_discrete_process_noise(diffusion, log_rate, 1.0, LagClock::EventTime)
+        .expect("Q_Δt")
+        / stationary;
+    assert!(
+        (discrete - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): discreteDIFFUSIONstd is not DIFFUSIONstd"
+    );
+    let trait_contaminated = diffusion / (0.5 + stationary + 0.1);
+    assert!(
+        (trait_contaminated - recovered).abs() > 1e-3,
+        "Driver et al. (2017, §7.1): q / (trait + p + added) is not DIFFUSIONstd"
+    );
+    let equal_ratio =
+        recover_standardised_continuous_diffusion(0.4, -0.5, LagClock::EventTime).expect("a=-0.5");
+    let asym_std = recover_standardised_asymptotic_diffusion(0.4, -0.5, LagClock::EventTime)
+        .expect("asymDIFFUSIONstd a=-0.5");
+    assert!(
+        (equal_ratio - asym_std).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): equal 1 when a = −0.5 remains a distinct named quantity"
+    );
+    assert_eq!(
+        refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion(
+            diffusion, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedContinuousDiffusionIsNotStandardisedContinuousDiffusion
+        )
+    );
+    assert_eq!(
+        refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion(
+            discrete, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedDiscreteDiffusionIsNotStandardisedContinuousDiffusion
+        )
+    );
+    assert_eq!(
+        refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion(
+            trait_contaminated,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::TraitContaminatedContinuousDiffusionIsNotStandardisedContinuousDiffusion
+        )
+    );
+    assert_eq!(
+        refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion(
+            equal_ratio, asym_std
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion
+        )
+    );
+    assert_eq!(
+        recover_standardised_continuous_diffusion(0.0, log_rate, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedContinuousDiffusionRequiresPositiveWithinSubjectVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_continuous_diffusion(diffusion, log_rate, LagClock::DocumentTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_continuous_diffusion(diffusion, 0.25, LagClock::EventTime),
         Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
     );
 }

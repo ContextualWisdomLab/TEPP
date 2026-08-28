@@ -605,6 +605,21 @@ pub enum PsychometricError {
     /// `asymDIFFUSIONstd`. The continuous-diffusion ratio is not
     /// the correlation form of `asymDIFFUSION`.
     StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion,
+    /// Driver p. 16 `DIFFUSIONstd` was requested with a non-positive
+    /// within-subject variance. Footnote 4 standardises continuous
+    /// process noise using only strictly positive `asymDIFFUSION`.
+    StandardisedContinuousDiffusionRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 unstandardised `DIFFUSION` `q` was treated as
+    /// `DIFFUSIONstd`. Unstandardised `q` is defined for growing or
+    /// zero-diffusion processes; standardised `DIFFUSION` is not.
+    UnstandardisedContinuousDiffusionIsNotStandardisedContinuousDiffusion,
+    /// Driver p. 16 `discreteDIFFUSIONstd` `Q_Δt / (−q / (2 a))` was
+    /// treated as `DIFFUSIONstd`. `1 − exp(2 a Δt)` is not `−2 a`.
+    StandardisedDiscreteDiffusionIsNotStandardisedContinuousDiffusion,
+    /// Driver §7.1 trait-contaminated continuous diffusion
+    /// `q / (trait + p + added)` was treated as p. 16 `DIFFUSIONstd`.
+    /// Footnote 4 uses only `asymDIFFUSION`, not `TRAITVAR`.
+    TraitContaminatedContinuousDiffusionIsNotStandardisedContinuousDiffusion,
     /// Driver p. 16 `TIPREDVARstd` was treated as p. 16
     /// `asymDIFFUSIONstd`. Equal numbers of 1 after a strictly
     /// positive relevant variance are still distinct named
@@ -1167,6 +1182,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion => {
                 "standardised continuous diffusion is not standardised asymptotic diffusion"
+            }
+            Self::StandardisedContinuousDiffusionRequiresPositiveWithinSubjectVariance => {
+                "standardised continuous diffusion requires strictly positive within-subject variance"
+            }
+            Self::UnstandardisedContinuousDiffusionIsNotStandardisedContinuousDiffusion => {
+                "unstandardised continuous diffusion is not standardised continuous diffusion"
+            }
+            Self::StandardisedDiscreteDiffusionIsNotStandardisedContinuousDiffusion => {
+                "standardised discrete diffusion is not standardised continuous diffusion"
+            }
+            Self::TraitContaminatedContinuousDiffusionIsNotStandardisedContinuousDiffusion => {
+                "trait-contaminated continuous diffusion is not standardised continuous diffusion"
             }
             Self::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion => {
                 "standardised time-independent predictor variance is not standardised asymptotic diffusion"
@@ -1971,6 +1998,26 @@ mod tests {
             PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion
                 .to_string(),
             "standardised continuous diffusion is not standardised asymptotic diffusion"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousDiffusionRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised continuous diffusion requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousDiffusionIsNotStandardisedContinuousDiffusion
+                .to_string(),
+            "unstandardised continuous diffusion is not standardised continuous diffusion"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteDiffusionIsNotStandardisedContinuousDiffusion
+                .to_string(),
+            "standardised discrete diffusion is not standardised continuous diffusion"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedContinuousDiffusionIsNotStandardisedContinuousDiffusion
+                .to_string(),
+            "trait-contaminated continuous diffusion is not standardised continuous diffusion"
         );
         assert_eq!(
             PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion

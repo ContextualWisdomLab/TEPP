@@ -261,6 +261,18 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver p. 16 `DIFFUSIONstd` as `q / p = −2 a` after
+//! strictly positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4
+//! uses only the relevant within-subject variance, not total
+//! `trait + p + added`; form `p` first, then `q / p`; the scalar
+//! stationary ratio does not depend on `q` once `q > 0`;
+//! unstandardised `q` is defined for growing `a ≥ 0` and for zero
+//! diffusion and is not that map; `Q_Δt / p = 1 − exp(2 a Δt)` is
+//! `discreteDIFFUSIONstd` and is not that map; `p / p = 1` is
+//! `asymDIFFUSIONstd` and is not that map even when `a = −0.5` so
+//! both equal 1; zero `q` fails closed; a non-event clock fails
+//! closed; `a ≥ 0` fails closed; JSS PDF re-opened
+//! 2026-08-28T17:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -403,6 +415,8 @@ pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 /// Exact scalar p. 16 `asymDIFFUSIONstd` `p / p = 1` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_asymptotic_diffusion;
+/// Exact scalar p. 16 `DIFFUSIONstd` `q / p = −2 a` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_continuous_diffusion;
 /// Exact scalar p. 16 `CINTstd` `κ / √p`.
 pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
@@ -624,6 +638,8 @@ pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asy
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating p. 16 `discreteDIFFUSIONstd` as `DIFFUSIONstd`.
+pub use event_time::refuse_standardised_discrete_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating p. 16 `T0MEANSstd` as `T0VARstd`.
 pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance;
 /// Refuse treating p. 16 `T0VARstd` as `asymDIFFUSIONstd`.
@@ -715,6 +731,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating `q / (trait + p + added)` as `DIFFUSIONstd`.
+pub use event_time::refuse_trait_contaminated_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
@@ -729,6 +747,8 @@ pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating unstandardised `asymDIFFUSION` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion;
+/// Refuse treating unstandardised `DIFFUSION` as `DIFFUSIONstd`.
+pub use event_time::refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
