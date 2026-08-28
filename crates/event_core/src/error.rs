@@ -82,6 +82,8 @@ pub enum EventError {
     IntervalConsistencyContradiction,
     /// Quantitative Allen classification received a nonproper interval.
     IntervalConsistencyRequiresProperBoundedInterval,
+    /// An interval-consistency dependency returned an unsupported error.
+    IntervalConsistencyDependencyError,
     /// Bounded path consistency was treated as unrestricted global SAT.
     IntervalConsistencyIsNotUnrestrictedSatisfiability,
     /// An interval contradiction was treated as an event instance.
@@ -148,6 +150,9 @@ impl fmt::Display for EventError {
             }
             Self::IntervalConsistencyRequiresProperBoundedInterval => {
                 "interval consistency requires proper bounded intervals"
+            }
+            Self::IntervalConsistencyDependencyError => {
+                "unsupported interval consistency dependency error"
             }
             Self::IntervalConsistencyIsNotUnrestrictedSatisfiability => {
                 "interval consistency is not unrestricted satisfiability"
@@ -309,6 +314,10 @@ mod tests {
             (
                 EventError::IntervalConsistencyRequiresProperBoundedInterval,
                 "interval consistency requires proper bounded intervals",
+            ),
+            (
+                EventError::IntervalConsistencyDependencyError,
+                "unsupported interval consistency dependency error",
             ),
             (
                 EventError::IntervalConsistencyIsNotUnrestrictedSatisfiability,

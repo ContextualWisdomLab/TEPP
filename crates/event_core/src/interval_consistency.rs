@@ -208,7 +208,7 @@ fn map_interval_error(error: Option<temporal_core::TemporalError>) -> EventError
         Some(temporal_core::TemporalError::RelationRequiresProperBoundedInterval) => {
             EventError::IntervalConsistencyRequiresProperBoundedInterval
         }
-        None | Some(_) => EventError::InvalidWirePayload,
+        None | Some(_) => EventError::IntervalConsistencyDependencyError,
     }
 }
 
@@ -231,7 +231,7 @@ fn map_optional_reasoner_error(error: Option<&TemporalReasonerError>) -> EventEr
         Some(TemporalReasonerError::Contradiction(_)) => {
             EventError::IntervalConsistencyContradiction
         }
-        None | Some(_) => EventError::InvalidWirePayload,
+        None | Some(_) => EventError::IntervalConsistencyDependencyError,
     }
 }
 
@@ -463,10 +463,13 @@ mod tests {
             Err(EventError::IntervalConsistencyLimitExceeded)
         );
 
-        assert_eq!(map_interval_error(None), EventError::InvalidWirePayload);
+        assert_eq!(
+            map_interval_error(None),
+            EventError::IntervalConsistencyDependencyError
+        );
         assert_eq!(
             map_optional_reasoner_error(None),
-            EventError::InvalidWirePayload
+            EventError::IntervalConsistencyDependencyError
         );
     }
 }
