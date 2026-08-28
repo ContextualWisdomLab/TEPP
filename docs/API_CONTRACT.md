@@ -104,10 +104,17 @@ path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
 evidence unavailable at the historical cutoff, preserves multiple-membership
 counts, and emits a digest-bound terminal result or a redacted failure. For the
 `trsl_topic_lineage_v1` profile it invokes the ADR-0012 `topic_measurement`
-reference estimator and publishes validated fitted associations and counts in
-`tepp.trsl_topic_lineage.v1`; it does not infer causality or replace production
-`K` selection. This remains active product-branch evidence until its exact-head
+reference estimator and publishes validated fitted associations, counts,
+candidate-fit evidence, and separate source-snapshot and numerical-input digests
+in `tepp.trsl_topic_lineage.v2`; it does not infer causality or replace
+production `K` selection. This remains active product-branch evidence until its exact-head
 checks and protected merge pass.
+
+Version 1 artifacts cannot be upgraded by filling fields: they do not contain
+the candidate-fit evidence or complete numerical-input digest required by v2.
+Clients retain v1 as historical evidence and rerun its immutable source snapshot
+at the original knowledge cutoff to produce v2; the parser rejects v1 rather
+than inventing missing scientific provenance.
 
 The separate `tepp.topic_context_posterior.v1` artifact carries per-post
 posterior logistic-normal plausible values, a declared event clock, opaque

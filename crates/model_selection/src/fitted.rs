@@ -375,11 +375,6 @@ pub fn select_fitted_candidate_k(
 ///
 /// Returns the same typed failures as [`select_fitted_candidate_k`].
 ///
-/// # Panics
-///
-/// Panics only if the already-validated fitted-selection configuration cannot
-/// construct its identical reference-estimator configuration, or a converged
-/// reference fit violates its own finite-diagnostic contract.
 #[allow(clippy::too_many_lines)]
 pub fn select_fitted_candidate_model(
     input: &ReferenceTopicInput,
@@ -419,7 +414,13 @@ pub fn select_fitted_candidate_model(
                 config.step_size,
             )
         })
-        .expect("validated fitted config maps to the identical reference config");
+        .map_err(|_| {
+            selection_failure(
+                ModelSelectionError::InvalidDiagnostic,
+                candidate_outcomes.clone(),
+                llm_votes,
+            )
+        })?;
         match fit_reference_topic_model(input, &fit_config) {
             Ok(model) => {
                 let candidate = statistical_candidate_from_fit(input, candidate_k, &model)
@@ -436,10 +437,10 @@ pub fn select_fitted_candidate_model(
                     objective: Some(model.objective),
                 });
                 candidates.push(candidate);
-                if select_candidate_k(&candidates)
-                    .expect("a statistical candidate always has a selected K")
-                    == candidate_k
-                {
+                let selected_candidate = select_candidate_k(&candidates).map_err(|error| {
+                    selection_failure(error, candidate_outcomes.clone(), llm_votes)
+                })?;
+                if selected_candidate == candidate_k {
                     selected_model = Some((candidate_k, model));
                 }
             }

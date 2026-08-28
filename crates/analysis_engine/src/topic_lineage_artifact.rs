@@ -300,6 +300,7 @@ impl TopicLineageArtifact {
             || !is_sha256(&self.source_snapshot_sha256)
             || !is_sha256(&self.model_input_sha256)
             || self.model_contract_version != TOPIC_LINEAGE_MODEL_CONTRACT_VERSION
+            || !self.objective.is_finite()
             || !valid_fit_manifest(
                 &self.fit_manifest,
                 self.topic_count,

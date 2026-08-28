@@ -1314,6 +1314,33 @@ class CoverageContractTests(unittest.TestCase):
                         coverage_contract.is_executable_source_line(str(source), 3)
                     )
 
+    def test_line_filter_excludes_array_type_declarations(self) -> None:
+        """Array types in parameters and struct fields are structural syntax."""
+
+        lines = [
+            "struct Packet {",
+            "    bytes: [u8; 4],",
+            "}",
+            "fn decode(",
+            "    bytes: [u8; 4],",
+            ") {}",
+            "fn use_value(values: &[u8], index: usize) {",
+            "    consume(values[index],",
+            "}",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "array_types.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 5)
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 8)
+            )
+
     def test_lcov_keeps_uncovered_dot_call_in_authored_denominator(self) -> None:
         """An uncovered chained call cannot pass as structural punctuation."""
 

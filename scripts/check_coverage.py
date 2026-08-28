@@ -294,8 +294,11 @@ def is_executable_source_line(
         return False
     if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
-    if text.endswith(",") and _has_executable_comma_syntax(text):
-        return True
+    if text.endswith(",") and not text.startswith(("let ", "return ")):
+        if _is_structural_comma_continuation(lines, line_number, text):
+            return False
+        if _has_executable_comma_syntax(text):
+            return True
     if text in {"} else {", "else {", "));"} or text.startswith(
         (".", "||", "&&")
     ):
@@ -313,13 +316,6 @@ def is_executable_source_line(
     if following.startswith(".") and all(
         character.isalnum() or character in "_:" for character in text
     ) and _is_structural_comma_continuation(lines, line_number, f"{text},"):
-        return False
-    if (
-        text.endswith(",")
-        and not text.startswith("let ")
-        and not text.startswith("return ")
-        and _is_structural_comma_continuation(lines, line_number, text)
-    ):
         return False
     return True
 
@@ -340,17 +336,6 @@ def _is_structural_comma_continuation(
     in one of those structural contexts are excluded from the authored-line
     denominator; every other comma-terminated line remains executable.
     """
-
-    if any(character in text for character in ".()[]=+-*/%<>!&|?"):
-        return False
-
-    previous = ""
-    for candidate in reversed(lines[: line_number - 1]):
-        if candidate.strip():
-            previous = candidate.strip()
-            break
-    if previous.endswith("(") and "let " not in previous and "=" not in previous:
-        return True
 
     declaration_depth = 0
     function_parenthesis_depth = 0
@@ -397,10 +382,19 @@ def _is_structural_comma_continuation(
             struct_literal_depth = max(
                 0, struct_literal_depth + candidate.count("{") - candidate.count("}")
             )
+    if declaration_depth > 0 or function_parenthesis_depth > 0:
+        return True
+    if _has_executable_comma_syntax(text):
+        return False
+    previous = ""
+    for candidate in reversed(lines[: line_number - 1]):
+        if candidate.strip():
+            previous = candidate.strip()
+            break
+    if previous.endswith("(") and "let " not in previous and "=" not in previous:
+        return True
     return (
-        declaration_depth > 0
-        or function_parenthesis_depth > 0
-        or expression_parenthesis_depth > 0
+        expression_parenthesis_depth > 0
         or array_depth > 0
         or struct_literal_depth > 0
     )
