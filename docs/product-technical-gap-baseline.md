@@ -231,7 +231,9 @@ contracts, orchestration routing, privacy authorization, release-evidence
 generation, the CPU topic-measurement reference estimator, the repaired
 posterior network estimator (#230 + #239), the Driver et al. (2017) SDE
 recovery suite (#231/#232) and its `T0MEANSstd`/`T0VARstd` restorations
-(#262/#265), the deterministic analysis-run execution engine, the loopback
+(#262/#265), followed by `asymDIFFUSIONstd`, `TRAITVARstd`,
+`MANIFESTTRAITVARstd`, and `MANIFESTVARstd` (#267/#268/#270/#271), the
+deterministic analysis-run execution engine, the loopback
 interpretation gateway, the provider-owned analysis-run status/read HTTP
 exchange (#266), the macOS-native MLX CPU receipt probe
 (`mlx_native_receipt`), and VRAM-policy compute types.
