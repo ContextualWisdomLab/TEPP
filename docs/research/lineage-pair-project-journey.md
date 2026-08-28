@@ -2,7 +2,7 @@
 
 ## Scope
 
-This note supports ADR 0024's evidence-state and temporal-graph contract. It
+This note supports ADR 0026's evidence-state and temporal-graph contract. It
 also supports the implemented independent binary TDT-link criterion posterior
 and exact materialization of an already identified discrete event-time
 posterior, but does not establish completed CHRONOS atom/mass inference, causal
@@ -14,7 +14,7 @@ Allan (2002) separates the TDT task family into segmentation, link detection,
 first-story detection, detection, and tracking. From that separation, TEPP
 decides that a relatedness channel cannot be its own independent criterion and
 that one thresholded similarity response cannot stand in for posterior event
-identity; those are ADR 0024 design constraints, not claims made by Allan.
+identity; those are ADR 0026 design constraints, not claims made by Allan.
 
 Anagnostopoulos et al. (2013) describe CHRONOS reasoning over qualitative
 temporal relations and consistency. Li et al. (2021) model complex event
@@ -22,7 +22,7 @@ schemas as graphs rather than a one-dimensional next-event sequence. TEPP
 infers from those sources that its product contract should preserve a
 posterior partial-order DAG, multiple predecessors, branches, hypothetical
 relations, and distinct record/event clocks. Those structures are TEPP's ADR
-0024 design, not direct findings of either source, and they do not license a
+0026 design, not direct findings of either source, and they do not license a
 causal interpretation.
 
 For independently observed binary link outcomes, Jeffreys' invariant prior for

@@ -1,4 +1,4 @@
-# ADR 0024 — Independent lineage-pair criterion and posterior Project Journey
+# ADR 0026 — Independent lineage-pair criterion and posterior Project Journey
 
 **Decision status:** Proposed  
 **Implementation maturity:** active-PR — strict wire contracts and Rust CPU independent-criterion estimator  

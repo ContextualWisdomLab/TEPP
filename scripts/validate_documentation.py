@@ -428,11 +428,23 @@ def validate_adr_graph() -> None:
     }
 
     adr_files: dict[str, Path] = {}
+    duplicate_numbers: dict[str, list[Path]] = {}
     for path in sorted(adr_root.glob("[0-9][0-9][0-9][0-9]-*.md")):
         match = ADR_FILE_NAME.fullmatch(path.name)
         if not match:
             raise AssertionError(f"invalid ADR filename: {path.relative_to(ROOT)}")
-        adr_files[match.group("number")] = path
+        number = match.group("number")
+        if previous := adr_files.get(number):
+            duplicate_numbers.setdefault(number, [previous]).append(path)
+        else:
+            adr_files[number] = path
+
+    if duplicate_numbers:
+        rendered = ", ".join(
+            f"{number}={[path.name for path in paths]}"
+            for number, paths in sorted(duplicate_numbers.items())
+        )
+        raise AssertionError(f"duplicate ADR numbers: {rendered}")
 
     file_numbers = set(adr_files)
     if indexed_numbers != file_numbers:

@@ -28,10 +28,10 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice; concept alignment, invariance, and topic estimation are not claimed. |
 | [0021](0021-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Credential-free bounded project-history API preserves LineageWeave authorization ownership. |
 | [0022](0022-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
-| [0024](0024-lineage-pair-criterion-and-project-journey-posterior.md) | Independent Event Lineage pair criterion and posterior Project Journey | Proposed | active-PR | Strict artifacts preserve criterion/event-time draws, branches, ties, and CPU/GPU receipts without claiming the scientific estimator is complete. |
-| [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
+| [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
+| [0026](0026-lineage-pair-criterion-and-project-journey-posterior.md) | Independent Event Lineage pair criterion and posterior Project Journey | Proposed | active-PR | Strict artifacts preserve criterion/event-time draws, branches, ties, and CPU/GPU receipts without claiming the scientific estimator is complete. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
 | [0002](0002-six-clock-temporal-semantics.md) | Six-clock temporal semantics and fail-closed historical leakage prevention | Accepted | partial | Typed clocks/intervals are implemented-main via `temporal_core`; input-process-outcome event-time order is `outcome_order` on the active PR. Remaining clock-identity and split enforcement stay accepted-target. |
 | [0003](0003-relational-event-multiple-membership.md) | Relational event ontology and time-varying cross-classified multiple membership | Accepted | partial | Weighted time-varying membership network/roles and the forward-transition graph are implemented-main; IPO event-time order is `outcome_order` on the active PR; full multilevel estimators and persistence remain accepted-target. ADR 0016 owns event-intelligence tasks. |
@@ -103,7 +103,6 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0015](0015-autonomous-development-review-and-merge-authority.md) | Autonomous development, review, and merge authority separation | Accepted | active-PR | Separates model proposal, deterministic verification, publication, independent review, and merge/release authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | TDT link precision/recall in existing `event_core`; remaining TDT/CHRONOS stack remains accepted-target. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | accepted-target | Separates observed evidence, detection/tracking, prediction/schema inference, temporal consistency, and promoted transition authority. |
-| [0021](0021-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Stacked on PR #157; closes the first executable buyer path from accepted run to digest-bound terminal result without claiming estimator authority. |
 | [0016](0016-tdt-chronos-event-intelligence-boundary.md) | TDT, CHRONOS, and Event Ontology intelligence boundary | Accepted | active-PR | First-story FAR/miss in existing `event_core`; remaining TDT/CHRONOS stack remains accepted-target. |
 | [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice. Does not claim concept alignment, invariance, or a topic estimator. |
 | [0017](0017-hourly-contextual-orchestrator-gateway.md) | Hourly contextual-orchestrator gateway and all-provider model discovery | Accepted | active-PR | Keeps proposal-model execution behind a pinned loopback gateway while preserving independent verifier, publisher, reviewer, and merge authority. |
@@ -132,14 +131,16 @@ Use the narrowest owning ADR when decisions overlap:
 - **claim maturity / release evidence:** ADR 0014;
 - **autonomous development/review/merge authority:** ADR 0015;
 - **TDT/CHRONOS event intelligence:** ADR 0016;
-- **accepted-run execution and terminal artifact production:** ADR 0021.
+- **accepted-run execution and terminal artifact production:** ADR 0022.
 - **hourly proposal gateway and provider discovery:** ADR 0017.
 - **modular consumer admission / replay identity:** ADR 0018.
 - **project-history wire-size symmetry:** ADR 0019.
 - **LineageWeave project-history service boundary:** ADR 0021.
 - **accepted-run execution and terminal artifact production:** ADR 0022.
-- **independent lineage criterion and posterior Project Journey:** ADR 0023.
-- **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
+- **TEPP-owned accepted/rejected lineage criterion anchor:** ADR 0023.
+- **posterior topic-context producer contract:** ADR 0024.
+- **macOS-native Rust-owned MLX Metal execution:** ADR 0025.
+- **independent lineage-pair criterion and posterior Project Journey:** ADR 0026.
 
 ## Change and supersession rule
 

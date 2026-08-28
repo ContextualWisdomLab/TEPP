@@ -543,5 +543,29 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
         self.assertIn("superseded draft", str(raised.exception))
 
 
+class AdrIdentityTests(unittest.TestCase):
+    """Require one current decision document for each ADR number."""
+
+    def test_duplicate_adr_numbers_fail_before_one_file_is_overwritten(self) -> None:
+        """Two filenames cannot silently share one normative identity."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0024](0024-first.md) | First | Accepted | partial | note |\n",
+                encoding="utf-8",
+            )
+            for name in ("0024-first.md", "0024-second.md"):
+                (adr_root / name).write_text("# duplicate\n", encoding="utf-8")
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError,
+                    r"duplicate ADR numbers: 0024=.*0024-first\.md.*0024-second\.md",
+                ):
+                    documentation.validate_adr_graph()
+
+
 if __name__ == "__main__":
     unittest.main()
