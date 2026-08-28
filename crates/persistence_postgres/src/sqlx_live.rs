@@ -8,7 +8,10 @@ use crate::classify_lifecycle_sql_failure;
 use crate::classify_write_conflict;
 use crate::live_pool::{LiveSqlCommand, LiveSqlResult, LiveSqlxPool, LiveSqlxPoolOptions};
 use crate::sqlx_gate::LiveSqlxConfig;
-use crate::{AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError};
+use crate::{
+    AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError,
+    ReproducibilityManifestRecord,
+};
 use sha2::{Digest, Sha256};
 use sqlx::{Acquire, Row};
 use std::future::Future;
@@ -102,6 +105,13 @@ impl SqlxTransport {
                 .load_analysis_run(tenant_record_id, analysis_run_id)
                 .map(Box::new)
                 .map(LiveSqlResult::AnalysisRun),
+            LiveSqlCommand::LoadReproducibilityManifest {
+                tenant_record_id,
+                reproducibility_manifest_id,
+            } => self
+                .load_reproducibility_manifest(tenant_record_id, reproducibility_manifest_id)
+                .map(Box::new)
+                .map(LiveSqlResult::ReproducibilityManifest),
         }
     }
 
@@ -224,6 +234,50 @@ impl SqlxTransport {
         })
         .map_err(|error| map_sqlx_error(&error))?;
         materialize_analysis_run(&row, tenant_record_id, analysis_run_id)
+    }
+
+    fn load_reproducibility_manifest(
+        &mut self,
+        tenant_record_id: Uuid,
+        reproducibility_manifest_id: Uuid,
+    ) -> Result<ReproducibilityManifestRecord, PersistenceError> {
+        const SQL: &str = "SELECT reproducibility_manifest_id::text, tenant_record_id::text, to_char(knowledge_cutoff AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS knowledge_cutoff, evidence_digest, code_commit_sha, dependency_lock_digest, to_char(system_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS system_time, to_char(available_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS available_time FROM reproducibility_manifest WHERE tenant_record_id = $1::uuid AND reproducibility_manifest_id = $2::uuid";
+        let connection = self
+            .connection
+            .as_mut()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        let runtime = self
+            .runtime
+            .as_ref()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        let row = drive_on_owned_runtime(runtime, async {
+            sqlx::query(SQL)
+                .bind(tenant_record_id.to_string())
+                .bind(reproducibility_manifest_id.to_string())
+                .fetch_one(&mut **connection)
+                .await
+        })
+        .map_err(|error| map_sqlx_error(&error))?;
+        let record = ReproducibilityManifestRecord {
+            reproducibility_manifest_id: parse_uuid_column(&row, "reproducibility_manifest_id")?,
+            tenant_record_id: parse_uuid_column(&row, "tenant_record_id")?,
+            knowledge_cutoff: AvailableTime::parse_rfc3339(&text_column(&row, "knowledge_cutoff")?)
+                .map_err(|_| PersistenceError::InvalidContentDigest)?,
+            evidence_digest: text_column(&row, "evidence_digest")?,
+            code_commit_sha: text_column(&row, "code_commit_sha")?,
+            dependency_lock_digest: text_column(&row, "dependency_lock_digest")?,
+            system_time: SystemTime::parse_rfc3339(&text_column(&row, "system_time")?)
+                .map_err(|_| PersistenceError::InvalidContentDigest)?,
+            available_time: AvailableTime::parse_rfc3339(&text_column(&row, "available_time")?)
+                .map_err(|_| PersistenceError::InvalidContentDigest)?,
+        };
+        if record.tenant_record_id != tenant_record_id
+            || record.reproducibility_manifest_id != reproducibility_manifest_id
+        {
+            return Err(PersistenceError::InvalidContentDigest);
+        }
+        record.validate()?;
+        Ok(record)
     }
 }
 

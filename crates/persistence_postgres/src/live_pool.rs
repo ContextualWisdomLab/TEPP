@@ -1,7 +1,10 @@
 //! Live pool options and fail-closed open gate for `SQLx`/`PostgreSQL`.
 
 use crate::sqlx_gate::LiveSqlxConfig;
-use crate::{AnalysisRunWorkerSnapshot, PersistenceError, RecordingSqlSession, SqlSession};
+use crate::{
+    AnalysisRunWorkerSnapshot, PersistenceError, RecordingSqlSession,
+    ReproducibilityManifestRecord, SqlSession,
+};
 use std::fmt;
 use uuid::Uuid;
 
@@ -77,12 +80,17 @@ pub(crate) enum LiveSqlCommand {
         tenant_record_id: Uuid,
         analysis_run_id: Uuid,
     },
+    LoadReproducibilityManifest {
+        tenant_record_id: Uuid,
+        reproducibility_manifest_id: Uuid,
+    },
 }
 
 pub(crate) enum LiveSqlResult {
     Executed,
     LockState(bool),
     AnalysisRun(Box<AnalysisRunWorkerSnapshot>),
+    ReproducibilityManifest(Box<ReproducibilityManifestRecord>),
 }
 
 type LiveSqlExecutor = dyn FnMut(LiveSqlCommand) -> Result<LiveSqlResult, PersistenceError> + Send;
@@ -250,6 +258,26 @@ impl LiveSqlxPool {
         }
     }
 
+    /// Load and revalidate one tenant-bound reproducibility manifest.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed transport or content-validation error when the row
+    /// is absent, malformed, or outside the requested tenant boundary.
+    pub fn load_reproducibility_manifest(
+        &mut self,
+        tenant_record_id: Uuid,
+        reproducibility_manifest_id: Uuid,
+    ) -> Result<ReproducibilityManifestRecord, PersistenceError> {
+        match self.run_live_command(LiveSqlCommand::LoadReproducibilityManifest {
+            tenant_record_id,
+            reproducibility_manifest_id,
+        })? {
+            LiveSqlResult::ReproducibilityManifest(record) => Ok(*record),
+            _ => Err(PersistenceError::SqlExecutionFailed),
+        }
+    }
+
     /// Execute validated SQL statements in one database transaction.
     ///
     /// # Errors
@@ -320,7 +348,8 @@ mod tests {
     };
     use crate::sqlx_gate::LiveSqlxConfig;
     use crate::{
-        AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError, SqlSession,
+        AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError,
+        ReproducibilityManifestRecord, SqlSession,
     };
     use temporal_core::{AvailableTime, SystemTime};
     use tepp_api::{ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalysisRunStatus};
@@ -350,6 +379,20 @@ mod tests {
         AnalysisRunWorkerSnapshot {
             request_record,
             status,
+        }
+    }
+
+    fn manifest() -> ReproducibilityManifestRecord {
+        ReproducibilityManifestRecord {
+            reproducibility_manifest_id: uuid::Uuid::from_u128(2),
+            tenant_record_id: uuid::Uuid::nil(),
+            knowledge_cutoff: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("cutoff"),
+            evidence_digest: "ab".repeat(32),
+            code_commit_sha: "c".repeat(40),
+            dependency_lock_digest: "de".repeat(32),
+            system_time: SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("system"),
+            available_time: AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z")
+                .expect("available"),
         }
     }
 
@@ -412,6 +455,9 @@ mod tests {
                 super::LiveSqlCommand::LoadAnalysisRun { .. } => {
                     Err(PersistenceError::InvalidAnalysisRun)
                 }
+                super::LiveSqlCommand::LoadReproducibilityManifest { .. } => {
+                    Err(PersistenceError::InvalidContentDigest)
+                }
             }),
             defaults,
         );
@@ -431,6 +477,10 @@ mod tests {
         assert_eq!(
             live.load_analysis_run(tenant, run),
             Err(PersistenceError::InvalidAnalysisRun)
+        );
+        assert_eq!(
+            live.load_reproducibility_manifest(tenant, run),
+            Err(PersistenceError::InvalidContentDigest)
         );
         let mut offline = LiveSqlxPool::offline_for_tests(defaults);
         assert_eq!(
@@ -469,6 +519,29 @@ mod tests {
             expected
         );
 
+        let expected_manifest = manifest();
+        let returned_manifest = expected_manifest.clone();
+        let mut manifest_loader = LiveSqlxPool::from_live_executor(
+            Box::new(move |command| match command {
+                super::LiveSqlCommand::LoadReproducibilityManifest { .. } => {
+                    Ok(super::LiveSqlResult::ReproducibilityManifest(Box::new(
+                        returned_manifest.clone(),
+                    )))
+                }
+                _ => Ok(super::LiveSqlResult::Executed),
+            }),
+            defaults,
+        );
+        assert_eq!(
+            manifest_loader
+                .load_reproducibility_manifest(
+                    expected_manifest.tenant_record_id,
+                    expected_manifest.reproducibility_manifest_id,
+                )
+                .expect("manifest"),
+            expected_manifest
+        );
+
         let mut mismatched = LiveSqlxPool::from_live_executor(
             Box::new(|command| match command {
                 super::LiveSqlCommand::Execute(_)
@@ -491,6 +564,10 @@ mod tests {
         );
         assert_eq!(
             mismatched.load_analysis_run(tenant, run),
+            Err(PersistenceError::SqlExecutionFailed)
+        );
+        assert_eq!(
+            mismatched.load_reproducibility_manifest(tenant, run),
             Err(PersistenceError::SqlExecutionFailed)
         );
         assert_eq!(

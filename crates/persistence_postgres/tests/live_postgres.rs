@@ -147,6 +147,12 @@ fn live_postgres_applies_migrations_and_document_sql() {
     .expect("select reproducibility_manifest by digests");
     repo.submit_reproducibility_manifest_by_id(manifest.reproducibility_manifest_id)
         .expect("select reproducibility_manifest by id");
+    assert_eq!(
+        repo.session_mut()
+            .load_reproducibility_manifest(tenant_record_id, manifest.reproducibility_manifest_id,)
+            .expect("load reproducibility manifest"),
+        manifest
+    );
 
     let model_artifact =
         exercise_model_run_artifact_chain(&mut repo, tenant_record_id, &manifest, available);
