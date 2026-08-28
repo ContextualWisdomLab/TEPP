@@ -985,7 +985,12 @@ mod tests {
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.posterior_draw_count = 0);
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_count = 1);
         invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_ids.pop());
-        invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_ids[0].clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| value.topic_basis_sha256.clear());
+        invalid!(|value: &mut TopicContextPosteriorArtifact| {
+            value.topic_ids[0].clear();
+            value.topic_basis_sha256 =
+                topic_basis_binding(&value.posterior_draw_set_id, &value.topic_ids);
+        });
         invalid!(
             |value: &mut TopicContextPosteriorArtifact| value.topic_ids[1] =
                 value.topic_ids[0].clone()
