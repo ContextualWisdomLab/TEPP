@@ -1,6 +1,7 @@
 //! SQL contracts for append-only model runs and model artifacts (ADR 0013).
 
 use crate::PersistenceError;
+use event_core::{INTERVAL_CONSISTENCY_ARTIFACT_TYPE, IntervalConsistencyArtifact};
 use temporal_core::{AvailableTime, SystemTime};
 use uuid::Uuid;
 
@@ -107,6 +108,41 @@ pub struct ModelArtifactRecord {
 }
 
 impl ModelArtifactRecord {
+    /// Bind a canonical TDT/CHRONOS artifact to the append-only model-run chain.
+    ///
+    /// The protected object reference must resolve to the exact canonical JSON
+    /// bytes whose digest is stored in this record.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed digest error for an invalid artifact or object reference.
+    #[allow(clippy::too_many_arguments)]
+    pub fn for_interval_consistency(
+        model_artifact_id: Uuid,
+        tenant_record_id: Uuid,
+        model_run_id: Uuid,
+        artifact: &IntervalConsistencyArtifact,
+        protected_object_ref: impl Into<String>,
+        system_time: SystemTime,
+        available_time: AvailableTime,
+    ) -> Result<Self, PersistenceError> {
+        let artifact_content_digest = artifact
+            .sha256()
+            .map_err(|_| PersistenceError::InvalidContentDigest)?;
+        let record = Self {
+            model_artifact_id,
+            tenant_record_id,
+            model_run_id,
+            artifact_type_code: INTERVAL_CONSISTENCY_ARTIFACT_TYPE.to_owned(),
+            artifact_content_digest,
+            protected_object_ref: Some(protected_object_ref.into()),
+            system_time,
+            available_time,
+        };
+        record.validate()?;
+        Ok(record)
+    }
+
     /// Fail-closed field validation for digests and labels.
     ///
     /// # Errors
@@ -278,7 +314,8 @@ mod tests {
         validate_sha256_hex,
     };
     use crate::PersistenceError;
-    use temporal_core::{AvailableTime, SystemTime};
+    use event_core::IntervalConsistencyNetwork;
+    use temporal_core::{AllenRelation, AvailableTime, RelationSet, SystemTime};
     use uuid::Uuid;
 
     fn sample_times() -> (AvailableTime, SystemTime) {
@@ -426,5 +463,51 @@ mod tests {
             Err(PersistenceError::InvalidContentDigest)
         );
         assert_eq!(super::escape_literal("a'b"), "a''b");
+    }
+
+    #[test]
+    fn interval_consistency_artifact_binds_canonical_bytes_to_model_run() {
+        let mut network = IntervalConsistencyNetwork::with_limits(2, 1, 8).expect("limits");
+        let left = network.add_variable().expect("left");
+        let right = network.add_variable().expect("right");
+        network
+            .assert_qualitative_relations(
+                left,
+                right,
+                RelationSet::singleton(AllenRelation::Before),
+            )
+            .expect("assertion");
+        let artifact = event_core::IntervalConsistencyArtifact::from_network(
+            "run-1",
+            "snapshot-1",
+            "ab".repeat(32),
+            &network,
+            &[("event-1".into(), left), ("event-2".into(), right)],
+        )
+        .expect("artifact");
+        let (available_time, system_time) = sample_times();
+        let record = ModelArtifactRecord::for_interval_consistency(
+            Uuid::nil(),
+            Uuid::nil(),
+            Uuid::nil(),
+            &artifact,
+            "s3://protected/artifact.json",
+            system_time,
+            available_time,
+        )
+        .expect("record");
+        assert_eq!(
+            record.artifact_type_code,
+            event_core::INTERVAL_CONSISTENCY_ARTIFACT_TYPE
+        );
+        assert_eq!(
+            record.artifact_content_digest,
+            artifact.sha256().expect("digest")
+        );
+        assert!(
+            insert_model_artifact_sql(&record)
+                .expect("sql")
+                .contains("tdt_chronos")
+        );
     }
 }

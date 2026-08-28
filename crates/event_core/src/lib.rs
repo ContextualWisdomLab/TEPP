@@ -28,6 +28,7 @@ mod identifier;
 mod instance;
 mod intelligence;
 mod interval_consistency;
+mod interval_consistency_artifact;
 mod link;
 mod mention;
 mod prediction;
@@ -113,6 +114,11 @@ pub use interval_consistency::IntervalConsistencyReport;
 pub use interval_consistency::refuse_interval_consistency_as_unrestricted_satisfiability;
 /// Explicit refusal to promote an interval contradiction into an instance.
 pub use interval_consistency::refuse_interval_contradiction_as_instance;
+/// Durable JSON and `GraphML` projection of one bounded consistency result.
+pub use interval_consistency_artifact::{
+    INTERVAL_CONSISTENCY_ARTIFACT_TYPE, IntervalConsistencyArtifact,
+    IntervalConsistencyArtifactRelation,
+};
 /// TDT same-event versus distinct-event link label.
 pub use link::EventLinkLabel;
 /// Undirected TDT link hypothesis between two mentions.

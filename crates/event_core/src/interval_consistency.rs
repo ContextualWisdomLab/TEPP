@@ -13,9 +13,9 @@
 
 use crate::{EventError, EventInstanceId};
 use temporal_core::{
-    AllenRelation, ClosureReport, ConstraintId, EventTime, RelationSet, TemporalInterval,
-    TemporalReasoner, TemporalReasonerError, TemporalReasonerLimits, TemporalVariableId,
-    classify_interval_relation,
+    AllenRelation, ClosureReport, ConstraintId, DerivedRelation, EventTime, RelationSet,
+    TemporalInterval, TemporalReasoner, TemporalReasonerError, TemporalReasonerLimits,
+    TemporalVariableId, classify_interval_relation,
 };
 
 /// Summary of one successful bounded interval-consistency closure.
@@ -164,6 +164,21 @@ impl IntervalConsistencyNetwork {
         self.reasoner
             .relation(left, right)
             .map(|derived| derived.relations())
+            .map_err(|error| map_reasoner_error(&error))
+    }
+
+    /// Return the current relation with observation and support provenance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unknown-variable error for identifiers outside this network.
+    pub fn derived_relation(
+        &self,
+        left: TemporalVariableId,
+        right: TemporalVariableId,
+    ) -> Result<DerivedRelation, EventError> {
+        self.reasoner
+            .relation(left, right)
             .map_err(|error| map_reasoner_error(&error))
     }
 }
