@@ -497,6 +497,10 @@ fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
         TopicIdentityBinding::new(topic_ids[0], 0),
         TopicIdentityBinding::new(topic_ids[0], 1),
     ]);
+    assert_invalid_topic_bindings(vec![
+        TopicIdentityBinding::new(topic_ids[0], 0),
+        TopicIdentityBinding::new(topic_ids[1], topic_ids.len()),
+    ]);
     let artifact = assemble_topic_context_posterior(
         &request,
         &accepted,
