@@ -304,6 +304,7 @@ committed.
 | [#282](https://github.com/ContextualWisdomLab/TEPP/pull/282) | Fitted candidate-`K` topic selection (GAP-004) | Complete newly restarted exact-head workflows after the coverage repair and obtain qualifying independent approval. |
 | [#283](https://github.com/ContextualWisdomLab/TEPP/pull/283) | Unique ADR identity enforcement (documentation authority) | Complete the newly queued exact-head checks and obtain qualifying independent approval. |
 | [#284](https://github.com/ContextualWisdomLab/TEPP/pull/284) | Topic-context posterior artifact assembly stacked on #282 (GAP-004) | Complete the restarted exact-head checks after the classifier repair and obtain qualifying independent approval. |
+
 ## Delivery sequence
 
 The dependency-aware product order is (✓ = landed on protected main):
