@@ -165,6 +165,23 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "fetched-live snapshot"):
                 docs.validate_product_technical_gap_baseline(root)
 
+    def test_incidental_fetched_live_prose_is_not_snapshot_evidence(self) -> None:
+        """A negated prose sentence cannot impersonate the canonical evidence line."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline().replace(
+                    "Facts fetched live at 2026-08-23T12:27:12Z.",
+                    "No facts fetched live at 2026-08-23T12:27:12Z.",
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "fetched-live snapshot"):
+                docs.validate_product_technical_gap_baseline(root)
+
     def test_queued_checks_as_implemented_main_fails(self) -> None:
         """Queued Checks must not be promoted to protected-main maturity."""
 

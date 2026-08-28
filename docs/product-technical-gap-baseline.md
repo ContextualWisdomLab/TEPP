@@ -84,6 +84,7 @@
 **Status:** Live delivery baseline
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 **Snapshot:** 2026-08-28T15:56:03Z
+Facts fetched live from GitHub at 2026-08-28T15:56:03Z.
 **Protected-main evidence:** `b03cc378228d5e568fc34970fcb23dc2b452f535` (merge of [PR #271](https://github.com/ContextualWisdomLab/TEPP/pull/271) `MANIFESTVARstd`, on top of #270 `MANIFESTTRAITVARstd`)
 **Workspace version on protected main:** `0.2.0`
 **Canonical gap-baseline authority:** [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164). [PR #164](https://github.com/ContextualWisdomLab/TEPP/pull/164) merged; this file is now maintained by follow-up refresh PRs against protected main.

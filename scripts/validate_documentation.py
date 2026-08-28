@@ -73,7 +73,9 @@ SNAPSHOT_STAMP = re.compile(
     r"\*\*Snapshot:\*\*\s*(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"
 )
 SNAPSHOT_FETCH_STAMP = re.compile(
-    r"fetched live (?:from GitHub )?at\s+(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"
+    r"^Facts fetched live (?:from GitHub )?at\s+"
+    r"(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\.\s*$",
+    re.MULTILINE,
 )
 INVENTORY_ROW = re.compile(
     r"^\|\s*#(?P<number>\d+)\s*\|\s*`(?P<sha>[0-9a-f]{40})`\s*\|\s*"
