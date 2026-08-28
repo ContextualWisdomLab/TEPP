@@ -92,7 +92,7 @@ GitHub state before any customer, release, certification, or valuation claim.
 | Workspace version | `0.2.0` (aligned across every crate manifest) | A version number alone does not establish a supported product release; no signed artifact or support policy exists yet. |
 | Open pull requests | **3** | Active queue: #272 `TIPREDVARstd`, #279 interval consistency, and #280 `discreteDRIFTstd`. |
 | Draft pull requests | **2** | #272 and #280 remain drafts; #279 is ready for independent review. Draft state is not merge readiness. |
-| Open product issues | **11** | Issues #166–#167, #169–#176, #275, and #277 remain open. |
+| Open product issues | **11** | Issues #166–#167, #169–#174, #176, #275, and #277 remain open. |
 | Current package version | `0.2.0` | No supported product release is established by the repository version alone; the tagged cut remains queued. |
 
 The pull-request counts come from the live GitHub search at this snapshot. The
@@ -273,6 +273,8 @@ the coordinated visual workspace, or a supported multi-tenant release.
 | [#174](https://github.com/ContextualWisdomLab/TEPP/issues/174) | Commercial deployment/release/support | Wraps a scientifically complete product without weakening gates; v0.2.0 version alignment (#239) is a prerequisite slice, not closure. |
 | [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175) **CLOSED** | PR queue and delivery consolidation | Queue consolidation completed at near-zero; issue closed after the residual queue drained through #239. |
 | [#176](https://github.com/ContextualWisdomLab/TEPP/issues/176) | Contextual-orchestrator interpreter/verifier | Consumes validated artifacts and cannot promote scientific truth. |
+| [#275](https://github.com/ContextualWisdomLab/TEPP/issues/275) | Leakage-safe longitudinal CEFR language-profile and drift analysis | Blocked on released interoperability, immutable result, psychometric, and temporal/persistence contracts; must not average ordinal CEFR labels. |
+| [#277](https://github.com/ContextualWisdomLab/TEPP/issues/277) | Longitudinal CEFR development and drift from immutable result events | Consumes versioned result observations without re-owning assessment execution or base scoring; requires cutoff-safe recovery evidence. |
 
 ## Priority pull-request queue
 
