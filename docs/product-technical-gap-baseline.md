@@ -296,7 +296,7 @@ committed.
 | [#280](https://github.com/ContextualWisdomLab/TEPP/pull/280) | Driver p.16 `discreteDRIFTstd` restore (GAP-006 recovery family) | Exact-head checks are terminal-success or intentionally skipped; qualifying independent approval remains required. |
 | [#281](https://github.com/ContextualWisdomLab/TEPP/pull/281) | Buyer-visible protected-main and queue baseline refresh (GAP-014/GAP-015) | Refresh this branch snapshot, rerun documentation checks, then obtain qualifying independent approval. |
 | [#282](https://github.com/ContextualWisdomLab/TEPP/pull/282) | Fitted candidate-`K` topic selection (GAP-004) | Complete queued exact-head workflows and obtain qualifying independent approval. |
-| [#283](https://github.com/ContextualWisdomLab/TEPP/pull/283) | Unique ADR identity enforcement (documentation authority) | Resolve the current-head Strix provider failure and obtain qualifying independent approval. |
+| [#283](https://github.com/ContextualWisdomLab/TEPP/pull/283) | Unique ADR identity enforcement (documentation authority) | Complete the newly queued exact-head checks and obtain qualifying independent approval. |
 ## Delivery sequence
 
 The dependency-aware product order is (✓ = landed on protected main):
