@@ -1097,6 +1097,17 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.fit_manifest.candidate_outcomes[0].statistical_score = None;
+                value.fit_manifest.candidate_outcomes[0].complexity = None;
+                value.fit_manifest.candidate_outcomes[0].failure_code =
+                    Some("unsupported_estimator_failure".into());
+                value.fit_manifest.candidate_outcomes[0].seed = None;
+                value.fit_manifest.candidate_outcomes[0].iterations = None;
+                value.fit_manifest.candidate_outcomes[0].objective = None;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.fit_manifest.candidate_outcomes[0].failure_code = Some("unknown".into());
                 value
             },

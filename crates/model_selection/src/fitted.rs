@@ -467,18 +467,13 @@ pub fn select_fitted_candidate_model(
             llm_votes,
         ));
     }
-    let selected_k = select_candidate_k(&candidates)
-        .map_err(|error| selection_failure(error, candidate_outcomes.clone(), llm_votes))?;
-    let model = selected_model
-        .filter(|(candidate_k, _)| *candidate_k == selected_k)
-        .map(|(_, model)| model)
-        .ok_or_else(|| {
-            selection_failure(
-                ModelSelectionError::LlmVoteIsNotStatisticalAuthority,
-                candidate_outcomes.clone(),
-                llm_votes,
-            )
-        })?;
+    let Some((selected_k, model)) = selected_model else {
+        return Err(selection_failure(
+            ModelSelectionError::LlmVoteIsNotStatisticalAuthority,
+            candidate_outcomes,
+            llm_votes,
+        ));
+    };
     Ok(FittedCandidateSelection {
         selected_k,
         model,
