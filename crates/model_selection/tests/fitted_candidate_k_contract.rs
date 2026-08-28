@@ -449,6 +449,7 @@ fn invalid_fitted_configuration_fails_closed() {
 fn statistical_candidate_from_fit_refuses_unusable_diagnostics() {
     let input = separated_topic_input();
     let matching = ReferenceTopicModel {
+        model_input_sha256: None,
         seed: 1,
         iterations: 4,
         objective: -1.0,
@@ -475,6 +476,7 @@ fn statistical_candidate_from_fit_refuses_unusable_diagnostics() {
 
     let tiny = two_document_input([0.2, 0.2, 0.2, 0.2]);
     let tiny_model = ReferenceTopicModel {
+        model_input_sha256: None,
         seed: 1,
         iterations: 4,
         objective: -1.0,

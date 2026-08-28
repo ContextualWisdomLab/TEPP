@@ -244,6 +244,8 @@ def is_executable_source_line(
         "};",
         "});",
         "Ok(())",
+        "Ok((",
+        "]",
     }:
         return False
     if _is_standalone_string_literal(text) or text.startswith("} else"):
@@ -253,6 +255,8 @@ def is_executable_source_line(
         if type_name and all(character.isalnum() or character in "_:" for character in type_name):
             return False
     if text.startswith("use ") or text.startswith("pub use "):
+        return False
+    if text.startswith("type "):
         return False
     if text.startswith("mod ") or text.startswith("pub mod "):
         return False
@@ -290,7 +294,25 @@ def is_executable_source_line(
         return False
     if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
-    if text in {"} else {", "else {", "));"} or text.startswith((".", "||", "&&")):
+    if text.endswith(",") and _has_executable_comma_syntax(text):
+        return True
+    if text in {"} else {", "else {", "));"} or text.startswith(
+        (".", "||", "&&")
+    ):
+        return False
+    if text.startswith(("/", "*")) and not any(
+        character in text for character in "()="
+    ):
+        return False
+    if text.endswith("=> event"):
+        return False
+    following = next(
+        (candidate.strip() for candidate in lines[line_number:] if candidate.strip()),
+        "",
+    )
+    if following.startswith(".") and all(
+        character.isalnum() or character in "_:" for character in text
+    ) and _is_structural_comma_continuation(lines, line_number, f"{text},"):
         return False
     if (
         text.endswith(",")
@@ -300,6 +322,12 @@ def is_executable_source_line(
     ):
         return False
     return True
+
+
+def _has_executable_comma_syntax(text: str) -> bool:
+    """Return whether a comma line contains expression-only syntax."""
+
+    return any(character in text for character in ".()[]=+-*/%<>!&|?")
 
 
 def _is_structural_comma_continuation(
@@ -326,6 +354,9 @@ def _is_structural_comma_continuation(
 
     declaration_depth = 0
     function_parenthesis_depth = 0
+    expression_parenthesis_depth = 0
+    array_depth = 0
+    struct_literal_depth = 0
     for candidate in lines[: line_number - 1]:
         stripped = candidate.strip()
         if declaration_depth:
@@ -352,7 +383,27 @@ def _is_structural_comma_continuation(
             continue
         if "fn " in stripped and "(" in candidate:
             function_parenthesis_depth = candidate.count("(") - candidate.count(")")
-    return declaration_depth > 0 or function_parenthesis_depth > 0
+            continue
+        expression_parenthesis_depth = max(
+            0,
+            expression_parenthesis_depth + candidate.count("(") - candidate.count(")"),
+        )
+        array_depth = max(0, array_depth + candidate.count("[") - candidate.count("]"))
+        if "{" in candidate and (" = " in candidate or "Self {" in candidate):
+            struct_literal_depth = max(
+                0, struct_literal_depth + candidate.count("{") - candidate.count("}")
+            )
+        elif struct_literal_depth:
+            struct_literal_depth = max(
+                0, struct_literal_depth + candidate.count("{") - candidate.count("}")
+            )
+    return (
+        declaration_depth > 0
+        or function_parenthesis_depth > 0
+        or expression_parenthesis_depth > 0
+        or array_depth > 0
+        or struct_literal_depth > 0
+    )
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
@@ -456,6 +507,7 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 ('"', "r\"", "r#", "br\"", "br#")
             )
     return False
+
 
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""

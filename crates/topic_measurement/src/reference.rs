@@ -243,6 +243,13 @@ impl ReferenceTopicInput {
         self.document_ids.len()
     }
 
+    /// Return fitted forward-transition endpoints as document identities.
+    pub fn transition_document_pairs(&self) -> impl Iterator<Item = (Uuid, Uuid)> + '_ {
+        self.transition_pairs
+            .iter()
+            .map(|&(source, target)| (self.document_ids[source], self.document_ids[target]))
+    }
+
     /// Return the vocabulary size.
     #[must_use]
     pub const fn vocabulary_size(&self) -> usize {
@@ -752,6 +759,8 @@ impl JointCoordinatePrecision {
 /// A converged topic-model result with uncertainty and lineage counts.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReferenceTopicModel {
+    /// Canonical digest of the validated estimator input used for this fit.
+    pub model_input_sha256: Option<String>,
     /// Selected deterministic initialization seed.
     pub seed: u64,
     /// Iterations used by the selected converged fit.
@@ -822,6 +831,13 @@ impl ReferenceTopicInput {
         config: &ReferenceTopicModelConfig,
         topic_ids: Vec<Uuid>,
     ) -> Result<JointCoordinatePrecision, TopicMeasurementError> {
+        if model.model_input_sha256.as_deref()
+            != self
+                .source_binding()
+                .map(ReferenceTopicSourceBinding::model_input_sha256)
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
         let topic_count = model.topic_term_probabilities.len();
         let coordinate_count = topic_count
             .checked_sub(1)
@@ -1310,6 +1326,9 @@ fn build_result(
         });
     }
     Ok(ReferenceTopicModel {
+        model_input_sha256: input
+            .source_binding()
+            .map(|binding| binding.model_input_sha256().to_owned()),
         seed: state.seed,
         iterations: state.iterations,
         objective: state.objective,
@@ -1394,9 +1413,10 @@ fn next_unit(state: &mut u64) -> f64 {
 mod tests {
     use super::{
         FitState, MAX_REFERENCE_FIT_BUDGET, MAX_REFERENCE_WORKING_CELLS, PrevalenceFeature,
-        ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, argmax, bounded_count,
-        build_design, build_result, dot, expectation, input_resources_within_budget, next_unit,
-        normalize, objective, require_finite, standardize_event_time, validate_positive_definite,
+        ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig,
+        ReferenceTopicSourceBinding, argmax, bounded_count, build_design, build_result, dot,
+        expectation, input_resources_within_budget, next_unit, normalize, objective,
+        require_finite, standardize_event_time, validate_positive_definite,
     };
     use crate::TopicMeasurementError;
     use membership_core::{
@@ -1594,6 +1614,7 @@ mod tests {
         document_topic_proportions: Vec<Vec<f64>>,
     ) -> ReferenceTopicModel {
         ReferenceTopicModel {
+            model_input_sha256: None,
             seed: 1,
             iterations: 4,
             objective: -1.0,
@@ -1713,6 +1734,24 @@ mod tests {
             .expect("precision");
         assert_eq!(precision.values.len(), 4);
         assert!(precision.values[0][1] < 0.0);
+
+        let mut mismatched_input = input.clone();
+        mismatched_input.source_binding = Some(ReferenceTopicSourceBinding {
+            snapshot_id: "snapshot-b".to_owned(),
+            source_snapshot_sha256: "b".repeat(64),
+            model_input_sha256: "b".repeat(64),
+            knowledge_cutoff: "2026-01-01T00:00:00Z".to_owned(),
+        });
+        let mut bound_model = valid.clone();
+        bound_model.model_input_sha256 = Some("a".repeat(64));
+        assert_eq!(
+            mismatched_input.build_joint_coordinate_precision(
+                &bound_model,
+                &config,
+                topic_ids.clone()
+            ),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
 
         let invalid = |model: &ReferenceTopicModel,
                        candidate_config: &ReferenceTopicModelConfig,

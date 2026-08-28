@@ -1,9 +1,12 @@
 //! End-to-end contract for the completed TRSL topic-lineage artifact.
 
 use analysis_engine::{
-    AnalysisEngineError, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
-    TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE,
-    execute_selected_topic_lineage_run, execute_topic_lineage_run,
+    AnalysisEngineError, TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE,
+    TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
+    TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, TopicActivityInterval,
+    TopicContextMembership, TopicDocumentRelation, TopicIdentityBinding,
+    assemble_topic_context_posterior, execute_selected_topic_lineage_run,
+    execute_topic_lineage_run,
 };
 use corpus_split::{CorpusDocument, CorpusSnapshot};
 use membership_core::{
@@ -18,7 +21,9 @@ use temporal_core::{
     TemporalPrecision,
 };
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
-use topic_measurement::{ReferenceTopicInput, ReferenceTopicModelConfig, SparseMatrix};
+use topic_measurement::{
+    ReferenceTopicInput, ReferenceTopicModelConfig, SparseMatrix, fit_reference_topic_model,
+};
 use uuid::Uuid;
 
 fn event_time(day: u8) -> EventTime {
@@ -95,6 +100,73 @@ fn request() -> AnalysisRunRequest {
         model_contract_version: TOPIC_LINEAGE_MODEL_CONTRACT_VERSION.into(),
         output_profile: TOPIC_LINEAGE_OUTPUT_PROFILE.into(),
     }
+}
+
+fn context_request() -> AnalysisRunRequest {
+    AnalysisRunRequest {
+        output_profile: TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE.into(),
+        ..request()
+    }
+}
+
+fn context_records(
+    ids: &[Uuid],
+    topic_ids: &[Uuid],
+) -> (
+    Vec<TopicActivityInterval>,
+    Vec<TopicDocumentRelation>,
+    Vec<TopicContextMembership>,
+) {
+    let activity = topic_ids
+        .iter()
+        .map(|topic_id| TopicActivityInterval {
+            topic_id: topic_id.to_string(),
+            state_code: "active".into(),
+            valid_from: "2026-07-01T00:00:00Z".into(),
+            valid_to: "2026-08-01T00:00:00Z".into(),
+        })
+        .collect();
+    let relations = [(0, 1), (1, 2), (2, 3)]
+        .into_iter()
+        .enumerate()
+        .map(|(index, (source, target))| TopicDocumentRelation {
+            source_document_id: ids[source].to_string(),
+            target_document_id: ids[target].to_string(),
+            relation_kind_code: "event_lineage_precedes".into(),
+            event_time: event_time(u8::try_from(target + 1).expect("day")).to_rfc3339(),
+            evidence_sha256: format!("{:064x}", index + 1),
+            evidence_resource_id: format!("relation-evidence-{index}"),
+            provenance_assertion_id: format!("relation-provenance-{index}"),
+        })
+        .collect();
+    let memberships = ids
+        .iter()
+        .flat_map(|document_id| {
+            ["business_unit", "process_unit", "team", "person"]
+                .into_iter()
+                .map(move |dimension| TopicContextMembership {
+                    document_id: document_id.to_string(),
+                    dimension_code: dimension.into(),
+                    context_id: format!("{dimension}-{document_id}"),
+                    weight: 1.0,
+                    valid_from: "2026-07-01T00:00:00Z".into(),
+                    valid_to: "2026-08-01T00:00:00Z".into(),
+                    evidence_sha256: "a".repeat(64),
+                    evidence_resource_id: format!("{dimension}-evidence-{document_id}"),
+                    provenance_assertion_id: format!("{dimension}-provenance-{document_id}"),
+                })
+        })
+        .collect();
+    (activity, relations, memberships)
+}
+
+fn topic_bindings(topic_ids: &[Uuid]) -> Vec<TopicIdentityBinding> {
+    topic_ids
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, topic_id)| TopicIdentityBinding::new(topic_id, index))
+        .collect()
 }
 
 #[test]
@@ -194,6 +266,342 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     );
     assert_eq!(selected.artifact.fit_manifest.candidate_outcomes.len(), 2);
     assert_eq!(selected.artifact.fit_manifest.llm_recommendations, vec![3]);
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn complete_topic_context_artifact_retains_event_time_branches_and_draws() {
+    let (snapshot, ids, times, source_memberships, source_relations) = fixture();
+    let counts = SparseMatrix::from_csr(
+        4,
+        4,
+        vec![0, 2, 4, 6, 8],
+        vec![0, 1, 0, 1, 2, 3, 2, 3],
+        vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0],
+    )
+    .expect("counts");
+    let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
+    let input = ReferenceTopicInput::new_bound(
+        &snapshot,
+        "snapshot-topic-lineage",
+        cutoff,
+        ids.clone(),
+        &counts,
+        &times,
+        None,
+        &source_memberships,
+        &source_relations,
+    )
+    .expect("input");
+    let config = ReferenceTopicModelConfig::new(2, vec![7, 11], 2_000, 1e-5)
+        .expect("config")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("hyperparameters");
+    let model = fit_reference_topic_model(&input, &config).expect("fit");
+    let topic_ids = vec![Uuid::from_u128(101), Uuid::from_u128(102)];
+    let (activity, relations, memberships) = context_records(&ids, &topic_ids);
+    let request = context_request();
+    let accepted =
+        AnalysisRunAccepted::new("run-topic-context", "accepted", &request.idempotency_key)
+            .expect("accepted");
+    assert_eq!(
+        assemble_topic_context_posterior(
+            &request,
+            &accepted,
+            "foreign-snapshot",
+            cutoff,
+            &input,
+            &model,
+            &config,
+            topic_bindings(&topic_ids),
+            activity.clone(),
+            vec![],
+            relations.clone(),
+            memberships.clone(),
+            19,
+            3,
+        ),
+        Err(AnalysisEngineError::SnapshotMismatch)
+    );
+    let invalid_profile_request = AnalysisRunRequest {
+        output_profile: TOPIC_LINEAGE_OUTPUT_PROFILE.into(),
+        ..context_request()
+    };
+    let invalid_profile_accepted = AnalysisRunAccepted::new(
+        "run-topic-context-invalid-profile",
+        "accepted",
+        &invalid_profile_request.idempotency_key,
+    )
+    .expect("accepted invalid profile request");
+    assert_eq!(
+        assemble_topic_context_posterior(
+            &invalid_profile_request,
+            &invalid_profile_accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &input,
+            &model,
+            &config,
+            topic_bindings(&topic_ids),
+            activity.clone(),
+            vec![],
+            relations.clone(),
+            memberships.clone(),
+            19,
+            3,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    let assert_invalid_binding =
+        |invalid_request: &AnalysisRunRequest,
+         invalid_accepted: &AnalysisRunAccepted,
+         invalid_snapshot: &str,
+         invalid_cutoff: KnowledgeCutoff| {
+            assert_eq!(
+                assemble_topic_context_posterior(
+                    invalid_request,
+                    invalid_accepted,
+                    invalid_snapshot,
+                    invalid_cutoff,
+                    &input,
+                    &model,
+                    &config,
+                    topic_bindings(&topic_ids),
+                    activity.clone(),
+                    vec![],
+                    relations.clone(),
+                    memberships.clone(),
+                    19,
+                    3,
+                ),
+                Err(AnalysisEngineError::InvalidEvidence)
+            );
+        };
+    let wrong_cutoff_request = AnalysisRunRequest {
+        knowledge_cutoff: "2026-07-31T00:00:00Z".into(),
+        ..context_request()
+    };
+    let wrong_cutoff_accepted = AnalysisRunAccepted::new(
+        "run-topic-context-wrong-cutoff",
+        "accepted",
+        &wrong_cutoff_request.idempotency_key,
+    )
+    .expect("accepted wrong-cutoff request");
+    assert_invalid_binding(
+        &wrong_cutoff_request,
+        &wrong_cutoff_accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+    );
+    let wrong_model_request = AnalysisRunRequest {
+        model_contract_version: "foreign-model-v1".into(),
+        ..context_request()
+    };
+    let wrong_model_accepted = AnalysisRunAccepted::new(
+        "run-topic-context-wrong-model",
+        "accepted",
+        &wrong_model_request.idempotency_key,
+    )
+    .expect("accepted wrong-model request");
+    assert_invalid_binding(
+        &wrong_model_request,
+        &wrong_model_accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+    );
+    let foreign_snapshot_request = AnalysisRunRequest {
+        snapshot_id: "foreign-snapshot".into(),
+        ..context_request()
+    };
+    let foreign_snapshot_accepted = AnalysisRunAccepted::new(
+        "run-topic-context-foreign-snapshot",
+        "accepted",
+        &foreign_snapshot_request.idempotency_key,
+    )
+    .expect("accepted foreign-snapshot request");
+    assert_invalid_binding(
+        &foreign_snapshot_request,
+        &foreign_snapshot_accepted,
+        "foreign-snapshot",
+        cutoff,
+    );
+    let foreign_cutoff =
+        KnowledgeCutoff::parse_rfc3339("2026-07-31T00:00:00Z").expect("foreign cutoff");
+    let foreign_cutoff_request = AnalysisRunRequest {
+        knowledge_cutoff: foreign_cutoff.to_rfc3339(),
+        ..context_request()
+    };
+    let foreign_cutoff_accepted = AnalysisRunAccepted::new(
+        "run-topic-context-foreign-cutoff",
+        "accepted",
+        &foreign_cutoff_request.idempotency_key,
+    )
+    .expect("accepted foreign-cutoff request");
+    assert_invalid_binding(
+        &foreign_cutoff_request,
+        &foreign_cutoff_accepted,
+        "snapshot-topic-lineage",
+        foreign_cutoff,
+    );
+    let mut divergent_relations = relations.clone();
+    divergent_relations[1].source_document_id = ids[0].to_string();
+    assert_eq!(
+        assemble_topic_context_posterior(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &input,
+            &model,
+            &config,
+            vec![
+                TopicIdentityBinding::new(topic_ids[0], 0),
+                TopicIdentityBinding::new(topic_ids[1], 1),
+            ],
+            activity.clone(),
+            vec![],
+            divergent_relations,
+            memberships.clone(),
+            19,
+            3,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    let mut duplicate_relations = relations.clone();
+    duplicate_relations.push(relations[0].clone());
+    duplicate_relations
+        .last_mut()
+        .expect("duplicate relation")
+        .evidence_resource_id = "duplicate-relation-evidence".into();
+    assert_eq!(
+        assemble_topic_context_posterior(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &input,
+            &model,
+            &config,
+            vec![
+                TopicIdentityBinding::new(topic_ids[0], 0),
+                TopicIdentityBinding::new(topic_ids[1], 1),
+            ],
+            activity.clone(),
+            vec![],
+            duplicate_relations,
+            memberships.clone(),
+            19,
+            3,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    let assert_invalid_topic_bindings = |bindings| {
+        assert_eq!(
+            assemble_topic_context_posterior(
+                &request,
+                &accepted,
+                "snapshot-topic-lineage",
+                cutoff,
+                &input,
+                &model,
+                &config,
+                bindings,
+                activity.clone(),
+                vec![],
+                relations.clone(),
+                memberships.clone(),
+                19,
+                3,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+    };
+    assert_invalid_topic_bindings(vec![TopicIdentityBinding::new(topic_ids[0], 0)]);
+    assert_invalid_topic_bindings(vec![
+        TopicIdentityBinding::new(topic_ids[0], 0),
+        TopicIdentityBinding::new(topic_ids[1], 0),
+    ]);
+    assert_invalid_topic_bindings(vec![
+        TopicIdentityBinding::new(topic_ids[0], 0),
+        TopicIdentityBinding::new(topic_ids[0], 1),
+    ]);
+    assert_invalid_topic_bindings(vec![
+        TopicIdentityBinding::new(topic_ids[0], 0),
+        TopicIdentityBinding::new(topic_ids[1], topic_ids.len()),
+    ]);
+    let artifact = assemble_topic_context_posterior(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input,
+        &model,
+        &config,
+        vec![
+            TopicIdentityBinding::new(topic_ids[1], 1),
+            TopicIdentityBinding::new(topic_ids[0], 0),
+        ],
+        activity.clone(),
+        vec![],
+        relations.clone(),
+        memberships.clone(),
+        19,
+        3,
+    )
+    .expect("artifact");
+    let swapped_basis_artifact = assemble_topic_context_posterior(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input,
+        &model,
+        &config,
+        vec![
+            TopicIdentityBinding::new(topic_ids[0], 1),
+            TopicIdentityBinding::new(topic_ids[1], 0),
+        ],
+        activity,
+        vec![],
+        relations,
+        memberships,
+        19,
+        3,
+    )
+    .expect("swapped basis artifact");
+
+    assert_eq!(
+        artifact.schema_version,
+        TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION
+    );
+    assert_ne!(
+        artifact.posterior_draw_set_id,
+        swapped_basis_artifact.posterior_draw_set_id
+    );
+    assert_eq!(artifact.posterior_draw_count, 3);
+    assert_eq!(
+        artifact.topic_ids,
+        topic_ids.iter().map(Uuid::to_string).collect::<Vec<_>>()
+    );
+    assert_eq!(artifact.plausible_values.len(), 12);
+    assert_eq!(artifact.document_relations.len(), 3);
+    assert_eq!(
+        artifact
+            .document_relations
+            .iter()
+            .filter(|relation| relation.source_document_id == ids[0].to_string())
+            .count(),
+        1
+    );
+    assert_eq!(artifact.posterior_draw_set_id.len(), 64);
+    let json = artifact.to_json().expect("json");
+    assert_eq!(
+        analysis_engine::TopicContextPosteriorArtifact::from_json(&json)
+            .expect("round trip")
+            .to_json()
+            .expect("canonical round trip"),
+        json
+    );
 }
 
 #[test]
