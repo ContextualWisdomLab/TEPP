@@ -2554,8 +2554,7 @@ pub fn refuse_asymptotic_standardised_continuous_intercept_as_standardised_discr
 /// [`PsychometricError::StandardisedDiscreteDiffusionRequiresPositiveWithinSubjectVariance`]
 /// when `asymDIFFUSION` is zero, and
 /// [`PsychometricError::InvalidNumericInput`] when an input is
-/// non-finite, the diffusion is negative, or the mapped ratio
-/// overflows.
+/// non-finite or the diffusion is negative.
 pub fn recover_standardised_discrete_diffusion(
     continuous_diffusion: f64,
     log_rate: f64,
@@ -2570,7 +2569,7 @@ pub fn recover_standardised_discrete_diffusion(
     }
     let process_noise =
         recover_discrete_process_noise(continuous_diffusion, log_rate, event_delta, clock)?;
-    require_finite(process_noise / within)
+    Ok(process_noise / within)
 }
 
 /// Refuse treating unstandardised `discreteDIFFUSION` as p. 16
