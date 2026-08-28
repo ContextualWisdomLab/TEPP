@@ -152,7 +152,7 @@ All previously queued slices landed on protected main through:
    2026-08-25T06:24Z), and network-repair/version-alignment
    [#239](https://github.com/ContextualWisdomLab/TEPP/pull/239).
 
-The residual open PRs are new forward work (#272 and #279–#283), not the
+The residual open PRs are new forward work (#272, #279–#283, and #287), not the
 historic consolidation backlog.
 
 ## Snapshot open pull-request evidence
