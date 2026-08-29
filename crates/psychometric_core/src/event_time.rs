@@ -4109,9 +4109,7 @@ pub fn refuse_asymptotic_time_independent_effect_as_time_dependent_impulse(
 /// [`PsychometricError::StandardisedAsymptoticTimeIndependentEffectRequiresPositiveWithinSubjectVariance`]
 /// when `q = 0`,
 /// [`PsychometricError::StandardisedAsymptoticTimeIndependentEffectRequiresPositivePredictorVariance`]
-/// when `v = 0`,
-/// [`PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift`]
-/// when the unit asymptotic effect cannot be formed, and
+/// when `v = 0`, and
 /// [`PsychometricError::InvalidNumericInput`] when an input is
 /// non-finite, the predictor variance is negative, or the mapped
 /// product overflows.
