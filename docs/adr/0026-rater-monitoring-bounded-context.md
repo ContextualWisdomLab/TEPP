@@ -1,7 +1,9 @@
 # ADR-0026: Temporal rater monitoring bounded context
 
-> Status: Proposed
-> Date: 2026-08-29
+**Decision status:** Proposed  
+**Implementation maturity:** active-PR — PR #301  
+**Date:** 2026-08-29  
+**Supersession:** None; specializes ADR 0002, ADR 0003, and ADR 0013 for governed rater parameter monitoring.
 
 ## Context
 
@@ -177,6 +179,16 @@ identity, evidence-containment rule, monitoring kind, unsafe reference, and
 error branch. Later numerical PRs must add true-parameter recovery, bias, RMSE,
 interval coverage, change-point recovery, false-alarm rate, deterministic CPU
 multithreading, and CPU/GPU parity.
+
+## Rollback and supersession
+
+Before merge, rollback is deletion of the draft crate, workspace registration,
+ADR, and changelog fragment from the feature branch. After release, published
+monitoring artifacts remain immutable; consumers may stop producing new
+artifacts and fall back to the versioned static parameter-snapshot workflow.
+Changing temporal authority, estimator ownership, clock semantics, or artifact
+kinds requires a superseding ADR and coordinated contract migration across
+TEPP, fast-mlsirm, Psychometrics Commons, and contextual-orchestrator.
 
 ## References
 
