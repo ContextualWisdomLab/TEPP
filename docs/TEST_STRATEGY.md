@@ -65,6 +65,17 @@ Simulation thresholds account for Monte Carlo standard error and interval uncert
 
 ## Release acceptance
 
+## Durable worker recovery
+
+The one-shot worker must prove accepted and running recovery, immutable
+terminal no-op, one retained-session advisory-lock owner, strict input byte and
+count bounds, duplicate/tamper/cross-manifest refusal before running, exact
+runtime commit/lockfile binding, scientific failure distinct from
+infrastructure failure, and one-transaction model-run/artifact/terminal
+publication. Database or object-input failure leaves the run retryable.
+
+## Release acceptance
+
 A release requires one integrated protected head with all relevant scientific, numerical, security, migration, packaging, SBOM/provenance, accessibility, operational, and independent-review evidence passing. Planning validation, superseded-branch results, and local-only results are supporting evidence, not release proof.
 
 ## References

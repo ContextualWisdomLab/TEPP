@@ -85,6 +85,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "analysis_worker"
+version = "0.2.0"
+dependencies = [
+ "analysis_engine",
+ "persistence_postgres",
+ "serde",
+ "serde_json",
+ "sha2",
+ "temporal_core",
+ "tepp_api",
+ "uuid",
+]
+
+[[package]]
 name = "assertion_clock"
 version = "0.2.0"
 

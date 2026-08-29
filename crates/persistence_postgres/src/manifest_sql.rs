@@ -42,6 +42,29 @@ impl ReproducibilityManifestRecord {
         validate_commit_sha(&self.code_commit_sha)?;
         Ok(())
     }
+
+    /// Revalidate this row against the caller's tenant, identity, and evidence.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PersistenceError::InvalidContentDigest`] when either digest is
+    /// malformed or any stored identity does not match the requested manifest.
+    pub fn validate_load_binding(
+        &self,
+        expected_tenant_record_id: Uuid,
+        expected_reproducibility_manifest_id: Uuid,
+        expected_evidence_digest: &str,
+    ) -> Result<(), PersistenceError> {
+        self.validate()?;
+        validate_sha256_hex(expected_evidence_digest)?;
+        if self.tenant_record_id != expected_tenant_record_id
+            || self.reproducibility_manifest_id != expected_reproducibility_manifest_id
+            || self.evidence_digest != expected_evidence_digest
+        {
+            return Err(PersistenceError::InvalidContentDigest);
+        }
+        Ok(())
+    }
 }
 
 /// Render append-only insert SQL for a validated reproducibility manifest.
@@ -188,7 +211,7 @@ mod tests {
             insert_reproducibility_manifest_sql(&bad),
             Err(PersistenceError::InvalidContentDigest)
         );
-        bad = record;
+        bad = record.clone();
         bad.code_commit_sha.clear();
         assert_eq!(
             insert_reproducibility_manifest_sql(&bad),
@@ -210,6 +233,45 @@ mod tests {
         assert!(validate_commit_sha(&"a".repeat(41)).is_err());
         assert!(validate_commit_sha(&"A".repeat(40)).is_err());
         assert!(validate_commit_sha("deadbeef-cafe_01").is_err());
+        record
+            .validate_load_binding(
+                record.tenant_record_id,
+                record.reproducibility_manifest_id,
+                &record.evidence_digest,
+            )
+            .expect("matching evidence");
+        assert_eq!(
+            record.validate_load_binding(
+                record.tenant_record_id,
+                record.reproducibility_manifest_id,
+                &"ff".repeat(32),
+            ),
+            Err(PersistenceError::InvalidContentDigest)
+        );
+        assert_eq!(
+            record.validate_load_binding(
+                record.tenant_record_id,
+                record.reproducibility_manifest_id,
+                "invalid",
+            ),
+            Err(PersistenceError::InvalidContentDigest)
+        );
+        assert_eq!(
+            record.validate_load_binding(
+                Uuid::from_u128(1),
+                record.reproducibility_manifest_id,
+                &record.evidence_digest,
+            ),
+            Err(PersistenceError::InvalidContentDigest)
+        );
+        assert_eq!(
+            record.validate_load_binding(
+                record.tenant_record_id,
+                Uuid::from_u128(1),
+                &record.evidence_digest,
+            ),
+            Err(PersistenceError::InvalidContentDigest)
+        );
         assert_eq!(super::escape_literal("a'b"), "a''b");
     }
 }

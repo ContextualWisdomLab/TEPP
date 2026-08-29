@@ -73,6 +73,14 @@ GET    /v1/exports/{export_id}
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.
 
+The internal `analysis_worker` input contract is not a customer HTTP payload.
+It carries no source text or identity mapping and is accepted only when its
+canonical snapshot/evidence digest matches the tenant-bound reproducibility
+manifest, its snapshot and cutoff match the durable request, and the executing
+Git/dependency-lock identities match that manifest. Unknown fields, duplicate
+evidence IDs, invalid clocks, zero memberships, and oversized JSON fail before
+the run enters `running`.
+
 The active persistence slice stores canonical request JSON and its SHA-256
 digest, then reconstructs status from the latest append-only state event.
 PostgreSQL serializes event appends on the run row and permits only
