@@ -201,9 +201,11 @@ impl RaterMonitoringRun {
         if observation.available_at_unix_ms > self.knowledge_cutoff_unix_ms {
             return Err(MonitoringError::EvidenceAfterKnowledgeCutoff);
         }
-        if self.parameter_observations.iter().any(|existing| {
-            existing.parameter_snapshot_ref == observation.parameter_snapshot_ref
-        }) {
+        if self
+            .parameter_observations
+            .iter()
+            .any(|existing| existing.parameter_snapshot_ref == observation.parameter_snapshot_ref)
+        {
             return Err(MonitoringError::DuplicateParameterSnapshot);
         }
         self.parameter_observations.push(observation);
@@ -409,7 +411,10 @@ mod tests {
             100,
         )
         .expect("valid observation");
-        assert_eq!(observation.rater_configuration_ref(), "configuration_alpha");
+        assert_eq!(
+            observation.rater_configuration_ref(),
+            "configuration_alpha"
+        );
         assert_eq!(observation.parameter_snapshot_ref(), "snapshot_alpha");
         assert_eq!(observation.effective_at_unix_ms(), 300);
         assert_eq!(observation.available_at_unix_ms(), 200);
@@ -422,8 +427,8 @@ mod tests {
 
     #[test]
     fn monitoring_run_enforces_cutoff_uniqueness_and_sealing() {
-        let mut run = RaterMonitoringRun::new("monitoring_run", 500)
-            .expect("valid monitoring run");
+        let mut run =
+            RaterMonitoringRun::new("monitoring_run", 500).expect("valid monitoring run");
         assert_eq!(run.run_ref(), "monitoring_run");
         assert_eq!(run.knowledge_cutoff_unix_ms(), 500);
         assert_eq!(run.state(), MonitoringRunState::Draft);
