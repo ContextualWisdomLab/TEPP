@@ -238,12 +238,14 @@
 //! `t0_b · √v / √p_0` after strictly positive free `T0VAR` and
 //! strictly positive `TIPREDVAR` (footnote 4 uses only the relevant
 //! first-occasion variance, not process-dynamics `asymDIFFUSION`;
-//! unstandardised `t0_b` is defined for a zero coefficient and for
-//! zero predictor variance and is not that map; `B · √v / √p` is
-//! `TIPREDEFFECTstd` and is not that map; `(-B / a) · √v / √p` is
-//! `asymTIPREDEFFECTstd` and is not that map;
-//! `t0_b · √v / √(trait + p_0 + added)` uses total variance and is
-//! not that map; free `T0VAR` does not require `a < 0`; JSS PDF
+//! a zero coefficient after strictly positive variances is exactly
+//! zero even when `√v / √p_0` overflows; when that ratio overflows,
+//! form `(t0_b / √p_0) √v`; unstandardised `t0_b` is defined for a
+//! zero coefficient and for zero predictor variance and is not that
+//! map; `B · √v / √p` is `TIPREDEFFECTstd` and is not that map;
+//! `(-B / a) · √v / √p` is `asymTIPREDEFFECTstd` and is not that
+//! map; `t0_b · √v / √(trait + p_0 + added)` uses total variance and
+//! is not that map; free `T0VAR` does not require `a < 0`; JSS PDF
 //! re-opened 2026-08-29T21:20Z),
 //! recovers the Driver p. 16 `asymDIFFUSIONstd` as `p / p = 1` after
 //! strictly positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4

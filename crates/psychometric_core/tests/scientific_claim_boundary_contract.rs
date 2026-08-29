@@ -1,7 +1,6 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -186,6 +185,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -3806,6 +3806,41 @@ fn standardised_initial_time_independent_effect_is_not_unstandardised_or_trait_c
             < 1e-15,
         "Driver et al. (2017, Table 3 / footnote 4): T0TIPREDEFFECTstd is t0_b·√v/√p_0"
     );
+    let cases = [
+        (0.3_f64, 1.0_f64, 1.6_f64),
+        (-0.5_f64, 2.25_f64, 4.0_f64),
+        (1.0_f64, 0.25_f64, 0.25_f64),
+        (0.0_f64, 9.0_f64, 4.0_f64),
+        (-1.2_f64, 0.81_f64, 2.25_f64),
+    ];
+    let mut sse = 0.0_f64;
+    let mut signed = 0.0_f64;
+    for (grid_coefficient, grid_predictor, grid_initial) in cases {
+        let grid_recovered = recover_standardised_initial_time_independent_predictor_effect(
+            grid_coefficient,
+            grid_predictor,
+            grid_initial,
+            LagClock::EventTime,
+        )
+        .expect("T0TIPREDEFFECTstd grid");
+        let grid_expected = grid_coefficient * grid_predictor.sqrt() / grid_initial.sqrt();
+        let error = grid_recovered - grid_expected;
+        sse += error * error;
+        signed += error;
+        assert!(
+            error.abs() < 1e-15,
+            "Driver et al. (2017, Table 3): noiseless t0_b·√v/√p_0 recovers known truth"
+        );
+    }
+    let n = cases.len() as f64;
+    assert!(
+        (sse / n).sqrt() < 1e-15,
+        "machine-scale RMSE on known truth"
+    );
+    assert!(
+        (signed / n).abs() < 1e-15,
+        "machine-scale bias on known truth"
+    );
     let larger_p0 = recover_standardised_initial_time_independent_predictor_effect(
         coefficient,
         predictor_variance,
@@ -3832,6 +3867,13 @@ fn standardised_initial_time_independent_effect_is_not_unstandardised_or_trait_c
     assert!(
         (contaminated - recovered).abs() > 1e-3,
         "Driver et al. (2017, footnote 4 / §7.1): TRAITVAR contaminates the affected SD"
+    );
+    let added = coefficient * coefficient * predictor_variance;
+    let total_with_added = total + added;
+    let contaminated_with_added = coefficient * predictor_variance.sqrt() / total_with_added.sqrt();
+    assert!(
+        (contaminated_with_added - recovered).abs() > 1e-3,
+        "Driver et al. (2017, footnote 4 / §7.1): t0_b·√v/√(trait+p_0+added) is not T0TIPREDEFFECTstd"
     );
     assert_eq!(
         recover_standardised_initial_time_independent_predictor_effect(
@@ -3894,6 +3936,15 @@ fn standardised_initial_time_independent_effect_is_not_unstandardised_or_trait_c
     assert_eq!(
         refuse_trait_contaminated_initial_time_independent_effect_as_standardised_initial_time_independent_effect(
             contaminated,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::TraitContaminatedInitialTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_trait_contaminated_initial_time_independent_effect_as_standardised_initial_time_independent_effect(
+            contaminated_with_added,
             recovered
         ),
         Err(
