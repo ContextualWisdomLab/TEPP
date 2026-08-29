@@ -234,6 +234,17 @@
 //! `μ_0 / √p_0` is `T0MEANSstd` and is not that map even when
 //! `μ_0 = √p_0`; `p / p = 1` is `asymDIFFUSIONstd` and is not that
 //! map even when both equal 1; JSS PDF re-opened 2026-08-26T07:17Z),
+//! recovers the Driver Table 3 / p. 16 `T0TIPREDEFFECTstd` as
+//! `t0_b · √v / √p_0` after strictly positive free `T0VAR` and
+//! strictly positive `TIPREDVAR` (footnote 4 uses only the relevant
+//! first-occasion variance, not process-dynamics `asymDIFFUSION`;
+//! unstandardised `t0_b` is defined for a zero coefficient and for
+//! zero predictor variance and is not that map; `B · √v / √p` is
+//! `TIPREDEFFECTstd` and is not that map; `(-B / a) · √v / √p` is
+//! `asymTIPREDEFFECTstd` and is not that map;
+//! `t0_b · √v / √(trait + p_0 + added)` uses total variance and is
+//! not that map; free `T0VAR` does not require `a < 0`; JSS PDF
+//! re-opened 2026-08-29T21:20Z),
 //! recovers the Driver p. 16 `asymDIFFUSIONstd` as `p / p = 1` after
 //! strictly positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4
 //! uses only the relevant within-subject variance; 2017-era
@@ -411,6 +422,8 @@ pub use event_time::recover_standardised_discrete_continuous_intercept;
 pub use event_time::recover_standardised_initial_latent_mean;
 /// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
 pub use event_time::recover_standardised_initial_latent_variance;
+/// Exact scalar Table 3 / p. 16 `T0TIPREDEFFECTstd` `t0_b · √v / √p_0`.
+pub use event_time::recover_standardised_initial_time_independent_predictor_effect;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
 /// Exact scalar p. 16 `MANIFESTTRAITVARstd` `ψ / ψ = 1` after strictly positive `MANIFESTTRAITVAR`.
@@ -618,12 +631,16 @@ pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 pub use event_time::refuse_process_noise_as_unconditional_variance;
 /// Refuse treating p. 16 `asymDIFFUSIONstd` as `T0VARstd`.
 pub use event_time::refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance;
+/// Refuse treating p. 16 `asymTIPREDEFFECTstd` as Table 3 `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_standardised_asymptotic_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating p. 16 `DIFFUSIONstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `CINTstd` as `asymCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating p. 16 `TIPREDEFFECTstd` as Table 3 `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_standardised_continuous_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating p. 16 `T0MEANSstd` as `T0VARstd`.
 pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance;
 /// Refuse treating p. 16 `T0VARstd` as `asymDIFFUSIONstd`.
@@ -715,6 +732,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating `t0_b · √v / √(trait + p_0 + added)` as `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_trait_contaminated_initial_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
@@ -737,6 +756,8 @@ pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_stand
 pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Refuse treating unstandardised `T0VAR` as `T0VARstd`.
 pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance;
+/// Refuse treating unstandardised `T0TIPREDEFFECT` as Table 3 `T0TIPREDEFFECTstd`.
+pub use event_time::refuse_unstandardised_initial_time_independent_effect_as_standardised_initial_time_independent_effect;
 /// Refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
 /// Refuse treating unstandardised `MANIFESTTRAITVAR` as `MANIFESTTRAITVARstd`.
