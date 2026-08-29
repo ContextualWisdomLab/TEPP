@@ -14,6 +14,9 @@
 //! evidence-backed gate. Track assignments, story segmentations, CHRONOS
 //! schema-slot predictions, and occurrence forecasts remain measurement or
 //! hypothesis artifacts and cannot promote an instance without that gate.
+//! Bounded Allen/CHRONOS interval consistency
+//! ([`IntervalConsistencyNetwork`]) derives implications and rejects
+//! contradictions without claiming unrestricted global satisfiability.
 
 mod composition;
 mod confidence;
@@ -24,6 +27,8 @@ mod first_story;
 mod identifier;
 mod instance;
 mod intelligence;
+mod interval_consistency;
+mod interval_consistency_artifact;
 mod link;
 mod mention;
 mod prediction;
@@ -101,6 +106,19 @@ pub use intelligence::admit_state_transition;
 pub use intelligence::classify_tdt_story;
 /// Score first-story detections against a known stream.
 pub use intelligence::first_story_detection_rates;
+/// Bounded CHRONOS-style interval-consistency network for event intelligence.
+pub use interval_consistency::IntervalConsistencyNetwork;
+/// Summary of one successful bounded interval-consistency closure.
+pub use interval_consistency::IntervalConsistencyReport;
+/// Explicit refusal to treat bounded path consistency as unrestricted SAT.
+pub use interval_consistency::refuse_interval_consistency_as_unrestricted_satisfiability;
+/// Explicit refusal to promote an interval contradiction into an instance.
+pub use interval_consistency::refuse_interval_contradiction_as_instance;
+/// Durable JSON and `GraphML` projection of one bounded consistency result.
+pub use interval_consistency_artifact::{
+    INTERVAL_CONSISTENCY_ARTIFACT_TYPE, IntervalConsistencyArtifact,
+    IntervalConsistencyArtifactRelation,
+};
 /// TDT same-event versus distinct-event link label.
 pub use link::EventLinkLabel;
 /// Undirected TDT link hypothesis between two mentions.
