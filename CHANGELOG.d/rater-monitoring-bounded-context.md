@@ -8,3 +8,5 @@
   parameter snapshots, and source-evidence containment.
 - Kept monitoring artifacts immutable and explicitly prevented temporal analysis
   from rewriting source parameters, observations, scores, or product decisions.
+- Indexed ADR-0026 in the repository decision catalog so documentation quality
+  checks validate the bounded context and its ownership alongside active ADRs.
