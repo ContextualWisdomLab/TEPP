@@ -1,7 +1,7 @@
 # ADR-0026: Temporal rater monitoring bounded context
 
-Status: **Proposed**  
-Date: 2026-08-29
+> Status: Proposed
+> Date: 2026-08-29
 
 ## Context
 
