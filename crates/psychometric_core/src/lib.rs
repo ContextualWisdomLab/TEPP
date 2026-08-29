@@ -261,6 +261,18 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver p. 16 `DRIFTstd` as the continuous auto-effect
+//! after strictly positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4
+//! uses only the relevant within-subject variance; 2017-era
+//! `summary.ctsemFit.R` forms `discreteDRIFTstd` and does not form a
+//! `DRIFTstd` matrix; scalar stationary SD ratio is 1 so the
+//! standardised auto-effect equals `a` numerically; those remain
+//! distinct named quantities; unstandardised `a` is defined for growing
+//! `a ≥ 0` and for zero diffusion and is not that map; `e^{a Δt}` is
+//! `discreteDRIFTstd` and depends on `Δt`; `a p / (trait + p + added)`
+//! uses `TRAITVAR` and is not that map; zero `q` fails closed; a
+//! non-event clock fails closed; `a ≥ 0` fails closed; JSS PDF
+//! re-opened 2026-08-29T00:25Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -407,6 +419,8 @@ pub use event_time::recover_standardised_asymptotic_diffusion;
 pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
 pub use event_time::recover_standardised_discrete_continuous_intercept;
+/// Exact scalar p. 16 `DRIFTstd` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_drift;
 /// Exact scalar p. 16 `T0MEANSstd` `μ_0 / √p_0`.
 pub use event_time::recover_standardised_initial_latent_mean;
 /// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
@@ -624,6 +638,8 @@ pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asy
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating p. 16 `discreteDRIFTstd` as `DRIFTstd`.
+pub use event_time::refuse_standardised_discrete_drift_as_standardised_drift;
 /// Refuse treating p. 16 `T0MEANSstd` as `T0VARstd`.
 pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance;
 /// Refuse treating p. 16 `T0VARstd` as `asymDIFFUSIONstd`.
@@ -715,6 +731,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating `a p / (trait + p + added)` as p. 16 `DRIFTstd`.
+pub use event_time::refuse_trait_contaminated_drift_as_standardised_drift;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
@@ -733,6 +751,8 @@ pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_a
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
 pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating unstandardised `DRIFT` as p. 16 `DRIFTstd`.
+pub use event_time::refuse_unstandardised_drift_as_standardised_drift;
 /// Refuse treating unstandardised `T0MEANS` as `T0MEANSstd`.
 pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Refuse treating unstandardised `T0VAR` as `T0VARstd`.

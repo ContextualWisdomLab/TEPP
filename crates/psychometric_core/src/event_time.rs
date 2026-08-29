@@ -2125,6 +2125,126 @@ pub fn refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffu
     Err(PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion)
 }
 
+/// Exact scalar p. 16 `DRIFTstd` after strictly positive
+/// `asymDIFFUSION`.
+///
+/// Driver, Oud, and Voelkle (2017, p. 16; Eq. 1, p. 4; footnote 4;
+/// Table 2, p. 12; §7.1, pp. 18–19; 2017-era ctsem
+/// `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-29T00:25Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// print continuous-time parameters (e.g., `DRIFT`, `DIFFUSION`)
+/// and, when appropriate, standardised matrices with the suffix
+/// `std`. The printed example on p. 16 is `discreteDRIFTstd`, not
+/// `DRIFTstd`. Footnote 4: standardisations use only the relevant
+/// variance, not the total. For `DRIFT` that relevant variance is
+/// within-subject `asymDIFFUSION` `p = −q / (2 a)`, because `DRIFT`
+/// is intended to represent individual, or average individual,
+/// temporal dynamics. The 2017-era `summary.ctsemFit.R` forms
+/// `discreteDRIFTstd` whenever `verbose = TRUE`, as
+/// `discreteDRIFT * standardiser` after
+/// `standardiser <- rep(sqrt(diag(asymDIFFUSION)), each = n.latent) /
+/// rep(diag(sqrt(asymDIFFUSION)), times = n.latent)` (comment: "std
+/// dev of affecting latent divided by std dev of affected latent").
+/// That source does **not** form a `DRIFTstd` matrix. The scalar map
+/// here is the footnote 4 standardisation of the named continuous
+/// auto-effect: form strictly positive `p` first, then
+/// `DRIFT * standardiser`. In the scalar stationary case that SD
+/// ratio is 1 after strictly positive `p`, so the standardised
+/// auto-effect equals the unstandardised log-rate `a` numerically;
+/// those remain distinct named quantities. Unstandardised `a` is
+/// defined for growing `a ≥ 0` and for zero diffusion; standardised
+/// `DRIFT` is not. Zero `q` has no positive SD and fails closed.
+/// Lasting `p` requires stable `a < 0`. `DRIFT` is an event-time
+/// process-dynamics quantity, so a non-event clock fails closed.
+/// Distinct positive `q` recover the same `a`. `discreteDRIFTstd`
+/// `e^{a Δt}` depends on the event interval and is not this
+/// continuous map. This crate does not currently export
+/// `discreteDRIFTstd`; the refuse still names that quantity.
+/// Section 7.1 warns that omitting trait variance confounds
+/// between- and within-person information.
+/// `a p / (trait + p + added)` uses the total, not `asymDIFFUSION`,
+/// and is not `DRIFTstd` when `TRAITVAR` is nonzero. `TRAITVAR` is
+/// not the standardisation variance. This is not a Kalman filter,
+/// not a matrix `expm`, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StationaryVarianceRequiresStableDrift`]
+/// when `a ≥ 0`,
+/// [`PsychometricError::StandardisedDriftRequiresPositiveWithinSubjectVariance`]
+/// when `q = 0`, and
+/// [`PsychometricError::InvalidNumericInput`] when the diffusion or
+/// log-rate is non-finite or the diffusion is negative.
+pub fn recover_standardised_drift(
+    continuous_diffusion: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let within = recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?;
+    if within == 0.0 {
+        return Err(PsychometricError::StandardisedDriftRequiresPositiveWithinSubjectVariance);
+    }
+    Ok(log_rate)
+}
+
+/// Refuse treating unstandardised `DRIFT` as p. 16 `DRIFTstd`.
+///
+/// Unstandardised `a` is defined for growing `a ≥ 0` and for a zero
+/// process. Footnote 4 `DRIFTstd` requires strictly positive
+/// `asymDIFFUSION`. Equal numbers in the scalar stationary case
+/// remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedDriftIsNotStandardisedDrift`].
+pub fn refuse_unstandardised_drift_as_standardised_drift(
+    unstandardised_drift: f64,
+    standardised_drift: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_drift, standardised_drift);
+    Err(PsychometricError::UnstandardisedDriftIsNotStandardisedDrift)
+}
+
+/// Refuse treating p. 16 `discreteDRIFTstd` as p. 16 `DRIFTstd`.
+///
+/// `e^{a Δt}` depends on the event interval. `DRIFTstd` does not.
+/// Equal numbers at a particular `Δt` remain distinct named
+/// quantities. This crate does not currently export
+/// `discreteDRIFTstd`; the refuse still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedDiscreteDriftIsNotStandardisedDrift`].
+pub fn refuse_standardised_discrete_drift_as_standardised_drift(
+    standardised_discrete_drift: f64,
+    standardised_drift: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_discrete_drift, standardised_drift);
+    Err(PsychometricError::StandardisedDiscreteDriftIsNotStandardisedDrift)
+}
+
+/// Refuse treating `a p / (trait + p + added)` as p. 16 `DRIFTstd`.
+///
+/// Footnote 4 measurement of the auto-effect uses `asymDIFFUSION`,
+/// not total variance. `TRAITVAR` is not the standardisation
+/// variance.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TraitContaminatedDriftIsNotStandardisedDrift`].
+pub fn refuse_trait_contaminated_drift_as_standardised_drift(
+    trait_contaminated_drift: f64,
+    standardised_drift: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (trait_contaminated_drift, standardised_drift);
+    Err(PsychometricError::TraitContaminatedDriftIsNotStandardisedDrift)
+}
+
 /// Refuse treating p. 16 `TIPREDVARstd` as p. 16
 /// `asymDIFFUSIONstd`.
 ///
@@ -6888,7 +7008,7 @@ mod tests {
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
         recover_standardised_asymptotic_continuous_intercept,
         recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
-        recover_standardised_discrete_continuous_intercept,
+        recover_standardised_discrete_continuous_intercept, recover_standardised_drift,
         recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
         recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
         recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
@@ -6983,6 +7103,7 @@ mod tests {
         refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
         refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_standardised_discrete_drift_as_standardised_drift,
         refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance,
         refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion,
         refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
@@ -7026,6 +7147,7 @@ mod tests {
         refuse_time_independent_effect_as_time_varying_discrete_effect,
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+        refuse_trait_contaminated_drift_as_standardised_drift,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
         refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
@@ -7034,6 +7156,7 @@ mod tests {
         refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
         refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_unstandardised_drift_as_standardised_drift,
         refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
@@ -16029,6 +16152,85 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_asymptotic_diffusion(f64::INFINITY, -0.25, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn standardised_drift_recovers_driver_page_sixteen_auto_effect_after_positive_asymdiffusion() {
+        // Driver et al. (2017, p. 16 DRIFTstd; Eq. 1; footnote 4):
+        // form strictly positive asymDIFFUSION p = −q/(2a), then
+        // DRIFT * standardiser. Scalar SD ratio is 1, so the
+        // standardised auto-effect equals a numerically. JSS PDF
+        // re-opened 2026-08-29T00:25Z.
+        let diffusion = 0.4_f64;
+        let log_rate = -0.5_f64;
+        let recovered =
+            recover_standardised_drift(diffusion, log_rate, LagClock::EventTime).expect("DRIFTstd");
+        assert!((recovered - log_rate).abs() < 1e-15);
+        let larger_q =
+            recover_standardised_drift(1.6, log_rate, LagClock::EventTime).expect("DRIFTstd q=1.6");
+        assert!((larger_q - recovered).abs() < 1e-15);
+        let within = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        assert!(within > 0.0);
+        let discrete = recover_discrete_lag_from_log_rate(log_rate, 1.0, LagClock::EventTime)
+            .expect("e^{aΔt}");
+        assert!((discrete - recovered).abs() > 1e-3);
+        let trait_variance = 1.0_f64;
+        let added = 0.1_f64;
+        let total = recover_trait_plus_state_latent_variance(trait_variance, within)
+            .expect("trait+state")
+            + added;
+        let contaminated = log_rate * within / total;
+        assert!((contaminated - recovered).abs() > 1e-3);
+        assert_eq!(
+            refuse_unstandardised_drift_as_standardised_drift(log_rate, recovered),
+            Err(PsychometricError::UnstandardisedDriftIsNotStandardisedDrift)
+        );
+        assert_eq!(
+            refuse_standardised_discrete_drift_as_standardised_drift(discrete, recovered),
+            Err(PsychometricError::StandardisedDiscreteDriftIsNotStandardisedDrift)
+        );
+        assert_eq!(
+            refuse_trait_contaminated_drift_as_standardised_drift(contaminated, recovered),
+            Err(PsychometricError::TraitContaminatedDriftIsNotStandardisedDrift)
+        );
+    }
+
+    #[test]
+    fn standardised_drift_fails_closed_when_unstandardised_is_defined() {
+        let log_rate = -0.5_f64;
+        assert_eq!(
+            recover_standardised_drift(0.0, log_rate, LagClock::EventTime),
+            Err(PsychometricError::StandardisedDriftRequiresPositiveWithinSubjectVariance)
+        );
+        assert_eq!(
+            recover_standardised_drift(0.4, 0.5, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_drift(0.4, 0.0, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_drift(0.4, log_rate, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_drift(-0.1, log_rate, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_drift(f64::NAN, log_rate, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_drift(0.4, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_drift(f64::INFINITY, log_rate, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
