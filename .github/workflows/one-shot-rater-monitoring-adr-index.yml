@@ -1,0 +1,81 @@
+name: One-shot rater monitoring ADR index repair
+
+on:
+  push:
+    branches:
+      - feat/rater-monitoring-bounded-context
+    paths:
+      - .github/workflows/one-shot-rater-monitoring-adr-index.yml
+
+permissions:
+  contents: write
+
+jobs:
+  index-and-remove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Add the exact ADR index row
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("docs/adr/README.md")
+          text = path.read_text(encoding="utf-8")
+          row = (
+              "| [0026](0026-rater-monitoring-bounded-context.md) | "
+              "Temporal rater monitoring bounded context | Proposed | active-PR | "
+              "Separates invocation noise, gradual drift, configuration change, "
+              "and measurement invariance while enforcing cutoff-safe evidence. |\n"
+          )
+          if row not in text:
+              lines = text.splitlines(keepends=True)
+              matches = [
+                  index for index, line in enumerate(lines) if line.startswith("| [0025](")
+              ]
+              if len(matches) != 1:
+                  raise SystemExit(f"expected one ADR 0025 anchor, found {len(matches)}")
+              lines.insert(matches[0] + 1, row)
+              path.write_text("".join(lines), encoding="utf-8")
+          PY
+          rm .github/workflows/one-shot-rater-monitoring-adr-index.yml
+
+      - name: Refuse unrelated mutation
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import subprocess
+
+          allowed = {
+              ".github/workflows/one-shot-rater-monitoring-adr-index.yml",
+              "docs/adr/README.md",
+          }
+          changed = {
+              line[3:]
+              for line in subprocess.check_output(
+                  ["git", "status", "--short"], text=True
+              ).splitlines()
+              if line[3:]
+          }
+          unexpected = changed - allowed
+          if unexpected:
+              raise SystemExit(f"unexpected ADR repair mutation: {sorted(unexpected)}")
+          if "docs/adr/README.md" not in changed:
+              raise SystemExit("ADR index did not receive the expected row")
+          PY
+
+      - name: Commit bounded repair
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/adr/README.md .github/workflows/one-shot-rater-monitoring-adr-index.yml
+          git commit -m "docs(adr): index rater monitoring decision"
+          git push origin HEAD:feat/rater-monitoring-bounded-context
