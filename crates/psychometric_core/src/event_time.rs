@@ -8622,9 +8622,15 @@ mod tests {
         );
         let rate = voelkle_same_sign_log_rate(earlier, later, 1.0).expect("near-equal");
         assert_eq!(rate.to_bits(), from_ratio.to_bits());
-        if subtracted.to_bits() == 0.0_f64.to_bits() {
-            assert_ne!(rate.to_bits(), 0.0_f64.to_bits());
-        }
+        assert_ne!(
+            rate.to_bits(),
+            0.0_f64.to_bits(),
+            "finite ratio logarithm must keep the tiny same-sign change"
+        );
+        assert!(
+            subtracted.is_finite(),
+            "difference of finite logs stays finite even when a libm rounds it to zero"
+        );
         let overflow_rate =
             voelkle_same_sign_log_rate(f64::from_bits(1), f64::MAX, 1.0).expect("overflow arm");
         let overflow_ratio = f64::MAX / f64::from_bits(1);
