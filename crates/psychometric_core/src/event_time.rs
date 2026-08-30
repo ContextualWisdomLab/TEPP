@@ -7134,7 +7134,6 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
         center_grand_mean_event_lags, center_within_cluster_event_lags, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, overflow_safe_running_mean,
         recover_asymptotic_continuous_intercept,
@@ -9129,18 +9128,14 @@ mod tests {
         assert!(cgm.is_finite());
         let pairs = center_grand_mean_event_lags(&rows, LagClock::EventTime).expect("cgm pairs");
         assert_eq!(pairs.len(), 2);
-        assert!(
-            pairs
-                .iter()
-                .all(|pair| same_sign_nonzero(pair.earlier_residual, pair.later_residual))
-        );
+        assert!(pairs
+            .iter()
+            .all(|pair| same_sign_nonzero(pair.earlier_residual, pair.later_residual)));
         let cwc_pairs =
             center_within_cluster_event_lags(&rows, LagClock::EventTime).expect("cwc pairs");
-        assert!(
-            cwc_pairs
-                .iter()
-                .all(|pair| !same_sign_nonzero(pair.earlier_residual, pair.later_residual))
-        );
+        assert!(cwc_pairs
+            .iter()
+            .all(|pair| !same_sign_nonzero(pair.earlier_residual, pair.later_residual)));
     }
 
     #[test]
@@ -9222,32 +9217,24 @@ mod tests {
             recover_grand_mean_centered_irregular_residual_log_rate(&rows, LagClock::EventTime)
                 .expect("stable log overflow");
         let extracted = center_grand_mean_event_lags(&rows, LagClock::EventTime).expect("extract");
-        let mut expected_sum = 0.0_f64;
-        let mut expected_count = 0.0_f64;
-        let mut ordinary_count = 0.0_f64;
-        let mut overflow_pairs = 0_u32;
+        assert_eq!(extracted.len(), 2);
+        let mut expected = 0.0_f64;
+        let mut count = 0.0_f64;
         for pair in extracted {
-            if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
-                continue;
-            }
+            let ratio = pair.later_residual / pair.earlier_residual;
+            assert!(
+                !ratio.is_finite(),
+                "fixture pairs overflow; ordinary-ratio reconstruction is a different test"
+            );
             let rate = voelkle_same_sign_log_rate(
                 pair.earlier_residual,
                 pair.later_residual,
                 pair.event_delta,
             )
             .expect("pair rate");
-            expected_sum += rate;
-            expected_count += 1.0;
-            let ratio = pair.later_residual / pair.earlier_residual;
-            if ratio.is_finite() {
-                ordinary_count += 1.0;
-            } else {
-                overflow_pairs += 1;
-            }
+            (expected, count) = overflow_safe_running_mean(expected, count, rate);
         }
-        assert_eq!(overflow_pairs, 2);
-        assert!(expected_count > ordinary_count);
-        let expected = expected_sum / expected_count;
+        assert_eq!(count.to_bits(), 2.0_f64.to_bits());
         assert!((recovered - expected).abs() < 1e-12);
     }
 
@@ -9263,32 +9250,25 @@ mod tests {
             recover_grand_mean_centered_irregular_residual_log_rate(&rows, LagClock::EventTime)
                 .expect("stable log underflow");
         let extracted = center_grand_mean_event_lags(&rows, LagClock::EventTime).expect("extract");
-        let mut expected_sum = 0.0_f64;
-        let mut expected_count = 0.0_f64;
-        let mut ordinary_count = 0.0_f64;
-        let mut underflow_pairs = 0_u32;
+        assert_eq!(extracted.len(), 2);
+        let mut expected = 0.0_f64;
+        let mut count = 0.0_f64;
         for pair in extracted {
-            if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
-                continue;
-            }
+            let ratio = pair.later_residual / pair.earlier_residual;
+            assert_eq!(
+                ratio.to_bits(),
+                0.0_f64.to_bits(),
+                "fixture pairs underflow to +0"
+            );
             let rate = voelkle_same_sign_log_rate(
                 pair.earlier_residual,
                 pair.later_residual,
                 pair.event_delta,
             )
             .expect("pair rate");
-            expected_sum += rate;
-            expected_count += 1.0;
-            let ratio = pair.later_residual / pair.earlier_residual;
-            if ratio.is_finite() && ratio > 0.0 {
-                ordinary_count += 1.0;
-            } else {
-                underflow_pairs += 1;
-            }
+            (expected, count) = overflow_safe_running_mean(expected, count, rate);
         }
-        assert_eq!(underflow_pairs, 2);
-        assert!(expected_count > ordinary_count);
-        let expected = expected_sum / expected_count;
+        assert_eq!(count.to_bits(), 2.0_f64.to_bits());
         assert!((recovered - expected).abs() < 1e-12);
     }
 
@@ -9391,6 +9371,18 @@ mod tests {
 
     #[test]
     fn grand_mean_irregular_residual_numeric_inputs_fail_closed() {
+        assert_eq!(
+            center_grand_mean_event_lags(
+                &[
+                    clustered(1, f64::NAN, 1.0),
+                    clustered(1, 1.0, 0.5),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
         assert_eq!(
             center_grand_mean_event_lags(
                 &[
