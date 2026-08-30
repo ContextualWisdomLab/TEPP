@@ -146,7 +146,17 @@
 //! not `M x`. Equation 5 of that carried first-occasion shift is
 //! `τ + λ(μ_t + e^{a Δt} t0_b z)` (`τ + λ μ_t` is not that observed
 //! mean; `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not that
-//! observed mean). Table 3 also names a different matrix
+//! observed mean). Equation 5 of 2017-era `addedT0TIPREDVAR` is
+//! `λ² t0_b² v` (Table 3 / p. 16 / 2017-era `summary.ctsemFit.R`;
+//! JSS PDF re-opened 2026-08-30T14:06Z). Form `t0_b` first, then
+//! square, then multiply by `v`, then `(λ extra) λ` with `θ = 0`.
+//! A zero loading or zero extra is exactly zero. `t0_b² v` is the
+//! latent extra, not the observed extra. `λ² p_0 + θ` is
+//! first-occasion observed variance, not this extra.
+//! `λ² (B / a)² v` is Eq. 5 of `addedTIPREDVAR`, not this
+//! first-occasion observed extra. `MANIFESTVAR` `θ` is not this
+//! extra. Free `T0TIPREDEFFECT` does not require `a < 0`. Table 3
+//! also names a different matrix
 //! `T0TDPREDEFFECT` for time-dependent predictors on latents at
 //! `T0`. The scalar first-occasion shift is `t0_m x0`. Equation 3's
 //! first summand carries that shift as `e^{A Δt} t0_m x0`. That
@@ -5509,6 +5519,160 @@ pub fn recover_initial_time_independent_predictor_effect(
     require_finite(initial_time_independent_effect * time_independent_predictor)
 }
 
+/// Exact scalar Eq. 5 of 2017-era `addedT0TIPREDVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Table 3, p. 13;
+/// Table 2, p. 12; p. 16; §7.2, pp. 20–21; 2017-era ctsem
+/// `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-30T14:06Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `y_i(t) = Γ + Λ η_i(t) + ζ_i(t)` with `ζ ~ N(0, Θ)` and
+/// `Γ ~ N(τ, Ψ)`. Equation 5 maps extra latent variance through
+/// `Λ`. Immediately after `T0TIPREDEFFECTstd`, the 2017-era
+/// `summary.ctsemFit.R` in ctsem 2.1.0 (lines 429–431) forms
+/// `addedT0TIPREDVAR = T0TIPREDEFFECT %*% TIPREDVAR %*% t(T0TIPREDEFFECT)`
+/// when `verbose = TRUE` and `'TOTIPRED'` is not in `stationary`.
+/// That source comments `#is this valid?`. The scalar analog of
+/// that quadratic form is `t0_b² v`. Equation 5 of that extra, with
+/// `θ = 0` and `ψ = 0`, is `λ² t0_b² v`. Form `t0_b` first, then
+/// square, then multiply by `v`, then `(λ extra) λ`. Do not form
+/// `λ²` first: at `λ = 1e308`, `extra = 1e-308`, `λ²` overflows
+/// and `λ² extra` is non-finite, but `(λ extra) λ = 1e308`. A zero
+/// loading or zero extra is exactly zero. `v < 0` fails closed.
+/// `T0` is an event-time occasion, so a non-event clock fails
+/// closed. Free `T0TIPREDEFFECT` does not require stable `a < 0`.
+/// `t0_b² v` is the latent extra and is not this observed extra.
+/// `λ² p_0 + θ` is first-occasion observed variance and is not this
+/// extra. `λ² (B / a)² v` is Eq. 5 of `addedTIPREDVAR` and is not
+/// this first-occasion observed extra. `MANIFESTVAR` `θ` is
+/// measurement error and is not this extra. `Ψ` is intercept
+/// variance and is not extra TI. The latent extra is formed
+/// inline; this map does not call an unpublished recover. This is
+/// not a Kalman filter, not a matrix `expm`, not DSEM, and not
+/// ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, the predictor variance is negative, or a product
+/// overflows. Propagates [`recover_manifest_observed_variance`].
+pub fn recover_initial_time_independent_observed_variance(
+    loading: f64,
+    initial_time_independent_effect: f64,
+    predictor_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !initial_time_independent_effect.is_finite()
+        || !predictor_variance.is_finite()
+        || predictor_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let extra = if initial_time_independent_effect == 0.0 || predictor_variance == 0.0 {
+        0.0
+    } else {
+        let squared =
+            require_finite(initial_time_independent_effect * initial_time_independent_effect)?;
+        require_finite(squared * predictor_variance)?
+    };
+    recover_manifest_observed_variance(loading, extra, 0.0)
+}
+
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` as the
+/// latent extra.
+///
+/// `λ² t0_b² v` is extra observed-indicator variance.
+/// `t0_b² v` is extra latent variance. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentObservedVarianceIsNotInitialTimeIndependentVariance`].
+pub fn refuse_initial_time_independent_observed_variance_as_initial_time_independent_variance(
+    initial_observed_predictor_variance: f64,
+    initial_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_observed_predictor_variance,
+        initial_predictor_variance,
+    );
+    Err(
+        PsychometricError::InitialTimeIndependentObservedVarianceIsNotInitialTimeIndependentVariance,
+    )
+}
+
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` as
+/// first-occasion observed variance.
+///
+/// `λ² t0_b² v` is extra observed TI variance. `λ² p_0 + θ` is
+/// first-occasion observed-indicator variance. Those are not the
+/// same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentObservedVarianceIsNotInitialObservedVariance`].
+pub fn refuse_initial_time_independent_observed_variance_as_initial_observed_variance(
+    initial_observed_predictor_variance: f64,
+    initial_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_observed_predictor_variance,
+        initial_observed_variance,
+    );
+    Err(PsychometricError::InitialTimeIndependentObservedVarianceIsNotInitialObservedVariance)
+}
+
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` as Eq. 5 of
+/// `addedTIPREDVAR`.
+///
+/// `λ² t0_b² v` uses free first-occasion `T0TIPREDEFFECT`.
+/// `λ² (B / a)² v` uses the asymptotic unit effect `-B / a` and
+/// requires stable `a < 0`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentObservedVarianceIsNotAsymptoticTimeIndependentObservedVariance`].
+pub fn refuse_initial_time_independent_observed_variance_as_asymptotic_time_independent_observed_variance(
+    initial_observed_predictor_variance: f64,
+    asymptotic_observed_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_observed_predictor_variance,
+        asymptotic_observed_predictor_variance,
+    );
+    Err(
+        PsychometricError::InitialTimeIndependentObservedVarianceIsNotAsymptoticTimeIndependentObservedVariance,
+    )
+}
+
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` as
+/// `MANIFESTVAR`.
+///
+/// `λ² t0_b² v` is extra observed TI variance. Table 2 names
+/// `MANIFESTVAR` as `Θ`, the variance of `ζ`. Those are not the
+/// same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentObservedVarianceIsNotMeasurementError`].
+pub fn refuse_initial_time_independent_observed_variance_as_measurement_error(
+    initial_observed_predictor_variance: f64,
+    measurement_error_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_observed_predictor_variance,
+        measurement_error_variance,
+    );
+    Err(PsychometricError::InitialTimeIndependentObservedVarianceIsNotMeasurementError)
+}
+
 /// Exact scalar carried first-occasion time-independent predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; Table 3, p. 13; JSS
@@ -6853,8 +7017,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
+        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
+        recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -6879,6 +7043,7 @@ mod tests {
         recover_event_time_discrete_lag_and_log_rate,
         recover_initial_time_dependent_predictor_carry,
         recover_initial_time_dependent_predictor_effect,
+        recover_initial_time_independent_observed_variance,
         recover_initial_time_independent_predictor_carry,
         recover_initial_time_independent_predictor_effect,
         recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
@@ -6959,6 +7124,10 @@ mod tests {
         refuse_initial_time_independent_effect_as_process_increment,
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
+        refuse_initial_time_independent_observed_variance_as_asymptotic_time_independent_observed_variance,
+        refuse_initial_time_independent_observed_variance_as_initial_observed_variance,
+        refuse_initial_time_independent_observed_variance_as_initial_time_independent_variance,
+        refuse_initial_time_independent_observed_variance_as_measurement_error,
         refuse_initial_time_independent_variance_as_standardised_trait_variance,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
@@ -7040,6 +7209,7 @@ mod tests {
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
     };
     use crate::error::PsychometricError;
 
@@ -11147,8 +11317,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -11723,8 +11893,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
         // λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ.
@@ -12300,8 +12470,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of stationary T0VAR is
         // λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ.
@@ -14455,8 +14625,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
+    ) {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -14606,8 +14776,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -15225,8 +15395,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,
@@ -16352,5 +16522,196 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn initial_time_independent_observed_variance_recovers_eq5_of_added_t0_tipred_var() {
+        // Driver et al. (2017, Eq. 5 of 2017-era addedT0TIPREDVAR;
+        // Table 3 / p. 16; Table 2, p. 12; 2017-era
+        // summary.ctsemFit.R 429–431): λ² t0_b² v. Form t0_b² v
+        // inline, then (λ extra) λ with θ = 0. JSS PDF re-opened
+        // 2026-08-30T14:06Z.
+        let loading = 2.0_f64;
+        let coefficient = 0.3_f64;
+        let predictor_variance = 4.0_f64;
+        let extra = coefficient * coefficient * predictor_variance;
+        let recovered = recover_initial_time_independent_observed_variance(
+            loading,
+            coefficient,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("eq5 addedT0TIPREDVAR");
+        let expected = recover_manifest_observed_variance(loading, extra, 0.0).expect("λ² extra");
+        assert!((recovered - expected).abs() < 1e-15);
+        assert!((recovered - loading * loading * extra).abs() < 1e-15);
+        let doubled = recover_initial_time_independent_observed_variance(
+            loading,
+            coefficient,
+            8.0,
+            LagClock::EventTime,
+        )
+        .expect("doubled v");
+        assert!((doubled - 2.0 * recovered).abs() < 1e-15);
+        let negative = recover_initial_time_independent_observed_variance(
+            loading,
+            -coefficient,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("signed coefficient");
+        assert_eq!(negative.to_bits(), recovered.to_bits());
+        let asymptotic_extra = recover_asymptotic_time_independent_predictor_variance(
+            coefficient,
+            predictor_variance,
+            -0.5,
+            LagClock::EventTime,
+        )
+        .expect("addedTIPREDVAR");
+        let asymptotic_observed =
+            recover_manifest_observed_variance(loading, asymptotic_extra, 0.0)
+                .expect("λ² (B/a)² v");
+        assert!((asymptotic_observed - recovered).abs() > 1e-3);
+        let initial_observed =
+            recover_manifest_observed_variance(loading, 1.6, 0.1).expect("λ² p_0 + θ");
+        assert!((initial_observed - recovered).abs() > 1e-3);
+        assert!((extra - recovered).abs() > 1e-3);
+        assert!((0.1_f64 - recovered).abs() > 1e-3);
+        let zero_loading = recover_initial_time_independent_observed_variance(
+            0.0,
+            coefficient,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("zero loading");
+        assert_eq!(zero_loading.to_bits(), 0.0_f64.to_bits());
+        let zero_coefficient = recover_initial_time_independent_observed_variance(
+            loading,
+            0.0,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("zero coefficient");
+        assert_eq!(zero_coefficient.to_bits(), 0.0_f64.to_bits());
+        let zero_variance = recover_initial_time_independent_observed_variance(
+            loading,
+            coefficient,
+            0.0,
+            LagClock::EventTime,
+        )
+        .expect("zero variance");
+        assert_eq!(zero_variance.to_bits(), 0.0_f64.to_bits());
+        let scaled = recover_initial_time_independent_observed_variance(
+            1e308,
+            1e-154,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("scale");
+        assert!(scaled.is_finite());
+        assert_eq!(
+            refuse_initial_time_independent_observed_variance_as_initial_time_independent_variance(
+                recovered, extra
+            ),
+            Err(
+                PsychometricError::InitialTimeIndependentObservedVarianceIsNotInitialTimeIndependentVariance
+            )
+        );
+        assert_eq!(
+            refuse_initial_time_independent_observed_variance_as_initial_observed_variance(
+                recovered,
+                initial_observed
+            ),
+            Err(
+                PsychometricError::InitialTimeIndependentObservedVarianceIsNotInitialObservedVariance
+            )
+        );
+        assert_eq!(
+            refuse_initial_time_independent_observed_variance_as_asymptotic_time_independent_observed_variance(
+                recovered,
+                asymptotic_observed
+            ),
+            Err(
+                PsychometricError::InitialTimeIndependentObservedVarianceIsNotAsymptoticTimeIndependentObservedVariance
+            )
+        );
+        assert_eq!(
+            refuse_initial_time_independent_observed_variance_as_measurement_error(recovered, 0.1),
+            Err(PsychometricError::InitialTimeIndependentObservedVarianceIsNotMeasurementError)
+        );
+    }
+
+    #[test]
+    fn initial_time_independent_observed_variance_fails_closed_on_non_event_clock_and_overflow() {
+        assert_eq!(
+            recover_initial_time_independent_observed_variance(2.0, 0.3, 4.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_time_independent_observed_variance(2.0, 0.3, -0.1, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_observed_variance(
+                f64::NAN,
+                0.3,
+                4.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_observed_variance(
+                2.0,
+                f64::NAN,
+                4.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_observed_variance(
+                2.0,
+                0.3,
+                f64::NAN,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_observed_variance(
+                2.0,
+                1e308,
+                4.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_independent_observed_variance(
+                1e308,
+                0.3,
+                4.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let zero_with_overflowing_loading = recover_initial_time_independent_observed_variance(
+            1e308,
+            0.0,
+            4.0,
+            LagClock::EventTime,
+        )
+        .expect("zero extra keeps zero");
+        assert_eq!(zero_with_overflowing_loading.to_bits(), 0.0_f64.to_bits());
+        let zero_with_overflowing_variance = recover_initial_time_independent_observed_variance(
+            2.0,
+            0.0,
+            1e308,
+            LagClock::EventTime,
+        )
+        .expect("zero coefficient keeps zero");
+        assert_eq!(zero_with_overflowing_variance.to_bits(), 0.0_f64.to_bits());
     }
 }

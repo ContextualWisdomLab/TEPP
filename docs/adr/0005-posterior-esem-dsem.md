@@ -40,6 +40,8 @@ The executable standardised-manifest-variance slice recovers Driver et al. (2017
 
 The executable standardised-trait-variance slice recovers Driver et al. (2017, p. 16 `TRAITVARstd`) as `trait / trait = 1` after strictly positive `TRAITVAR` (Table 2 `φ_ξ`; §7.1; footnote 4; 2017-era `summary.ctsemFit.R` `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR`; JSS PDF re-opened 2026-08-26T17:45Z). Unlike `T0VARstd` there is no ridge addend. Unstandardised `TRAITVAR` is defined for a zero trait and is not that map. `p_0 / p_0 = 1` is the named `T0VARstd` first-occasion correlation and is not `TRAITVARstd` even when both equal 1. `t0_b² v` is `addedT0TIPREDVAR` and is not this correlation. Zero `TRAITVAR` and a non-event clock fail closed. `TRAITVAR` does not require `a < 0`. This is not ctsem estimation.
 
+The executable Eq. 5 of 2017-era `addedT0TIPREDVAR` slice recovers Driver et al. (2017, Eq. 5, p. 5; Table 3 / p. 16; Table 2, p. 12; 2017-era `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-30T14:06Z) as `λ² t0_b² v`. Form `t0_b` first, then square, then multiply by `v`, then `(λ extra) λ` with `θ = 0`. Do not form `λ²` first. The latent extra is formed inline; unpublished `#307` is not a dependency. `t0_b² v` is the latent extra and is not this observed extra. `λ² p_0 + θ` is first-occasion observed variance and is not this extra. `λ² (B / a)² v` is Eq. 5 of `addedTIPREDVAR` and is not this first-occasion observed extra. `MANIFESTVAR` `θ` is not this extra. Free `T0TIPREDEFFECT` does not require `a < 0`. This is not ctsem estimation.
+
 Input/process/intervention/outcome paths obey event-time order. Temporal precedence, document linkage, event tracking, or model prediction alone do not justify causal language.
 
 ## Non-goals
