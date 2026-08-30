@@ -12,12 +12,14 @@ use psychometric_core::{
     recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
     recover_discrete_latent_mean_with_initial_time_dependent_predictor,
     recover_discrete_latent_mean_with_initial_time_independent_predictor,
+    recover_discrete_latent_mean_with_initial_trait_effect,
     recover_discrete_latent_mean_with_time_independent_predictor, recover_discrete_latent_variance,
     recover_discrete_observed_mean, recover_discrete_observed_mean_with_extra_process,
     recover_discrete_observed_mean_with_extra_process_after,
     recover_discrete_observed_mean_with_impulse, recover_discrete_observed_mean_with_impulse_carry,
     recover_discrete_observed_mean_with_initial_time_dependent_predictor,
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
+    recover_discrete_observed_mean_with_initial_trait_effect,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
@@ -69,6 +71,7 @@ use psychometric_core::{
     refuse_evolved_observed_mean_as_impulse_observed_mean,
     refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_evolved_observed_mean_as_initial_trait_observed_mean,
     refuse_evolved_observed_mean_as_stationary_initial_observed_mean,
     refuse_evolved_observed_mean_as_time_independent_observed_mean,
     refuse_evolved_observed_variance_as_stationary_initial_observed_variance,
@@ -79,11 +82,13 @@ use psychometric_core::{
     refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_impulse_carry_observed_mean_as_initial_trait_observed_mean,
     refuse_impulse_carry_observed_mean_as_time_independent_observed_mean,
     refuse_impulse_observed_mean_as_extra_process_observed_mean,
     refuse_impulse_observed_mean_as_impulse_carry_observed_mean,
     refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_impulse_observed_mean_as_initial_trait_observed_mean,
     refuse_impulse_observed_mean_as_time_independent_observed_mean,
     refuse_initial_latent_mean_as_evolved_mean,
     refuse_initial_observed_mean_as_evolved_observed_mean,
@@ -96,12 +101,14 @@ use psychometric_core::{
     refuse_initial_time_dependent_effect_as_continuous_intercept,
     refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
     refuse_initial_time_dependent_effect_as_process_increment,
+    refuse_initial_time_dependent_observed_mean_as_initial_trait_observed_mean,
     refuse_initial_time_independent_carry_as_initial_effect,
     refuse_initial_time_independent_coefficient_as_initial_effect,
     refuse_initial_time_independent_effect_as_continuous_intercept,
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
+    refuse_initial_time_independent_observed_mean_as_initial_trait_observed_mean,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
@@ -167,6 +174,7 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_time_independent_observed_mean_as_initial_trait_observed_mean,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
@@ -1418,6 +1426,197 @@ fn evolved_and_process_observed_mean_are_not_initial_time_dependent_observed_mea
         ),
         Err(
             psychometric_core::PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_latent_mean_as_observed_mean(composed, initial_observed),
+        Err(psychometric_core::PsychometricError::LatentMeanIsNotObservedMean)
+    );
+    assert_eq!(
+        refuse_manifest_means_as_observed_mean(manifest_mean, initial_observed),
+        Err(psychometric_core::PsychometricError::ManifestMeansIsNotObservedMean)
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines, clippy::similar_names)]
+fn evolved_and_process_observed_mean_are_not_initial_trait_observed_mean() {
+    let loading = 2.0_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let effect = 0.4_f64;
+    let trait_score = 3.0_f64;
+    let initial = 1.0_f64;
+    let intercept = 0.3_f64;
+    let manifest_mean = 0.5_f64;
+    let initial_observed = recover_discrete_observed_mean_with_initial_trait_effect(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        trait_score,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0trait-mean");
+    let evolved_observed = recover_discrete_observed_mean(
+        loading,
+        initial,
+        drift,
+        intercept,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-eq5-mean");
+    let process_observed = recover_discrete_observed_mean_with_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        trait_score,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-tipred-mean");
+    let impulse_observed = recover_discrete_observed_mean_with_impulse(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        trait_score,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-impulse-mean");
+    let carried_observed = recover_discrete_observed_mean_with_impulse_carry(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        trait_score,
+        manifest_mean,
+        delta,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("eq5-carry-mean");
+    let tipred_observed = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        trait_score,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0tipred-mean");
+    let tdpred_observed = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+        loading,
+        initial,
+        drift,
+        intercept,
+        effect,
+        trait_score,
+        manifest_mean,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq5-t0tdpred-mean");
+    let composed = recover_discrete_latent_mean_with_initial_trait_effect(
+        initial,
+        drift,
+        intercept,
+        effect,
+        trait_score,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq3-t0trait");
+    assert!(
+        (evolved_observed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of 2017-era T0TRAITEFFECT): τ + λ μ_t is not T0TRAITEFFECT E(y_t)"
+    );
+    assert!(
+        (process_observed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): TIPREDEFFECT E(y_t) is not T0TRAITEFFECT E(y_t)"
+    );
+    assert!(
+        (impulse_observed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): τ + λ(μ_t + m x) is not T0TRAITEFFECT E(y_t)"
+    );
+    assert!(
+        (carried_observed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): τ + λ(μ_t + carry) is not T0TRAITEFFECT E(y_t)"
+    );
+    assert!(
+        (composed - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): evolved-plus-T0TRAITEFFECT latent mean is not E(y_t)"
+    );
+    assert!(
+        (manifest_mean - initial_observed).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 / Table 2 p. 12): MANIFESTMEANS is not T0TRAITEFFECT E(y_t)"
+    );
+    // Same numbers as T0TIPRED/T0TDPRED yield the same product; remain distinct named quantities.
+    assert!((tipred_observed - initial_observed).abs() < 1e-15);
+    assert!((tdpred_observed - initial_observed).abs() < 1e-15);
+    assert_eq!(
+        refuse_evolved_observed_mean_as_initial_trait_observed_mean(
+            evolved_observed,
+            initial_observed
+        ),
+        Err(psychometric_core::PsychometricError::EvolvedObservedMeanIsNotInitialTraitObservedMean)
+    );
+    assert_eq!(
+        refuse_time_independent_observed_mean_as_initial_trait_observed_mean(
+            process_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::TimeIndependentObservedMeanIsNotInitialTraitObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_impulse_observed_mean_as_initial_trait_observed_mean(
+            impulse_observed,
+            initial_observed
+        ),
+        Err(psychometric_core::PsychometricError::ImpulseObservedMeanIsNotInitialTraitObservedMean)
+    );
+    assert_eq!(
+        refuse_impulse_carry_observed_mean_as_initial_trait_observed_mean(
+            carried_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::ImpulseCarryObservedMeanIsNotInitialTraitObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_observed_mean_as_initial_trait_observed_mean(
+            tipred_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTraitObservedMean
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_observed_mean_as_initial_trait_observed_mean(
+            tdpred_observed,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentObservedMeanIsNotInitialTraitObservedMean
         )
     );
     assert_eq!(
