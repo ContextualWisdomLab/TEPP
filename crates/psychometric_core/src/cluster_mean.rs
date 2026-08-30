@@ -8,7 +8,7 @@
 //! **contextual** effect. The CWC cluster-mean coefficient is the contextual
 //! effect (`between − within`), not the between-cluster effect. Kish-weighted
 //! CWC uses weighted cluster means and cluster-total WLS between; that
-//! \(n_j\)-weighted between is a different estimand from their unweighted
+//! `n_j`-weighted between is a different estimand from their unweighted
 //! between when cluster sizes differ. Kish ESS is diagnostic, not a slope.
 
 use std::collections::BTreeMap;
@@ -126,29 +126,49 @@ pub(crate) fn contextual_effect_from_slopes(
 /// Kish effective sample size `ESS = (Σ w)² / Σ w²` for non-negative weights.
 ///
 /// This is the same Kish (1965) formula used by `membership_core`. It is
-/// reimplemented here so `psychometric_core` stays standalone.
+/// reimplemented here so `psychometric_core` stays standalone. ESS is
+/// homogeneous of degree 0: a common positive scale on every weight does
+/// not change the diagnostic. Weights are therefore divided by their
+/// maximum before forming `(Σ w)² / Σ w²`, so a valid common scale of
+/// `f64::MAX` or `f64::MIN_POSITIVE` does not overflow or underflow to
+/// an all-zero sum.
 ///
 /// # Errors
 ///
 /// Returns [`PsychometricError::InvalidWeight`] for empty, negative, non-finite,
 /// or all-zero weights.
 pub fn kish_effective_sample_size(weights: &[f64]) -> Result<f64, PsychometricError> {
+    let max_weight = require_max_positive_weight(weights)?;
+    let mut sum = 0.0_f64;
+    let mut sum_sq = 0.0_f64;
+    for &weight in weights {
+        let scaled = weight / max_weight;
+        sum += scaled;
+        sum_sq += scaled * scaled;
+    }
+    require_finite((sum * sum) / sum_sq)
+}
+
+/// Maximum strictly positive finite weight. Negative, non-finite, empty, or
+/// all-zero series fail closed. Crate-visible so overflow-scale tests can
+/// recover the same scale the estimators use.
+pub(crate) fn require_max_positive_weight(weights: &[f64]) -> Result<f64, PsychometricError> {
     if weights.is_empty() {
         return Err(PsychometricError::InvalidWeight);
     }
-    let mut sum = 0.0_f64;
-    let mut sum_sq = 0.0_f64;
+    let mut max_weight = 0.0_f64;
     for &weight in weights {
         if !weight.is_finite() || weight < 0.0 {
             return Err(PsychometricError::InvalidWeight);
         }
-        sum += weight;
-        sum_sq += weight * weight;
+        if weight > max_weight {
+            max_weight = weight;
+        }
     }
-    if sum <= 0.0 {
+    if max_weight <= 0.0 {
         return Err(PsychometricError::InvalidWeight);
     }
-    require_finite((sum * sum) / sum_sq)
+    Ok(max_weight)
 }
 
 /// Weighted least-squares slope using Kish membership/survey weights.
@@ -170,14 +190,14 @@ pub fn recover_kish_weighted_slope(
     if predictor.len() < 2 || predictor.len() != outcome.len() || predictor.len() != weights.len() {
         return Err(PsychometricError::InvalidNumericInput);
     }
-    let _ess = kish_effective_sample_size(weights)?;
+    let max_weight = require_max_positive_weight(weights)?;
     let mut weight_sum = 0.0_f64;
     let mut pred_sum = 0.0_f64;
     let mut out_sum = 0.0_f64;
     for index in 0..predictor.len() {
         let pred = predictor[index];
         let out = outcome[index];
-        let weight = weights[index];
+        let weight = weights[index] / max_weight;
         if !pred.is_finite() || !out.is_finite() {
             return Err(PsychometricError::InvalidNumericInput);
         }
@@ -192,7 +212,7 @@ pub fn recover_kish_weighted_slope(
     for index in 0..predictor.len() {
         let pred_dev = predictor[index] - pred_mean;
         let out_dev = outcome[index] - out_mean;
-        let weight = weights[index];
+        let weight = weights[index] / max_weight;
         cross += weight * pred_dev * out_dev;
         pred_ss += weight * pred_dev * pred_dev;
     }
@@ -212,30 +232,33 @@ pub struct KishWeightedWithinBetweenSlopes {
     /// WLS slope of weighted-mean-centered outcomes on centered predictors.
     pub within_slope: f64,
     /// WLS slope of weighted cluster-mean outcomes on weighted cluster-mean
-    /// predictors, with cluster totals \(W_j = \sum_i w_{ij}\).
+    /// predictors, with cluster totals `W_j = sum_i w_ij`.
     pub between_slope: f64,
     /// Kish-weighted CWC cluster-mean coefficient:
     /// `between_slope - within_slope`.
     pub contextual_effect: f64,
     /// Kish ESS of the observation weights. Not a slope.
     pub observation_effective_sample_size: f64,
-    /// Kish ESS of the cluster totals \(W_j\). Not a slope.
+    /// Kish ESS of the cluster totals `W_j`. Not a slope.
     pub cluster_effective_sample_size: f64,
 }
 
 /// Recover Kish-weighted within-cluster and between-cluster slopes after CWC.
 ///
-/// Cluster means are weighted: \(\bar x_j = \sum_i w_{ij} x_{ij} / \sum_i
-/// w_{ij}\). Within WLS uses the stacked weighted-mean-centered residuals
+/// Cluster means are weighted: `x_j_bar = sum_i w_ij x_ij / sum_i w_ij`.
+/// Within WLS uses the stacked weighted-mean-centered residuals
 /// with the observation weights. Between WLS uses those cluster means with
-/// cluster totals \(W_j = \sum_i w_{ij}\). The contextual effect is
+/// cluster totals `W_j = sum_i w_ij`. The contextual effect is
 /// weighted between minus weighted within (Enders & Tofighi, 2007, Table 2
 /// identity). Equal cluster sizes and equal observation weights recover the
-/// unweighted CWC slopes. Unequal \(n_j\) even with equal observation
-/// weights makes the \(n_j\)-weighted between a different estimand from
-/// Enders and Tofighi's unweighted between. Pooled Kish WLS of the raw
-/// scores is not the weighted within slope. Kish ESS is reported as the
-/// observation and cluster diagnostics and is not a slope.
+/// unweighted CWC slopes. A common positive scale on every observation
+/// weight is the same estimand (Kish ESS and WLS are homogeneous of
+/// degree 0); weights are divided by their maximum so `f64::MAX` or
+/// `f64::MIN_POSITIVE` common scales recover that estimand. Unequal `n_j`
+/// even with equal observation weights makes the `n_j`-weighted between a
+/// different estimand from Enders and Tofighi's unweighted between. Pooled
+/// Kish WLS of the raw scores is not the weighted within slope. Kish ESS is
+/// reported as the observation and cluster diagnostics and is not a slope.
 ///
 /// This is two-level WLS, not DSEM, not RI-CLPM, and not their multilevel
 /// maximum-likelihood model.
@@ -256,16 +279,18 @@ pub fn recover_kish_weighted_cluster_mean_within_between_slopes(
     if rows.len() < 2 || rows.len() != weights.len() {
         return Err(PsychometricError::InvalidNumericInput);
     }
+    let max_weight = require_max_positive_weight(weights)?;
     let observation_effective_sample_size = kish_effective_sample_size(weights)?;
     let mut groups: BTreeMap<u64, Vec<(f64, f64, f64)>> = BTreeMap::new();
     for (row, &weight) in rows.iter().zip(weights.iter()) {
         if !row.predictor.is_finite() || !row.outcome.is_finite() {
             return Err(PsychometricError::InvalidNumericInput);
         }
-        groups
-            .entry(row.cluster_key)
-            .or_default()
-            .push((row.predictor, row.outcome, weight));
+        groups.entry(row.cluster_key).or_default().push((
+            row.predictor,
+            row.outcome,
+            weight / max_weight,
+        ));
     }
     if groups.len() < 2 {
         return Err(PsychometricError::InsufficientClusters);
@@ -340,7 +365,7 @@ pub fn refuse_pooled_kish_slope_as_weighted_within_slope(
 ///
 /// Enders and Tofighi (2007, Table 2) form the between slope from
 /// unweighted cluster means. Kish-weighted CWC forms WLS of those means
-/// with cluster totals \(W_j\). Unequal \(n_j\) makes the estimands
+/// with cluster totals `W_j`. Unequal `n_j` makes the estimands
 /// differ even when every observation weight equals 1.
 ///
 /// # Errors
@@ -613,10 +638,43 @@ mod tests {
             kish_effective_sample_size(&[0.0, 0.0]),
             Err(PsychometricError::InvalidWeight)
         );
-        assert_eq!(
-            kish_effective_sample_size(&[f64::MAX, f64::MAX]),
-            Err(PsychometricError::InvalidNumericInput)
-        );
+        let huge_ess = kish_effective_sample_size(&[f64::MAX, f64::MAX]).expect("huge");
+        assert!((huge_ess - 2.0).abs() < 1e-12);
+        let tiny_ess =
+            kish_effective_sample_size(&[f64::MIN_POSITIVE, f64::MIN_POSITIVE, f64::MIN_POSITIVE])
+                .expect("tiny");
+        assert!((tiny_ess - 3.0).abs() < 1e-12);
+        let unscaled = kish_effective_sample_size(&[1.0, 2.0, 3.0]).expect("unit");
+        let scaled = kish_effective_sample_size(&[10.0, 20.0, 30.0]).expect("scaled");
+        assert!((unscaled - scaled).abs() < 1e-12);
+        let uneven = kish_effective_sample_size(&[1e-8, 1.0, 1e8]).expect("uneven");
+        let scaled_uneven = kish_effective_sample_size(&[1e-9, 0.1, 1e7]).expect("scaled uneven");
+        assert!((uneven - scaled_uneven).abs() < 1e-12);
+        assert!((1.0 - 1e-12..=3.0 + 1e-12).contains(&uneven));
+        assert!((1.0 - 1e-12..=2.0 + 1e-12).contains(&huge_ess));
+        assert!((1.0 - 1e-12..=3.0 + 1e-12).contains(&tiny_ess));
+        let uneven_slope =
+            recover_kish_weighted_slope(&[0.0, 1.0, 2.0], &[0.0, 2.0, 4.0], &[1e-8, 1.0, 1e8])
+                .expect("uneven wls");
+        let scaled_uneven_slope =
+            recover_kish_weighted_slope(&[0.0, 1.0, 2.0], &[0.0, 2.0, 4.0], &[1e-9, 0.1, 1e7])
+                .expect("scaled uneven wls");
+        assert!((uneven_slope - 2.0).abs() < 1e-12);
+        assert!((scaled_uneven_slope - uneven_slope).abs() < 1e-12);
+        let huge_slope = recover_kish_weighted_slope(
+            &[0.0, 1.0, 2.0],
+            &[0.0, 2.0, 4.0],
+            &[f64::MAX, f64::MAX, f64::MAX],
+        )
+        .expect("huge wls");
+        assert!((huge_slope - 2.0).abs() < 1e-12);
+        let tiny_slope = recover_kish_weighted_slope(
+            &[0.0, 1.0, 2.0],
+            &[0.0, 2.0, 4.0],
+            &[f64::MIN_POSITIVE, f64::MIN_POSITIVE, f64::MIN_POSITIVE],
+        )
+        .expect("tiny wls");
+        assert!((tiny_slope - 2.0).abs() < 1e-12);
         assert_eq!(
             recover_kish_weighted_slope(&[0.0], &[1.0], &[1.0]),
             Err(PsychometricError::InvalidNumericInput)
@@ -663,6 +721,17 @@ mod tests {
         assert!((weighted.contextual_effect - unweighted.contextual_effect).abs() < 1e-12);
         assert!((weighted.observation_effective_sample_size - 4.0).abs() < 1e-12);
         assert!((weighted.cluster_effective_sample_size - 2.0).abs() < 1e-12);
+        for scale in [f64::MAX, f64::MIN_POSITIVE] {
+            let scaled_weights = [scale, scale, scale, scale];
+            let scaled =
+                recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &scaled_weights)
+                    .expect("scaled wls");
+            assert!((scaled.within_slope - unweighted.within_slope).abs() < 1e-12);
+            assert!((scaled.between_slope - unweighted.between_slope).abs() < 1e-12);
+            assert!((scaled.contextual_effect - unweighted.contextual_effect).abs() < 1e-12);
+            assert!((scaled.observation_effective_sample_size - 4.0).abs() < 1e-12);
+            assert!((scaled.cluster_effective_sample_size - 2.0).abs() < 1e-12);
+        }
     }
 
     #[test]
@@ -706,6 +775,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn kish_weighted_cwc_fails_closed_on_length_weight_cluster_and_singular() {
         let rows = equal_n_cwc_rows();
         assert_eq!(

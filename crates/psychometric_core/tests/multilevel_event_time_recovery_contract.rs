@@ -317,6 +317,99 @@ fn kish_weighted_cwc_recovers_known_within_between_and_differs_from_unweighted()
         refuse_kish_effective_sample_size_as_slope(weighted.observation_effective_sample_size),
         Err(PsychometricError::KishEffectiveSampleSizeIsNotASlope)
     );
+    for scale in [f64::MAX, f64::MIN_POSITIVE] {
+        let scaled_weights = vec![scale; rows.len()];
+        let scaled =
+            recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &scaled_weights)
+                .expect("scaled wls");
+        assert!((scaled.within_slope - weighted.within_slope).abs() < 1e-12);
+        assert!((scaled.between_slope - weighted.between_slope).abs() < 1e-12);
+        assert!((scaled.contextual_effect - weighted.contextual_effect).abs() < 1e-12);
+        assert!(
+            (scaled.observation_effective_sample_size - weighted.observation_effective_sample_size)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (scaled.cluster_effective_sample_size - weighted.cluster_effective_sample_size).abs()
+                < 1e-12
+        );
+        let n = rows.len() as f64;
+        assert!((1.0 - 1e-12..=n + 1e-12).contains(&scaled.observation_effective_sample_size));
+    }
+}
+
+#[test]
+fn kish_weighted_cwc_noisy_truth_reports_bias_and_rmse() {
+    use psychometric_core::recover_kish_weighted_cluster_mean_within_between_slopes;
+    let true_within = 0.5_f64;
+    let true_between = 2.0_f64;
+    let true_contextual = true_between - true_within;
+    let mut recovered_within = Vec::new();
+    let mut recovered_between = Vec::new();
+    let mut recovered_contextual = Vec::new();
+    for replicate in 0..40 {
+        let mut rows = Vec::new();
+        let mut weights = Vec::new();
+        let phase = f64::from(replicate) * 0.37;
+        for cluster in 0..16_u64 {
+            let cluster_mean = f64::from(u32::try_from(cluster).expect("tiny"));
+            for occasion in 0..6 {
+                let within = f64::from(occasion) - 2.5;
+                let position = cluster_mean * 0.73 + f64::from(occasion) * 1.1 + phase;
+                let noise = 0.15 * position.sin() + 0.08 * (1.7 * position).cos();
+                rows.push(ClusteredScore {
+                    cluster_key: cluster,
+                    predictor: cluster_mean + within,
+                    outcome: true_between * cluster_mean + true_within * within + noise,
+                });
+                let cycle = occasion % 4;
+                weights.push(0.5 + f64::from(cycle) * 0.5);
+            }
+        }
+        let recovered = recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &weights)
+            .expect("noisy Kish CWC");
+        recovered_within.push(recovered.within_slope);
+        recovered_between.push(recovered.between_slope);
+        recovered_contextual.push(recovered.contextual_effect);
+    }
+    let n = recovered_within.len() as f64;
+    let within_mean = recovered_within.iter().sum::<f64>() / n;
+    let between_mean = recovered_between.iter().sum::<f64>() / n;
+    let contextual_mean = recovered_contextual.iter().sum::<f64>() / n;
+    let within_bias = within_mean - true_within;
+    let between_bias = between_mean - true_between;
+    let contextual_bias = contextual_mean - true_contextual;
+    let within_rmse = rmse(
+        &vec![true_within; recovered_within.len()],
+        &recovered_within,
+    );
+    let between_rmse = rmse(
+        &vec![true_between; recovered_between.len()],
+        &recovered_between,
+    );
+    let contextual_rmse = rmse(
+        &vec![true_contextual; recovered_contextual.len()],
+        &recovered_contextual,
+    );
+    assert!(
+        within_bias.abs() < 0.05,
+        "Kish CWC within bias {within_bias}"
+    );
+    assert!(
+        between_bias.abs() < 0.05,
+        "Kish CWC between bias {between_bias}"
+    );
+    assert!(
+        contextual_bias.abs() < 0.05,
+        "Kish CWC contextual bias {contextual_bias}"
+    );
+    assert!(within_rmse < 0.08, "Kish CWC within RMSE {within_rmse}");
+    assert!(between_rmse < 0.08, "Kish CWC between RMSE {between_rmse}");
+    assert!(
+        contextual_rmse < 0.08,
+        "Kish CWC contextual RMSE {contextual_rmse}"
+    );
 }
 
 #[test]

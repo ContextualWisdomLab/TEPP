@@ -714,7 +714,7 @@ pub enum PsychometricError {
     /// CWC within slope. Pooled WLS confounds within and between.
     PooledKishSlopeIsNotWeightedWithinSlope,
     /// Unweighted between-cluster OLS was treated as Kish-weighted
-    /// between. Unequal \(n_j\) makes cluster-total WLS a different
+    /// between. Unequal `n_j` makes cluster-total WLS a different
     /// estimand from Enders and Tofighi (2007) unweighted between.
     UnweightedBetweenSlopeIsNotKishWeightedBetweenSlope,
     /// Kish effective sample size was treated as a slope. ESS is the
