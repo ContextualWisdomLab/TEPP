@@ -1,7 +1,6 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -24,6 +23,7 @@ use psychometric_core::{
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_variance,
     recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
     recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
@@ -102,7 +102,11 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
+    refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance,
+    refuse_initial_time_independent_variance_as_initial_latent_variance,
+    refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
+    refuse_initial_time_independent_variance_as_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -181,6 +185,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -990,6 +995,88 @@ fn initial_time_independent_predictor_is_not_process_increment_cint_or_impulse()
         Err(
             psychometric_core::PsychometricError::InitialTimeIndependentCoefficientIsNotInitialEffect
         )
+    );
+}
+
+#[test]
+fn initial_time_independent_predictor_variance_is_not_asymptotic_std_t0var_or_trait() {
+    let effect = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let recovered = recover_initial_time_independent_predictor_variance(
+        effect,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("addedT0TIPREDVAR");
+    let expected = effect * effect * predictor_variance;
+    assert!(
+        (recovered - expected).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era addedT0TIPREDVAR): t0_b² v RMSE"
+    );
+    let asymptotic = recover_asymptotic_time_independent_predictor_variance(
+        effect,
+        predictor_variance,
+        -0.5,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let initial_latent = 1.6_f64;
+    let standardised = effect * predictor_variance.sqrt() / initial_latent.sqrt();
+    let trait_variance = 0.8_f64;
+    assert!(
+        (recovered - asymptotic).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): addedT0TIPREDVAR is not addedTIPREDVAR"
+    );
+    assert!(
+        (recovered - standardised).abs() > 1e-3,
+        "Driver et al. (2017, Table 3): addedT0TIPREDVAR is not T0TIPREDEFFECTstd"
+    );
+    assert!(
+        (recovered - initial_latent).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): addedT0TIPREDVAR is not free T0VAR"
+    );
+    assert!(
+        (recovered - trait_variance).abs() > 1e-3,
+        "Driver et al. (2017, §4.3): addedT0TIPREDVAR is not TRAITVAR"
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_asymptotic_time_independent_variance(
+            recovered,
+            asymptotic
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentVarianceIsNotAsymptoticTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_standardised_initial_time_independent_effect(
+            recovered,
+            standardised
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedInitialTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_initial_latent_variance(
+            recovered,
+            initial_latent
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentVarianceIsNotInitialLatentVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_trait_variance(recovered, trait_variance),
+        Err(psychometric_core::PsychometricError::InitialTimeIndependentVarianceIsNotTraitVariance)
+    );
+    assert_eq!(
+        recover_initial_time_independent_predictor_variance(effect, -1.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_time_independent_predictor_variance(effect, 4.0, LagClock::SystemTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
     );
 }
 
@@ -3477,7 +3564,8 @@ fn standardised_trait_variance_is_not_unstandardised_or_t0varstd() {
         (t0var_std - recovered).abs() < 1e-15,
         "Driver et al. (2017, p. 16): T0VARstd and TRAITVARstd equal 1 and remain distinct named quantities"
     );
-    let extra = 0.3_f64 * 0.3_f64 * 4.0_f64;
+    let extra = recover_initial_time_independent_predictor_variance(0.3, 4.0, LagClock::EventTime)
+        .expect("addedT0TIPREDVAR");
     assert!(
         (extra - recovered).abs() > 1e-3,
         "Driver et al. (2017, 2017-era addedT0TIPREDVAR): t0_b² v is not TRAITVARstd"
