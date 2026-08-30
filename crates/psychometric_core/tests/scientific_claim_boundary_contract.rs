@@ -1,7 +1,6 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -181,6 +180,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -378,6 +378,98 @@ fn kish_weighted_cwc_is_not_pooled_or_unweighted_or_ess() {
     assert_eq!(
         refuse_kish_effective_sample_size_as_slope(ess),
         Err(psychometric_core::PsychometricError::KishEffectiveSampleSizeIsNotASlope)
+    );
+}
+
+#[test]
+fn kish_zero_underflow_cluster_is_not_an_invalid_weight() {
+    use psychometric_core::{
+        kish_effective_sample_size, recover_kish_weighted_cluster_mean_within_between_slopes,
+        recover_kish_weighted_slope,
+    };
+    let mixed_ess = kish_effective_sample_size(&[f64::MAX, f64::MIN_POSITIVE]).expect("mixed ess");
+    assert!(
+        (mixed_ess - 1.0).abs() < 1e-12,
+        "Kish-zero relative information after max-scale is ESS 1, not an invalid weight"
+    );
+    let mixed_slope = recover_kish_weighted_slope(
+        &[0.0, 1.0, 2.0],
+        &[0.0, 2.0, 4.0],
+        &[f64::MAX, f64::MAX, f64::MIN_POSITIVE],
+    )
+    .expect("mixed wls");
+    assert!(
+        (mixed_slope - 2.0).abs() < 1e-12,
+        "Kish-zero observation after max-scale must not change the two-point WLS slope"
+    );
+    let two_cluster = [
+        ClusteredScore {
+            cluster_key: 1,
+            predictor: 0.0,
+            outcome: 2.0,
+        },
+        ClusteredScore {
+            cluster_key: 1,
+            predictor: 2.0,
+            outcome: 3.0,
+        },
+        ClusteredScore {
+            cluster_key: 2,
+            predictor: 4.0,
+            outcome: 10.0,
+        },
+        ClusteredScore {
+            cluster_key: 2,
+            predictor: 6.0,
+            outcome: 11.0,
+        },
+    ];
+    let expected = recover_kish_weighted_cluster_mean_within_between_slopes(
+        &two_cluster,
+        &[f64::MAX, f64::MAX, f64::MAX, f64::MAX],
+    )
+    .expect("two-cluster max");
+    let three_cluster = [
+        two_cluster[0],
+        two_cluster[1],
+        two_cluster[2],
+        two_cluster[3],
+        ClusteredScore {
+            cluster_key: 3,
+            predictor: 100.0,
+            outcome: 100.0,
+        },
+        ClusteredScore {
+            cluster_key: 3,
+            predictor: 200.0,
+            outcome: 200.0,
+        },
+    ];
+    let recovered = recover_kish_weighted_cluster_mean_within_between_slopes(
+        &three_cluster,
+        &[
+            f64::MAX,
+            f64::MAX,
+            f64::MAX,
+            f64::MAX,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+        ],
+    )
+    .expect("omit kish-zero");
+    assert!(
+        (recovered.within_slope - expected.within_slope).abs() < 1e-12,
+        "Kish-zero underflow cluster must be omitted, not InvalidWeight"
+    );
+    assert!((recovered.between_slope - expected.between_slope).abs() < 1e-12);
+    assert!((recovered.contextual_effect - expected.contextual_effect).abs() < 1e-12);
+    assert_eq!(
+        recover_kish_weighted_cluster_mean_within_between_slopes(
+            &two_cluster,
+            &[f64::MAX, f64::MAX, f64::MIN_POSITIVE, f64::MIN_POSITIVE],
+        ),
+        Err(psychometric_core::PsychometricError::InsufficientClusters),
+        "two-cluster MAX versus MIN_POSITIVE must not be InvalidWeight"
     );
 }
 
