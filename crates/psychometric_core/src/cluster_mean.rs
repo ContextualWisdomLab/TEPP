@@ -10,6 +10,8 @@
 //! CWC uses weighted cluster means and cluster-total WLS between; that
 //! `n_j`-weighted between is a different estimand from their unweighted
 //! between when cluster sizes differ. Kish ESS is diagnostic, not a slope.
+//! A cluster whose scaled total underflows to 0 after max-scale is
+//! Kish-zero relative information and is omitted.
 
 use std::collections::BTreeMap;
 
@@ -254,10 +256,15 @@ pub struct KishWeightedWithinBetweenSlopes {
 /// unweighted CWC slopes. A common positive scale on every observation
 /// weight is the same estimand (Kish ESS and WLS are homogeneous of
 /// degree 0); weights are divided by their maximum so `f64::MAX` or
-/// `f64::MIN_POSITIVE` common scales recover that estimand. Unequal `n_j`
-/// even with equal observation weights makes the `n_j`-weighted between a
-/// different estimand from Enders and Tofighi's unweighted between. Pooled
-/// Kish WLS of the raw scores is not the weighted within slope. Kish ESS is
+/// `f64::MIN_POSITIVE` common scales recover that estimand. A cluster
+/// whose original weights are all zero has no weighted mean and fails
+/// closed. A cluster whose scaled total underflows to 0 after that
+/// max-scale has Kish-zero relative information (Kish, 1965) and is
+/// omitted; if fewer than two clusters remain, the design is
+/// [`PsychometricError::InsufficientClusters`]. Unequal `n_j` even with
+/// equal observation weights makes the `n_j`-weighted between a different
+/// estimand from Enders and Tofighi's unweighted between. Pooled Kish WLS
+/// of the raw scores is not the weighted within slope. Kish ESS is
 /// reported as the observation and cluster diagnostics and is not a slope.
 ///
 /// This is two-level WLS, not DSEM, not RI-CLPM, and not their multilevel
@@ -269,9 +276,9 @@ pub struct KishWeightedWithinBetweenSlopes {
 /// length-mismatched, or non-finite rows,
 /// [`PsychometricError::InvalidWeight`] for invalid weights or a
 /// zero-weight cluster, [`PsychometricError::InsufficientClusters`] when
-/// fewer than two clusters are present, and
-/// [`PsychometricError::SingularDesign`] when either the weighted within
-/// or the weighted between predictor has zero variance.
+/// fewer than two clusters remain after omitting Kish-zero relative
+/// information, and [`PsychometricError::SingularDesign`] when either the
+/// weighted within or the weighted between predictor has zero variance.
 pub fn recover_kish_weighted_cluster_mean_within_between_slopes(
     rows: &[ClusteredScore],
     weights: &[f64],
@@ -286,11 +293,10 @@ pub fn recover_kish_weighted_cluster_mean_within_between_slopes(
         if !row.predictor.is_finite() || !row.outcome.is_finite() {
             return Err(PsychometricError::InvalidNumericInput);
         }
-        groups.entry(row.cluster_key).or_default().push((
-            row.predictor,
-            row.outcome,
-            weight / max_weight,
-        ));
+        groups
+            .entry(row.cluster_key)
+            .or_default()
+            .push((row.predictor, row.outcome, weight));
     }
     if groups.len() < 2 {
         return Err(PsychometricError::InsufficientClusters);
@@ -303,16 +309,24 @@ pub fn recover_kish_weighted_cluster_mean_within_between_slopes(
     let mut between_outcomes = Vec::new();
     let mut cluster_weights = Vec::new();
     for pairs in groups.values() {
+        let mut original_positive = false;
         let mut weight_sum = 0.0_f64;
         let mut pred_sum = 0.0_f64;
         let mut out_sum = 0.0_f64;
         for &(predictor, outcome, weight) in pairs {
-            weight_sum += weight;
-            pred_sum += weight * predictor;
-            out_sum += weight * outcome;
+            if weight > 0.0 {
+                original_positive = true;
+            }
+            let scaled = weight / max_weight;
+            weight_sum += scaled;
+            pred_sum += scaled * predictor;
+            out_sum += scaled * outcome;
+        }
+        if !original_positive {
+            return Err(PsychometricError::InvalidWeight);
         }
         if weight_sum <= 0.0 {
-            return Err(PsychometricError::InvalidWeight);
+            continue;
         }
         let pred_mean = require_finite(pred_sum / weight_sum)?;
         let out_mean = require_finite(out_sum / weight_sum)?;
@@ -322,8 +336,11 @@ pub fn recover_kish_weighted_cluster_mean_within_between_slopes(
         for &(predictor, outcome, weight) in pairs {
             within_predictors.push(predictor - pred_mean);
             within_outcomes.push(outcome - out_mean);
-            within_weights.push(weight);
+            within_weights.push(weight / max_weight);
         }
+    }
+    if between_predictors.len() < 2 {
+        return Err(PsychometricError::InsufficientClusters);
     }
 
     let within_slope =
@@ -399,12 +416,12 @@ pub fn refuse_kish_effective_sample_size_as_slope(
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredScore, contextual_effect_from_slopes, kish_effective_sample_size,
+        contextual_effect_from_slopes, kish_effective_sample_size,
         recover_cluster_mean_within_between_slopes,
         recover_kish_weighted_cluster_mean_within_between_slopes, recover_kish_weighted_slope,
         refuse_kish_effective_sample_size_as_slope,
         refuse_pooled_kish_slope_as_weighted_within_slope,
-        refuse_unweighted_between_slope_as_kish_weighted_between_slope,
+        refuse_unweighted_between_slope_as_kish_weighted_between_slope, ClusteredScore,
     };
     use crate::error::PsychometricError;
 
@@ -935,6 +952,70 @@ mod tests {
                 &[1.0, 1.0, 1.0, 1.0],
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn kish_zero_underflow_cluster_is_omitted_not_invalid_weight() {
+        let mixed_ess =
+            kish_effective_sample_size(&[f64::MAX, f64::MIN_POSITIVE]).expect("mixed ess");
+        assert!((mixed_ess - 1.0).abs() < 1e-12);
+        let mixed_slope = recover_kish_weighted_slope(
+            &[0.0, 1.0, 2.0],
+            &[0.0, 2.0, 4.0],
+            &[f64::MAX, f64::MAX, f64::MIN_POSITIVE],
+        )
+        .expect("mixed wls");
+        assert!((mixed_slope - 2.0).abs() < 1e-12);
+        let two_cluster = equal_n_cwc_rows();
+        let two_cluster_weights = [f64::MAX, f64::MAX, f64::MAX, f64::MAX];
+        let expected = recover_kish_weighted_cluster_mean_within_between_slopes(
+            &two_cluster,
+            &two_cluster_weights,
+        )
+        .expect("two-cluster max");
+        let mut three_cluster = two_cluster.to_vec();
+        three_cluster.push(ClusteredScore {
+            cluster_key: 3,
+            predictor: 100.0,
+            outcome: 100.0,
+        });
+        three_cluster.push(ClusteredScore {
+            cluster_key: 3,
+            predictor: 200.0,
+            outcome: 200.0,
+        });
+        let three_cluster_weights = [
+            f64::MAX,
+            f64::MAX,
+            f64::MAX,
+            f64::MAX,
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+        ];
+        let recovered = recover_kish_weighted_cluster_mean_within_between_slopes(
+            &three_cluster,
+            &three_cluster_weights,
+        )
+        .expect("omit kish-zero");
+        assert!((recovered.within_slope - expected.within_slope).abs() < 1e-12);
+        assert!((recovered.between_slope - expected.between_slope).abs() < 1e-12);
+        assert!((recovered.contextual_effect - expected.contextual_effect).abs() < 1e-12);
+        assert!(
+            (recovered.cluster_effective_sample_size - expected.cluster_effective_sample_size)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (recovered.observation_effective_sample_size
+                - expected.observation_effective_sample_size)
+                .abs()
+                < 1e-12
+        );
+        let mixed_two = [f64::MAX, f64::MAX, f64::MIN_POSITIVE, f64::MIN_POSITIVE];
+        assert_eq!(
+            recover_kish_weighted_cluster_mean_within_between_slopes(&two_cluster, &mixed_two),
+            Err(PsychometricError::InsufficientClusters)
         );
     }
 }
