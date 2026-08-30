@@ -119,6 +119,14 @@
 //! (pp. 20–21; stable between-subject variance accounted for by a
 //! time-independent predictor with variance `v`; not `TRAITVAR`,
 //! not `asymDIFFUSION`, and not `-B z / a`),
+//! recovers the 2017-era commented `asymTRAITVAR` as `trait / a²`
+//! (`solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))`; Eq. 1
+//! `η_∞ = −ξ / a`; form `1 / a` first, then square, then multiply
+//! by `trait`; a zero trait is exactly zero; `a ≥ 0` with a nonzero
+//! trait fails closed; not `TRAITVAR` `φ_ξ`, not `addedTIPREDVAR`,
+//! and not `asymDIFFUSION`; the commented `DRIFT %&% TRAITVAR` is
+//! `a² · trait` and is the opposite transform; JSS PDF re-opened
+//! 2026-08-30T21:10Z),
 //! recovers the Driver Table 2 `asymCINT` as `-κ / a`
 //! (p. 12; Eq. 3 as `Δt → ∞`; JSS PDF opened 2026-08-21T16:13Z;
 //! expected change in process means for a unit intercept; `a < 0`;
@@ -317,6 +325,8 @@ pub use event_time::recover_asymptotic_continuous_intercept;
 pub use event_time::recover_asymptotic_time_independent_predictor_effect;
 /// Exact scalar §7.2 `addedTIPREDVAR` `(B / a)² v`.
 pub use event_time::recover_asymptotic_time_independent_predictor_variance;
+/// Exact scalar 2017-era commented `asymTRAITVAR` `trait / a²`.
+pub use event_time::recover_asymptotic_trait_variance;
 /// Exact scalar discrete effect of a constant event-time predictor.
 pub use event_time::recover_discrete_constant_predictor_effect;
 /// Exact scalar discrete intercept increment `A^{-1}[e^{A Δt} − I] κ`.
@@ -480,6 +490,12 @@ pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_ef
 pub use event_time::refuse_asymptotic_time_independent_variance_as_stationary_within_subject;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `TRAITVAR`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_trait_variance;
+/// Refuse treating 2017-era `asymTRAITVAR` as `addedTIPREDVAR`.
+pub use event_time::refuse_asymptotic_trait_variance_as_added_time_independent_variance;
+/// Refuse treating 2017-era `asymTRAITVAR` as `asymDIFFUSION`.
+pub use event_time::refuse_asymptotic_trait_variance_as_stationary_within_subject;
+/// Refuse treating 2017-era `asymTRAITVAR` as `TRAITVAR`.
+pub use event_time::refuse_asymptotic_trait_variance_as_trait_variance;
 /// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
 pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 /// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.
