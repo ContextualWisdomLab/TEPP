@@ -416,12 +416,12 @@ pub fn refuse_kish_effective_sample_size_as_slope(
 #[cfg(test)]
 mod tests {
     use super::{
-        contextual_effect_from_slopes, kish_effective_sample_size,
+        ClusteredScore, contextual_effect_from_slopes, kish_effective_sample_size,
         recover_cluster_mean_within_between_slopes,
         recover_kish_weighted_cluster_mean_within_between_slopes, recover_kish_weighted_slope,
         refuse_kish_effective_sample_size_as_slope,
         refuse_pooled_kish_slope_as_weighted_within_slope,
-        refuse_unweighted_between_slope_as_kish_weighted_between_slope, ClusteredScore,
+        refuse_unweighted_between_slope_as_kish_weighted_between_slope,
     };
     use crate::error::PsychometricError;
 
