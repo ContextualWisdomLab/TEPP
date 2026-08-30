@@ -710,6 +710,29 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` after `addedT0TIPREDVAR`
+    /// was treated as the latent total. Observed total variance
+    /// `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ` is not
+    /// `extra + p_0 + ti_extra`.
+    InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotLatentTotal,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` after `addedT0TIPREDVAR`
+    /// was treated as Eq. 5 of `T0TOTALVAR` without the TI extra.
+    /// Omitting `t0_b² v` is not the observed total after
+    /// `addedT0TIPREDVAR`.
+    InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotInitialTotalObservedVariance,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` after `addedT0TIPREDVAR`
+    /// was treated as Eq. 5 of `addedT0TIPREDVAR`. Omitting trait
+    /// extra and free `T0VAR` is not the observed total.
+    InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotAddedTimeIndependentObservedVariance,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` after `addedT0TIPREDVAR`
+    /// was treated as `MANIFESTVAR` `θ`. Measurement error is not
+    /// the observed composition of extra plus free `T0VAR` plus TI
+    /// extra.
+    InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotMeasurementError,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` after `addedT0TIPREDVAR`
+    /// was treated as 2017-era `T0TOTALVARstd`. Observed total
+    /// variance is not the correlation form `total / total = 1`.
+    InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotStandardisedInitialTotalVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1257,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotLatentTotal => {
+                "initial total observed variance with time-independent predictor is not the latent total"
+            }
+            Self::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotInitialTotalObservedVariance => {
+                "initial total observed variance with time-independent predictor is not initial total observed variance"
+            }
+            Self::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotAddedTimeIndependentObservedVariance => {
+                "initial total observed variance with time-independent predictor is not extra time-independent observed variance"
+            }
+            Self::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotMeasurementError => {
+                "initial total observed variance with time-independent predictor is not measurement-error variance"
+            }
+            Self::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotStandardisedInitialTotalVariance => {
+                "initial total observed variance with time-independent predictor is not standardised initial total variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2109,36 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn initial_total_observed_variance_with_time_independent_predictor_boundary_messages_are_stable(
+    ) {
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotLatentTotal
+                .to_string(),
+            "initial total observed variance with time-independent predictor is not the latent total"
+        );
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotInitialTotalObservedVariance
+                .to_string(),
+            "initial total observed variance with time-independent predictor is not initial total observed variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotAddedTimeIndependentObservedVariance
+                .to_string(),
+            "initial total observed variance with time-independent predictor is not extra time-independent observed variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotMeasurementError
+                .to_string(),
+            "initial total observed variance with time-independent predictor is not measurement-error variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotStandardisedInitialTotalVariance
+                .to_string(),
+            "initial total observed variance with time-independent predictor is not standardised initial total variance"
         );
     }
 }
