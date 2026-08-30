@@ -282,10 +282,10 @@ pub use causality::CausalHeuristic;
 pub use causality::claim_causal_effect;
 /// One clustered predictor–outcome pair.
 pub use cluster_mean::ClusteredScore;
-/// Recovered within-cluster, between-cluster, and contextual OLS slopes.
-pub use cluster_mean::WithinBetweenSlopes;
 /// Recovered Kish-weighted CWC slopes plus Kish ESS diagnostics.
 pub use cluster_mean::KishWeightedWithinBetweenSlopes;
+/// Recovered within-cluster, between-cluster, and contextual OLS slopes.
+pub use cluster_mean::WithinBetweenSlopes;
 /// Kish effective sample size on psychometric weights.
 pub use cluster_mean::kish_effective_sample_size;
 /// Cluster-mean within/between OLS after CWC, plus the contextual effect.
@@ -294,12 +294,12 @@ pub use cluster_mean::recover_cluster_mean_within_between_slopes;
 pub use cluster_mean::recover_kish_weighted_cluster_mean_within_between_slopes;
 /// Kish-weighted least-squares slope.
 pub use cluster_mean::recover_kish_weighted_slope;
+/// Refuse Kish ESS as a slope.
+pub use cluster_mean::refuse_kish_effective_sample_size_as_slope;
 /// Refuse pooled Kish WLS as the weighted within slope.
 pub use cluster_mean::refuse_pooled_kish_slope_as_weighted_within_slope;
 /// Refuse unweighted between as Kish-weighted between.
 pub use cluster_mean::refuse_unweighted_between_slope_as_kish_weighted_between_slope;
-/// Refuse Kish ESS as a slope.
-pub use cluster_mean::refuse_kish_effective_sample_size_as_slope;
 /// Higher-order construct class.
 pub use construct::ConstructClass;
 /// Typed invariance evidence required before a latent-mean comparison.
