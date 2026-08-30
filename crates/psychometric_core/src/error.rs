@@ -613,6 +613,23 @@ pub enum PsychometricError {
     /// correlation form of `TIPREDVAR`.
     StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion,
 
+    /// Driver p. 16 `DRIFTstd` was requested with a non-positive
+    /// within-subject variance. Footnote 4 standardises continuous
+    /// `DRIFT` using only strictly positive `asymDIFFUSION`.
+    StandardisedDriftRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 unstandardised `DRIFT` `a` was treated as
+    /// `DRIFTstd`. Unstandardised `a` is defined for growing or
+    /// zero-diffusion processes; standardised `DRIFT` is not.
+    UnstandardisedDriftIsNotStandardisedDrift,
+    /// Driver p. 16 `discreteDRIFTstd` `e^{a Δt}` was treated as
+    /// `DRIFTstd`. The discrete auto-effect depends on the event
+    /// interval; the continuous auto-effect does not.
+    StandardisedDiscreteDriftIsNotStandardisedDrift,
+    /// Driver §7.1 trait-contaminated continuous auto-effect
+    /// `a p / (trait + p + added)` was treated as p. 16 `DRIFTstd`.
+    /// Footnote 4 uses only `asymDIFFUSION`, not `TRAITVAR`.
+    TraitContaminatedDriftIsNotStandardisedDrift,
+
     /// Driver p. 16 `TRAITVARstd` was requested with a non-positive
     /// trait variance. The 2017-era source skips forming
     /// `TRAITVARstd` when `TRAITVAR == 0`; footnote 4
@@ -1170,6 +1187,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion => {
                 "standardised time-independent predictor variance is not standardised asymptotic diffusion"
+            }
+            Self::StandardisedDriftRequiresPositiveWithinSubjectVariance => {
+                "standardised drift requires strictly positive within-subject variance"
+            }
+            Self::UnstandardisedDriftIsNotStandardisedDrift => {
+                "unstandardised drift is not standardised drift"
+            }
+            Self::StandardisedDiscreteDriftIsNotStandardisedDrift => {
+                "standardised discrete drift is not standardised drift"
+            }
+            Self::TraitContaminatedDriftIsNotStandardisedDrift => {
+                "trait-contaminated drift is not standardised drift"
             }
             Self::StandardisedTraitVarianceRequiresPositiveTraitVariance => {
                 "standardised trait variance requires strictly positive trait variance"
@@ -1976,6 +2005,22 @@ mod tests {
             PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion
                 .to_string(),
             "standardised time-independent predictor variance is not standardised asymptotic diffusion"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedDriftRequiresPositiveWithinSubjectVariance.to_string(),
+            "standardised drift requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDriftIsNotStandardisedDrift.to_string(),
+            "unstandardised drift is not standardised drift"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteDriftIsNotStandardisedDrift.to_string(),
+            "standardised discrete drift is not standardised drift"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedDriftIsNotStandardisedDrift.to_string(),
+            "trait-contaminated drift is not standardised drift"
         );
     }
 
