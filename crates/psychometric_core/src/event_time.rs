@@ -7002,7 +7002,6 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
         center_within_cluster_event_lags, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, overflow_safe_running_mean,
         recover_asymptotic_continuous_intercept,
@@ -7194,7 +7193,8 @@ mod tests {
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
-        same_sign_nonzero, voelkle_same_sign_log_rate,
+        same_sign_nonzero, voelkle_same_sign_log_rate, ClusteredEventScore, EventOccasion,
+        LagClock, LaggedWithinResidual,
     };
     use crate::error::PsychometricError;
 
@@ -8589,11 +8589,11 @@ mod tests {
             expected_sum += rate;
             expected_count += 1.0;
             let ratio = pair.later_residual / pair.earlier_residual;
-            if ratio.is_finite() && ratio > 0.0 {
+            if ratio == 0.0 {
+                underflow_pairs += 1;
+            } else {
                 ordinary_sum += rate;
                 ordinary_count += 1.0;
-            } else {
-                underflow_pairs += 1;
             }
         }
         assert_eq!(underflow_pairs, 1);
@@ -8613,7 +8613,8 @@ mod tests {
         let later = earlier * (-1e-12_f64).exp();
         let subtracted = later.abs().ln() - earlier.abs().ln();
         let ratio = later.abs() / earlier.abs();
-        assert!(ratio.is_finite() && ratio > 0.0);
+        assert!(ratio.is_finite());
+        assert!(ratio > 0.0);
         let from_ratio = ratio.ln();
         assert_ne!(
             from_ratio.to_bits(),
@@ -8640,7 +8641,11 @@ mod tests {
         let underflow_rate =
             voelkle_same_sign_log_rate(1e300_f64, 1e-300_f64, 1.0).expect("underflow arm");
         let underflow_ratio = 1e-300_f64 / 1e300_f64;
-        assert!(!(underflow_ratio.is_finite() && underflow_ratio > 0.0));
+        assert_eq!(
+            underflow_ratio.to_bits(),
+            0.0_f64.to_bits(),
+            "1e-300 / 1e300 underflows to +0, which is finite and not strictly positive"
+        );
         let underflow_logs = (1e-300_f64).ln() - (1e300_f64).ln();
         assert_eq!(underflow_rate.to_bits(), underflow_logs.to_bits());
     }
@@ -11832,8 +11837,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -12408,8 +12413,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
         // λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ.
@@ -12985,8 +12990,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of stationary T0VAR is
         // λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ.
@@ -15140,8 +15145,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
+    ) {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -15291,8 +15296,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -15910,8 +15915,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,
