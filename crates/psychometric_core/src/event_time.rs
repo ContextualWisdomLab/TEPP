@@ -6763,11 +6763,7 @@ pub fn center_within_cluster_event_lags(
         }
         let count = occasions.len() as f64;
         let mean = occasions.iter().map(|row| row.score).sum::<f64>() / count;
-        occasions.sort_by(|left, right| {
-            left.event_time
-                .partial_cmp(&right.event_time)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        occasions.sort_by(|left, right| left.event_time.total_cmp(&right.event_time));
         for window in occasions.windows(2) {
             let earlier_residual = window[0].score - mean;
             let later_residual = window[1].score - mean;
@@ -8609,6 +8605,41 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
+        assert_eq!(
+            center_within_cluster_event_lags(&[clustered(1, 0.0, 1.0)], LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_within_cluster_event_lags(
+                &[
+                    clustered(1, f64::MAX, 1.0),
+                    clustered(1, -f64::MAX, 0.5),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+    }
+
+    #[test]
+    fn cwc_orders_unsorted_event_times_before_lag_pairs() {
+        let later = clustered(1, 2.0, 0.4);
+        let earlier = clustered(1, 0.5, 1.6);
+        let other_later = clustered(2, 3.0, -0.8);
+        let other_earlier = clustered(2, 1.0, 0.2);
+        let pairs = center_within_cluster_event_lags(
+            &[later, other_later, earlier, other_earlier],
+            LagClock::EventTime,
+        )
+        .expect("unsorted");
+        assert_eq!(pairs.len(), 2);
+        assert!((pairs[0].event_delta - 1.5).abs() < 1e-15);
+        assert!((pairs[1].event_delta - 2.0).abs() < 1e-15);
+        let cluster_one_mean = f64::midpoint(1.6, 0.4);
+        assert!((pairs[0].earlier_residual - (1.6 - cluster_one_mean)).abs() < 1e-15);
+        assert!((pairs[0].later_residual - (0.4 - cluster_one_mean)).abs() < 1e-15);
     }
 
     #[test]
