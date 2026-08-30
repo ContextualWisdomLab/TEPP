@@ -261,6 +261,17 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver Eq. 5 of 2017-era `T0TOTALVAR` after
+//! `addedT0TIPREDVAR` with nonzero `MANIFESTTRAITVAR` as
+//! `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ + ψ` (Eq. 5, p. 5;
+//! Table 2, p. 12; Table 3, p. 13; 2017-era `summary.ctsemFit.R`
+//! lines 322–339 then 437–442; form extra first, then add free
+//! `T0VAR`, then form `t0_b² v`, then add, then `(λ total) λ + θ`
+//! plus `ψ`; the latent total is not that observed map;
+//! `λ² (extra + p_0 + ti_extra) + θ` omits `ψ`; `MANIFESTVAR` `θ`
+//! is not that composition; `MANIFESTTRAITVAR` `ψ` is not that
+//! composition; `T0TOTALVARstd` is not that map; JSS PDF re-opened
+//! 2026-08-30T20:56Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -379,6 +390,8 @@ pub use event_time::recover_initial_time_dependent_predictor_effect;
 pub use event_time::recover_initial_time_independent_predictor_carry;
 /// Exact scalar first-occasion `T0TIPREDEFFECT` shift `t0_b z`.
 pub use event_time::recover_initial_time_independent_predictor_effect;
+/// Exact scalar Eq. 5 of 2017-era `T0TOTALVAR` after `addedT0TIPREDVAR` with `ψ`.
+pub use event_time::recover_initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait;
 /// Mean exact log-rate on already-centered irregular residuals.
 pub use event_time::recover_irregular_centered_residual_log_rate;
 /// Exact scalar §7.2 level-change `CINT` `κ = −a m x`.
@@ -572,6 +585,16 @@ pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_imp
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
+/// Refuse treating Eq. 5 of `T0TOTALVAR` after `addedT0TIPREDVAR` with `ψ` as the latent total.
+pub use event_time::refuse_initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_as_latent_total;
+/// Refuse treating Eq. 5 of `T0TOTALVAR` after `addedT0TIPREDVAR` with `ψ` as `MANIFESTTRAITVAR`.
+pub use event_time::refuse_initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_as_manifest_trait_variance;
+/// Refuse treating Eq. 5 of `T0TOTALVAR` after `addedT0TIPREDVAR` with `ψ` as `MANIFESTVAR`.
+pub use event_time::refuse_initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_as_measurement_error;
+/// Refuse treating Eq. 5 of `T0TOTALVAR` after `addedT0TIPREDVAR` with `ψ` as that map without `ψ`.
+pub use event_time::refuse_initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_as_observed_variance_without_manifest_trait;
+/// Refuse treating Eq. 5 of `T0TOTALVAR` after `addedT0TIPREDVAR` with `ψ` as `T0TOTALVARstd`.
+pub use event_time::refuse_initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_as_standardised_initial_total_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.
