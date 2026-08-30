@@ -6791,12 +6791,14 @@ pub fn center_within_cluster_event_lags(
 ///
 /// This is [`center_within_cluster_event_lags`] then the pairwise mean of
 /// Voelkle et al. (2012, Eq. 7) on the pairs whose residuals are nonzero
-/// and the same sign. Admissibility does **not** divide the residuals:
-/// a finite same-sign pair whose ratio overflows or underflows still
-/// contributes `a = (ln|later| − ln|earlier|) / Δt`. That identity equals
-/// `ln(later / earlier) / Δt` whenever the ratio is finite and positive.
-/// Opposite-sign and zero residuals have no real logarithm and are skipped
-/// (CWC residuals of a connected series straddle zero). It is **not** the
+/// and the same sign. Admissibility does **not** divide the residuals.
+/// When `|later| / |earlier|` is finite and positive the rate is
+/// `ln(|later| / |earlier|) / Δt` so near-equal large residuals do not
+/// collapse to zero. When that ratio overflows or underflows the rate is
+/// `(ln|later| − ln|earlier|) / Δt`, which stays finite. Opposite-sign and
+/// zero residuals have no real logarithm and are skipped. CWC residuals of
+/// a connected series sum to zero; consecutive pairs need not all have
+/// opposite signs. An empty admissible set fails closed. It is **not** the
 /// Newton least-squares fit used by
 /// [`recover_within_residual_event_time_log_rate`]. The already-centered
 /// helper [`recover_irregular_centered_residual_log_rate`] still uses
@@ -6840,17 +6842,23 @@ pub(crate) fn same_sign_nonzero(earlier: f64, later: f64) -> bool {
     earlier != 0.0 && later != 0.0 && earlier.is_sign_positive() == later.is_sign_positive()
 }
 
-/// Voelkle et al. (2012, Eq. 7) `a = (ln|later| − ln|earlier|) / Δt`.
+/// Voelkle et al. (2012, Eq. 7) `a = ln(|later| / |earlier|) / Δt`.
 ///
 /// Caller already established same-sign nonzero residuals and a strictly
-/// positive finite event interval. The absolute-log form stays finite when
-/// `later / earlier` overflows or underflows.
+/// positive finite event interval. Prefer the finite ratio logarithm so
+/// near-equal large residuals keep a nonzero rate. Fall back to
+/// `ln|later| − ln|earlier|` only when that ratio overflows or underflows.
 pub(crate) fn voelkle_same_sign_log_rate(
     earlier: f64,
     later: f64,
     event_delta: f64,
 ) -> Result<f64, PsychometricError> {
-    let log_ratio = later.abs().ln() - earlier.abs().ln();
+    let ratio = later.abs() / earlier.abs();
+    let log_ratio = if ratio.is_finite() && ratio > 0.0 {
+        ratio.ln()
+    } else {
+        later.abs().ln() - earlier.abs().ln()
+    };
     require_finite(log_ratio / event_delta)
 }
 
@@ -8578,6 +8586,38 @@ mod tests {
             (recovered - ordinary_only).abs() > 1.0,
             "underflow pair must enter the pairwise mean: recovered {recovered} ordinary {ordinary_only}"
         );
+    }
+
+    #[test]
+    fn voelkle_same_sign_prefers_finite_ratio_ln_for_near_equal_large_residuals() {
+        let earlier = 1e20_f64;
+        let later = earlier * (-1e-12_f64).exp();
+        let subtracted = later.abs().ln() - earlier.abs().ln();
+        let ratio = later.abs() / earlier.abs();
+        assert!(ratio.is_finite() && ratio > 0.0);
+        let from_ratio = ratio.ln();
+        assert_ne!(
+            from_ratio.to_bits(),
+            0.0_f64.to_bits(),
+            "finite ratio logarithm must keep the tiny same-sign change"
+        );
+        let rate = voelkle_same_sign_log_rate(earlier, later, 1.0).expect("near-equal");
+        assert_eq!(rate.to_bits(), from_ratio.to_bits());
+        if subtracted.to_bits() == 0.0_f64.to_bits() {
+            assert_ne!(rate.to_bits(), 0.0_f64.to_bits());
+        }
+        let overflow_rate =
+            voelkle_same_sign_log_rate(f64::from_bits(1), f64::MAX, 1.0).expect("overflow arm");
+        let overflow_ratio = f64::MAX / f64::from_bits(1);
+        assert!(!overflow_ratio.is_finite());
+        let overflow_logs = f64::MAX.ln() - f64::from_bits(1).ln();
+        assert_eq!(overflow_rate.to_bits(), overflow_logs.to_bits());
+        let underflow_rate =
+            voelkle_same_sign_log_rate(1e300_f64, 1e-300_f64, 1.0).expect("underflow arm");
+        let underflow_ratio = 1e-300_f64 / 1e300_f64;
+        assert!(!(underflow_ratio.is_finite() && underflow_ratio > 0.0));
+        let underflow_logs = (1e-300_f64).ln() - (1e300_f64).ln();
+        assert_eq!(underflow_rate.to_bits(), underflow_logs.to_bits());
     }
 
     #[test]
