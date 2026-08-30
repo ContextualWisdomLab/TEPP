@@ -32,16 +32,16 @@ use psychometric_core::{
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
-    recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_initial_latent_variance, recover_standardised_initial_trait_variance,
+    recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
+    recover_standardised_manifest_variance, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -102,6 +102,7 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
+    refuse_initial_time_independent_variance_as_standardised_initial_trait_variance,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
@@ -126,10 +127,12 @@ use psychometric_core::{
     refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance,
     refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion,
     refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
+    refuse_standardised_initial_latent_variance_as_standardised_initial_trait_variance,
     refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
     refuse_standardised_manifest_variance_as_standardised_manifest_mean,
     refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
+    refuse_standardised_trait_variance_as_standardised_initial_trait_variance,
     refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -176,6 +179,7 @@ use psychometric_core::{
     refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
     refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
     refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
+    refuse_unstandardised_initial_trait_variance_as_standardised_initial_trait_variance,
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
@@ -3779,6 +3783,90 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
+        )
+    );
+}
+
+#[test]
+fn standardised_initial_trait_variance_is_not_unstandardised_traitstd_or_t0varstd() {
+    let effect = 0.5_f64;
+    let trait_variance = 1.6_f64;
+    let recovered =
+        recover_standardised_initial_trait_variance(effect, trait_variance, LagClock::EventTime)
+            .expect("T0TRAITVARstd");
+    assert!(
+        (recovered - 1.0).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era summary.ctsemFit.R 334–337): T0TRAITVARstd is extra/extra = 1"
+    );
+    let larger_extra = recover_standardised_initial_trait_variance(0.8, 6.4, LagClock::EventTime)
+        .expect("T0TRAITVARstd larger extra");
+    assert!(
+        (larger_extra - recovered).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era T0TRAITVARstd): distinct positive extras recover the same 1"
+    );
+    let extra = effect * effect * trait_variance;
+    assert!(
+        (extra - recovered).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era T0TRAITVAR): unstandardised extra is not T0TRAITVARstd"
+    );
+    let trait_std = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)
+        .expect("TRAITVARstd");
+    assert!(
+        (trait_std - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): TRAITVARstd and T0TRAITVARstd equal 1 and remain distinct named quantities"
+    );
+    let t0var_std =
+        recover_standardised_initial_latent_variance(trait_variance, LagClock::EventTime)
+            .expect("T0VARstd");
+    assert!(
+        (t0var_std - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): T0VARstd and T0TRAITVARstd equal 1 and remain distinct named quantities"
+    );
+    let added_t0 = 0.3_f64 * 0.3_f64 * 4.0_f64;
+    assert!(
+        (added_t0 - recovered).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era addedT0TIPREDVAR): t0_b² v is not T0TRAITVARstd"
+    );
+    assert_eq!(
+        recover_standardised_initial_trait_variance(0.5, 0.0, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedInitialTraitVarianceRequiresPositiveInitialTraitVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_initial_trait_variance(effect, trait_variance, LagClock::SystemTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        refuse_unstandardised_initial_trait_variance_as_standardised_initial_trait_variance(
+            extra, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedInitialTraitVarianceIsNotStandardisedInitialTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_standardised_trait_variance_as_standardised_initial_trait_variance(
+            trait_std, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedTraitVarianceIsNotStandardisedInitialTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_standardised_initial_latent_variance_as_standardised_initial_trait_variance(
+            t0var_std, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedInitialTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_variance_as_standardised_initial_trait_variance(
+            added_t0, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedInitialTraitVariance
         )
     );
 }

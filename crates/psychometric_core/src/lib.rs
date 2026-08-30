@@ -411,6 +411,8 @@ pub use event_time::recover_standardised_discrete_continuous_intercept;
 pub use event_time::recover_standardised_initial_latent_mean;
 /// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
 pub use event_time::recover_standardised_initial_latent_variance;
+/// Exact scalar 2017-era `T0TRAITVARstd` `extra / extra = 1` after strictly positive extra.
+pub use event_time::recover_standardised_initial_trait_variance;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
 /// Exact scalar p. 16 `MANIFESTTRAITVARstd` `ψ / ψ = 1` after strictly positive `MANIFESTTRAITVAR`.
@@ -570,6 +572,8 @@ pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
 pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating first-occasion TI observed mean as the first-occasion TD observed mean.
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as 2017-era `T0TRAITVARstd`.
+pub use event_time::refuse_initial_time_independent_variance_as_standardised_initial_trait_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
@@ -630,12 +634,18 @@ pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_init
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `T0VARstd` as `T0MEANSstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
+/// Refuse treating p. 16 `T0VARstd` as 2017-era `T0TRAITVARstd`.
+pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_trait_variance;
 /// Refuse treating p. 16 `T0VARstd` as `TRAITVARstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_trait_variance;
 /// Refuse treating p. 16 `MANIFESTTRAITVARstd` as `MANIFESTVARstd`.
 pub use event_time::refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
+/// Refuse treating p. 16 `TRAITVARstd` as 2017-era `T0TRAITVARstd`.
+pub use event_time::refuse_standardised_trait_variance_as_standardised_initial_trait_variance;
+/// Refuse treating unstandardised `T0TRAITVAR` as 2017-era `T0TRAITVARstd`.
+pub use event_time::refuse_unstandardised_initial_trait_variance_as_standardised_initial_trait_variance;
 
 /// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
