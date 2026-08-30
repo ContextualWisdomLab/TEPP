@@ -199,6 +199,15 @@
 //! unstandardised `τ` is defined for a zero residual and is not
 //! that map; `θ / θ = 1` is `MANIFESTVARstd` and is not that map
 //! even when `τ = √θ`; JSS PDF re-opened 2026-08-25T11:32Z),
+//! recovers the Driver p. 16 `LAMBDAstd` as `λ · √p / √θ` after
+//! strictly positive `asymDIFFUSION` `p = −q / (2 a)` and strictly
+//! positive residual `MANIFESTVAR` (footnote 4 uses only the
+//! relevant variances of the latent and of residual `θ`, not total
+//! `Var(y) = λ² p + θ`; unstandardised `λ` is defined for growing
+//! `a ≥ 0` and for a zero residual and is not that map;
+//! `τ / √θ` is `MANIFESTMEANSstd` and is not that map even when
+//! `λ √p = τ`; `λ √p / √(λ² p + θ)` uses total observed variance
+//! and is not that map; JSS PDF re-opened 2026-08-30T16:45Z),
 //! recovers the Driver p. 16 `T0MEANSstd` as `μ_0 / √p_0` after
 //! strictly positive free `T0VAR` (footnote 4 uses only the
 //! relevant first-occasion variance, not process-dynamics
@@ -411,6 +420,8 @@ pub use event_time::recover_standardised_discrete_continuous_intercept;
 pub use event_time::recover_standardised_initial_latent_mean;
 /// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
 pub use event_time::recover_standardised_initial_latent_variance;
+/// Exact scalar p. 16 `LAMBDAstd` `λ · √p / √θ` after strictly positive `asymDIFFUSION` and `MANIFESTVAR`.
+pub use event_time::recover_standardised_loading;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
 /// Exact scalar p. 16 `MANIFESTTRAITVARstd` `ψ / ψ = 1` after strictly positive `MANIFESTTRAITVAR`.
@@ -610,6 +621,8 @@ pub use event_time::refuse_measurement_error_as_standardised_manifest_trait_vari
 pub use event_time::refuse_measurement_error_as_stationary_lagged_observed_covariance;
 /// Refuse treating `MANIFESTVAR` as Eq. 5 of later-occasion §4.3 stationary `T0VAR`.
 pub use event_time::refuse_measurement_error_as_stationary_later_observed_variance;
+/// Refuse treating `λ √p / √(λ² p + θ)` as `LAMBDAstd`.
+pub use event_time::refuse_observed_scaled_loading_as_standardised_loading;
 /// Refuse treating `τ / √(λ² Var(η) + θ)` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean;
 /// Refuse pooling discrete lags from unequal event intervals.
@@ -632,6 +645,8 @@ pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
 /// Refuse treating p. 16 `T0VARstd` as `TRAITVARstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_trait_variance;
+/// Refuse treating p. 16 `MANIFESTMEANSstd` as `LAMBDAstd`.
+pub use event_time::refuse_standardised_manifest_mean_as_standardised_loading;
 /// Refuse treating p. 16 `MANIFESTTRAITVARstd` as `MANIFESTVARstd`.
 pub use event_time::refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
@@ -719,6 +734,8 @@ pub use event_time::refuse_time_independent_observed_mean_as_initial_time_indepe
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
 pub use event_time::refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating `λ √(trait + p + added) / √θ` as `LAMBDAstd`.
+pub use event_time::refuse_trait_scaled_loading_as_standardised_loading;
 /// Refuse treating Driver §4.3 trait variance as process noise.
 pub use event_time::refuse_trait_variance_as_process_noise;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.
@@ -737,6 +754,8 @@ pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_stand
 pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Refuse treating unstandardised `T0VAR` as `T0VARstd`.
 pub use event_time::refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance;
+/// Refuse treating unstandardised `LAMBDA` as `LAMBDAstd`.
+pub use event_time::refuse_unstandardised_loading_as_standardised_loading;
 /// Refuse treating unstandardised `MANIFESTMEANS` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest_mean;
 /// Refuse treating unstandardised `MANIFESTTRAITVAR` as `MANIFESTTRAITVARstd`.
