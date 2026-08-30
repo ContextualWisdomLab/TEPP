@@ -27,7 +27,7 @@ use psychometric_core::{
     recover_event_time_discrete_lag_and_log_rate, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
-    recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_effect, recover_initial_trait_effect_carry,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
     recover_level_change_continuous_intercept, recover_level_change_discrete_increment,
     recover_level_change_extra_process_contribution,
@@ -92,18 +92,21 @@ use psychometric_core::{
     refuse_initial_observed_variance_as_stationary_initial_observed_variance,
     refuse_initial_time_dependent_carry_as_impulse_carry,
     refuse_initial_time_dependent_carry_as_initial_effect,
+    refuse_initial_time_dependent_carry_as_initial_trait_carry,
     refuse_initial_time_dependent_coefficient_as_initial_effect,
     refuse_initial_time_dependent_effect_as_contemporaneous_impulse,
     refuse_initial_time_dependent_effect_as_continuous_intercept,
     refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
     refuse_initial_time_dependent_effect_as_process_increment,
     refuse_initial_time_independent_carry_as_initial_effect,
+    refuse_initial_time_independent_carry_as_initial_trait_carry,
     refuse_initial_time_independent_coefficient_as_initial_effect,
     refuse_initial_time_independent_effect_as_continuous_intercept,
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
+    refuse_initial_trait_effect_as_initial_trait_carry,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -157,6 +160,7 @@ use psychometric_core::{
     refuse_time_independent_effect_as_continuous_intercept,
     refuse_time_independent_effect_as_time_dependent_impulse,
     refuse_time_independent_effect_as_time_varying_discrete_effect,
+    refuse_time_independent_increment_as_initial_trait_carry,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
@@ -6537,6 +6541,133 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
     let non_event = clocks[non_event_index];
     assert_eq!(
         recover_standardised_manifest_variance(0.4, non_event),
+        Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn initial_trait_effect_carry_recovers_driver_generate_product() {
+    let coefficient = 0.5_f64;
+    let trait_score = 1.6_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let event = LagClock::EventTime;
+    let shift = coefficient * trait_score;
+    let carry = recover_initial_trait_effect_carry(coefficient, trait_score, drift, delta, event)
+        .expect("T0TRAITEFFECT carry");
+    let expected = shift * (drift * delta).exp();
+    assert!((carry - expected).abs() < 1e-15);
+    let zero_drift =
+        recover_initial_trait_effect_carry(coefficient, trait_score, 0.0, delta, event)
+            .expect("zero-drift");
+    assert!((zero_drift - shift).abs() < 1e-15);
+    assert_eq!(
+        recover_initial_trait_effect_carry(0.0, trait_score, drift, delta, event),
+        Ok(0.0)
+    );
+    assert_eq!(
+        recover_initial_trait_effect_carry(coefficient, 0.0, drift, delta, event),
+        Ok(0.0)
+    );
+    let vanished = recover_initial_trait_effect_carry(coefficient, trait_score, -800.0, 1.0, event)
+        .expect("underflow");
+    assert_eq!(vanished.to_bits(), 0.0_f64.to_bits());
+}
+
+#[test]
+fn initial_trait_effect_carry_refuses_shift_ti_td_and_increment() {
+    let coefficient = 0.5_f64;
+    let trait_score = 1.6_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let event = LagClock::EventTime;
+    let shift = coefficient * trait_score;
+    let carry = recover_initial_trait_effect_carry(coefficient, trait_score, drift, delta, event)
+        .expect("T0TRAITEFFECT carry");
+    let time_independent_carry = recover_initial_time_independent_predictor_carry(
+        coefficient,
+        trait_score,
+        drift,
+        delta,
+        event,
+    )
+    .expect("T0TIPREDEFFECT carry");
+    let time_dependent_carry = recover_initial_time_dependent_predictor_carry(
+        coefficient,
+        trait_score,
+        drift,
+        delta,
+        event,
+    )
+    .expect("T0TDPREDEFFECT carry");
+    let increment = recover_discrete_time_independent_predictor_effect(
+        coefficient,
+        trait_score,
+        drift,
+        delta,
+        event,
+    )
+    .expect("TIPREDEFFECT");
+    assert!((time_independent_carry - carry).abs() < 1e-15);
+    assert!((time_dependent_carry - carry).abs() < 1e-15);
+    assert_eq!(
+        refuse_initial_trait_effect_as_initial_trait_carry(shift, carry),
+        Err(PsychometricError::InitialTraitEffectIsNotInitialTraitCarry)
+    );
+    assert_eq!(
+        refuse_initial_time_independent_carry_as_initial_trait_carry(time_independent_carry, carry),
+        Err(PsychometricError::InitialTimeIndependentCarryIsNotInitialTraitCarry)
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_carry_as_initial_trait_carry(time_dependent_carry, carry),
+        Err(PsychometricError::InitialTimeDependentCarryIsNotInitialTraitCarry)
+    );
+    assert_eq!(
+        refuse_time_independent_increment_as_initial_trait_carry(increment, carry),
+        Err(PsychometricError::TimeIndependentIncrementIsNotInitialTraitCarry)
+    );
+}
+
+#[test]
+fn initial_trait_effect_carry_refuses_non_event_clocks_and_overflow() {
+    assert_eq!(
+        recover_initial_trait_effect_carry(0.5, 1.6, -0.5, 2.0, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_trait_effect_carry(0.5, 1.6, -0.5, 2.0, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_trait_effect_carry(0.5, 1.6, -0.5, 0.0, LagClock::EventTime),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_initial_trait_effect_carry(1e308, 2.0, 0.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_trait_effect_carry(2.0, 0.5, 710.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    let finite_rewrite =
+        recover_initial_trait_effect_carry(1e-308, 1.0, 700.0, 1.0, LagClock::EventTime)
+            .expect("log-rewrite");
+    let expected_rewrite = (1e-308_f64.ln() + 700.0).exp();
+    assert!((finite_rewrite - expected_rewrite).abs() / expected_rewrite < 1e-12);
+}
+
+#[test]
+fn initial_trait_effect_carry_clock_path_is_runtime_opaque() {
+    let clocks = [
+        LagClock::SystemTime,
+        LagClock::DocumentTime,
+        LagClock::AssertionTime,
+    ];
+    let non_event_index = std::process::id() as usize % clocks.len();
+    let non_event = clocks[non_event_index];
+    assert_eq!(
+        recover_initial_trait_effect_carry(0.5, 1.6, -0.5, 2.0, non_event),
         Err(PsychometricError::EventTimeRequired)
     );
 }
