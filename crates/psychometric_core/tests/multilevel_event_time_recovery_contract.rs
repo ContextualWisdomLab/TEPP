@@ -27,7 +27,7 @@ use psychometric_core::{
     recover_event_time_discrete_lag_and_log_rate, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
-    recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_effect, recover_initial_total_variance,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
     recover_level_change_continuous_intercept, recover_level_change_discrete_increment,
     recover_level_change_extra_process_contribution,
@@ -104,6 +104,10 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
+    refuse_initial_total_variance_as_initial_latent_variance,
+    refuse_initial_total_variance_as_initial_time_independent_variance,
+    refuse_initial_total_variance_as_initial_trait_variance,
+    refuse_initial_total_variance_as_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -6537,6 +6541,142 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
     let non_event = clocks[non_event_index];
     assert_eq!(
         recover_standardised_manifest_variance(0.4, non_event),
+        Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn initial_total_variance_recovers_driver_2017_era_t0_total_var() {
+    let effect = 0.5_f64;
+    let trait_variance = 0.8_f64;
+    let initial_variance = 1.6_f64;
+    let recovered = recover_initial_total_variance(
+        effect,
+        trait_variance,
+        initial_variance,
+        LagClock::EventTime,
+    )
+    .expect("T0TOTALVAR");
+    let extra = effect * effect * trait_variance;
+    let expected = extra + initial_variance;
+    let error = rmse(&[expected], &[recovered]);
+    assert!(
+        error < 1e-15,
+        "Driver 2017-era T0TOTALVAR RMSE {error}: got {recovered}"
+    );
+    let doubled =
+        recover_initial_total_variance(effect, 1.6, initial_variance, LagClock::EventTime)
+            .expect("doubled-trait");
+    assert!((doubled - (2.0 * extra + initial_variance)).abs() < 1e-15);
+    let signed = recover_initial_total_variance(
+        -effect,
+        trait_variance,
+        initial_variance,
+        LagClock::EventTime,
+    )
+    .expect("signed");
+    assert!((signed - expected).abs() < 1e-15);
+    let zero_extra =
+        recover_initial_total_variance(0.0, trait_variance, initial_variance, LagClock::EventTime)
+            .expect("zero extra");
+    assert!((zero_extra - initial_variance).abs() < 1e-15);
+    let zero_p0 = recover_initial_total_variance(effect, trait_variance, 0.0, LagClock::EventTime)
+        .expect("zero p0");
+    assert!((zero_p0 - extra).abs() < 1e-15);
+    let both_zero =
+        recover_initial_total_variance(0.0, 0.0, 0.0, LagClock::EventTime).expect("0+0");
+    assert_eq!(both_zero.to_bits(), 0.0_f64.to_bits());
+    let stationary_zero_p0 =
+        recover_initial_total_variance(1.0, trait_variance, 0.0, LagClock::EventTime)
+            .expect("I, p0=0");
+    assert!((stationary_zero_p0 - trait_variance).abs() < 1e-15);
+    let added_t0 = 0.3_f64 * 0.3_f64 * 4.0_f64;
+    assert!(rmse(&[recovered], &[extra]) > error);
+    assert!(rmse(&[recovered], &[initial_variance]) > error);
+    assert!(rmse(&[recovered], &[trait_variance]) > error);
+    assert!(rmse(&[recovered], &[added_t0]) > error);
+    assert_eq!(
+        refuse_initial_total_variance_as_initial_trait_variance(zero_p0, extra),
+        Err(PsychometricError::InitialTotalVarianceIsNotInitialTraitVariance)
+    );
+    assert_eq!(
+        refuse_initial_total_variance_as_initial_latent_variance(zero_extra, initial_variance),
+        Err(PsychometricError::InitialTotalVarianceIsNotInitialLatentVariance)
+    );
+    assert_eq!(
+        refuse_initial_total_variance_as_trait_variance(stationary_zero_p0, trait_variance),
+        Err(PsychometricError::InitialTotalVarianceIsNotTraitVariance)
+    );
+    assert_eq!(
+        refuse_initial_total_variance_as_initial_time_independent_variance(recovered, added_t0),
+        Err(PsychometricError::InitialTotalVarianceIsNotInitialTimeIndependentVariance)
+    );
+}
+
+#[test]
+fn initial_total_variance_refuses_non_event_clocks_and_negative_operands() {
+    let effect = 0.5_f64;
+    assert_eq!(
+        recover_initial_total_variance(effect, 0.8, 1.6, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, 0.8, 1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, 0.8, 1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, 0.8, 1.6, LagClock::DocumentTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, -1.0, 1.6, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, 0.8, -1.6, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_total_variance(0.0, 0.8, 1.6, LagClock::EventTime),
+        Ok(1.6)
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, 0.8, 0.0, LagClock::EventTime),
+        Ok(0.2)
+    );
+    assert_eq!(
+        recover_initial_total_variance(0.0, 0.0, 0.0, LagClock::EventTime),
+        Ok(0.0)
+    );
+    assert_eq!(
+        recover_initial_total_variance(1e200, 1.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_total_variance(f64::NAN, 0.8, 1.6, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, f64::INFINITY, 1.6, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn initial_total_variance_clock_path_is_runtime_opaque() {
+    let clocks = [
+        LagClock::SystemTime,
+        LagClock::DocumentTime,
+        LagClock::AssertionTime,
+    ];
+    let non_event_index = std::process::id() as usize % clocks.len();
+    let non_event = clocks[non_event_index];
+    assert_eq!(
+        recover_initial_total_variance(0.5, 0.8, 1.6, non_event),
         Err(PsychometricError::EventTimeRequired)
     );
 }

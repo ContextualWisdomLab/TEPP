@@ -6795,6 +6795,135 @@ pub fn recover_irregular_centered_residual_log_rate(
     require_finite(sum / count)
 }
 
+/// Exact scalar 2017-era `T0TOTALVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12 `TRAITVAR` /
+/// `T0VAR`; §7.1, pp. 18–19; p. 16; 2017-era ctsem
+/// `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-30T18:50Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// print first-occasion matrices. The 2017-era `summary.ctsemFit.R`
+/// (ctsem 2.5.0, lines 322–339) comments
+/// `T0TRAITVAR <- T0TRAITEFFECT %*% TRAITVAR %*% t(T0TRAITEFFECT)`
+/// with `#is this valid?`, then
+/// `T0TOTALVAR <- T0TRAITVAR + T0VAR`. The scalar analog extra is
+/// `t0_trait² · trait`. The scalar total is `extra + p_0`. Form the
+/// extra first, then add free first-occasion `T0VAR`. This crate
+/// does not currently export `recover_initial_trait_variance`; form
+/// the quadratic directly. A zero extra or zero `p_0` is kept. A
+/// zero extra and a zero `p_0` is exactly zero. `trait < 0` or
+/// `p_0 < 0` fails closed. `T0` is an event-time occasion, so a
+/// non-event clock fails closed. Free `T0TRAITEFFECT` and free
+/// `T0VAR` do not require stable `a < 0`. `t0_trait² · trait` is
+/// `T0TRAITVAR` and equals this total when `p_0 = 0` and remains a
+/// distinct named quantity. Free `p_0` is `T0VAR` and equals this
+/// total when the extra is 0 and remains a distinct named quantity.
+/// `TRAITVAR` equals this total when `T0TRAITEFFECT = I` and
+/// `p_0 = 0` and remains a distinct named quantity. `t0_b² v` is
+/// `addedT0TIPREDVAR` and is not this total. This is not a Kalman
+/// filter, not a matrix `expm`, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock and [`PsychometricError::InvalidNumericInput`]
+/// when an input is non-finite, the trait variance is negative, the
+/// first-occasion variance is negative, or a product or sum
+/// overflows.
+pub fn recover_initial_total_variance(
+    initial_trait_effect: f64,
+    trait_variance: f64,
+    initial_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !initial_trait_effect.is_finite()
+        || !trait_variance.is_finite()
+        || !initial_variance.is_finite()
+        || trait_variance < 0.0
+        || initial_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let squared = require_finite(initial_trait_effect * initial_trait_effect)?;
+    let extra = require_finite(squared * trait_variance)?;
+    require_finite(extra + initial_variance)
+}
+
+/// Refuse treating 2017-era `T0TOTALVAR` as 2017-era `T0TRAITVAR`.
+///
+/// `t0_trait² · trait + p_0` includes free first-occasion `T0VAR`.
+/// `T0TRAITVAR` is the trait extra alone. Equal numbers when
+/// `p_0 = 0` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalVarianceIsNotInitialTraitVariance`].
+pub fn refuse_initial_total_variance_as_initial_trait_variance(
+    initial_total_variance: f64,
+    initial_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_total_variance, initial_trait_variance);
+    Err(PsychometricError::InitialTotalVarianceIsNotInitialTraitVariance)
+}
+
+/// Refuse treating 2017-era `T0TOTALVAR` as free first-occasion `T0VAR`.
+///
+/// `t0_trait² · trait + p_0` includes first-occasion trait extra.
+/// Free `T0VAR` is `p_0` alone. Equal numbers when the extra is 0
+/// are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalVarianceIsNotInitialLatentVariance`].
+pub fn refuse_initial_total_variance_as_initial_latent_variance(
+    initial_total_variance: f64,
+    initial_latent_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_total_variance, initial_latent_variance);
+    Err(PsychometricError::InitialTotalVarianceIsNotInitialLatentVariance)
+}
+
+/// Refuse treating 2017-era `T0TOTALVAR` as Table 2 `TRAITVAR`.
+///
+/// Stationary `T0TRAITEFFECT = I` with `p_0 = 0` makes the total
+/// equal `TRAITVAR` numerically. Those remain distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalVarianceIsNotTraitVariance`].
+pub fn refuse_initial_total_variance_as_trait_variance(
+    initial_total_variance: f64,
+    trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_total_variance, trait_variance);
+    Err(PsychometricError::InitialTotalVarianceIsNotTraitVariance)
+}
+
+/// Refuse treating 2017-era `T0TOTALVAR` as 2017-era `addedT0TIPREDVAR`.
+///
+/// `t0_b² v` is extra first-occasion TI variance. `T0TOTALVAR` is
+/// first-occasion trait extra plus free `T0VAR`. This crate does
+/// not currently export `addedT0TIPREDVAR`; the refuse still names
+/// that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalVarianceIsNotInitialTimeIndependentVariance`].
+pub fn refuse_initial_total_variance_as_initial_time_independent_variance(
+    initial_total_variance: f64,
+    initial_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_total_variance, initial_predictor_variance);
+    Err(PsychometricError::InitialTotalVarianceIsNotInitialTimeIndependentVariance)
+}
+
 /// Least-squares scalar log-rate for already-formed residual pairs.
 ///
 /// Pair-wise logs initialize Newton. This helper is crate-visible so overflow
@@ -6880,7 +7009,7 @@ mod tests {
         recover_initial_time_dependent_predictor_carry,
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_predictor_carry,
-        recover_initial_time_independent_predictor_effect,
+        recover_initial_time_independent_predictor_effect, recover_initial_total_variance,
         recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
         recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
@@ -6960,6 +7089,10 @@ mod tests {
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_initial_time_independent_variance_as_standardised_trait_variance,
+        refuse_initial_total_variance_as_initial_latent_variance,
+        refuse_initial_total_variance_as_initial_time_independent_variance,
+        refuse_initial_total_variance_as_initial_trait_variance,
+        refuse_initial_total_variance_as_trait_variance,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
         refuse_level_change_extra_process_as_impulse,
@@ -16350,6 +16483,110 @@ mod tests {
                 -1.0,
                 LagClock::EventTime
             ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn initial_total_variance_recovers_driver_2017_era_t0_total_var() {
+        // Driver et al. (2017, Table 2 TRAITVAR / T0VAR; §7.1;
+        // 2017-era summary.ctsemFit.R 322–339; JSS PDF re-opened
+        // 2026-08-30T18:50Z): form extra = t0_trait² · trait, then
+        // extra + p_0. This crate does not currently export
+        // recover_initial_trait_variance; form the quadratic
+        // directly. A zero extra or zero p_0 is kept.
+        let effect = 0.5_f64;
+        let trait_variance = 0.8_f64;
+        let initial_variance = 1.6_f64;
+        let recovered = recover_initial_total_variance(
+            effect,
+            trait_variance,
+            initial_variance,
+            LagClock::EventTime,
+        )
+        .expect("T0TOTALVAR");
+        let extra = effect * effect * trait_variance;
+        let expected = extra + initial_variance;
+        assert!((recovered - expected).abs() < 1e-15);
+        let doubled =
+            recover_initial_total_variance(effect, 1.6, initial_variance, LagClock::EventTime)
+                .expect("doubled-trait");
+        assert!((doubled - (2.0 * extra + initial_variance)).abs() < 1e-15);
+        let signed = recover_initial_total_variance(
+            -effect,
+            trait_variance,
+            initial_variance,
+            LagClock::EventTime,
+        )
+        .expect("signed");
+        assert!((signed - expected).abs() < 1e-15);
+        let zero_extra = recover_initial_total_variance(
+            0.0,
+            trait_variance,
+            initial_variance,
+            LagClock::EventTime,
+        )
+        .expect("zero extra");
+        assert!((zero_extra - initial_variance).abs() < 1e-15);
+        let zero_p0 =
+            recover_initial_total_variance(effect, trait_variance, 0.0, LagClock::EventTime)
+                .expect("zero p0");
+        assert!((zero_p0 - extra).abs() < 1e-15);
+        let both_zero =
+            recover_initial_total_variance(0.0, 0.0, 0.0, LagClock::EventTime).expect("0+0");
+        assert_eq!(both_zero.to_bits(), 0.0_f64.to_bits());
+        let stationary_zero_p0 =
+            recover_initial_total_variance(1.0, trait_variance, 0.0, LagClock::EventTime)
+                .expect("I, p0=0");
+        assert!((stationary_zero_p0 - trait_variance).abs() < 1e-15);
+        let added_t0 = 0.3_f64 * 0.3_f64 * 4.0_f64;
+        assert_eq!(
+            refuse_initial_total_variance_as_initial_trait_variance(zero_p0, extra),
+            Err(PsychometricError::InitialTotalVarianceIsNotInitialTraitVariance)
+        );
+        assert_eq!(
+            refuse_initial_total_variance_as_initial_latent_variance(zero_extra, initial_variance),
+            Err(PsychometricError::InitialTotalVarianceIsNotInitialLatentVariance)
+        );
+        assert_eq!(
+            refuse_initial_total_variance_as_trait_variance(stationary_zero_p0, trait_variance),
+            Err(PsychometricError::InitialTotalVarianceIsNotTraitVariance)
+        );
+        assert_eq!(
+            refuse_initial_total_variance_as_initial_time_independent_variance(recovered, added_t0),
+            Err(PsychometricError::InitialTotalVarianceIsNotInitialTimeIndependentVariance)
+        );
+    }
+
+    #[test]
+    fn initial_total_variance_fails_closed_when_operands_are_defined() {
+        let effect = 0.5_f64;
+        assert_eq!(
+            recover_initial_total_variance(effect, 0.8, 1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_total_variance(effect, -1.0, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_variance(effect, 0.8, -1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_variance(1e200, 1.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_variance(f64::NAN, 0.8, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_variance(effect, f64::INFINITY, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_variance(effect, 0.8, f64::INFINITY, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
