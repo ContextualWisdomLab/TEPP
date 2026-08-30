@@ -544,6 +544,33 @@ pub enum PsychometricError {
     /// intercept using residual `MANIFESTVAR`, not total observed
     /// variance.
     ObservedScaledManifestMeanIsNotStandardisedManifestMean,
+    /// Driver p. 16 `LAMBDAstd` was requested without a strictly
+    /// positive `asymDIFFUSION`. Footnote 4 standardises using only
+    /// the relevant variance; zero `q` has no positive process SD.
+    StandardisedLoadingRequiresPositiveStationaryVariance,
+    /// Driver p. 16 `LAMBDAstd` was requested with a non-positive
+    /// residual `MANIFESTVAR`. Footnote 4 standardises using only the
+    /// relevant variance; zero `θ` has no positive measurement SD.
+    StandardisedLoadingRequiresPositiveManifestVariance,
+    /// Driver Table 2 unstandardised `LAMBDA` `λ` was treated as
+    /// `LAMBDAstd`. Unstandardised loading is defined for a zero
+    /// process and for a zero residual; standardised `LAMBDA` is not.
+    UnstandardisedLoadingIsNotStandardisedLoading,
+    /// Driver p. 16 `MANIFESTMEANSstd` `τ / √θ` was treated as
+    /// `LAMBDAstd`. Equal numbers when `λ √p = τ` are still
+    /// distinct named quantities. `MANIFESTMEANSstd` is the
+    /// measurement intercept; `LAMBDAstd` is the loading.
+    StandardisedManifestMeanIsNotStandardisedLoading,
+    /// Driver Eq. 5 `λ √p / √(λ² p + θ)` was treated as
+    /// `LAMBDAstd`. Footnote 4 standardises using the relevant
+    /// variances of the latent and of residual `MANIFESTVAR`, not
+    /// total observed `Var(y)`.
+    ObservedScaledLoadingIsNotStandardisedLoading,
+    /// `λ √(trait + p + added) / √θ` was treated as `LAMBDAstd`.
+    /// Footnote 4 uses only `asymDIFFUSION` for the affecting
+    /// latent, not total variance. `TRAITVAR` is not the
+    /// standardisation variance.
+    TraitScaledLoadingIsNotStandardisedLoading,
     /// Driver p. 16 `T0MEANSstd` was requested with a
     /// non-positive first-occasion variance. Footnote 4
     /// standardisation of the 2017-era `T0MEANS` vector
@@ -1131,6 +1158,24 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedScaledManifestMeanIsNotStandardisedManifestMean => {
                 "observed scaled manifest mean is not standardised manifest mean"
+            }
+            Self::StandardisedLoadingRequiresPositiveStationaryVariance => {
+                "standardised loading requires strictly positive stationary within-subject variance"
+            }
+            Self::StandardisedLoadingRequiresPositiveManifestVariance => {
+                "standardised loading requires strictly positive measurement error"
+            }
+            Self::UnstandardisedLoadingIsNotStandardisedLoading => {
+                "unstandardised loading is not standardised loading"
+            }
+            Self::StandardisedManifestMeanIsNotStandardisedLoading => {
+                "standardised manifest mean is not standardised loading"
+            }
+            Self::ObservedScaledLoadingIsNotStandardisedLoading => {
+                "observed scaled loading is not standardised loading"
+            }
+            Self::TraitScaledLoadingIsNotStandardisedLoading => {
+                "trait-scaled loading is not standardised loading"
             }
             Self::StandardisedInitialLatentMeanRequiresPositiveInitialLatentVariance => {
                 "standardised initial latent mean requires strictly positive initial latent variance"
@@ -1899,6 +1944,34 @@ mod tests {
         assert_eq!(
             PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean.to_string(),
             "observed scaled manifest mean is not standardised manifest mean"
+        );
+    }
+
+    #[test]
+    fn standardised_loading_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedLoadingRequiresPositiveStationaryVariance.to_string(),
+            "standardised loading requires strictly positive stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedLoadingRequiresPositiveManifestVariance.to_string(),
+            "standardised loading requires strictly positive measurement error"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedLoadingIsNotStandardisedLoading.to_string(),
+            "unstandardised loading is not standardised loading"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedManifestMeanIsNotStandardisedLoading.to_string(),
+            "standardised manifest mean is not standardised loading"
+        );
+        assert_eq!(
+            PsychometricError::ObservedScaledLoadingIsNotStandardisedLoading.to_string(),
+            "observed scaled loading is not standardised loading"
+        );
+        assert_eq!(
+            PsychometricError::TraitScaledLoadingIsNotStandardisedLoading.to_string(),
+            "trait-scaled loading is not standardised loading"
         );
     }
 
