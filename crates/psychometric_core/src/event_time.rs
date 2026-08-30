@@ -6787,6 +6787,21 @@ pub fn center_within_cluster_event_lags(
     Ok(pairs)
 }
 
+/// Incremental mean that stays finite when the raw sum of finite values overflows.
+///
+/// Form `mean * (n − 1) / n + value / n` so two rates near `1.45e308` keep a
+/// representable pairwise mean. Mixed signs scale each term by `1 / n` before
+/// adding, so `MAX + (−MAX)` is not formed. Caller supplies finite values.
+pub(crate) fn overflow_safe_running_mean(mean: f64, count: f64, value: f64) -> (f64, f64) {
+    let next_count = count + 1.0;
+    if count <= 0.0 {
+        (value, next_count)
+    } else {
+        let inv = 1.0 / next_count;
+        (mean.mul_add(1.0 - inv, value * inv), next_count)
+    }
+}
+
 /// Pairwise-mean exact log-rate after CWC on irregular event intervals.
 ///
 /// This is [`center_within_cluster_event_lags`] then the pairwise mean of
@@ -6796,8 +6811,10 @@ pub fn center_within_cluster_event_lags(
 /// `ln(|later| / |earlier|) / Δt` so near-equal large residuals do not
 /// collapse to zero. When that ratio overflows or underflows the rate is
 /// `(ln|later| − ln|earlier|) / Δt`, which stays finite. Opposite-sign and
-/// zero residuals have no real logarithm and are skipped. CWC residuals of
-/// a connected series sum to zero; consecutive pairs need not all have
+/// zero residuals have no real logarithm and are skipped. The pairwise mean
+/// is formed incrementally as `mean · (n − 1) / n + rate / n` so two finite
+/// rates whose raw sum overflows still keep a representable mean; mixed
+/// signs scale each term before adding. CWC residuals of a connected series sum to zero; consecutive pairs need not all have
 /// opposite signs. An empty admissible set fails closed. It is **not** the
 /// Newton least-squares fit used by
 /// [`recover_within_residual_event_time_log_rate`]. The already-centered
@@ -6812,29 +6829,30 @@ pub fn center_within_cluster_event_lags(
 /// A non-finite log-rate after the stable logarithm (tiny `Δt` with a
 /// huge log-ratio) is [`PsychometricError::InvalidNumericInput`]. An empty
 /// admissible list after skipping zero and opposite-sign pairs is
-/// [`PsychometricError::InvalidNumericInput`].
+/// [`PsychometricError::InvalidNumericInput`]. Two finite rates whose raw
+/// sum overflows still recover the representable pairwise mean.
 pub fn recover_within_cluster_irregular_residual_log_rate(
     rows: &[ClusteredEventScore],
     clock: LagClock,
 ) -> Result<f64, PsychometricError> {
     let lagged = center_within_cluster_event_lags(rows, clock)?;
-    let mut sum = 0.0_f64;
+    let mut mean = 0.0_f64;
     let mut count = 0.0_f64;
     for pair in lagged {
         if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
             continue;
         }
-        sum += voelkle_same_sign_log_rate(
+        let rate = voelkle_same_sign_log_rate(
             pair.earlier_residual,
             pair.later_residual,
             pair.event_delta,
         )?;
-        count += 1.0;
+        (mean, count) = overflow_safe_running_mean(mean, count, rate);
     }
     if count <= 0.0 {
         return Err(PsychometricError::InvalidNumericInput);
     }
-    require_finite(sum / count)
+    require_finite(mean)
 }
 
 /// Nonzero residuals of equal sign admit a real Voelkle Eq. 7 logarithm.
@@ -6986,7 +7004,8 @@ mod tests {
     use super::{
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
         center_within_cluster_event_lags, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
+        map_discrete_lag_across_event_intervals, overflow_safe_running_mean,
+        recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -8618,6 +8637,88 @@ mod tests {
         assert!(!(underflow_ratio.is_finite() && underflow_ratio > 0.0));
         let underflow_logs = (1e-300_f64).ln() - (1e300_f64).ln();
         assert_eq!(underflow_rate.to_bits(), underflow_logs.to_bits());
+    }
+
+    #[test]
+    fn overflow_safe_running_mean_keeps_finite_pairwise_mean() {
+        let large = 1.45e308_f64;
+        assert!(
+            !(large + large).is_finite(),
+            "raw sum of two large finite rates must overflow"
+        );
+        let (first, n1) = overflow_safe_running_mean(0.0, 0.0, large);
+        assert_eq!(first.to_bits(), large.to_bits());
+        assert_eq!(n1.to_bits(), 1.0_f64.to_bits());
+        let (same_sign, n2) = overflow_safe_running_mean(first, n1, large);
+        assert!(same_sign.is_finite());
+        assert!((same_sign - large).abs() < 1.0);
+        assert_eq!(n2.to_bits(), 2.0_f64.to_bits());
+        let mixed_delta = (-large) - large;
+        assert!(
+            !mixed_delta.is_finite(),
+            "naive Welford (x − mean) of mixed large rates overflows"
+        );
+        let (mixed, n_mixed) = overflow_safe_running_mean(first, n1, -large);
+        assert!(mixed.abs() < 1.0);
+        assert_eq!(n_mixed.to_bits(), 2.0_f64.to_bits());
+    }
+
+    fn overflowing_cwc_rate_rows(cluster_key: u64, growing: bool) -> [ClusteredEventScore; 3] {
+        let delta = 1e-305_f64;
+        let (first, second) = if growing {
+            (f64::from_bits(1), f64::MAX)
+        } else {
+            (f64::MAX, f64::from_bits(1))
+        };
+        [
+            clustered(cluster_key, 0.0, first),
+            clustered(cluster_key, delta, second),
+            clustered(cluster_key, 2.0 * delta, -f64::MAX),
+        ]
+    }
+
+    #[test]
+    fn cwc_pairwise_keeps_overflowed_rate_sum_via_incremental_mean() {
+        let mut rows = overflowing_cwc_rate_rows(1, true).to_vec();
+        rows.extend(overflowing_cwc_rate_rows(2, true));
+        let recovered =
+            recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
+                .expect("incremental mean of overflowed rate sum");
+        assert!(recovered.is_finite());
+        let extracted =
+            center_within_cluster_event_lags(&rows, LagClock::EventTime).expect("extract");
+        let mut rates = Vec::new();
+        for pair in extracted {
+            if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
+                continue;
+            }
+            rates.push(
+                voelkle_same_sign_log_rate(
+                    pair.earlier_residual,
+                    pair.later_residual,
+                    pair.event_delta,
+                )
+                .expect("pair rate"),
+            );
+        }
+        assert_eq!(rates.len(), 2);
+        assert!(
+            !(rates[0] + rates[1]).is_finite(),
+            "two finite CWC rates must overflow a raw sum"
+        );
+        let expected = overflow_safe_running_mean(
+            overflow_safe_running_mean(0.0, 0.0, rates[0]).0,
+            1.0,
+            rates[1],
+        )
+        .0;
+        assert!((recovered - expected).abs() <= expected.abs() * 1e-15);
+        let mut mixed = overflowing_cwc_rate_rows(1, true).to_vec();
+        mixed.extend(overflowing_cwc_rate_rows(2, false));
+        let mixed_mean =
+            recover_within_cluster_irregular_residual_log_rate(&mixed, LagClock::EventTime)
+                .expect("mixed-sign incremental mean");
+        assert!(mixed_mean.abs() < recovered.abs() * 1e-12);
     }
 
     #[test]

@@ -747,6 +747,70 @@ fn irregular_centered_residuals_recover_known_drift_better_than_cwc_of_raw_ar() 
 }
 
 #[test]
+fn cwc_pairwise_mean_keeps_overflowed_finite_rate_sum() {
+    let delta = 1e-305_f64;
+    let rows = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: f64::from_bits(1),
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: delta,
+            score: f64::MAX,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 2.0 * delta,
+            score: -f64::MAX,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: f64::from_bits(1),
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: delta,
+            score: f64::MAX,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 2.0 * delta,
+            score: -f64::MAX,
+        },
+    ];
+    let recovered = recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
+        .expect("incremental mean of two overflowed CWC rates");
+    assert!(recovered.is_finite() && recovered > 1e308);
+    let mixed = [
+        rows[0],
+        rows[1],
+        rows[2],
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: f64::MAX,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: delta,
+            score: f64::from_bits(1),
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 2.0 * delta,
+            score: -f64::MAX,
+        },
+    ];
+    let mixed_mean =
+        recover_within_cluster_irregular_residual_log_rate(&mixed, LagClock::EventTime)
+            .expect("mixed-sign incremental mean");
+    assert!(mixed_mean.abs() < recovered.abs() * 1e-12);
+}
+
+#[test]
 fn discrete_latent_variance_recovers_driver_equations_three_and_four() {
     let prior = 2.0_f64;
     let diffusion = 0.4_f64;

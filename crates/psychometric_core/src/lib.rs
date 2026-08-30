@@ -13,7 +13,9 @@
 //! already-centered irregular residuals without re-centering, extracts CWC
 //! lagged within residuals and a pairwise-mean log-rate after that CWC
 //! (same-sign without dividing; Voelkle Eq. 7 as
-//! `(ln|later| − ln|earlier|) / Δt` so a finite overflowed ratio is kept;
+//! `ln(|later| / |earlier|) / Δt` when that ratio is finite, else
+//! `(ln|later| − ln|earlier|) / Δt`; the pairwise mean is incremental so
+//! two finite rates whose raw sum overflows stay representable;
 //! not Newton LS, not raw-process AR drift), remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
 //! exact scalar discrete effect of a constant predictor, recovers the
