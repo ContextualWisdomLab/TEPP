@@ -278,10 +278,10 @@ fn person_mean_subtraction_on_raw_ar_is_not_the_lagged_within_effect() {
         .iter()
         .copied()
         .filter(|pair| {
-            pair.earlier_residual != 0.0 && {
-                let discrete_lag = pair.later_residual / pair.earlier_residual;
-                discrete_lag.is_finite() && discrete_lag > 0.0
-            }
+            pair.earlier_residual != 0.0
+                && pair.later_residual != 0.0
+                && pair.earlier_residual.is_sign_positive()
+                    == pair.later_residual.is_sign_positive()
         })
         .collect();
     let from_pairs = recover_irregular_centered_residual_log_rate(&admissible, LagClock::EventTime)

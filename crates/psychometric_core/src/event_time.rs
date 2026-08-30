@@ -6789,39 +6789,69 @@ pub fn center_within_cluster_event_lags(
 
 /// Pairwise-mean exact log-rate after CWC on irregular event intervals.
 ///
-/// This is [`center_within_cluster_event_lags`] then
-/// [`recover_irregular_centered_residual_log_rate`] on the pairs whose
-/// residual ratio is strictly positive. Each admitted pair uses
-/// `a = ln(later / earlier) / Δt` (Voelkle et al., 2012, Eq. 7). A
-/// consecutive CWC pair that crosses or hits zero has no real logarithm
-/// and is skipped (CWC residuals of a connected series straddle zero).
-/// It is **not** the Newton least-squares fit used by
-/// [`recover_within_residual_event_time_log_rate`]. It is not DSEM and
-/// does not recover raw-process drift from CWC of a raw AR path
-/// (Curran & Bauer, 2011, pp. 607–608).
+/// This is [`center_within_cluster_event_lags`] then the pairwise mean of
+/// Voelkle et al. (2012, Eq. 7) on the pairs whose residuals are nonzero
+/// and the same sign. Admissibility does **not** divide the residuals:
+/// a finite same-sign pair whose ratio overflows or underflows still
+/// contributes `a = (ln|later| − ln|earlier|) / Δt`. That identity equals
+/// `ln(later / earlier) / Δt` whenever the ratio is finite and positive.
+/// Opposite-sign and zero residuals have no real logarithm and are skipped
+/// (CWC residuals of a connected series straddle zero). It is **not** the
+/// Newton least-squares fit used by
+/// [`recover_within_residual_event_time_log_rate`]. The already-centered
+/// helper [`recover_irregular_centered_residual_log_rate`] still uses
+/// `later / earlier` and fails closed on a non-finite ratio; it is not
+/// this pairwise mean. This is not DSEM and does not recover raw-process
+/// drift from CWC of a raw AR path (Curran & Bauer, 2011, pp. 607–608).
 ///
 /// # Errors
 ///
-/// Propagates centering errors from [`center_within_cluster_event_lags`]
-/// and scalar-map errors from
-/// [`recover_irregular_centered_residual_log_rate`]. An empty admissible
-/// list after skipping non-positive residual ratios is
+/// Propagates centering errors from [`center_within_cluster_event_lags`].
+/// A non-finite log-rate after the stable logarithm (tiny `Δt` with a
+/// huge log-ratio) is [`PsychometricError::InvalidNumericInput`]. An empty
+/// admissible list after skipping zero and opposite-sign pairs is
 /// [`PsychometricError::InvalidNumericInput`].
 pub fn recover_within_cluster_irregular_residual_log_rate(
     rows: &[ClusteredEventScore],
     clock: LagClock,
 ) -> Result<f64, PsychometricError> {
     let lagged = center_within_cluster_event_lags(rows, clock)?;
-    let admissible: Vec<LaggedWithinResidual> = lagged
-        .into_iter()
-        .filter(|pair| {
-            pair.earlier_residual != 0.0 && {
-                let discrete_lag = pair.later_residual / pair.earlier_residual;
-                discrete_lag.is_finite() && discrete_lag > 0.0
-            }
-        })
-        .collect();
-    recover_irregular_centered_residual_log_rate(&admissible, clock)
+    let mut sum = 0.0_f64;
+    let mut count = 0.0_f64;
+    for pair in lagged {
+        if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
+            continue;
+        }
+        sum += voelkle_same_sign_log_rate(
+            pair.earlier_residual,
+            pair.later_residual,
+            pair.event_delta,
+        )?;
+        count += 1.0;
+    }
+    if count <= 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    require_finite(sum / count)
+}
+
+/// Nonzero residuals of equal sign admit a real Voelkle Eq. 7 logarithm.
+pub(crate) fn same_sign_nonzero(earlier: f64, later: f64) -> bool {
+    earlier != 0.0 && later != 0.0 && earlier.is_sign_positive() == later.is_sign_positive()
+}
+
+/// Voelkle et al. (2012, Eq. 7) `a = (ln|later| − ln|earlier|) / Δt`.
+///
+/// Caller already established same-sign nonzero residuals and a strictly
+/// positive finite event interval. The absolute-log form stays finite when
+/// `later / earlier` overflows or underflows.
+pub(crate) fn voelkle_same_sign_log_rate(
+    earlier: f64,
+    later: f64,
+    event_delta: f64,
+) -> Result<f64, PsychometricError> {
+    let log_ratio = later.abs().ln() - earlier.abs().ln();
+    require_finite(log_ratio / event_delta)
 }
 
 /// Refuse treating a CWC residual log-rate as raw-process AR drift.
@@ -7137,6 +7167,7 @@ mod tests {
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+        same_sign_nonzero, voelkle_same_sign_log_rate,
     };
     use crate::error::PsychometricError;
 
@@ -8405,12 +8436,7 @@ mod tests {
         let admissible: Vec<LaggedWithinResidual> = extracted
             .iter()
             .copied()
-            .filter(|pair| {
-                pair.earlier_residual != 0.0 && {
-                    let discrete_lag = pair.later_residual / pair.earlier_residual;
-                    discrete_lag.is_finite() && discrete_lag > 0.0
-                }
-            })
+            .filter(|pair| same_sign_nonzero(pair.earlier_residual, pair.later_residual))
             .collect();
         let composed =
             recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
@@ -8436,25 +8462,176 @@ mod tests {
     }
 
     #[test]
-    fn cwc_pairwise_skips_overflowed_ratio_and_keeps_admissible_pairs() {
+    fn same_sign_nonzero_rejects_zero_and_opposite_signs() {
+        assert!(!same_sign_nonzero(0.0, 1.0));
+        assert!(!same_sign_nonzero(1.0, 0.0));
+        assert!(!same_sign_nonzero(-1.0, 2.0));
+        assert!(same_sign_nonzero(1e-160, 1e160));
+        assert!(same_sign_nonzero(-0.4, -1.2));
+    }
+
+    #[test]
+    fn cwc_pairwise_keeps_overflowed_same_sign_ratio_via_stable_log() {
         let drift = -0.3_f64;
         let mut rows: Vec<ClusteredEventScore> = decaying_clustered_scores(drift)
             .into_iter()
             .filter(|row| row.cluster_key == 2)
             .collect();
         rows.extend([
-            clustered(1, 0.0, f64::from_bits(1)),
-            clustered(1, 1.0, f64::MAX),
-            clustered(1, 2.0, -f64::MAX),
+            clustered(1, 0.0, 1e-160),
+            clustered(1, 1.0, 1e160),
+            clustered(1, 2.0, -1e160),
         ]);
         let recovered =
             recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
-                .expect("skip inf keep others");
-        assert!(recovered.is_finite());
+                .expect("stable log overflow");
+        let extracted =
+            center_within_cluster_event_lags(&rows, LagClock::EventTime).expect("extract");
+        let mut expected_sum = 0.0_f64;
+        let mut expected_count = 0.0_f64;
+        let mut ordinary_sum = 0.0_f64;
+        let mut ordinary_count = 0.0_f64;
+        let mut overflow_pairs = 0_u32;
+        for pair in extracted {
+            if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
+                continue;
+            }
+            let rate = voelkle_same_sign_log_rate(
+                pair.earlier_residual,
+                pair.later_residual,
+                pair.event_delta,
+            )
+            .expect("pair rate");
+            expected_sum += rate;
+            expected_count += 1.0;
+            let ratio = pair.later_residual / pair.earlier_residual;
+            if ratio.is_finite() {
+                ordinary_sum += rate;
+                ordinary_count += 1.0;
+            } else {
+                overflow_pairs += 1;
+            }
+        }
+        assert_eq!(overflow_pairs, 1);
+        assert!(expected_count > ordinary_count);
+        let expected = expected_sum / expected_count;
+        assert!((recovered - expected).abs() < 1e-12);
+        let ordinary_only = ordinary_sum / ordinary_count;
+        assert!(
+            (recovered - ordinary_only).abs() > 1.0,
+            "overflow pair must enter the pairwise mean: recovered {recovered} ordinary {ordinary_only}"
+        );
         assert!(
             (recovered - drift).abs() > 1e-6,
             "Curran & Bauer: mixed CWC pairwise {recovered} must not equal raw-process drift {drift}"
         );
+    }
+
+    #[test]
+    fn cwc_pairwise_keeps_underflowed_same_sign_ratio_via_stable_log() {
+        let drift = -0.3_f64;
+        let mut rows: Vec<ClusteredEventScore> = decaying_clustered_scores(drift)
+            .into_iter()
+            .filter(|row| row.cluster_key == 2)
+            .collect();
+        rows.extend([
+            clustered(1, 0.0, 1e30),
+            clustered(1, 1.0, 1e-300),
+            clustered(1, 2.0, -1e30),
+        ]);
+        let recovered =
+            recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
+                .expect("stable log underflow");
+        let extracted =
+            center_within_cluster_event_lags(&rows, LagClock::EventTime).expect("extract");
+        let mut expected_sum = 0.0_f64;
+        let mut expected_count = 0.0_f64;
+        let mut ordinary_sum = 0.0_f64;
+        let mut ordinary_count = 0.0_f64;
+        let mut underflow_pairs = 0_u32;
+        for pair in extracted {
+            if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
+                continue;
+            }
+            let rate = voelkle_same_sign_log_rate(
+                pair.earlier_residual,
+                pair.later_residual,
+                pair.event_delta,
+            )
+            .expect("pair rate");
+            expected_sum += rate;
+            expected_count += 1.0;
+            let ratio = pair.later_residual / pair.earlier_residual;
+            if ratio.is_finite() && ratio > 0.0 {
+                ordinary_sum += rate;
+                ordinary_count += 1.0;
+            } else {
+                underflow_pairs += 1;
+            }
+        }
+        assert_eq!(underflow_pairs, 1);
+        assert!(expected_count > ordinary_count);
+        let expected = expected_sum / expected_count;
+        assert!((recovered - expected).abs() < 1e-12);
+        let ordinary_only = ordinary_sum / ordinary_count;
+        assert!(
+            (recovered - ordinary_only).abs() > 1.0,
+            "underflow pair must enter the pairwise mean: recovered {recovered} ordinary {ordinary_only}"
+        );
+    }
+
+    #[test]
+    fn cwc_pairwise_tiny_interval_with_huge_log_ratio_fails_closed() {
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, 1e-160),
+                    clustered(1, f64::from_bits(1), 1e160),
+                    clustered(1, 1.0, -1e160),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn cwc_pairwise_skips_zero_residuals_and_keeps_same_sign_pairs() {
+        let recovered = recover_within_cluster_irregular_residual_log_rate(
+            &[
+                clustered(1, 0.0, 7.0),
+                clustered(1, 1.0, 5.0),
+                clustered(1, 2.0, 4.0),
+                clustered(1, 3.0, 4.0),
+                clustered(2, 0.0, -1.2),
+                clustered(2, 1.0, -0.4),
+                clustered(2, 2.0, -0.8),
+            ],
+            LagClock::EventTime,
+        )
+        .expect("skip zeros keep same-sign");
+        assert!(recovered.is_finite());
+        let extracted = center_within_cluster_event_lags(
+            &[
+                clustered(1, 0.0, 7.0),
+                clustered(1, 1.0, 5.0),
+                clustered(1, 2.0, 4.0),
+                clustered(1, 3.0, 4.0),
+                clustered(2, 0.0, -1.2),
+                clustered(2, 1.0, -0.4),
+                clustered(2, 2.0, -0.8),
+            ],
+            LagClock::EventTime,
+        )
+        .expect("extract");
+        assert!(extracted.iter().any(|pair| pair.later_residual == 0.0));
+        assert!(extracted.iter().any(|pair| pair.earlier_residual == 0.0));
+        assert!(extracted.iter().any(|pair| same_sign_nonzero(
+            pair.earlier_residual,
+            pair.later_residual
+        ) && !pair.earlier_residual.is_sign_positive()));
     }
 
     #[test]
@@ -8591,20 +8768,21 @@ mod tests {
             ),
             Err(PsychometricError::InvalidNumericInput)
         );
-        assert_eq!(
-            recover_within_cluster_irregular_residual_log_rate(
-                &[
-                    clustered(1, 0.0, f64::from_bits(1)),
-                    clustered(1, 1.0, f64::MAX),
-                    clustered(1, 2.0, -f64::MAX),
-                    clustered(2, 0.0, f64::from_bits(1)),
-                    clustered(2, 1.0, f64::MAX),
-                    clustered(2, 2.0, -f64::MAX),
-                ],
-                LagClock::EventTime
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
+        let overflowed_both_clusters = recover_within_cluster_irregular_residual_log_rate(
+            &[
+                clustered(1, 0.0, f64::from_bits(1)),
+                clustered(1, 1.0, f64::MAX),
+                clustered(1, 2.0, -f64::MAX),
+                clustered(2, 0.0, f64::from_bits(1)),
+                clustered(2, 1.0, f64::MAX),
+                clustered(2, 2.0, -f64::MAX),
+            ],
+            LagClock::EventTime,
+        )
+        .expect("stable log of overflowed same-sign CWC pairs");
+        let overflow_rate =
+            voelkle_same_sign_log_rate(f64::from_bits(1), f64::MAX, 1.0).expect("tiny/MAX");
+        assert!((overflowed_both_clusters - overflow_rate).abs() < 1e-9);
         assert_eq!(
             center_within_cluster_event_lags(&[clustered(1, 0.0, 1.0)], LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)

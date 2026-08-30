@@ -12,7 +12,9 @@
 //! maps event-time discrete lags through the exact scalar exponential, maps
 //! already-centered irregular residuals without re-centering, extracts CWC
 //! lagged within residuals and a pairwise-mean log-rate after that CWC
-//! (not Newton LS, not raw-process AR drift), remaps discrete
+//! (same-sign without dividing; Voelkle Eq. 7 as
+//! `(ln|later| − ln|earlier|) / Δt` so a finite overflowed ratio is kept;
+//! not Newton LS, not raw-process AR drift), remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
 //! exact scalar discrete effect of a constant predictor, recovers the
 //! first-order discrete effect of a time-varying predictor with matched
@@ -421,7 +423,7 @@ pub use event_time::recover_standardised_manifest_mean;
 pub use event_time::recover_standardised_manifest_trait_variance;
 /// Exact scalar p. 16 `MANIFESTVARstd` `θ/...` after strictly positive `MANIFESTVAR`.
 pub use event_time::recover_standardised_manifest_variance;
-/// Pairwise-mean exact log-rate after CWC (not Newton LS; not DSEM).
+/// Pairwise-mean exact log-rate after CWC (same-sign without dividing; not Newton LS; not DSEM).
 pub use event_time::recover_within_cluster_irregular_residual_log_rate;
 
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
