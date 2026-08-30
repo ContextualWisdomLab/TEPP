@@ -191,7 +191,13 @@
 //! process, not this `DRIFT` drive). The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
-//! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
+//! Eqs. 3–4) is refused. Equation 5 of 2017-era `T0TOTALVAR` after
+//! `addedT0TIPREDVAR` is
+//! `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ` (JSS PDF re-opened
+//! 2026-08-30T20:06Z; form extra then add free `T0VAR`, then form
+//! the TI extra, then add, then `λ² total + θ`;
+//! `t0_trait² · trait + p_0 + t0_b² v` is the latent total, not the
+//! observed total). This is not DSEM and not a matrix `expm`.
 
 use std::collections::BTreeMap;
 
@@ -6795,6 +6801,218 @@ pub fn recover_irregular_centered_residual_log_rate(
     require_finite(sum / count)
 }
 
+/// Exact scalar Eq. 5 of 2017-era `T0TOTALVAR` after `addedT0TIPREDVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Table 2, p. 12
+/// `TRAITVAR` / `T0VAR` / `T0TIPREDEFFECT` / `TIPREDVAR` / `LAMBDA` /
+/// `MANIFESTVAR`; Table 3, p. 13; p. 16; 2017-era ctsem
+/// `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-30T20:06Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `y_i(t) = τ + Λ η_i(t) + ε_i(t)` with `ε ~ N(0, Θ)`.
+/// Table 2 names `MANIFESTVAR` `Θ`, not `Var(y)`. The 2017-era
+/// `summary.ctsemFit.R` (ctsem 2.5.0, lines 322–339) comments
+/// `T0TRAITVAR <- T0TRAITEFFECT %*% TRAITVAR %*% t(T0TRAITEFFECT)`
+/// with `#is this valid?`, then
+/// `T0TOTALVAR <- T0TRAITVAR + T0VAR`. Lines 437–442 then form
+/// `addedT0TIPREDVAR <- T0TIPREDEFFECT %*% TIPREDVAR %*% t(T0TIPREDEFFECT)`
+/// and comment `T0TOTALVAR <- addedT0TIPREDVAR + T0TOTALVAR`. The
+/// scalar analog extras are `t0_trait² · trait` and `t0_b² v`. The
+/// scalar total is `extra + p_0 + ti_extra`. Equation 5 of that
+/// total is `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ`. Form the
+/// trait extra first, then add free first-occasion `T0VAR`, then
+/// form the TI extra, then add, then
+/// [`recover_manifest_observed_variance`]. Do not form `λ²` first:
+/// at `λ = 1e308`, `total = 1e-308`, `λ²` overflows and `λ² total`
+/// is non-finite, but `(λ total) λ = 1e308`. This crate does not
+/// currently export `recover_initial_trait_variance`,
+/// `recover_initial_total_variance`,
+/// `recover_initial_time_independent_predictor_variance`, or
+/// `recover_initial_total_observed_variance`; form the quadratics
+/// and the sums inline. A zero extra, a zero `p_0`, a zero TI extra,
+/// or a zero loading is exactly `θ` when the remaining terms are
+/// zero. `trait < 0`, `p_0 < 0`, or `v < 0` fails closed. `T0` is
+/// an event-time occasion, so a non-event clock fails closed. Free
+/// `T0TRAITEFFECT`, free `T0VAR`, and free `T0TIPREDEFFECT` do not
+/// require stable `a < 0`. `t0_trait² · trait + p_0 + t0_b² v` is
+/// the latent total and equals this observed map when `λ = 1` and
+/// `θ = 0` and remains a distinct named quantity.
+/// `total / total = 1` is `T0TOTALVARstd` and is not this map.
+/// `λ² (t0_trait² · trait + p_0) + θ` is Eq. 5 of `T0TOTALVAR`
+/// without the TI extra. `λ² t0_b² v + θ` is Eq. 5 of
+/// `addedT0TIPREDVAR` and omits trait extra and free `T0VAR`.
+/// `MANIFESTVAR` `θ` is measurement error and is not this
+/// composition. Section 4.3 predetermined first-occasion observed
+/// variance `λ²(trait + p_0 + (B / a)² v) + θ + ψ` uses raw
+/// `TRAITVAR`, the asymptotic extra, and `ψ`, and is not this map.
+/// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
+/// not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock and [`PsychometricError::InvalidNumericInput`]
+/// when an input is non-finite, the trait variance is negative, the
+/// first-occasion variance is negative, the predictor variance is
+/// negative, or a product or sum overflows. Propagates
+/// [`recover_manifest_observed_variance`].
+#[allow(clippy::too_many_arguments)]
+pub fn recover_initial_total_observed_variance_with_time_independent_predictor(
+    loading: f64,
+    initial_trait_effect: f64,
+    trait_variance: f64,
+    initial_variance: f64,
+    initial_time_independent_effect: f64,
+    predictor_variance: f64,
+    measurement_error_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !initial_trait_effect.is_finite()
+        || !trait_variance.is_finite()
+        || !initial_variance.is_finite()
+        || !initial_time_independent_effect.is_finite()
+        || !predictor_variance.is_finite()
+        || trait_variance < 0.0
+        || initial_variance < 0.0
+        || predictor_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let extra = if initial_trait_effect == 0.0 || trait_variance == 0.0 {
+        0.0
+    } else {
+        let squared = require_finite(initial_trait_effect * initial_trait_effect)?;
+        require_finite(squared * trait_variance)?
+    };
+    let with_process = require_finite(extra + initial_variance)?;
+    let ti_extra = if initial_time_independent_effect == 0.0 || predictor_variance == 0.0 {
+        0.0
+    } else {
+        let squared =
+            require_finite(initial_time_independent_effect * initial_time_independent_effect)?;
+        require_finite(squared * predictor_variance)?
+    };
+    let total = require_finite(with_process + ti_extra)?;
+    recover_manifest_observed_variance(loading, total, measurement_error_variance)
+}
+
+/// Refuse treating Eq. 5 of 2017-era `T0TOTALVAR` after
+/// `addedT0TIPREDVAR` as the latent total.
+///
+/// `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ` is the observed
+/// composition. `t0_trait² · trait + p_0 + t0_b² v` is the latent
+/// total. Equal numbers when `λ = 1` and `θ = 0` are still distinct
+/// named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotLatentTotal`].
+pub fn refuse_initial_total_observed_variance_with_time_independent_predictor_as_latent_total(
+    initial_total_observed_variance: f64,
+    latent_total: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_total_observed_variance, latent_total);
+    Err(PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotLatentTotal)
+}
+
+/// Refuse treating Eq. 5 of 2017-era `T0TOTALVAR` after
+/// `addedT0TIPREDVAR` as Eq. 5 of `T0TOTALVAR` without the TI extra.
+///
+/// `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ` includes first-occasion
+/// TI extra. `λ² (t0_trait² · trait + p_0) + θ` omits that extra.
+/// Equal numbers when the TI extra is 0 are still distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotInitialTotalObservedVariance`].
+pub fn refuse_initial_total_observed_variance_with_time_independent_predictor_as_initial_total_observed_variance(
+    initial_total_observed_variance: f64,
+    initial_total_observed_variance_without_predictor: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_total_observed_variance,
+        initial_total_observed_variance_without_predictor,
+    );
+    Err(
+        PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotInitialTotalObservedVariance,
+    )
+}
+
+/// Refuse treating Eq. 5 of 2017-era `T0TOTALVAR` after
+/// `addedT0TIPREDVAR` as Eq. 5 of `addedT0TIPREDVAR`.
+///
+/// `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ` includes trait extra
+/// and free `T0VAR`. `λ² t0_b² v + θ` is the TI extra alone. Equal
+/// numbers when the trait extra and `p_0` are 0 are still distinct
+/// named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotAddedTimeIndependentObservedVariance`].
+pub fn refuse_initial_total_observed_variance_with_time_independent_predictor_as_added_time_independent_observed_variance(
+    initial_total_observed_variance: f64,
+    added_time_independent_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_total_observed_variance,
+        added_time_independent_observed_variance,
+    );
+    Err(
+        PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotAddedTimeIndependentObservedVariance,
+    )
+}
+
+/// Refuse treating Eq. 5 of 2017-era `T0TOTALVAR` after
+/// `addedT0TIPREDVAR` as `MANIFESTVAR`.
+///
+/// `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ` is the observed
+/// composition. Table 2 names `MANIFESTVAR` as `Θ`, the variance of
+/// `ε`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotMeasurementError`].
+pub fn refuse_initial_total_observed_variance_with_time_independent_predictor_as_measurement_error(
+    initial_total_observed_variance: f64,
+    measurement_error_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_total_observed_variance, measurement_error_variance);
+    Err(
+        PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotMeasurementError,
+    )
+}
+
+/// Refuse treating Eq. 5 of 2017-era `T0TOTALVAR` after
+/// `addedT0TIPREDVAR` as 2017-era `T0TOTALVARstd`.
+///
+/// `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ` is observed total
+/// variance. `T0TOTALVARstd` is the correlation form
+/// `total / total = 1`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotStandardisedInitialTotalVariance`].
+pub fn refuse_initial_total_observed_variance_with_time_independent_predictor_as_standardised_initial_total_variance(
+    initial_total_observed_variance: f64,
+    standardised_initial_total_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_total_observed_variance,
+        standardised_initial_total_variance,
+    );
+    Err(
+        PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotStandardisedInitialTotalVariance,
+    )
+}
+
 /// Least-squares scalar log-rate for already-formed residual pairs.
 ///
 /// Pair-wise logs initialize Newton. This helper is crate-visible so overflow
@@ -6853,8 +7071,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
+        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
+        recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -6881,6 +7099,7 @@ mod tests {
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_predictor_carry,
         recover_initial_time_independent_predictor_effect,
+        recover_initial_total_observed_variance_with_time_independent_predictor,
         recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
         recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
@@ -6960,6 +7179,11 @@ mod tests {
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_initial_time_independent_variance_as_standardised_trait_variance,
+        refuse_initial_total_observed_variance_with_time_independent_predictor_as_added_time_independent_observed_variance,
+        refuse_initial_total_observed_variance_with_time_independent_predictor_as_initial_total_observed_variance,
+        refuse_initial_total_observed_variance_with_time_independent_predictor_as_latent_total,
+        refuse_initial_total_observed_variance_with_time_independent_predictor_as_measurement_error,
+        refuse_initial_total_observed_variance_with_time_independent_predictor_as_standardised_initial_total_variance,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
         refuse_level_change_extra_process_as_impulse,
@@ -7040,6 +7264,7 @@ mod tests {
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
     };
     use crate::error::PsychometricError;
 
@@ -11147,8 +11372,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -11723,8 +11948,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
         // λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ.
@@ -12300,8 +12525,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of stationary T0VAR is
         // λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ.
@@ -14455,8 +14680,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
+    ) {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -14606,8 +14831,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -15225,8 +15450,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,
@@ -16351,6 +16576,322 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
+    fn initial_total_observed_variance_with_time_independent_predictor_is_eq5_of_t0_total_var_plus_added_t0_tipred(
+    ) {
+        let loading = 2.0_f64;
+        let effect = 0.5_f64;
+        let trait_variance = 0.8_f64;
+        let initial_variance = 1.6_f64;
+        let ti_effect = 0.4_f64;
+        let predictor_variance = 2.5_f64;
+        let measurement_error = 0.1_f64;
+        let extra = effect * effect * trait_variance;
+        let ti_extra = ti_effect * ti_effect * predictor_variance;
+        let total = extra + initial_variance + ti_extra;
+        let recovered = recover_initial_total_observed_variance_with_time_independent_predictor(
+            loading,
+            effect,
+            trait_variance,
+            initial_variance,
+            ti_effect,
+            predictor_variance,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("eq5 T0TOTALVAR + addedT0TIPREDVAR");
+        assert!(
+            (recovered - (loading * loading * total + measurement_error)).abs() < 1e-15,
+            "Driver et al. (2017, Eq. 5 of 2017-era T0TOTALVAR after addedT0TIPREDVAR): λ² (t0_trait² · trait + p_0 + t0_b² v) + θ"
+        );
+        let signed = recover_initial_total_observed_variance_with_time_independent_predictor(
+            loading,
+            -effect,
+            trait_variance,
+            initial_variance,
+            -ti_effect,
+            predictor_variance,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("signed effects");
+        assert_eq!(signed.to_bits(), recovered.to_bits());
+        let doubled = recover_initial_total_observed_variance_with_time_independent_predictor(
+            loading,
+            effect,
+            trait_variance,
+            initial_variance,
+            ti_effect,
+            5.0,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("larger TI extra");
+        assert!(doubled > recovered);
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                0.0,
+                effect,
+                trait_variance,
+                initial_variance,
+                ti_effect,
+                predictor_variance,
+                measurement_error,
+                LagClock::EventTime
+            )
+            .expect("zero loading")
+            .to_bits(),
+            measurement_error.to_bits()
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                0.0,
+                trait_variance,
+                0.0,
+                0.0,
+                predictor_variance,
+                measurement_error,
+                LagClock::EventTime
+            )
+            .expect("zero extras and p_0")
+            .to_bits(),
+            measurement_error.to_bits()
+        );
+        let without_ti = recover_initial_total_observed_variance_with_time_independent_predictor(
+            loading,
+            effect,
+            trait_variance,
+            initial_variance,
+            0.0,
+            predictor_variance,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("zero TI extra");
+        let without_ti_expected = recover_manifest_observed_variance(
+            loading,
+            extra + initial_variance,
+            measurement_error,
+        )
+        .expect("λ² (extra+p_0) + θ");
+        assert_eq!(without_ti.to_bits(), without_ti_expected.to_bits());
+        let ti_only = recover_initial_total_observed_variance_with_time_independent_predictor(
+            loading,
+            0.0,
+            trait_variance,
+            0.0,
+            ti_effect,
+            predictor_variance,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("TI extra only");
+        let ti_only_expected =
+            recover_manifest_observed_variance(loading, ti_extra, measurement_error)
+                .expect("λ² t0_b² v + θ");
+        assert_eq!(ti_only.to_bits(), ti_only_expected.to_bits());
+        let scaled = recover_initial_total_observed_variance_with_time_independent_predictor(
+            1e308,
+            1.0,
+            1e-308,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            LagClock::EventTime,
+        )
+        .expect("scale extra");
+        assert!((scaled - 1e308).abs() / 1e308 < 1e-15);
+        let scaled_ti = recover_initial_total_observed_variance_with_time_independent_predictor(
+            1e308,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            1e-308,
+            0.0,
+            LagClock::EventTime,
+        )
+        .expect("scale TI extra");
+        assert!((scaled_ti - 1e308).abs() / 1e308 < 1e-15);
+        assert!(!(1e308_f64 * 1e308_f64).is_finite());
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                effect,
+                trait_variance,
+                initial_variance,
+                ti_effect,
+                predictor_variance,
+                measurement_error,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                effect,
+                -0.8,
+                initial_variance,
+                ti_effect,
+                predictor_variance,
+                measurement_error,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                effect,
+                trait_variance,
+                -1.6,
+                ti_effect,
+                predictor_variance,
+                measurement_error,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                effect,
+                trait_variance,
+                initial_variance,
+                ti_effect,
+                -2.5,
+                measurement_error,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                1e308,
+                1.0,
+                1.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                1e200,
+                1.0,
+                1.0,
+                0.0,
+                1.0,
+                measurement_error,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                0.0,
+                1.0,
+                1.0,
+                1e200,
+                1.0,
+                measurement_error,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                f64::NAN,
+                trait_variance,
+                initial_variance,
+                ti_effect,
+                predictor_variance,
+                measurement_error,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                effect,
+                trait_variance,
+                initial_variance,
+                f64::INFINITY,
+                predictor_variance,
+                measurement_error,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_total_observed_variance_with_time_independent_predictor(
+                loading,
+                effect,
+                trait_variance,
+                initial_variance,
+                ti_effect,
+                f64::INFINITY,
+                measurement_error,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            refuse_initial_total_observed_variance_with_time_independent_predictor_as_latent_total(
+                recovered, total
+            ),
+            Err(
+                PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotLatentTotal
+            )
+        );
+        assert_eq!(
+            refuse_initial_total_observed_variance_with_time_independent_predictor_as_initial_total_observed_variance(
+                recovered,
+                without_ti_expected
+            ),
+            Err(
+                PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotInitialTotalObservedVariance
+            )
+        );
+        assert_eq!(
+            refuse_initial_total_observed_variance_with_time_independent_predictor_as_added_time_independent_observed_variance(
+                recovered,
+                ti_only_expected
+            ),
+            Err(
+                PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotAddedTimeIndependentObservedVariance
+            )
+        );
+        assert_eq!(
+            refuse_initial_total_observed_variance_with_time_independent_predictor_as_measurement_error(
+                recovered,
+                measurement_error
+            ),
+            Err(
+                PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotMeasurementError
+            )
+        );
+        assert_eq!(
+            refuse_initial_total_observed_variance_with_time_independent_predictor_as_standardised_initial_total_variance(
+                recovered, 1.0
+            ),
+            Err(
+                PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorIsNotStandardisedInitialTotalVariance
+            )
         );
     }
 }
