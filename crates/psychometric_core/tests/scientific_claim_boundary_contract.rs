@@ -23,7 +23,7 @@ use psychometric_core::{
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
-    recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_effect, recover_initial_total_observed_variance,
     recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
     recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
@@ -103,6 +103,11 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
+    refuse_initial_total_observed_variance_as_initial_observed_variance,
+    refuse_initial_total_observed_variance_as_initial_total_variance,
+    refuse_initial_total_observed_variance_as_initial_trait_observed_variance,
+    refuse_initial_total_observed_variance_as_measurement_error,
+    refuse_initial_total_observed_variance_as_standardised_initial_total_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -3779,6 +3784,140 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
+        )
+    );
+}
+
+#[allow(clippy::too_many_lines)]
+#[test]
+fn initial_total_observed_variance_is_not_latent_total_or_measurement_error() {
+    let loading = 2.0_f64;
+    let effect = 0.5_f64;
+    let trait_variance = 0.8_f64;
+    let initial_variance = 1.6_f64;
+    let measurement_error = 0.1_f64;
+    let extra = effect * effect * trait_variance;
+    let total = extra + initial_variance;
+    let recovered = recover_initial_total_observed_variance(
+        loading,
+        effect,
+        trait_variance,
+        initial_variance,
+        measurement_error,
+        LagClock::EventTime,
+    )
+    .expect("eq5 T0TOTALVAR");
+    assert!(
+        (recovered - (loading * loading * total + measurement_error)).abs() < 1e-15,
+        "Driver et al. (2017, Eq. 5 of 2017-era T0TOTALVAR): λ² (t0_trait² · trait + p_0) + θ"
+    );
+    assert!(
+        (total - recovered).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era T0TOTALVAR): extra+p_0 is not λ²(extra+p_0)+θ"
+    );
+    assert!(
+        (1.0 - recovered).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era T0TOTALVARstd): total/total=1 is not observed total"
+    );
+    let process_only =
+        recover_manifest_observed_variance(loading, initial_variance, measurement_error)
+            .expect("λ² p_0 + θ");
+    assert!(
+        (process_only - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of T0VAR): λ² p_0 + θ omits first-occasion trait extra"
+    );
+    assert!(
+        (measurement_error - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Table 2 MANIFESTVAR): θ is not observed total"
+    );
+    let extra_only = recover_manifest_observed_variance(loading, extra, measurement_error)
+        .expect("λ² extra + θ");
+    assert!(
+        (extra_only - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of T0TRAITVAR): λ² extra + θ omits free T0VAR"
+    );
+    assert_eq!(
+        recover_initial_total_observed_variance(
+            loading,
+            effect,
+            trait_variance,
+            initial_variance,
+            measurement_error,
+            LagClock::DocumentTime
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_total_observed_variance(
+            0.0,
+            effect,
+            trait_variance,
+            initial_variance,
+            measurement_error,
+            LagClock::EventTime
+        )
+        .expect("zero loading")
+        .to_bits(),
+        measurement_error.to_bits()
+    );
+    assert_eq!(
+        recover_initial_total_observed_variance(
+            loading,
+            0.0,
+            0.0,
+            0.0,
+            measurement_error,
+            LagClock::EventTime
+        )
+        .expect("zero extra and p_0")
+        .to_bits(),
+        measurement_error.to_bits()
+    );
+    assert_eq!(
+        recover_initial_total_observed_variance(
+            loading,
+            effect,
+            -0.1,
+            initial_variance,
+            measurement_error,
+            LagClock::EventTime
+        ),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        refuse_initial_total_observed_variance_as_initial_total_variance(recovered, total),
+        Err(
+            psychometric_core::PsychometricError::InitialTotalObservedVarianceIsNotInitialTotalVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_total_observed_variance_as_standardised_initial_total_variance(
+            recovered, 1.0
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTotalObservedVarianceIsNotStandardisedInitialTotalVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_total_observed_variance_as_initial_observed_variance(
+            recovered, process_only
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTotalObservedVarianceIsNotInitialObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_total_observed_variance_as_measurement_error(recovered, measurement_error),
+        Err(
+            psychometric_core::PsychometricError::InitialTotalObservedVarianceIsNotMeasurementError
+        )
+    );
+    assert_eq!(
+        refuse_initial_total_observed_variance_as_initial_trait_observed_variance(
+            recovered, extra_only
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTotalObservedVarianceIsNotInitialTraitObservedVariance
         )
     );
 }
