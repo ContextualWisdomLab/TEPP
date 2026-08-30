@@ -715,6 +715,12 @@ pub enum PsychometricError {
     /// pp. 607–608) show that person-mean subtraction on a raw AR
     /// series does not isolate the lagged within-person residual.
     CwcResidualLogRateIsNotRawProcessDrift,
+    /// Grand-mean-centered residual log-rate was treated as the
+    /// within-person lagged effect. Hamaker, Kuiper, and Grasman
+    /// (2015) show that lagged relations from grand-mean deviations
+    /// confound stable between-person differences with within-person
+    /// change.
+    GrandMeanCenteredLogRateIsNotWithinPersonLag,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1242,6 +1248,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::CwcResidualLogRateIsNotRawProcessDrift => {
                 "cluster-mean-centered residual log-rate is not the raw-process autoregressive drift"
+            }
+            Self::GrandMeanCenteredLogRateIsNotWithinPersonLag => {
+                "grand-mean-centered residual log-rate is not the within-person lagged effect"
             }
         };
         formatter.write_str(message)
@@ -2110,6 +2119,14 @@ mod tests {
         assert_eq!(
             PsychometricError::CwcResidualLogRateIsNotRawProcessDrift.to_string(),
             "cluster-mean-centered residual log-rate is not the raw-process autoregressive drift"
+        );
+    }
+
+    #[test]
+    fn grand_mean_centered_log_rate_boundary_message_is_stable() {
+        assert_eq!(
+            PsychometricError::GrandMeanCenteredLogRateIsNotWithinPersonLag.to_string(),
+            "grand-mean-centered residual log-rate is not the within-person lagged effect"
         );
     }
 }

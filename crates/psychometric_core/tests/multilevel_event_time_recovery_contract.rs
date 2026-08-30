@@ -3,9 +3,10 @@
 
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
-    LaggedWithinResidual, PsychometricError, center_within_cluster_event_lags,
-    map_discrete_lag_across_event_intervals, ordinary_least_squares_slope,
-    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
+    LaggedWithinResidual, PsychometricError, center_grand_mean_event_lags,
+    center_within_cluster_event_lags, map_discrete_lag_across_event_intervals,
+    ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
+    recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
@@ -24,7 +25,9 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_initial_time_dependent_predictor_carry,
+    recover_event_time_discrete_lag_and_log_rate,
+    recover_grand_mean_centered_irregular_residual_log_rate,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -79,6 +82,7 @@ use psychometric_core::{
     refuse_extra_process_latent_mean_as_observed_mean,
     refuse_extra_process_observed_mean_as_after_extra_process_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_grand_mean_centered_log_rate_as_within_person_lag,
     refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
@@ -808,6 +812,78 @@ fn cwc_pairwise_mean_keeps_overflowed_finite_rate_sum() {
         recover_within_cluster_irregular_residual_log_rate(&mixed, LagClock::EventTime)
             .expect("mixed-sign incremental mean");
     assert!(mixed_mean.abs() < recovered.abs() * 1e-12);
+}
+
+#[test]
+fn grand_mean_centered_irregular_residuals_do_not_recover_within_person_drift() {
+    let true_drift = -0.35_f64;
+    let pairs = [
+        LaggedWithinResidual {
+            earlier_residual: 1.4,
+            later_residual: 1.4 * (true_drift * 0.4).exp(),
+            event_delta: 0.4,
+        },
+        LaggedWithinResidual {
+            earlier_residual: 0.9,
+            later_residual: 0.9 * (true_drift * 1.6).exp(),
+            event_delta: 1.6,
+        },
+        LaggedWithinResidual {
+            earlier_residual: -0.7,
+            later_residual: -0.7 * (true_drift * 2.2).exp(),
+            event_delta: 2.2,
+        },
+    ];
+    let centered = recover_irregular_centered_residual_log_rate(&pairs, LagClock::EventTime)
+        .expect("centered residual");
+    let centered_error = rmse(&[true_drift], &[centered]);
+    assert!(
+        centered_error < 1e-12,
+        "already-centered irregular RMSE {centered_error}"
+    );
+
+    let mut raw_ar = Vec::new();
+    for (cluster, person_mean, start) in [(1_u64, 7.5_f64, 1.1_f64), (2, -4.0, 0.8)] {
+        for step in 0..6 {
+            let time = f64::from(step);
+            raw_ar.push(ClusteredEventScore {
+                cluster_key: cluster,
+                event_time: time,
+                score: person_mean + start * (true_drift * time).exp(),
+            });
+        }
+    }
+    let cgm = recover_grand_mean_centered_irregular_residual_log_rate(&raw_ar, LagClock::EventTime)
+        .expect("cgm");
+    let cwc = recover_within_cluster_irregular_residual_log_rate(&raw_ar, LagClock::EventTime)
+        .expect("cwc pairwise");
+    let cgm_error = rmse(&[true_drift], &[cgm]);
+    assert!(
+        cgm_error > centered_error,
+        "Hamaker (2015, p. 104): CGM RMSE {cgm_error} must exceed already-centered {centered_error}"
+    );
+    assert!(
+        (cgm - cwc).abs() > 1e-6,
+        "CGM {cgm} is not CWC {cwc} when between-person levels differ"
+    );
+    let extracted = center_grand_mean_event_lags(&raw_ar, LagClock::EventTime).expect("extract");
+    let admissible: Vec<_> = extracted
+        .iter()
+        .copied()
+        .filter(|pair| {
+            pair.earlier_residual != 0.0
+                && pair.later_residual != 0.0
+                && pair.earlier_residual.is_sign_positive()
+                    == pair.later_residual.is_sign_positive()
+        })
+        .collect();
+    let from_pairs = recover_irregular_centered_residual_log_rate(&admissible, LagClock::EventTime)
+        .expect("from pairs");
+    assert!((cgm - from_pairs).abs() < 1e-15);
+    assert_eq!(
+        refuse_grand_mean_centered_log_rate_as_within_person_lag(cgm, true_drift),
+        Err(PsychometricError::GrandMeanCenteredLogRateIsNotWithinPersonLag)
+    );
 }
 
 #[test]
