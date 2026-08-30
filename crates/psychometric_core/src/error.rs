@@ -710,6 +710,36 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+
+    /// Driver p. 16 `TDPREDEFFECTstd` was requested without a
+    /// strictly positive `asymDIFFUSION`. Footnote 4 standardises
+    /// using only the relevant within-subject variance; zero `q`
+    /// has no positive process SD.
+    StandardisedTimeDependentEffectRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 `TDPREDEFFECTstd` was requested without a
+    /// strictly positive time-dependent predictor variance.
+    /// Footnote 4 `m · √v / √p` has no positive affecting SD when
+    /// `v = 0`.
+    StandardisedTimeDependentEffectRequiresPositivePredictorVariance,
+    /// Driver Table 2 unstandardised `TDPREDEFFECT` `M` was treated
+    /// as `TDPREDEFFECTstd`. Unstandardised `M` is defined for a
+    /// zero coefficient and for zero predictor variance;
+    /// standardised `TDPREDEFFECT` is not.
+    UnstandardisedTimeDependentEffectIsNotStandardisedTimeDependentEffect,
+    /// Driver p. 16 `TIPREDEFFECTstd` `B · √v / √p` was treated as
+    /// `TDPREDEFFECTstd`. Equal numbers when `M = B` remain distinct
+    /// named quantities.
+    StandardisedTimeIndependentEffectIsNotStandardisedTimeDependentEffect,
+    /// Finite-interval intercept-style
+    /// `A^{-1}[e^{A Δt} − I] M · √v / √p` was treated as p. 16
+    /// `TDPREDEFFECTstd`. That map depends on `Δt` and is not the
+    /// continuous Dirac coefficient.
+    DiscreteStandardisedTimeDependentEffectIsNotStandardisedTimeDependentEffect,
+    /// `m · √v / √(trait + p + added)` was treated as p. 16
+    /// `TDPREDEFFECTstd`. Footnote 4 uses only `asymDIFFUSION`, not
+    /// total variance. `TRAITVAR` is not the standardisation
+    /// variance.
+    TraitContaminatedTimeDependentEffectIsNotStandardisedTimeDependentEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1264,24 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedTimeDependentEffectRequiresPositiveWithinSubjectVariance => {
+                "standardised time-dependent effect requires strictly positive within-subject variance"
+            }
+            Self::StandardisedTimeDependentEffectRequiresPositivePredictorVariance => {
+                "standardised time-dependent effect requires strictly positive predictor variance"
+            }
+            Self::UnstandardisedTimeDependentEffectIsNotStandardisedTimeDependentEffect => {
+                "unstandardised time-dependent effect is not standardised time-dependent effect"
+            }
+            Self::StandardisedTimeIndependentEffectIsNotStandardisedTimeDependentEffect => {
+                "standardised time-independent effect is not standardised time-dependent effect"
+            }
+            Self::DiscreteStandardisedTimeDependentEffectIsNotStandardisedTimeDependentEffect => {
+                "discrete standardised time-dependent effect is not standardised time-dependent effect"
+            }
+            Self::TraitContaminatedTimeDependentEffectIsNotStandardisedTimeDependentEffect => {
+                "trait-contaminated time-dependent effect is not standardised time-dependent effect"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2119,40 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_time_dependent_effect_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedTimeDependentEffectRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised time-dependent effect requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTimeDependentEffectRequiresPositivePredictorVariance
+                .to_string(),
+            "standardised time-dependent effect requires strictly positive predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedTimeDependentEffectIsNotStandardisedTimeDependentEffect
+                .to_string(),
+            "unstandardised time-dependent effect is not standardised time-dependent effect"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTimeIndependentEffectIsNotStandardisedTimeDependentEffect
+                .to_string(),
+            "standardised time-independent effect is not standardised time-dependent effect"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteStandardisedTimeDependentEffectIsNotStandardisedTimeDependentEffect
+                .to_string(),
+            "discrete standardised time-dependent effect is not standardised time-dependent effect"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedTimeDependentEffectIsNotStandardisedTimeDependentEffect
+                .to_string(),
+            "trait-contaminated time-dependent effect is not standardised time-dependent effect"
         );
     }
 }
