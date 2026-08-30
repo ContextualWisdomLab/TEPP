@@ -710,6 +710,27 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Driver 2017-era `T0TOTALVARstd` was formed without a strictly
+    /// positive first-occasion total `t0_trait² · trait + p_0`.
+    /// Unstandardised `T0TOTALVAR` is defined for a zero total;
+    /// standardised `T0TOTALVAR` is not.
+    StandardisedInitialTotalVarianceRequiresPositiveInitialTotalVariance,
+    /// Driver 2017-era unstandardised `T0TOTALVAR` `t0_trait² · trait + p_0`
+    /// was treated as `T0TOTALVARstd`. Equal numbers when the total
+    /// equals 1 are still distinct named quantities.
+    UnstandardisedInitialTotalVarianceIsNotStandardisedInitialTotalVariance,
+    /// Driver 2017-era `T0TRAITVARstd` `extra / extra = 1` was treated
+    /// as `T0TOTALVARstd`. Equal numbers when both correlations equal
+    /// 1 are still distinct named quantities.
+    StandardisedInitialTraitVarianceIsNotStandardisedInitialTotalVariance,
+    /// Driver p. 16 `T0VARstd` `p_0 / p_0 = 1` was treated as
+    /// 2017-era `T0TOTALVARstd`. Equal numbers when both correlations
+    /// equal 1 are still distinct named quantities.
+    StandardisedInitialLatentVarianceIsNotStandardisedInitialTotalVariance,
+    /// Driver p. 16 `TRAITVARstd` `trait / trait = 1` was treated as
+    /// 2017-era `T0TOTALVARstd`. Equal numbers when both correlations
+    /// equal 1 are still distinct named quantities.
+    StandardisedTraitVarianceIsNotStandardisedInitialTotalVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1255,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedInitialTotalVarianceRequiresPositiveInitialTotalVariance => {
+                "standardised initial total variance requires strictly positive initial total variance"
+            }
+            Self::UnstandardisedInitialTotalVarianceIsNotStandardisedInitialTotalVariance => {
+                "unstandardised initial total variance is not standardised initial total variance"
+            }
+            Self::StandardisedInitialTraitVarianceIsNotStandardisedInitialTotalVariance => {
+                "standardised initial trait variance is not standardised initial total variance"
+            }
+            Self::StandardisedInitialLatentVarianceIsNotStandardisedInitialTotalVariance => {
+                "standardised initial latent variance is not standardised initial total variance"
+            }
+            Self::StandardisedTraitVarianceIsNotStandardisedInitialTotalVariance => {
+                "standardised trait variance is not standardised initial total variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2107,35 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_initial_total_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedInitialTotalVarianceRequiresPositiveInitialTotalVariance
+                .to_string(),
+            "standardised initial total variance requires strictly positive initial total variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedInitialTotalVarianceIsNotStandardisedInitialTotalVariance
+                .to_string(),
+            "unstandardised initial total variance is not standardised initial total variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialTraitVarianceIsNotStandardisedInitialTotalVariance
+                .to_string(),
+            "standardised initial trait variance is not standardised initial total variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedInitialTotalVariance
+                .to_string(),
+            "standardised initial latent variance is not standardised initial total variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTraitVarianceIsNotStandardisedInitialTotalVariance
+                .to_string(),
+            "standardised trait variance is not standardised initial total variance"
         );
     }
 }
