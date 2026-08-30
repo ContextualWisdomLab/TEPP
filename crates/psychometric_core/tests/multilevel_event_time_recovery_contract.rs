@@ -246,6 +246,80 @@ fn kish_weighted_slope_recovers_known_loading() {
 }
 
 #[test]
+fn kish_weighted_cwc_recovers_known_within_between_and_differs_from_unweighted() {
+    use psychometric_core::{
+        recover_kish_weighted_cluster_mean_within_between_slopes, recover_kish_weighted_slope,
+        refuse_kish_effective_sample_size_as_slope,
+        refuse_pooled_kish_slope_as_weighted_within_slope,
+        refuse_unweighted_between_slope_as_kish_weighted_between_slope,
+    };
+    let true_within = 0.5_f64;
+    let mut rows = Vec::new();
+    for &(cluster, mean_x, mean_y, within) in &[
+        (1_u64, 0.0_f64, 0.0_f64, -1.0_f64),
+        (1, 0.0, 0.0, 1.0),
+        (2, 1.0, 0.0, -1.0),
+        (2, 1.0, 0.0, 1.0),
+    ] {
+        rows.push(ClusteredScore {
+            cluster_key: cluster,
+            predictor: mean_x + within,
+            outcome: mean_y + true_within * within,
+        });
+    }
+    for deviation in [-2.5_f64, -1.5, -0.5, 0.5, 1.5, 2.5] {
+        rows.push(ClusteredScore {
+            cluster_key: 3,
+            predictor: 2.0 + deviation,
+            outcome: 4.0 + true_within * deviation,
+        });
+    }
+    let weights = vec![1.0_f64; rows.len()];
+    let unweighted = recover_cluster_mean_within_between_slopes(&rows).expect("ols");
+    let weighted =
+        recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &weights).expect("wls");
+    let within_error = rmse(&[true_within], &[weighted.within_slope]);
+    let between_error = rmse(&[2.25], &[weighted.between_slope]);
+    let contextual_error = rmse(&[1.75], &[weighted.contextual_effect]);
+    assert!(within_error < 1e-12, "Kish CWC within RMSE {within_error}");
+    assert!(
+        between_error < 1e-12,
+        "Kish CWC between RMSE {between_error}"
+    );
+    assert!(
+        contextual_error < 1e-12,
+        "Kish CWC contextual RMSE {contextual_error}"
+    );
+    assert!(
+        (weighted.between_slope - unweighted.between_slope).abs() > 1e-9,
+        "n_j-weighted between must differ from Enders-Tofighi unweighted between"
+    );
+    let predictors: Vec<f64> = rows.iter().map(|row| row.predictor).collect();
+    let outcomes: Vec<f64> = rows.iter().map(|row| row.outcome).collect();
+    let pooled = recover_kish_weighted_slope(&predictors, &outcomes, &weights).expect("pooled");
+    let pooled_within_error = rmse(&[true_within], &[pooled]);
+    assert!(
+        pooled_within_error > within_error,
+        "pooled Kish RMSE {pooled_within_error} should exceed weighted CWC within {within_error}"
+    );
+    assert_eq!(
+        refuse_pooled_kish_slope_as_weighted_within_slope(pooled, weighted.within_slope),
+        Err(PsychometricError::PooledKishSlopeIsNotWeightedWithinSlope)
+    );
+    assert_eq!(
+        refuse_unweighted_between_slope_as_kish_weighted_between_slope(
+            unweighted.between_slope,
+            weighted.between_slope,
+        ),
+        Err(PsychometricError::UnweightedBetweenSlopeIsNotKishWeightedBetweenSlope)
+    );
+    assert_eq!(
+        refuse_kish_effective_sample_size_as_slope(weighted.observation_effective_sample_size),
+        Err(PsychometricError::KishEffectiveSampleSizeIsNotASlope)
+    );
+}
+
+#[test]
 fn event_time_log_rate_recovers_known_drift_and_refuses_quotient() {
     let true_drift = -0.4_f64;
     let earlier = 1.25_f64;

@@ -8,7 +8,8 @@
 //! distinguishes ALR from orthonormal ILR geometry, averages loading point
 //! estimates across posterior draws on a CPU `f64` path without claiming Rubin
 //! uncertainty pooling, combines draw-level OLS loadings with Rubin `T`,
-//! decomposes cluster-mean within/between OLS and the CWC contextual effect,
+//! decomposes cluster-mean within/between OLS, the CWC contextual effect,
+//! and Kish-weighted CWC (cluster-total between weights; ESS is diagnostic),
 //! maps event-time discrete lags through the exact scalar exponential, maps
 //! already-centered irregular residuals without re-centering, remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
@@ -283,12 +284,22 @@ pub use causality::claim_causal_effect;
 pub use cluster_mean::ClusteredScore;
 /// Recovered within-cluster, between-cluster, and contextual OLS slopes.
 pub use cluster_mean::WithinBetweenSlopes;
+/// Recovered Kish-weighted CWC slopes plus Kish ESS diagnostics.
+pub use cluster_mean::KishWeightedWithinBetweenSlopes;
 /// Kish effective sample size on psychometric weights.
 pub use cluster_mean::kish_effective_sample_size;
 /// Cluster-mean within/between OLS after CWC, plus the contextual effect.
 pub use cluster_mean::recover_cluster_mean_within_between_slopes;
+/// Kish-weighted CWC within/between slopes; ESS is diagnostic.
+pub use cluster_mean::recover_kish_weighted_cluster_mean_within_between_slopes;
 /// Kish-weighted least-squares slope.
 pub use cluster_mean::recover_kish_weighted_slope;
+/// Refuse pooled Kish WLS as the weighted within slope.
+pub use cluster_mean::refuse_pooled_kish_slope_as_weighted_within_slope;
+/// Refuse unweighted between as Kish-weighted between.
+pub use cluster_mean::refuse_unweighted_between_slope_as_kish_weighted_between_slope;
+/// Refuse Kish ESS as a slope.
+pub use cluster_mean::refuse_kish_effective_sample_size_as_slope;
 /// Higher-order construct class.
 pub use construct::ConstructClass;
 /// Typed invariance evidence required before a latent-mean comparison.

@@ -710,6 +710,16 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Pooled Kish WLS of raw scores was treated as the Kish-weighted
+    /// CWC within slope. Pooled WLS confounds within and between.
+    PooledKishSlopeIsNotWeightedWithinSlope,
+    /// Unweighted between-cluster OLS was treated as Kish-weighted
+    /// between. Unequal \(n_j\) makes cluster-total WLS a different
+    /// estimand from Enders and Tofighi (2007) unweighted between.
+    UnweightedBetweenSlopeIsNotKishWeightedBetweenSlope,
+    /// Kish effective sample size was treated as a slope. ESS is the
+    /// information diagnostic; WLS uses the weights in the slope.
+    KishEffectiveSampleSizeIsNotASlope,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1244,15 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::PooledKishSlopeIsNotWeightedWithinSlope => {
+                "pooled Kish slope is not the weighted within-cluster slope"
+            }
+            Self::UnweightedBetweenSlopeIsNotKishWeightedBetweenSlope => {
+                "unweighted between-cluster slope is not the Kish-weighted between-cluster slope"
+            }
+            Self::KishEffectiveSampleSizeIsNotASlope => {
+                "Kish effective sample size is not a slope"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2090,22 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn kish_weighted_cwc_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::PooledKishSlopeIsNotWeightedWithinSlope.to_string(),
+            "pooled Kish slope is not the weighted within-cluster slope"
+        );
+        assert_eq!(
+            PsychometricError::UnweightedBetweenSlopeIsNotKishWeightedBetweenSlope.to_string(),
+            "unweighted between-cluster slope is not the Kish-weighted between-cluster slope"
+        );
+        assert_eq!(
+            PsychometricError::KishEffectiveSampleSizeIsNotASlope.to_string(),
+            "Kish effective sample size is not a slope"
         );
     }
 }
