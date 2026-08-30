@@ -16,7 +16,9 @@
 //! `ln(|later| / |earlier|) / Δt` when that ratio is finite, else
 //! `(ln|later| − ln|earlier|) / Δt`; the pairwise mean is incremental so
 //! two finite rates whose raw sum overflows stay representable;
-//! not Newton LS, not raw-process AR drift), remaps discrete
+//! not Newton LS, not raw-process AR drift), extracts grand-mean-centered
+//! lagged residuals and a pairwise-mean log-rate after that CGM (Hamaker
+//! et al., 2015: not a within-person lag), remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
 //! exact scalar discrete effect of a constant predictor, recovers the
 //! first-order discrete effect of a time-varying predictor with matched
@@ -315,6 +317,8 @@ pub use event_time::EventOccasion;
 pub use event_time::LagClock;
 /// Already-centered lagged residual pair with an irregular event interval.
 pub use event_time::LaggedWithinResidual;
+/// Grand-mean-center consecutive event-time lags (not a within-person lag).
+pub use event_time::center_grand_mean_event_lags;
 /// Cluster-mean-center consecutive event-time lags (not raw-process AR drift).
 pub use event_time::center_within_cluster_event_lags;
 /// Map a discrete lag onto another event interval through the exact log-rate.
@@ -379,6 +383,8 @@ pub use event_time::recover_discrete_time_varying_predictor_effect;
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
 pub use event_time::recover_event_time_discrete_lag_and_log_rate;
+/// Pairwise-mean exact log-rate after grand-mean centering (not a within-person lag; not DSEM).
+pub use event_time::recover_grand_mean_centered_irregular_residual_log_rate;
 /// Exact scalar carried first-occasion `T0TDPREDEFFECT` `e^{A Δt} t0_m x0`.
 pub use event_time::recover_initial_time_dependent_predictor_carry;
 /// Exact scalar first-occasion `T0TDPREDEFFECT` shift `t0_m x0`.
@@ -530,6 +536,8 @@ pub use event_time::refuse_extra_process_latent_mean_as_observed_mean;
 pub use event_time::refuse_extra_process_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating finite-interval `Q_Δt` as `asymDIFFUSION`.
 pub use event_time::refuse_finite_interval_process_noise_as_stationary_variance;
+/// Refuse treating a grand-mean-centered log-rate as a within-person lag.
+pub use event_time::refuse_grand_mean_centered_log_rate_as_within_person_lag;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the after-t0 extra-process observed mean.
 pub use event_time::refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the first-occasion TD-predictor observed mean.
