@@ -687,7 +687,22 @@ pub enum PsychometricError {
     /// `MANIFESTTRAITVARstd`. Measurement error is not the
     /// correlation form of indicator-level trait variance.
     MeasurementErrorIsNotStandardisedManifestTraitVariance,
-
+    /// Driver p. 16 `discreteDRIFTstd` was requested with a non-positive
+    /// within-subject variance. Footnote 4 standardises `DRIFT` using
+    /// only strictly positive `asymDIFFUSION`.
+    StandardisedDiscreteDriftRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 unstandardised `discreteDRIFT` `e^{a Δt}` was treated
+    /// as `discreteDRIFTstd`. Unstandardised `e^{a Δt}` is defined for
+    /// growing or zero-diffusion processes; standardised `DRIFT` is not.
+    UnstandardisedDiscreteDriftIsNotStandardisedDiscreteDrift,
+    /// Driver §7.1 trait-plus-state autocorrelation was treated as
+    /// p. 16 `discreteDRIFTstd`. Footnote 4 uses only `asymDIFFUSION`,
+    /// not `TRAITVAR`.
+    TraitPlusStateAutocorrelationIsNotStandardisedDiscreteDrift,
+    /// Driver §4.3 / §7.1 trait variance was treated as the p. 16
+    /// footnote 4 standardisation variance. `TRAITVAR` is not
+    /// `asymDIFFUSION`.
+    TraitVarianceIsNotStandardisationVariance,
     /// Driver p. 16 `MANIFESTVARstd` was requested with a
     /// non-positive residual `MANIFESTVAR`. Unlike `TRAITVAR` /
     /// `MANIFESTTRAITVAR`, the 2017-era source still forms
@@ -1222,7 +1237,18 @@ impl fmt::Display for PsychometricError {
             Self::MeasurementErrorIsNotStandardisedManifestTraitVariance => {
                 "measurement error is not standardised manifest-trait variance"
             }
-
+            Self::StandardisedDiscreteDriftRequiresPositiveWithinSubjectVariance => {
+                "standardised discrete DRIFT requires strictly positive within-subject variance"
+            }
+            Self::UnstandardisedDiscreteDriftIsNotStandardisedDiscreteDrift => {
+                "unstandardised discrete DRIFT is not standardised discrete DRIFT"
+            }
+            Self::TraitPlusStateAutocorrelationIsNotStandardisedDiscreteDrift => {
+                "trait-plus-state autocorrelation is not standardised discrete DRIFT"
+            }
+            Self::TraitVarianceIsNotStandardisationVariance => {
+                "trait variance is not the standardisation variance"
+            }
             Self::StandardisedManifestVarianceRequiresPositiveManifestVariance => {
                 "standardised measurement-error variance requires strictly positive measurement-error variance"
             }
@@ -2071,6 +2097,29 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_drift_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteDriftRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised discrete DRIFT requires strictly positive within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDiscreteDriftIsNotStandardisedDiscreteDrift
+                .to_string(),
+            "unstandardised discrete DRIFT is not standardised discrete DRIFT"
+        );
+        assert_eq!(
+            PsychometricError::TraitPlusStateAutocorrelationIsNotStandardisedDiscreteDrift
+                .to_string(),
+            "trait-plus-state autocorrelation is not standardised discrete DRIFT"
+        );
+        assert_eq!(
+            PsychometricError::TraitVarianceIsNotStandardisationVariance.to_string(),
+            "trait variance is not the standardisation variance"
         );
     }
 }
