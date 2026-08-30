@@ -710,6 +710,28 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Driver 2017-era `T0TRAITVAR` `t0_trait² · trait` was treated
+    /// as Table 2 `TRAITVAR`. When `T0TRAITEFFECT` is the
+    /// stationary identity those numbers equal and remain distinct
+    /// named quantities.
+    InitialTraitVarianceIsNotTraitVariance,
+    /// Driver 2017-era `T0TRAITVAR` `t0_trait² · trait` was treated
+    /// as 2017-era `addedT0TIPREDVAR` `t0_b² v`. Trait loadings
+    /// are not time-independent predictor effects.
+    InitialTraitVarianceIsNotInitialTimeIndependentVariance,
+    /// Driver 2017-era `T0TRAITVAR` `t0_trait² · trait` was treated
+    /// as §7.2 `addedTIPREDVAR` `(B / a)² v`. First-occasion trait
+    /// extra is not asymptotic TI extra.
+    InitialTraitVarianceIsNotAsymptoticTimeIndependentVariance,
+    /// Driver 2017-era `T0TRAITVAR` `t0_trait² · trait` was treated
+    /// as free `T0VAR` `p_0`. Trait extra at `T0` is not the
+    /// first-occasion state.
+    InitialTraitVarianceIsNotInitialLatentVariance,
+    /// Driver 2017-era `T0TRAITVAR` `t0_trait² · trait` was treated
+    /// as the ctGenerate unit-normal extra `t0_trait²`. Generate
+    /// draws traits from `N(0, I)` at `T0`; SEM path-tracing uses
+    /// `TRAITVAR`.
+    InitialTraitVarianceIsNotUnitTraitGenerateVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1256,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::InitialTraitVarianceIsNotTraitVariance => {
+                "initial trait variance is not trait variance"
+            }
+            Self::InitialTraitVarianceIsNotInitialTimeIndependentVariance => {
+                "initial trait variance is not initial time-independent predictor variance"
+            }
+            Self::InitialTraitVarianceIsNotAsymptoticTimeIndependentVariance => {
+                "initial trait variance is not asymptotic time-independent predictor variance"
+            }
+            Self::InitialTraitVarianceIsNotInitialLatentVariance => {
+                "initial trait variance is not initial latent variance"
+            }
+            Self::InitialTraitVarianceIsNotUnitTraitGenerateVariance => {
+                "initial trait variance is not unit-trait generate variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2108,31 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn initial_trait_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::InitialTraitVarianceIsNotTraitVariance.to_string(),
+            "initial trait variance is not trait variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTraitVarianceIsNotInitialTimeIndependentVariance.to_string(),
+            "initial trait variance is not initial time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTraitVarianceIsNotAsymptoticTimeIndependentVariance
+                .to_string(),
+            "initial trait variance is not asymptotic time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTraitVarianceIsNotInitialLatentVariance.to_string(),
+            "initial trait variance is not initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTraitVarianceIsNotUnitTraitGenerateVariance.to_string(),
+            "initial trait variance is not unit-trait generate variance"
         );
     }
 }
