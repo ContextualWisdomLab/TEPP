@@ -23,7 +23,7 @@ use psychometric_core::{
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
-    recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_effect, recover_initial_total_variance,
     recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
     recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
@@ -103,6 +103,10 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
+    refuse_initial_total_variance_as_initial_latent_variance,
+    refuse_initial_total_variance_as_initial_time_independent_variance,
+    refuse_initial_total_variance_as_initial_trait_variance,
+    refuse_initial_total_variance_as_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -3779,6 +3783,105 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
+        )
+    );
+}
+
+#[test]
+fn initial_total_variance_is_not_trait_t0var_traitvar_or_added_t0() {
+    let effect = 0.5_f64;
+    let trait_variance = 0.8_f64;
+    let initial_variance = 1.6_f64;
+    let recovered = recover_initial_total_variance(
+        effect,
+        trait_variance,
+        initial_variance,
+        LagClock::EventTime,
+    )
+    .expect("T0TOTALVAR");
+    let extra = effect * effect * trait_variance;
+    let expected = extra + initial_variance;
+    assert!(
+        (recovered - expected).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era T0TOTALVAR): extra + p_0 RMSE"
+    );
+    let zero_extra =
+        recover_initial_total_variance(0.0, trait_variance, initial_variance, LagClock::EventTime)
+            .expect("zero extra");
+    assert!(
+        (zero_extra - initial_variance).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era T0TOTALVAR): zero extra keeps p_0"
+    );
+    let zero_p0 = recover_initial_total_variance(effect, trait_variance, 0.0, LagClock::EventTime)
+        .expect("zero p0");
+    assert!(
+        (zero_p0 - extra).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era T0TOTALVAR): zero p_0 keeps extra"
+    );
+    let both_zero =
+        recover_initial_total_variance(0.0, 0.0, 0.0, LagClock::EventTime).expect("0+0");
+    assert_eq!(
+        both_zero.to_bits(),
+        0.0_f64.to_bits(),
+        "Driver et al. (2017, 2017-era T0TOTALVAR): 0 + 0 is exactly 0"
+    );
+    let stationary_zero_p0 =
+        recover_initial_total_variance(1.0, trait_variance, 0.0, LagClock::EventTime)
+            .expect("I, p0=0");
+    assert!(
+        (stationary_zero_p0 - trait_variance).abs() < 1e-15,
+        "Driver et al. (2017, ctFit.R 1494–1508): T0TRAITEFFECT = I and p_0 = 0 equals TRAITVAR numerically"
+    );
+    let added_t0 = 0.3_f64 * 0.3_f64 * 4.0_f64;
+    assert!(
+        (recovered - extra).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era T0TRAITVAR): T0TOTALVAR is not T0TRAITVAR when p_0 ≠ 0"
+    );
+    assert!(
+        (recovered - initial_variance).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): T0TOTALVAR is not free T0VAR when extra ≠ 0"
+    );
+    assert!(
+        (recovered - trait_variance).abs() > 1e-3,
+        "Driver et al. (2017, §7.1): T0TOTALVAR is not TRAITVAR when T0TRAITEFFECT is not I or p_0 ≠ 0"
+    );
+    assert!(
+        (recovered - added_t0).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era addedT0TIPREDVAR): T0TOTALVAR is not t0_b² v"
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, -1.0, initial_variance, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_total_variance(effect, trait_variance, -1.6, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_total_variance(
+            effect,
+            trait_variance,
+            initial_variance,
+            LagClock::DocumentTime
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        refuse_initial_total_variance_as_initial_trait_variance(zero_p0, extra),
+        Err(psychometric_core::PsychometricError::InitialTotalVarianceIsNotInitialTraitVariance)
+    );
+    assert_eq!(
+        refuse_initial_total_variance_as_initial_latent_variance(zero_extra, initial_variance),
+        Err(psychometric_core::PsychometricError::InitialTotalVarianceIsNotInitialLatentVariance)
+    );
+    assert_eq!(
+        refuse_initial_total_variance_as_trait_variance(stationary_zero_p0, trait_variance),
+        Err(psychometric_core::PsychometricError::InitialTotalVarianceIsNotTraitVariance)
+    );
+    assert_eq!(
+        refuse_initial_total_variance_as_initial_time_independent_variance(recovered, added_t0),
+        Err(
+            psychometric_core::PsychometricError::InitialTotalVarianceIsNotInitialTimeIndependentVariance
         )
     );
 }
