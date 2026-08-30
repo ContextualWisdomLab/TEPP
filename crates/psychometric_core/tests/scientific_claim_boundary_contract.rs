@@ -3832,7 +3832,7 @@ fn standardised_initial_time_independent_effect_is_not_unstandardised_or_trait_c
             "Driver et al. (2017, Table 3): noiseless t0_b·√v/√p_0 recovers known truth"
         );
     }
-    let n = cases.len() as f64;
+    let n = f64::from(u32::try_from(cases.len()).expect("tiny"));
     assert!(
         (sse / n).sqrt() < 1e-15,
         "machine-scale RMSE on known truth"

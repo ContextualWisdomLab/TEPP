@@ -16685,6 +16685,7 @@ mod tests {
         );
     }
 
+    #[allow(clippy::too_many_lines)]
     #[test]
     fn standardised_initial_time_independent_effect_fails_closed_when_unstandardised_is_defined() {
         assert_eq!(
