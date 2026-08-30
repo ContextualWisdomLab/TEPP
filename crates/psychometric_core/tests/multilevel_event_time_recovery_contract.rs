@@ -413,6 +413,54 @@ fn kish_weighted_cwc_noisy_truth_reports_bias_and_rmse() {
 }
 
 #[test]
+fn kish_weighted_cwc_equal_weight_noisy_truth_reports_interval_coverage() {
+    use psychometric_core::recover_kish_weighted_cluster_mean_within_between_slopes;
+    let true_within = 0.5_f64;
+    let true_between = 2.0_f64;
+    let mut within_covered = 0_usize;
+    let mut between_covered = 0_usize;
+    for replicate in 0..40 {
+        let mut rows = Vec::new();
+        let mut weights = Vec::new();
+        let phase = f64::from(replicate) * 0.37;
+        for cluster in 0..16_u64 {
+            let cluster_mean = f64::from(u32::try_from(cluster).expect("tiny"));
+            for occasion in 0..6 {
+                let within = f64::from(occasion) - 2.5;
+                let position = cluster_mean * 0.73 + f64::from(occasion) * 1.1 + phase;
+                let noise = 0.15 * position.sin() + 0.08 * (1.7 * position).cos();
+                rows.push(ClusteredScore {
+                    cluster_key: cluster,
+                    predictor: cluster_mean + within,
+                    outcome: true_between * cluster_mean + true_within * within + noise,
+                });
+                weights.push(1.0);
+            }
+        }
+        let recovered = recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &weights)
+            .expect("equal-weight Kish CWC");
+        let within_half = 1.96 * recovered.within_slope_sampling_variance.sqrt();
+        let between_half = 1.96 * recovered.between_slope_sampling_variance.sqrt();
+        if (recovered.within_slope - true_within).abs() <= within_half {
+            within_covered += 1;
+        }
+        if (recovered.between_slope - true_between).abs() <= between_half {
+            between_covered += 1;
+        }
+    }
+    let within_coverage = within_covered as f64 / 40.0;
+    let between_coverage = between_covered as f64 / 40.0;
+    assert!(
+        within_coverage >= 0.95,
+        "Kish CWC within coverage {within_coverage}"
+    );
+    assert!(
+        between_coverage >= 0.95,
+        "Kish CWC between coverage {between_coverage}"
+    );
+}
+
+#[test]
 fn event_time_log_rate_recovers_known_drift_and_refuses_quotient() {
     let true_drift = -0.4_f64;
     let earlier = 1.25_f64;

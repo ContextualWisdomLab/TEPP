@@ -9,7 +9,8 @@
 //! estimates across posterior draws on a CPU `f64` path without claiming Rubin
 //! uncertainty pooling, combines draw-level OLS loadings with Rubin `T`,
 //! decomposes cluster-mean within/between OLS, the CWC contextual effect,
-//! and Kish-weighted CWC (cluster-total between weights; ESS is diagnostic),
+//! and Kish-weighted CWC (cluster-total between weights; ESS is diagnostic;
+//! model-based WLS residual and slope sampling variance),
 //! maps event-time discrete lags through the exact scalar exponential, maps
 //! already-centered irregular residuals without re-centering, remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
@@ -282,7 +283,10 @@ pub use causality::CausalHeuristic;
 pub use causality::claim_causal_effect;
 /// One clustered predictor–outcome pair.
 pub use cluster_mean::ClusteredScore;
-/// Recovered Kish-weighted CWC slopes plus Kish ESS diagnostics.
+/// Kish-weighted least-squares slope with residual and sampling variance.
+pub use cluster_mean::KishWeightedFit;
+/// Recovered Kish-weighted CWC slopes plus Kish ESS diagnostics and WLS
+/// residual / sampling variance.
 pub use cluster_mean::KishWeightedWithinBetweenSlopes;
 /// Recovered within-cluster, between-cluster, and contextual OLS slopes.
 pub use cluster_mean::WithinBetweenSlopes;
@@ -292,10 +296,20 @@ pub use cluster_mean::kish_effective_sample_size;
 pub use cluster_mean::recover_cluster_mean_within_between_slopes;
 /// Kish-weighted CWC within/between slopes; ESS is diagnostic.
 pub use cluster_mean::recover_kish_weighted_cluster_mean_within_between_slopes;
+/// Kish-weighted least-squares slope with residual and sampling variance.
+pub use cluster_mean::recover_kish_weighted_fit;
 /// Kish-weighted least-squares slope.
 pub use cluster_mean::recover_kish_weighted_slope;
+/// Refuse a cluster-robust sandwich as WLS sampling variance.
+pub use cluster_mean::refuse_cluster_robust_sandwich_as_wls_sampling_variance;
+/// Refuse Enders ML SE as WLS sampling variance.
+pub use cluster_mean::refuse_enders_maximum_likelihood_standard_error_as_wls_sampling_variance;
+/// Refuse Kish design-based variance as WLS sampling variance.
+pub use cluster_mean::refuse_kish_design_based_variance_as_wls_sampling_variance;
 /// Refuse Kish ESS as a slope.
 pub use cluster_mean::refuse_kish_effective_sample_size_as_slope;
+/// Refuse Kish ESS as WLS sampling variance.
+pub use cluster_mean::refuse_kish_effective_sample_size_as_wls_sampling_variance;
 /// Refuse pooled Kish WLS as the weighted within slope.
 pub use cluster_mean::refuse_pooled_kish_slope_as_weighted_within_slope;
 /// Refuse unweighted between as Kish-weighted between.

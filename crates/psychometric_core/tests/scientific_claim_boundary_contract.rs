@@ -382,6 +382,83 @@ fn kish_weighted_cwc_is_not_pooled_or_unweighted_or_ess() {
 }
 
 #[test]
+fn kish_wls_sampling_variance_is_not_design_based_or_sandwich_or_ml_or_ess() {
+    use psychometric_core::{
+        recover_kish_weighted_cluster_mean_within_between_slopes,
+        refuse_cluster_robust_sandwich_as_wls_sampling_variance,
+        refuse_enders_maximum_likelihood_standard_error_as_wls_sampling_variance,
+        refuse_kish_design_based_variance_as_wls_sampling_variance,
+        refuse_kish_effective_sample_size_as_wls_sampling_variance,
+    };
+    let rows = [
+        ClusteredScore {
+            cluster_key: 1,
+            predictor: 0.0,
+            outcome: 0.0,
+        },
+        ClusteredScore {
+            cluster_key: 1,
+            predictor: 1.0,
+            outcome: 0.5,
+        },
+        ClusteredScore {
+            cluster_key: 2,
+            predictor: 2.0,
+            outcome: 4.0,
+        },
+        ClusteredScore {
+            cluster_key: 2,
+            predictor: 3.0,
+            outcome: 4.5,
+        },
+        ClusteredScore {
+            cluster_key: 3,
+            predictor: 4.0,
+            outcome: 8.0,
+        },
+        ClusteredScore {
+            cluster_key: 3,
+            predictor: 5.0,
+            outcome: 8.5,
+        },
+    ];
+    let weights = [1.0_f64; 6];
+    let weighted =
+        recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &weights).expect("wls");
+    assert!(weighted.within_slope_sampling_variance >= 0.0);
+    assert!(weighted.between_slope_sampling_variance >= 0.0);
+    assert_eq!(
+        refuse_kish_design_based_variance_as_wls_sampling_variance(
+            weighted.observation_effective_sample_size,
+            weighted.within_slope_sampling_variance,
+        ),
+        Err(psychometric_core::PsychometricError::KishDesignBasedVarianceIsNotWlsSamplingVariance)
+    );
+    assert_eq!(
+        refuse_cluster_robust_sandwich_as_wls_sampling_variance(
+            weighted.between_slope_sampling_variance,
+            weighted.within_slope_sampling_variance,
+        ),
+        Err(psychometric_core::PsychometricError::ClusterRobustSandwichIsNotWlsSamplingVariance)
+    );
+    assert_eq!(
+        refuse_enders_maximum_likelihood_standard_error_as_wls_sampling_variance(
+            weighted.between_slope_sampling_variance.sqrt(),
+            weighted.within_slope_sampling_variance,
+        ),
+        Err(
+            psychometric_core::PsychometricError::EndersMaximumLikelihoodStandardErrorIsNotWlsSamplingVariance
+        )
+    );
+    assert_eq!(
+        refuse_kish_effective_sample_size_as_wls_sampling_variance(
+            weighted.observation_effective_sample_size,
+        ),
+        Err(psychometric_core::PsychometricError::KishEffectiveSampleSizeIsNotWlsSamplingVariance)
+    );
+}
+
+#[test]
 fn kish_zero_underflow_cluster_is_not_an_invalid_weight() {
     use psychometric_core::{
         kish_effective_sample_size, recover_kish_weighted_cluster_mean_within_between_slopes,

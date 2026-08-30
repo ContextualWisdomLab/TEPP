@@ -720,6 +720,21 @@ pub enum PsychometricError {
     /// Kish effective sample size was treated as a slope. ESS is the
     /// information diagnostic; WLS uses the weights in the slope.
     KishEffectiveSampleSizeIsNotASlope,
+    /// Kish design-based variance was treated as model-based WLS sampling
+    /// variance. Survey-sampling design-based variance is not the OLS
+    /// analogue `σ² / Σ w(x − x̄_w)²`.
+    KishDesignBasedVarianceIsNotWlsSamplingVariance,
+    /// A cluster-robust sandwich estimator was treated as model-based WLS
+    /// sampling variance. Sandwich SEs are not the OLS analogue.
+    ClusterRobustSandwichIsNotWlsSamplingVariance,
+    /// Enders and Tofighi (2007) multilevel maximum-likelihood standard
+    /// error was treated as model-based WLS sampling variance. This crate
+    /// reports the two-level WLS analogue, not their ML SE.
+    EndersMaximumLikelihoodStandardErrorIsNotWlsSamplingVariance,
+    /// Kish effective sample size was treated as WLS sampling variance.
+    /// ESS is the information diagnostic; residual variance uses `n − 2`,
+    /// not ESS.
+    KishEffectiveSampleSizeIsNotWlsSamplingVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1253,6 +1268,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::KishEffectiveSampleSizeIsNotASlope => {
                 "Kish effective sample size is not a slope"
+            }
+            Self::KishDesignBasedVarianceIsNotWlsSamplingVariance => {
+                "Kish design-based variance is not WLS sampling variance"
+            }
+            Self::ClusterRobustSandwichIsNotWlsSamplingVariance => {
+                "cluster-robust sandwich is not WLS sampling variance"
+            }
+            Self::EndersMaximumLikelihoodStandardErrorIsNotWlsSamplingVariance => {
+                "Enders maximum-likelihood standard error is not WLS sampling variance"
+            }
+            Self::KishEffectiveSampleSizeIsNotWlsSamplingVariance => {
+                "Kish effective sample size is not WLS sampling variance"
             }
         };
         formatter.write_str(message)
@@ -2106,6 +2133,23 @@ mod tests {
         assert_eq!(
             PsychometricError::KishEffectiveSampleSizeIsNotASlope.to_string(),
             "Kish effective sample size is not a slope"
+        );
+        assert_eq!(
+            PsychometricError::KishDesignBasedVarianceIsNotWlsSamplingVariance.to_string(),
+            "Kish design-based variance is not WLS sampling variance"
+        );
+        assert_eq!(
+            PsychometricError::ClusterRobustSandwichIsNotWlsSamplingVariance.to_string(),
+            "cluster-robust sandwich is not WLS sampling variance"
+        );
+        assert_eq!(
+            PsychometricError::EndersMaximumLikelihoodStandardErrorIsNotWlsSamplingVariance
+                .to_string(),
+            "Enders maximum-likelihood standard error is not WLS sampling variance"
+        );
+        assert_eq!(
+            PsychometricError::KishEffectiveSampleSizeIsNotWlsSamplingVariance.to_string(),
+            "Kish effective sample size is not WLS sampling variance"
         );
     }
 }

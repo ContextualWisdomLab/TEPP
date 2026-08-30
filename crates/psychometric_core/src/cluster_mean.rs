@@ -11,7 +11,11 @@
 //! `n_j`-weighted between is a different estimand from their unweighted
 //! between when cluster sizes differ. Kish ESS is diagnostic, not a slope.
 //! A cluster whose scaled total underflows to 0 after max-scale is
-//! Kish-zero relative information and is omitted.
+//! Kish-zero relative information and is omitted. Model-based WLS residual
+//! variance is the OLS analogue `Σ w e² / (n − 2)` after that same
+//! max-scale; slope sampling variance is `σ² / Σ w(x − x̄_w)²`. That is
+//! not Kish design-based variance, not a cluster-robust sandwich, not
+//! Enders ML SE, and not ESS.
 
 use std::collections::BTreeMap;
 
@@ -173,6 +177,26 @@ pub(crate) fn require_max_positive_weight(weights: &[f64]) -> Result<f64, Psycho
     Ok(max_weight)
 }
 
+/// Kish-weighted least-squares slope with model-based residual and sampling
+/// variance.
+///
+/// Residual variance uses the same max-weight scale as the slope and ESS
+/// (homogeneous of degree 0). Slope sampling variance is the OLS analogue
+/// `σ² / Σ w(x − x̄_w)²`. This is not Kish design-based variance, not a
+/// cluster-robust sandwich, not Enders ML SE, and not ESS.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct KishWeightedFit {
+    /// WLS slope.
+    pub slope: f64,
+    /// Weighted residual variance `Σ w e² / (n − 2)` after max-scale, or `0`
+    /// when `n ≤ 2`.
+    pub residual_variance: f64,
+    /// Model-based slope sampling variance `σ² / Σ w(x − x̄_w)²`.
+    pub slope_sampling_variance: f64,
+    /// Weighted predictor sum of squares `Σ w(x − x̄_w)²` after max-scale.
+    pub weighted_predictor_sum_of_squares: f64,
+}
+
 /// Weighted least-squares slope using Kish membership/survey weights.
 ///
 /// The slope is the ordinary WLS estimator. Kish ESS is the information
@@ -189,6 +213,30 @@ pub fn recover_kish_weighted_slope(
     outcome: &[f64],
     weights: &[f64],
 ) -> Result<f64, PsychometricError> {
+    Ok(recover_kish_weighted_fit(predictor, outcome, weights)?.slope)
+}
+
+/// Kish-weighted least-squares slope with residual and sampling variance.
+///
+/// Residual variance is the weighted analogue of
+/// [`crate::loading::ordinary_least_squares_fit`]: `Σ w e² / (n − 2)` after
+/// the same max-weight scale used by ESS and the slope (homogeneous of
+/// degree 0). Two-point lines have residual variance `0`. Slope sampling
+/// variance is `σ² / Σ w(x − x̄_w)²`. Equal weights recover OLS residual
+/// variance and sampling variance. This is not Kish design-based variance,
+/// not a cluster-robust sandwich, not Enders ML SE, and not ESS.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::InvalidNumericInput`] for length or finiteness
+/// failures, [`PsychometricError::InvalidWeight`] for invalid weights, and
+/// [`PsychometricError::SingularDesign`] when the weighted predictor has zero
+/// variance.
+pub fn recover_kish_weighted_fit(
+    predictor: &[f64],
+    outcome: &[f64],
+    weights: &[f64],
+) -> Result<KishWeightedFit, PsychometricError> {
     if predictor.len() < 2 || predictor.len() != outcome.len() || predictor.len() != weights.len() {
         return Err(PsychometricError::InvalidNumericInput);
     }
@@ -221,7 +269,26 @@ pub fn recover_kish_weighted_slope(
     if pred_ss <= 0.0 {
         return Err(PsychometricError::SingularDesign);
     }
-    require_finite(cross / pred_ss)
+    let slope = require_finite(cross / pred_ss)?;
+    let mut weighted_sse = 0.0_f64;
+    for index in 0..predictor.len() {
+        let residual = (outcome[index] - out_mean) - slope * (predictor[index] - pred_mean);
+        let weight = weights[index] / max_weight;
+        weighted_sse += weight * residual * residual;
+    }
+    let count = predictor.len() as f64;
+    let residual_variance = if count > 2.0 {
+        require_finite(weighted_sse / (count - 2.0))?
+    } else {
+        0.0
+    };
+    let slope_sampling_variance = require_finite(residual_variance / pred_ss)?;
+    Ok(KishWeightedFit {
+        slope,
+        residual_variance,
+        slope_sampling_variance,
+        weighted_predictor_sum_of_squares: pred_ss,
+    })
 }
 
 /// Recovered Kish-weighted within-cluster, between-cluster, and contextual
@@ -243,6 +310,17 @@ pub struct KishWeightedWithinBetweenSlopes {
     pub observation_effective_sample_size: f64,
     /// Kish ESS of the cluster totals `W_j`. Not a slope.
     pub cluster_effective_sample_size: f64,
+    /// Within WLS residual variance. Not a slope.
+    pub within_residual_variance: f64,
+    /// Between WLS residual variance. Not a slope.
+    pub between_residual_variance: f64,
+    /// Model-based within-slope sampling variance. Not Kish design-based
+    /// variance, not a cluster-robust sandwich, not Enders ML SE, and not ESS.
+    pub within_slope_sampling_variance: f64,
+    /// Model-based between-slope sampling variance. Contextual sampling
+    /// variance is not returned: within and between slopes are not
+    /// independent.
+    pub between_slope_sampling_variance: f64,
 }
 
 /// Recover Kish-weighted within-cluster and between-cluster slopes after CWC.
@@ -266,6 +344,9 @@ pub struct KishWeightedWithinBetweenSlopes {
 /// estimand from Enders and Tofighi's unweighted between. Pooled Kish WLS
 /// of the raw scores is not the weighted within slope. Kish ESS is
 /// reported as the observation and cluster diagnostics and is not a slope.
+/// Model-based WLS residual variance and slope sampling variance are
+/// returned for within and between. Contextual sampling variance is not
+/// `var_within + var_between` because the slopes are not independent.
 ///
 /// This is two-level WLS, not DSEM, not RI-CLPM, and not their multilevel
 /// maximum-likelihood model.
@@ -343,18 +424,22 @@ pub fn recover_kish_weighted_cluster_mean_within_between_slopes(
         return Err(PsychometricError::InsufficientClusters);
     }
 
-    let within_slope =
-        recover_kish_weighted_slope(&within_predictors, &within_outcomes, &within_weights)?;
-    let between_slope =
-        recover_kish_weighted_slope(&between_predictors, &between_outcomes, &cluster_weights)?;
-    let contextual_effect = contextual_effect_from_slopes(within_slope, between_slope)?;
+    let within_fit =
+        recover_kish_weighted_fit(&within_predictors, &within_outcomes, &within_weights)?;
+    let between_fit =
+        recover_kish_weighted_fit(&between_predictors, &between_outcomes, &cluster_weights)?;
+    let contextual_effect = contextual_effect_from_slopes(within_fit.slope, between_fit.slope)?;
     let cluster_effective_sample_size = kish_effective_sample_size(&cluster_weights)?;
     Ok(KishWeightedWithinBetweenSlopes {
-        within_slope,
-        between_slope,
+        within_slope: within_fit.slope,
+        between_slope: between_fit.slope,
         contextual_effect,
         observation_effective_sample_size,
         cluster_effective_sample_size,
+        within_residual_variance: within_fit.residual_variance,
+        between_residual_variance: between_fit.residual_variance,
+        within_slope_sampling_variance: within_fit.slope_sampling_variance,
+        between_slope_sampling_variance: between_fit.slope_sampling_variance,
     })
 }
 
@@ -413,17 +498,93 @@ pub fn refuse_kish_effective_sample_size_as_slope(
     Err(PsychometricError::KishEffectiveSampleSizeIsNotASlope)
 }
 
+/// Refuse treating Kish design-based variance as model-based WLS sampling
+/// variance.
+///
+/// Kish (1965) survey-sampling design-based variance is a different
+/// estimand from the OLS analogue `σ² / Σ w(x − x̄_w)²`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::KishDesignBasedVarianceIsNotWlsSamplingVariance`].
+pub fn refuse_kish_design_based_variance_as_wls_sampling_variance(
+    kish_design_based_variance: f64,
+    wls_sampling_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (kish_design_based_variance, wls_sampling_variance);
+    Err(PsychometricError::KishDesignBasedVarianceIsNotWlsSamplingVariance)
+}
+
+/// Refuse treating a cluster-robust sandwich as model-based WLS sampling
+/// variance.
+///
+/// Sandwich standard errors are not the OLS analogue returned here.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ClusterRobustSandwichIsNotWlsSamplingVariance`].
+pub fn refuse_cluster_robust_sandwich_as_wls_sampling_variance(
+    cluster_robust_sandwich: f64,
+    wls_sampling_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (cluster_robust_sandwich, wls_sampling_variance);
+    Err(PsychometricError::ClusterRobustSandwichIsNotWlsSamplingVariance)
+}
+
+/// Refuse treating Enders ML SE as model-based WLS sampling variance.
+///
+/// Enders and Tofighi (2007) estimate a multilevel maximum-likelihood
+/// model. This crate reports two-level WLS, not their ML SE.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::EndersMaximumLikelihoodStandardErrorIsNotWlsSamplingVariance`].
+pub fn refuse_enders_maximum_likelihood_standard_error_as_wls_sampling_variance(
+    enders_maximum_likelihood_standard_error: f64,
+    wls_sampling_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        enders_maximum_likelihood_standard_error,
+        wls_sampling_variance,
+    );
+    Err(PsychometricError::EndersMaximumLikelihoodStandardErrorIsNotWlsSamplingVariance)
+}
+
+/// Refuse treating Kish ESS as WLS sampling variance.
+///
+/// Residual variance uses `n − 2`, not ESS. ESS is the information
+/// diagnostic.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::KishEffectiveSampleSizeIsNotWlsSamplingVariance`].
+pub fn refuse_kish_effective_sample_size_as_wls_sampling_variance(
+    effective_sample_size: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = effective_sample_size;
+    Err(PsychometricError::KishEffectiveSampleSizeIsNotWlsSamplingVariance)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         ClusteredScore, contextual_effect_from_slopes, kish_effective_sample_size,
         recover_cluster_mean_within_between_slopes,
-        recover_kish_weighted_cluster_mean_within_between_slopes, recover_kish_weighted_slope,
+        recover_kish_weighted_cluster_mean_within_between_slopes, recover_kish_weighted_fit,
+        recover_kish_weighted_slope, refuse_cluster_robust_sandwich_as_wls_sampling_variance,
+        refuse_enders_maximum_likelihood_standard_error_as_wls_sampling_variance,
+        refuse_kish_design_based_variance_as_wls_sampling_variance,
         refuse_kish_effective_sample_size_as_slope,
+        refuse_kish_effective_sample_size_as_wls_sampling_variance,
         refuse_pooled_kish_slope_as_weighted_within_slope,
         refuse_unweighted_between_slope_as_kish_weighted_between_slope,
     };
     use crate::error::PsychometricError;
+    use crate::loading::ordinary_least_squares_fit;
 
     fn equal_n_cwc_rows() -> [ClusteredScore; 4] {
         [
@@ -727,6 +888,53 @@ mod tests {
     }
 
     #[test]
+    fn kish_wls_residual_variance_matches_ols_and_is_homogeneous() {
+        let predictor = [0.0_f64, 1.0, 2.0, 3.0];
+        let outcome = [1.0, 2.1, 2.9, 4.2];
+        let ols = ordinary_least_squares_fit(&predictor, &outcome).expect("ols");
+        let unit =
+            recover_kish_weighted_fit(&predictor, &outcome, &[1.0, 1.0, 1.0, 1.0]).expect("unit");
+        assert!((unit.slope - ols.slope).abs() < 1e-12);
+        assert!((unit.residual_variance - ols.residual_variance).abs() < 1e-12);
+        let ols_sampling = ols.residual_variance / ols.predictor_sum_of_squares;
+        assert!((unit.slope_sampling_variance - ols_sampling).abs() < 1e-12);
+        let huge = recover_kish_weighted_fit(
+            &predictor,
+            &outcome,
+            &[f64::MAX, f64::MAX, f64::MAX, f64::MAX],
+        )
+        .expect("huge");
+        let tiny = recover_kish_weighted_fit(
+            &predictor,
+            &outcome,
+            &[
+                f64::MIN_POSITIVE,
+                f64::MIN_POSITIVE,
+                f64::MIN_POSITIVE,
+                f64::MIN_POSITIVE,
+            ],
+        )
+        .expect("tiny");
+        assert!((huge.residual_variance - unit.residual_variance).abs() < 1e-12);
+        assert!((tiny.residual_variance - unit.residual_variance).abs() < 1e-12);
+        assert!((huge.slope_sampling_variance - unit.slope_sampling_variance).abs() < 1e-12);
+        assert!((tiny.slope_sampling_variance - unit.slope_sampling_variance).abs() < 1e-12);
+        let two_point =
+            recover_kish_weighted_fit(&[0.0, 1.0], &[0.0, 2.0], &[1.0, 1.0]).expect("two");
+        assert!(two_point.residual_variance.abs() < 1e-15);
+        assert!(two_point.slope_sampling_variance.abs() < 1e-15);
+        assert!((two_point.slope - 2.0).abs() < 1e-12);
+        assert_eq!(
+            recover_kish_weighted_fit(&[0.0], &[1.0], &[1.0]),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_kish_weighted_fit(&[1.0, 1.0], &[2.0, 3.0], &[1.0, 1.0]),
+            Err(PsychometricError::SingularDesign)
+        );
+    }
+
+    #[test]
     fn equal_n_equal_weights_recover_unweighted_cwc() {
         let rows = equal_n_cwc_rows();
         let weights = [1.0_f64, 1.0, 1.0, 1.0];
@@ -738,6 +946,10 @@ mod tests {
         assert!((weighted.contextual_effect - unweighted.contextual_effect).abs() < 1e-12);
         assert!((weighted.observation_effective_sample_size - 4.0).abs() < 1e-12);
         assert!((weighted.cluster_effective_sample_size - 2.0).abs() < 1e-12);
+        assert!(weighted.within_residual_variance.abs() < 1e-15);
+        assert!(weighted.between_residual_variance.abs() < 1e-15);
+        assert!(weighted.within_slope_sampling_variance.abs() < 1e-15);
+        assert!(weighted.between_slope_sampling_variance.abs() < 1e-15);
         for scale in [f64::MAX, f64::MIN_POSITIVE] {
             let scaled_weights = [scale, scale, scale, scale];
             let scaled =
@@ -748,6 +960,23 @@ mod tests {
             assert!((scaled.contextual_effect - unweighted.contextual_effect).abs() < 1e-12);
             assert!((scaled.observation_effective_sample_size - 4.0).abs() < 1e-12);
             assert!((scaled.cluster_effective_sample_size - 2.0).abs() < 1e-12);
+            assert!(
+                (scaled.within_residual_variance - weighted.within_residual_variance).abs() < 1e-12
+            );
+            assert!(
+                (scaled.between_residual_variance - weighted.between_residual_variance).abs()
+                    < 1e-12
+            );
+            assert!(
+                (scaled.within_slope_sampling_variance - weighted.within_slope_sampling_variance)
+                    .abs()
+                    < 1e-12
+            );
+            assert!(
+                (scaled.between_slope_sampling_variance - weighted.between_slope_sampling_variance)
+                    .abs()
+                    < 1e-12
+            );
         }
     }
 
@@ -788,6 +1017,33 @@ mod tests {
         assert_eq!(
             refuse_kish_effective_sample_size_as_slope(weighted.observation_effective_sample_size),
             Err(PsychometricError::KishEffectiveSampleSizeIsNotASlope)
+        );
+        assert_eq!(
+            refuse_kish_design_based_variance_as_wls_sampling_variance(
+                weighted.observation_effective_sample_size,
+                weighted.within_slope_sampling_variance,
+            ),
+            Err(PsychometricError::KishDesignBasedVarianceIsNotWlsSamplingVariance)
+        );
+        assert_eq!(
+            refuse_cluster_robust_sandwich_as_wls_sampling_variance(
+                weighted.between_slope_sampling_variance,
+                weighted.within_slope_sampling_variance,
+            ),
+            Err(PsychometricError::ClusterRobustSandwichIsNotWlsSamplingVariance)
+        );
+        assert_eq!(
+            refuse_enders_maximum_likelihood_standard_error_as_wls_sampling_variance(
+                weighted.between_slope_sampling_variance.sqrt(),
+                weighted.within_slope_sampling_variance,
+            ),
+            Err(PsychometricError::EndersMaximumLikelihoodStandardErrorIsNotWlsSamplingVariance)
+        );
+        assert_eq!(
+            refuse_kish_effective_sample_size_as_wls_sampling_variance(
+                weighted.observation_effective_sample_size,
+            ),
+            Err(PsychometricError::KishEffectiveSampleSizeIsNotWlsSamplingVariance)
         );
     }
 
@@ -1009,6 +1265,23 @@ mod tests {
         assert!(
             (recovered.observation_effective_sample_size
                 - expected.observation_effective_sample_size)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (recovered.within_residual_variance - expected.within_residual_variance).abs() < 1e-12
+        );
+        assert!(
+            (recovered.between_residual_variance - expected.between_residual_variance).abs()
+                < 1e-12
+        );
+        assert!(
+            (recovered.within_slope_sampling_variance - expected.within_slope_sampling_variance)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (recovered.between_slope_sampling_variance - expected.between_slope_sampling_variance)
                 .abs()
                 < 1e-12
         );
