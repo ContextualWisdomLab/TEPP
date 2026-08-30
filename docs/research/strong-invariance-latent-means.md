@@ -13,7 +13,7 @@ This slice does **not** import the unpublished `measurement_invariance` crate on
 - Strict (also equal residual variance) also licenses latent means. Residual invariance is **not** required for those means.
 - Two-observation series have no residual degrees of freedom. OLS residual variance is then identically `0` and is not an estimated residual. Those series cap at strong/scalar and still license means.
 - This is two-group OLS, not MGCFA, not partial invariance, and not alignment optimization.
-- The weak/strong/strict labels remain conventional labels here. Meredith (1993) is the primary source for the hierarchy; its Cambridge Core original-paper page and abstract were opened, but its full-text PDF was not. Unpaywall, OpenAlex, Semantic Scholar, and Springer `content/pdf` were re-tried 2026-08-25T11:32Z and remain closed (`is_oa: false`, 0 locations; Springer returns a 3038-byte HTML stub). Putnick and Bornstein (2016) cite Meredith for residual invariance as part of *full factorial invariance*; that specific claim is not a reading of Meredith's full text.
+- The weak/strong/strict labels remain conventional labels here. Meredith (1993) is the primary source for the hierarchy; its Cambridge Core original-paper page and abstract were opened, but its full-text PDF was not. Unpaywall, OpenAlex, Semantic Scholar, and Springer `content/pdf` were re-tried 2026-08-30T20:25Z and remain closed (`is_oa: false`, 0 locations, `best_oa_location: null`; Springer returns a 3038-byte HTML stub). Putnick and Bornstein (2016) cite Meredith for residual invariance as part of *full factorial invariance*; that specific claim is not a reading of Meredith's full text.
 
 ## Authoritative sources used for the mean gate
 

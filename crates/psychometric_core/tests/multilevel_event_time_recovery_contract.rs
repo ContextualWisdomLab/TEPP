@@ -2,9 +2,10 @@
 #![allow(clippy::cast_precision_loss)]
 
 use psychometric_core::{
-    center_within_cluster_event_lags, map_discrete_lag_across_event_intervals,
-    ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
-    recover_asymptotic_time_independent_predictor_effect,
+    ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
+    LaggedWithinResidual, PsychometricError, center_within_cluster_event_lags,
+    map_discrete_lag_across_event_intervals, ordinary_least_squares_slope,
+    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
@@ -165,9 +166,7 @@ use psychometric_core::{
     refuse_unmatched_time_varying_predictor_interval,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
-    refuse_unstandardised_trait_variance_as_standardised_trait_variance, ClusteredEventScore,
-    ClusteredScore, EventOccasion, IndicatorKind, LagClock, LaggedWithinResidual,
-    PsychometricError,
+    refuse_unstandardised_trait_variance_as_standardised_trait_variance,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -2273,8 +2272,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_is_not_impulse
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry(
-) {
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry()
+ {
     let loading = 2.0_f64;
     let drift = -0.5_f64;
     let delta = 2.0_f64;
@@ -2428,8 +2427,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_zero_loading_i
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks(
-) {
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks()
+ {
     assert_eq!(
         recover_discrete_observed_mean_with_initial_time_independent_predictor(
             1e308,
@@ -3360,8 +3359,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_is_not_impulse_o
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_process_impulse_and_carry(
-) {
+fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_process_impulse_and_carry()
+ {
     let loading = 2.0_f64;
     let drift = -0.5_f64;
     let delta = 2.0_f64;
@@ -3534,8 +3533,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_zero_loading_is_
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks(
-) {
+fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks()
+ {
     assert_eq!(
         recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             1e308,

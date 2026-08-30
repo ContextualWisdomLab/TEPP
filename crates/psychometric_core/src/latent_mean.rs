@@ -14,8 +14,8 @@
 //! Two-observation series have no residual degrees of freedom
 //! (`ordinary_least_squares_fit` returns residual variance `0`) and
 //! therefore cannot be classified as strict. Meredith (1993) names
-//! weak/strong/strict remain unread labels (Unpaywall/OpenAlex
-//! 2026-08-25T11:32Z: closed; Springer `content/pdf` is an HTML stub).
+//! weak/strong/strict remain unread labels (Unpaywall 2026-08-30T20:25Z:
+//! closed; Springer `content/pdf` is an HTML stub).
 
 use crate::error::PsychometricError;
 use crate::indicator::{IndicatorKind, require_finite, require_valid_indicator};
