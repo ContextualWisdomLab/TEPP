@@ -1,9 +1,9 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
-    ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
-    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
+    center_within_cluster_event_lags, ordinary_least_squares_slope,
+    posterior_draw_point_estimate_mean, recover_asymptotic_continuous_intercept,
+    recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
@@ -41,6 +41,7 @@ use psychometric_core::{
     recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
     recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
     recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_cluster_irregular_residual_log_rate,
     recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
@@ -61,6 +62,7 @@ use psychometric_core::{
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
+    refuse_cwc_residual_log_rate_as_raw_process_drift,
     refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
@@ -181,6 +183,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -262,6 +265,39 @@ fn person_mean_subtraction_on_raw_ar_is_not_the_lagged_within_effect() {
     assert!(
         (cwc - drift).abs() > 1e-6,
         "Curran & Bauer (2011, pp. 607–608): CWC of raw AR recovered {cwc}, which must not equal drift {drift}"
+    );
+    let pairwise = recover_within_cluster_irregular_residual_log_rate(&raw, LagClock::EventTime)
+        .expect("pair");
+    let extracted = center_within_cluster_event_lags(&raw, LagClock::EventTime).expect("extract");
+    assert_eq!(
+        recover_irregular_centered_residual_log_rate(&extracted, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput),
+        "unfiltered CWC pairs straddle zero and have no real logarithm"
+    );
+    let admissible: Vec<_> = extracted
+        .iter()
+        .copied()
+        .filter(|pair| {
+            pair.earlier_residual != 0.0 && {
+                let discrete_lag = pair.later_residual / pair.earlier_residual;
+                discrete_lag.is_finite() && discrete_lag > 0.0
+            }
+        })
+        .collect();
+    let from_pairs = recover_irregular_centered_residual_log_rate(&admissible, LagClock::EventTime)
+        .expect("from pairs");
+    assert!((pairwise - from_pairs).abs() < 1e-15);
+    assert!(
+        (pairwise - drift).abs() > 1e-6,
+        "Curran & Bauer (2011, pp. 607–608): CWC pairwise-mean {pairwise} must not equal drift {drift}"
+    );
+    assert_eq!(
+        refuse_cwc_residual_log_rate_as_raw_process_drift(cwc, drift),
+        Err(psychometric_core::PsychometricError::CwcResidualLogRateIsNotRawProcessDrift)
+    );
+    assert_eq!(
+        refuse_cwc_residual_log_rate_as_raw_process_drift(pairwise, drift),
+        Err(psychometric_core::PsychometricError::CwcResidualLogRateIsNotRawProcessDrift)
     );
 }
 

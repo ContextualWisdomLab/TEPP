@@ -2,8 +2,7 @@
 #![allow(clippy::cast_precision_loss)]
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
-    LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
+    center_within_cluster_event_lags, map_discrete_lag_across_event_intervals,
     ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
     recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -46,6 +45,7 @@ use psychometric_core::{
     recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
     recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
     recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+    recover_within_cluster_irregular_residual_log_rate,
     recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
@@ -63,7 +63,8 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_variance_as_trait_variance,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
-    refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+    refuse_continuous_intercept_as_manifest_means,
+    refuse_cwc_residual_log_rate_as_raw_process_drift, refuse_difference_quotient_as_local_rate,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -164,7 +165,9 @@ use psychometric_core::{
     refuse_unmatched_time_varying_predictor_interval,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
-    refuse_unstandardised_trait_variance_as_standardised_trait_variance,
+    refuse_unstandardised_trait_variance_as_standardised_trait_variance, ClusteredEventScore,
+    ClusteredScore, EventOccasion, IndicatorKind, LagClock, LaggedWithinResidual,
+    PsychometricError,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -710,6 +713,37 @@ fn irregular_centered_residuals_recover_known_drift_better_than_cwc_of_raw_ar() 
     assert!(
         cwc_error > centered_error,
         "Curran & Bauer: CWC of raw AR RMSE {cwc_error} must exceed already-centered {centered_error}"
+    );
+    let pairwise = recover_within_cluster_irregular_residual_log_rate(&raw_ar, LagClock::EventTime)
+        .expect("cwc pairwise");
+    let extracted =
+        center_within_cluster_event_lags(&raw_ar, LagClock::EventTime).expect("extract");
+    assert_eq!(
+        recover_irregular_centered_residual_log_rate(&extracted, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput),
+        "unfiltered CWC pairs straddle zero and have no real logarithm"
+    );
+    let admissible: Vec<_> = extracted
+        .iter()
+        .copied()
+        .filter(|pair| {
+            pair.earlier_residual != 0.0 && {
+                let discrete_lag = pair.later_residual / pair.earlier_residual;
+                discrete_lag.is_finite() && discrete_lag > 0.0
+            }
+        })
+        .collect();
+    let from_pairs = recover_irregular_centered_residual_log_rate(&admissible, LagClock::EventTime)
+        .expect("from pairs");
+    assert!((pairwise - from_pairs).abs() < 1e-15);
+    let pairwise_error = rmse(&[true_drift], &[pairwise]);
+    assert!(
+        pairwise_error > centered_error,
+        "Curran & Bauer: CWC pairwise-mean RMSE {pairwise_error} must exceed already-centered {centered_error}"
+    );
+    assert_eq!(
+        refuse_cwc_residual_log_rate_as_raw_process_drift(cwc, true_drift),
+        Err(PsychometricError::CwcResidualLogRateIsNotRawProcessDrift)
     );
 }
 
@@ -2239,8 +2273,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_is_not_impulse
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry()
- {
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry(
+) {
     let loading = 2.0_f64;
     let drift = -0.5_f64;
     let delta = 2.0_f64;
@@ -2394,8 +2428,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_zero_loading_i
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks()
- {
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks(
+) {
     assert_eq!(
         recover_discrete_observed_mean_with_initial_time_independent_predictor(
             1e308,
@@ -3326,8 +3360,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_is_not_impulse_o
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_process_impulse_and_carry()
- {
+fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_process_impulse_and_carry(
+) {
     let loading = 2.0_f64;
     let drift = -0.5_f64;
     let delta = 2.0_f64;
@@ -3500,8 +3534,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_zero_loading_is_
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks()
- {
+fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks(
+) {
     assert_eq!(
         recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             1e308,

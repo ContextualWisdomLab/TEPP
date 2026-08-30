@@ -710,6 +710,11 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Cluster-mean-centered residual log-rate was treated as the
+    /// raw-process autoregressive drift. Curran and Bauer (2011,
+    /// pp. 607–608) show that person-mean subtraction on a raw AR
+    /// series does not isolate the lagged within-person residual.
+    CwcResidualLogRateIsNotRawProcessDrift,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1239,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::CwcResidualLogRateIsNotRawProcessDrift => {
+                "cluster-mean-centered residual log-rate is not the raw-process autoregressive drift"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2079,14 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn cwc_residual_log_rate_boundary_message_is_stable() {
+        assert_eq!(
+            PsychometricError::CwcResidualLogRateIsNotRawProcessDrift.to_string(),
+            "cluster-mean-centered residual log-rate is not the raw-process autoregressive drift"
         );
     }
 }

@@ -6697,6 +6697,10 @@ pub fn recover_event_series_mean_log_rate(
 /// estimand, supply already-centered lagged residuals to
 /// [`recover_irregular_centered_residual_log_rate`].
 ///
+/// Pair construction is [`center_within_cluster_event_lags`]. The rate is
+/// Newton least-squares of one `a` across those pairs, not the pairwise
+/// mean used by [`recover_within_cluster_irregular_residual_log_rate`].
+///
 /// # Errors
 ///
 /// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock,
@@ -6707,6 +6711,35 @@ pub fn recover_within_residual_event_time_log_rate(
     rows: &[ClusteredEventScore],
     clock: LagClock,
 ) -> Result<f64, PsychometricError> {
+    let lagged = center_within_cluster_event_lags(rows, clock)?;
+    let pairs: Vec<(f64, f64, f64)> = lagged
+        .iter()
+        .map(|pair| (pair.earlier_residual, pair.later_residual, pair.event_delta))
+        .collect();
+    fit_scalar_log_rate(&pairs)
+}
+
+/// Cluster-mean-center consecutive event-time lags inside each cluster.
+///
+/// Stable between-cluster means are removed first (CWC). Consecutive
+/// within-cluster residuals then become [`LaggedWithinResidual`] pairs on
+/// possibly irregular event intervals. Singleton clusters are skipped.
+/// This is not DSEM. Curran and Bauer (2011, pp. 607–608) show that
+/// person-mean subtraction on a raw autoregressive series does **not**
+/// isolate the lagged within-person residual. The returned pairs are
+/// therefore not a license to recover raw-process drift `a`.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock,
+/// [`PsychometricError::InvalidNumericInput`] for empty, singleton-only, or
+/// non-finite rows, [`PsychometricError::InsufficientClusters`] when fewer
+/// than two clusters appear, and [`PsychometricError::NonPositiveInterval`]
+/// when any consecutive event interval is not strictly positive.
+pub fn center_within_cluster_event_lags(
+    rows: &[ClusteredEventScore],
+    clock: LagClock,
+) -> Result<Vec<LaggedWithinResidual>, PsychometricError> {
     if !clock.admits_structural_lag() {
         return Err(PsychometricError::EventTimeRequired);
     }
@@ -6736,19 +6769,83 @@ pub fn recover_within_residual_event_time_log_rate(
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         for window in occasions.windows(2) {
-            let earlier_resid = window[0].score - mean;
-            let later_resid = window[1].score - mean;
-            let delta = window[1].event_time - window[0].event_time;
-            if !delta.is_finite() || delta <= 0.0 {
+            let earlier_residual = window[0].score - mean;
+            let later_residual = window[1].score - mean;
+            let event_delta = window[1].event_time - window[0].event_time;
+            if !event_delta.is_finite() || event_delta <= 0.0 {
                 return Err(PsychometricError::NonPositiveInterval);
             }
-            if !(earlier_resid.is_finite() & later_resid.is_finite()) {
+            if !(earlier_residual.is_finite() & later_residual.is_finite()) {
                 return Err(PsychometricError::InvalidNumericInput);
             }
-            pairs.push((earlier_resid, later_resid, delta));
+            pairs.push(LaggedWithinResidual {
+                earlier_residual,
+                later_residual,
+                event_delta,
+            });
         }
     }
-    fit_scalar_log_rate(&pairs)
+    if pairs.is_empty() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    Ok(pairs)
+}
+
+/// Pairwise-mean exact log-rate after CWC on irregular event intervals.
+///
+/// This is [`center_within_cluster_event_lags`] then
+/// [`recover_irregular_centered_residual_log_rate`] on the pairs whose
+/// residual ratio is strictly positive. Each admitted pair uses
+/// `a = ln(later / earlier) / Δt` (Voelkle et al., 2012, Eq. 7). A
+/// consecutive CWC pair that crosses or hits zero has no real logarithm
+/// and is skipped (CWC residuals of a connected series straddle zero).
+/// It is **not** the Newton least-squares fit used by
+/// [`recover_within_residual_event_time_log_rate`]. It is not DSEM and
+/// does not recover raw-process drift from CWC of a raw AR path
+/// (Curran & Bauer, 2011, pp. 607–608).
+///
+/// # Errors
+///
+/// Propagates centering errors from [`center_within_cluster_event_lags`]
+/// and scalar-map errors from
+/// [`recover_irregular_centered_residual_log_rate`]. An empty admissible
+/// list after skipping non-positive residual ratios is
+/// [`PsychometricError::InvalidNumericInput`].
+pub fn recover_within_cluster_irregular_residual_log_rate(
+    rows: &[ClusteredEventScore],
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let lagged = center_within_cluster_event_lags(rows, clock)?;
+    let admissible: Vec<LaggedWithinResidual> = lagged
+        .into_iter()
+        .filter(|pair| {
+            pair.earlier_residual != 0.0 && {
+                let discrete_lag = pair.later_residual / pair.earlier_residual;
+                discrete_lag.is_finite() && discrete_lag > 0.0
+            }
+        })
+        .collect();
+    recover_irregular_centered_residual_log_rate(&admissible, clock)
+}
+
+/// Refuse treating a CWC residual log-rate as raw-process AR drift.
+///
+/// Always fails closed. Curran and Bauer (2011, pp. 607–608) show that
+/// person-mean subtraction on a raw autoregressive series does not isolate
+/// the lagged within-person residual. Use
+/// [`recover_irregular_centered_residual_log_rate`] on already-centered
+/// residuals for that estimand.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::CwcResidualLogRateIsNotRawProcessDrift`].
+pub fn refuse_cwc_residual_log_rate_as_raw_process_drift(
+    cwc_log_rate: f64,
+    raw_process_drift: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (cwc_log_rate, raw_process_drift);
+    Err(PsychometricError::CwcResidualLogRateIsNotRawProcessDrift)
 }
 
 /// Mean exact scalar log-rate on already-centered residuals with irregular intervals.
@@ -6853,7 +6950,7 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
+        center_within_cluster_event_lags, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
@@ -6898,6 +6995,7 @@ mod tests {
         recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
         recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
         recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
+        recover_within_cluster_irregular_residual_log_rate,
         recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
@@ -6917,7 +7015,9 @@ mod tests {
         refuse_asymptotic_time_independent_variance_as_trait_variance,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
-        refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+        refuse_continuous_intercept_as_manifest_means,
+        refuse_cwc_residual_log_rate_as_raw_process_drift,
+        refuse_difference_quotient_as_local_rate,
         refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
@@ -7040,6 +7140,7 @@ mod tests {
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
     };
     use crate::error::PsychometricError;
 
@@ -8283,6 +8384,230 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::NonPositiveInterval)
+        );
+    }
+
+    #[test]
+    fn already_centered_irregular_pairs_recover_true_log_rate() {
+        let drift = -0.35_f64;
+        let pairs = [
+            lagged(1.4, 1.4 * (drift * 0.4).exp(), 0.4),
+            lagged(0.9, 0.9 * (drift * 1.6).exp(), 1.6),
+            lagged(-0.7, -0.7 * (drift * 2.2).exp(), 2.2),
+        ];
+        let recovered = recover_irregular_centered_residual_log_rate(&pairs, LagClock::EventTime)
+            .expect("already centered");
+        assert!((recovered - drift).abs() < 1e-12);
+    }
+
+    #[test]
+    fn cwc_then_pairwise_mean_equals_extracted_centered_pairs() {
+        let drift = -0.3_f64;
+        let rows = decaying_clustered_scores(drift);
+        let extracted =
+            center_within_cluster_event_lags(&rows, LagClock::EventTime).expect("cwc pairs");
+        let admissible: Vec<LaggedWithinResidual> = extracted
+            .iter()
+            .copied()
+            .filter(|pair| {
+                pair.earlier_residual != 0.0 && {
+                    let discrete_lag = pair.later_residual / pair.earlier_residual;
+                    discrete_lag.is_finite() && discrete_lag > 0.0
+                }
+            })
+            .collect();
+        let composed =
+            recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
+                .expect("cwc pairwise");
+        let from_pairs =
+            recover_irregular_centered_residual_log_rate(&admissible, LagClock::EventTime)
+                .expect("pairs");
+        assert!((composed - from_pairs).abs() < 1e-15);
+        assert!(
+            (composed - drift).abs() > 1e-6,
+            "Curran & Bauer: CWC pairwise mean {composed} must not equal raw-process drift {drift}"
+        );
+        let newton = recover_within_residual_event_time_log_rate(&rows, LagClock::EventTime)
+            .expect("newton");
+        assert_eq!(
+            refuse_cwc_residual_log_rate_as_raw_process_drift(composed, drift),
+            Err(PsychometricError::CwcResidualLogRateIsNotRawProcessDrift)
+        );
+        assert_eq!(
+            refuse_cwc_residual_log_rate_as_raw_process_drift(newton, drift),
+            Err(PsychometricError::CwcResidualLogRateIsNotRawProcessDrift)
+        );
+    }
+
+    #[test]
+    fn cwc_pairwise_skips_overflowed_ratio_and_keeps_admissible_pairs() {
+        let drift = -0.3_f64;
+        let mut rows: Vec<ClusteredEventScore> = decaying_clustered_scores(drift)
+            .into_iter()
+            .filter(|row| row.cluster_key == 2)
+            .collect();
+        rows.extend([
+            clustered(1, 0.0, f64::from_bits(1)),
+            clustered(1, 1.0, f64::MAX),
+            clustered(1, 2.0, -f64::MAX),
+        ]);
+        let recovered =
+            recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
+                .expect("skip inf keep others");
+        assert!(recovered.is_finite());
+        assert!(
+            (recovered - drift).abs() > 1e-6,
+            "Curran & Bauer: mixed CWC pairwise {recovered} must not equal raw-process drift {drift}"
+        );
+    }
+
+    #[test]
+    fn cwc_irregular_residual_paths_fail_closed() {
+        let rows = decaying_clustered_scores(-0.25);
+        assert_eq!(
+            center_within_cluster_event_lags(&rows, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            center_within_cluster_event_lags(&[], LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(&[], LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_within_cluster_event_lags(
+                &[clustered(1, 0.0, 1.0), clustered(1, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InsufficientClusters)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(
+                &[clustered(1, 0.0, 1.0), clustered(1, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InsufficientClusters)
+        );
+        assert_eq!(
+            center_within_cluster_event_lags(
+                &[clustered(1, 0.0, 1.0), clustered(2, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_within_cluster_event_lags(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 0.0, 1.2),
+                    clustered(2, 0.0, 2.0),
+                    clustered(2, 1.0, 1.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 0.0, 1.2),
+                    clustered(2, 0.0, 2.0),
+                    clustered(2, 1.0, 1.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            refuse_cwc_residual_log_rate_as_raw_process_drift(f64::NAN, f64::INFINITY),
+            Err(PsychometricError::CwcResidualLogRateIsNotRawProcessDrift)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 1.0, 0.5),
+                    clustered(2, 0.0, 2.0),
+                    clustered(2, 1.0, 1.0),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 1.0, 2.0),
+                    clustered(1, 2.0, 3.0),
+                    clustered(2, 0.0, 4.0),
+                    clustered(2, 1.0, 5.0),
+                    clustered(2, 2.0, 6.0),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn cwc_irregular_residual_numeric_inputs_fail_closed() {
+        assert_eq!(
+            center_within_cluster_event_lags(
+                &[
+                    clustered(1, 0.0, f64::NAN),
+                    clustered(1, 1.0, 1.0),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, f64::INFINITY),
+                    clustered(1, 1.0, 1.0),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, f64::MAX),
+                    clustered(1, 1.0, f64::MAX),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_within_cluster_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, f64::from_bits(1)),
+                    clustered(1, 1.0, f64::MAX),
+                    clustered(1, 2.0, -f64::MAX),
+                    clustered(2, 0.0, f64::from_bits(1)),
+                    clustered(2, 1.0, f64::MAX),
+                    clustered(2, 2.0, -f64::MAX),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 
@@ -11147,8 +11472,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -11723,8 +12048,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
         // λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ.
@@ -12300,8 +12625,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of stationary T0VAR is
         // λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ.
@@ -14455,8 +14780,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
+    ) {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -14606,8 +14931,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -15225,8 +15550,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,
