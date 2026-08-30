@@ -35,19 +35,19 @@ use psychometric_core::{
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_standardised_asymptotic_continuous_intercept,
-    recover_standardised_asymptotic_diffusion, recover_standardised_asymptotic_time_independent_predictor_variance,
-    recover_standardised_continuous_intercept,
-    recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
-    recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_asymptotic_diffusion,
+    recover_standardised_asymptotic_time_independent_predictor_variance,
+    recover_standardised_continuous_intercept, recover_standardised_discrete_continuous_intercept,
+    recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
+    recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
+    recover_standardised_manifest_variance, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -6289,8 +6289,8 @@ fn standardised_added_time_independent_variance_recovers_driver_section_seven_tw
         (larger - recovered).abs() < 1e-15,
         "Driver et al. (2017, p. 16): distinct positive extra recover the same addedTIPREDVARstd"
     );
-    let trait_std = recover_standardised_trait_variance(extra, LagClock::EventTime)
-        .expect("TRAITVARstd");
+    let trait_std =
+        recover_standardised_trait_variance(extra, LagClock::EventTime).expect("TRAITVARstd");
     assert!(
         (trait_std - recovered).abs() < 1e-15,
         "Driver et al. (2017, p. 16): TRAITVARstd equals 1 after strictly positive TRAITVAR"
@@ -6341,8 +6341,8 @@ fn standardised_added_time_independent_variance_recovers_driver_section_seven_tw
 }
 
 #[test]
-fn standardised_added_time_independent_variance_refuses_non_event_clocks_and_does_not_keep_zero_extra(
-) {
+fn standardised_added_time_independent_variance_refuses_non_event_clocks_and_does_not_keep_zero_extra()
+ {
     assert_eq!(
         recover_standardised_asymptotic_time_independent_predictor_variance(
             0.4,

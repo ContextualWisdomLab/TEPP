@@ -16292,8 +16292,8 @@ mod tests {
     }
 
     #[test]
-    fn standardised_added_time_independent_variance_recovers_driver_section_seven_two_after_positive_extra(
-    ) {
+    fn standardised_added_time_independent_variance_recovers_driver_section_seven_two_after_positive_extra()
+     {
         // Driver et al. (2017, §7.2 addedTIPREDVAR; p. 16
         // addedTIPREDVARstd; 2017-era summary.ctsemFit.R): form
         // strictly positive extra (B/a)² v, then
