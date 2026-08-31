@@ -1,0 +1,1 @@
+- `tepp_api` loopback `POST /v1/analysis-runs/{run_id}/retry` clones failed or cancelled runs into a metric-free new `202 Accepted` with a new idempotency key (ADR 0032). Accepted/running/succeeded/unknown retry fails closed. Not GET-by-id, not lifecycle POST, not cancel, not collection GET, not persistence.

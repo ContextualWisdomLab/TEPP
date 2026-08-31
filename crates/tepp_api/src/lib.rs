@@ -16,6 +16,7 @@ mod analysis_run;
 mod analysis_run_cancel_http;
 mod analysis_run_collection_http;
 mod analysis_run_live;
+mod analysis_run_retry_http;
 mod analysis_run_status_http;
 mod authorization;
 mod corpus_split_manifest;
@@ -105,6 +106,16 @@ pub use analysis_run_collection_http::parse_collection_page_limit;
 pub use analysis_run_collection_http::refuse_metrics_on_collection_payload;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
+/// Analysis-run retry contract version constant.
+pub use analysis_run_retry_http::ANALYSIS_RUN_RETRY_CONTRACT_VERSION;
+/// Maximum opaque run identity length on the retry path.
+pub use analysis_run_retry_http::ANALYSIS_RUN_RETRY_ID_MAX_LEN;
+/// Versioned analysis-run retry request.
+pub use analysis_run_retry_http::AnalysisRunRetryRequest;
+/// Build a Naruon analysis-run retry exchange.
+pub use analysis_run_retry_http::naruon_analysis_run_retry_exchange;
+/// Refuse scientific-metric keys on a retry payload.
+pub use analysis_run_retry_http::refuse_metrics_on_retry_payload;
 /// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
 /// Corpus-split leakage-audit contract version.
