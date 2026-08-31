@@ -17901,6 +17901,38 @@ mod tests {
     }
 
     #[test]
+    fn linear_detrend_residuals_are_invariant_to_grand_mean_centering_time() {
+        let rows = orthogonal_linear_detrend_rows();
+        let raw = center_within_cluster_linear_detrend_event_lags(&rows, LagClock::EventTime)
+            .expect("raw time");
+        let time_mean = rows.iter().map(|row| row.event_time).sum::<f64>() / (rows.len() as f64);
+        let shifted: Vec<ClusteredEventScore> = rows
+            .iter()
+            .map(|row| clustered(row.cluster_key, row.event_time - time_mean, row.score))
+            .collect();
+        let centered_time =
+            center_within_cluster_linear_detrend_event_lags(&shifted, LagClock::EventTime)
+                .expect("centered time");
+        assert_eq!(raw.len(), centered_time.len());
+        for (left, right) in raw.iter().zip(&centered_time) {
+            assert!((left.earlier_residual - right.earlier_residual).abs() < 1e-12);
+            assert!((left.later_residual - right.later_residual).abs() < 1e-12);
+            assert!((left.event_delta - right.event_delta).abs() < 1e-15);
+        }
+        let raw_rate = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+            &rows,
+            LagClock::EventTime,
+        )
+        .expect("raw rate");
+        let shifted_rate = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+            &shifted,
+            LagClock::EventTime,
+        )
+        .expect("shifted rate");
+        assert!((raw_rate - shifted_rate).abs() < 1e-15);
+    }
+
+    #[test]
     fn t2_linear_detrend_interpolates_to_zero() {
         let rows = two_wave_level_separated();
         let pairs = center_within_cluster_linear_detrend_event_lags(&rows, LagClock::EventTime)
