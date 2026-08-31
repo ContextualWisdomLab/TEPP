@@ -1,11 +1,15 @@
-//! Provider-owned analysis-run stored-request GET contracts.
+//! Provider-owned analysis-run retry-parent GET contracts.
 //!
-//! GAP-003A ninth slice: `GET /v1/analysis-runs/{run_id}/request` returns the
-//! metric-free stored create fields operators need before retry — snapshot,
-//! cutoff, model contract, and output profile. Collection GET lists identity
-//! only. GET-by-id (#359) remains a later slice on this stack. Retry HTTP
-//! (#369) clones blindly. This module does not serve lifecycle POST, cancel,
-//! collection GET, retry POST, or loopback CLI. Persistence remains GAP-003B.
+//! GAP-003A twelfth slice: `GET /v1/analysis-runs/{run_id}/parent` returns the
+//! metric-free parent identity of a listed run. Retry-lineage GET lists
+//! children of a parent. Collection GET lists parent and child independently
+//! without `retried_from`. Idempotency-key lookup resolves a key to a
+//! `run_id` without linkage. Operators looking at a retry child therefore
+//! cannot see which parent it came from. This module does not serve GET-by-id
+//! (#359), lifecycle POST (#360), cancel HTTP (#361), loopback CLI (#362),
+//! collection GET (#368), retry POST (#369), stored-request GET (#377),
+//! retry-lineage GET (#379), or idempotency-key lookup GET (#380).
+//! Persistence remains GAP-003B.
 
 use crate::naruon_http::{NaruonHttpExchange, compose_https_target};
 use crate::wire::{
@@ -16,13 +20,13 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-/// Maximum length accepted for an opaque run identity in the stored-request path.
-pub const ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN: usize = 128;
+/// Maximum length accepted for an opaque run identity in the retry-parent path.
+pub const ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN: usize = 128;
 
-/// Supported analysis-run stored-request contract version.
-pub const ANALYSIS_RUN_STORED_REQUEST_CONTRACT_VERSION: u16 = 1;
+/// Supported analysis-run retry-parent contract version.
+pub const ANALYSIS_RUN_RETRY_PARENT_CONTRACT_VERSION: u16 = 1;
 
-const FORBIDDEN_STORED_REQUEST_KEYS: [&str; 14] = [
+const FORBIDDEN_RETRY_PARENT_KEYS: [&str; 14] = [
     "rmse",
     "rmse_standard_error",
     "mean_bias",
@@ -39,34 +43,75 @@ const FORBIDDEN_STORED_REQUEST_KEYS: [&str; 14] = [
     "tenant_workspace_id",
 ];
 
-/// Metric-free stored create fields for one analysis run.
+/// One metric-free parent identity of a retry child.
 ///
-/// Operators inspect snapshot, cutoff, model contract, and output profile
-/// before retry. The payload never carries a terminal result or
-/// scientific-acceptance artifact.
+/// The row names the original attempt. It never carries a terminal result,
+/// snapshot, or scientific-acceptance artifact.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct AnalysisRunStoredRequest {
-    /// Semantic contract version for this payload family.
-    pub contract_version: u16,
-    /// Opaque server-assigned run identity.
+pub struct AnalysisRunRetryParentItem {
+    /// Opaque server-assigned parent run identity.
     pub run_id: String,
-    /// Current lifecycle state.
+    /// Current lifecycle state of the parent.
     pub run_state: AnalysisRunStatusState,
-    /// Exact request idempotency key of this run.
+    /// Exact request idempotency key of the parent.
     pub idempotency_key: String,
-    /// Immutable corpus/evidence snapshot identity.
-    pub snapshot_id: String,
-    /// Knowledge cutoff instant as an ISO-8601 / RFC 3339 string.
-    pub knowledge_cutoff: String,
-    /// Versioned model/backend contract identity.
-    pub model_contract_version: String,
-    /// Requested output profile name.
-    pub output_profile: String,
 }
 
-impl AnalysisRunStoredRequest {
-    /// Construct a validated metric-free stored-request payload.
+impl AnalysisRunRetryParentItem {
+    /// Construct a validated metric-free retry-parent identity row.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed error for empty identities or an oversized run
+    /// identity.
+    pub fn new(
+        run_id: impl Into<String>,
+        run_state: AnalysisRunStatusState,
+        idempotency_key: impl Into<String>,
+    ) -> Result<Self, ApiError> {
+        let item = Self {
+            run_id: run_id.into(),
+            run_state,
+            idempotency_key: idempotency_key.into(),
+        };
+        item.validate()?;
+        Ok(item)
+    }
+
+    fn validate(&self) -> Result<(), ApiError> {
+        require_nonempty(&self.run_id)?;
+        require_nonempty(&self.idempotency_key)?;
+        if self.run_id.len() > ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN {
+            return Err(ApiError::LimitExceeded);
+        }
+        Ok(())
+    }
+}
+
+/// Metric-free retry parent for one analysis run.
+///
+/// Operators inspect which listed run a retry child was cloned from.
+/// `parent` is JSON `null` when the run was never retried from another run.
+/// The payload never carries a terminal result or scientific-acceptance
+/// artifact. The `parent` key is always present.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnalysisRunRetryParent {
+    /// Semantic contract version for this payload family.
+    pub contract_version: u16,
+    /// Opaque server-assigned child (or original) run identity.
+    pub run_id: String,
+    /// Current lifecycle state of the inspected run.
+    pub run_state: AnalysisRunStatusState,
+    /// Exact request idempotency key of the inspected run.
+    pub idempotency_key: String,
+    /// Direct parent identity, or `null` when this run was never retried.
+    pub parent: Option<AnalysisRunRetryParentItem>,
+}
+
+impl AnalysisRunRetryParent {
+    /// Construct a validated metric-free retry-parent payload.
     ///
     /// # Errors
     ///
@@ -76,26 +121,20 @@ impl AnalysisRunStoredRequest {
         run_id: impl Into<String>,
         run_state: AnalysisRunStatusState,
         idempotency_key: impl Into<String>,
-        snapshot_id: impl Into<String>,
-        knowledge_cutoff: impl Into<String>,
-        model_contract_version: impl Into<String>,
-        output_profile: impl Into<String>,
+        parent: Option<AnalysisRunRetryParentItem>,
     ) -> Result<Self, ApiError> {
-        let stored = Self {
-            contract_version: ANALYSIS_RUN_STORED_REQUEST_CONTRACT_VERSION,
+        let payload = Self {
+            contract_version: ANALYSIS_RUN_RETRY_PARENT_CONTRACT_VERSION,
             run_id: run_id.into(),
             run_state,
             idempotency_key: idempotency_key.into(),
-            snapshot_id: snapshot_id.into(),
-            knowledge_cutoff: knowledge_cutoff.into(),
-            model_contract_version: model_contract_version.into(),
-            output_profile: output_profile.into(),
+            parent,
         };
-        stored.validate()?;
-        Ok(stored)
+        payload.validate()?;
+        Ok(payload)
     }
 
-    /// Parse and validate a stored-request payload with the default byte limit.
+    /// Parse and validate a retry-parent payload with the default byte limit.
     ///
     /// # Errors
     ///
@@ -104,20 +143,20 @@ impl AnalysisRunStoredRequest {
         Self::from_json_with_limit(payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
     }
 
-    /// Parse and validate a stored-request payload with a caller-supplied limit.
+    /// Parse and validate a retry-parent payload with a caller-supplied limit.
     ///
     /// # Errors
     ///
     /// Returns wire, version, limit, metric-key, or field-validation errors.
     pub fn from_json_with_limit(payload: &str, maximum_bytes: usize) -> Result<Self, ApiError> {
         require_byte_limit(payload, maximum_bytes)?;
-        refuse_metrics_on_stored_request_payload(payload)?;
-        let stored: Self = from_json(payload)?;
-        stored.validate()?;
-        Ok(stored)
+        refuse_metrics_on_retry_parent_payload(payload)?;
+        let decoded: Self = from_json(payload)?;
+        decoded.validate()?;
+        Ok(decoded)
     }
 
-    /// Serialize this stored-request payload after complete validation.
+    /// Serialize this retry-parent payload after complete validation.
     ///
     /// # Errors
     ///
@@ -126,29 +165,28 @@ impl AnalysisRunStoredRequest {
         self.validate()?;
         let payload = to_json(self)?;
         require_byte_limit(&payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)?;
-        refuse_metrics_on_stored_request_payload(&payload)?;
+        refuse_metrics_on_retry_parent_payload(&payload)?;
         Ok(payload)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(
             self.contract_version,
-            ANALYSIS_RUN_STORED_REQUEST_CONTRACT_VERSION,
+            ANALYSIS_RUN_RETRY_PARENT_CONTRACT_VERSION,
         )?;
         require_nonempty(&self.run_id)?;
         require_nonempty(&self.idempotency_key)?;
-        require_nonempty(&self.snapshot_id)?;
-        require_nonempty(&self.knowledge_cutoff)?;
-        require_nonempty(&self.model_contract_version)?;
-        require_nonempty(&self.output_profile)?;
-        if self.run_id.len() > ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN {
+        if self.run_id.len() > ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN {
             return Err(ApiError::LimitExceeded);
+        }
+        if let Some(parent) = &self.parent {
+            parent.validate()?;
         }
         Ok(())
     }
 }
 
-/// Refuse stored-request JSON that already carries scientific-metric keys.
+/// Refuse retry-parent JSON that already carries scientific-metric keys.
 ///
 /// Empty payloads are admitted for the GET request body. Non-object JSON
 /// fails closed as invalid wire.
@@ -157,7 +195,7 @@ impl AnalysisRunStoredRequest {
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when a forbidden metric key is
 /// present or the payload is a non-empty non-object.
-pub fn refuse_metrics_on_stored_request_payload(payload: &str) -> Result<(), ApiError> {
+pub fn refuse_metrics_on_retry_parent_payload(payload: &str) -> Result<(), ApiError> {
     if payload.trim().is_empty() {
         return Ok(());
     }
@@ -166,7 +204,7 @@ pub fn refuse_metrics_on_stored_request_payload(payload: &str) -> Result<(), Api
     let Some(object) = value.as_object() else {
         return Err(ApiError::InvalidWirePayload);
     };
-    if FORBIDDEN_STORED_REQUEST_KEYS
+    if FORBIDDEN_RETRY_PARENT_KEYS
         .iter()
         .any(|key| object.contains_key(*key))
     {
@@ -175,15 +213,16 @@ pub fn refuse_metrics_on_stored_request_payload(payload: &str) -> Result<(), Api
     Ok(())
 }
 
-/// Extract the opaque run identity from `GET /v1/analysis-runs/{run_id}/request`.
+/// Extract the opaque run identity from `GET /v1/analysis-runs/{run_id}/parent`.
 ///
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] for a collection path, extra
-/// segments, a missing `/request` suffix, cancel/retry/running/terminal
-/// suffixes, or a hostile encoding, and [`ApiError::LimitExceeded`] when the
-/// decoded identity exceeds [`ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN`].
-pub(crate) fn analysis_run_stored_request_path_run_id(path: &str) -> Result<String, ApiError> {
+/// segments, a missing `/parent` suffix, cancel/retry/retries/request/
+/// running/terminal suffixes, or a hostile encoding, and
+/// [`ApiError::LimitExceeded`] when the decoded identity exceeds
+/// [`ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN`].
+pub(crate) fn analysis_run_retry_parent_path_run_id(path: &str) -> Result<String, ApiError> {
     let remainder = path
         .strip_prefix(ANALYSIS_RUN_STATUS_PATH)
         .ok_or(ApiError::InvalidWirePayload)?;
@@ -191,19 +230,19 @@ pub(crate) fn analysis_run_stored_request_path_run_id(path: &str) -> Result<Stri
         .strip_prefix('/')
         .ok_or(ApiError::InvalidWirePayload)?;
     let encoded = encoded
-        .strip_suffix("/request")
+        .strip_suffix("/parent")
         .ok_or(ApiError::InvalidWirePayload)?;
     if encoded.is_empty() || encoded.contains('/') {
         return Err(ApiError::InvalidWirePayload);
     }
     let run_id = decode_path_segment(encoded)?;
-    if run_id.len() > ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN {
+    if run_id.len() > ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN {
         return Err(ApiError::LimitExceeded);
     }
     Ok(run_id)
 }
 
-/// Build a provider-owned `GET` analysis-run stored-request exchange.
+/// Build a provider-owned `GET` analysis-run retry-parent exchange.
 ///
 /// The builder refuses non-`https` origins and empty or oversized run
 /// identifiers. It does not inject credentials. The GET body is empty.
@@ -212,17 +251,17 @@ pub(crate) fn analysis_run_stored_request_path_run_id(path: &str) -> Result<Stri
 ///
 /// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin or empty
 /// identity, and [`ApiError::LimitExceeded`] when the run identity exceeds
-/// [`ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN`] bytes.
-pub fn naruon_analysis_run_stored_request_exchange(
+/// [`ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN`] bytes.
+pub fn naruon_analysis_run_retry_parent_exchange(
     origin: &str,
     run_id: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
     require_nonempty(run_id)?;
-    if run_id.len() > ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN {
+    if run_id.len() > ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN {
         return Err(ApiError::LimitExceeded);
     }
     let encoded_run_id = encode_path_segment(run_id);
-    let target_path = format!("{ANALYSIS_RUN_STATUS_PATH}/{encoded_run_id}/request");
+    let target_path = format!("{ANALYSIS_RUN_STATUS_PATH}/{encoded_run_id}/parent");
     let target_url = compose_https_target(origin, &target_path)?;
     Ok(NaruonHttpExchange {
         method: "GET",
@@ -296,202 +335,212 @@ fn from_hex(byte: u8) -> Result<u8, ApiError> {
 mod tests {
     use super::*;
 
-    fn sample_stored() -> AnalysisRunStoredRequest {
-        AnalysisRunStoredRequest::new(
-            "tepp-run-1",
-            AnalysisRunStatusState::Failed,
-            "idem-1",
-            "snapshot-1",
-            "2026-08-01T00:00:00Z",
-            "tepp-analysis-run-v1",
-            "calibrated_event_measurement",
+    fn sample_parent() -> AnalysisRunRetryParent {
+        AnalysisRunRetryParent::new(
+            "tepp-run-2",
+            AnalysisRunStatusState::Accepted,
+            "idem-retry-1",
+            Some(
+                AnalysisRunRetryParentItem::new(
+                    "tepp-run-1",
+                    AnalysisRunStatusState::Failed,
+                    "idem-1",
+                )
+                .expect("parent"),
+            ),
         )
-        .expect("stored")
+        .expect("payload")
     }
 
     #[test]
-    fn stored_request_round_trips_and_refuses_hostile_shapes() {
-        let stored = sample_stored();
-        let json = stored.to_json().expect("json");
+    fn retry_parent_round_trips_and_refuses_hostile_shapes() {
+        let payload = sample_parent();
+        let json = payload.to_json().expect("json");
         assert_eq!(
-            AnalysisRunStoredRequest::from_json(&json).expect("decode"),
-            stored
+            AnalysisRunRetryParent::from_json(&json).expect("decode"),
+            payload
         );
+        assert!(json.contains("\"parent\":{") || json.contains("\"parent\": {"));
         assert!(!json.contains("rmse"));
         assert!(!json.contains("scientific_acceptance"));
         assert!(!json.contains("terminal_result"));
         assert!(!json.contains("tenant_workspace_id"));
+        assert!(!json.contains("snapshot_id"));
+        assert!(!json.contains("retried_from"));
+
+        let original = AnalysisRunRetryParent::new(
+            "tepp-run-1",
+            AnalysisRunStatusState::Failed,
+            "idem-1",
+            None,
+        )
+        .expect("original");
+        let original_json = original.to_json().expect("original json");
+        assert!(original_json.contains("\"parent\":null"));
+        assert_eq!(
+            AnalysisRunRetryParent::from_json(&original_json).expect("null parent"),
+            original
+        );
 
         assert_eq!(
-            AnalysisRunStoredRequest::new(
-                "",
-                AnalysisRunStatusState::Failed,
-                "idem-1",
-                "snapshot-1",
-                "2026-08-01T00:00:00Z",
-                "tepp-analysis-run-v1",
-                "calibrated_event_measurement",
-            ),
+            AnalysisRunRetryParent::new("", AnalysisRunStatusState::Failed, "idem-1", None,),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::new(
-                "tepp-run-1",
-                AnalysisRunStatusState::Failed,
-                "",
-                "snapshot-1",
-                "2026-08-01T00:00:00Z",
-                "tepp-analysis-run-v1",
-                "calibrated_event_measurement",
-            ),
+            AnalysisRunRetryParent::new("tepp-run-1", AnalysisRunStatusState::Failed, "", None,),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::new(
-                "a".repeat(ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN + 1),
+            AnalysisRunRetryParent::new(
+                "a".repeat(ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN + 1),
                 AnalysisRunStatusState::Failed,
                 "idem-1",
-                "snapshot-1",
-                "2026-08-01T00:00:00Z",
-                "tepp-analysis-run-v1",
-                "calibrated_event_measurement",
+                None,
+            ),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(
+            AnalysisRunRetryParentItem::new(
+                "a".repeat(ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN + 1),
+                AnalysisRunStatusState::Failed,
+                "idem-1",
             ),
             Err(ApiError::LimitExceeded)
         );
 
-        let mut unsupported = stored.clone();
+        let mut unsupported = payload.clone();
         unsupported.contract_version = 9;
         assert_eq!(
             unsupported.to_json(),
             Err(ApiError::UnsupportedContractVersion)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::from_json(
-                r#"{"contract_version":9,"run_id":"tepp-run-1","run_state":"failed","idempotency_key":"idem-1","snapshot_id":"snapshot-1","knowledge_cutoff":"2026-08-01T00:00:00Z","model_contract_version":"tepp-analysis-run-v1","output_profile":"calibrated_event_measurement"}"#
+            AnalysisRunRetryParent::from_json(
+                r#"{"contract_version":9,"run_id":"tepp-run-1","run_state":"failed","idempotency_key":"idem-1","parent":null}"#
             ),
             Err(ApiError::UnsupportedContractVersion)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::from_json(
-                r#"{"contract_version":1,"run_id":"tepp-run-1","run_state":"failed","idempotency_key":"idem-1","snapshot_id":"snapshot-1","knowledge_cutoff":"2026-08-01T00:00:00Z","model_contract_version":"tepp-analysis-run-v1","output_profile":"calibrated_event_measurement","extra":true}"#
+            AnalysisRunRetryParent::from_json(
+                r#"{"contract_version":1,"run_id":"tepp-run-1","run_state":"failed","idempotency_key":"idem-1","parent":null,"extra":true}"#
             ),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::from_json_with_limit(&json, 8),
+            AnalysisRunRetryParent::from_json_with_limit(&json, 8),
             Err(ApiError::LimitExceeded)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::from_json("[1,2,3]"),
+            AnalysisRunRetryParent::from_json("[1,2,3]"),
             Err(ApiError::InvalidWirePayload)
         );
     }
 
     #[test]
-    fn stored_request_payloads_refuse_scientific_metric_keys() {
-        assert_eq!(refuse_metrics_on_stored_request_payload(""), Ok(()));
-        assert_eq!(refuse_metrics_on_stored_request_payload("   "), Ok(()));
+    fn retry_parent_payloads_refuse_scientific_metric_keys() {
+        assert_eq!(refuse_metrics_on_retry_parent_payload(""), Ok(()));
+        assert_eq!(refuse_metrics_on_retry_parent_payload("   "), Ok(()));
         assert_eq!(
-            refuse_metrics_on_stored_request_payload(r#"{"run_id":"r"}"#),
+            refuse_metrics_on_retry_parent_payload(r#"{"run_id":"r"}"#),
             Ok(())
         );
-        for key in FORBIDDEN_STORED_REQUEST_KEYS {
+        for key in FORBIDDEN_RETRY_PARENT_KEYS {
             let payload = format!(r#"{{"{key}":1,"run_id":"r"}}"#);
             assert_eq!(
-                refuse_metrics_on_stored_request_payload(&payload),
+                refuse_metrics_on_retry_parent_payload(&payload),
                 Err(ApiError::InvalidWirePayload),
                 "key={key}"
             );
         }
         assert_eq!(
-            refuse_metrics_on_stored_request_payload("[true]"),
+            refuse_metrics_on_retry_parent_payload("[true]"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            refuse_metrics_on_stored_request_payload("null"),
+            refuse_metrics_on_retry_parent_payload("null"),
             Err(ApiError::InvalidWirePayload)
         );
     }
 
     #[test]
-    fn stored_request_path_decodes_identities_and_refuses_hostile_segments() {
+    fn retry_parent_path_decodes_identities_and_refuses_hostile_segments() {
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/request")
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/tepp-run-1/parent")
                 .expect("plain"),
             "tepp-run-1"
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/run%2dabc/request")
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/run%2dabc/parent")
                 .expect("lower"),
             "run-abc"
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/run%2Dabc/request")
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/run%2Dabc/parent")
                 .expect("upper"),
             "run-abc"
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/tepp-run-1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/cancel"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/tepp-run-1/cancel"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/retry"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/tepp-run-1/retry"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/retries"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/tepp-run-1/retries"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/parent"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/tepp-run-1/request"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/by-idempotency/idem-1"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/by-idempotency/idem-1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/running"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/tepp-run-1/running"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/terminal"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/tepp-run-1/terminal"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/other/tepp-run-1/request"),
+            analysis_run_retry_parent_path_run_id("/v1/other/tepp-run-1/parent"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs//request"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs//parent"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/a/b/request"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/a/b/parent"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/%2F/request"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/%2F/parent"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/%00/request"),
+            analysis_run_retry_parent_path_run_id("/v1/analysis-runs/%00/parent"),
             Err(ApiError::InvalidWirePayload)
         );
         let oversized = format!(
-            "/v1/analysis-runs/{}/request",
-            "a".repeat(ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN + 1)
+            "/v1/analysis-runs/{}/parent",
+            "a".repeat(ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN + 1)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id(&oversized),
+            analysis_run_retry_parent_path_run_id(&oversized),
             Err(ApiError::LimitExceeded)
         );
         assert_eq!(decode_path_segment(""), Err(ApiError::InvalidWirePayload));
@@ -501,14 +550,14 @@ mod tests {
     }
 
     #[test]
-    fn stored_request_exchange_gets_https_path_without_credentials() {
+    fn retry_parent_exchange_gets_https_path_without_credentials() {
         let exchange =
-            naruon_analysis_run_stored_request_exchange("https://tepp.example.com", "tepp-run-1")
+            naruon_analysis_run_retry_parent_exchange("https://tepp.example.com", "tepp-run-1")
                 .expect("exchange");
         assert_eq!(exchange.method, "GET");
         assert_eq!(
             exchange.target_url,
-            "https://tepp.example.com/v1/analysis-runs/tepp-run-1/request"
+            "https://tepp.example.com/v1/analysis-runs/tepp-run-1/parent"
         );
         assert!(exchange.body.is_empty());
         assert!(
@@ -526,25 +575,23 @@ mod tests {
                     || name.contains("idempotency"))
         );
 
-        let encoded = naruon_analysis_run_stored_request_exchange(
-            "https://tepp.example.com",
-            "run/../../etc",
-        )
-        .expect("encoded");
-        assert!(encoded.target_url.contains("run%2F..%2F..%2Fetc/request"));
+        let encoded =
+            naruon_analysis_run_retry_parent_exchange("https://tepp.example.com", "run/../../etc")
+                .expect("encoded");
+        assert!(encoded.target_url.contains("run%2F..%2F..%2Fetc/parent"));
 
         assert_eq!(
-            naruon_analysis_run_stored_request_exchange("http://tepp.example.com", "tepp-run-1"),
+            naruon_analysis_run_retry_parent_exchange("http://tepp.example.com", "tepp-run-1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            naruon_analysis_run_stored_request_exchange("https://tepp.example.com", ""),
+            naruon_analysis_run_retry_parent_exchange("https://tepp.example.com", ""),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            naruon_analysis_run_stored_request_exchange(
+            naruon_analysis_run_retry_parent_exchange(
                 "https://tepp.example.com",
-                &"a".repeat(ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN + 1)
+                &"a".repeat(ANALYSIS_RUN_RETRY_PARENT_ID_MAX_LEN + 1)
             ),
             Err(ApiError::LimitExceeded)
         );

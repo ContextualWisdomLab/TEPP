@@ -444,6 +444,10 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1/parent"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1/running"),
             Err(ApiError::InvalidWirePayload)
         );

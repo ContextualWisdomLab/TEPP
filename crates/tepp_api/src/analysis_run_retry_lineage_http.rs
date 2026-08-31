@@ -518,6 +518,10 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            analysis_run_retry_lineage_path_run_id("/v1/analysis-runs/tepp-run-1/parent"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             analysis_run_retry_lineage_path_run_id("/v1/analysis-runs/by-idempotency/idem-1"),
             Err(ApiError::InvalidWirePayload)
         );

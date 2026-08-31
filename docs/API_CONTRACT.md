@@ -8,7 +8,7 @@
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary, `POST /v1/analysis-runs/{run_id}/cancel` for metric-free cancellation of accepted or running runs, `GET /v1/analysis-runs` for metric-free enumeration of accepted, running, cancelled, and terminal runs, and `POST /v1/analysis-runs/{run_id}/retry` for cloning a failed or cancelled run into a new metric-free `202 Accepted`, and `GET /v1/analysis-runs/{run_id}/request` for metric-free inspect of stored create fields, and `GET /v1/analysis-runs/{run_id}/retries` for metric-free inspect of direct retry children, and `GET /v1/analysis-runs/by-idempotency/{idempotency_key}` for metric-free resolve of a 202 receipt or retry child key to a durable run identity. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
+Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary, `POST /v1/analysis-runs/{run_id}/cancel` for metric-free cancellation of accepted or running runs, `GET /v1/analysis-runs` for metric-free enumeration of accepted, running, cancelled, and terminal runs, and `POST /v1/analysis-runs/{run_id}/retry` for cloning a failed or cancelled run into a new metric-free `202 Accepted`, and `GET /v1/analysis-runs/{run_id}/request` for metric-free inspect of stored create fields, and `GET /v1/analysis-runs/{run_id}/retries` for metric-free inspect of direct retry children, and `GET /v1/analysis-runs/by-idempotency/{idempotency_key}` for metric-free resolve of a 202 receipt or retry child key to a durable run identity, and `GET /v1/analysis-runs/{run_id}/parent` for metric-free inspect of a retry child's parent (`null` when the run was never retried). `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
 
 ## 2. Contract families
 
@@ -71,6 +71,7 @@ POST   /v1/analysis-runs/{run_id}/cancel
 POST   /v1/analysis-runs/{run_id}/retry
 GET    /v1/analysis-runs/{run_id}/request
 GET    /v1/analysis-runs/{run_id}/retries
+GET    /v1/analysis-runs/{run_id}/parent
 GET    /v1/analysis-runs/by-idempotency/{idempotency_key}
 GET    /v1/model-artifacts/{artifact_id}
 GET    /v1/exports/{export_id}
@@ -100,8 +101,11 @@ can inspect lineage after retry. An empty `retries` array is `200` when the
 parent was never retried. `GET /v1/analysis-runs/by-idempotency/{idempotency_key}`
 on the loopback listener returns the metric-free identity of the unique run
 that used that key so operators can jump from a 202 receipt or retry child
-key without scanning collection pages. GET-by-id remains a later slice on this
-protected-main lineage.
+key without scanning collection pages. `GET /v1/analysis-runs/{run_id}/parent`
+on the loopback listener returns the metric-free parent of that run so
+operators can inspect which listed run a retry child was cloned from. Original
+(never-retried) runs return `"parent": null`. GET-by-id remains a later slice
+on this protected-main lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
