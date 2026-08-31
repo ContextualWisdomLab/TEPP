@@ -12,10 +12,13 @@
 //! causality, or completed psychometric model results. `GET /v1/analysis-runs/{run_id}`
 //! on the loopback listener keeps accepted and running statuses metric-free;
 //! only a succeeded status with profile `scientific_acceptance_v1` may return
-//! `tepp.scientific_acceptance.v1`.
+//! `tepp.scientific_acceptance.v1`. `POST /v1/analysis-runs/{run_id}/running`
+//! and `POST /v1/analysis-runs/{run_id}/terminal` record those statuses on the
+//! same loopback listener.
 
 mod analysis_result;
 mod analysis_run;
+mod analysis_run_lifecycle_http;
 mod analysis_run_live;
 mod analysis_run_status_http;
 mod authorization;
@@ -73,6 +76,14 @@ pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 pub use analysis_run::requests_are_idempotent_matches;
 /// Require exact status binding to a request and accepted receipt.
 pub use analysis_run::require_status_binding;
+/// Lifecycle-transition contract version constant.
+pub use analysis_run_lifecycle_http::ANALYSIS_RUN_LIFECYCLE_CONTRACT_VERSION;
+/// Production HTTP running/terminal transition body.
+pub use analysis_run_lifecycle_http::AnalysisRunLifecycleTransition;
+/// Provider-owned running-status HTTP exchange builder.
+pub use analysis_run_lifecycle_http::naruon_analysis_run_running_exchange;
+/// Provider-owned terminal-status HTTP exchange builder.
+pub use analysis_run_lifecycle_http::naruon_analysis_run_terminal_exchange;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
 /// Analysis-run status HTTP exchange re-exports.

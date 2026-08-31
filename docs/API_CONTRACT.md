@@ -66,6 +66,8 @@ POST   /v1/interpretation-runs
 POST   /v1/analysis-runs
 POST   /v1/temporal-context
 GET    /v1/analysis-runs/{run_id}
+POST   /v1/analysis-runs/{run_id}/running
+POST   /v1/analysis-runs/{run_id}/terminal
 POST   /v1/analysis-runs/{run_id}/cancel
 GET    /v1/model-artifacts/{artifact_id}
 GET    /v1/exports/{export_id}
@@ -99,8 +101,11 @@ snapshot, cutoff, model, profile, and idempotency bindings before treating the
 run as measurement evidence. The loopback `AnalysisRunLiveService` now serves
 `GET /v1/analysis-runs/{run_id}` for those statuses: accepted and running GET
 bodies stay metric-free, and only a succeeded status with profile
-`scientific_acceptance_v1` may return `tepp.scientific_acceptance.v1`. Production
-TLS remains a later adapter.
+`scientific_acceptance_v1` may return `tepp.scientific_acceptance.v1`.
+`POST /v1/analysis-runs/{run_id}/running` and
+`POST /v1/analysis-runs/{run_id}/terminal` are the production loopback
+status-update path that records those statuses; they do not persist and do not
+execute psychometric estimation. Production TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

@@ -6,14 +6,19 @@
 //! accepts transport acknowledgements only. `GET /v1/analysis-runs/{run_id}`
 //! returns metric-free accepted/running status, and may return
 //! `tepp.scientific_acceptance.v1` only on a succeeded status whose request
-//! profile is `scientific_acceptance_v1`. Completed psychometric estimation
-//! remains outside this crate.
+//! profile is `scientific_acceptance_v1`. `POST /v1/analysis-runs/{run_id}/running`
+//! and `POST /v1/analysis-runs/{run_id}/terminal` are the production
+//! status-update path. Completed psychometric estimation remains outside this
+//! crate.
 
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
 
-use crate::analysis_run_status_http::analysis_run_status_path_run_id;
+use crate::analysis_run_lifecycle_http::AnalysisRunLifecycleTransition;
+use crate::analysis_run_status_http::{
+    AnalysisRunLiveRoute, analysis_run_status_path_run_id, parse_analysis_run_live_route,
+};
 use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};
 use crate::live_http::{
     header_value, map_io_error, parse_headers, parse_request_line, read_http_request_with_limit,
@@ -22,15 +27,12 @@ use crate::live_http::{
 use crate::naruon_http::NARUON_ANALYSIS_RUN_PATH;
 use crate::scientific_acceptance_http::{refuse_metrics_on_receipt, status_http_json};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunStatus, ApiError,
+    AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState, ApiError,
     DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse,
     PROJECT_HISTORY_PATH, ProjectHistoryProjection, ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH,
     TemporalContextRequest, build_temporal_context, project_history_projection,
-    requests_are_idempotent_matches,
+    requests_are_idempotent_matches, require_status_binding,
 };
-
-#[cfg(test)]
-use crate::require_status_binding;
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
 
@@ -168,19 +170,15 @@ impl AnalysisRunLiveService {
         if method == "GET" {
             return self.read_analysis_run_status(path, &headers, body);
         }
-        if method != "POST"
-            || (path != NARUON_ANALYSIS_RUN_PATH
-                && path != TEMPORAL_CONTEXT_PATH
-                && path != PROJECT_HISTORY_PATH)
-        {
+        if method != "POST" {
             return Err(ApiError::InvalidWirePayload);
         }
-        let consumer = require_headers(
-            &headers,
-            self.bound_addr,
-            path == NARUON_ANALYSIS_RUN_PATH || path == PROJECT_HISTORY_PATH,
-        )?;
+        if path == NARUON_ANALYSIS_RUN_PATH {
+            let consumer = require_headers(&headers, self.bound_addr, true)?;
+            return self.accept_analysis_run(consumer, &headers, body);
+        }
         if path == TEMPORAL_CONTEXT_PATH {
+            let consumer = require_headers(&headers, self.bound_addr, false)?;
             if consumer != LINEAGEWEAVE_CONSUMER_CODE {
                 return Err(ApiError::InvalidWirePayload);
             }
@@ -189,9 +187,18 @@ impl AnalysisRunLiveService {
             return Ok(json_response(200, "OK", response.to_json()?));
         }
         if path == PROJECT_HISTORY_PATH {
+            let consumer = require_headers(&headers, self.bound_addr, true)?;
             return self.accept_project_history(consumer, &headers, body);
         }
-        self.accept_analysis_run(consumer, &headers, body)
+        match parse_analysis_run_live_route(path)? {
+            AnalysisRunLiveRoute::Running { run_id } => {
+                self.post_running_status(&run_id, &headers, body)
+            }
+            AnalysisRunLiveRoute::Terminal { run_id } => {
+                self.post_terminal_status(&run_id, &headers, body)
+            }
+            AnalysisRunLiveRoute::Status { .. } => Err(ApiError::InvalidWirePayload),
+        }
     }
 
     fn accept_analysis_run(
@@ -276,10 +283,10 @@ impl AnalysisRunLiveService {
 
     /// Record a loopback lifecycle transition for an already accepted run.
     ///
-    /// Tests and the in-memory listener use this helper because completed
-    /// psychometric execution remains outside this crate. HTTP GET is the only
-    /// operator-visible status path.
-    #[cfg(test)]
+    /// HTTP `POST /v1/analysis-runs/{run_id}/running` and
+    /// `POST /v1/analysis-runs/{run_id}/terminal` call this after the request
+    /// is authenticated and parsed. Psychometric execution remains outside this
+    /// crate; this records the supplied status only.
     pub(crate) fn record_loopback_status(
         &mut self,
         run_id: &str,
@@ -307,6 +314,110 @@ impl AnalysisRunLiveService {
         stored.status = status;
         stored.scientific_acceptance_json = scientific_acceptance_json;
         Ok(())
+    }
+
+    fn post_running_status(
+        &mut self,
+        run_id: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        refuse_metrics_on_receipt(body)?;
+        let transition = AnalysisRunLifecycleTransition::from_json(body)?;
+        if transition.run_state != AnalysisRunStatusState::Running {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        self.commit_lifecycle_transition(run_id, headers, &transition)
+    }
+
+    fn post_terminal_status(
+        &mut self,
+        run_id: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let transition = AnalysisRunLifecycleTransition::from_json(body)?;
+        if !matches!(
+            transition.run_state,
+            AnalysisRunStatusState::Succeeded | AnalysisRunStatusState::Failed
+        ) {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        self.commit_lifecycle_transition(run_id, headers, &transition)
+    }
+
+    fn commit_lifecycle_transition(
+        &mut self,
+        path_run_id: &str,
+        headers: &HashMap<String, String>,
+        transition: &AnalysisRunLifecycleTransition,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if transition.run_id != path_run_id {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, true)?;
+        let idempotency_key = header_value(headers, "idempotency-key")?;
+        if idempotency_key != transition.idempotency_key {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let replay_key = self
+            .runs_by_id
+            .get(path_run_id)
+            .ok_or(ApiError::InvalidWirePayload)?
+            .clone();
+        let stored = self
+            .accepted_runs
+            .get(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if stored.consumer != consumer || stored.accepted.idempotency_key != idempotency_key {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let status = match transition.run_state {
+            AnalysisRunStatusState::Running => AnalysisRunStatus::running(&stored.accepted)?,
+            AnalysisRunStatusState::Succeeded | AnalysisRunStatusState::Failed => {
+                let result = transition
+                    .terminal_result
+                    .clone()
+                    .ok_or(ApiError::InvalidWirePayload)?;
+                AnalysisRunStatus::terminal(&stored.request, &stored.accepted, result)?
+            }
+            AnalysisRunStatusState::Accepted => return Err(ApiError::InvalidWirePayload),
+        };
+        if stored.status == status
+            && stored.scientific_acceptance_json == transition.scientific_acceptance_json
+        {
+            let response_body = status_http_json(
+                &stored.status,
+                &stored.request,
+                stored.scientific_acceptance_json.as_deref(),
+            )?;
+            return Ok(json_response(200, "OK", response_body));
+        }
+        match stored.status.run_state {
+            AnalysisRunStatusState::Accepted => {}
+            AnalysisRunStatusState::Running
+                if matches!(
+                    transition.run_state,
+                    AnalysisRunStatusState::Succeeded | AnalysisRunStatusState::Failed
+                ) => {}
+            AnalysisRunStatusState::Running
+            | AnalysisRunStatusState::Succeeded
+            | AnalysisRunStatusState::Failed => {
+                return Err(ApiError::InvalidWirePayload);
+            }
+        }
+        let artifact = transition.scientific_acceptance_json.clone();
+        self.record_loopback_status(path_run_id, status, artifact)?;
+        let stored = self
+            .accepted_runs
+            .get(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let response_body = status_http_json(
+            &stored.status,
+            &stored.request,
+            stored.scientific_acceptance_json.as_deref(),
+        )?;
+        Ok(json_response(200, "OK", response_body))
     }
 
     fn accept_project_history(
@@ -418,9 +529,9 @@ mod tests {
     use std::time::Duration;
 
     use super::{
-        AnalysisRunLiveService, consumer_tenant_idempotency_key, declared_content_length,
-        error_envelope_json, host_implies_table_access, map_io_error, parse_headers,
-        require_headers, split_header_line, status_for,
+        AnalysisRunLifecycleTransition, AnalysisRunLiveService, consumer_tenant_idempotency_key,
+        declared_content_length, error_envelope_json, host_implies_table_access, map_io_error,
+        parse_headers, require_headers, split_header_line, status_for,
     };
     use crate::live_http::{host_is_loopback, read_http_request, split_request};
     use crate::{
@@ -473,6 +584,13 @@ mod tests {
                 ("tepp-contract-version", "1"),
                 ("idempotency-key", idempotency_key),
             ],
+        )
+    }
+
+    fn lifecycle_post(path: &str, body: &str, consumer: &str, idempotency_key: &str) -> String {
+        format!(
+            "POST {path} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\nidempotency-key: {idempotency_key}\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
         )
     }
 
@@ -1314,6 +1432,385 @@ mod tests {
                 ))
                 .status_code,
             403
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&http_get(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+                    &[
+                        ("Host", "127.0.0.1"),
+                        ("content-type", "application/json"),
+                        ("tepp-consumer", NARUON_CONSUMER_CODE),
+                        ("tepp-contract-version", "1"),
+                        ("idempotency-key", run.idempotency_key.as_str()),
+                    ],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&http_get(
+                    &format!(
+                        "{NARUON_ANALYSIS_RUN_PATH}/{}/terminal",
+                        accepted_dto.run_id
+                    ),
+                    &[
+                        ("Host", "127.0.0.1"),
+                        ("content-type", "application/json"),
+                        ("tepp-consumer", NARUON_CONSUMER_CODE),
+                        ("tepp-contract-version", "1"),
+                        ("idempotency-key", run.idempotency_key.as_str()),
+                    ],
+                ))
+                .status_code,
+            400
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn production_http_lifecycle_posts_record_running_and_terminal_status() {
+        let mut run = sample_run();
+        run.output_profile = SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE.into();
+        let mut service = AnalysisRunLiveService::new();
+        let accepted =
+            service.handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"));
+        assert_eq!(accepted.status_code, 202);
+        let accepted_dto = AnalysisRunAccepted::from_json(&accepted.body).expect("accepted");
+
+        let put = format!(
+            "PUT {NARUON_ANALYSIS_RUN_PATH}/{} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: 2\r\n\r\n{{}}",
+            accepted_dto.run_id, run.idempotency_key
+        );
+        assert_eq!(service.handle_http_request(&put).status_code, 400);
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}", accepted_dto.run_id),
+                    "{}",
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+
+        let running = AnalysisRunLifecycleTransition::running(
+            accepted_dto.run_id.clone(),
+            run.idempotency_key.clone(),
+        )
+        .expect("running");
+        let running_json = running.to_json().expect("running json");
+        let post_running = service.handle_http_request(&lifecycle_post(
+            &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+            &running_json,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        ));
+        assert_eq!(post_running.status_code, 200);
+        assert!(post_running.body.contains("\"running\""));
+        assert!(!post_running.body.contains("rmse"));
+        assert!(!post_running.body.contains("scientific_acceptance"));
+        let replay_running = service.handle_http_request(&lifecycle_post(
+            &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+            &running_json,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        ));
+        assert_eq!(replay_running.body, post_running.body);
+
+        let mismatched_id =
+            AnalysisRunLifecycleTransition::running("tepp-run-other", run.idempotency_key.clone())
+                .expect("other id");
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+                    &mismatched_id.to_json().expect("json"),
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+                    &running_json.replacen('{', r#"{"rmse":0.1,"#, 1),
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+                    &running_json,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+                    &running_json,
+                    NARUON_CONSUMER_CODE,
+                    "wrong-key",
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/missing/running"),
+                    &AnalysisRunLifecycleTransition::running(
+                        "missing",
+                        run.idempotency_key.clone()
+                    )
+                    .expect("missing")
+                    .to_json()
+                    .expect("json"),
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+
+        let artifact = format!(
+            r#"{{"schema_version":"{SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA}","output_profile":"{SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE}","binding_sha256":"{}","run_id":"{}"}}"#,
+            "ab".repeat(32),
+            accepted_dto.run_id
+        );
+        let digest = sha256_hex(artifact.as_bytes());
+        let terminal = AnalysisRunTerminalResult::succeeded(
+            &run,
+            &accepted_dto,
+            "artifact-live-1",
+            digest,
+            SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA,
+            "2026-08-02T03:04:05Z",
+            AnalysisResultSummary::new("scientific_acceptance", 4, 8, "validated")
+                .expect("summary"),
+        )
+        .expect("terminal");
+        let transition = AnalysisRunLifecycleTransition::terminal(
+            accepted_dto.run_id.clone(),
+            run.idempotency_key.clone(),
+            terminal.clone(),
+            Some(artifact.clone()),
+        )
+        .expect("transition");
+        let terminal_json = transition.to_json().expect("terminal json");
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+                    &terminal_json,
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        let post_terminal = service.handle_http_request(&lifecycle_post(
+            &format!(
+                "{NARUON_ANALYSIS_RUN_PATH}/{}/terminal",
+                accepted_dto.run_id
+            ),
+            &terminal_json,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        ));
+        assert_eq!(post_terminal.status_code, 200);
+        assert!(
+            post_terminal
+                .body
+                .contains(SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA)
+        );
+        assert!(post_terminal.body.contains("scientific_acceptance"));
+        let replay_terminal = service.handle_http_request(&lifecycle_post(
+            &format!(
+                "{NARUON_ANALYSIS_RUN_PATH}/{}/terminal",
+                accepted_dto.run_id
+            ),
+            &terminal_json,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        ));
+        assert_eq!(replay_terminal.body, post_terminal.body);
+        let get_succeeded = service.handle_http_request(&status_get(
+            &accepted_dto.run_id,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        ));
+        assert_eq!(get_succeeded.body, post_terminal.body);
+
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", accepted_dto.run_id),
+                    &running_json,
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        let failed = AnalysisRunTerminalResult::failed(
+            &run,
+            &accepted_dto,
+            "2026-08-02T03:04:05Z",
+            "estimation_failed",
+        )
+        .expect("failed");
+        let failed_transition = AnalysisRunLifecycleTransition::terminal(
+            accepted_dto.run_id.clone(),
+            run.idempotency_key.clone(),
+            failed,
+            None,
+        )
+        .expect("failed transition");
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!(
+                        "{NARUON_ANALYSIS_RUN_PATH}/{}/terminal",
+                        accepted_dto.run_id
+                    ),
+                    &failed_transition.to_json().expect("json"),
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!(
+                        "{NARUON_ANALYSIS_RUN_PATH}/{}/terminal",
+                        accepted_dto.run_id
+                    ),
+                    &running_json,
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+
+        let mut ghost = AnalysisRunLiveService::new();
+        ghost
+            .runs_by_id
+            .insert("ghost".into(), "missing-replay".into());
+        assert_eq!(
+            ghost
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/ghost/running"),
+                    &AnalysisRunLifecycleTransition::running("ghost", run.idempotency_key.clone())
+                        .expect("ghost")
+                        .to_json()
+                        .expect("json"),
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+
+        let ordinary = sample_run();
+        let mut ordinary_service = AnalysisRunLiveService::new();
+        let ordinary_accepted = ordinary_service.handle_http_request(&valid_request(
+            &ordinary,
+            NARUON_CONSUMER_CODE,
+            "127.0.0.1",
+        ));
+        let ordinary_dto =
+            AnalysisRunAccepted::from_json(&ordinary_accepted.body).expect("ordinary accepted");
+        let ordinary_terminal = AnalysisRunTerminalResult::succeeded(
+            &ordinary,
+            &ordinary_dto,
+            "artifact-ordinary-1",
+            "cd".repeat(32),
+            "tepp-result-v1",
+            "2026-08-02T03:04:05Z",
+            AnalysisResultSummary::new("calibrated_event", 2, 2, "validated").expect("summary"),
+        )
+        .expect("ordinary terminal");
+        let ordinary_transition = AnalysisRunLifecycleTransition::terminal(
+            ordinary_dto.run_id.clone(),
+            ordinary.idempotency_key.clone(),
+            ordinary_terminal,
+            None,
+        )
+        .expect("ordinary transition");
+        let ordinary_post = ordinary_service.handle_http_request(&lifecycle_post(
+            &format!(
+                "{NARUON_ANALYSIS_RUN_PATH}/{}/terminal",
+                ordinary_dto.run_id
+            ),
+            &ordinary_transition.to_json().expect("json"),
+            NARUON_CONSUMER_CODE,
+            ordinary.idempotency_key.as_str(),
+        ));
+        assert_eq!(ordinary_post.status_code, 200);
+        assert!(!ordinary_post.body.contains("scientific_acceptance"));
+
+        let mut conflicted = sample_run();
+        conflicted.idempotency_key = "analysis-live-idem-conflict".into();
+        let mut conflict_service = AnalysisRunLiveService::new();
+        let conflict_accepted = conflict_service.handle_http_request(&valid_request(
+            &conflicted,
+            NARUON_CONSUMER_CODE,
+            "127.0.0.1",
+        ));
+        let conflict_dto =
+            AnalysisRunAccepted::from_json(&conflict_accepted.body).expect("conflict accepted");
+        let conflict_running = AnalysisRunLifecycleTransition::running(
+            conflict_dto.run_id.clone(),
+            conflicted.idempotency_key.clone(),
+        )
+        .expect("conflict running");
+        assert_eq!(
+            conflict_service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", conflict_dto.run_id),
+                    &conflict_running.to_json().expect("json"),
+                    NARUON_CONSUMER_CODE,
+                    conflicted.idempotency_key.as_str(),
+                ))
+                .status_code,
+            200
+        );
+        conflict_service
+            .accepted_runs
+            .get_mut(
+                conflict_service
+                    .runs_by_id
+                    .get(&conflict_dto.run_id)
+                    .expect("replay"),
+            )
+            .expect("stored")
+            .scientific_acceptance_json = Some("{}".into());
+        assert_eq!(
+            conflict_service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/running", conflict_dto.run_id),
+                    &conflict_running.to_json().expect("json"),
+                    NARUON_CONSUMER_CODE,
+                    conflicted.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
         );
     }
 

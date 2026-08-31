@@ -13,6 +13,17 @@ use crate::{ANALYSIS_RUN_STATUS_PATH, ApiError};
 /// Maximum length accepted for an opaque run identity in the status path.
 pub const ANALYSIS_RUN_ID_MAX_LEN: usize = 128;
 
+/// Parsed loopback analysis-run route after percent-decoding.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum AnalysisRunLiveRoute {
+    /// `GET /v1/analysis-runs/{run_id}`
+    Status { run_id: String },
+    /// `POST /v1/analysis-runs/{run_id}/running`
+    Running { run_id: String },
+    /// `POST /v1/analysis-runs/{run_id}/terminal`
+    Terminal { run_id: String },
+}
+
 /// Build a provider-owned `GET` analysis-run status exchange.
 ///
 /// The caller supplies the TEPP origin and the opaque server-assigned run
@@ -31,12 +42,7 @@ pub fn naruon_analysis_run_status_exchange(
     run_id: &str,
     idempotency_key: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
-    require_nonempty(run_id)?;
-    if run_id.len() > ANALYSIS_RUN_ID_MAX_LEN {
-        return Err(ApiError::LimitExceeded);
-    }
-    let encoded_run_id = encode_path_segment(run_id);
-    let target_path = format!("{ANALYSIS_RUN_STATUS_PATH}/{encoded_run_id}");
+    let target_path = encoded_run_path(run_id, None)?;
     let target_url = compose_https_target(origin, &target_path)?;
     Ok(NaruonHttpExchange {
         method: "GET",
@@ -46,8 +52,22 @@ pub fn naruon_analysis_run_status_exchange(
     })
 }
 
+fn encoded_run_path(run_id: &str, suffix: Option<&str>) -> Result<String, ApiError> {
+    require_nonempty(run_id)?;
+    if run_id.len() > ANALYSIS_RUN_ID_MAX_LEN {
+        return Err(ApiError::LimitExceeded);
+    }
+    let encoded_run_id = encode_path_segment(run_id);
+    match suffix {
+        None => Ok(format!("{ANALYSIS_RUN_STATUS_PATH}/{encoded_run_id}")),
+        Some(suffix) => Ok(format!(
+            "{ANALYSIS_RUN_STATUS_PATH}/{encoded_run_id}/{suffix}"
+        )),
+    }
+}
+
 /// Percent-encode one `URI` path segment without double-encoding safe chars.
-fn encode_path_segment(value: &str) -> String {
+pub(crate) fn encode_path_segment(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + value.len() / 2);
     let hex = b"0123456789ABCDEF";
     for byte in value.bytes() {
@@ -109,6 +129,52 @@ fn from_hex(byte: u8) -> Result<u8, ApiError> {
     }
 }
 
+fn require_run_id_length(run_id: &str) -> Result<(), ApiError> {
+    if run_id.len() > ANALYSIS_RUN_ID_MAX_LEN {
+        Err(ApiError::LimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
+/// Parse `GET` status and `POST` running/terminal loopback routes.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for a collection path, extra
+/// segments, an unknown suffix, or a hostile encoding, and
+/// [`ApiError::LimitExceeded`] when the decoded identity exceeds
+/// [`ANALYSIS_RUN_ID_MAX_LEN`].
+pub(crate) fn parse_analysis_run_live_route(path: &str) -> Result<AnalysisRunLiveRoute, ApiError> {
+    let remainder = path
+        .strip_prefix(ANALYSIS_RUN_STATUS_PATH)
+        .ok_or(ApiError::InvalidWirePayload)?;
+    let encoded = remainder
+        .strip_prefix('/')
+        .ok_or(ApiError::InvalidWirePayload)?;
+    if encoded.is_empty() {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    match encoded.split_once('/') {
+        None => {
+            let run_id = decode_path_segment(encoded)?;
+            require_run_id_length(&run_id)?;
+            Ok(AnalysisRunLiveRoute::Status { run_id })
+        }
+        Some((encoded_id, "running")) => {
+            let run_id = decode_path_segment(encoded_id)?;
+            require_run_id_length(&run_id)?;
+            Ok(AnalysisRunLiveRoute::Running { run_id })
+        }
+        Some((encoded_id, "terminal")) => {
+            let run_id = decode_path_segment(encoded_id)?;
+            require_run_id_length(&run_id)?;
+            Ok(AnalysisRunLiveRoute::Terminal { run_id })
+        }
+        Some(_) => Err(ApiError::InvalidWirePayload),
+    }
+}
+
 /// Extract the opaque run identity from `GET /v1/analysis-runs/{run_id}`.
 ///
 /// # Errors
@@ -117,20 +183,12 @@ fn from_hex(byte: u8) -> Result<u8, ApiError> {
 /// segments, or a hostile encoding, and [`ApiError::LimitExceeded`] when the
 /// decoded identity exceeds [`ANALYSIS_RUN_ID_MAX_LEN`].
 pub(crate) fn analysis_run_status_path_run_id(path: &str) -> Result<String, ApiError> {
-    let remainder = path
-        .strip_prefix(ANALYSIS_RUN_STATUS_PATH)
-        .ok_or(ApiError::InvalidWirePayload)?;
-    let encoded = remainder
-        .strip_prefix('/')
-        .ok_or(ApiError::InvalidWirePayload)?;
-    if encoded.is_empty() || encoded.contains('/') {
-        return Err(ApiError::InvalidWirePayload);
+    match parse_analysis_run_live_route(path)? {
+        AnalysisRunLiveRoute::Status { run_id } => Ok(run_id),
+        AnalysisRunLiveRoute::Running { .. } | AnalysisRunLiveRoute::Terminal { .. } => {
+            Err(ApiError::InvalidWirePayload)
+        }
     }
-    let run_id = decode_path_segment(encoded)?;
-    if run_id.len() > ANALYSIS_RUN_ID_MAX_LEN {
-        return Err(ApiError::LimitExceeded);
-    }
-    Ok(run_id)
 }
 
 #[cfg(test)]
@@ -239,5 +297,45 @@ mod tests {
             decode_path_segment(invalid_utf8),
             Err(ApiError::InvalidWirePayload)
         );
+        assert_eq!(
+            analysis_run_status_path_run_id("/v1/analysis-runs/tepp-run-1/running"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_analysis_run_live_route("/v1/analysis-runs/tepp-run-1/running").expect("running"),
+            AnalysisRunLiveRoute::Running {
+                run_id: "tepp-run-1".into()
+            }
+        );
+        assert_eq!(
+            parse_analysis_run_live_route("/v1/analysis-runs/tepp-run-1/terminal")
+                .expect("terminal"),
+            AnalysisRunLiveRoute::Terminal {
+                run_id: "tepp-run-1".into()
+            }
+        );
+        assert_eq!(
+            parse_analysis_run_live_route("/v1/analysis-runs/tepp-run-1/running/extra"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_analysis_run_live_route(&format!(
+                "/v1/analysis-runs/{}/running",
+                "a".repeat(ANALYSIS_RUN_ID_MAX_LEN + 1)
+            )),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(
+            parse_analysis_run_live_route(&format!(
+                "/v1/analysis-runs/{}/terminal",
+                "a".repeat(ANALYSIS_RUN_ID_MAX_LEN + 1)
+            )),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(
+            parse_analysis_run_live_route("/v1/analysis-runs/%2F/running"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let _ = encoded_run_path("tepp-run-1", Some("running")).expect("suffix path");
     }
 }
