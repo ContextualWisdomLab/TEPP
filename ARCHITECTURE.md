@@ -69,7 +69,7 @@ boundaries above remain the target modular MSA architecture.
 | `corpus_split` | cutoff-safe, relation-aware partitioning |
 | `tepp_simulation` | known-truth temporal/event data generation |
 | `validation_core` | RMSE, bias, coverage, graph, Monte Carlo, and exact-head claim-promotion metrics |
-| `tepp_api` | versioned DTO, schema, terminal-result, and export contracts |
+| `tepp_api` | versioned DTO, schema, terminal-result, export contracts, and published `tepp-retry-lineage` loopback CLI |
 | `analysis_engine` | bounded cutoff-safe temporal evidence readiness execution and digest-bound terminal artifacts |
 | `episode_membership` | event-time episode membership containment gate |
 | `prompt_source` | prompt boilerplate is not unique latent content and not stopword deletion |
