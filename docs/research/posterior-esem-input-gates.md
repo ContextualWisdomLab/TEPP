@@ -44,3 +44,5 @@ Holland, P. W. (1986). Statistics and causal inference. *Journal of the American
 - noiseless OLS recovers a known loading with machine-scale computed RMSE;
 - symmetric posterior-draw point-estimate noise cancels in the arithmetic mean and has smaller computed RMSE than a single draw;
 - raw-proportion, empty, non-finite, singular, invariance-missing, formative-reinterpretation, and causal-heuristic paths fail closed.
+
+The executable standardised discrete TDPRED slice recovers Driver et al. (2017, p. 16 `discreteTDPREDEFFECTstd`) as `e^{a Δt} m · √v / √p` after strictly positive `asymDIFFUSION` and strictly positive `TDPREDVAR`. Unstandardised `e^{a Δt} m` is not that map. `TDPREDEFFECTstd` does not depend on `Δt`. `discreteDRIFTstd` `e^{a Δt}` is not that map. Intercept-style `A^{-1}[e^{A Δt} − I] M · √v / √p` is discreteCINT arithmetic on `M` and is not that map. Trait-scaled totals are not that residual map.

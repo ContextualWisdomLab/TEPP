@@ -710,6 +710,37 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Footnote-4 `discreteTDPREDEFFECTstd` was requested without a
+    /// strictly positive `asymDIFFUSION`. Footnote 4 standardises
+    /// using only the relevant variance; zero `q` has no positive
+    /// process SD.
+    StandardisedDiscreteTimeDependentPredictorEffectRequiresPositiveStationaryVariance,
+    /// Footnote-4 `discreteTDPREDEFFECTstd` was requested without a
+    /// strictly positive time-dependent predictor variance. Page 22
+    /// does not form standardised TDPRED estimates when there is no
+    /// model for that variance; zero `v` has no positive predictor SD.
+    StandardisedDiscreteTimeDependentPredictorEffectRequiresPositivePredictorVariance,
+    /// Unstandardised remaining impulse `e^{a Δt} m` was treated as
+    /// `discreteTDPREDEFFECTstd`. Unstandardised `e^{a Δt} m` is
+    /// defined for growing `a ≥ 0` and for zero diffusion;
+    /// standardised discrete TDPRED is not.
+    UnstandardisedDiscreteTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect,
+    /// Footnote-4 `TDPREDEFFECTstd` `m · √v / √p` was treated as
+    /// `discreteTDPREDEFFECTstd`. The continuous std does not depend
+    /// on the event interval.
+    StandardisedTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect,
+    /// `discreteDRIFTstd` `e^{a Δt}` was treated as
+    /// `discreteTDPREDEFFECTstd`. The auto-effect is not
+    /// `e^{a Δt} m · √v / √p`.
+    StandardisedDiscreteDriftIsNotStandardisedDiscreteTimeDependentPredictorEffect,
+    /// Intercept-style `A^{-1}[e^{A Δt} − I] M · √v / √p` was treated
+    /// as `discreteTDPREDEFFECTstd`. That is discreteCINT arithmetic
+    /// on `M`.
+    InterceptStyleStandardisedTimeDependentEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect,
+    /// `e^{a Δt} m · √v / √(trait + p + added)` was treated as
+    /// `discreteTDPREDEFFECTstd`. Footnote 4 uses `asymDIFFUSION`,
+    /// not the total.
+    TraitScaledDiscreteTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1265,27 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedDiscreteTimeDependentPredictorEffectRequiresPositiveStationaryVariance => {
+                "standardised discrete time-dependent predictor effect requires strictly positive stationary within-subject variance"
+            }
+            Self::StandardisedDiscreteTimeDependentPredictorEffectRequiresPositivePredictorVariance => {
+                "standardised discrete time-dependent predictor effect requires strictly positive time-dependent predictor variance"
+            }
+            Self::UnstandardisedDiscreteTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect => {
+                "unstandardised discrete time-dependent predictor effect is not standardised discrete time-dependent predictor effect"
+            }
+            Self::StandardisedTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect => {
+                "standardised time-dependent predictor effect is not standardised discrete time-dependent predictor effect"
+            }
+            Self::StandardisedDiscreteDriftIsNotStandardisedDiscreteTimeDependentPredictorEffect => {
+                "standardised discrete drift is not standardised discrete time-dependent predictor effect"
+            }
+            Self::InterceptStyleStandardisedTimeDependentEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect => {
+                "intercept-style standardised time-dependent effect is not standardised discrete time-dependent predictor effect"
+            }
+            Self::TraitScaledDiscreteTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect => {
+                "trait-scaled discrete time-dependent predictor effect is not standardised discrete time-dependent predictor effect"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2123,45 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_time_dependent_predictor_effect_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteTimeDependentPredictorEffectRequiresPositiveStationaryVariance
+                .to_string(),
+            "standardised discrete time-dependent predictor effect requires strictly positive stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteTimeDependentPredictorEffectRequiresPositivePredictorVariance
+                .to_string(),
+            "standardised discrete time-dependent predictor effect requires strictly positive time-dependent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDiscreteTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect
+                .to_string(),
+            "unstandardised discrete time-dependent predictor effect is not standardised discrete time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect
+                .to_string(),
+            "standardised time-dependent predictor effect is not standardised discrete time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteDriftIsNotStandardisedDiscreteTimeDependentPredictorEffect
+                .to_string(),
+            "standardised discrete drift is not standardised discrete time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::InterceptStyleStandardisedTimeDependentEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect
+                .to_string(),
+            "intercept-style standardised time-dependent effect is not standardised discrete time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::TraitScaledDiscreteTimeDependentPredictorEffectIsNotStandardisedDiscreteTimeDependentPredictorEffect
+                .to_string(),
+            "trait-scaled discrete time-dependent predictor effect is not standardised discrete time-dependent predictor effect"
         );
     }
 }
