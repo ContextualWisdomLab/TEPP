@@ -29,6 +29,7 @@ mod naruon_live;
 mod orchestration;
 mod project_history;
 mod project_history_collection_http;
+mod project_history_retrieval_http;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
@@ -255,6 +256,14 @@ pub use project_history_collection_http::parse_project_history_collection_page_c
 pub use project_history_collection_http::parse_project_history_collection_page_limit;
 /// Refuse metric, evidence, and causal-score keys on collection JSON.
 pub use project_history_collection_http::refuse_metrics_on_project_history_collection_payload;
+/// Maximum opaque idempotency-key length on project-history GET-by-id.
+pub use project_history_retrieval_http::PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN;
+/// `LineageWeave` GET exchange for one stored project-history projection.
+pub use project_history_retrieval_http::lineageweave_project_history_retrieval_exchange;
+/// Extract the opaque idempotency key from a project-history retrieval path.
+pub use project_history_retrieval_http::project_history_retrieval_path_id;
+/// Refuse scientific-metric and causal-score keys on retrieval JSON.
+pub use project_history_retrieval_http::refuse_metrics_on_project_history_retrieval_payload;
 /// Maximum posterior Project Journey artifact size.
 pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
 /// Exact posterior Project Journey schema identity.

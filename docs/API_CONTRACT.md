@@ -98,6 +98,12 @@ projections on `tepp-loopback`. Collection rows stay metric-free identities
 `inference_status=temporal_association_only`). `tepp.scientific_acceptance.v1`,
 evidence text, findings, and causal scores never appear.
 
+`GET /v1/project-histories/{idempotency_key}` retrieves one accepted
+cutoff-safe `ProjectHistoryProjection` on `tepp-loopback`. Consumer is
+`lineageweave` only. `inference_status` remains `temporal_association_only`.
+`tepp.scientific_acceptance.v1` and causal scores never appear. The retrieval
+does not infer causality.
+
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
 terminal status contains exactly one request-bound

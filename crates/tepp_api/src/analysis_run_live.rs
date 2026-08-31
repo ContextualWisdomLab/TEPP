@@ -23,7 +23,8 @@ use crate::{
     ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH, TemporalContextRequest, build_temporal_context,
     is_project_history_collection_path, page_project_history_collection_items,
     parse_project_history_collection_page_cursor, parse_project_history_collection_page_limit,
-    project_history_projection, requests_are_idempotent_matches,
+    project_history_projection, project_history_retrieval_path_id,
+    refuse_metrics_on_project_history_retrieval_payload, requests_are_idempotent_matches,
 };
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
@@ -148,7 +149,16 @@ impl AnalysisRunLiveService {
         let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
         let headers = parse_headers(&mut lines)?;
         if method == "GET" {
-            return self.list_project_histories(path, &headers, body);
+            if is_project_history_collection_path(path) {
+                return self.list_project_histories(path, &headers, body);
+            }
+            if matches!(
+                project_history_retrieval_path_id(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.get_project_history(path, &headers, body);
+            }
+            return Err(ApiError::InvalidWirePayload);
         }
         if method != "POST"
             || (path != NARUON_ANALYSIS_RUN_PATH
@@ -281,6 +291,39 @@ impl AnalysisRunLiveService {
         Ok(json_response(200, "OK", collection.to_json()?))
     }
 
+    fn get_project_history(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let idempotency_key = project_history_retrieval_path_id(path)?;
+        if !body.is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_project_history_retrieval_payload(body)?;
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != LINEAGEWEAVE_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if headers.contains_key("tepp-page-limit") || headers.contains_key("tepp-page-cursor") {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let matches: Vec<&ProjectHistoryProjection> = self
+            .accepted_project_histories
+            .values()
+            .filter(|(request, _)| request.idempotency_key == idempotency_key)
+            .map(|(_, projection)| projection)
+            .collect();
+        let projection = match matches.as_slice() {
+            [projection] => *projection,
+            _ => return Err(ApiError::InvalidWirePayload),
+        };
+        let response_body = projection.to_json()?;
+        refuse_metrics_on_project_history_retrieval_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
     fn response_from_error(&mut self, error: ApiError) -> NaruonLiveResponse {
         let request_id = format!("analysis-run-live-{}", self.next_request_serial);
         self.next_request_serial += 1;
@@ -366,8 +409,8 @@ mod tests {
         DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, LINEAGEWEAVE_CONSUMER_CODE,
         NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
         NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, PROJECT_HISTORY_CONTRACT_VERSION,
-        PROJECT_HISTORY_PATH, ProjectHistoryCollection, ProjectHistoryEvent, ProjectHistoryRequest,
-        TEMPORAL_CONTEXT_PATH,
+        PROJECT_HISTORY_PATH, ProjectHistoryCollection, ProjectHistoryEvent,
+        ProjectHistoryProjection, ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH,
     };
 
     fn sample_run() -> AnalysisRunRequest {
@@ -1071,6 +1114,52 @@ mod tests {
             "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}"
         );
         assert_eq!(service.handle_http_request(&nonempty).status_code, 400);
+    }
+
+    #[test]
+    fn project_history_retrieval_get_returns_stored_projection_and_fails_closed() {
+        let mut service = AnalysisRunLiveService::new();
+        let first = sample_project_history("idem-a", "project-a");
+        let posted = service.handle_http_request(&project_history_post(&first));
+        assert_eq!(posted.status_code, 200);
+        let stored = ProjectHistoryProjection::from_json(&posted.body).expect("stored");
+
+        let got = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(got.status_code, 200);
+        let retrieved = ProjectHistoryProjection::from_json(&got.body).expect("retrieved");
+        assert_eq!(retrieved, stored);
+        assert_eq!(retrieved.inference_status, "temporal_association_only");
+        assert!(!got.body.contains("rmse"));
+        assert!(!got.body.contains("tepp.scientific_acceptance.v1"));
+        assert!(!got.body.contains("causal_score"));
+
+        let unknown = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/missing HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(unknown.status_code, 400);
+        let naruon = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(naruon.status_code, 400);
+        let extra = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a/extra HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(extra.status_code, 400);
+        let paged = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-page-limit: 1\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(paged.status_code, 400);
+        let nonempty = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}"
+        ));
+        assert_eq!(nonempty.status_code, 400);
+        let collection = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(collection.status_code, 200);
+        assert!(!collection.body.contains("evidence_text"));
     }
 
     struct ScriptedRead {
