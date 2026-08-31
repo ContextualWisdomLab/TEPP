@@ -100,7 +100,7 @@ can inspect lineage after retry. An empty `retries` array is `200` when the
 parent was never retried. `GET /v1/analysis-runs/by-idempotency/{idempotency_key}`
 on the loopback listener returns the metric-free identity of the unique run
 that used that key so operators can jump from a 202 receipt or retry child
-key without scanning collection pages. GET-by-id remains a later slice on this
+key without scanning collection pages. `lineageweave_analysis_run_idempotency_lookup_exchange` and the Naruon compatibility listener serve the same metric-free GET for published consumers (ADR 0047); LineageWeave remains refused on `NaruonLiveService`. GET-by-id remains a later slice on this
 protected-main lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side

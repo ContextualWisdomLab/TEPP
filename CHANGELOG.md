@@ -38,6 +38,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- Loopback idempotency-lookup consumer parity: LineageWeave GET-by-idempotency exchange, Naruon compatibility-listener inspect (accepted creates return a real `run_id`), and `tepp-loopback` TCP create-then-GET proof (ADR 0047).
+
 - `tepp_api` serves `GET /v1/analysis-runs` on the shared loopback listener (ADR 0031). Operators enumerate accepted, running, cancelled, and terminal runs as metric-free collection rows. Collection bodies refuse RMSE/bias/coverage/SE-gate/scientific-acceptance/`terminal_result` keys. GET-by-id and running/terminal POST remain later GAP-003A slices; this is not an ADR 0014 claim.
 
 - `tepp_api` serves `POST /v1/analysis-runs/{run_id}/cancel` on the shared loopback listener (ADR 0029). Accepted and running runs become metric-free `cancelled` status. Succeeded, failed, and unknown runs cannot be cancelled. Cancel bodies refuse RMSE/bias/coverage/SE-gate/scientific-acceptance keys. GET status and running/terminal POST remain later GAP-003A slices; this is not an ADR 0014 claim.

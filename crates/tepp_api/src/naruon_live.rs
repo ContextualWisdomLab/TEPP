@@ -5,6 +5,10 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 
+use crate::analysis_run_idempotency_lookup_http::{
+    AnalysisRunIdempotencyLookup, analysis_run_idempotency_lookup_path_key,
+    refuse_metrics_on_idempotency_lookup_payload,
+};
 use crate::authorization::{
     AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
 };
@@ -16,7 +20,7 @@ use crate::live_http::{
 use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH};
 use crate::wire::{from_json, to_json};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, ApiError, ErrorEnvelope,
+    AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunStatusState, ApiError, ErrorEnvelope,
     requests_are_idempotent_matches,
 };
 
@@ -51,7 +55,7 @@ pub struct NaruonLiveResponse {
 /// Production interchange origins remain `https` only. This listener binds
 /// loopback TCP so tests and local standalone operation can prove request
 /// handling without claiming TLS termination or cross-service table access.
-/// This port only accepts versioned naruon POSTs.
+/// This port accepts versioned naruon POSTs and Naruon-only idempotency-lookup GET.
 #[derive(Debug)]
 pub struct NaruonLiveService {
     listener: Option<TcpListener>,
@@ -198,14 +202,24 @@ impl NaruonLiveService {
         let mut lines = header_block.split("\r\n");
         let request_line = lines.next().unwrap_or("");
         let (method, path) = parse_request_line(request_line)?;
+        let headers = parse_headers(lines)?;
+        if method == "GET" {
+            if matches!(
+                analysis_run_idempotency_lookup_path_key(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                refuse_live_headers(&headers, self.bound_addr, false)?;
+                return self.lookup_analysis_run_by_idempotency(path, &headers, body);
+            }
+            return Err(ApiError::InvalidWirePayload);
+        }
         if method != "POST" {
             return Err(ApiError::InvalidWirePayload);
         }
         if path != NARUON_ANALYSIS_RUN_PATH && path != NARUON_EXPORT_PATH {
             return Err(ApiError::InvalidWirePayload);
         }
-        let headers = parse_headers(lines)?;
-        refuse_live_headers(&headers, self.bound_addr)?;
+        refuse_live_headers(&headers, self.bound_addr, true)?;
         self.dispatch_path(path, &headers, body)
     }
 
@@ -250,6 +264,37 @@ impl NaruonLiveService {
         let body = accepted.to_json()?;
         self.accepted_runs.insert(replay_key, (request, accepted));
         Ok(NaruonLiveResponse::json(202, "Accepted", body))
+    }
+
+    fn lookup_analysis_run_by_idempotency(
+        &self,
+        path: &str,
+        _headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let idempotency_key = analysis_run_idempotency_lookup_path_key(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_idempotency_lookup_payload(body)?;
+        let mut matches: Vec<&AnalysisRunAccepted> = self
+            .accepted_runs
+            .values()
+            .filter(|(_, accepted)| accepted.idempotency_key == idempotency_key)
+            .map(|(_, accepted)| accepted)
+            .collect();
+        if matches.len() != 1 {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let stored = matches.remove(0);
+        let payload = AnalysisRunIdempotencyLookup::new(
+            stored.run_id.clone(),
+            AnalysisRunStatusState::Accepted,
+            stored.idempotency_key.clone(),
+        )?;
+        let response_body = payload.to_json()?;
+        refuse_metrics_on_idempotency_lookup_payload(&response_body)?;
+        Ok(NaruonLiveResponse::json(200, "OK", response_body))
     }
 
     fn authorize_export(
@@ -326,6 +371,7 @@ fn status_for(error: ApiError) -> (u16, &'static str) {
 fn refuse_live_headers(
     headers: &HashMap<String, String>,
     bound_addr: Option<SocketAddr>,
+    require_idempotency: bool,
 ) -> Result<(), ApiError> {
     validate_common_headers(headers, bound_addr)?;
     if header_value(headers, "tepp-consumer")? != NARUON_CONSUMER_CODE {
@@ -334,7 +380,9 @@ fn refuse_live_headers(
     if header_value(headers, "tepp-contract-version")? != "1" {
         return Err(ApiError::InvalidWirePayload);
     }
-    let _idempotency_key = header_value(headers, "idempotency-key")?;
+    if require_idempotency {
+        let _idempotency_key = header_value(headers, "idempotency-key")?;
+    }
     Ok(())
 }
 
@@ -530,5 +578,90 @@ mod tests {
                 .expect_err("accept"),
             ApiError::InvalidWirePayload
         );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn naruon_compatibility_listener_looks_up_accepted_idempotency_key() {
+        use crate::{
+            ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunIdempotencyLookup, AnalysisRunRequest,
+        };
+
+        let run = AnalysisRunRequest {
+            contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
+            idempotency_key: "naruon-lookup-idem".into(),
+            tenant_workspace_id: "naruon-lookup-tenant".into(),
+            snapshot_id: "naruon-lookup-snapshot".into(),
+            knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            model_contract_version: "tepp-analysis-run-v1".into(),
+            output_profile: "calibrated_event_measurement".into(),
+        };
+        let body = run.to_json().expect("run json");
+        let create = format!(
+            "POST /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: naruon-lookup-idem\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let mut service = NaruonLiveService::new();
+        let accepted = service.handle_http_request(&create);
+        assert_eq!(accepted.status_code, 202);
+        let run_id = serde_json::from_str::<serde_json::Value>(&accepted.body)
+            .expect("accepted json")["run_id"]
+            .as_str()
+            .expect("run_id")
+            .to_owned();
+
+        let inspect =
+            "GET /v1/analysis-runs/by-idempotency/naruon-lookup-idem HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n";
+        let inspected = service.handle_http_request(inspect);
+        assert_eq!(inspected.status_code, 200);
+        let lookup = AnalysisRunIdempotencyLookup::from_json(&inspected.body).expect("lookup");
+        assert_eq!(lookup.run_id, run_id);
+        assert_eq!(lookup.run_state, crate::AnalysisRunStatusState::Accepted);
+        assert_eq!(lookup.idempotency_key, run.idempotency_key);
+        assert!(!inspected.body.contains("rmse"));
+        assert!(!inspected.body.contains("scientific_acceptance"));
+        assert!(!inspected.body.contains("tenant_workspace_id"));
+        assert!(!inspected.body.contains("snapshot_id"));
+
+        let replay = service.handle_http_request(inspect);
+        assert_eq!(replay.body, inspected.body);
+
+        let lineageweave = "GET /v1/analysis-runs/by-idempotency/naruon-lookup-idem HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: lineageweave\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n";
+        assert_eq!(service.handle_http_request(lineageweave).status_code, 400);
+        assert_eq!(
+            service
+                .handle_http_request(
+                    "GET /v1/analysis-runs/by-idempotency/missing-key HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                )
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(
+                    "GET /v1/analysis-runs/by-idempotency/naruon-lookup-idem HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{}"
+                )
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(
+                    "POST /v1/analysis-runs/by-idempotency/naruon-lookup-idem HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: naruon-lookup-idem\r\ncontent-length: 0\r\n\r\n"
+                )
+                .status_code,
+            400
+        );
+        let oversized = "a".repeat(129);
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET /v1/analysis-runs/by-idempotency/{oversized} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            413
+        );
+        let metrics = "GET /v1/analysis-runs/by-idempotency/naruon-lookup-idem HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 16\r\n\r\n{\"rmse\":0.1}";
+        assert_eq!(service.handle_http_request(metrics).status_code, 400);
     }
 }

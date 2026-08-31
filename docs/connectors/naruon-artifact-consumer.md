@@ -27,6 +27,8 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | purpose-bound export auth | `tepp_api` `authorize_export` with `ModularServiceConsumer` | TEPP gate |
 | HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
 | HTTP analysis-run collection | `tepp_api` `naruon_analysis_run_collection_exchange` → `GET /v1/analysis-runs` | naruon → TEPP |
+| HTTP analysis-run idempotency lookup | `tepp_api` `naruon_analysis_run_idempotency_lookup_exchange` → `GET /v1/analysis-runs/by-idempotency/{key}` | naruon → TEPP |
+| Live loopback idempotency-lookup GET | `tepp_api` `NaruonLiveService` Naruon-only `GET /v1/analysis-runs/by-idempotency/{key}` | naruon → TEPP |
 | HTTP analysis-run cancel | `tepp_api` `naruon_analysis_run_cancel_exchange` → `POST /v1/analysis-runs/{run_id}/cancel` | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
@@ -54,6 +56,8 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 - scientific-metric keys (`rmse`, `bias`, `coverage`, `se_gate`, `scientific_acceptance`, `report`) on a cancel body → reject;
 - scientific-metric keys (`rmse`, `bias`, `coverage`, `se_gate`, `scientific_acceptance`, `report`, `terminal_result`) on a collection body → reject;
 - cancel of a succeeded, failed, or unknown analysis run → reject.
+- LineageWeave consumer on `NaruonLiveService` idempotency-lookup GET → reject;
+- unknown, nonempty, or metric-bearing idempotency-lookup GET → reject.
 
 ## Authority sources
 

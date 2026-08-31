@@ -7,11 +7,11 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunRequest, AnalyticalPurpose,
-    ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, ExportAuthorizationRequest,
-    NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH, NARUON_LIVE_HEADER_BYTE_LIMIT,
-    NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, NaruonLiveService,
-    naruon_analysis_run_exchange, naruon_export_exchange,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunIdempotencyLookup,
+    AnalysisRunRequest, AnalyticalPurpose, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
+    ErrorEnvelope, ExportAuthorizationRequest, NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH,
+    NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT,
+    NaruonLiveService, naruon_analysis_run_exchange, naruon_export_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -717,6 +717,33 @@ fn serve_one_maps_partial_request_timeout_to_limit_exceeded() {
     assert!(started.elapsed() >= NARUON_LIVE_IO_TIMEOUT);
     assert_eq!(served.status_code, 413);
     assert_eq!(envelope(&served.body).error_code(), "limit_exceeded");
+}
+
+#[test]
+fn handle_http_lists_naruon_idempotency_lookup_and_refuses_lineageweave() {
+    let run = sample_run();
+    let mut service = NaruonLiveService::new();
+    let accepted = service.handle_http_request(&analysis_http(&run));
+    assert_eq!(accepted.status_code, 202);
+    let run_id = AnalysisRunAccepted::from_json(&accepted.body)
+        .expect("accepted")
+        .run_id;
+    let inspect = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/by-idempotency/{} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        run.idempotency_key
+    );
+    let inspected = service.handle_http_request(&inspect);
+    assert_eq!(inspected.status_code, 200);
+    let lookup = AnalysisRunIdempotencyLookup::from_json(&inspected.body).expect("lookup");
+    assert_eq!(lookup.run_id, run_id);
+    assert_eq!(lookup.idempotency_key, run.idempotency_key);
+    assert!(!inspected.body.contains("rmse"));
+    assert!(!inspected.body.contains("scientific_acceptance"));
+    let lineageweave = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/by-idempotency/{} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: lineageweave\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        run.idempotency_key
+    );
+    assert_eq!(service.handle_http_request(&lineageweave).status_code, 400);
 }
 
 struct TimeoutRead;
