@@ -721,6 +721,18 @@ pub enum PsychometricError {
     /// confound stable between-person differences with within-person
     /// change.
     GrandMeanCenteredLogRateIsNotWithinPersonLag,
+    /// Cluster-mean-centered residual log-rate was treated as the
+    /// linear-detrend residual log-rate. Curran and Bauer (2011,
+    /// pp. 607–608) show that person-mean centering is a horizontal
+    /// line; when the score is related to time, the residual from
+    /// that line is not the residual from the person-specific OLS
+    /// line on event time.
+    CwcResidualLogRateIsNotLinearDetrend,
+    /// Linear-detrend residual log-rate was treated as the
+    /// raw-process autoregressive drift. Person-specific OLS of
+    /// score on event time absorbs the linear component of a raw
+    /// exponential path; those residuals are not the raw process.
+    LinearDetrendLogRateIsNotRawProcessDrift,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1251,6 +1263,12 @@ impl fmt::Display for PsychometricError {
             }
             Self::GrandMeanCenteredLogRateIsNotWithinPersonLag => {
                 "grand-mean-centered residual log-rate is not the within-person lagged effect"
+            }
+            Self::CwcResidualLogRateIsNotLinearDetrend => {
+                "cluster-mean-centered residual log-rate is not the linear-detrend residual log-rate"
+            }
+            Self::LinearDetrendLogRateIsNotRawProcessDrift => {
+                "linear-detrend residual log-rate is not the raw-process autoregressive drift"
             }
         };
         formatter.write_str(message)
@@ -2127,6 +2145,22 @@ mod tests {
         assert_eq!(
             PsychometricError::GrandMeanCenteredLogRateIsNotWithinPersonLag.to_string(),
             "grand-mean-centered residual log-rate is not the within-person lagged effect"
+        );
+    }
+
+    #[test]
+    fn cwc_residual_log_rate_is_not_linear_detrend_message_is_stable() {
+        assert_eq!(
+            PsychometricError::CwcResidualLogRateIsNotLinearDetrend.to_string(),
+            "cluster-mean-centered residual log-rate is not the linear-detrend residual log-rate"
+        );
+    }
+
+    #[test]
+    fn linear_detrend_log_rate_is_not_raw_process_drift_message_is_stable() {
+        assert_eq!(
+            PsychometricError::LinearDetrendLogRateIsNotRawProcessDrift.to_string(),
+            "linear-detrend residual log-rate is not the raw-process autoregressive drift"
         );
     }
 }

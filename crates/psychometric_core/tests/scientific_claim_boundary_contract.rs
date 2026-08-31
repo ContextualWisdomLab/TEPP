@@ -2,7 +2,8 @@
 
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
-    center_grand_mean_event_lags, center_within_cluster_event_lags, ordinary_least_squares_slope,
+    center_grand_mean_event_lags, center_within_cluster_event_lags,
+    center_within_cluster_linear_detrend_event_lags, ordinary_least_squares_slope,
     posterior_draw_point_estimate_mean, recover_asymptotic_continuous_intercept,
     recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -45,6 +46,7 @@ use psychometric_core::{
     recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
     recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
     recover_within_cluster_irregular_residual_log_rate,
+    recover_within_cluster_linear_detrend_irregular_residual_log_rate,
     recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
@@ -64,7 +66,7 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_variance_as_trait_variance,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
-    refuse_continuous_intercept_as_manifest_means,
+    refuse_continuous_intercept_as_manifest_means, refuse_cwc_residual_log_rate_as_linear_detrend,
     refuse_cwc_residual_log_rate_as_raw_process_drift,
     refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
@@ -116,7 +118,8 @@ use psychometric_core::{
     refuse_level_change_increment_as_process_increment,
     refuse_level_change_intercept_as_free_continuous_intercept,
     refuse_level_change_intercept_as_impulse, refuse_level_change_intercept_as_process_increment,
-    refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
+    refuse_linear_detrend_log_rate_as_raw_process_drift, refuse_manifest_means_as_observed_mean,
+    refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
     refuse_measurement_error_as_standardised_manifest_trait_variance,
@@ -399,6 +402,181 @@ fn grand_mean_centered_lag_is_not_the_within_person_effect() {
     assert_eq!(
         refuse_grand_mean_centered_log_rate_as_within_person_lag(cgm, drift),
         Err(psychometric_core::PsychometricError::GrandMeanCenteredLogRateIsNotWithinPersonLag)
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn linear_detrend_lag_is_not_cwc() {
+    let expected = 0.5_f64.ln();
+    let trending = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 6.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 1.0,
+            score: 5.5,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 2.0,
+            score: -3.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 3.0,
+            score: 10.5,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: 0.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 1.0,
+            score: -1.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 2.0,
+            score: -18.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 3.0,
+            score: 9.0,
+        },
+    ];
+    let detrend = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+        &trending,
+        LagClock::EventTime,
+    )
+    .expect("detrend");
+    assert!((detrend - expected).abs() < 1e-12);
+    let extracted = center_within_cluster_linear_detrend_event_lags(&trending, LagClock::EventTime)
+        .expect("extract");
+    assert!((extracted[0].earlier_residual - 2.0).abs() < 1e-12);
+    assert!((extracted[0].later_residual - 1.0).abs() < 1e-12);
+    let cwc = recover_within_cluster_irregular_residual_log_rate(&trending, LagClock::EventTime)
+        .expect("cwc");
+    assert!(
+        (cwc - expected).abs() > 1e-6,
+        "Curran & Bauer (2011, pp. 607–608): CWC {cwc} is not the OLS-line residual rate {expected}"
+    );
+    let no_growth = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 2.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 1.0,
+            score: 1.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 2.0,
+            score: -8.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 3.0,
+            score: 5.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: 4.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 1.0,
+            score: 2.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 2.0,
+            score: -16.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 3.0,
+            score: 10.0,
+        },
+    ];
+    let no_growth_detrend = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+        &no_growth,
+        LagClock::EventTime,
+    )
+    .expect("no growth detrend");
+    let no_growth_cwc =
+        recover_within_cluster_irregular_residual_log_rate(&no_growth, LagClock::EventTime)
+            .expect("no growth cwc");
+    assert!((no_growth_detrend - no_growth_cwc).abs() < 1e-15);
+    assert_eq!(
+        refuse_cwc_residual_log_rate_as_linear_detrend(cwc, detrend),
+        Err(psychometric_core::PsychometricError::CwcResidualLogRateIsNotLinearDetrend)
+    );
+}
+
+#[test]
+fn linear_detrend_lag_is_not_raw_process_drift() {
+    let t2 = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 10.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 1.0,
+            score: 12.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: 0.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 1.0,
+            score: 1.0,
+        },
+    ];
+    assert_eq!(
+        recover_within_cluster_linear_detrend_irregular_residual_log_rate(&t2, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput),
+        "T=2 interpolates exactly"
+    );
+    let drift = -0.28_f64;
+    let mut raw = Vec::new();
+    for (cluster_key, person_mean, start) in [(1_u64, 6.0_f64, 1.0_f64), (2, -3.0, 1.2)] {
+        for step in 0..6 {
+            let event_time = f64::from(step);
+            raw.push(ClusteredEventScore {
+                cluster_key,
+                event_time,
+                score: person_mean + start * (drift * event_time).exp(),
+            });
+        }
+    }
+    let raw_detrend = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+        &raw,
+        LagClock::EventTime,
+    )
+    .expect("raw detrend");
+    assert!(
+        (raw_detrend - drift).abs() > 1e-6,
+        "linear detrend of a raw AR {raw_detrend} must not equal drift {drift}"
+    );
+    assert_eq!(
+        refuse_linear_detrend_log_rate_as_raw_process_drift(raw_detrend, drift),
+        Err(psychometric_core::PsychometricError::LinearDetrendLogRateIsNotRawProcessDrift)
     );
 }
 

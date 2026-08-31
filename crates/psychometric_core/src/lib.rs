@@ -18,7 +18,11 @@
 //! two finite rates whose raw sum overflows stay representable;
 //! not Newton LS, not raw-process AR drift), extracts grand-mean-centered
 //! lagged residuals and a pairwise-mean log-rate after that CGM (Hamaker
-//! et al., 2015: not a within-person lag), remaps discrete
+//! et al., 2015: not a within-person lag), extracts person-specific
+//! linear-detrend lagged residuals and a pairwise-mean log-rate after
+//! that detrend (Curran & Bauer, 2011, pp. 607–608: not CWC when the
+//! score is related to time; T=2 interpolates to zero; not raw-process
+//! AR drift), remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
 //! exact scalar discrete effect of a constant predictor, recovers the
 //! first-order discrete effect of a time-varying predictor with matched
@@ -321,6 +325,8 @@ pub use event_time::LaggedWithinResidual;
 pub use event_time::center_grand_mean_event_lags;
 /// Cluster-mean-center consecutive event-time lags (not raw-process AR drift).
 pub use event_time::center_within_cluster_event_lags;
+/// Person-specific OLS linear-detrend consecutive event-time lags (not CWC; not raw-process AR drift).
+pub use event_time::center_within_cluster_linear_detrend_event_lags;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
@@ -433,6 +439,8 @@ pub use event_time::recover_standardised_manifest_trait_variance;
 pub use event_time::recover_standardised_manifest_variance;
 /// Pairwise-mean exact log-rate after CWC (same-sign without dividing; not Newton LS; not DSEM).
 pub use event_time::recover_within_cluster_irregular_residual_log_rate;
+/// Pairwise-mean exact log-rate after person-specific linear detrend (not CWC when related to time; not DSEM).
+pub use event_time::recover_within_cluster_linear_detrend_irregular_residual_log_rate;
 
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
@@ -502,6 +510,8 @@ pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating Driver Table 2 `CINT` as `MANIFESTMEANS`.
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
+/// Refuse treating a CWC residual log-rate as a linear-detrend log-rate.
+pub use event_time::refuse_cwc_residual_log_rate_as_linear_detrend;
 /// Refuse treating a CWC residual log-rate as raw-process AR drift.
 pub use event_time::refuse_cwc_residual_log_rate_as_raw_process_drift;
 /// Refuse the difference quotient as a continuous-time rate.
@@ -616,6 +626,8 @@ pub use event_time::refuse_level_change_intercept_as_free_continuous_intercept;
 pub use event_time::refuse_level_change_intercept_as_impulse;
 /// Refuse treating Driver §7.2 level-change `CINT` as the Eq. 3 process increment.
 pub use event_time::refuse_level_change_intercept_as_process_increment;
+/// Refuse treating a linear-detrend residual log-rate as raw-process AR drift.
+pub use event_time::refuse_linear_detrend_log_rate_as_raw_process_drift;
 /// Refuse treating Driver Eq. 5 `MANIFESTMEANS` as `E(y)`.
 pub use event_time::refuse_manifest_means_as_observed_mean;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.

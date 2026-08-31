@@ -7032,6 +7032,222 @@ pub fn refuse_grand_mean_centered_log_rate_as_within_person_lag(
     Err(PsychometricError::GrandMeanCenteredLogRateIsNotWithinPersonLag)
 }
 
+/// Cluster-linear-detrend consecutive event-time lags inside each cluster.
+///
+/// Curran and Bauer (2011, pp. 607–608; PMC3059070 NIHMS238778 opened
+/// 2026-08-31) show that when a time-varying score is related to time,
+/// person-mean centering (a horizontal line) is biased. The licensed
+/// case-based detrend is ordinary least squares of the score on event
+/// time inside each cluster; the residual is the observed score minus
+/// that fitted line. Consecutive residuals then become
+/// [`LaggedWithinResidual`] pairs on possibly irregular event
+/// intervals. Singleton clusters are skipped. Two observations
+/// interpolate the line exactly, so those residuals are forced to
+/// zero (Curran & Bauer, 2011, pp. 607–608). In the absence of
+/// growth the fitted line is the person mean and this reduces to
+/// CWC. The returned pairs are not a license to recover raw-process
+/// drift `a`: OLS absorbs the linear component of a raw exponential
+/// path. This is not CWC, not CGM, not DSEM, not RI-CLPM, and not a
+/// Kalman filter.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock,
+/// [`PsychometricError::InvalidNumericInput`] for empty, singleton-only,
+/// non-finite, or overflowing rows, [`PsychometricError::InsufficientClusters`]
+/// when fewer than two clusters appear,
+/// [`PsychometricError::SingularDesign`] when a cluster with three or
+/// more occasions has no event-time variance, and
+/// [`PsychometricError::NonPositiveInterval`] when any consecutive
+/// event interval is not strictly positive.
+pub fn center_within_cluster_linear_detrend_event_lags(
+    rows: &[ClusteredEventScore],
+    clock: LagClock,
+) -> Result<Vec<LaggedWithinResidual>, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if rows.len() < 2 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let mut groups: BTreeMap<u64, Vec<ClusteredEventScore>> = BTreeMap::new();
+    for &row in rows {
+        if !row.event_time.is_finite() || !row.score.is_finite() {
+            return Err(PsychometricError::InvalidNumericInput);
+        }
+        groups.entry(row.cluster_key).or_default().push(row);
+    }
+    if groups.len() < 2 {
+        return Err(PsychometricError::InsufficientClusters);
+    }
+    let mut pairs = Vec::new();
+    for occasions in groups.values_mut() {
+        if occasions.len() < 2 {
+            continue;
+        }
+        occasions.sort_by(|left, right| left.event_time.total_cmp(&right.event_time));
+        if occasions.len() == 2 {
+            let event_delta = occasions[1].event_time - occasions[0].event_time;
+            if !event_delta.is_finite() || event_delta <= 0.0 {
+                return Err(PsychometricError::NonPositiveInterval);
+            }
+            pairs.push(LaggedWithinResidual {
+                earlier_residual: 0.0,
+                later_residual: 0.0,
+                event_delta,
+            });
+            continue;
+        }
+        let times: Vec<f64> = occasions.iter().map(|row| row.event_time).collect();
+        let scores: Vec<f64> = occasions.iter().map(|row| row.score).collect();
+        let (intercept, slope) = person_specific_linear_fit(&times, &scores)?;
+        let mut residuals = Vec::with_capacity(occasions.len());
+        for occasion in occasions.iter() {
+            let residual =
+                require_finite(occasion.score - slope.mul_add(occasion.event_time, intercept))?;
+            residuals.push(residual);
+        }
+        for index in 0..occasions.len() - 1 {
+            let event_delta = occasions[index + 1].event_time - occasions[index].event_time;
+            if !event_delta.is_finite() || event_delta <= 0.0 {
+                return Err(PsychometricError::NonPositiveInterval);
+            }
+            pairs.push(LaggedWithinResidual {
+                earlier_residual: residuals[index],
+                later_residual: residuals[index + 1],
+                event_delta,
+            });
+        }
+    }
+    if pairs.is_empty() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    Ok(pairs)
+}
+
+/// Person-specific OLS intercept and slope of score on event time.
+///
+/// This is the Curran and Bauer (2011, pp. 607–608) case-based line.
+/// Overflowed residual sum-of-squares is not a missing line: huge
+/// residuals orthogonal to `{1, t}` still have a finite intercept and
+/// slope.
+fn person_specific_linear_fit(
+    times: &[f64],
+    scores: &[f64],
+) -> Result<(f64, f64), PsychometricError> {
+    let n = times.len() as f64;
+    let mut time_sum = 0.0_f64;
+    let mut score_sum = 0.0_f64;
+    for (&time, &score) in times.iter().zip(scores) {
+        time_sum += time;
+        score_sum += score;
+    }
+    let time_mean = time_sum / n;
+    let score_mean = score_sum / n;
+    if !(time_mean.is_finite() & score_mean.is_finite()) {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let mut cross = 0.0_f64;
+    let mut pred_ss = 0.0_f64;
+    for (&time, &score) in times.iter().zip(scores) {
+        let time_dev = time - time_mean;
+        let score_dev = score - score_mean;
+        cross += time_dev * score_dev;
+        pred_ss += time_dev * time_dev;
+    }
+    if pred_ss <= 0.0 {
+        return Err(PsychometricError::SingularDesign);
+    }
+    let slope = require_finite(cross / pred_ss)?;
+    let intercept = require_finite(score_mean - slope * time_mean)?;
+    Ok((intercept, slope))
+}
+
+/// Pairwise-mean exact log-rate after person-specific linear detrend.
+///
+/// This is [`center_within_cluster_linear_detrend_event_lags`] then the
+/// pairwise mean of Voelkle et al. (2012, Eq. 7) on nonzero same-sign
+/// residuals. When `|later| / |earlier|` is finite and positive the
+/// rate is `ln(|later| / |earlier|) / Δt`; overflowed or underflowed
+/// ratios use `(ln|later| − ln|earlier|) / Δt`. The pairwise mean is
+/// formed incrementally so two finite rates whose raw sum overflows
+/// stay representable. Two-observation clusters interpolate exactly
+/// and contribute only zero residuals, so they never enter the
+/// admissible set. In the absence of growth this equals the CWC
+/// pairwise mean. It is **not** CWC when the score is related to
+/// time, **not** raw-process drift, **not** CGM, and **not** DSEM
+/// (Curran & Bauer, 2011, pp. 607–608).
+///
+/// # Errors
+///
+/// Propagates centering errors from
+/// [`center_within_cluster_linear_detrend_event_lags`]. A non-finite
+/// log-rate after the stable logarithm is
+/// [`PsychometricError::InvalidNumericInput`]. An empty admissible
+/// list after skipping zero and opposite-sign pairs is
+/// [`PsychometricError::InvalidNumericInput`].
+pub fn recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+    rows: &[ClusteredEventScore],
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let lagged = center_within_cluster_linear_detrend_event_lags(rows, clock)?;
+    let mut mean = 0.0_f64;
+    let mut count = 0.0_f64;
+    for pair in lagged {
+        if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
+            continue;
+        }
+        let rate = voelkle_same_sign_log_rate(
+            pair.earlier_residual,
+            pair.later_residual,
+            pair.event_delta,
+        )?;
+        (mean, count) = overflow_safe_running_mean(mean, count, rate);
+    }
+    if count <= 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    require_finite(mean)
+}
+
+/// Refuse treating a CWC residual log-rate as a linear-detrend log-rate.
+///
+/// Always fails closed. Curran and Bauer (2011, pp. 607–608) show that
+/// person-mean centering is a horizontal line; when the score is
+/// related to time, those CWC residuals are not the residuals from
+/// the person-specific OLS line on event time.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::CwcResidualLogRateIsNotLinearDetrend`].
+pub fn refuse_cwc_residual_log_rate_as_linear_detrend(
+    cwc_log_rate: f64,
+    linear_detrend_log_rate: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (cwc_log_rate, linear_detrend_log_rate);
+    Err(PsychometricError::CwcResidualLogRateIsNotLinearDetrend)
+}
+
+/// Refuse treating a linear-detrend log-rate as raw-process AR drift.
+///
+/// Always fails closed. Person-specific OLS of score on event time
+/// absorbs the linear component of a raw exponential path. Use
+/// [`recover_irregular_centered_residual_log_rate`] on already-centered
+/// residuals for the raw-process estimand.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LinearDetrendLogRateIsNotRawProcessDrift`].
+pub fn refuse_linear_detrend_log_rate_as_raw_process_drift(
+    linear_detrend_log_rate: f64,
+    raw_process_drift: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (linear_detrend_log_rate, raw_process_drift);
+    Err(PsychometricError::LinearDetrendLogRateIsNotRawProcessDrift)
+}
+
 /// Mean exact scalar log-rate on already-centered residuals with irregular intervals.
 ///
 /// Each pair is `a = ln(later / earlier) / Δt` (Voelkle et al., 2012, Eq. 7).
@@ -7134,7 +7350,9 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        center_grand_mean_event_lags, center_within_cluster_event_lags, fit_scalar_log_rate,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
+        center_grand_mean_event_lags, center_within_cluster_event_lags,
+        center_within_cluster_linear_detrend_event_lags, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, overflow_safe_running_mean,
         recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
@@ -7182,6 +7400,7 @@ mod tests {
         recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
         recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
         recover_within_cluster_irregular_residual_log_rate,
+        recover_within_cluster_linear_detrend_irregular_residual_log_rate,
         recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
@@ -7202,6 +7421,7 @@ mod tests {
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means,
+        refuse_cwc_residual_log_rate_as_linear_detrend,
         refuse_cwc_residual_log_rate_as_raw_process_drift,
         refuse_difference_quotient_as_local_rate,
         refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
@@ -7256,7 +7476,9 @@ mod tests {
         refuse_level_change_increment_as_process_increment,
         refuse_level_change_intercept_as_free_continuous_intercept,
         refuse_level_change_intercept_as_impulse,
-        refuse_level_change_intercept_as_process_increment, refuse_manifest_means_as_observed_mean,
+        refuse_level_change_intercept_as_process_increment,
+        refuse_linear_detrend_log_rate_as_raw_process_drift,
+        refuse_manifest_means_as_observed_mean,
         refuse_manifest_trait_variance_as_measurement_error,
         refuse_measurement_error_as_lagged_observed_covariance,
         refuse_measurement_error_as_observed_variance,
@@ -7327,8 +7549,7 @@ mod tests {
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
-        same_sign_nonzero, voelkle_same_sign_log_rate, ClusteredEventScore, EventOccasion,
-        LagClock, LaggedWithinResidual,
+        same_sign_nonzero, voelkle_same_sign_log_rate,
     };
     use crate::error::PsychometricError;
 
@@ -9129,14 +9350,18 @@ mod tests {
         assert!(cgm.is_finite());
         let pairs = center_grand_mean_event_lags(&rows, LagClock::EventTime).expect("cgm pairs");
         assert_eq!(pairs.len(), 2);
-        assert!(pairs
-            .iter()
-            .all(|pair| same_sign_nonzero(pair.earlier_residual, pair.later_residual)));
+        assert!(
+            pairs
+                .iter()
+                .all(|pair| same_sign_nonzero(pair.earlier_residual, pair.later_residual))
+        );
         let cwc_pairs =
             center_within_cluster_event_lags(&rows, LagClock::EventTime).expect("cwc pairs");
-        assert!(cwc_pairs
-            .iter()
-            .all(|pair| !same_sign_nonzero(pair.earlier_residual, pair.later_residual)));
+        assert!(
+            cwc_pairs
+                .iter()
+                .all(|pair| !same_sign_nonzero(pair.earlier_residual, pair.later_residual))
+        );
     }
 
     #[test]
@@ -12355,8 +12580,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -12931,8 +13156,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
         // λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ.
@@ -13508,8 +13733,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of stationary T0VAR is
         // λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ.
@@ -15663,8 +15888,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
-    ) {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
+     {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -15814,8 +16039,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
-    ) {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
+     {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -16433,8 +16658,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
-    ) {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
+     {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,
@@ -17559,6 +17784,527 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    fn orthogonal_linear_detrend_rows() -> [ClusteredEventScore; 8] {
+        [
+            clustered(1, 0.0, 6.0),
+            clustered(1, 1.0, 5.5),
+            clustered(1, 2.0, -3.0),
+            clustered(1, 3.0, 10.5),
+            clustered(2, 0.0, 0.0),
+            clustered(2, 1.0, -1.0),
+            clustered(2, 2.0, -18.0),
+            clustered(2, 3.0, 9.0),
+        ]
+    }
+
+    fn no_growth_orthogonal_rows() -> [ClusteredEventScore; 8] {
+        [
+            clustered(1, 0.0, 2.0),
+            clustered(1, 1.0, 1.0),
+            clustered(1, 2.0, -8.0),
+            clustered(1, 3.0, 5.0),
+            clustered(2, 0.0, 4.0),
+            clustered(2, 1.0, 2.0),
+            clustered(2, 2.0, -16.0),
+            clustered(2, 3.0, 10.0),
+        ]
+    }
+
+    #[test]
+    fn linear_detrend_recovers_orthogonal_same_sign_log_rate() {
+        let rows = orthogonal_linear_detrend_rows();
+        let recovered = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+            &rows,
+            LagClock::EventTime,
+        )
+        .expect("orthogonal detrend");
+        let expected = 0.5_f64.ln();
+        assert!(
+            (recovered - expected).abs() < 1e-12,
+            "Curran & Bauer (2011, pp. 607–608): detrend of line-plus-orthogonal residuals recovered {recovered}, expected {expected}"
+        );
+        let extracted = center_within_cluster_linear_detrend_event_lags(&rows, LagClock::EventTime)
+            .expect("extract");
+        assert_eq!(extracted.len(), 6);
+        assert!((extracted[0].earlier_residual - 2.0).abs() < 1e-12);
+        assert!((extracted[0].later_residual - 1.0).abs() < 1e-12);
+        assert!((extracted[3].earlier_residual - 4.0).abs() < 1e-12);
+        assert!((extracted[3].later_residual - 2.0).abs() < 1e-12);
+        let cwc = recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
+            .expect("cwc");
+        assert!(
+            (cwc - expected).abs() > 1e-6,
+            "person-mean centering is not the OLS line: CWC {cwc} must not equal {expected}"
+        );
+        assert_eq!(
+            refuse_cwc_residual_log_rate_as_linear_detrend(cwc, recovered),
+            Err(PsychometricError::CwcResidualLogRateIsNotLinearDetrend)
+        );
+        assert_eq!(
+            refuse_cwc_residual_log_rate_as_linear_detrend(f64::NAN, f64::INFINITY),
+            Err(PsychometricError::CwcResidualLogRateIsNotLinearDetrend)
+        );
+    }
+
+    #[test]
+    fn linear_detrend_equals_cwc_in_absence_of_growth() {
+        let rows = no_growth_orthogonal_rows();
+        let detrend = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+            &rows,
+            LagClock::EventTime,
+        )
+        .expect("detrend");
+        let cwc = recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
+            .expect("cwc");
+        assert!((detrend - cwc).abs() < 1e-15);
+        assert!((detrend - 0.5_f64.ln()).abs() < 1e-12);
+        assert_eq!(
+            refuse_cwc_residual_log_rate_as_linear_detrend(cwc, detrend),
+            Err(PsychometricError::CwcResidualLogRateIsNotLinearDetrend),
+            "absence of growth does not license treating CWC as detrend"
+        );
+    }
+
+    #[test]
+    fn linear_detrend_of_raw_ar_is_not_raw_process_drift() {
+        let drift = -0.3_f64;
+        let rows = decaying_clustered_scores(drift);
+        let detrend = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+            &rows,
+            LagClock::EventTime,
+        )
+        .expect("detrend");
+        assert!(
+            (detrend - drift).abs() > 1e-6,
+            "Curran & Bauer (2011, pp. 607–608): detrend {detrend} must not equal raw-process drift {drift}"
+        );
+        let already = recover_irregular_centered_residual_log_rate(
+            &[
+                lagged(1.0, 1.0 * drift.exp(), 1.0),
+                lagged(-0.8, -0.8 * (drift * 1.5).exp(), 1.5),
+            ],
+            LagClock::EventTime,
+        )
+        .expect("already centered");
+        assert!((already - drift).abs() < 1e-12);
+        assert_eq!(
+            refuse_linear_detrend_log_rate_as_raw_process_drift(detrend, already),
+            Err(PsychometricError::LinearDetrendLogRateIsNotRawProcessDrift)
+        );
+        assert_eq!(
+            refuse_linear_detrend_log_rate_as_raw_process_drift(f64::NAN, f64::INFINITY),
+            Err(PsychometricError::LinearDetrendLogRateIsNotRawProcessDrift)
+        );
+    }
+
+    #[test]
+    fn t2_linear_detrend_interpolates_to_zero() {
+        let rows = two_wave_level_separated();
+        let pairs = center_within_cluster_linear_detrend_event_lags(&rows, LagClock::EventTime)
+            .expect("t2 detrend pairs");
+        assert_eq!(pairs.len(), 2);
+        assert!(pairs.iter().all(|pair| pair.earlier_residual == 0.0
+            && pair.later_residual == 0.0
+            && pair.event_delta > 0.0));
+        assert_eq!(
+            recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+                &rows,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput),
+            "T=2 interpolates exactly; residuals are zero"
+        );
+        let cgm =
+            recover_grand_mean_centered_irregular_residual_log_rate(&rows, LagClock::EventTime)
+                .expect("T=2 CGM same-sign");
+        assert!(cgm.is_finite());
+    }
+
+    #[test]
+    fn pure_line_linear_detrend_has_empty_admissible_set() {
+        let rows = [
+            clustered(1, 0.0, 4.0),
+            clustered(1, 1.0, 4.5),
+            clustered(1, 2.0, 5.0),
+            clustered(1, 3.0, 5.5),
+            clustered(2, 0.0, -2.0),
+            clustered(2, 1.0, -1.0),
+            clustered(2, 2.0, 0.0),
+            clustered(2, 3.0, 1.0),
+        ];
+        let pairs = center_within_cluster_linear_detrend_event_lags(&rows, LagClock::EventTime)
+            .expect("pure line");
+        assert!(
+            pairs.iter().all(
+                |pair| pair.earlier_residual.abs() < 1e-12 && pair.later_residual.abs() < 1e-12
+            )
+        );
+        assert_eq!(
+            recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+                &rows,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let cwc = recover_within_cluster_irregular_residual_log_rate(&rows, LagClock::EventTime)
+            .expect("CWC of a trending line keeps same-sign pairs");
+        assert!(cwc.is_finite());
+    }
+
+    #[test]
+    fn linear_detrend_orders_unsorted_event_times_before_lag_pairs() {
+        let later = clustered(1, 3.0, 10.5);
+        let earlier = clustered(1, 0.0, 6.0);
+        let mid_late = clustered(1, 2.0, -3.0);
+        let mid_early = clustered(1, 1.0, 5.5);
+        let other_later = clustered(2, 3.0, 9.0);
+        let other_earlier = clustered(2, 0.0, 0.0);
+        let other_mid_late = clustered(2, 2.0, -18.0);
+        let other_mid_early = clustered(2, 1.0, -1.0);
+        let pairs = center_within_cluster_linear_detrend_event_lags(
+            &[
+                later,
+                other_later,
+                earlier,
+                other_earlier,
+                mid_late,
+                other_mid_late,
+                mid_early,
+                other_mid_early,
+            ],
+            LagClock::EventTime,
+        )
+        .expect("unsorted");
+        assert_eq!(pairs.len(), 6);
+        assert!((pairs[0].event_delta - 1.0).abs() < 1e-15);
+        assert!((pairs[0].earlier_residual - 2.0).abs() < 1e-12);
+        assert!((pairs[0].later_residual - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn linear_detrend_skips_singleton_cluster() {
+        let mixed = [
+            clustered(1, 0.0, 6.0),
+            clustered(1, 1.0, 5.5),
+            clustered(1, 2.0, -3.0),
+            clustered(1, 3.0, 10.5),
+            clustered(2, 0.0, 4.0),
+        ];
+        let pairs = center_within_cluster_linear_detrend_event_lags(&mixed, LagClock::EventTime)
+            .expect("skip");
+        assert_eq!(pairs.len(), 3);
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[clustered(1, 0.0, 1.0), clustered(2, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn linear_detrend_pairwise_keeps_overflowed_same_sign_ratio_via_stable_log() {
+        let huge = 2.0_f64.powi(1022);
+        let tiny = f64::from_bits(1);
+        let rows = [
+            clustered(1, 0.0, tiny),
+            clustered(1, 1.0, huge),
+            clustered(1, 2.0, -2.0 * huge),
+            clustered(1, 3.0, huge),
+            clustered(2, 0.0, -tiny),
+            clustered(2, 1.0, -huge),
+            clustered(2, 2.0, 2.0 * huge),
+            clustered(2, 3.0, -huge),
+        ];
+        let recovered = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+            &rows,
+            LagClock::EventTime,
+        )
+        .expect("stable log overflow");
+        let extracted = center_within_cluster_linear_detrend_event_lags(&rows, LagClock::EventTime)
+            .expect("extract");
+        let mut expected = 0.0_f64;
+        let mut count = 0.0_f64;
+        let mut overflowed = 0_u32;
+        for pair in extracted {
+            if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
+                continue;
+            }
+            let ratio = pair.later_residual.abs() / pair.earlier_residual.abs();
+            if !ratio.is_finite() {
+                overflowed += 1;
+            }
+            let rate = voelkle_same_sign_log_rate(
+                pair.earlier_residual,
+                pair.later_residual,
+                pair.event_delta,
+            )
+            .expect("pair rate");
+            (expected, count) = overflow_safe_running_mean(expected, count, rate);
+        }
+        assert!(overflowed >= 1, "fixture must overflow |later|/|earlier|");
+        assert!(count > 0.0);
+        assert!((recovered - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn linear_detrend_pairwise_keeps_underflowed_same_sign_ratio_via_stable_log() {
+        let huge = 2.0_f64.powi(1022);
+        let tiny = f64::from_bits(1);
+        let rows = [
+            clustered(1, 0.0, huge),
+            clustered(1, 1.0, tiny),
+            clustered(1, 2.0, -3.0 * huge),
+            clustered(1, 3.0, 2.0 * huge),
+            clustered(2, 0.0, -huge),
+            clustered(2, 1.0, -tiny),
+            clustered(2, 2.0, 3.0 * huge),
+            clustered(2, 3.0, -2.0 * huge),
+        ];
+        let recovered = recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+            &rows,
+            LagClock::EventTime,
+        )
+        .expect("stable log underflow");
+        let extracted = center_within_cluster_linear_detrend_event_lags(&rows, LagClock::EventTime)
+            .expect("extract");
+        let mut expected = 0.0_f64;
+        let mut count = 0.0_f64;
+        let mut underflowed = 0_u32;
+        for pair in extracted {
+            if !same_sign_nonzero(pair.earlier_residual, pair.later_residual) {
+                continue;
+            }
+            let ratio = pair.later_residual.abs() / pair.earlier_residual.abs();
+            if ratio == 0.0 {
+                underflowed += 1;
+            }
+            let rate = voelkle_same_sign_log_rate(
+                pair.earlier_residual,
+                pair.later_residual,
+                pair.event_delta,
+            )
+            .expect("pair rate");
+            (expected, count) = overflow_safe_running_mean(expected, count, rate);
+        }
+        assert!(underflowed >= 1, "fixture must underflow |later|/|earlier|");
+        assert!(count > 0.0);
+        assert!((recovered - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn linear_detrend_tiny_interval_with_huge_log_ratio_fails_closed() {
+        assert_eq!(
+            recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, 1e-160),
+                    clustered(1, f64::from_bits(1), 1e160),
+                    clustered(1, 2.0, -2e160),
+                    clustered(1, 3.0, 1e160),
+                    clustered(2, 0.0, -1e-160),
+                    clustered(2, f64::from_bits(1), -1e160),
+                    clustered(2, 2.0, 2e160),
+                    clustered(2, 3.0, -1e160),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn linear_detrend_paths_fail_closed() {
+        let rows = orthogonal_linear_detrend_rows();
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(&rows, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+                &rows,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(&[], LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+                &[],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[clustered(1, 0.0, 1.0), clustered(1, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InsufficientClusters)
+        );
+        assert_eq!(
+            recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+                &[clustered(1, 0.0, 1.0), clustered(1, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InsufficientClusters)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[clustered(1, 0.0, 1.0), clustered(2, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 0.0, 1.2),
+                    clustered(2, 0.0, 2.0),
+                    clustered(2, 1.0, 1.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 1.0, 1.2),
+                    clustered(1, 1.0, 1.5),
+                    clustered(2, 0.0, 2.0),
+                    clustered(2, 1.0, 1.5),
+                    clustered(2, 2.0, 1.0),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 0.0, 2.0),
+                    clustered(1, 0.0, 3.0),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                    clustered(2, 2.0, 0.25),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::SingularDesign)
+        );
+        assert_eq!(
+            recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 1.0, 2.0),
+                    clustered(1, 2.0, 3.0),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 2.0),
+                    clustered(2, 2.0, 3.0),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput),
+            "T=3 [1,-2,1] residuals after a line have no same-sign pair"
+        );
+    }
+
+    #[test]
+    fn linear_detrend_numeric_inputs_fail_closed() {
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[
+                    clustered(1, f64::NAN, 1.0),
+                    clustered(1, 1.0, 0.5),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[
+                    clustered(1, 0.0, f64::NAN),
+                    clustered(1, 1.0, 1.0),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_within_cluster_linear_detrend_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, f64::INFINITY),
+                    clustered(1, 1.0, 1.0),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[
+                    clustered(1, 0.0, f64::MAX),
+                    clustered(1, 1.0, f64::MAX),
+                    clustered(1, 2.0, f64::MAX),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                    clustered(2, 2.0, 0.25),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput),
+            "overflowing OLS intercept fails closed"
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[
+                    clustered(1, f64::MAX, 1.0),
+                    clustered(1, f64::MAX, 2.0),
+                    clustered(1, f64::MAX, 3.0),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                    clustered(2, 2.0, 0.25),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput),
+            "overflowing OLS time mean fails closed"
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[clustered(1, 0.0, 1.0)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_within_cluster_linear_detrend_event_lags(
+                &[
+                    clustered(1, f64::MAX, 1.0),
+                    clustered(1, -f64::MAX, 0.5),
+                    clustered(2, 0.0, 1.0),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
         );
     }
 }
