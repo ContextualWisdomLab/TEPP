@@ -8,13 +8,17 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Fitted candidate-`K`
+//! selection is invoked through [`model_selection`] and is not a Bayesian
+//! sampler.
 
 mod case_deletion_refit;
+mod fitted_candidate_k_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use model_selection::ModelSelectionError;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -41,6 +45,12 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Fitted candidate-`K` artifact and execution contracts from this engine.
+pub use fitted_candidate_k_artifact::{
+    FITTED_CANDIDATE_K_ARTIFACT_BYTE_LIMIT, FITTED_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION,
+    FITTED_CANDIDATE_K_MODEL_CONTRACT_VERSION, FITTED_CANDIDATE_K_OUTPUT_PROFILE,
+    FittedCandidateKArtifact, FittedCandidateKExecution, execute_fitted_candidate_k_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +258,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A model-selection gate rejected the offered candidates or method.
+    ModelSelection(ModelSelectionError),
+    /// A fitted candidate-`K` artifact violated its bounded schema or counts.
+    InvalidFittedCandidateKArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +276,8 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::ModelSelection(error) => return error.fmt(formatter),
+            Self::InvalidFittedCandidateKArtifact => "invalid fitted candidate-k artifact",
         };
         formatter.write_str(message)
     }
@@ -278,6 +294,12 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<ModelSelectionError> for AnalysisEngineError {
+    fn from(error: ModelSelectionError) -> Self {
+        Self::ModelSelection(error)
     }
 }
 
@@ -413,7 +435,8 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
+        MAX_EVIDENCE_UNITS, ModelSelectionError, TopicMeasurementError, add_membership_count,
+        execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -680,6 +703,14 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::ModelSelection(ModelSelectionError::NoSuccessfulFit),
+                "no fitted candidate produced a finite diagnostic",
+            ),
+            (
+                AnalysisEngineError::InvalidFittedCandidateKArtifact,
+                "invalid fitted candidate-k artifact",
             ),
         ];
         for (error, message) in messages {
