@@ -60,4 +60,7 @@ https://doi.org/10.1103/PhysRevE.69.026113
   wrapper with zero drop probability;
 - out-of-range, self, and non-positive edges are ignored;
 - identical seeds reproduce the partition;
-- isolated topics keep a distinct unclustered assignment at consensus.
+- isolated topics keep a distinct unclustered assignment at consensus;
+- aggregation sums parallel supernode edges and keeps distinct neighbours;
+- the connectedness oracle rejects a disconnected community and accepts
+  singletons.

@@ -571,6 +571,7 @@ mod tests {
         let labels = leiden_partition(&edges, 3, &mut rng);
         assert_eq!(labels[0], labels[1]);
         assert_ne!(labels[2], labels[0]);
+        assert!(communities_connected(&edges, &labels));
     }
 
     #[test]
@@ -641,5 +642,49 @@ mod tests {
         let mut empty: Vec<usize> = Vec::new();
         shuffle(&mut rng, &mut empty);
         assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn aggregate_sums_parallel_supernode_edges_and_keeps_distinct_neighbors() {
+        // Two crossing edges between supernodes 0 and 1 plus one edge
+        // from 1 to 2. Aggregation must merge the parallel pair and keep
+        // the distinct neighbour.
+        let owned = vec![
+            edge(0, 1, 1.0),
+            edge(2, 3, 1.0),
+            edge(4, 5, 1.0),
+            edge(0, 2, 0.3),
+            edge(1, 3, 0.4),
+            edge(2, 4, 0.2),
+        ];
+        let edges = refs(&owned);
+        let graph = Graph::from_edges(&edges, 6);
+        let refined = vec![0, 0, 1, 1, 2, 2];
+        let parent = refined.clone();
+        let leaf_members: Vec<Vec<usize>> = (0..6).map(|node| vec![node]).collect();
+        let (aggregate, next_membership, next_leaves) =
+            aggregate_graph(&graph, &parent, &refined, &leaf_members);
+        assert_eq!(aggregate.node_count, 3);
+        assert_eq!(aggregate.adjacency[0].len(), 1);
+        assert_eq!(aggregate.adjacency[0][0].0, 1);
+        assert!((aggregate.adjacency[0][0].1 - 0.7).abs() < 1e-15);
+        assert_eq!(aggregate.adjacency[1].len(), 2);
+        assert_eq!(aggregate.adjacency[1][0].0, 0);
+        assert_eq!(aggregate.adjacency[1][1].0, 2);
+        assert!((aggregate.adjacency[1][0].1 - 0.7).abs() < 1e-15);
+        assert!((aggregate.adjacency[1][1].1 - 0.2).abs() < 1e-15);
+        assert_eq!(next_membership, vec![0, 1, 2]);
+        assert_eq!(next_leaves[0], vec![0, 1]);
+        assert_eq!(next_leaves[1], vec![2, 3]);
+        assert_eq!(next_leaves[2], vec![4, 5]);
+    }
+
+    #[test]
+    fn connectedness_oracle_rejects_a_disconnected_community() {
+        let owned = vec![edge(0, 1, 1.0), edge(2, 3, 1.0)];
+        let edges = refs(&owned);
+        assert!(!communities_connected(&edges, &[0, 0, 0, 0]));
+        assert!(communities_connected(&edges, &[0, 0, 1, 1]));
+        assert!(communities_connected(&edges, &[0, 1, 2, 3]));
     }
 }
