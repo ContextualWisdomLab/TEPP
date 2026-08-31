@@ -7,9 +7,11 @@ use std::thread;
 use std::time::Duration;
 
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
-    ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE,
-    NARUON_LIVE_HEADER_BYTE_LIMIT, lineageweave_analysis_run_exchange,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLifecycleTransition,
+    AnalysisRunLiveService, AnalysisRunRequest, ApiError, LINEAGEWEAVE_CONSUMER_CODE,
+    NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
+    lineageweave_analysis_run_exchange, lineageweave_analysis_run_running_exchange,
+    lineageweave_analysis_run_terminal_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -69,6 +71,41 @@ fn lineageweave_exchange_uses_the_published_consumer_header_without_credentials(
 }
 
 #[test]
+fn lineageweave_lifecycle_exchanges_post_without_credentials() {
+    let running = AnalysisRunLifecycleTransition::running("tepp-run-9", "shared-idempotency-key")
+        .expect("running");
+    let exchange =
+        lineageweave_analysis_run_running_exchange("https://tepp.example.test", &running)
+            .expect("lineageweave running");
+    assert_eq!(exchange.method, "POST");
+    assert_eq!(
+        exchange.target_url,
+        "https://tepp.example.test/v1/analysis-runs/tepp-run-9/running"
+    );
+    assert!(
+        exchange
+            .headers
+            .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+    );
+    assert!(exchange.headers.iter().all(|(name, _)| {
+        !matches!(
+            name.to_ascii_lowercase().as_str(),
+            "authorization" | "proxy-authorization" | "cookie" | "x-api-key"
+        )
+    }));
+    assert!(!exchange.body.contains("rmse"));
+    assert_eq!(
+        lineageweave_analysis_run_running_exchange("http://tepp.example.test", &running),
+        Err(ApiError::InvalidWirePayload)
+    );
+    assert_eq!(
+        lineageweave_analysis_run_terminal_exchange("https://tepp.example.test", &running)
+            .expect_err("running on terminal"),
+        ApiError::InvalidWirePayload
+    );
+}
+
+#[test]
 fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     let loopback = AnalysisRunLiveService::bind_loopback().expect("loopback bind");
     assert!(
@@ -108,6 +145,31 @@ fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     let conflict_response =
         service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &conflict));
     assert_eq!(conflict_response.status_code, 400);
+
+    let running = AnalysisRunLifecycleTransition::running(
+        &lineageweave_accepted.run_id,
+        run.idempotency_key.clone(),
+    )
+    .expect("running")
+    .to_json()
+    .expect("running json");
+    let post_running = service.handle_http_request(&format!(
+        "POST {NARUON_ANALYSIS_RUN_PATH}/{}/running HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{running}",
+        lineageweave_accepted.run_id,
+        run.idempotency_key,
+        running.len()
+    ));
+    assert_eq!(post_running.status_code, 200);
+    assert!(post_running.body.contains("\"running\""));
+    assert!(!post_running.body.contains("rmse"));
+    assert!(!post_running.body.contains("scientific_acceptance"));
+    let naruon_running = service.handle_http_request(&format!(
+        "POST {NARUON_ANALYSIS_RUN_PATH}/{}/running HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{running}",
+        lineageweave_accepted.run_id,
+        run.idempotency_key,
+        running.len()
+    ));
+    assert_eq!(naruon_running.status_code, 400);
 }
 
 #[test]

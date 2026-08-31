@@ -3,9 +3,10 @@
 use crate::naruon_http::compose_https_target;
 use crate::project_history::build_project_history_exchange;
 use crate::{
-    AnalysisRunRequest, ApiError, NaruonHttpExchange, ProjectHistoryHttpExchange,
-    ProjectHistoryRequest, TEMPORAL_CONTEXT_CONTRACT_VERSION, TEMPORAL_CONTEXT_PATH,
-    TemporalContextRequest, naruon_analysis_run_exchange,
+    AnalysisRunLifecycleTransition, AnalysisRunRequest, ApiError, NaruonHttpExchange,
+    ProjectHistoryHttpExchange, ProjectHistoryRequest, TEMPORAL_CONTEXT_CONTRACT_VERSION,
+    TEMPORAL_CONTEXT_PATH, TemporalContextRequest, naruon_analysis_run_exchange,
+    naruon_analysis_run_running_exchange, naruon_analysis_run_terminal_exchange,
 };
 
 /// Stable consumer identity used by the Naruon adapter.
@@ -29,13 +30,54 @@ pub fn lineageweave_analysis_run_exchange(
     request: &AnalysisRunRequest,
 ) -> Result<NaruonHttpExchange, ApiError> {
     let mut exchange = naruon_analysis_run_exchange(origin, request)?;
+    swap_consumer_header(&mut exchange)?;
+    Ok(exchange)
+}
+
+/// Build a `LineageWeave` → TEPP running-status POST without credentials.
+///
+/// The function reuses TEPP's existing origin, body, and header validation,
+/// then replaces only the published modular-consumer identity. Running stays
+/// a metric-free lifecycle command, not a measurement result.
+///
+/// # Errors
+///
+/// Returns the same fail-closed errors as [`naruon_analysis_run_running_exchange`].
+pub fn lineageweave_analysis_run_running_exchange(
+    origin: &str,
+    transition: &AnalysisRunLifecycleTransition,
+) -> Result<NaruonHttpExchange, ApiError> {
+    let mut exchange = naruon_analysis_run_running_exchange(origin, transition)?;
+    swap_consumer_header(&mut exchange)?;
+    Ok(exchange)
+}
+
+/// Build a `LineageWeave` → TEPP terminal-status POST without credentials.
+///
+/// The function reuses TEPP's existing origin, body, and header validation,
+/// then replaces only the published modular-consumer identity. Terminal
+/// scientific-acceptance bytes remain request-bound and fail closed.
+///
+/// # Errors
+///
+/// Returns the same fail-closed errors as [`naruon_analysis_run_terminal_exchange`].
+pub fn lineageweave_analysis_run_terminal_exchange(
+    origin: &str,
+    transition: &AnalysisRunLifecycleTransition,
+) -> Result<NaruonHttpExchange, ApiError> {
+    let mut exchange = naruon_analysis_run_terminal_exchange(origin, transition)?;
+    swap_consumer_header(&mut exchange)?;
+    Ok(exchange)
+}
+
+fn swap_consumer_header(exchange: &mut NaruonHttpExchange) -> Result<(), ApiError> {
     let consumer_header = exchange
         .headers
         .iter_mut()
         .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
         .ok_or(ApiError::InvalidWirePayload)?;
     LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
-    Ok(exchange)
+    Ok(())
 }
 
 /// Build a credential-free `LineageWeave` temporal-context exchange.
@@ -94,9 +136,12 @@ pub(crate) fn consumer_is_supported(consumer_code: &str) -> bool {
 mod tests {
     use super::{
         LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, consumer_is_supported,
-        lineageweave_analysis_run_exchange,
+        lineageweave_analysis_run_exchange, lineageweave_analysis_run_running_exchange,
+        lineageweave_analysis_run_terminal_exchange,
     };
-    use crate::{ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError};
+    use crate::{
+        ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunLifecycleTransition, AnalysisRunRequest, ApiError,
+    };
 
     fn sample_run() -> AnalysisRunRequest {
         AnalysisRunRequest {
@@ -130,6 +175,65 @@ mod tests {
         assert_eq!(
             lineageweave_analysis_run_exchange("http://tepp.example.test", &run),
             Err(ApiError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn lineageweave_lifecycle_exchanges_swap_only_the_consumer_header() {
+        let running =
+            AnalysisRunLifecycleTransition::running("tepp-run-1", "idem-1").expect("running");
+        let running_exchange =
+            lineageweave_analysis_run_running_exchange("https://tepp.example.test", &running)
+                .expect("running exchange");
+        assert_eq!(running_exchange.method, "POST");
+        assert_eq!(
+            running_exchange.target_url,
+            "https://tepp.example.test/v1/analysis-runs/tepp-run-1/running"
+        );
+        assert!(
+            running_exchange
+                .headers
+                .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+        );
+        assert!(
+            !running_exchange
+                .headers
+                .contains(&("tepp-consumer".into(), NARUON_CONSUMER_CODE.into()))
+        );
+        assert!(!running_exchange.body.contains("rmse"));
+        assert_eq!(
+            lineageweave_analysis_run_running_exchange("http://tepp.example.test", &running),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let failed = crate::AnalysisRunTerminalResult::failed(
+            &sample_run(),
+            &crate::AnalysisRunAccepted::new("tepp-run-1", "accepted", "idem-1").expect("accepted"),
+            "2026-08-02T03:04:05Z",
+            "estimation_failed",
+        )
+        .expect("failed");
+        let terminal =
+            AnalysisRunLifecycleTransition::terminal("tepp-run-1", "idem-1", failed, None)
+                .expect("terminal");
+        let terminal_exchange =
+            lineageweave_analysis_run_terminal_exchange("https://tepp.example.test", &terminal)
+                .expect("terminal exchange");
+        assert_eq!(terminal_exchange.method, "POST");
+        assert!(
+            terminal_exchange
+                .target_url
+                .ends_with("/v1/analysis-runs/tepp-run-1/terminal")
+        );
+        assert!(
+            terminal_exchange
+                .headers
+                .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+        );
+        assert_eq!(
+            lineageweave_analysis_run_terminal_exchange("https://tepp.example.test", &running)
+                .expect_err("running on terminal"),
+            ApiError::InvalidWirePayload
         );
     }
 }

@@ -105,7 +105,11 @@ bodies stay metric-free, and only a succeeded status with profile
 `POST /v1/analysis-runs/{run_id}/running` and
 `POST /v1/analysis-runs/{run_id}/terminal` are the production loopback
 status-update path that records those statuses; they do not persist and do not
-execute psychometric estimation. Production TLS remains a later adapter.
+execute psychometric estimation. LineageWeave mints those POSTs through
+`lineageweave_analysis_run_running_exchange` and
+`lineageweave_analysis_run_terminal_exchange`. `NaruonLiveService` serves the
+same running/terminal POSTs for Naruon only and still refuses GET.
+Production TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
