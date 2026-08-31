@@ -9,13 +9,16 @@
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
-//! causality, or completed psychometric model results.
+//! causality, or completed psychometric model results. The published `tepp-retry`
+//! CLI mints typed naruon/`LineageWeave` retry exchanges onto spawned
+//! `tepp-loopback` TCP.
 
 mod analysis_result;
 mod analysis_run;
 mod analysis_run_cancel_http;
 mod analysis_run_collection_http;
 mod analysis_run_live;
+mod analysis_run_retry_cli;
 mod analysis_run_retry_http;
 mod analysis_run_status_http;
 mod authorization;
@@ -116,6 +119,22 @@ pub use analysis_run_retry_http::AnalysisRunRetryRequest;
 pub use analysis_run_retry_http::naruon_analysis_run_retry_exchange;
 /// Refuse scientific-metric keys on a retry payload.
 pub use analysis_run_retry_http::refuse_metrics_on_retry_payload;
+/// Loopback retry CLI invocation.
+pub use analysis_run_retry_cli::AnalysisRunRetryCliInvocation;
+/// Loopback retry CLI verb.
+pub use analysis_run_retry_cli::AnalysisRunRetryCliVerb;
+/// Compose HTTP/1.1 retry POST from the typed exchange.
+pub use analysis_run_retry_cli::compose_analysis_run_retry_cli_http;
+/// Dispatch retry CLI against an in-process loopback service.
+pub use analysis_run_retry_cli::dispatch_analysis_run_retry_cli;
+/// Execute retry CLI over loopback TCP.
+pub use analysis_run_retry_cli::execute_analysis_run_retry_cli;
+/// Render a typed retry exchange onto a loopback HTTP/1.1 request.
+pub use analysis_run_retry_cli::loopback_http1_from_retry_exchange;
+/// Read retry CLI stdin leftover bytes.
+pub use analysis_run_retry_cli::read_analysis_run_retry_cli_stdin;
+/// Filter retry CLI stdout so receipts stay metric-free.
+pub use analysis_run_retry_cli::render_analysis_run_retry_cli_stdout;
 /// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
 /// Corpus-split leakage-audit contract version.

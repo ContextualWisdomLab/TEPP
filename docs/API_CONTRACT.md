@@ -88,7 +88,10 @@ operators do not guess run identities. Collection bodies never carry
 `tepp.scientific_acceptance.v1`. `POST /v1/analysis-runs/{run_id}/retry`
 clones a failed or cancelled run into a new metric-free `202 Accepted` with a
 new idempotency key; accepted, running, succeeded, and unknown runs fail
-closed. GET-by-id remains a later slice on this protected-main lineage.
+closed. `tepp-retry retry` is the published CLI that mints those typed
+naruon/`LineageWeave` retry exchanges onto spawned `tepp-loopback` TCP.
+Public bind hosts and `localhost` fail closed. GET-by-id remains a later
+slice on this protected-main lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
