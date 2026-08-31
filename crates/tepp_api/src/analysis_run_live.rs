@@ -7,8 +7,9 @@
 //! results remain outside this crate. `POST /v1/analysis-runs/{run_id}/cancel`
 //! is the operator-visible cancel path: accepted and running runs become
 //! metric-free `cancelled` status. `GET /v1/analysis-runs` enumerates those
-//! runs without guessing identities. GET-by-id and running/terminal POST
-//! transitions remain later slices.
+//! runs without guessing identities. `POST /v1/analysis-runs/{run_id}/retry`
+//! clones a failed or cancelled run into a new metric-free `202 Accepted`.
+//! GET-by-id and running/terminal POST transitions remain later slices.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -21,6 +22,9 @@ use crate::analysis_run_collection_http::{
     AnalysisRunCollection, AnalysisRunCollectionItem, is_analysis_run_collection_path,
     parse_collection_page_cursor, parse_collection_page_limit,
     refuse_metrics_on_collection_payload,
+};
+use crate::analysis_run_retry_http::{
+    AnalysisRunRetryRequest, analysis_run_retry_path_run_id, refuse_metrics_on_retry_payload,
 };
 use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};
 use crate::live_http::{
@@ -175,6 +179,12 @@ impl AnalysisRunLiveService {
             return Err(ApiError::InvalidWirePayload);
         }
         if matches!(
+            analysis_run_retry_path_run_id(path),
+            Ok(_) | Err(ApiError::LimitExceeded)
+        ) {
+            return self.retry_analysis_run(path, &headers, body);
+        }
+        if matches!(
             analysis_run_cancel_path_run_id(path),
             Ok(_) | Err(ApiError::LimitExceeded)
         ) {
@@ -289,6 +299,90 @@ impl AnalysisRunLiveService {
         Ok(json_response(200, "OK", response_body))
     }
 
+    fn retry_analysis_run(
+        &mut self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let run_id = analysis_run_retry_path_run_id(path)?;
+        let consumer = require_headers(headers, self.bound_addr, true)?;
+        refuse_metrics_on_retry_payload(body)?;
+        let new_idempotency_key = header_value(headers, "idempotency-key")?;
+        if !body.trim().is_empty() {
+            let retry = AnalysisRunRetryRequest::from_json(body)?;
+            if retry.run_id != run_id || retry.idempotency_key != new_idempotency_key {
+                return Err(ApiError::InvalidWirePayload);
+            }
+        }
+        let parent_replay_key = self
+            .runs_by_id
+            .get(&run_id)
+            .cloned()
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let (parent_consumer, mut cloned_request, parent_idempotency_key, parent_state) = {
+            let stored = self
+                .accepted_runs
+                .get(&parent_replay_key)
+                .ok_or(ApiError::InvalidWirePayload)?;
+            (
+                stored.consumer.clone(),
+                stored.request.clone(),
+                stored.accepted.idempotency_key.clone(),
+                stored.run_state,
+            )
+        };
+        if parent_consumer != consumer {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if new_idempotency_key == parent_idempotency_key {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        match parent_state {
+            AnalysisRunStatusState::Failed | AnalysisRunStatusState::Cancelled => {}
+            AnalysisRunStatusState::Accepted
+            | AnalysisRunStatusState::Running
+            | AnalysisRunStatusState::Succeeded => {
+                return Err(ApiError::InvalidWirePayload);
+            }
+        }
+        new_idempotency_key.clone_into(&mut cloned_request.idempotency_key);
+        cloned_request.validate()?;
+        let replay_key = consumer_tenant_idempotency_key(
+            consumer,
+            &cloned_request.tenant_workspace_id,
+            new_idempotency_key,
+        );
+        if let Some(stored) = self.accepted_runs.get(&replay_key) {
+            if requests_are_idempotent_matches(&stored.request, &cloned_request) {
+                let response_body = stored.accepted.to_json()?;
+                refuse_metrics_on_retry_payload(&response_body)?;
+                return Ok(json_response(202, "Accepted", response_body));
+            }
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let child_run_id = format!("tepp-run-{}", self.next_run_serial);
+        self.next_run_serial += 1;
+        let accepted = AnalysisRunAccepted::new(
+            child_run_id.clone(),
+            "accepted",
+            cloned_request.idempotency_key.clone(),
+        )?;
+        let response_body = accepted.to_json()?;
+        refuse_metrics_on_retry_payload(&response_body)?;
+        self.runs_by_id.insert(child_run_id, replay_key.clone());
+        self.accepted_runs.insert(
+            replay_key,
+            LiveAnalysisRun {
+                consumer: consumer.to_owned(),
+                request: cloned_request,
+                accepted,
+                run_state: AnalysisRunStatusState::Accepted,
+            },
+        );
+        Ok(json_response(202, "Accepted", response_body))
+    }
+
     fn list_analysis_runs(
         &self,
         path: &str,
@@ -350,9 +444,9 @@ impl AnalysisRunLiveService {
 
     /// Test-only seam that records a non-accepted loopback state.
     ///
-    /// Used to prove cancel and collection of running, succeeded, failed, and
-    /// cancelled runs without duplicating the live POST running/terminal
-    /// lifecycle slice.
+    /// Used to prove cancel, collection, and retry of running, succeeded,
+    /// failed, and cancelled runs without duplicating the live POST
+    /// running/terminal lifecycle slice.
     #[cfg(test)]
     fn force_loopback_run_state(
         &mut self,
@@ -1288,6 +1382,258 @@ mod tests {
                 .status_code,
             400
         );
+    }
+
+    fn retry_http(run_id: &str, body: &str, consumer: &str, idempotency_key: &str) -> String {
+        let mut request = format!("POST {NARUON_ANALYSIS_RUN_PATH}/{run_id}/retry HTTP/1.1\r\n");
+        write!(
+            request,
+            "Host: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\nidempotency-key: {idempotency_key}\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        )
+        .expect("retry request");
+        request
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn handler_covers_metric_free_retry_of_failed_and_cancelled() {
+        use crate::{
+            AnalysisRunAccepted, AnalysisRunCollection, AnalysisRunRetryRequest,
+            AnalysisRunStatusState,
+        };
+
+        let run = sample_run();
+        let mut service = AnalysisRunLiveService::new();
+        let accepted =
+            service.handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"));
+        assert_eq!(accepted.status_code, 202);
+        let parent_id = serde_json::from_str::<serde_json::Value>(&accepted.body)
+            .expect("accepted json")["run_id"]
+            .as_str()
+            .expect("run_id")
+            .to_owned();
+        assert_eq!(parent_id, "tepp-run-1");
+        service
+            .force_loopback_run_state(&parent_id, AnalysisRunStatusState::Failed)
+            .expect("force failed");
+
+        let retry_key = "analysis-live-retry-001";
+        let retry_body = AnalysisRunRetryRequest::new(&parent_id, retry_key)
+            .expect("retry dto")
+            .to_json()
+            .expect("retry json");
+        let retried = service.handle_http_request(&retry_http(
+            &parent_id,
+            &retry_body,
+            NARUON_CONSUMER_CODE,
+            retry_key,
+        ));
+        assert_eq!(retried.status_code, 202);
+        let child = AnalysisRunAccepted::from_json(&retried.body).expect("child");
+        assert_eq!(child.run_id, "tepp-run-2");
+        assert_eq!(child.run_state, "accepted");
+        assert_eq!(child.idempotency_key, retry_key);
+        assert!(!retried.body.contains("rmse"));
+        assert!(!retried.body.contains("scientific_acceptance"));
+        assert_ne!(child.run_id, parent_id);
+
+        let replay = service.handle_http_request(&retry_http(
+            &parent_id,
+            &retry_body,
+            NARUON_CONSUMER_CODE,
+            retry_key,
+        ));
+        assert_eq!(replay.status_code, 202);
+        assert_eq!(replay.body, retried.body);
+
+        let empty_body = service.handle_http_request(&retry_http(
+            &parent_id,
+            "",
+            NARUON_CONSUMER_CODE,
+            retry_key,
+        ));
+        assert_eq!(empty_body.status_code, 202);
+        assert_eq!(empty_body.body, retried.body);
+
+        let mut cancelled_run = run.clone();
+        cancelled_run.idempotency_key = "analysis-live-idem-002".into();
+        let cancelled_accepted = service.handle_http_request(&valid_request(
+            &cancelled_run,
+            NARUON_CONSUMER_CODE,
+            "127.0.0.1",
+        ));
+        let cancelled_id = serde_json::from_str::<serde_json::Value>(&cancelled_accepted.body)
+            .expect("cancelled accepted")["run_id"]
+            .as_str()
+            .expect("id")
+            .to_owned();
+        service
+            .force_loopback_run_state(&cancelled_id, AnalysisRunStatusState::Cancelled)
+            .expect("force cancelled");
+        let cancelled_retry = service.handle_http_request(&retry_http(
+            &cancelled_id,
+            "",
+            NARUON_CONSUMER_CODE,
+            "analysis-live-retry-002",
+        ));
+        assert_eq!(cancelled_retry.status_code, 202);
+        let cancelled_child =
+            AnalysisRunAccepted::from_json(&cancelled_retry.body).expect("cancelled child");
+        assert_eq!(cancelled_child.run_id, "tepp-run-4");
+        assert_eq!(cancelled_child.idempotency_key, "analysis-live-retry-002");
+
+        for (state, key_suffix) in [
+            (AnalysisRunStatusState::Accepted, "003"),
+            (AnalysisRunStatusState::Running, "004"),
+            (AnalysisRunStatusState::Succeeded, "005"),
+        ] {
+            let mut blocked = run.clone();
+            blocked.idempotency_key = format!("analysis-live-idem-{key_suffix}");
+            let blocked_accepted = service.handle_http_request(&valid_request(
+                &blocked,
+                NARUON_CONSUMER_CODE,
+                "127.0.0.1",
+            ));
+            let blocked_id = serde_json::from_str::<serde_json::Value>(&blocked_accepted.body)
+                .expect("blocked accepted")["run_id"]
+                .as_str()
+                .expect("id")
+                .to_owned();
+            service
+                .force_loopback_run_state(&blocked_id, state)
+                .expect("force blocked");
+            assert_eq!(
+                service
+                    .handle_http_request(&retry_http(
+                        &blocked_id,
+                        "",
+                        NARUON_CONSUMER_CODE,
+                        &format!("analysis-live-retry-{key_suffix}"),
+                    ))
+                    .status_code,
+                400,
+                "state={state:?}"
+            );
+        }
+
+        assert_eq!(
+            service
+                .handle_http_request(&retry_http(
+                    "missing-run",
+                    "",
+                    NARUON_CONSUMER_CODE,
+                    retry_key,
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&retry_http(
+                    &parent_id,
+                    &retry_body,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    retry_key,
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&retry_http(
+                    &parent_id,
+                    "",
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        let mismatched = AnalysisRunRetryRequest::new("other-run", retry_key)
+            .expect("mismatch")
+            .to_json()
+            .expect("mismatch json");
+        assert_eq!(
+            service
+                .handle_http_request(&retry_http(
+                    &parent_id,
+                    &mismatched,
+                    NARUON_CONSUMER_CODE,
+                    retry_key,
+                ))
+                .status_code,
+            400
+        );
+        let key_mismatch = AnalysisRunRetryRequest::new(&parent_id, "wrong-retry-key")
+            .expect("key mismatch")
+            .to_json()
+            .expect("key json");
+        assert_eq!(
+            service
+                .handle_http_request(&retry_http(
+                    &parent_id,
+                    &key_mismatch,
+                    NARUON_CONSUMER_CODE,
+                    retry_key,
+                ))
+                .status_code,
+            400
+        );
+        let metric_body = r#"{"contract_version":1,"run_id":"tepp-run-1","idempotency_key":"analysis-live-retry-001","rmse":0.1}"#;
+        assert_eq!(
+            service
+                .handle_http_request(&retry_http(
+                    &parent_id,
+                    metric_body,
+                    NARUON_CONSUMER_CODE,
+                    retry_key,
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/{parent_id} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "POST {NARUON_ANALYSIS_RUN_PATH}/{parent_id}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {retry_key}\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        let oversized = "a".repeat(129);
+        assert_eq!(
+            service
+                .handle_http_request(&retry_http(&oversized, "", NARUON_CONSUMER_CODE, retry_key,))
+                .status_code,
+            413
+        );
+
+        let listed = service.handle_http_request(&collection_http(NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(listed.status_code, 200);
+        let page = AnalysisRunCollection::from_json(&listed.body).expect("page");
+        let parent_row = page
+            .runs
+            .iter()
+            .find(|row| row.run_id == parent_id)
+            .expect("parent row");
+        assert_eq!(parent_row.run_state, AnalysisRunStatusState::Failed);
+        let child_row = page
+            .runs
+            .iter()
+            .find(|row| row.run_id == child.run_id)
+            .expect("child row");
+        assert_eq!(child_row.run_state, AnalysisRunStatusState::Accepted);
+        assert_eq!(child_row.idempotency_key, retry_key);
+        assert!(!listed.body.contains("scientific_acceptance"));
+        assert!(!listed.body.contains("rmse"));
     }
 
     #[test]
