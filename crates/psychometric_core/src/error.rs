@@ -504,6 +504,18 @@ pub enum PsychometricError {
     /// later-occasion stationary observed variance. Lagged covariance
     /// omits `Q_Δt` and `θ`.
     StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance,
+    /// Driver §4.3 later-occasion predetermined variance was treated
+    /// as later-occasion stationary variance. Free `T0VAR` `p_0` is
+    /// not `−q / (2 a)` when the first occasion is predetermined.
+    PredeterminedLaterLatentVarianceIsNotStationaryLaterVariance,
+    /// Driver §4.3 later-occasion predetermined variance was treated
+    /// as the free discrete evolution of `trait + p_0 + (B / a)² v`.
+    /// Trait variance and `addedTIPREDVAR` do not enter `Q_Δt`.
+    PredeterminedLaterLatentVarianceIsNotDiscreteVariance,
+    /// Driver §4.3 later-occasion predetermined variance was treated
+    /// as free first-occasion `T0VAR`. `p_0` is the start, not
+    /// `trait + e^{2 a Δt} p_0 + Q_Δt + (B / a)² v`.
+    PredeterminedLaterLatentVarianceIsNotInitialVariance,
     /// Driver p. 16 `CINTstd` was requested without a strictly positive
     /// `asymDIFFUSION`. Footnote 4 standardises using only the
     /// relevant variance; zero `q` has no positive process SD.
@@ -1104,6 +1116,15 @@ impl fmt::Display for PsychometricError {
             }
             Self::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance => {
                 "stationary lagged observed covariance is not the stationary later-occasion observed variance"
+            }
+            Self::PredeterminedLaterLatentVarianceIsNotStationaryLaterVariance => {
+                "predetermined later-occasion latent variance is not the stationary later-occasion latent variance"
+            }
+            Self::PredeterminedLaterLatentVarianceIsNotDiscreteVariance => {
+                "predetermined later-occasion latent variance is not the free discrete latent variance"
+            }
+            Self::PredeterminedLaterLatentVarianceIsNotInitialVariance => {
+                "predetermined later-occasion latent variance is not the free first-occasion latent variance"
             }
             Self::StandardisedContinuousInterceptRequiresPositiveStationaryVariance => {
                 "standardised continuous intercept requires strictly positive stationary within-subject variance"
@@ -1849,6 +1870,23 @@ mod tests {
             PsychometricError::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance
                 .to_string(),
             "stationary lagged observed covariance is not the stationary later-occasion observed variance"
+        );
+    }
+
+    #[test]
+    fn predetermined_later_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLatentVarianceIsNotStationaryLaterVariance
+                .to_string(),
+            "predetermined later-occasion latent variance is not the stationary later-occasion latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLatentVarianceIsNotDiscreteVariance.to_string(),
+            "predetermined later-occasion latent variance is not the free discrete latent variance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLatentVarianceIsNotInitialVariance.to_string(),
+            "predetermined later-occasion latent variance is not the free first-occasion latent variance"
         );
     }
 

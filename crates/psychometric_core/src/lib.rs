@@ -185,6 +185,14 @@
 //! (the lagged observed covariance omits `Q_Δt` and `θ`;
 //! `MANIFESTVAR` is not that later observed variance; the
 //! later-occasion latent variance is not that observed variance),
+//! recovers the Driver later-occasion variance of §4.3
+//! predetermined `T0VAR` as
+//! `trait + e^{2 a Δt} p_0 + Q_Δt + (B / a)² v` (JSS PDF re-opened
+//! 2026-08-31T09:29Z; free `p_0` is not that later map; setting
+//! `p_0 = −q / (2 a)` recovers the stationary later-occasion map;
+//! evolving `trait + p_0 + (B / a)² v` as if it were all state is
+//! not that later map; nonzero diffusion with `a ≥ 0` is a growing
+//! process and is kept),
 //! recovers the Driver p. 16 `CINTstd` as `κ / √p` after strictly
 //! positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4 uses only
 //! the relevant within-subject variance, not total `trait + p + added`;
@@ -399,6 +407,8 @@ pub use event_time::recover_manifest_observed_mean;
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
+/// Exact scalar later-occasion variance of §4.3 predetermined `T0VAR` `trait + e^{2 a Δt} p_0 + Q_Δt + (B / a)² v`.
+pub use event_time::recover_predetermined_later_latent_variance;
 /// Exact scalar p. 16 `asymCINTstd` `(-κ / a) / √p` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 /// Exact scalar p. 16 `asymDIFFUSIONstd` `p / p = 1` after strictly positive `asymDIFFUSION`.
@@ -679,6 +689,12 @@ pub use event_time::refuse_stationary_lagged_latent_covariance_as_observed_covar
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance;
 /// Refuse treating Eq. 5 of lagged §4.3 stationary `T0VAR` as later-occasion observed variance.
 pub use event_time::refuse_stationary_lagged_observed_covariance_as_stationary_later_observed_variance;
+/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as the free discrete evolution of `trait + p_0 + (B / a)² v`.
+pub use event_time::refuse_predetermined_later_latent_variance_as_discrete_variance;
+/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as free first-occasion `T0VAR`.
+pub use event_time::refuse_predetermined_later_latent_variance_as_initial_variance;
+/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as later-occasion stationary variance.
+pub use event_time::refuse_predetermined_later_latent_variance_as_stationary_later_variance;
 /// Refuse treating later-occasion §4.3 stationary `T0VAR` as the free discrete evolution of the constrained total.
 pub use event_time::refuse_stationary_later_latent_variance_as_discrete_variance;
 /// Refuse treating later-occasion §4.3 stationary `T0VAR` as lagged covariance.
