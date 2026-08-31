@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-analysis-runs list` enumerates metric-free accepted, running, cancelled, and terminal runs (ADR 0032). Collection CLI stdout refuses RMSE/bias/coverage/SE-gate/scientific-acceptance keys. Not GET-by-id, not scientific-acceptance CLI, not persistence.
