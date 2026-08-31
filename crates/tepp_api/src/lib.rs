@@ -5,7 +5,9 @@
 //! These pure wire contracts let TEPP operate standalone and as a modular CWL
 //! component without sharing application tables. Domain estimation remains in
 //! scientific crates; this crate only defines fail-closed interchange shapes.
-//! Naruon and `LineageWeave` use the versioned analysis-run contract; `LineageWeave`
+//! Analysis-run request and accepted receipts stay metric-free; only a succeeded
+//! terminal result with profile `scientific_acceptance_v1` may carry
+//! `tepp.scientific_acceptance.v1`. Naruon and `LineageWeave` use the versioned analysis-run contract; `LineageWeave`
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
@@ -30,6 +32,7 @@ mod orchestration;
 mod project_history;
 mod project_journey;
 mod provider_payload;
+mod scientific_acceptance;
 mod temporal_context;
 mod wire;
 
@@ -95,6 +98,26 @@ pub use export::GraphMlExport;
 pub use export::JsonLdExport;
 /// Reproducibility manifest.
 pub use export::ReproducibilityManifest;
+/// Default maximum scientific-acceptance artifact size.
+pub use scientific_acceptance::DEFAULT_SCIENTIFIC_ACCEPTANCE_BYTE_LIMIT;
+/// Bound compute backend identity for scientific acceptance.
+pub use scientific_acceptance::SCIENTIFIC_ACCEPTANCE_BACKEND;
+/// CPU `f64` reference model identity for scientific acceptance.
+pub use scientific_acceptance::SCIENTIFIC_ACCEPTANCE_MODEL;
+/// Output profile that authorizes a scientific-acceptance terminal artifact.
+pub use scientific_acceptance::SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE;
+/// Numeric precision bound into a scientific-acceptance artifact.
+pub use scientific_acceptance::SCIENTIFIC_ACCEPTANCE_PRECISION;
+/// Versioned scientific-acceptance artifact schema.
+pub use scientific_acceptance::SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION;
+/// Digest-bound scientific-acceptance artifact.
+pub use scientific_acceptance::ScientificAcceptanceArtifact;
+/// Nested recovery report carried by a scientific-acceptance artifact.
+pub use scientific_acceptance::ScientificAcceptanceReport;
+/// Detect scientific-metric keys on a receipt JSON object.
+pub use scientific_acceptance::receipt_json_carries_scientific_metrics;
+/// Refuse a request or accepted receipt that already carries metrics.
+pub use scientific_acceptance::refuse_metrics_on_receipt;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;

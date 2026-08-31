@@ -59,6 +59,7 @@ This report tracks exact-head scientific and engineering evidence required befor
 | Unicode canonical identity | `corpus_split` | implemented-main | merged PR #59 | NFC/NFD and Hangul canonical-equivalence links, duplicate/empty refusal, connected-group co-partition | ADR 0004/0008/0013; `docs/research/unicode-canonical-identity.md` |
 | Truth corpora / manifests | `tepp_simulation` | implemented-main | — | deterministic generator tests | Task 10 / PR #18 |
 | Recovery metrics | `validation_core` | implemented-main | — | RMSE/bias/coverage/MC gates | Task 11 / PR #19 |
+| Scientific-acceptance terminal wire | `tepp_api` | active-PR | this PR | metric-free receipts; `tepp.scientific_acceptance.v1` only on succeeded terminal | GAP-003A; issue #166; `docs/research/scientific-acceptance-terminal-wire.md` |
 | Mention-confidence Brier score | `event_core` | active-PR | calibration vs binary truth | perfect 0 / half 0.25 RMSE | ADR 0003; `docs/research/mention-confidence-brier.md` |
 | Checkpoint is not the estimator | `checkpoint_authority` | accepted-target | active PR | refuse checkpoint-as-estimator + unvalidated artifact + recovery vs estimator collapse | ADR 0001/0014 |
 | Scientific claim promotion gates | `validation_core` | active-PR | this PR | exact-head SHA + computed RMSE SE gate | ADR 0014; full release bundle remaining |

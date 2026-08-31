@@ -6,6 +6,10 @@
 //! redacted failure code.
 
 use crate::analysis_run::require_rfc3339_knowledge_cutoff;
+use crate::scientific_acceptance::{
+    SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE, SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION,
+    ScientificAcceptanceArtifact,
+};
 use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
@@ -86,7 +90,8 @@ impl AnalysisResultSummary {
 /// The succeeded shape excludes source text, credentials, direct identity,
 /// respondent/item records, and unrestricted model output. The failed shape
 /// contains no measurement artifact.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[serde(deny_unknown_fields)]
 pub struct AnalysisRunTerminalResult {
     /// Semantic contract version.
@@ -119,6 +124,10 @@ pub struct AnalysisRunTerminalResult {
     pub summary: Option<AnalysisResultSummary>,
     /// Stable snake-case code for a failed run.
     pub failure_code: Option<String>,
+    /// Scientific-acceptance artifact, present only on a succeeded
+    /// `scientific_acceptance_v1` terminal result.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scientific_acceptance: Option<ScientificAcceptanceArtifact>,
 }
 
 impl AnalysisRunTerminalResult {
@@ -153,6 +162,51 @@ impl AnalysisRunTerminalResult {
             completed_at: completed_at.into(),
             summary: Some(summary),
             failure_code: None,
+            scientific_acceptance: None,
+        };
+        value.validate()?;
+        require_terminal_binding(request, accepted, &value)?;
+        Ok(value)
+    }
+
+    /// Construct a succeeded terminal result that carries scientific acceptance.
+    ///
+    /// The request and accepted receipt remain metric-free. The artifact digest
+    /// becomes `result_sha256` and the schema is `tepp.scientific_acceptance.v1`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed error for invalid shape, digest, time, summary,
+    /// artifact, or request/receipt binding.
+    pub fn succeeded_scientific_acceptance(
+        request: &AnalysisRunRequest,
+        accepted: &AnalysisRunAccepted,
+        result_artifact_id: impl Into<String>,
+        completed_at: impl Into<String>,
+        summary: AnalysisResultSummary,
+        artifact: ScientificAcceptanceArtifact,
+    ) -> Result<Self, ApiError> {
+        if request.output_profile != SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let digest = artifact.sha256()?;
+        let value = Self {
+            contract_version: ANALYSIS_RESULT_CONTRACT_VERSION,
+            run_id: accepted.run_id.clone(),
+            run_state: AnalysisRunTerminalState::Succeeded,
+            idempotency_key: request.idempotency_key.clone(),
+            tenant_workspace_id: request.tenant_workspace_id.clone(),
+            snapshot_id: request.snapshot_id.clone(),
+            knowledge_cutoff: request.knowledge_cutoff.clone(),
+            model_contract_version: request.model_contract_version.clone(),
+            output_profile: request.output_profile.clone(),
+            result_artifact_id: Some(result_artifact_id.into()),
+            result_sha256: Some(digest),
+            result_schema_version: Some(SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION.into()),
+            completed_at: completed_at.into(),
+            summary: Some(summary),
+            failure_code: None,
+            scientific_acceptance: Some(artifact),
         };
         value.validate()?;
         require_terminal_binding(request, accepted, &value)?;
@@ -187,6 +241,7 @@ impl AnalysisRunTerminalResult {
             completed_at: completed_at.into(),
             summary: None,
             failure_code: Some(failure_code.into()),
+            scientific_acceptance: None,
         };
         value.validate()?;
         require_terminal_binding(request, accepted, &value)?;
@@ -270,7 +325,31 @@ impl AnalysisRunTerminalResult {
         if self.failure_code.is_some() {
             return Err(ApiError::InvalidWirePayload);
         }
-        Ok(())
+        self.validate_scientific_acceptance(digest, schema)
+    }
+
+    fn validate_scientific_acceptance(&self, digest: &str, schema: &str) -> Result<(), ApiError> {
+        match (
+            self.output_profile.as_str() == SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE,
+            self.scientific_acceptance.as_ref(),
+        ) {
+            (false, None) => Ok(()),
+            (false, Some(_)) | (true, None) => Err(ApiError::InvalidWirePayload),
+            (true, Some(artifact)) => {
+                artifact.validate()?;
+                if schema != SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION
+                    || artifact.schema_version != SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION
+                    || artifact.run_id != self.run_id
+                    || artifact.snapshot_id != self.snapshot_id
+                    || artifact.knowledge_cutoff != self.knowledge_cutoff
+                    || artifact.output_profile != self.output_profile
+                    || artifact.sha256()?.as_str() != digest
+                {
+                    return Err(ApiError::InvalidWirePayload);
+                }
+                Ok(())
+            }
+        }
     }
 
     fn validate_failed(&self) -> Result<(), ApiError> {
@@ -278,6 +357,7 @@ impl AnalysisRunTerminalResult {
             || self.result_sha256.is_some()
             || self.result_schema_version.is_some()
             || self.summary.is_some()
+            || self.scientific_acceptance.is_some()
         {
             return Err(ApiError::InvalidWirePayload);
         }
@@ -288,6 +368,8 @@ impl AnalysisRunTerminalResult {
         )
     }
 }
+
+impl Eq for AnalysisRunTerminalResult {}
 
 /// Return whether a terminal result exactly binds to its submitted request.
 #[must_use]

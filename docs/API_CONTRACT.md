@@ -1,6 +1,7 @@
 # TEPP API and Modular Integration Contract
 
 **Status:** Accepted target contract; exact endpoints are introduced only with executable services.  
+**Last reviewed:** 2026-08-31
 **Last reviewed:** 2026-08-24
 **Last reviewed:** 2026-08-21
 
@@ -30,6 +31,7 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | project-history projection contract | `tepp_api` v1 wire DTOs | LineageWeave | active-PR |
 | analysis-run status/terminal-result contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active-PR #157 |
 | cutoff-safe analysis-run readiness execution | `analysis_engine` bounded Rust crate | `tepp_api`, future HTTP/service adapters | active-PR |
+| scientific-acceptance terminal artifact v1 | TEPP `tepp_api` `tepp.scientific_acceptance.v1` | operators, naruon, future analysis-run adapters | active-PR |
 
 ## 3. Versioning
 

@@ -1,6 +1,7 @@
 //! Versioned analysis-run request and accepted-run response contracts.
 
 use crate::ApiError;
+use crate::scientific_acceptance::refuse_metrics_on_receipt;
 use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
@@ -70,7 +71,8 @@ pub enum AnalysisRunStatusState {
 }
 
 /// Typed status/read response for an accepted analysis run.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[serde(deny_unknown_fields)]
 pub struct AnalysisRunStatus {
     /// Semantic contract version for this status payload family.
@@ -102,6 +104,7 @@ impl AnalysisRunRequest {
     /// Returns wire, version, limit, or field-validation errors.
     pub fn from_json_with_limit(payload: &str, maximum_bytes: usize) -> Result<Self, ApiError> {
         require_byte_limit(payload, maximum_bytes)?;
+        refuse_metrics_on_receipt(payload)?;
         let request: Self = from_json(payload)?;
         request.validate()?;
         Ok(request)
@@ -184,6 +187,7 @@ impl AnalysisRunAccepted {
     /// Returns wire, version, limit, or field-validation errors.
     pub fn from_json_with_limit(payload: &str, maximum_bytes: usize) -> Result<Self, ApiError> {
         require_byte_limit(payload, maximum_bytes)?;
+        refuse_metrics_on_receipt(payload)?;
         let accepted: Self = from_json(payload)?;
         accepted.validate()?;
         Ok(accepted)
@@ -336,6 +340,8 @@ impl AnalysisRunStatus {
         Ok(())
     }
 }
+
+impl Eq for AnalysisRunStatus {}
 
 /// Compare two requests for idempotent-retry semantic equality.
 #[must_use]
