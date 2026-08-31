@@ -9,7 +9,9 @@
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
-//! causality, or completed psychometric model results.
+//! causality, or completed psychometric model results. The published
+//! `tepp-project-history` CLI mints typed `LineageWeave` project-history POST
+//! exchanges onto spawned `tepp-loopback` TCP.
 
 mod analysis_result;
 mod analysis_run;
@@ -28,6 +30,7 @@ mod naruon_http;
 mod naruon_live;
 mod orchestration;
 mod project_history;
+mod project_history_cli;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
@@ -230,6 +233,24 @@ pub use project_history::ProjectHistoryProjection;
 pub use project_history::ProjectHistoryRequest;
 /// Build a cutoff-safe project-history projection.
 pub use project_history::project_history_projection;
+/// Loopback project-history CLI invocation.
+pub use project_history_cli::ProjectHistoryCliInvocation;
+/// Loopback project-history CLI verb.
+pub use project_history_cli::ProjectHistoryCliVerb;
+/// Compose HTTP/1.1 project-history POST from a CLI invocation.
+pub use project_history_cli::compose_project_history_cli_http;
+/// Dispatch a project-history CLI invocation against an in-process listener.
+pub use project_history_cli::dispatch_project_history_cli;
+/// Execute a project-history CLI invocation over loopback TCP.
+pub use project_history_cli::execute_project_history_cli;
+/// Render a typed project-history exchange onto a loopback HTTP/1.1 request.
+pub use project_history_cli::loopback_http1_from_project_history_exchange;
+/// Read leftover stdin for the project-history CLI.
+pub use project_history_cli::read_project_history_cli_stdin;
+/// Refuse scientific-metric keys on project-history CLI JSON.
+pub use project_history_cli::refuse_metrics_on_project_history_cli_payload;
+/// Filter project-history CLI stdout so the projection stays metric-free.
+pub use project_history_cli::render_project_history_cli_stdout;
 /// Maximum posterior Project Journey artifact size.
 pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
 /// Exact posterior Project Journey schema identity.
