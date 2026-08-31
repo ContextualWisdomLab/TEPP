@@ -12,6 +12,7 @@
 //! CLIs, GET-by-id, Leiden, or GAP-010 Figma/export. Persistence remains
 //! GAP-003B.
 
+use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
@@ -20,13 +21,16 @@ use crate::live_http::map_io_error;
 use crate::naruon_http::header_is_credential;
 use crate::wire::require_nonempty;
 use crate::{
-    AnalysisRunLiveService, ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_LIVE_IO_TIMEOUT,
-    NaruonLiveResponse, PROJECT_HISTORY_PATH, ProjectHistoryHttpExchange, ProjectHistoryProjection,
+    AnalysisRunLiveService, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
+    LINEAGEWEAVE_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT,
+    NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_CONTRACT_VERSION,
+    PROJECT_HISTORY_PATH, ProjectHistoryHttpExchange, ProjectHistoryProjection,
     ProjectHistoryRequest, lineageweave_project_history_exchange,
 };
 
 const SCIENTIFIC_ACCEPTANCE_SCHEMA: &str = "tepp.scientific_acceptance.v1";
-const TEMPORAL_ASSOCIATION_ONLY: &str = "temporal_association_only";
+const MAXIMUM_HTTP_RESPONSE_BYTES: usize =
+    NARUON_LIVE_HEADER_BYTE_LIMIT + 4 + DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
 
 /// Supported operator verbs for the loopback project-history CLI.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -208,10 +212,31 @@ pub fn loopback_http1_from_project_history_exchange(
     if path != PROJECT_HISTORY_PATH {
         return Err(ApiError::InvalidWirePayload);
     }
-    for (name, _) in &exchange.headers {
+    let body = ProjectHistoryRequest::from_json(&exchange.body)?;
+    let mut seen = HashSet::with_capacity(exchange.headers.len());
+    for (name, value) in &exchange.headers {
         if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);
         }
+        if !valid_http_field_name(name)
+            || value.chars().any(char::is_control)
+            || !seen.insert(name.to_ascii_lowercase())
+        {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let valid = match name.to_ascii_lowercase().as_str() {
+            "content-type" => value == "application/json",
+            "tepp-consumer" => value == LINEAGEWEAVE_CONSUMER_CODE,
+            "tepp-contract-version" => value == &PROJECT_HISTORY_CONTRACT_VERSION.to_string(),
+            "idempotency-key" => value == &body.idempotency_key,
+            _ => false,
+        };
+        if !valid {
+            return Err(ApiError::InvalidWirePayload);
+        }
+    }
+    if seen.len() != 4 {
+        return Err(ApiError::InvalidWirePayload);
     }
     let mut request = String::new();
     write!(
@@ -221,9 +246,6 @@ pub fn loopback_http1_from_project_history_exchange(
     )
     .map_err(|_| ApiError::InvalidWirePayload)?;
     for (name, value) in &exchange.headers {
-        if name.eq_ignore_ascii_case("host") || name.eq_ignore_ascii_case("content-length") {
-            continue;
-        }
         write!(request, "{name}: {value}\r\n").map_err(|_| ApiError::InvalidWirePayload)?;
     }
     write!(
@@ -246,9 +268,6 @@ pub fn compose_project_history_cli_http(
     invocation: &ProjectHistoryCliInvocation,
 ) -> Result<String, ApiError> {
     invocation.validate()?;
-    if invocation.consumer != LINEAGEWEAVE_CONSUMER_CODE {
-        return Err(ApiError::InvalidWirePayload);
-    }
     let exchange = lineageweave_project_history_exchange(&invocation.origin, &invocation.request)?;
     loopback_http1_from_project_history_exchange(&exchange, &invocation.host)
 }
@@ -287,10 +306,7 @@ pub fn execute_project_history_cli(
         .write_all(request.as_bytes())
         .map_err(|error| map_io_error(&error))?;
     stream.flush().map_err(|error| map_io_error(&error))?;
-    let mut bytes = Vec::new();
-    stream
-        .read_to_end(&mut bytes)
-        .map_err(|error| map_io_error(&error))?;
+    let bytes = read_bounded(&mut stream, MAXIMUM_HTTP_RESPONSE_BYTES)?;
     parse_http_response(&bytes)
 }
 
@@ -312,7 +328,7 @@ pub fn render_project_history_cli_stdout(
     refuse_scientific_acceptance(&response.body)?;
     refuse_metrics_on_project_history_cli_payload(&response.body)?;
     if !(200..300).contains(&response.status_code) {
-        return Ok(response.body.clone());
+        return Err(ApiError::InvalidWirePayload);
     }
     if response.status_code != 200 {
         return Err(ApiError::InvalidWirePayload);
@@ -320,7 +336,6 @@ pub fn render_project_history_cli_stdout(
     let projection = ProjectHistoryProjection::from_json(&response.body)?;
     if projection.project_key != invocation.request.project_key
         || projection.focus_event_id != invocation.request.focus_event_id
-        || projection.inference_status != TEMPORAL_ASSOCIATION_ONLY
     {
         return Err(ApiError::InvalidWirePayload);
     }
@@ -391,25 +406,42 @@ fn parse_http_response(bytes: &[u8]) -> Result<NaruonLiveResponse, ApiError> {
     let (header_block, body) = text
         .split_once("\r\n\r\n")
         .ok_or(ApiError::InvalidWirePayload)?;
+    if header_block.len() > NARUON_LIVE_HEADER_BYTE_LIMIT {
+        return Err(ApiError::LimitExceeded);
+    }
     let mut lines = header_block.split("\r\n");
     let status_line = lines.next().ok_or(ApiError::InvalidWirePayload)?;
-    let mut parts = status_line.split(' ');
-    if parts.next() != Some("HTTP/1.1") {
+    let (version, status) = status_line
+        .split_once(' ')
+        .ok_or(ApiError::InvalidWirePayload)?;
+    if version != "HTTP/1.1" {
         return Err(ApiError::InvalidWirePayload);
     }
-    let code = parts
-        .next()
-        .ok_or(ApiError::InvalidWirePayload)?
+    let (code, reason) = status.split_once(' ').ok_or(ApiError::InvalidWirePayload)?;
+    let code = code
         .parse::<u16>()
         .map_err(|_| ApiError::InvalidWirePayload)?;
     let reason_phrase = static_reason(code)?;
+    if reason != reason_phrase {
+        return Err(ApiError::InvalidWirePayload);
+    }
     let mut content_length = None;
-    for line in lines {
+    let mut seen = HashSet::new();
+    for (index, line) in lines.enumerate() {
+        if index >= NARUON_LIVE_HEADER_COUNT_LIMIT {
+            return Err(ApiError::LimitExceeded);
+        }
         let (name, value) = line.split_once(':').ok_or(ApiError::InvalidWirePayload)?;
+        if !valid_http_field_name(name)
+            || value
+                .chars()
+                .any(|character| character.is_control() && character != '\t')
+            || !seen.insert(name.to_ascii_lowercase())
+            || name.eq_ignore_ascii_case("transfer-encoding")
+        {
+            return Err(ApiError::InvalidWirePayload);
+        }
         if name.eq_ignore_ascii_case("content-length") {
-            if content_length.is_some() {
-                return Err(ApiError::InvalidWirePayload);
-            }
             content_length = Some(
                 value
                     .trim()
@@ -419,6 +451,9 @@ fn parse_http_response(bytes: &[u8]) -> Result<NaruonLiveResponse, ApiError> {
         }
     }
     let declared = content_length.ok_or(ApiError::InvalidWirePayload)?;
+    if declared > DEFAULT_PROJECT_HISTORY_BYTE_LIMIT {
+        return Err(ApiError::LimitExceeded);
+    }
     if declared != body.len() {
         return Err(ApiError::InvalidWirePayload);
     }
@@ -453,29 +488,65 @@ pub fn read_project_history_cli_stdin(
     if stdin_is_terminal {
         Ok(String::new())
     } else {
-        let mut body = String::new();
-        stdin
-            .read_to_string(&mut body)
-            .map_err(|_| ApiError::InvalidWirePayload)?;
-        Ok(body)
+        let bytes = read_bounded(&mut stdin, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)?;
+        String::from_utf8(bytes).map_err(|_| ApiError::InvalidWirePayload)
     }
+}
+
+fn read_bounded(reader: &mut impl Read, maximum_bytes: usize) -> Result<Vec<u8>, ApiError> {
+    let mut bytes = Vec::new();
+    reader
+        .take((maximum_bytes + 1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(|error| map_io_error(&error))?;
+    if bytes.len() > maximum_bytes {
+        return Err(ApiError::LimitExceeded);
+    }
+    Ok(bytes)
+}
+
+fn valid_http_field_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric()
+                || matches!(
+                    byte,
+                    b'!' | b'#'
+                        | b'$'
+                        | b'%'
+                        | b'&'
+                        | b'\''
+                        | b'*'
+                        | b'+'
+                        | b'-'
+                        | b'.'
+                        | b'^'
+                        | b'_'
+                        | b'`'
+                        | b'|'
+                        | b'~'
+                )
+        })
 }
 
 #[cfg(test)]
 #[allow(clippy::too_many_lines)]
 mod tests {
+    use std::fmt::Write as _;
+
     use super::{
         ProjectHistoryCliInvocation, ProjectHistoryCliVerb, SCIENTIFIC_ACCEPTANCE_SCHEMA,
-        TEMPORAL_ASSOCIATION_ONLY, compose_project_history_cli_http, dispatch_project_history_cli,
+        compose_project_history_cli_http, dispatch_project_history_cli,
         execute_project_history_cli, loopback_http1_from_project_history_exchange,
         parse_http_response, read_project_history_cli_stdin, render_project_history_cli_stdout,
         static_reason,
     };
     use crate::{
-        AnalysisRunLiveService, ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE,
-        NaruonLiveResponse, NaruonLiveService, PROJECT_HISTORY_CONTRACT_VERSION,
-        ProjectHistoryEvent, ProjectHistoryHttpExchange, ProjectHistoryProjection,
-        ProjectHistoryRequest, lineageweave_project_history_exchange,
+        AnalysisRunLiveService, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
+        LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
+        NARUON_LIVE_HEADER_COUNT_LIMIT, NaruonLiveResponse, NaruonLiveService,
+        PROJECT_HISTORY_CONTRACT_VERSION, ProjectHistoryEvent, ProjectHistoryHttpExchange,
+        ProjectHistoryProjection, ProjectHistoryRequest, lineageweave_project_history_exchange,
     };
 
     const ORIGIN: &str = "https://tepp.example.test";
@@ -567,6 +638,17 @@ mod tests {
             .unwrap_err(),
             ApiError::AuthorizationDenied
         );
+        for args in [
+            vec!["query", "host", "value"],
+            vec!["query", "--unknown", "value"],
+            vec!["query", "--host"],
+            vec!["query", "--host", "127.0.0.1:1", "--host", "127.0.0.1:2"],
+        ] {
+            assert_eq!(
+                ProjectHistoryCliInvocation::from_args(args, query_body()).unwrap_err(),
+                ApiError::InvalidWirePayload
+            );
+        }
         assert_eq!(
             ProjectHistoryCliInvocation::from_args(
                 [
@@ -659,6 +741,12 @@ mod tests {
             ProjectHistoryCliInvocation::from_args(query_args(), "").unwrap_err(),
             ApiError::InvalidWirePayload
         );
+        let injected =
+            query_body().replace("lineageweave-project-cli-1", r"safe\r\nx-api-key: secret");
+        assert_eq!(
+            ProjectHistoryCliInvocation::from_args(query_args(), injected).unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
     }
 
     #[test]
@@ -688,7 +776,7 @@ mod tests {
         let projection = ProjectHistoryProjection::from_json(&stdout).expect("projection");
         assert_eq!(projection.project_key, "project-acme");
         assert_eq!(projection.focus_event_id, "event-voc");
-        assert_eq!(projection.inference_status, TEMPORAL_ASSOCIATION_ONLY);
+        assert_eq!(projection.inference_status, "temporal_association_only");
         assert!(!stdout.contains(SCIENTIFIC_ACCEPTANCE_SCHEMA));
         assert!(!stdout.contains("rmse"));
         assert!(!stdout.contains("causal_score"));
@@ -721,6 +809,54 @@ mod tests {
                 .unwrap_err(),
             ApiError::InvalidWirePayload
         );
+
+        let fresh = lineageweave_project_history_exchange(&invocation.origin, &invocation.request)
+            .expect("exchange");
+        let mut injected = fresh.clone();
+        injected.headers[3].1 = "safe\r\nx-api-key: secret".into();
+        assert_eq!(
+            loopback_http1_from_project_history_exchange(&injected, &invocation.host).unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        let mut extra = fresh;
+        extra.headers.push(("x-extra".into(), "value".into()));
+        assert_eq!(
+            loopback_http1_from_project_history_exchange(&extra, &invocation.host).unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        let mut duplicate =
+            lineageweave_project_history_exchange(&invocation.origin, &invocation.request)
+                .expect("exchange");
+        duplicate
+            .headers
+            .push(("Content-Type".into(), "application/json".into()));
+        assert_eq!(
+            loopback_http1_from_project_history_exchange(&duplicate, &invocation.host).unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        let mut missing =
+            lineageweave_project_history_exchange(&invocation.origin, &invocation.request)
+                .expect("exchange");
+        missing.headers.pop();
+        assert_eq!(
+            loopback_http1_from_project_history_exchange(&missing, &invocation.host).unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        let mut credential = missing.clone();
+        credential
+            .headers
+            .push(("authorization".into(), "secret".into()));
+        assert_eq!(
+            loopback_http1_from_project_history_exchange(&credential, &invocation.host)
+                .unwrap_err(),
+            ApiError::AuthorizationDenied
+        );
+        let mut malformed = missing;
+        malformed.headers.push(("bad name".into(), "value".into()));
+        assert_eq!(
+            loopback_http1_from_project_history_exchange(&malformed, &invocation.host).unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
     }
 
     #[test]
@@ -734,6 +870,67 @@ mod tests {
                     status_code: 200,
                     reason_phrase: "OK",
                     body: String::new(),
+                }
+            )
+            .unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        let mut mismatched =
+            crate::project_history_projection(&invocation.request).expect("projection");
+        mismatched.project_key = "other-project".into();
+        assert_eq!(
+            render_project_history_cli_stdout(
+                &invocation,
+                &NaruonLiveResponse {
+                    status_code: 200,
+                    reason_phrase: "OK",
+                    body: mismatched.to_json().expect("projection json"),
+                }
+            )
+            .unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        let valid = crate::project_history_projection(&invocation.request)
+            .expect("projection")
+            .to_json()
+            .expect("projection json");
+        let mut wrong_focus = invocation.clone();
+        wrong_focus.request.focus_event_id = "event-award".into();
+        assert_eq!(
+            render_project_history_cli_stdout(
+                &wrong_focus,
+                &NaruonLiveResponse {
+                    status_code: 200,
+                    reason_phrase: "OK",
+                    body: valid,
+                }
+            )
+            .unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        assert_eq!(
+            render_project_history_cli_stdout(
+                &invocation,
+                &NaruonLiveResponse {
+                    status_code: 202,
+                    reason_phrase: "Accepted",
+                    body: r#"{"error":"pending"}"#.into(),
+                }
+            )
+            .unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        assert_eq!(
+            super::refuse_metrics_on_project_history_cli_payload("[]").unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        assert_eq!(
+            render_project_history_cli_stdout(
+                &invocation,
+                &NaruonLiveResponse {
+                    status_code: 400,
+                    reason_phrase: "Bad Request",
+                    body: r#"{"error":"invalid"}"#.into(),
                 }
             )
             .unwrap_err(),
@@ -792,7 +989,77 @@ mod tests {
             parse_http_response(b"not-http").unwrap_err(),
             ApiError::InvalidWirePayload
         );
+        for response in [
+            "HTTP/1.0 200 OK\r\ncontent-length: 2\r\n\r\n{}".to_owned(),
+            "HTTP/1.1 200 Wrong\r\ncontent-length: 2\r\n\r\n{}".to_owned(),
+            "HTTP/1.1 200 OK\r\ncontent-length: 1\r\n\r\n{}".to_owned(),
+        ] {
+            assert_eq!(
+                parse_http_response(response.as_bytes()).unwrap_err(),
+                ApiError::InvalidWirePayload
+            );
+        }
+        assert_eq!(
+            parse_http_response(
+                b"HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\ncontent-length: 2\r\n\r\n{}"
+            )
+            .unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        for response in [
+            b"HTTP/1.1 200 OK\r\n: value\r\ncontent-length: 2\r\n\r\n{}".as_slice(),
+            b"HTTP/1.1 200 OK\r\nx-value: bad\0value\r\ncontent-length: 2\r\n\r\n{}".as_slice(),
+            b"HTTP/1.1 200 OK\r\nx-value: one\r\nX-Value: two\r\ncontent-length: 2\r\n\r\n{}"
+                .as_slice(),
+        ] {
+            assert_eq!(
+                parse_http_response(response).unwrap_err(),
+                ApiError::InvalidWirePayload
+            );
+        }
+        assert_eq!(
+            parse_http_response(
+                b"HTTP/1.1 200 OK\r\nx-value:\tvalue\r\ncontent-length: 2\r\n\r\n{}"
+            )
+            .expect("tab header")
+            .status_code,
+            200
+        );
+        let oversized = format!(
+            "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n",
+            DEFAULT_PROJECT_HISTORY_BYTE_LIMIT + 1
+        );
+        assert_eq!(
+            parse_http_response(oversized.as_bytes()).unwrap_err(),
+            ApiError::LimitExceeded
+        );
+        let long_header = format!(
+            "HTTP/1.1 200 OK\r\nx-long: {}\r\ncontent-length: 2\r\n\r\n{{}}",
+            "x".repeat(NARUON_LIVE_HEADER_BYTE_LIMIT)
+        );
+        assert_eq!(
+            parse_http_response(long_header.as_bytes()).unwrap_err(),
+            ApiError::LimitExceeded
+        );
+        let mut many_headers = String::new();
+        for index in 0..NARUON_LIVE_HEADER_COUNT_LIMIT {
+            write!(many_headers, "x-{index}: value\r\n").expect("header");
+        }
+        let crowded = format!("HTTP/1.1 200 OK\r\n{many_headers}content-length: 2\r\n\r\n{{}}");
+        assert_eq!(
+            parse_http_response(crowded.as_bytes()).unwrap_err(),
+            ApiError::LimitExceeded
+        );
         assert_eq!(static_reason(200).expect("200"), "OK");
+        for (code, reason) in [
+            (202, "Accepted"),
+            (400, "Bad Request"),
+            (403, "Forbidden"),
+            (413, "Payload Too Large"),
+            (422, "Unprocessable Entity"),
+        ] {
+            assert_eq!(static_reason(code).expect("known status"), reason);
+        }
         assert_eq!(
             static_reason(500).unwrap_err(),
             ApiError::InvalidWirePayload
@@ -802,5 +1069,17 @@ mod tests {
         let piped =
             read_project_history_cli_stdin(false, std::io::Cursor::new(b"{}")).expect("piped");
         assert_eq!(piped, "{}");
+        let exact = vec![b'x'; DEFAULT_PROJECT_HISTORY_BYTE_LIMIT];
+        assert_eq!(
+            read_project_history_cli_stdin(false, std::io::Cursor::new(exact))
+                .expect("bounded stdin")
+                .len(),
+            DEFAULT_PROJECT_HISTORY_BYTE_LIMIT
+        );
+        let excess = vec![b'x'; DEFAULT_PROJECT_HISTORY_BYTE_LIMIT + 1];
+        assert_eq!(
+            read_project_history_cli_stdin(false, std::io::Cursor::new(excess)).unwrap_err(),
+            ApiError::LimitExceeded
+        );
     }
 }

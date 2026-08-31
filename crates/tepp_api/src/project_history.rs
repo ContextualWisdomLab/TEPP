@@ -162,7 +162,7 @@ impl ProjectHistoryRequest {
 
     fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(self.contract_version, PROJECT_HISTORY_CONTRACT_VERSION)?;
-        validate_bounded_text(&self.idempotency_key, 256)?;
+        validate_http_field_value(&self.idempotency_key, 256)?;
         validate_bounded_text(&self.tenant_workspace_id, 256)?;
         validate_bounded_text(&self.project_key, 256)?;
         validate_bounded_text(&self.project_name, 512)?;
@@ -391,6 +391,13 @@ fn validate_bounded_text(value: &str, maximum_bytes: usize) -> Result<(), ApiErr
     Ok(())
 }
 
+fn validate_http_field_value(value: &str, maximum_bytes: usize) -> Result<(), ApiError> {
+    validate_bounded_text(value, maximum_bytes)?;
+    (!value.chars().any(char::is_control))
+        .then_some(())
+        .ok_or(ApiError::InvalidWirePayload)
+}
+
 fn validate_code(value: &str) -> Result<(), ApiError> {
     validate_bounded_text(value, 64)?;
     if !value
@@ -597,7 +604,7 @@ mod tests {
     use super::{
         PROJECT_HISTORY_CONTRACT_VERSION, ProjectHistoryEvent, ProjectHistoryProjection,
         ProjectHistoryRequest, build_project_history_exchange, compose_https_target,
-        project_history_projection, validate_code,
+        project_history_projection, validate_code, validate_http_field_value,
     };
     use crate::ApiError;
 
@@ -706,6 +713,14 @@ mod tests {
         assert_eq!(
             project_history_projection(&excess),
             Err(ApiError::LimitExceeded)
+        );
+
+        let mut injected = request_with_single_event();
+        injected.idempotency_key = "safe\r\nx-api-key: secret".into();
+        assert_eq!(injected.to_json(), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            validate_http_field_value("safe\0value", 256),
+            Err(ApiError::InvalidWirePayload)
         );
     }
 

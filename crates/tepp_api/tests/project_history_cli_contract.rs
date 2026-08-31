@@ -1,7 +1,10 @@
 //! Contract tests for the `LineageWeave` project-history loopback CLI.
 
+use std::io::Write;
+use std::process::{Command, Stdio};
+
 use tepp_api::{
-    ApiError, LINEAGEWEAVE_CONSUMER_CODE, PROJECT_HISTORY_CONTRACT_VERSION,
+    AnalysisRunLiveService, ApiError, LINEAGEWEAVE_CONSUMER_CODE, PROJECT_HISTORY_CONTRACT_VERSION,
     ProjectHistoryCliInvocation, ProjectHistoryCliVerb, ProjectHistoryEvent, ProjectHistoryRequest,
     compose_project_history_cli_http,
 };
@@ -89,5 +92,54 @@ fn project_history_cli_refuses_non_loopback_unknown_verbs_and_metrics() {
             r#"{"rmse":1.0}"#
         ),
         Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
+fn project_history_binary_queries_loopback_and_rejects_unknown_verbs() {
+    let binary = env!("CARGO_BIN_EXE_tepp-project-history");
+    assert!(
+        !Command::new(binary)
+            .arg("unknown")
+            .output()
+            .expect("run")
+            .status
+            .success()
+    );
+
+    let mut service = AnalysisRunLiveService::bind_loopback().expect("bind");
+    let host = service.local_addr().expect("address").to_string();
+    let server = std::thread::spawn(move || service.serve_one().expect("serve"));
+    let mut child = Command::new(binary)
+        .args([
+            "query",
+            "--host",
+            &host,
+            "--origin",
+            "https://tepp.example.test",
+            "--consumer",
+            LINEAGEWEAVE_CONSUMER_CODE,
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(query_body().as_bytes())
+        .expect("write");
+    let output = child.wait_with_output().expect("wait");
+    server.join().expect("join");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .expect("utf8")
+            .contains("temporal_association_only")
     );
 }

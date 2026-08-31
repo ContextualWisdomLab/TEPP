@@ -29,9 +29,5 @@ fn run_query(args: &[String]) -> Result<(), ApiError> {
     let response = execute_project_history_cli(&invocation)?;
     let stdout = render_project_history_cli_stdout(&invocation, &response)?;
     println!("{stdout}");
-    if (200..300).contains(&response.status_code) {
-        Ok(())
-    } else {
-        Err(ApiError::InvalidWirePayload)
-    }
+    Ok(())
 }

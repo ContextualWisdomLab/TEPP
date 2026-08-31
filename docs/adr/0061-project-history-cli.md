@@ -24,7 +24,9 @@ adapter; `NaruonLiveService` stays POST-only for analysis-run and export.
   loopback bind address.
 - Stdin is `ProjectHistoryRequest` JSON. Consumer is `lineageweave` only.
 - The idempotency key travels in the typed exchange header from the request
-  body. Operators do not pass a separate credential flag.
+  body. HTTP control characters fail closed, and the raw serializer revalidates
+  the exact four-header set against the typed body. Operators do not pass a
+  separate credential flag.
 - Stdout is the cutoff-safe `ProjectHistoryProjection`.
   `inference_status` remains `temporal_association_only`.
   `tepp.scientific_acceptance.v1`, RMSE, bias, coverage, SE-gate, and
@@ -34,6 +36,9 @@ adapter; `NaruonLiveService` stays POST-only for analysis-run and export.
 - Non-loopback hosts, `localhost`, credential-shaped flags, unknown verbs,
   empty stdin, unpublished consumers, naruon, non-`https` origins, and metric
   keys fail closed.
+- Stdin and response bodies are bounded by the existing 256 KiB project-history
+  wire limit. Response headers use the existing loopback header limits;
+  duplicate framing, transfer encoding, and non-2xx bodies never reach stdout.
 - This slice does not implement temporal-context CLI, export CLI, or
   analysis-run HTTP.
 
@@ -67,6 +72,8 @@ closed. The in-memory listener is not durable.
 ## Security, privacy, scientific-integrity, and governance impact
 
 - No credential headers cross the consumer boundary.
+- Header injection, duplicate headers, unbounded reads, and ambiguous HTTP/1.1
+  response framing fail closed before operator output.
 - The CLI remains loopback-only. Event identities stay opaque; free-text PII
   is not introduced by this client.
 - Process exit 0 on query is not measurement evidence and is not a causal
