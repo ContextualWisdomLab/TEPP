@@ -14,7 +14,9 @@
 //! only a succeeded status with profile `scientific_acceptance_v1` may return
 //! `tepp.scientific_acceptance.v1`. `POST /v1/analysis-runs/{run_id}/running`
 //! and `POST /v1/analysis-runs/{run_id}/terminal` record those statuses on the
-//! same loopback listener.
+//! same loopback listener. `POST /v1/analysis-runs/{run_id}/execute` is refused
+//! here; `analysis_engine` owns engine execution so a scientific-acceptance run
+//! can produce `tepp.scientific_acceptance.v1` without a caller-supplied artifact.
 
 mod analysis_result;
 mod analysis_run;
@@ -85,9 +87,11 @@ pub use analysis_run_lifecycle_http::naruon_analysis_run_running_exchange;
 /// Provider-owned terminal-status HTTP exchange builder.
 pub use analysis_run_lifecycle_http::naruon_analysis_run_terminal_exchange;
 /// Consumer-neutral loopback analysis-run service.
-pub use analysis_run_live::AnalysisRunLiveService;
+pub use analysis_run_live::{AnalysisRunLiveService, LoopbackAnalysisRun};
 /// Analysis-run status HTTP exchange re-exports.
-pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
+pub use analysis_run_status_http::{
+    ANALYSIS_RUN_ID_MAX_LEN, analysis_run_execute_path_run_id, naruon_analysis_run_status_exchange,
+};
 /// Corpus-split leakage-audit contract version.
 pub use corpus_split_manifest::CORPUS_SPLIT_MANIFEST_CONTRACT_VERSION;
 /// Versioned corpus-split leakage-audit manifest.
@@ -110,6 +114,8 @@ pub use export::GraphMlExport;
 pub use export::JsonLdExport;
 /// Reproducibility manifest.
 pub use export::ReproducibilityManifest;
+/// Parsed loopback HTTP/1.1 request parts for engine glue.
+pub use live_http::{LoopbackHttpParts, parse_loopback_http_parts};
 /// Output profile that authorizes scientific-acceptance on a loopback GET.
 pub use scientific_acceptance_http::SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE;
 /// Schema identity returned on a succeeded scientific-acceptance GET.

@@ -33,6 +33,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0026](0026-validation-run-scientific-acceptance.md) | Durable validation-run scientific acceptance evidence | Accepted | active-PR | GAP-003A first slice binds cutoff-safe evidence to a hash-stable run that emits `tepp.scientific_acceptance.v1`; Postgres persistence remains GAP-003B. |
 | [0027](0027-scientific-acceptance-http-status.md) | Scientific-acceptance loopback HTTP status path | Accepted | active-PR | GET `/v1/analysis-runs/{run_id}` stays metric-free on accepted/running; `tepp.scientific_acceptance.v1` only on succeeded `scientific_acceptance_v1`. |
 | [0028](0028-scientific-acceptance-http-lifecycle.md) | Scientific-acceptance loopback HTTP lifecycle POST | Accepted | active-PR | POST `/running` and `/terminal` are the production status-update path; GET remains ADR 0027. Persistence remains GAP-003B. |
+| [0032](0032-scientific-acceptance-loopback-engine.md) | Scientific-acceptance loopback engine execute | Accepted | active-PR | POST `/execute` runs `analysis_engine` on the loopback lifecycle so GET returns `tepp.scientific_acceptance.v1` without a caller-supplied artifact. Persistence remains GAP-003B. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -141,6 +142,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **project-history wire-size symmetry:** ADR 0019.
 - **LineageWeave project-history service boundary:** ADR 0021.
 - **accepted-run execution and terminal artifact production:** ADR 0022.
+- **scientific-acceptance loopback engine execute:** ADR 0032.
 - **independent lineage criterion and posterior Project Journey:** ADR 0023.
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
 

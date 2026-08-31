@@ -53,7 +53,41 @@ pub(crate) fn read_http_request_with_limit<R: Read>(
     Ok(format!("{header_text}{body_text}"))
 }
 
-/// Split one complete request into its header block and UTF-8 body.
+/// Parsed loopback HTTP/1.1 request already in memory.
+#[derive(Debug)]
+pub struct LoopbackHttpParts<'a> {
+    /// HTTP method token from the request line.
+    pub method: &'a str,
+    /// Request-target path. Query strings are refused.
+    pub path: &'a str,
+    /// Lowercased unique headers.
+    pub headers: HashMap<String, String>,
+    /// UTF-8 body whose length matches `Content-Length`.
+    pub body: &'a str,
+}
+
+/// Parse one complete loopback HTTP/1.1 request already in memory.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for framing, version, or header
+/// violations and [`ApiError::LimitExceeded`] when the header block or body
+/// exceeds the configured bound.
+pub fn parse_loopback_http_parts(
+    request: &str,
+    maximum_body_bytes: usize,
+) -> Result<LoopbackHttpParts<'_>, ApiError> {
+    let (header_block, body) = split_request_with_limit(request, maximum_body_bytes)?;
+    let mut lines = header_block.split("\r\n");
+    let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
+    let headers = parse_headers(&mut lines)?;
+    Ok(LoopbackHttpParts {
+        method,
+        path,
+        headers,
+        body,
+    })
+}
 pub(crate) fn split_request(request: &str) -> Result<(&str, &str), ApiError> {
     split_request_with_limit(request, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
 }

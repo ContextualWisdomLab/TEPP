@@ -8,8 +8,9 @@
 //! `tepp.scientific_acceptance.v1` only on a succeeded status whose request
 //! profile is `scientific_acceptance_v1`. `POST /v1/analysis-runs/{run_id}/running`
 //! and `POST /v1/analysis-runs/{run_id}/terminal` are the production
-//! status-update path. Completed psychometric estimation remains outside this
-//! crate.
+//! status-update path. `POST /v1/analysis-runs/{run_id}/execute` is recognized
+//! and refused here; `analysis_engine` owns engine execution on this listener.
+//! Completed psychometric estimation remains outside this crate.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -47,6 +48,22 @@ struct LiveAnalysisRun {
     accepted: AnalysisRunAccepted,
     status: AnalysisRunStatus,
     scientific_acceptance_json: Option<String>,
+}
+
+/// Public copy of one accepted loopback run for engine glue.
+///
+/// Scientific-acceptance bytes stay private on the live service. Engine
+/// execution records them through [`AnalysisRunLiveService::record_loopback_status`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoopbackAnalysisRun {
+    /// Consumer identity that accepted the run.
+    pub consumer: String,
+    /// Original create request.
+    pub request: AnalysisRunRequest,
+    /// Accepted receipt.
+    pub accepted: AnalysisRunAccepted,
+    /// Current lifecycle status.
+    pub status: AnalysisRunStatus,
 }
 
 /// Loopback HTTP/1.1 analysis-run service shared by published CWL consumers.
@@ -197,7 +214,9 @@ impl AnalysisRunLiveService {
             AnalysisRunLiveRoute::Terminal { run_id } => {
                 self.post_terminal_status(&run_id, &headers, body)
             }
-            AnalysisRunLiveRoute::Status { .. } => Err(ApiError::InvalidWirePayload),
+            AnalysisRunLiveRoute::Execute { .. } | AnalysisRunLiveRoute::Status { .. } => {
+                Err(ApiError::InvalidWirePayload)
+            }
         }
     }
 
@@ -285,9 +304,17 @@ impl AnalysisRunLiveService {
     ///
     /// HTTP `POST /v1/analysis-runs/{run_id}/running` and
     /// `POST /v1/analysis-runs/{run_id}/terminal` call this after the request
-    /// is authenticated and parsed. Psychometric execution remains outside this
-    /// crate; this records the supplied status only.
-    pub(crate) fn record_loopback_status(
+    /// is authenticated and parsed. `analysis_engine` records a produced
+    /// scientific-acceptance artifact through the same method so GET can return
+    /// `tepp.scientific_acceptance.v1` without a caller-supplied artifact.
+    /// Psychometric execution remains outside this crate; this records the
+    /// supplied status only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApiError::InvalidWirePayload`] for an unknown run, a binding
+    /// mismatch, or an HTTP-layer scientific-acceptance gate failure.
+    pub fn record_loopback_status(
         &mut self,
         run_id: &str,
         status: AnalysisRunStatus,
@@ -314,6 +341,66 @@ impl AnalysisRunLiveService {
         stored.status = status;
         stored.scientific_acceptance_json = scientific_acceptance_json;
         Ok(())
+    }
+
+    /// Return a copy of one accepted loopback run.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApiError::InvalidWirePayload`] when the run identity is unknown
+    /// or internally inconsistent.
+    pub fn loopback_run(&self, run_id: &str) -> Result<LoopbackAnalysisRun, ApiError> {
+        let replay_key = self
+            .runs_by_id
+            .get(run_id)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let stored = self
+            .accepted_runs
+            .get(replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if stored.accepted.run_id != run_id {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        Ok(LoopbackAnalysisRun {
+            consumer: stored.consumer.clone(),
+            request: stored.request.clone(),
+            accepted: stored.accepted.clone(),
+            status: stored.status.clone(),
+        })
+    }
+
+    /// Serialize the current loopback status GET body for one run.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same fail-closed errors as the GET status path.
+    pub fn loopback_status_json(&self, run_id: &str) -> Result<String, ApiError> {
+        let replay_key = self
+            .runs_by_id
+            .get(run_id)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let stored = self
+            .accepted_runs
+            .get(replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        status_http_json(
+            &stored.status,
+            &stored.request,
+            stored.scientific_acceptance_json.as_deref(),
+        )
+    }
+
+    /// Authorize consumer-scoped loopback headers against this listener.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApiError::InvalidWirePayload`] for missing contract headers
+    /// and [`ApiError::AuthorizationDenied`] for credential headers.
+    pub fn authorize_loopback_headers<'a>(
+        &self,
+        headers: &'a HashMap<String, String>,
+    ) -> Result<&'a str, ApiError> {
+        require_headers(headers, self.bound_addr, true)
     }
 
     fn post_running_status(
@@ -1484,6 +1571,17 @@ mod tests {
             accepted_dto.run_id, run.idempotency_key
         );
         assert_eq!(service.handle_http_request(&put).status_code, 400);
+        assert_eq!(
+            service
+                .handle_http_request(&lifecycle_post(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/execute", accepted_dto.run_id),
+                    "{}",
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
         assert_eq!(
             service
                 .handle_http_request(&lifecycle_post(

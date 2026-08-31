@@ -105,7 +105,12 @@ bodies stay metric-free, and only a succeeded status with profile
 `POST /v1/analysis-runs/{run_id}/running` and
 `POST /v1/analysis-runs/{run_id}/terminal` are the production loopback
 status-update path that records those statuses; they do not persist and do not
-execute psychometric estimation. Production TLS remains a later adapter.
+execute psychometric estimation. `POST /v1/analysis-runs/{run_id}/execute` on
+`analysis_engine::ScientificAcceptanceLoopbackService` is the engine-owned
+loopback path that produces `tepp.scientific_acceptance.v1` for a
+`scientific_acceptance_v1` run without a caller-supplied artifact. The execute
+body carries corpus, recovery, seed, and the pre-registered SE-gate multiplier
+and refuses `scientific_acceptance_json`. Production TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

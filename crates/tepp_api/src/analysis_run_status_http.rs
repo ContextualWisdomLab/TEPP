@@ -22,6 +22,8 @@ pub(crate) enum AnalysisRunLiveRoute {
     Running { run_id: String },
     /// `POST /v1/analysis-runs/{run_id}/terminal`
     Terminal { run_id: String },
+    /// `POST /v1/analysis-runs/{run_id}/execute`
+    Execute { run_id: String },
 }
 
 /// Build a provider-owned `GET` analysis-run status exchange.
@@ -137,7 +139,7 @@ fn require_run_id_length(run_id: &str) -> Result<(), ApiError> {
     }
 }
 
-/// Parse `GET` status and `POST` running/terminal loopback routes.
+/// Parse `GET` status and `POST` running/terminal/execute loopback routes.
 ///
 /// # Errors
 ///
@@ -171,7 +173,32 @@ pub(crate) fn parse_analysis_run_live_route(path: &str) -> Result<AnalysisRunLiv
             require_run_id_length(&run_id)?;
             Ok(AnalysisRunLiveRoute::Terminal { run_id })
         }
+        Some((encoded_id, "execute")) => {
+            let run_id = decode_path_segment(encoded_id)?;
+            require_run_id_length(&run_id)?;
+            Ok(AnalysisRunLiveRoute::Execute { run_id })
+        }
         Some(_) => Err(ApiError::InvalidWirePayload),
+    }
+}
+
+/// Extract the opaque run identity from `POST /v1/analysis-runs/{run_id}/execute`.
+///
+/// The loopback listener in this crate refuses the execute suffix. Engine glue
+/// in `analysis_engine` owns the execution path and uses this parser so hostile
+/// encodings fail closed before any scientific work.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for a non-execute path or a hostile
+/// encoding, and [`ApiError::LimitExceeded`] when the decoded identity exceeds
+/// [`ANALYSIS_RUN_ID_MAX_LEN`].
+pub fn analysis_run_execute_path_run_id(path: &str) -> Result<String, ApiError> {
+    match parse_analysis_run_live_route(path)? {
+        AnalysisRunLiveRoute::Execute { run_id } => Ok(run_id),
+        AnalysisRunLiveRoute::Status { .. }
+        | AnalysisRunLiveRoute::Running { .. }
+        | AnalysisRunLiveRoute::Terminal { .. } => Err(ApiError::InvalidWirePayload),
     }
 }
 
@@ -185,9 +212,9 @@ pub(crate) fn parse_analysis_run_live_route(path: &str) -> Result<AnalysisRunLiv
 pub(crate) fn analysis_run_status_path_run_id(path: &str) -> Result<String, ApiError> {
     match parse_analysis_run_live_route(path)? {
         AnalysisRunLiveRoute::Status { run_id } => Ok(run_id),
-        AnalysisRunLiveRoute::Running { .. } | AnalysisRunLiveRoute::Terminal { .. } => {
-            Err(ApiError::InvalidWirePayload)
-        }
+        AnalysisRunLiveRoute::Running { .. }
+        | AnalysisRunLiveRoute::Terminal { .. }
+        | AnalysisRunLiveRoute::Execute { .. } => Err(ApiError::InvalidWirePayload),
     }
 }
 
@@ -240,6 +267,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn decodes_status_path_identities_and_refuses_hostile_segments() {
         assert_eq!(
             analysis_run_status_path_run_id("/v1/analysis-runs/tepp-run-1").expect("plain"),
@@ -313,6 +341,29 @@ mod tests {
             AnalysisRunLiveRoute::Terminal {
                 run_id: "tepp-run-1".into()
             }
+        );
+        assert_eq!(
+            parse_analysis_run_live_route("/v1/analysis-runs/tepp-run-1/execute").expect("execute"),
+            AnalysisRunLiveRoute::Execute {
+                run_id: "tepp-run-1".into()
+            }
+        );
+        assert_eq!(
+            analysis_run_execute_path_run_id("/v1/analysis-runs/tepp-run-1/execute")
+                .expect("execute id"),
+            "tepp-run-1"
+        );
+        assert_eq!(
+            analysis_run_execute_path_run_id("/v1/analysis-runs/tepp-run-1"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            analysis_run_status_path_run_id("/v1/analysis-runs/tepp-run-1/execute"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_analysis_run_live_route("/v1/analysis-runs/tepp-run-1/execute/extra"),
+            Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
             parse_analysis_run_live_route("/v1/analysis-runs/tepp-run-1/running/extra"),
