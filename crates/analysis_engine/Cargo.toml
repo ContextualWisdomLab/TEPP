@@ -21,9 +21,11 @@ sha2 = { workspace = true }
 tepp_api = { path = "../tepp_api", version = "0.2.0" }
 temporal_core = { path = "../temporal_core", version = "0.2.0" }
 topic_measurement = { path = "../topic_measurement", version = "0.2.0" }
+modality_source = { path = "../modality_source", version = "0.2.0" }
 uuid.workspace = true
 
 [dev-dependencies]
+modality_source = { path = "../modality_source", version = "0.2.0" }
 corpus_split = { path = "../corpus_split", version = "0.2.0" }
 membership_core = { path = "../membership_core", version = "0.2.0" }
 relation_graph = { path = "../relation_graph", version = "0.2.0" }
