@@ -27,10 +27,10 @@ Add the `composed_fitted_lineage_v1` analysis-run output profile to
 
 - consumes an already-constructed `ReferenceTopicInput` plus
   `FittedCandidateKConfig`, method name, and optional LLM votes;
-- requires the request snapshot and knowledge cutoff to match the offered
-  construction;
-- invokes `select_fitted_candidate_k` then `execute_topic_lineage_run` at the
-  selected `K` without reimplementing Schwarz scoring or lineage edges;
+- requires every modeled document's retained availability time to be at or
+  before the request knowledge cutoff;
+- retains the exact winning fitted model, including all non-default numerical
+  hyperparameters, and builds lineage from that fit without a second fit;
 - emits a canonical SHA-256-digested `tepp.composed_fitted_lineage.v1`
   artifact with selected `K`, candidate/evidence counts, lineage topic/edge
   counts, the inner lineage digest, and inference status
@@ -60,13 +60,15 @@ Operators can request cutoff-safe fitted-`K` selection followed by a
 production lineage fit as one digest-bound terminal result. The artifact
 does not claim Schwarz-only selection, Pareto-front selection, Bayesian
 sampling, GPU parity, or topic birth/split/merge. Snapshot/profile/cutoff
-mismatch, lexical methods, and failed selection fail closed.
+mismatch, late-available evidence, lexical methods, inconsistent counts, and
+failed selection fail closed.
 
 ## Verification
 
 The PR includes Rust unit and integration tests for successful composition,
-lexical-method refusal, snapshot/profile/cutoff mismatch including reuse of
-live sibling profiles, and artifact tampering. Run:
+non-default-hyperparameter preservation, lexical-method refusal,
+snapshot/profile/cutoff mismatch including late-available evidence and reuse
+of live sibling profiles, count invariants, and artifact tampering. Run:
 
 ```text
 cargo fmt --all -- --check

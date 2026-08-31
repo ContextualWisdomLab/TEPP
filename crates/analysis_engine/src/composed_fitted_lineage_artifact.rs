@@ -1,16 +1,17 @@
 //! Digest-bound fitted candidate-`K` selection composed with topic lineage.
 
-use model_selection::{FittedCandidateKConfig, select_fitted_candidate_k};
+use model_selection::{FittedCandidateKConfig, select_fitted_candidate_model};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use temporal_core::KnowledgeCutoff;
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
-use topic_measurement::{ReferenceTopicInput, ReferenceTopicModelConfig};
+use topic_measurement::ReferenceTopicInput;
 
 use crate::topic_lineage_artifact::{
-    TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, execute_topic_lineage_run,
+    TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE,
+    topic_lineage_execution_from_model,
 };
 use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
 
@@ -132,9 +133,6 @@ impl ComposedFittedLineageArtifact {
         self.validate()?;
         let payload =
             serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > COMPOSED_FITTED_LINEAGE_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
         Ok(payload)
     }
 
@@ -157,6 +155,8 @@ impl ComposedFittedLineageArtifact {
             || self.candidate_count == 0
             || self.evidence_count < 2
             || self.lineage_topic_count != self.selected_k
+            || self.connected_post_count > self.evidence_count
+            || self.lineage_edge_count > self.evidence_count.saturating_mul(self.evidence_count - 1)
             || self.lineage_artifact_sha256.len() != 64
             || !self
                 .lineage_artifact_sha256
@@ -181,8 +181,8 @@ pub struct ComposedFittedLineageExecution {
 
 /// Execute fitted candidate-`K` selection then the CPU `f64` topic-lineage fit.
 ///
-/// The executor invokes [`select_fitted_candidate_k`] and
-/// [`execute_topic_lineage_run`] and does not reimplement Schwarz scoring or
+/// The executor invokes [`select_fitted_candidate_model`] and reuses its exact
+/// winning fit to build topic lineage; it does not reimplement Schwarz scoring or
 /// lineage edges. LLM votes cannot define the numerical optimum. This is not
 /// a standalone fitted-`K` profile, not a Pareto-front profile, and not a
 /// Bayesian sampler.
@@ -209,40 +209,24 @@ pub fn execute_composed_fitted_lineage_run(
         || request.model_contract_version != COMPOSED_FITTED_LINEAGE_MODEL_CONTRACT_VERSION
         || request.output_profile != COMPOSED_FITTED_LINEAGE_OUTPUT_PROFILE
         || !valid_identifier(composition.method_name())
+        || !composition.input().is_eligible_at(&knowledge_cutoff)
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
 
-    let selected_k = select_fitted_candidate_k(
+    let (selected_k, selected_model) = select_fitted_candidate_model(
         composition.input(),
         composition.selection(),
         composition.method_name(),
         composition.llm_votes(),
     )?;
-    let topic_count =
-        usize::try_from(selected_k).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
-    let fit_config = ReferenceTopicModelConfig::new(
-        topic_count,
-        composition.selection().seeds().to_vec(),
-        composition.selection().maximum_iterations(),
-        composition.selection().tolerance(),
-    )?;
     let mut lineage_request = request.clone();
     lineage_request.model_contract_version = TOPIC_LINEAGE_MODEL_CONTRACT_VERSION.into();
     lineage_request.output_profile = TOPIC_LINEAGE_OUTPUT_PROFILE.into();
     let completed_at = completed_at.into();
-    let lineage = execute_topic_lineage_run(
-        &lineage_request,
-        accepted,
-        snapshot_id,
-        knowledge_cutoff,
-        composition.input(),
-        &fit_config,
-        completed_at.clone(),
-    )?;
-    if lineage.artifact.topic_count != u64::from(selected_k) {
-        return Err(AnalysisEngineError::InvalidComposedFittedLineageArtifact);
-    }
+    #[rustfmt::skip]
+    let lineage = topic_lineage_execution_from_model(&lineage_request, accepted, snapshot_id, knowledge_cutoff, composition.input(), &selected_model, completed_at.clone())?;
+    let connected_post_count = lineage.artifact.connected_post_count;
     let artifact = ComposedFittedLineageArtifact {
         schema_version: COMPOSED_FITTED_LINEAGE_ARTIFACT_SCHEMA_VERSION.into(),
         run_id: accepted.run_id.clone(),
@@ -255,26 +239,15 @@ pub fn execute_composed_fitted_lineage_run(
         lineage_topic_count: lineage.artifact.topic_count,
         lineage_edge_count: u64::try_from(lineage.artifact.sequence_edges.len())
             .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
-        connected_post_count: lineage.artifact.connected_post_count,
+        connected_post_count,
         lineage_artifact_sha256: lineage.artifact.sha256()?,
         inference_status: COMPOSED_FITTED_LINEAGE_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "composed_fitted_lineage",
-        artifact.evidence_count,
-        4,
-        COMPOSED_FITTED_LINEAGE_INFERENCE_STATUS,
-    )?;
-    let terminal_result = AnalysisRunTerminalResult::succeeded(
-        request,
-        accepted,
-        format!("composed_fitted_lineage_artifact_{}", &digest[..16]),
-        digest,
-        COMPOSED_FITTED_LINEAGE_ARTIFACT_SCHEMA_VERSION,
-        completed_at,
-        summary,
-    )?;
+    #[rustfmt::skip]
+    let summary = AnalysisResultSummary::new("composed_fitted_lineage", artifact.evidence_count, 4, COMPOSED_FITTED_LINEAGE_INFERENCE_STATUS)?;
+    #[rustfmt::skip]
+    let terminal_result = AnalysisRunTerminalResult::succeeded(request, accepted, format!("composed_fitted_lineage_artifact_{}", &digest[..16]), digest, COMPOSED_FITTED_LINEAGE_ARTIFACT_SCHEMA_VERSION, completed_at, summary)?;
     Ok(ComposedFittedLineageExecution {
         artifact,
         terminal_result,
@@ -377,6 +350,16 @@ mod tests {
             {
                 let mut value = artifact.clone();
                 value.lineage_topic_count = 3;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.connected_post_count = 5;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.lineage_edge_count = 13;
                 value
             },
             {

@@ -3,7 +3,8 @@
 use analysis_engine::{
     AnalysisEngineError, COMPOSED_FITTED_LINEAGE_ARTIFACT_SCHEMA_VERSION,
     COMPOSED_FITTED_LINEAGE_MODEL_CONTRACT_VERSION, COMPOSED_FITTED_LINEAGE_OUTPUT_PROFILE,
-    ComposedFittedLineageInput, execute_composed_fitted_lineage_run,
+    ComposedFittedLineageInput, TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE,
+    execute_composed_fitted_lineage_run, execute_topic_lineage_run,
 };
 use corpus_split::{CorpusDocument, CorpusSnapshot};
 use membership_core::{
@@ -30,14 +31,21 @@ fn cutoff() -> KnowledgeCutoff {
 }
 
 fn fixture() -> ReferenceTopicInput {
+    fixture_available_at("2026-07-01T00:00:00Z", cutoff())
+}
+
+fn fixture_available_at(
+    available_at: &str,
+    admission_cutoff: KnowledgeCutoff,
+) -> ReferenceTopicInput {
     let ids: Vec<_> = (1_u128..=4).map(Uuid::from_u128).collect();
     let times: Vec<_> = (1_u8..=4).map(event_time).collect();
-    let available = AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available");
+    let available = AvailableTime::parse_rfc3339(available_at).expect("available");
     let mut snapshot = CorpusSnapshot::new();
     let mut memberships = MembershipNetwork::new();
     for id in &ids {
         snapshot
-            .insert_if_eligible(CorpusDocument::new(*id, available), &cutoff())
+            .insert_if_eligible(CorpusDocument::new(*id, available), &admission_cutoff)
             .expect("eligible");
         memberships
             .insert(
@@ -184,6 +192,62 @@ fn fitted_selection_then_lineage_emits_digest_bound_composition() {
 }
 
 #[test]
+fn selected_fit_preserves_hyperparameters_and_cutoff_provenance() {
+    let request = request();
+    let accepted = accepted(&request);
+    let input = fixture();
+    let selection = selection()
+        .with_hyperparameters(1.7, 0.4, 0.03, 0.08, 0.12)
+        .expect("non-default selection");
+    let execution = execute_composed_fitted_lineage_run(
+        &request,
+        &accepted,
+        "snapshot-composed-fitted-lineage",
+        cutoff(),
+        &composition(&input, &selection, "trsl_tm_reference", &[]),
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("composition");
+
+    let selected_k = u32::try_from(execution.artifact.selected_k).expect("selected K");
+    let mut lineage_request = request.clone();
+    lineage_request.model_contract_version = TOPIC_LINEAGE_MODEL_CONTRACT_VERSION.into();
+    lineage_request.output_profile = TOPIC_LINEAGE_OUTPUT_PROFILE.into();
+    let direct = execute_topic_lineage_run(
+        &lineage_request,
+        &accepted,
+        "snapshot-composed-fitted-lineage",
+        cutoff(),
+        &input,
+        &selection
+            .reference_config(selected_k)
+            .expect("exact config"),
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("direct lineage");
+    assert_eq!(
+        execution.artifact.lineage_artifact_sha256,
+        direct.artifact.sha256().expect("lineage digest")
+    );
+
+    let late_input = fixture_available_at(
+        "2026-08-02T00:00:00Z",
+        KnowledgeCutoff::parse_rfc3339("2026-08-03T00:00:00Z").expect("later cutoff"),
+    );
+    assert_eq!(
+        execute_composed_fitted_lineage_run(
+            &request,
+            &accepted,
+            "snapshot-composed-fitted-lineage",
+            cutoff(),
+            &composition(&late_input, &selection, "trsl_tm_reference", &[]),
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
 fn lexical_method_and_empty_candidates_fail_closed() {
     let request = request();
     let input = fixture();
@@ -200,6 +264,17 @@ fn lexical_method_and_empty_candidates_fail_closed() {
         Err(AnalysisEngineError::ModelSelection(
             ModelSelectionError::LexicalWeightForbidden
         ))
+    );
+    assert_eq!(
+        execute_composed_fitted_lineage_run(
+            &request,
+            &accepted(&request),
+            "snapshot-composed-fitted-lineage",
+            cutoff(),
+            &composition(&input, &selection, "", &[]),
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
     );
 }
 

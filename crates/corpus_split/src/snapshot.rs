@@ -4,7 +4,7 @@ use crate::CorpusDocument;
 use crate::CorpusSplitError;
 use crate::cutoff_eligible;
 use std::collections::BTreeMap;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use uuid::Uuid;
 
 /// Immutable snapshot of documents eligible under a knowledge cutoff.
@@ -44,6 +44,14 @@ impl CorpusSnapshot {
     #[must_use]
     pub fn contains(&self, document_id: Uuid) -> bool {
         self.documents.contains_key(&document_id)
+    }
+
+    /// Return the availability time retained for one snapshot document.
+    #[must_use]
+    pub fn available_time(&self, document_id: Uuid) -> Option<AvailableTime> {
+        self.documents
+            .get(&document_id)
+            .map(|document| document.available_time)
     }
 
     /// Return the number of eligible documents.
@@ -97,6 +105,11 @@ mod tests {
         assert_eq!(snapshot.len(), 1);
         assert!(!snapshot.is_empty());
         assert!(snapshot.contains(early.document_id));
+        assert_eq!(
+            snapshot.available_time(early.document_id),
+            Some(early.available_time)
+        );
+        assert_eq!(snapshot.available_time(Uuid::nil()), None);
         assert_eq!(snapshot.document_ids().count(), 1);
     }
 }
