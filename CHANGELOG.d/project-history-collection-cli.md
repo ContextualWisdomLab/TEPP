@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-project-histories list` enumerates metric-free accepted LineageWeave project-history projections (ADR 0065). Collection CLI stdout refuses RMSE/bias/coverage/SE-gate/scientific-acceptance/evidence/`causal_score` keys. Naruon refused. Not project-history POST CLI, not collection GET listener, not persistence.

@@ -98,6 +98,11 @@ projections on `tepp-loopback`. Collection rows stay metric-free identities
 `inference_status=temporal_association_only`). `tepp.scientific_acceptance.v1`,
 evidence text, findings, and causal scores never appear.
 
+`tepp-project-histories list` is the operator-visible client of that collection
+GET. It mints a typed `LineageWeave` exchange onto spawned `tepp-loopback` TCP.
+Empty stdin is admitted. Naruon is refused. Process exit 0 is not a scientific
+claim and does not infer causality.
+
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
 terminal status contains exactly one request-bound

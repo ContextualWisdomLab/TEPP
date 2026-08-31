@@ -28,6 +28,7 @@ mod naruon_http;
 mod naruon_live;
 mod orchestration;
 mod project_history;
+mod project_history_collection_cli;
 mod project_history_collection_http;
 mod project_journey;
 mod provider_payload;
@@ -231,6 +232,22 @@ pub use project_history::ProjectHistoryProjection;
 pub use project_history::ProjectHistoryRequest;
 /// Build a cutoff-safe project-history projection.
 pub use project_history::project_history_projection;
+/// Loopback project-history collection CLI invocation.
+pub use project_history_collection_cli::ProjectHistoryCollectionCliInvocation;
+/// Loopback project-history collection CLI verb.
+pub use project_history_collection_cli::ProjectHistoryCollectionCliVerb;
+/// Compose HTTP/1.1 collection GET from a CLI invocation.
+pub use project_history_collection_cli::compose_project_history_collection_cli_http;
+/// Dispatch a collection CLI invocation against an in-process listener.
+pub use project_history_collection_cli::dispatch_project_history_collection_cli;
+/// Execute a collection CLI invocation over loopback TCP.
+pub use project_history_collection_cli::execute_project_history_collection_cli;
+/// Render a typed collection GET exchange as loopback HTTP/1.1.
+pub use project_history_collection_cli::loopback_http1_from_project_history_collection_exchange;
+/// Read leftover stdin for the project-history collection CLI.
+pub use project_history_collection_cli::read_project_history_collection_cli_stdin;
+/// Filter collection CLI stdout so the page stays metric-free.
+pub use project_history_collection_cli::render_project_history_collection_cli_stdout;
 /// Maximum opaque cursor length on project-history collection GET.
 pub use project_history_collection_http::PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN;
 /// Default page size for project-history collection GET.
