@@ -14,6 +14,7 @@ mod cluster;
 mod consensus;
 mod edges;
 mod error;
+mod leiden;
 mod simplex;
 mod stability;
 
