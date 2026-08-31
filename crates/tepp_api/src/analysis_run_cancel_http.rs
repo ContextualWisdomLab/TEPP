@@ -199,7 +199,7 @@ pub(crate) fn analysis_run_cancel_path_run_id(path: &str) -> Result<String, ApiE
     Ok(run_id)
 }
 
-fn encode_path_segment(value: &str) -> String {
+pub(crate) fn encode_path_segment(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + value.len() / 2);
     let hex = b"0123456789ABCDEF";
     for byte in value.bytes() {

@@ -87,7 +87,10 @@ operators do not guess run identities. Collection bodies never carry
 `tepp.scientific_acceptance.v1`. GET-by-id remains a later slice on this
 protected-main lineage. The loopback `tepp-analysis-runs list` CLI is the
 operator-visible client for that collection GET; it does not duplicate the
-scientific-acceptance `tepp-analysis-run` CLI.
+scientific-acceptance `tepp-analysis-run` CLI. The loopback
+`tepp-analysis-runs cancel` CLI is the operator-visible client for
+`POST /v1/analysis-runs/{run_id}/cancel`; cancel stdout stays metric-free and
+never prints `tepp.scientific_acceptance.v1`.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

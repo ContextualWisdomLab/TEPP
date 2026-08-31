@@ -13,6 +13,7 @@
 
 mod analysis_result;
 mod analysis_run;
+mod analysis_run_cancel_cli;
 mod analysis_run_cancel_http;
 mod analysis_run_collection_cli;
 mod analysis_run_collection_http;
@@ -72,6 +73,20 @@ pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 pub use analysis_run::requests_are_idempotent_matches;
 /// Require exact status binding to a request and accepted receipt.
 pub use analysis_run::require_status_binding;
+/// One validated cancel CLI invocation.
+pub use analysis_run_cancel_cli::AnalysisRunCancelCliInvocation;
+/// Loopback cancel CLI verb.
+pub use analysis_run_cancel_cli::AnalysisRunCancelCliVerb;
+/// Compose loopback cancel POST bytes for a CLI invocation.
+pub use analysis_run_cancel_cli::compose_analysis_run_cancel_cli_http;
+/// Dispatch a cancel CLI invocation against an in-process listener.
+pub use analysis_run_cancel_cli::dispatch_analysis_run_cancel_cli;
+/// Execute a cancel CLI invocation over loopback TCP.
+pub use analysis_run_cancel_cli::execute_analysis_run_cancel_cli;
+/// Read leftover stdin for the cancel CLI.
+pub use analysis_run_cancel_cli::read_analysis_run_cancel_cli_stdin;
+/// Render metric-free cancel CLI stdout.
+pub use analysis_run_cancel_cli::render_analysis_run_cancel_cli_stdout;
 /// Analysis-run cancel contract version constant.
 pub use analysis_run_cancel_http::ANALYSIS_RUN_CANCEL_CONTRACT_VERSION;
 /// Maximum opaque run identity length on the cancel path.

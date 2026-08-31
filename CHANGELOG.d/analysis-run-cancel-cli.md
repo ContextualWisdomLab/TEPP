@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-analysis-runs cancel` withdraws metric-free accepted and running runs (ADR 0033). Cancel CLI stdout refuses RMSE/bias/coverage/SE-gate/scientific-acceptance keys and a non-null `terminal_result`. Not GET-by-id, not scientific-acceptance CLI, not collection list, not persistence.
