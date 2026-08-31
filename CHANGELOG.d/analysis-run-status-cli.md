@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-analysis-runs status` inspects one analysis run (ADR 0029). Accepted/running/failed stdout refuses RMSE/bias/coverage/SE-gate keys and `tepp.scientific_acceptance.v1`. Succeeded `scientific_acceptance_v1` may print that schema. Not GET-by-id HTTP, not scientific-acceptance CLI, not collection list, not persistence.

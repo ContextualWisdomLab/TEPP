@@ -47,7 +47,7 @@ pub fn naruon_analysis_run_status_exchange(
 }
 
 /// Percent-encode one `URI` path segment without double-encoding safe chars.
-fn encode_path_segment(value: &str) -> String {
+pub(crate) fn encode_path_segment(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + value.len() / 2);
     let hex = b"0123456789ABCDEF";
     for byte in value.bytes() {

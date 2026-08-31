@@ -99,7 +99,11 @@ snapshot, cutoff, model, profile, and idempotency bindings before treating the
 run as measurement evidence. The loopback `AnalysisRunLiveService` now serves
 `GET /v1/analysis-runs/{run_id}` for those statuses: accepted and running GET
 bodies stay metric-free, and only a succeeded status with profile
-`scientific_acceptance_v1` may return `tepp.scientific_acceptance.v1`. Production
+`scientific_acceptance_v1` may return `tepp.scientific_acceptance.v1`. The
+loopback `tepp-analysis-runs status` CLI is the operator-visible client for
+that GET; accepted/running/failed stdout stays metric-free, and
+`tepp.scientific_acceptance.v1` prints only on succeeded
+`scientific_acceptance_v1`. Production
 TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side

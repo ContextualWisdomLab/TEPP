@@ -17,6 +17,7 @@
 mod analysis_result;
 mod analysis_run;
 mod analysis_run_live;
+mod analysis_run_status_cli;
 mod analysis_run_status_http;
 mod authorization;
 mod corpus_split_manifest;
@@ -75,6 +76,20 @@ pub use analysis_run::requests_are_idempotent_matches;
 pub use analysis_run::require_status_binding;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
+/// One validated status CLI invocation.
+pub use analysis_run_status_cli::AnalysisRunStatusCliInvocation;
+/// Loopback status CLI verb.
+pub use analysis_run_status_cli::AnalysisRunStatusCliVerb;
+/// Compose loopback status GET bytes for a CLI invocation.
+pub use analysis_run_status_cli::compose_analysis_run_status_cli_http;
+/// Dispatch a status CLI invocation against an in-process listener.
+pub use analysis_run_status_cli::dispatch_analysis_run_status_cli;
+/// Execute a status CLI invocation over loopback TCP.
+pub use analysis_run_status_cli::execute_analysis_run_status_cli;
+/// Read leftover stdin for the status CLI.
+pub use analysis_run_status_cli::read_analysis_run_status_cli_stdin;
+/// Render status CLI stdout with scientific-acceptance gates.
+pub use analysis_run_status_cli::render_analysis_run_status_cli_stdout;
 /// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
 /// Corpus-split leakage-audit contract version.

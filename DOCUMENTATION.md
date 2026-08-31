@@ -13,6 +13,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | naruon modular consumer contract | [`docs/connectors/naruon-artifact-consumer.md`](docs/connectors/naruon-artifact-consumer.md) |
 | Analysis-run status GET doctoring | [`docs/research/scientific-acceptance-http-status.md`](docs/research/scientific-acceptance-http-status.md) |
 | Analysis-run status consumer-parity doctoring | [`docs/research/analysis-run-status-consumer-parity.md`](docs/research/analysis-run-status-consumer-parity.md) |
+| Analysis-run status CLI doctoring | [`docs/research/analysis-run-status-cli.md`](docs/research/analysis-run-status-cli.md) |
 | contextual-orchestrator interpretation port | [`docs/connectors/contextual-orchestrator-interpretation-port.md`](docs/connectors/contextual-orchestrator-interpretation-port.md) |
 | Orchestrator live HTTP doctoring | [`docs/research/orchestrator-live-http.md`](docs/research/orchestrator-live-http.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
