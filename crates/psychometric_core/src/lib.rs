@@ -261,6 +261,20 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era commented `discreteTRAITVAR` as
+//! `(1 − e^{a Δt})² · (trait / a²)` (cran/ctsem 2.5.0 comments
+//! `(I − expm(DRIFT * timeInterval)) %*% asymTRAITVAR %*% t(...)`
+//! with `OpenMx` `expm` and
+//! `asymTRAITVAR <- solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))`;
+//! form `trait / a²` inline and do not import unpublished #330; do
+//! not call `recover_discrete_lag_from_log_rate`; underflow of
+//! `e^{a Δt}` to `+0` keeps `trait / a²`; a zero trait is exactly
+//! zero even if `a ≥ 0`; `a ≥ 0` with a nonzero trait fails closed;
+//! a non-event clock and a non-positive event interval fail closed;
+//! Table 2 `TRAITVAR` `φ_ξ` is not that map; unpublished
+//! `asymTRAITVAR` `trait / a²` is the `Δt → ∞` limit and is not that
+//! finite-interval map even when `e^{a Δt}` underflows; Driver Eq. 3
+//! `Q_Δt` is not that map; JSS PDF re-opened 2026-08-31T05:15Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -367,6 +381,8 @@ pub use event_time::recover_discrete_process_noise;
 pub use event_time::recover_discrete_time_independent_predictor_effect;
 /// First-order discrete effect of a time-varying event-time predictor.
 pub use event_time::recover_discrete_time_varying_predictor_effect;
+/// Exact scalar 2017-era commented `discreteTRAITVAR` `(1 − e^{a Δt})² · (trait / a²)`.
+pub use event_time::recover_discrete_trait_variance;
 /// Mean local log-rate on a sorted event-time series.
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
@@ -480,6 +496,8 @@ pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_ef
 pub use event_time::refuse_asymptotic_time_independent_variance_as_stationary_within_subject;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `TRAITVAR`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_trait_variance;
+/// Refuse treating unpublished 2017-era `asymTRAITVAR` as `discreteTRAITVAR`.
+pub use event_time::refuse_asymptotic_trait_variance_as_discrete_trait_variance;
 /// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
 pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 /// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.
@@ -488,6 +506,8 @@ pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating Driver Eq. 3 `Q_Δt` as 2017-era `discreteTRAITVAR`.
+pub use event_time::refuse_discrete_process_noise_as_discrete_trait_variance;
 /// Refuse treating p. 16 `discreteCINTstd` as `asymCINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
@@ -719,6 +739,8 @@ pub use event_time::refuse_time_independent_observed_mean_as_initial_time_indepe
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
 pub use event_time::refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating Table 2 `TRAITVAR` as 2017-era `discreteTRAITVAR`.
+pub use event_time::refuse_trait_variance_as_discrete_trait_variance;
 /// Refuse treating Driver §4.3 trait variance as process noise.
 pub use event_time::refuse_trait_variance_as_process_noise;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.
