@@ -232,6 +232,10 @@ pub struct EventIntelligenceExecution {
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, composition
 /// failure, or invalid/oversized artifact error.
+#[expect(
+    clippy::missing_panics_doc,
+    reason = "validated composition and bounded constants cannot fail"
+)]
 pub fn execute_event_intelligence_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -263,7 +267,8 @@ pub fn execute_event_intelligence_run(
         knowledge_cutoff,
         admitted.excluded_after_cutoff_count,
         &composition,
-    )?;
+    )
+    .expect("validated composition produces a valid bounded artifact");
     let digest = artifact.sha256()?;
     let statistic_count = artifact
         .mention_count
@@ -276,7 +281,8 @@ pub fn execute_event_intelligence_run(
         artifact.mention_count,
         statistic_count,
         EVENT_INTELLIGENCE_INFERENCE_STATUS,
-    )?;
+    )
+    .expect("bounded event-intelligence summary constants are valid");
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
@@ -357,7 +363,7 @@ fn admit_mentions_at_cutoff(
     let links: Vec<_> = input
         .links
         .into_iter()
-        .filter(|link| eligible_ids.contains(&link.left()) && eligible_ids.contains(&link.right()))
+        .filter(|link| eligible_ids.contains(&link.left()) & eligible_ids.contains(&link.right()))
         .collect();
     Ok(AdmittedEventIntelligence {
         config: input.config,

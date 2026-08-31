@@ -525,3 +525,23 @@ fn execution_refuses_empty_cutoff_receipt_mismatch_and_compose_failure() {
         Err(AnalysisEngineError::Event(EventError::InvalidWirePayload))
     );
 }
+
+#[test]
+fn execution_refuses_invalid_completion_time() {
+    let fixture = KnownTruthFixture::build();
+    let request = request();
+    let accepted = accepted(&request);
+    assert_eq!(
+        execute_event_intelligence_run(
+            &request,
+            &accepted,
+            "snapshot-event-intelligence",
+            cutoff(),
+            fixture.input(),
+            "invalid",
+        ),
+        Err(AnalysisEngineError::Api(
+            tepp_api::ApiError::InvalidWirePayload
+        ))
+    );
+}
