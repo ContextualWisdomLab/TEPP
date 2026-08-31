@@ -45,6 +45,7 @@ fn durable_run_binds_cutoff_eligible_evidence_and_emits_acceptance_evidence() {
     assert_eq!(receipt.eligible_evidence_count(), 2);
     assert!(!receipt.to_json().expect("json").contains("rmse"));
     let observation = RecoveryObservation::new(
+        &receipt,
         "contract-recovery",
         vec![0.70, 0.55, 0.40, -0.20, 0.85],
         vec![0.70, 0.55, 0.40, -0.20, 0.85],
@@ -63,6 +64,7 @@ fn durable_run_binds_cutoff_eligible_evidence_and_emits_acceptance_evidence() {
         SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION
     );
     assert_eq!(evidence.run_id(), receipt.run_id());
+    assert_eq!(evidence.recovery_sha256().len(), 64);
     assert!(evidence.se_gate_accepted());
     assert!(evidence.to_json().expect("json").contains("rmse"));
 }
@@ -85,6 +87,7 @@ fn llm_authored_recovery_and_cutoff_empty_corpora_fail_closed() {
     .expect("eligible");
     let receipt = submit_validation_run(&request(), &eligible, 1).expect("submit");
     let llm = RecoveryObservation::new(
+        &receipt,
         "llm-contract",
         vec![1.0, 2.0, 3.0],
         vec![1.0, 2.0, 3.0],
@@ -99,5 +102,49 @@ fn llm_authored_recovery_and_cutoff_empty_corpora_fail_closed() {
     assert_eq!(
         complete_validation_run(&receipt, &request(), &eligible, &llm),
         Err(AnalysisEngineError::LlmAuthoredRecovery)
+    );
+}
+
+#[test]
+fn recovery_from_a_different_run_or_tenant_fails_closed() {
+    let first = AnalysisCorpus::new(
+        "snapshot-contract",
+        vec![unit("evidence-1", "2026-07-10T00:00:00Z")],
+    )
+    .expect("first");
+    let second = AnalysisCorpus::new(
+        "snapshot-contract",
+        vec![
+            unit("evidence-1", "2026-07-10T00:00:00Z"),
+            unit("evidence-2", "2026-07-20T00:00:00Z"),
+        ],
+    )
+    .expect("second");
+    let receipt_a = submit_validation_run(&request(), &first, 1).expect("a");
+    let receipt_b = submit_validation_run(&request(), &second, 1).expect("b");
+    let foreign = RecoveryObservation::new(
+        &receipt_a,
+        "foreign-recovery",
+        vec![1.0, 2.0, 3.0],
+        vec![1.0, 2.0, 3.0],
+        vec![0.5, 1.5, 2.5],
+        vec![1.5, 2.5, 3.5],
+        vec![1.0, 2.0, 3.0],
+        vec![1.0, 2.0, 3.0],
+        3.0,
+        false,
+    )
+    .expect("foreign");
+    assert_eq!(
+        complete_validation_run(&receipt_b, &request(), &second, &foreign),
+        Err(AnalysisEngineError::BindingMismatch)
+    );
+    let mut other_tenant = request();
+    other_tenant.tenant_workspace_id = "tenant-workspace-other".into();
+    let other_receipt = submit_validation_run(&other_tenant, &first, 1).expect("tenant");
+    assert_ne!(receipt_a.run_id(), other_receipt.run_id());
+    assert_eq!(
+        complete_validation_run(&other_receipt, &other_tenant, &first, &foreign),
+        Err(AnalysisEngineError::BindingMismatch)
     );
 }

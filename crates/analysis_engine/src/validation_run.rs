@@ -1,11 +1,14 @@
 //! Bind immutable evidence to a durable scientific-acceptance validation run.
 //!
-//! This is the first GAP-003A slice: cutoff-safe evidence, model, seed, backend,
-//! and precision hash to one durable run identity. The accepted receipt carries
-//! no scientific metrics. Completion asks `validation_core` for RMSE, bias,
-//! coverage, temporal-order accuracy, and an SE-aware gate, then emits
-//! `tepp.scientific_acceptance.v1`. LLM-authored recovery, non-finite inputs,
-//! empty or duplicate evidence, snapshot mismatch, and cutoff-empty corpora
+//! This is the first GAP-003A slice: cutoff-safe evidence, tenant workspace,
+//! output profile, model, seed, backend, and precision hash to one durable run
+//! identity. The accepted receipt carries no scientific metrics. Completion
+//! asks `validation_core` for RMSE, bias, coverage, temporal-order accuracy,
+//! and an SE-aware gate, then emits `tepp.scientific_acceptance.v1`. Recovery
+//! vectors must be stamped with that same run identity; a different run,
+//! model, snapshot, seed, tenant, profile, or eligible evidence set fails
+//! closed. LLM-authored recovery, non-finite inputs, empty or duplicate
+//! evidence, snapshot mismatch, oversized recovery, and cutoff-empty corpora
 //! fail closed. Postgres persistence remains GAP-003B.
 
 use crate::{AnalysisCorpus, AnalysisEngineError, valid_identifier};
@@ -37,6 +40,8 @@ pub const VALIDATION_RUN_ID_PREFIX: &str = "tepp-validation-";
 pub const VALIDATION_RUN_ID_HEX_LEN: usize = 32;
 /// Wilson critical value for nominal 95% coverage bounds.
 pub const WILSON_Z: f64 = 1.96;
+/// Maximum length of one recovery, interval, or event-time vector.
+pub const MAX_RECOVERY_VECTOR_LEN: usize = 10_000;
 
 /// Durable identity of one submitted validation run. Receipts never carry
 /// scientific metrics.
@@ -46,6 +51,8 @@ pub struct ValidationRunReceipt {
     pub run_id: String,
     /// Lowercase SHA-256 of the canonical binding.
     pub binding_sha256: String,
+    /// Tenant workspace that owns the run.
+    pub tenant_workspace_id: String,
     /// Immutable source snapshot identity.
     pub snapshot_id: String,
     /// Historical cutoff applied to availability.
@@ -85,6 +92,12 @@ impl ValidationRunReceipt {
     #[must_use]
     pub fn binding_sha256(&self) -> &str {
         &self.binding_sha256
+    }
+
+    /// Return the bound tenant workspace identity.
+    #[must_use]
+    pub fn tenant_workspace_id(&self) -> &str {
+        &self.tenant_workspace_id
     }
 
     /// Return the bound snapshot identity.
@@ -134,11 +147,30 @@ impl ValidationRunReceipt {
     pub const fn eligible_evidence_count(&self) -> u64 {
         self.eligible_evidence_count
     }
+
+    fn identity_record(&self) -> String {
+        format!(
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+            self.run_id,
+            self.binding_sha256,
+            self.tenant_workspace_id,
+            self.snapshot_id,
+            self.knowledge_cutoff,
+            self.model,
+            self.seed,
+            self.backend,
+            self.precision,
+            self.output_profile,
+            self.eligible_evidence_count
+        )
+    }
 }
 
 /// Known-truth recovery vectors offered to complete a validation run.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecoveryObservation {
+    run_id: String,
+    binding_sha256: String,
     study_label: String,
     truth: Vec<f64>,
     recovered: Vec<f64>,
@@ -151,19 +183,24 @@ pub struct RecoveryObservation {
 }
 
 impl RecoveryObservation {
-    /// Construct a recovery observation.
+    /// Construct a recovery observation stamped to one submitted receipt.
     ///
     /// LLM authorship is recorded here and refused at completion. Non-finite
-    /// `se_gate_k` or a negative multiplier fail closed immediately.
+    /// `se_gate_k`, a negative multiplier, or an oversized vector fail closed
+    /// immediately. Completing a different run, model, snapshot, seed, tenant,
+    /// profile, or eligible evidence set fails later as a binding mismatch.
     ///
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::InvalidEvidence`] for an empty, oversized,
-    /// or control-bearing study label, and
+    /// or control-bearing study label,
+    /// [`AnalysisEngineError::LimitExceeded`] when any vector exceeds
+    /// [`MAX_RECOVERY_VECTOR_LEN`], and
     /// [`AnalysisEngineError::Validation`] for a non-finite or negative SE
     /// multiplier.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        receipt: &ValidationRunReceipt,
         study_label: impl Into<String>,
         truth: Vec<f64>,
         recovered: Vec<f64>,
@@ -178,6 +215,19 @@ impl RecoveryObservation {
         if !valid_identifier(&study_label) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
+        if [
+            truth.len(),
+            recovered.len(),
+            interval_lower.len(),
+            interval_upper.len(),
+            truth_times.len(),
+            recovered_times.len(),
+        ]
+        .into_iter()
+        .any(|len| len > MAX_RECOVERY_VECTOR_LEN)
+        {
+            return Err(AnalysisEngineError::LimitExceeded);
+        }
         if !se_gate_k.is_finite() {
             return Err(AnalysisEngineError::Validation(
                 ValidationError::InvalidInput,
@@ -189,6 +239,8 @@ impl RecoveryObservation {
             ));
         }
         Ok(Self {
+            run_id: receipt.run_id.clone(),
+            binding_sha256: receipt.binding_sha256.clone(),
             study_label,
             truth,
             recovered,
@@ -199,6 +251,18 @@ impl RecoveryObservation {
             se_gate_k,
             authored_by_llm,
         })
+    }
+
+    /// Return the stamped run identity.
+    #[must_use]
+    pub fn run_id(&self) -> &str {
+        &self.run_id
+    }
+
+    /// Return the stamped binding digest.
+    #[must_use]
+    pub fn binding_sha256(&self) -> &str {
+        &self.binding_sha256
     }
 
     /// Return the study label.
@@ -254,39 +318,43 @@ impl RecoveryObservation {
     pub const fn authored_by_llm(&self) -> bool {
         self.authored_by_llm
     }
+
+    fn digest_hex(&self) -> String {
+        let mut canonical = String::from("tepp.recovery_observation.v1\n");
+        let _ = writeln!(canonical, "run_id={}", self.run_id);
+        let _ = writeln!(canonical, "binding={}", self.binding_sha256);
+        let _ = writeln!(canonical, "study={}", self.study_label);
+        let _ = writeln!(canonical, "se_gate_k={:016x}", self.se_gate_k.to_bits());
+        let _ = writeln!(canonical, "authored_by_llm={}", self.authored_by_llm);
+        append_f64_vector(&mut canonical, "truth", &self.truth);
+        append_f64_vector(&mut canonical, "recovered", &self.recovered);
+        append_f64_vector(&mut canonical, "interval_lower", &self.interval_lower);
+        append_f64_vector(&mut canonical, "interval_upper", &self.interval_upper);
+        append_f64_vector(&mut canonical, "truth_times", &self.truth_times);
+        append_f64_vector(&mut canonical, "recovered_times", &self.recovered_times);
+        format_hex(Sha256::digest(canonical.into_bytes()))
+    }
 }
 
 /// Operator-usable scientific acceptance evidence for one completed run.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ScientificAcceptanceEvidence {
-    /// Versioned artifact schema.
-    pub schema_version: String,
-    /// Durable run identity.
-    pub run_id: String,
-    /// Canonical binding digest.
-    pub binding_sha256: String,
-    /// Immutable source snapshot identity.
-    pub snapshot_id: String,
-    /// Historical cutoff applied to availability.
-    pub knowledge_cutoff: String,
-    /// Bound model identity.
-    pub model: String,
-    /// Bound numeric seed.
-    pub seed: u64,
-    /// Bound compute backend.
-    pub backend: String,
-    /// Bound numeric precision.
-    pub precision: String,
-    /// Output profile.
-    pub output_profile: String,
-    /// Number of cutoff-eligible evidence identities.
-    pub eligible_evidence_count: u64,
-    /// Whether RMSE toward 0 passed the SE-aware gate.
-    pub se_gate_accepted: bool,
-    /// SE-gate multiplier used for acceptance.
-    pub se_gate_k: f64,
-    /// Machine-readable recovery report.
-    pub report: ValidationReport,
+    schema_version: String,
+    run_id: String,
+    binding_sha256: String,
+    recovery_sha256: String,
+    tenant_workspace_id: String,
+    snapshot_id: String,
+    knowledge_cutoff: String,
+    model: String,
+    seed: u64,
+    backend: String,
+    precision: String,
+    output_profile: String,
+    eligible_evidence_count: u64,
+    se_gate_accepted: bool,
+    se_gate_k: f64,
+    report: ValidationReport,
 }
 
 impl ScientificAcceptanceEvidence {
@@ -330,20 +398,94 @@ impl ScientificAcceptanceEvidence {
         &self.run_id
     }
 
+    /// Return the scientific binding digest.
+    #[must_use]
+    pub fn binding_sha256(&self) -> &str {
+        &self.binding_sha256
+    }
+
+    /// Return the recovery-vector digest stamped into this artifact.
+    #[must_use]
+    pub fn recovery_sha256(&self) -> &str {
+        &self.recovery_sha256
+    }
+
+    /// Return the tenant workspace identity.
+    #[must_use]
+    pub fn tenant_workspace_id(&self) -> &str {
+        &self.tenant_workspace_id
+    }
+
+    /// Return the snapshot identity.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
+    /// Return the knowledge cutoff.
+    #[must_use]
+    pub fn knowledge_cutoff(&self) -> &str {
+        &self.knowledge_cutoff
+    }
+
+    /// Return the bound model identity.
+    #[must_use]
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    /// Return the bound seed.
+    #[must_use]
+    pub const fn seed(&self) -> u64 {
+        self.seed
+    }
+
+    /// Return the bound backend.
+    #[must_use]
+    pub fn backend(&self) -> &str {
+        &self.backend
+    }
+
+    /// Return the bound precision.
+    #[must_use]
+    pub fn precision(&self) -> &str {
+        &self.precision
+    }
+
+    /// Return the output profile.
+    #[must_use]
+    pub fn output_profile(&self) -> &str {
+        &self.output_profile
+    }
+
+    /// Return the eligible evidence count.
+    #[must_use]
+    pub const fn eligible_evidence_count(&self) -> u64 {
+        self.eligible_evidence_count
+    }
+
     /// Return whether the SE-aware gate accepted RMSE toward 0.
     #[must_use]
     pub const fn se_gate_accepted(&self) -> bool {
         self.se_gate_accepted
     }
+
+    /// Return the SE-gate multiplier used for acceptance.
+    #[must_use]
+    pub const fn se_gate_k(&self) -> f64 {
+        self.se_gate_k
+    }
 }
 
 struct CanonicalBinding {
+    tenant_workspace_id: String,
     snapshot_id: String,
     knowledge_cutoff: String,
     model: String,
     seed: u64,
     backend: String,
     precision: String,
+    output_profile: String,
     eligible_ids: Vec<String>,
 }
 
@@ -366,12 +508,14 @@ impl CanonicalBinding {
 
     fn canonical_bytes(&self) -> String {
         let mut canonical = String::from("tepp.validation_binding.v1\n");
+        let _ = writeln!(canonical, "tenant={}", self.tenant_workspace_id);
         let _ = writeln!(canonical, "snapshot={}", self.snapshot_id);
         let _ = writeln!(canonical, "cutoff={}", self.knowledge_cutoff);
         let _ = writeln!(canonical, "model={}", self.model);
         let _ = writeln!(canonical, "seed={}", self.seed);
         let _ = writeln!(canonical, "backend={}", self.backend);
         let _ = writeln!(canonical, "precision={}", self.precision);
+        let _ = writeln!(canonical, "profile={}", self.output_profile);
         for identity in &self.eligible_ids {
             let _ = writeln!(canonical, "evidence={identity}");
         }
@@ -380,31 +524,16 @@ impl CanonicalBinding {
 
     fn identity_record(&self, digest_hex: &str, run_id: &str) -> String {
         format!(
-            "{run_id}\n{digest_hex}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+            "{run_id}\n{digest_hex}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+            self.tenant_workspace_id,
             self.snapshot_id,
             self.knowledge_cutoff,
             self.model,
             self.seed,
             self.backend,
             self.precision,
+            self.output_profile,
             self.eligible_count()
-        )
-    }
-}
-
-impl ValidationRunReceipt {
-    fn identity_record(&self) -> String {
-        format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
-            self.run_id,
-            self.binding_sha256,
-            self.snapshot_id,
-            self.knowledge_cutoff,
-            self.model,
-            self.seed,
-            self.backend,
-            self.precision,
-            self.eligible_evidence_count
         )
     }
 }
@@ -431,13 +560,14 @@ pub fn submit_validation_run(
     Ok(ValidationRunReceipt {
         run_id,
         binding_sha256,
+        tenant_workspace_id: binding.tenant_workspace_id,
         snapshot_id: binding.snapshot_id,
         knowledge_cutoff: binding.knowledge_cutoff,
         model: binding.model,
         seed: binding.seed,
         backend: binding.backend,
         precision: binding.precision,
-        output_profile: SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE.to_owned(),
+        output_profile: binding.output_profile,
         eligible_evidence_count,
     })
 }
@@ -447,8 +577,9 @@ pub fn submit_validation_run(
 /// # Errors
 ///
 /// Returns a fail-closed engine error when recovery was LLM-authored, the
-/// receipt does not match the rebound scientific identity, metric inputs are
-/// invalid, or report validation fails.
+/// observation is stamped to a different run identity, the receipt does not
+/// match the rebound scientific identity, metric inputs are invalid, or
+/// report validation fails.
 pub fn complete_validation_run(
     receipt: &ValidationRunReceipt,
     request: &AnalysisRunRequest,
@@ -457,6 +588,12 @@ pub fn complete_validation_run(
 ) -> Result<ScientificAcceptanceEvidence, AnalysisEngineError> {
     if observation.authored_by_llm {
         return Err(AnalysisEngineError::LlmAuthoredRecovery);
+    }
+    if observation.run_id != receipt.run_id
+        || observation.binding_sha256 != receipt.binding_sha256
+        || receipt.output_profile != SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE
+    {
+        return Err(AnalysisEngineError::BindingMismatch);
     }
     let binding = bind_validation_run(request, corpus, receipt.seed)?;
     let binding_sha256 = binding.digest_hex();
@@ -476,6 +613,8 @@ pub fn complete_validation_run(
         schema_version: SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION.to_owned(),
         run_id,
         binding_sha256,
+        recovery_sha256: observation.digest_hex(),
+        tenant_workspace_id: binding.tenant_workspace_id,
         snapshot_id: binding.snapshot_id,
         knowledge_cutoff: binding.knowledge_cutoff,
         model: binding.model,
@@ -528,12 +667,14 @@ fn bind_validation_run(
         return Err(AnalysisEngineError::NoEligibleEvidence);
     }
     Ok(CanonicalBinding {
+        tenant_workspace_id: request.tenant_workspace_id.clone(),
         snapshot_id: request.snapshot_id.clone(),
         knowledge_cutoff: cutoff.to_rfc3339(),
         model: VALIDATION_CPU_F64_MODEL.to_owned(),
         seed,
         backend: VALIDATION_BACKEND.to_owned(),
         precision: VALIDATION_PRECISION.to_owned(),
+        output_profile: SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE.to_owned(),
         eligible_ids: eligible.into_iter().collect(),
     })
 }
@@ -574,6 +715,13 @@ fn compute_report(
     Ok(report)
 }
 
+fn append_f64_vector(canonical: &mut String, label: &str, values: &[f64]) {
+    let _ = writeln!(canonical, "{label}_len={}", values.len());
+    for value in values {
+        let _ = writeln!(canonical, "{label}={:016x}", value.to_bits());
+    }
+}
+
 fn format_hex(digest: impl AsRef<[u8]>) -> String {
     let bytes = digest.as_ref();
     let mut output = String::with_capacity(bytes.len() * 2);
@@ -586,7 +734,7 @@ fn format_hex(digest: impl AsRef<[u8]>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        RecoveryObservation, SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE,
+        MAX_RECOVERY_VECTOR_LEN, RecoveryObservation, SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE,
         SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION, VALIDATION_BACKEND, VALIDATION_CPU_F64_MODEL,
         VALIDATION_PRECISION, VALIDATION_RUN_ID_PREFIX, WILSON_Z, complete_validation_run,
         submit_validation_run,
@@ -624,12 +772,18 @@ mod tests {
         AnalysisCorpus::new("snapshot-1", units).expect("corpus")
     }
 
-    fn recovery(truth: Vec<f64>, recovered: Vec<f64>, k: f64) -> RecoveryObservation {
+    fn recovery(
+        receipt: &super::ValidationRunReceipt,
+        truth: Vec<f64>,
+        recovered: Vec<f64>,
+        k: f64,
+    ) -> RecoveryObservation {
         let times = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
         let times = times[..truth.len()].to_vec();
         let lower: Vec<f64> = truth.iter().map(|value| value - 0.5).collect();
         let upper: Vec<f64> = truth.iter().map(|value| value + 0.5).collect();
         RecoveryObservation::new(
+            receipt,
             "foundation-recovery",
             truth,
             recovered,
@@ -644,11 +798,13 @@ mod tests {
     }
 
     fn two_point(
+        receipt: &super::ValidationRunReceipt,
         label: impl Into<String>,
         k: f64,
         authored_by_llm: bool,
     ) -> Result<RecoveryObservation, AnalysisEngineError> {
         RecoveryObservation::new(
+            receipt,
             label,
             vec![1.0, 2.0],
             vec![1.0, 2.0],
@@ -682,6 +838,7 @@ mod tests {
             VALIDATION_RUN_ID_PREFIX.len() + 32
         );
         assert_eq!(receipt_a.eligible_evidence_count(), 2);
+        assert_eq!(receipt_a.tenant_workspace_id(), "tenant-workspace-1");
         assert_eq!(receipt_a.snapshot_id(), "snapshot-1");
         assert_eq!(receipt_a.knowledge_cutoff(), "2026-08-01T00:00:00Z");
         assert_eq!(receipt_a.model(), VALIDATION_CPU_F64_MODEL);
@@ -698,6 +855,10 @@ mod tests {
         assert!(!json.contains("coverage"));
         let other_seed = submit_validation_run(&request(), &first, 8).expect("seed");
         assert_ne!(receipt_a.run_id(), other_seed.run_id());
+        let mut other_tenant = request();
+        other_tenant.tenant_workspace_id = "tenant-workspace-2".into();
+        let other_tenant_receipt = submit_validation_run(&other_tenant, &first, 7).expect("tenant");
+        assert_ne!(receipt_a.run_id(), other_tenant_receipt.run_id());
     }
 
     #[test]
@@ -708,10 +869,13 @@ mod tests {
         ]);
         let receipt = submit_validation_run(&request(), &offered, 11).expect("submit");
         let observation = recovery(
+            &receipt,
             vec![0.70, 0.55, 0.40, -0.20, 0.85],
             vec![0.70, 0.55, 0.40, -0.20, 0.85],
             3.0,
         );
+        assert_eq!(observation.run_id(), receipt.run_id());
+        assert_eq!(observation.binding_sha256(), receipt.binding_sha256());
         assert_eq!(observation.study_label(), "foundation-recovery");
         assert_eq!(observation.truth().len(), 5);
         assert_eq!(observation.recovered().len(), 5);
@@ -728,20 +892,31 @@ mod tests {
             SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION
         );
         assert_eq!(evidence.run_id(), receipt.run_id());
+        assert_eq!(evidence.binding_sha256(), receipt.binding_sha256());
+        assert_eq!(evidence.recovery_sha256().len(), 64);
+        assert_eq!(evidence.tenant_workspace_id(), "tenant-workspace-1");
         assert!(evidence.se_gate_accepted());
         assert_eq!(
-            evidence.output_profile,
+            evidence.output_profile(),
             SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE
         );
-        assert_eq!(evidence.eligible_evidence_count, 2);
-        assert!((evidence.se_gate_k - 3.0).abs() < f64::EPSILON);
+        assert_eq!(evidence.eligible_evidence_count(), 2);
+        assert!((evidence.se_gate_k() - 3.0).abs() < f64::EPSILON);
+        assert_eq!(evidence.snapshot_id(), "snapshot-1");
+        assert_eq!(evidence.knowledge_cutoff(), "2026-08-01T00:00:00Z");
+        assert_eq!(evidence.model(), VALIDATION_CPU_F64_MODEL);
+        assert_eq!(evidence.seed(), 11);
+        assert_eq!(evidence.backend(), VALIDATION_BACKEND);
+        assert_eq!(evidence.precision(), VALIDATION_PRECISION);
         assert!((WILSON_Z - 1.96).abs() < f64::EPSILON);
         let json = evidence.to_json().expect("json");
         assert!(json.contains(SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION));
         assert!(json.contains("rmse"));
+        assert!(json.contains("recovery_sha256"));
         assert_eq!(evidence.sha256().expect("digest").len(), 64);
         assert!(evidence.to_human_summary().contains("foundation-recovery"));
         let rejected = recovery(
+            &receipt,
             vec![0.0, 1.0, 2.0, 3.0, 4.0],
             vec![10.0, 11.0, 12.0, 13.0, 14.0],
             1.0,
@@ -749,6 +924,7 @@ mod tests {
         let refused =
             complete_validation_run(&receipt, &request(), &offered, &rejected).expect("refused");
         assert!(!refused.se_gate_accepted());
+        assert_ne!(refused.recovery_sha256(), evidence.recovery_sha256());
     }
 
     #[test]
@@ -815,6 +991,7 @@ mod tests {
         ]);
         let receipt = submit_validation_run(&request(), &offered, 3).expect("submit");
         let llm = RecoveryObservation::new(
+            &receipt,
             "llm-study",
             vec![1.0, 2.0, 3.0],
             vec![1.0, 2.0, 3.0],
@@ -833,9 +1010,44 @@ mod tests {
         );
         let mut tampered = receipt.clone();
         tampered.run_id = "tepp-validation-deadbeefdeadbeefdeadbeefdeadbeef".into();
-        let observation = recovery(vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0], 3.0);
+        let observation = recovery(&receipt, vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0], 3.0);
         assert_eq!(
             complete_validation_run(&tampered, &request(), &offered, &observation),
+            Err(AnalysisEngineError::BindingMismatch)
+        );
+        let mut profile_tampered = receipt.clone();
+        profile_tampered.output_profile = "tampered-profile".into();
+        assert_eq!(
+            complete_validation_run(&profile_tampered, &request(), &offered, &observation),
+            Err(AnalysisEngineError::BindingMismatch)
+        );
+    }
+
+    #[test]
+    fn complete_refuses_recovery_stamped_to_a_different_run() {
+        let first = corpus(vec![unit("evidence-a", "2026-07-10T00:00:00Z")]);
+        let second = corpus(vec![
+            unit("evidence-a", "2026-07-10T00:00:00Z"),
+            unit("evidence-b", "2026-07-15T00:00:00Z"),
+        ]);
+        let receipt_a = submit_validation_run(&request(), &first, 3).expect("a");
+        let receipt_b = submit_validation_run(&request(), &second, 3).expect("b");
+        assert_ne!(receipt_a.run_id(), receipt_b.run_id());
+        let foreign = recovery(&receipt_a, vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0], 3.0);
+        assert_eq!(
+            complete_validation_run(&receipt_b, &request(), &second, &foreign),
+            Err(AnalysisEngineError::BindingMismatch)
+        );
+        let other_seed = submit_validation_run(&request(), &first, 9).expect("seed");
+        assert_eq!(
+            complete_validation_run(&other_seed, &request(), &first, &foreign),
+            Err(AnalysisEngineError::BindingMismatch)
+        );
+        let mut other_tenant = request();
+        other_tenant.tenant_workspace_id = "tenant-workspace-other".into();
+        let other_tenant_receipt = submit_validation_run(&other_tenant, &first, 3).expect("tenant");
+        assert_eq!(
+            complete_validation_run(&other_tenant_receipt, &other_tenant, &first, &foreign),
             Err(AnalysisEngineError::BindingMismatch)
         );
     }
@@ -848,6 +1060,7 @@ mod tests {
         ]);
         let receipt = submit_validation_run(&request(), &offered, 3).expect("submit");
         let nan = RecoveryObservation::new(
+            &receipt,
             "nan-study",
             vec![1.0, 2.0, 3.0],
             vec![f64::NAN, 2.0, 3.0],
@@ -866,24 +1079,45 @@ mod tests {
             ))
         );
         assert_eq!(
-            two_point("", 3.0, false),
+            two_point(&receipt, "", 3.0, false),
             Err(AnalysisEngineError::InvalidEvidence)
         );
         assert_eq!(
-            two_point("x".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES + 1), 3.0, false),
+            two_point(
+                &receipt,
+                "x".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES + 1),
+                3.0,
+                false
+            ),
             Err(AnalysisEngineError::InvalidEvidence)
         );
         assert_eq!(
-            two_point("nan-k", f64::NAN, false),
+            two_point(&receipt, "nan-k", f64::NAN, false),
             Err(AnalysisEngineError::Validation(
                 ValidationError::InvalidInput
             ))
         );
         assert_eq!(
-            two_point("neg-k", -1.0, false),
+            two_point(&receipt, "neg-k", -1.0, false),
             Err(AnalysisEngineError::Validation(
                 ValidationError::InvalidConfiguration
             ))
+        );
+        let oversized = vec![0.0; MAX_RECOVERY_VECTOR_LEN + 1];
+        assert_eq!(
+            RecoveryObservation::new(
+                &receipt,
+                "oversized",
+                oversized.clone(),
+                oversized.clone(),
+                oversized.clone(),
+                oversized.clone(),
+                oversized.clone(),
+                oversized,
+                3.0,
+                false,
+            ),
+            Err(AnalysisEngineError::LimitExceeded)
         );
         let converted: AnalysisEngineError = ValidationError::InvalidInput.into();
         assert_eq!(converted.to_string(), "invalid validation input");

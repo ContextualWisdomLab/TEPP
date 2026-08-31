@@ -25,17 +25,22 @@ Postgres persistence, restart/recovery, and Compose E2E remain GAP-003B.
 Add a bounded `analysis_engine` validation-run executor:
 
 - `submit_validation_run` binds sorted cutoff-eligible evidence identities,
-  snapshot, knowledge cutoff, model `validation_cpu_f64_v1`, seed, backend
-  `cpu`, and precision `f64` into a canonical SHA-256 digest. The durable
+  tenant workspace, snapshot, knowledge cutoff, model `validation_cpu_f64_v1`,
+  seed, backend `cpu`, precision `f64`, and output profile
+  `scientific_acceptance_v1` into a canonical SHA-256 digest. The durable
   `run_id` is `tepp-validation-{32 hex}`. The receipt carries no RMSE, bias,
   coverage, or gate fields.
-- `complete_validation_run` rebinds the same scientific identity, refuses
+- `complete_validation_run` rebinds the same scientific identity, requires
+  recovery vectors stamped to that `run_id` and binding digest, refuses
   LLM-authored recovery, computes `validation_core` recovery metrics, applies
   the SE-aware gate `|RMSE − 0| ≤ k · SE(RMSE)`, and emits
   `tepp.scientific_acceptance.v1` under output profile
-  `scientific_acceptance_v1`.
+  `scientific_acceptance_v1`. The artifact records a SHA-256 of the stamped
+  recovery vectors. Evidence fields are private after completion.
 - Empty corpora, duplicate evidence identities, snapshot mismatch, invalid
-  profiles, non-finite inputs, and cutoff-empty eligibility fail closed.
+  profiles, non-finite inputs, oversized recovery vectors, a different run /
+  tenant / seed / eligible evidence set, a tampered output profile, and
+  cutoff-empty eligibility fail closed.
 - A computed recovery that fails the SE-aware gate still emits evidence with
   `se_gate_accepted = false` so operators can read the metrics. Invalid or
   LLM-authored recovery never emits evidence.
@@ -67,9 +72,10 @@ become scientific authority.
 ## Verification
 
 The stacked PR includes unit and integration tests for hash-stable identity,
-cutoff exclusion, metric-free receipts, SE-aware accept and refuse, and
-fail-closed LLM, NaN, empty, duplicate, snapshot, profile, and cutoff-empty
-paths. Run:
+cutoff exclusion, metric-free receipts, SE-aware accept and refuse, recovery
+stamped to a foreign run or tenant, a tampered output profile, oversized
+vectors, and fail-closed LLM, NaN, empty, duplicate, snapshot, profile, and
+cutoff-empty paths. Run:
 
 ```text
 cargo fmt --all -- --check
