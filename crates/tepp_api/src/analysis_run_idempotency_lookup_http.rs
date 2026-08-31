@@ -1,11 +1,14 @@
-//! Provider-owned analysis-run stored-request GET contracts.
+//! Provider-owned analysis-run idempotency-key lookup GET contracts.
 //!
-//! GAP-003A ninth slice: `GET /v1/analysis-runs/{run_id}/request` returns the
-//! metric-free stored create fields operators need before retry — snapshot,
-//! cutoff, model contract, and output profile. Collection GET lists identity
-//! only. GET-by-id (#359) remains a later slice on this stack. Retry HTTP
-//! (#369) clones blindly. This module does not serve lifecycle POST, cancel,
-//! collection GET, retry POST, or loopback CLI. Persistence remains GAP-003B.
+//! GAP-003A eleventh slice: `GET /v1/analysis-runs/by-idempotency/{key}`
+//! returns the metric-free identity of the unique run that used that
+//! idempotency key. Collection GET is cursor-paginated. Stored-request GET
+//! and retry-lineage GET require a `run_id`. Retry HTTP mints a new key.
+//! Operators with a 202 receipt or log key cannot jump to that run without
+//! scanning pages. This module does not serve GET-by-id (#359), lifecycle
+//! POST (#360), cancel HTTP (#361), loopback CLI (#362), collection GET
+//! (#368), retry POST (#369), stored-request GET (#377), retry-lineage GET
+//! (#379), or cancel CLI (#378). Persistence remains GAP-003B.
 
 use crate::naruon_http::{NaruonHttpExchange, compose_https_target};
 use crate::wire::{
@@ -16,13 +19,16 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-/// Maximum length accepted for an opaque run identity in the stored-request path.
-pub const ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN: usize = 128;
+/// Maximum length accepted for an opaque idempotency key in the lookup path.
+pub const ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN: usize = 128;
 
-/// Supported analysis-run stored-request contract version.
-pub const ANALYSIS_RUN_STORED_REQUEST_CONTRACT_VERSION: u16 = 1;
+/// Supported analysis-run idempotency-lookup contract version.
+pub const ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_CONTRACT_VERSION: u16 = 1;
 
-const FORBIDDEN_STORED_REQUEST_KEYS: [&str; 14] = [
+/// Reserved collection-relative prefix that names the lookup resource.
+pub const ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_PREFIX: &str = "by-idempotency";
+
+const FORBIDDEN_IDEMPOTENCY_LOOKUP_KEYS: [&str; 14] = [
     "rmse",
     "rmse_standard_error",
     "mean_bias",
@@ -39,63 +45,47 @@ const FORBIDDEN_STORED_REQUEST_KEYS: [&str; 14] = [
     "tenant_workspace_id",
 ];
 
-/// Metric-free stored create fields for one analysis run.
+/// Metric-free identity of one analysis run found by idempotency key.
 ///
-/// Operators inspect snapshot, cutoff, model contract, and output profile
-/// before retry. The payload never carries a terminal result or
-/// scientific-acceptance artifact.
+/// Operators jump from a 202 receipt or log key to the durable `run_id`
+/// without scanning a cursor-paginated collection. The payload never carries
+/// a terminal result, snapshot, or scientific-acceptance artifact.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct AnalysisRunStoredRequest {
+pub struct AnalysisRunIdempotencyLookup {
     /// Semantic contract version for this payload family.
     pub contract_version: u16,
     /// Opaque server-assigned run identity.
     pub run_id: String,
     /// Current lifecycle state.
     pub run_state: AnalysisRunStatusState,
-    /// Exact request idempotency key of this run.
+    /// Exact request idempotency key that selected this run.
     pub idempotency_key: String,
-    /// Immutable corpus/evidence snapshot identity.
-    pub snapshot_id: String,
-    /// Knowledge cutoff instant as an ISO-8601 / RFC 3339 string.
-    pub knowledge_cutoff: String,
-    /// Versioned model/backend contract identity.
-    pub model_contract_version: String,
-    /// Requested output profile name.
-    pub output_profile: String,
 }
 
-impl AnalysisRunStoredRequest {
-    /// Construct a validated metric-free stored-request payload.
+impl AnalysisRunIdempotencyLookup {
+    /// Construct a validated metric-free idempotency-lookup payload.
     ///
     /// # Errors
     ///
-    /// Returns a fail-closed error for empty identities, an oversized run
+    /// Returns a fail-closed error for empty identities, an oversized
     /// identity, or an unsupported contract version.
     pub fn new(
         run_id: impl Into<String>,
         run_state: AnalysisRunStatusState,
         idempotency_key: impl Into<String>,
-        snapshot_id: impl Into<String>,
-        knowledge_cutoff: impl Into<String>,
-        model_contract_version: impl Into<String>,
-        output_profile: impl Into<String>,
     ) -> Result<Self, ApiError> {
-        let stored = Self {
-            contract_version: ANALYSIS_RUN_STORED_REQUEST_CONTRACT_VERSION,
+        let lookup = Self {
+            contract_version: ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_CONTRACT_VERSION,
             run_id: run_id.into(),
             run_state,
             idempotency_key: idempotency_key.into(),
-            snapshot_id: snapshot_id.into(),
-            knowledge_cutoff: knowledge_cutoff.into(),
-            model_contract_version: model_contract_version.into(),
-            output_profile: output_profile.into(),
         };
-        stored.validate()?;
-        Ok(stored)
+        lookup.validate()?;
+        Ok(lookup)
     }
 
-    /// Parse and validate a stored-request payload with the default byte limit.
+    /// Parse and validate an idempotency-lookup payload with the default byte limit.
     ///
     /// # Errors
     ///
@@ -104,20 +94,20 @@ impl AnalysisRunStoredRequest {
         Self::from_json_with_limit(payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
     }
 
-    /// Parse and validate a stored-request payload with a caller-supplied limit.
+    /// Parse and validate an idempotency-lookup payload with a caller-supplied limit.
     ///
     /// # Errors
     ///
     /// Returns wire, version, limit, metric-key, or field-validation errors.
     pub fn from_json_with_limit(payload: &str, maximum_bytes: usize) -> Result<Self, ApiError> {
         require_byte_limit(payload, maximum_bytes)?;
-        refuse_metrics_on_stored_request_payload(payload)?;
-        let stored: Self = from_json(payload)?;
-        stored.validate()?;
-        Ok(stored)
+        refuse_metrics_on_idempotency_lookup_payload(payload)?;
+        let lookup: Self = from_json(payload)?;
+        lookup.validate()?;
+        Ok(lookup)
     }
 
-    /// Serialize this stored-request payload after complete validation.
+    /// Serialize this idempotency-lookup payload after complete validation.
     ///
     /// # Errors
     ///
@@ -126,29 +116,27 @@ impl AnalysisRunStoredRequest {
         self.validate()?;
         let payload = to_json(self)?;
         require_byte_limit(&payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)?;
-        refuse_metrics_on_stored_request_payload(&payload)?;
+        refuse_metrics_on_idempotency_lookup_payload(&payload)?;
         Ok(payload)
     }
 
     fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(
             self.contract_version,
-            ANALYSIS_RUN_STORED_REQUEST_CONTRACT_VERSION,
+            ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_CONTRACT_VERSION,
         )?;
         require_nonempty(&self.run_id)?;
         require_nonempty(&self.idempotency_key)?;
-        require_nonempty(&self.snapshot_id)?;
-        require_nonempty(&self.knowledge_cutoff)?;
-        require_nonempty(&self.model_contract_version)?;
-        require_nonempty(&self.output_profile)?;
-        if self.run_id.len() > ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN {
+        if self.run_id.len() > ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN
+            || self.idempotency_key.len() > ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN
+        {
             return Err(ApiError::LimitExceeded);
         }
         Ok(())
     }
 }
 
-/// Refuse stored-request JSON that already carries scientific-metric keys.
+/// Refuse idempotency-lookup JSON that already carries scientific-metric keys.
 ///
 /// Empty payloads are admitted for the GET request body. Non-object JSON
 /// fails closed as invalid wire.
@@ -157,7 +145,7 @@ impl AnalysisRunStoredRequest {
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when a forbidden metric key is
 /// present or the payload is a non-empty non-object.
-pub fn refuse_metrics_on_stored_request_payload(payload: &str) -> Result<(), ApiError> {
+pub fn refuse_metrics_on_idempotency_lookup_payload(payload: &str) -> Result<(), ApiError> {
     if payload.trim().is_empty() {
         return Ok(());
     }
@@ -166,7 +154,7 @@ pub fn refuse_metrics_on_stored_request_payload(payload: &str) -> Result<(), Api
     let Some(object) = value.as_object() else {
         return Err(ApiError::InvalidWirePayload);
     };
-    if FORBIDDEN_STORED_REQUEST_KEYS
+    if FORBIDDEN_IDEMPOTENCY_LOOKUP_KEYS
         .iter()
         .any(|key| object.contains_key(*key))
     {
@@ -175,15 +163,17 @@ pub fn refuse_metrics_on_stored_request_payload(payload: &str) -> Result<(), Api
     Ok(())
 }
 
-/// Extract the opaque run identity from `GET /v1/analysis-runs/{run_id}/request`.
+/// Extract the opaque idempotency key from
+/// `GET /v1/analysis-runs/by-idempotency/{key}`.
 ///
 /// # Errors
 ///
-/// Returns [`ApiError::InvalidWirePayload`] for a collection path, extra
-/// segments, a missing `/request` suffix, cancel/retry/running/terminal
-/// suffixes, or a hostile encoding, and [`ApiError::LimitExceeded`] when the
-/// decoded identity exceeds [`ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN`].
-pub(crate) fn analysis_run_stored_request_path_run_id(path: &str) -> Result<String, ApiError> {
+/// Returns [`ApiError::InvalidWirePayload`] for a collection path, GET-by-id,
+/// extra segments, a missing `by-idempotency` prefix, cancel/retry/request/
+/// retries/running/terminal suffixes, or a hostile encoding, and
+/// [`ApiError::LimitExceeded`] when the decoded key exceeds
+/// [`ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`].
+pub(crate) fn analysis_run_idempotency_lookup_path_key(path: &str) -> Result<String, ApiError> {
     let remainder = path
         .strip_prefix(ANALYSIS_RUN_STATUS_PATH)
         .ok_or(ApiError::InvalidWirePayload)?;
@@ -191,38 +181,47 @@ pub(crate) fn analysis_run_stored_request_path_run_id(path: &str) -> Result<Stri
         .strip_prefix('/')
         .ok_or(ApiError::InvalidWirePayload)?;
     let encoded = encoded
-        .strip_suffix("/request")
+        .strip_prefix(ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_PREFIX)
+        .ok_or(ApiError::InvalidWirePayload)?;
+    let encoded = encoded
+        .strip_prefix('/')
         .ok_or(ApiError::InvalidWirePayload)?;
     if encoded.is_empty() || encoded.contains('/') {
         return Err(ApiError::InvalidWirePayload);
     }
-    let run_id = decode_path_segment(encoded)?;
-    if run_id.len() > ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN {
+    let key = decode_path_segment(encoded)?;
+    if key == ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_PREFIX {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    if key.len() > ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN {
         return Err(ApiError::LimitExceeded);
     }
-    Ok(run_id)
+    Ok(key)
 }
 
-/// Build a provider-owned `GET` analysis-run stored-request exchange.
+/// Build a provider-owned `GET` analysis-run idempotency-lookup exchange.
 ///
-/// The builder refuses non-`https` origins and empty or oversized run
-/// identifiers. It does not inject credentials. The GET body is empty.
+/// The builder refuses non-`https` origins and empty or oversized keys. It
+/// does not inject credentials. The GET body is empty. The key travels in
+/// the path; the builder does not send an `idempotency-key` header.
 ///
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin or empty
-/// identity, and [`ApiError::LimitExceeded`] when the run identity exceeds
-/// [`ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN`] bytes.
-pub fn naruon_analysis_run_stored_request_exchange(
+/// key, and [`ApiError::LimitExceeded`] when the key exceeds
+/// [`ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`] bytes.
+pub fn naruon_analysis_run_idempotency_lookup_exchange(
     origin: &str,
-    run_id: &str,
+    idempotency_key: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
-    require_nonempty(run_id)?;
-    if run_id.len() > ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN {
+    require_nonempty(idempotency_key)?;
+    if idempotency_key.len() > ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN {
         return Err(ApiError::LimitExceeded);
     }
-    let encoded_run_id = encode_path_segment(run_id);
-    let target_path = format!("{ANALYSIS_RUN_STATUS_PATH}/{encoded_run_id}/request");
+    let encoded_key = encode_path_segment(idempotency_key);
+    let target_path = format!(
+        "{ANALYSIS_RUN_STATUS_PATH}/{ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_PREFIX}/{encoded_key}"
+    );
     let target_url = compose_https_target(origin, &target_path)?;
     Ok(NaruonHttpExchange {
         method: "GET",
@@ -296,198 +295,190 @@ fn from_hex(byte: u8) -> Result<u8, ApiError> {
 mod tests {
     use super::*;
 
-    fn sample_stored() -> AnalysisRunStoredRequest {
-        AnalysisRunStoredRequest::new(
-            "tepp-run-1",
-            AnalysisRunStatusState::Failed,
-            "idem-1",
-            "snapshot-1",
-            "2026-08-01T00:00:00Z",
-            "tepp-analysis-run-v1",
-            "calibrated_event_measurement",
-        )
-        .expect("stored")
+    fn sample_lookup() -> AnalysisRunIdempotencyLookup {
+        AnalysisRunIdempotencyLookup::new("tepp-run-1", AnalysisRunStatusState::Failed, "idem-1")
+            .expect("lookup")
     }
 
     #[test]
-    fn stored_request_round_trips_and_refuses_hostile_shapes() {
-        let stored = sample_stored();
-        let json = stored.to_json().expect("json");
+    fn idempotency_lookup_round_trips_and_refuses_hostile_shapes() {
+        let lookup = sample_lookup();
+        let json = lookup.to_json().expect("json");
         assert_eq!(
-            AnalysisRunStoredRequest::from_json(&json).expect("decode"),
-            stored
+            AnalysisRunIdempotencyLookup::from_json(&json).expect("decode"),
+            lookup
         );
         assert!(!json.contains("rmse"));
         assert!(!json.contains("scientific_acceptance"));
         assert!(!json.contains("terminal_result"));
         assert!(!json.contains("tenant_workspace_id"));
+        assert!(!json.contains("snapshot_id"));
+        assert!(!json.contains("retried_from"));
 
         assert_eq!(
-            AnalysisRunStoredRequest::new(
-                "",
-                AnalysisRunStatusState::Failed,
-                "idem-1",
-                "snapshot-1",
-                "2026-08-01T00:00:00Z",
-                "tepp-analysis-run-v1",
-                "calibrated_event_measurement",
-            ),
+            AnalysisRunIdempotencyLookup::new("", AnalysisRunStatusState::Failed, "idem-1",),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::new(
+            AnalysisRunIdempotencyLookup::new("tepp-run-1", AnalysisRunStatusState::Failed, "",),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            AnalysisRunIdempotencyLookup::new(
+                "a".repeat(ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN + 1),
+                AnalysisRunStatusState::Failed,
+                "idem-1",
+            ),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(
+            AnalysisRunIdempotencyLookup::new(
                 "tepp-run-1",
                 AnalysisRunStatusState::Failed,
-                "",
-                "snapshot-1",
-                "2026-08-01T00:00:00Z",
-                "tepp-analysis-run-v1",
-                "calibrated_event_measurement",
-            ),
-            Err(ApiError::InvalidWirePayload)
-        );
-        assert_eq!(
-            AnalysisRunStoredRequest::new(
-                "a".repeat(ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN + 1),
-                AnalysisRunStatusState::Failed,
-                "idem-1",
-                "snapshot-1",
-                "2026-08-01T00:00:00Z",
-                "tepp-analysis-run-v1",
-                "calibrated_event_measurement",
+                "a".repeat(ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN + 1),
             ),
             Err(ApiError::LimitExceeded)
         );
 
-        let mut unsupported = stored.clone();
+        let mut unsupported = lookup.clone();
         unsupported.contract_version = 9;
         assert_eq!(
             unsupported.to_json(),
             Err(ApiError::UnsupportedContractVersion)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::from_json(
-                r#"{"contract_version":9,"run_id":"tepp-run-1","run_state":"failed","idempotency_key":"idem-1","snapshot_id":"snapshot-1","knowledge_cutoff":"2026-08-01T00:00:00Z","model_contract_version":"tepp-analysis-run-v1","output_profile":"calibrated_event_measurement"}"#
+            AnalysisRunIdempotencyLookup::from_json(
+                r#"{"contract_version":9,"run_id":"tepp-run-1","run_state":"failed","idempotency_key":"idem-1"}"#
             ),
             Err(ApiError::UnsupportedContractVersion)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::from_json(
-                r#"{"contract_version":1,"run_id":"tepp-run-1","run_state":"failed","idempotency_key":"idem-1","snapshot_id":"snapshot-1","knowledge_cutoff":"2026-08-01T00:00:00Z","model_contract_version":"tepp-analysis-run-v1","output_profile":"calibrated_event_measurement","extra":true}"#
+            AnalysisRunIdempotencyLookup::from_json(
+                r#"{"contract_version":1,"run_id":"tepp-run-1","run_state":"failed","idempotency_key":"idem-1","extra":true}"#
             ),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::from_json_with_limit(&json, 8),
+            AnalysisRunIdempotencyLookup::from_json_with_limit(&json, 8),
             Err(ApiError::LimitExceeded)
         );
         assert_eq!(
-            AnalysisRunStoredRequest::from_json("[1,2,3]"),
+            AnalysisRunIdempotencyLookup::from_json("[1,2,3]"),
             Err(ApiError::InvalidWirePayload)
         );
     }
 
     #[test]
-    fn stored_request_payloads_refuse_scientific_metric_keys() {
-        assert_eq!(refuse_metrics_on_stored_request_payload(""), Ok(()));
-        assert_eq!(refuse_metrics_on_stored_request_payload("   "), Ok(()));
+    fn idempotency_lookup_payloads_refuse_scientific_metric_keys() {
+        assert_eq!(refuse_metrics_on_idempotency_lookup_payload(""), Ok(()));
+        assert_eq!(refuse_metrics_on_idempotency_lookup_payload("   "), Ok(()));
         assert_eq!(
-            refuse_metrics_on_stored_request_payload(r#"{"run_id":"r"}"#),
+            refuse_metrics_on_idempotency_lookup_payload(r#"{"run_id":"r"}"#),
             Ok(())
         );
-        for key in FORBIDDEN_STORED_REQUEST_KEYS {
+        for key in FORBIDDEN_IDEMPOTENCY_LOOKUP_KEYS {
             let payload = format!(r#"{{"{key}":1,"run_id":"r"}}"#);
             assert_eq!(
-                refuse_metrics_on_stored_request_payload(&payload),
+                refuse_metrics_on_idempotency_lookup_payload(&payload),
                 Err(ApiError::InvalidWirePayload),
                 "key={key}"
             );
         }
         assert_eq!(
-            refuse_metrics_on_stored_request_payload("[true]"),
+            refuse_metrics_on_idempotency_lookup_payload("[true]"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            refuse_metrics_on_stored_request_payload("null"),
+            refuse_metrics_on_idempotency_lookup_payload("null"),
             Err(ApiError::InvalidWirePayload)
         );
     }
 
     #[test]
-    fn stored_request_path_decodes_identities_and_refuses_hostile_segments() {
+    fn idempotency_lookup_path_decodes_keys_and_refuses_hostile_segments() {
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/request")
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/by-idempotency/idem-1")
                 .expect("plain"),
-            "tepp-run-1"
+            "idem-1"
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/run%2dabc/request")
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/by-idempotency/key%2dabc")
                 .expect("lower"),
-            "run-abc"
+            "key-abc"
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/run%2Dabc/request")
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/by-idempotency/key%2Dabc")
                 .expect("upper"),
-            "run-abc"
+            "key-abc"
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/cancel"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/by-idempotency"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/retry"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/by-idempotency/"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/retries"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1/cancel"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/by-idempotency/idem-1"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1/retry"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/running"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1/retries"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/tepp-run-1/terminal"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1/request"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/other/tepp-run-1/request"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1/running"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs//request"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/tepp-run-1/terminal"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/a/b/request"),
+            analysis_run_idempotency_lookup_path_key("/v1/other/by-idempotency/idem-1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/%2F/request"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/by-idempotency/a/b"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id("/v1/analysis-runs/%00/request"),
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/by-idempotency/%2F"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            analysis_run_idempotency_lookup_path_key("/v1/analysis-runs/by-idempotency/%00"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            analysis_run_idempotency_lookup_path_key(
+                "/v1/analysis-runs/by-idempotency/by-idempotency"
+            ),
             Err(ApiError::InvalidWirePayload)
         );
         let oversized = format!(
-            "/v1/analysis-runs/{}/request",
-            "a".repeat(ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN + 1)
+            "/v1/analysis-runs/by-idempotency/{}",
+            "a".repeat(ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN + 1)
         );
         assert_eq!(
-            analysis_run_stored_request_path_run_id(&oversized),
+            analysis_run_idempotency_lookup_path_key(&oversized),
             Err(ApiError::LimitExceeded)
         );
         assert_eq!(decode_path_segment(""), Err(ApiError::InvalidWirePayload));
@@ -497,14 +488,14 @@ mod tests {
     }
 
     #[test]
-    fn stored_request_exchange_gets_https_path_without_credentials() {
+    fn idempotency_lookup_exchange_gets_https_path_without_credentials() {
         let exchange =
-            naruon_analysis_run_stored_request_exchange("https://tepp.example.com", "tepp-run-1")
+            naruon_analysis_run_idempotency_lookup_exchange("https://tepp.example.com", "idem-1")
                 .expect("exchange");
         assert_eq!(exchange.method, "GET");
         assert_eq!(
             exchange.target_url,
-            "https://tepp.example.com/v1/analysis-runs/tepp-run-1/request"
+            "https://tepp.example.com/v1/analysis-runs/by-idempotency/idem-1"
         );
         assert!(exchange.body.is_empty());
         assert!(
@@ -522,25 +513,29 @@ mod tests {
                     || name.contains("idempotency"))
         );
 
-        let encoded = naruon_analysis_run_stored_request_exchange(
+        let encoded = naruon_analysis_run_idempotency_lookup_exchange(
             "https://tepp.example.com",
-            "run/../../etc",
+            "key/../../etc",
         )
         .expect("encoded");
-        assert!(encoded.target_url.contains("run%2F..%2F..%2Fetc/request"));
+        assert!(
+            encoded
+                .target_url
+                .contains("by-idempotency/key%2F..%2F..%2Fetc")
+        );
 
         assert_eq!(
-            naruon_analysis_run_stored_request_exchange("http://tepp.example.com", "tepp-run-1"),
+            naruon_analysis_run_idempotency_lookup_exchange("http://tepp.example.com", "idem-1"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            naruon_analysis_run_stored_request_exchange("https://tepp.example.com", ""),
+            naruon_analysis_run_idempotency_lookup_exchange("https://tepp.example.com", ""),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            naruon_analysis_run_stored_request_exchange(
+            naruon_analysis_run_idempotency_lookup_exchange(
                 "https://tepp.example.com",
-                &"a".repeat(ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN + 1)
+                &"a".repeat(ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN + 1)
             ),
             Err(ApiError::LimitExceeded)
         );
