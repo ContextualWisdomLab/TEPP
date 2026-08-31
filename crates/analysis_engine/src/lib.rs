@@ -8,9 +8,12 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Exhaustive case-deletion
+//! is invoked through [`fit_exhaustive_case_deletion`] and is not a
+//! reweighting approximation or a Bayesian sampler.
 
 mod case_deletion_refit;
+mod case_deletion_refit_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -41,6 +44,13 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Exhaustive case-deletion artifact and execution contracts from this engine.
+pub use case_deletion_refit_artifact::{
+    CASE_DELETION_REFIT_ARTIFACT_BYTE_LIMIT, CASE_DELETION_REFIT_ARTIFACT_SCHEMA_VERSION,
+    CASE_DELETION_REFIT_MODEL_CONTRACT_VERSION, CASE_DELETION_REFIT_OUTPUT_PROFILE,
+    CaseDeletionRefitArtifact, CaseDeletionRefitExecution, CaseDeletionRefitInput,
+    execute_case_deletion_refit_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +258,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A case-deletion artifact violated its bounded schema or counts.
+    InvalidCaseDeletionRefitArtifact,
+    /// The scientific fitter refused a full or actual deleted-data corpus.
+    CaseDeletionFitFailure,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +276,8 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidCaseDeletionRefitArtifact => "invalid case-deletion refit artifact",
+            Self::CaseDeletionFitFailure => "case-deletion fitter refused an actual corpus",
         };
         formatter.write_str(message)
     }
@@ -680,6 +696,14 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidCaseDeletionRefitArtifact,
+                "invalid case-deletion refit artifact",
+            ),
+            (
+                AnalysisEngineError::CaseDeletionFitFailure,
+                "case-deletion fitter refused an actual corpus",
             ),
         ];
         for (error, message) in messages {
