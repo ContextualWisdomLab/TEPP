@@ -3,7 +3,8 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
-    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
+    recover_asymptotes_true_trait_variance, recover_asymptotic_continuous_intercept,
+    recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
@@ -55,6 +56,7 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
     refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
+    refuse_asymptotic_time_independent_predictor_variance_as_asymptotes_true_trait_variance,
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
@@ -130,6 +132,7 @@ use psychometric_core::{
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
     refuse_standardised_manifest_variance_as_standardised_manifest_mean,
     refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
+    refuse_standardised_trait_variance_as_asymptotes_true_trait_variance,
     refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -153,6 +156,7 @@ use psychometric_core::{
     refuse_stationary_later_latent_variance_as_lagged_covariance,
     refuse_stationary_later_latent_variance_as_observed_variance,
     refuse_stationary_later_latent_variance_as_process_noise,
+    refuse_stationary_variance_as_asymptotes_true_trait_variance,
     refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
@@ -179,6 +183,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
+    refuse_unstandardised_trait_variance_as_asymptotes_true_trait_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
 };
@@ -3779,6 +3784,95 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
+        )
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn asymptotes_true_trait_variance_is_not_unstandardised_or_traitstd() {
+    let trait_variance = 1.0_f64;
+    let log_rate = -0.5_f64;
+    let recovered =
+        recover_asymptotes_true_trait_variance(trait_variance, log_rate, LagClock::EventTime)
+            .expect("asymptotes=TRUE TRAITVAR");
+    assert!(
+        (recovered - 0.25).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era summary.ctsemFit.R): asymptotes=TRUE TRAITVAR is a² · trait = 0.25"
+    );
+    let from_stored =
+        recover_asymptotes_true_trait_variance(4.0, log_rate, LagClock::EventTime).expect("stored");
+    assert!(
+        (from_stored - 1.0).abs() < 1e-15,
+        "Driver et al. (2017): stored trait/a² = 4 recovers original TRAITVAR"
+    );
+    let standardised = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)
+        .expect("TRAITVARstd");
+    assert!(
+        (standardised - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): TRAITVARstd is not the asymptotes=TRUE rewrite"
+    );
+    let stationary =
+        recover_stationary_latent_variance(0.4, log_rate, LagClock::EventTime).expect("p");
+    assert!(
+        (stationary - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): asymDIFFUSION is not the asymptotes=TRUE rewrite"
+    );
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        0.5,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    assert!(
+        (added - recovered).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): addedTIPREDVAR is not the asymptotes=TRUE rewrite"
+    );
+    assert_eq!(
+        recover_asymptotes_true_trait_variance(0.0, 0.5, LagClock::EventTime)
+            .expect("zero")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        recover_asymptotes_true_trait_variance(1.0, 0.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::AsymptotesTrueTraitVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotes_true_trait_variance(1.0, -0.5, LagClock::SystemTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        refuse_unstandardised_trait_variance_as_asymptotes_true_trait_variance(
+            trait_variance,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_standardised_trait_variance_as_asymptotes_true_trait_variance(
+            standardised,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_stationary_variance_as_asymptotes_true_trait_variance(stationary, recovered),
+        Err(
+            psychometric_core::PsychometricError::StationaryVarianceIsNotAsymptotesTrueTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_predictor_variance_as_asymptotes_true_trait_variance(
+            added, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotAsymptotesTrueTraitVariance
         )
     );
 }
