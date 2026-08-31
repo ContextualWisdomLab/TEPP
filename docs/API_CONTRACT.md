@@ -8,7 +8,7 @@
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary, `POST /v1/analysis-runs/{run_id}/cancel` for metric-free cancellation of accepted or running runs, `GET /v1/analysis-runs` for metric-free enumeration of accepted, running, cancelled, and terminal runs, and `POST /v1/analysis-runs/{run_id}/retry` for cloning a failed or cancelled run into a new metric-free `202 Accepted`, and `GET /v1/analysis-runs/{run_id}/request` for metric-free inspect of stored create fields. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
+Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary, `POST /v1/analysis-runs/{run_id}/cancel` for metric-free cancellation of accepted or running runs, `GET /v1/analysis-runs` for metric-free enumeration of accepted, running, cancelled, and terminal runs, and `POST /v1/analysis-runs/{run_id}/retry` for cloning a failed or cancelled run into a new metric-free `202 Accepted`, and `GET /v1/analysis-runs/{run_id}/request` for metric-free inspect of stored create fields, and `GET /v1/analysis-runs/{run_id}/retries` for metric-free inspect of direct retry children. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
 
 ## 2. Contract families
 
@@ -70,6 +70,7 @@ GET    /v1/analysis-runs/{run_id}
 POST   /v1/analysis-runs/{run_id}/cancel
 POST   /v1/analysis-runs/{run_id}/retry
 GET    /v1/analysis-runs/{run_id}/request
+GET    /v1/analysis-runs/{run_id}/retries
 GET    /v1/model-artifacts/{artifact_id}
 GET    /v1/exports/{export_id}
 ```
@@ -92,7 +93,10 @@ new idempotency key; accepted, running, succeeded, and unknown runs fail
 closed. `GET /v1/analysis-runs/{run_id}/request` on the loopback listener
 returns metric-free stored create fields (`snapshot_id`, `knowledge_cutoff`,
 `model_contract_version`, `output_profile`) so operators can inspect a listed
-run before retry. GET-by-id remains a later slice on this protected-main
+run before retry. `GET /v1/analysis-runs/{run_id}/retries` on the loopback
+listener returns metric-free direct retry children of that parent so operators
+can inspect lineage after retry. An empty `retries` array is `200` when the
+parent was never retried. GET-by-id remains a later slice on this protected-main
 lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side

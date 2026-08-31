@@ -17,6 +17,7 @@ mod analysis_run_cancel_http;
 mod analysis_run_collection_http;
 mod analysis_run_live;
 mod analysis_run_retry_http;
+mod analysis_run_retry_lineage_http;
 mod analysis_run_status_http;
 mod analysis_run_stored_request_http;
 mod authorization;
@@ -117,6 +118,20 @@ pub use analysis_run_retry_http::AnalysisRunRetryRequest;
 pub use analysis_run_retry_http::naruon_analysis_run_retry_exchange;
 /// Refuse scientific-metric keys on a retry payload.
 pub use analysis_run_retry_http::refuse_metrics_on_retry_payload;
+/// Analysis-run retry-lineage contract version constant.
+pub use analysis_run_retry_lineage_http::ANALYSIS_RUN_RETRY_LINEAGE_CONTRACT_VERSION;
+/// Maximum opaque run identity length on the retry-lineage path.
+pub use analysis_run_retry_lineage_http::ANALYSIS_RUN_RETRY_LINEAGE_ID_MAX_LEN;
+/// Maximum number of direct retry children on one lineage page.
+pub use analysis_run_retry_lineage_http::ANALYSIS_RUN_RETRY_LINEAGE_MAX_RETRIES;
+/// Versioned metric-free retry lineage of one parent analysis run.
+pub use analysis_run_retry_lineage_http::AnalysisRunRetryLineage;
+/// One metric-free retry-lineage child row.
+pub use analysis_run_retry_lineage_http::AnalysisRunRetryLineageItem;
+/// Build a Naruon analysis-run retry-lineage GET exchange.
+pub use analysis_run_retry_lineage_http::naruon_analysis_run_retry_lineage_exchange;
+/// Refuse scientific-metric keys on a retry-lineage payload.
+pub use analysis_run_retry_lineage_http::refuse_metrics_on_retry_lineage_payload;
 /// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
 /// Analysis-run stored-request contract version constant.

@@ -11,7 +11,9 @@
 //! clones a failed or cancelled run into a new metric-free `202 Accepted`.
 //! `GET /v1/analysis-runs/{run_id}/request` returns metric-free stored create
 //! fields so operators can inspect snapshot, cutoff, model, and profile before
-//! retry. GET-by-id and running/terminal POST transitions remain later slices.
+//! retry. `GET /v1/analysis-runs/{run_id}/retries` returns metric-free direct
+//! retry children of a listed parent. GET-by-id and running/terminal POST
+//! transitions remain later slices.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -27,6 +29,10 @@ use crate::analysis_run_collection_http::{
 };
 use crate::analysis_run_retry_http::{
     AnalysisRunRetryRequest, analysis_run_retry_path_run_id, refuse_metrics_on_retry_payload,
+};
+use crate::analysis_run_retry_lineage_http::{
+    AnalysisRunRetryLineage, AnalysisRunRetryLineageItem, analysis_run_retry_lineage_path_run_id,
+    refuse_metrics_on_retry_lineage_payload,
 };
 use crate::analysis_run_stored_request_http::{
     AnalysisRunStoredRequest, analysis_run_stored_request_path_run_id,
@@ -58,6 +64,7 @@ struct LiveAnalysisRun {
     request: AnalysisRunRequest,
     accepted: AnalysisRunAccepted,
     run_state: AnalysisRunStatusState,
+    retried_from_run_id: Option<String>,
 }
 
 /// Loopback HTTP/1.1 analysis-run service shared by published CWL consumers.
@@ -180,6 +187,12 @@ impl AnalysisRunLiveService {
         let headers = parse_headers(&mut lines)?;
         if method == "GET" {
             if matches!(
+                analysis_run_retry_lineage_path_run_id(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.list_analysis_run_retries(path, &headers, body);
+            }
+            if matches!(
                 analysis_run_stored_request_path_run_id(path),
                 Ok(_) | Err(ApiError::LimitExceeded)
             ) {
@@ -263,6 +276,7 @@ impl AnalysisRunLiveService {
                 request,
                 accepted,
                 run_state: AnalysisRunStatusState::Accepted,
+                retried_from_run_id: None,
             },
         );
         Ok(json_response(202, "Accepted", response_body))
@@ -390,6 +404,7 @@ impl AnalysisRunLiveService {
                 request: cloned_request,
                 accepted,
                 run_state: AnalysisRunStatusState::Accepted,
+                retried_from_run_id: Some(run_id),
             },
         );
         Ok(json_response(202, "Accepted", response_body))
@@ -430,6 +445,58 @@ impl AnalysisRunLiveService {
         )?;
         let response_body = payload.to_json()?;
         refuse_metrics_on_stored_request_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
+    fn list_analysis_run_retries(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let run_id = analysis_run_retry_lineage_path_run_id(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        refuse_metrics_on_retry_lineage_payload(body)?;
+        let replay_key = self
+            .runs_by_id
+            .get(&run_id)
+            .cloned()
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let parent = self
+            .accepted_runs
+            .get(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if parent.consumer != consumer {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let mut children: Vec<&LiveAnalysisRun> = self
+            .accepted_runs
+            .values()
+            .filter(|stored| {
+                stored.consumer == consumer
+                    && stored.retried_from_run_id.as_deref() == Some(run_id.as_str())
+            })
+            .collect();
+        children.sort_by(|left, right| left.accepted.run_id.cmp(&right.accepted.run_id));
+        let mut retries = Vec::with_capacity(children.len());
+        for stored in children {
+            retries.push(AnalysisRunRetryLineageItem::new(
+                stored.accepted.run_id.clone(),
+                stored.run_state,
+                stored.accepted.idempotency_key.clone(),
+            )?);
+        }
+        let lineage = AnalysisRunRetryLineage::new(
+            parent.accepted.run_id.clone(),
+            parent.run_state,
+            parent.accepted.idempotency_key.clone(),
+            retries,
+        )?;
+        let response_body = lineage.to_json()?;
+        refuse_metrics_on_retry_lineage_payload(&response_body)?;
         Ok(json_response(200, "OK", response_body))
     }
 
@@ -494,9 +561,9 @@ impl AnalysisRunLiveService {
 
     /// Test-only seam that records a non-accepted loopback state.
     ///
-    /// Used to prove cancel, collection, retry, and stored-request inspect of
-    /// running, succeeded, failed, and cancelled runs without duplicating the
-    /// live POST running/terminal lifecycle slice.
+    /// Used to prove cancel, collection, retry, stored-request inspect, and
+    /// retry-lineage inspect of running, succeeded, failed, and cancelled runs
+    /// without duplicating the live POST running/terminal lifecycle slice.
     #[cfg(test)]
     fn force_loopback_run_state(
         &mut self,
@@ -1829,6 +1896,192 @@ mod tests {
         let listed = service.handle_http_request(&collection_http(NARUON_CONSUMER_CODE, &[]));
         assert_eq!(listed.status_code, 200);
         assert!(!listed.body.contains("snapshot_id"));
+    }
+
+    fn retry_lineage_http(run_id: &str, consumer: &str, extra: &[(&str, &str)]) -> String {
+        let mut request = format!("GET {NARUON_ANALYSIS_RUN_PATH}/{run_id}/retries HTTP/1.1\r\n");
+        write!(
+            request,
+            "Host: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\n"
+        )
+        .expect("retry-lineage headers");
+        for (name, value) in extra {
+            write!(request, "{name}: {value}\r\n").expect("extra header");
+        }
+        request.push_str("content-length: 0\r\n\r\n");
+        request
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn handler_covers_metric_free_retry_lineage_get() {
+        use crate::{AnalysisRunRetryLineage, AnalysisRunRetryRequest, AnalysisRunStatusState};
+
+        let run = sample_run();
+        let mut service = AnalysisRunLiveService::new();
+        let accepted =
+            service.handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"));
+        assert_eq!(accepted.status_code, 202);
+        let parent_id = serde_json::from_str::<serde_json::Value>(&accepted.body)
+            .expect("accepted json")["run_id"]
+            .as_str()
+            .expect("run_id")
+            .to_owned();
+
+        let empty =
+            service.handle_http_request(&retry_lineage_http(&parent_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(empty.status_code, 200);
+        let empty_lineage = AnalysisRunRetryLineage::from_json(&empty.body).expect("empty");
+        assert_eq!(empty_lineage.run_id, parent_id);
+        assert_eq!(empty_lineage.run_state, AnalysisRunStatusState::Accepted);
+        assert!(empty_lineage.retries.is_empty());
+        assert!(!empty.body.contains("rmse"));
+        assert!(!empty.body.contains("scientific_acceptance"));
+        assert!(!empty.body.contains("snapshot_id"));
+        assert!(!empty.body.contains("tenant_workspace_id"));
+
+        service
+            .force_loopback_run_state(&parent_id, AnalysisRunStatusState::Failed)
+            .expect("force failed");
+        let retry_key = "analysis-live-retry-lineage-001";
+        let retry_body = AnalysisRunRetryRequest::new(&parent_id, retry_key)
+            .expect("retry dto")
+            .to_json()
+            .expect("retry json");
+        let retried = service.handle_http_request(&retry_http(
+            &parent_id,
+            &retry_body,
+            NARUON_CONSUMER_CODE,
+            retry_key,
+        ));
+        assert_eq!(retried.status_code, 202);
+        let child_id = serde_json::from_str::<serde_json::Value>(&retried.body)
+            .expect("child json")["run_id"]
+            .as_str()
+            .expect("child id")
+            .to_owned();
+
+        let lineage_response =
+            service.handle_http_request(&retry_lineage_http(&parent_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(lineage_response.status_code, 200);
+        let lineage = AnalysisRunRetryLineage::from_json(&lineage_response.body).expect("lineage");
+        assert_eq!(lineage.run_id, parent_id);
+        assert_eq!(lineage.run_state, AnalysisRunStatusState::Failed);
+        assert_eq!(lineage.retries.len(), 1);
+        assert_eq!(lineage.retries[0].run_id, child_id);
+        assert_eq!(
+            lineage.retries[0].run_state,
+            AnalysisRunStatusState::Accepted
+        );
+        assert_eq!(lineage.retries[0].idempotency_key, retry_key);
+        assert!(!lineage_response.body.contains("scientific_acceptance"));
+        assert!(!lineage_response.body.contains("snapshot_id"));
+
+        let child_lineage =
+            service.handle_http_request(&retry_lineage_http(&child_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(child_lineage.status_code, 200);
+        assert!(
+            AnalysisRunRetryLineage::from_json(&child_lineage.body)
+                .expect("child lineage")
+                .retries
+                .is_empty()
+        );
+
+        let mut cancelled_run = run.clone();
+        cancelled_run.idempotency_key = "analysis-live-idem-lineage-002".into();
+        let cancelled_accepted = service.handle_http_request(&valid_request(
+            &cancelled_run,
+            NARUON_CONSUMER_CODE,
+            "127.0.0.1",
+        ));
+        let cancelled_id = serde_json::from_str::<serde_json::Value>(&cancelled_accepted.body)
+            .expect("cancelled accepted")["run_id"]
+            .as_str()
+            .expect("id")
+            .to_owned();
+        service
+            .force_loopback_run_state(&cancelled_id, AnalysisRunStatusState::Cancelled)
+            .expect("force cancelled");
+        let cancelled_retry = service.handle_http_request(&retry_http(
+            &cancelled_id,
+            "",
+            NARUON_CONSUMER_CODE,
+            "analysis-live-retry-lineage-002",
+        ));
+        assert_eq!(cancelled_retry.status_code, 202);
+        let cancelled_lineage = service.handle_http_request(&retry_lineage_http(
+            &cancelled_id,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(cancelled_lineage.status_code, 200);
+        let cancelled =
+            AnalysisRunRetryLineage::from_json(&cancelled_lineage.body).expect("cancelled");
+        assert_eq!(cancelled.run_state, AnalysisRunStatusState::Cancelled);
+        assert_eq!(cancelled.retries.len(), 1);
+
+        assert_eq!(
+            service
+                .handle_http_request(&retry_lineage_http(
+                    &parent_id,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    &[],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&retry_lineage_http(
+                    "missing-run",
+                    NARUON_CONSUMER_CODE,
+                    &[],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/{parent_id} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "POST {NARUON_ANALYSIS_RUN_PATH}/{parent_id}/retries HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/{parent_id}/retries HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}"
+                ))
+                .status_code,
+            400
+        );
+        let oversized = "a".repeat(129);
+        assert_eq!(
+            service
+                .handle_http_request(&retry_lineage_http(&oversized, NARUON_CONSUMER_CODE, &[],))
+                .status_code,
+            413
+        );
+        let listed = service.handle_http_request(&collection_http(NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(listed.status_code, 200);
+        assert!(!listed.body.contains("retried_from"));
+        assert!(!listed.body.contains("snapshot_id"));
+        let stored = service.handle_http_request(&stored_request_http(
+            &parent_id,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(stored.status_code, 200);
+        assert!(!stored.body.contains("retries"));
     }
 
     #[test]
