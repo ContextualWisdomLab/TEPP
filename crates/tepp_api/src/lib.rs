@@ -18,6 +18,7 @@ mod analysis_run_collection_http;
 mod analysis_run_live;
 mod analysis_run_retry_http;
 mod analysis_run_status_http;
+mod analysis_run_stored_request_cli;
 mod analysis_run_stored_request_http;
 mod authorization;
 mod corpus_split_manifest;
@@ -119,6 +120,20 @@ pub use analysis_run_retry_http::naruon_analysis_run_retry_exchange;
 pub use analysis_run_retry_http::refuse_metrics_on_retry_payload;
 /// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
+/// One validated stored-request CLI invocation.
+pub use analysis_run_stored_request_cli::AnalysisRunStoredRequestCliInvocation;
+/// Loopback stored-request CLI verb.
+pub use analysis_run_stored_request_cli::AnalysisRunStoredRequestCliVerb;
+/// Compose loopback stored-request GET bytes for a CLI invocation.
+pub use analysis_run_stored_request_cli::compose_analysis_run_stored_request_cli_http;
+/// Dispatch a stored-request CLI invocation against an in-process listener.
+pub use analysis_run_stored_request_cli::dispatch_analysis_run_stored_request_cli;
+/// Execute a stored-request CLI invocation over loopback TCP.
+pub use analysis_run_stored_request_cli::execute_analysis_run_stored_request_cli;
+/// Read leftover stdin for the stored-request CLI.
+pub use analysis_run_stored_request_cli::read_analysis_run_stored_request_cli_stdin;
+/// Render stored-request CLI stdout with metric-free gates.
+pub use analysis_run_stored_request_cli::render_analysis_run_stored_request_cli_stdout;
 /// Analysis-run stored-request contract version constant.
 pub use analysis_run_stored_request_http::ANALYSIS_RUN_STORED_REQUEST_CONTRACT_VERSION;
 /// Maximum opaque run identity length on the stored-request path.

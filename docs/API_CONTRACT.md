@@ -93,7 +93,9 @@ closed. `GET /v1/analysis-runs/{run_id}/request` on the loopback listener
 returns metric-free stored create fields (`snapshot_id`, `knowledge_cutoff`,
 `model_contract_version`, `output_profile`) so operators can inspect a listed
 run before retry. GET-by-id remains a later slice on this protected-main
-lineage. `lineageweave_analysis_run_stored_request_exchange` builds the same
+lineage. The loopback `tepp-analysis-runs stored-request` CLI is the
+operator-visible client for that GET; stdout stays metric-free and
+`tepp.scientific_acceptance.v1` never appears. `lineageweave_analysis_run_stored_request_exchange` builds the same
 GET for LineageWeave. `NaruonLiveService` serves stored-request GET for Naruon
 only; LineageWeave remains refused on that compatibility listener.
 
