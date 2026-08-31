@@ -100,7 +100,10 @@ can inspect lineage after retry. An empty `retries` array is `200` when the
 parent was never retried. `GET /v1/analysis-runs/by-idempotency/{idempotency_key}`
 on the loopback listener returns the metric-free identity of the unique run
 that used that key so operators can jump from a 202 receipt or retry child
-key without scanning collection pages. GET-by-id remains a later slice on this
+key without scanning collection pages. The loopback
+`tepp-analysis-runs lookup` CLI is the operator-visible client for that GET;
+stdout stays metric-free and `tepp.scientific_acceptance.v1` never appears.
+GET-by-id remains a later slice on this
 protected-main lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side
