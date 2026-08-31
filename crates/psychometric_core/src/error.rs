@@ -710,6 +710,26 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// 2017-era commented-out `asymTOTALVAR` after `addedTIPREDVAR`
+    /// was requested for a non-stable drift. The three-term map
+    /// `-q / (2 a) + trait / a² + (B / a)² v` requires `a < 0`
+    /// whenever a contribution is nonzero.
+    AsymptoticTotalVarianceAfterAddedPredictorRequiresStableDrift,
+    /// 2017-era two-term `asymTOTALVAR` was treated as the later
+    /// commented three-term total. `p + trait / a²` omits
+    /// `addedTIPREDVAR`. Equal numbers when `B = 0` or `v = 0`
+    /// remain distinct named quantities.
+    TwoTermAsymptoticTotalVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor,
+    /// Driver §4.3 / p. 16 stationary `T0VAR` was treated as 2017-era
+    /// `asymTOTALVAR` after `addedTIPREDVAR`. `trait + p + (B / a)² v`
+    /// keeps `TRAITVAR` in process units; the commented total uses
+    /// `solve(DRIFT)` and is `p + trait / a² + (B / a)² v`.
+    StationaryInitialLatentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor,
+    /// Driver §7.2 `addedTIPREDVAR` was treated as 2017-era
+    /// `asymTOTALVAR` after `addedTIPREDVAR`. `(B / a)² v` is the
+    /// later addend, not the three-term total that also includes
+    /// `asymDIFFUSION` and `asymTRAITVAR`.
+    AsymptoticTimeIndependentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1254,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptoticTotalVarianceAfterAddedPredictorRequiresStableDrift => {
+                "asymptotic total variance after added time-independent predictor requires a stable negative drift"
+            }
+            Self::TwoTermAsymptoticTotalVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor => {
+                "two-term asymptotic total variance is not asymptotic total variance after added time-independent predictor"
+            }
+            Self::StationaryInitialLatentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor => {
+                "stationary initial latent variance is not asymptotic total variance after added time-independent predictor"
+            }
+            Self::AsymptoticTimeIndependentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor => {
+                "asymptotic time-independent predictor variance is not asymptotic total variance after added time-independent predictor"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2103,30 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotic_total_variance_after_added_predictor_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptoticTotalVarianceAfterAddedPredictorRequiresStableDrift
+                .to_string(),
+            "asymptotic total variance after added time-independent predictor requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::TwoTermAsymptoticTotalVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
+                .to_string(),
+            "two-term asymptotic total variance is not asymptotic total variance after added time-independent predictor"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialLatentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
+                .to_string(),
+            "stationary initial latent variance is not asymptotic total variance after added time-independent predictor"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
+                .to_string(),
+            "asymptotic time-independent predictor variance is not asymptotic total variance after added time-independent predictor"
         );
     }
 }

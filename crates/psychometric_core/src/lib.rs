@@ -261,6 +261,20 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era commented-out `asymTOTALVAR` after
+//! `addedTIPREDVAR` as `-q / (2 a) + trait / a² + (B / a)² v`
+//! (2017-era `summary.ctsemFit.R` comments
+//! `asymTOTALVAR <- asymDIFFUSION + asymTRAITVAR` then later
+//! `asymTOTALVAR <- asymTOTALVAR + addedTIPREDVAR`; form the
+//! two-term total first, then include `addedTIPREDVAR`, then add;
+//! a zero trait, a zero diffusion, and a zero TI extra is exactly
+//! zero even if `a ≥ 0`; `a ≥ 0` with a nonzero contribution
+//! fails closed; `p + trait / a²` is the two-term commented total
+//! and is not this map when `addedTIPREDVAR ≠ 0`; stationary
+//! `T0VAR` `trait + p + (B / a)² v` keeps `TRAITVAR` in process
+//! units and is not this map; `(B / a)² v` is `addedTIPREDVAR` and
+//! is not this total when `q ≠ 0` or `trait ≠ 0`; JSS PDF
+//! re-opened 2026-08-31T04:40Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -317,6 +331,8 @@ pub use event_time::recover_asymptotic_continuous_intercept;
 pub use event_time::recover_asymptotic_time_independent_predictor_effect;
 /// Exact scalar §7.2 `addedTIPREDVAR` `(B / a)² v`.
 pub use event_time::recover_asymptotic_time_independent_predictor_variance;
+/// Exact scalar 2017-era commented-out `asymTOTALVAR` after `addedTIPREDVAR` `-q / (2 a) + trait / a² + (B / a)² v`.
+pub use event_time::recover_asymptotic_total_variance_after_added_time_independent_predictor;
 /// Exact scalar discrete effect of a constant event-time predictor.
 pub use event_time::recover_discrete_constant_predictor_effect;
 /// Exact scalar discrete intercept increment `A^{-1}[e^{A Δt} − I] κ`.
@@ -476,6 +492,8 @@ pub use event_time::refuse_asymptotic_time_independent_effect_as_discrete_effect
 pub use event_time::refuse_asymptotic_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymTIPREDEFFECT`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_effect;
+/// Refuse treating §7.2 `addedTIPREDVAR` as 2017-era `asymTOTALVAR` after `addedTIPREDVAR`.
+pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_total_variance_after_added_predictor;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymDIFFUSION`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_stationary_within_subject;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `TRAITVAR`.
@@ -655,6 +673,8 @@ pub use event_time::refuse_stationary_initial_latent_mean_as_initial_latent_mean
 pub use event_time::refuse_stationary_initial_latent_mean_as_observed_mean;
 /// Refuse treating §4.3 / p. 16 stationary `T0VAR` as `addedTIPREDVAR`.
 pub use event_time::refuse_stationary_initial_latent_variance_as_asymptotic_time_independent_variance;
+/// Refuse treating §4.3 / p. 16 stationary `T0VAR` as 2017-era `asymTOTALVAR` after `addedTIPREDVAR`.
+pub use event_time::refuse_stationary_initial_latent_variance_as_asymptotic_total_variance_after_added_predictor;
 /// Refuse treating §4.3 / p. 16 stationary `T0VAR` as a finite-interval discrete variance.
 pub use event_time::refuse_stationary_initial_latent_variance_as_discrete_variance;
 /// Refuse treating §4.3 / p. 16 stationary `T0VAR` as free `T0VAR`.
@@ -723,6 +743,8 @@ pub use event_time::refuse_trait_scaled_continuous_intercept_as_standardised_con
 pub use event_time::refuse_trait_variance_as_process_noise;
 /// Refuse treating Driver §4.3 trait variance as `asymDIFFUSION`.
 pub use event_time::refuse_trait_variance_as_stationary_within_subject;
+/// Refuse treating the two-term commented `asymTOTALVAR` as the later three-term total.
+pub use event_time::refuse_two_term_asymptotic_total_variance_as_asymptotic_total_variance_after_added_predictor;
 /// Refuse a time-varying predictor whose sampling and constancy intervals differ.
 pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 /// Refuse treating unstandardised `asymCINT` as `asymCINTstd`.
