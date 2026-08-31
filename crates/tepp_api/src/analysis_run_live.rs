@@ -989,6 +989,12 @@ mod tests {
                 .status_code,
             400
         );
+        assert_eq!(
+            service
+                .handle_http_request(&cancel_http(run_id, "", NARUON_CONSUMER_CODE, "wrong-key",))
+                .status_code,
+            400
+        );
         let mismatched = AnalysisRunCancelRequest::new("other-run", run.idempotency_key.as_str())
             .expect("mismatch")
             .to_json()

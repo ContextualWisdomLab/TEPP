@@ -459,17 +459,15 @@ mod tests {
             "https://tepp.example.com/v1/analysis-runs/tepp-run-1/cancel"
         );
         assert!(!exchange.body.is_empty());
-        assert!(
-            exchange
-                .headers
-                .iter()
-                .any(|(name, value)| name == "tepp-consumer" && value == "naruon")
-        );
-        assert!(
-            !exchange
-                .headers
-                .iter()
-                .any(|(name, _)| name.contains("authorization") || name.contains("copilot"))
+        assert_eq!(
+            exchange.headers,
+            [
+                ("content-type", "application/json"),
+                ("tepp-consumer", "naruon"),
+                ("tepp-contract-version", "1"),
+                ("idempotency-key", "idem-1"),
+            ]
+            .map(|(name, value)| (name.into(), value.into()))
         );
 
         let encoded = AnalysisRunCancelRequest::new("run/../../etc", "key").expect("encoded");
