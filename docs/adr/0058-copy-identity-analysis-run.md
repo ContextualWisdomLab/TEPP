@@ -29,9 +29,11 @@ Add the `copy_identity_v1` analysis-run output profile to
 `analysis_engine`. The executor:
 
 - consumes already-validated `CopyIdentityDocument` rows with closed
-  `CopyKind` values;
+  `CopyKind` values and retained availability times;
 - requires the request snapshot and knowledge cutoff to match the offered
   input construction;
+- rejects every document whose availability time exceeds the knowledge
+  cutoff instead of trusting only caller-supplied labels;
 - invokes `refuse_copy_as_source_identity` and `refuse_copy_as_transition`
   without reimplementing the copy/source vocabulary;
 - emits a canonical SHA-256-digested `tepp.copy_identity.v1` artifact with
@@ -58,12 +60,13 @@ digest-bound terminal result. The artifact does not claim MCMC, GPU
 parity, method-effect estimation, or topic birth/split/merge.
 Snapshot/profile/cutoff mismatch, empty or single-kind corpora, and
 duplicate document identities fail closed.
+Future-available documents also fail closed.
 
 ## Verification
 
 The PR includes Rust unit and integration tests for mixed source/copy
 corpora, empty/source-only/copy-only/duplicate refusal, snapshot /
-profile / cutoff mismatch, and artifact tampering. Run:
+profile / cutoff mismatch, future availability, and artifact tampering. Run:
 
 ```text
 cargo fmt --all -- --check

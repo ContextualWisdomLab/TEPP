@@ -3,9 +3,10 @@
 use copy_identity::{
     CopyIdentityError, CopyKind, refuse_copy_as_source_identity, refuse_copy_as_transition,
 };
+use corpus_split::cutoff_eligible;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
@@ -27,6 +28,7 @@ const COPY_IDENTITY_INFERENCE_STATUS: &str = "template_copy_is_not_source_identi
 pub struct CopyIdentityDocument {
     document_id: String,
     kind: CopyKind,
+    available_time: AvailableTime,
 }
 
 impl CopyIdentityDocument {
@@ -39,12 +41,17 @@ impl CopyIdentityDocument {
     pub fn new(
         document_id: impl Into<String>,
         kind: CopyKind,
+        available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
         let document_id = document_id.into();
         if !valid_identifier(&document_id) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        Ok(Self { document_id, kind })
+        Ok(Self {
+            document_id,
+            kind,
+            available_time,
+        })
     }
 
     /// Return the opaque document identity.
@@ -57,6 +64,12 @@ impl CopyIdentityDocument {
     #[must_use]
     pub const fn kind(&self) -> CopyKind {
         self.kind
+    }
+
+    /// Return when the document became available for historical analysis.
+    #[must_use]
+    pub const fn available_time(&self) -> &AvailableTime {
+        &self.available_time
     }
 }
 
@@ -112,9 +125,6 @@ impl CopyIdentityArtifact {
         self.validate()?;
         let payload =
             serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > COPY_IDENTITY_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
         Ok(payload)
     }
 
@@ -197,34 +207,31 @@ pub fn execute_copy_identity_run(
     let mut refused_as_source_count = 0_u64;
     let mut refused_as_transition_count = 0_u64;
     for document in documents {
+        if !cutoff_eligible(document.available_time(), &knowledge_cutoff) {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
         match document.kind() {
             CopyKind::SourceDocument => {
-                refuse_copy_as_source_identity(document.kind()).map_err(map_copy_error)?;
-                refuse_copy_as_transition(document.kind()).map_err(map_copy_error)?;
+                require_copy_result(refuse_copy_as_source_identity(document.kind()), Ok(()))?;
+                require_copy_result(refuse_copy_as_transition(document.kind()), Ok(()))?;
                 source_document_count = source_document_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
             }
             CopyKind::TemplateCopy => {
-                match refuse_copy_as_source_identity(document.kind()) {
-                    Err(CopyIdentityError::CopyIsNotSourceIdentity) => {
-                        refused_as_source_count = refused_as_source_count
-                            .checked_add(1)
-                            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
-                match refuse_copy_as_transition(document.kind()) {
-                    Err(CopyIdentityError::CopyIsNotTransition) => {
-                        refused_as_transition_count = refused_as_transition_count
-                            .checked_add(1)
-                            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
+                #[rustfmt::skip]
+                require_copy_result(refuse_copy_as_source_identity(document.kind()), Err(CopyIdentityError::CopyIsNotSourceIdentity))?;
+                refused_as_source_count = refused_as_source_count
+                    .checked_add(1)
+                    .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
+                #[rustfmt::skip]
+                require_copy_result(refuse_copy_as_transition(document.kind()), Err(CopyIdentityError::CopyIsNotTransition))?;
+                refused_as_transition_count = refused_as_transition_count
+                    .checked_add(1)
+                    .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
                 template_copy_count = template_copy_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
@@ -250,43 +257,34 @@ pub fn execute_copy_identity_run(
         inference_status: COPY_IDENTITY_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "copy_identity",
-        document_count,
-        4,
-        COPY_IDENTITY_INFERENCE_STATUS,
-    )?;
-    let terminal_result = AnalysisRunTerminalResult::succeeded(
-        request,
-        accepted,
-        format!("copy_identity_artifact_{}", &digest[..16]),
-        digest,
-        COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION,
-        completed_at,
-        summary,
-    )?;
+    #[rustfmt::skip]
+    let summary = AnalysisResultSummary::new("copy_identity", document_count, 4, COPY_IDENTITY_INFERENCE_STATUS)?;
+    #[rustfmt::skip]
+    let terminal_result = AnalysisRunTerminalResult::succeeded(request, accepted, format!("copy_identity_artifact_{}", &digest[..16]), digest, COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION, completed_at, summary)?;
     Ok(CopyIdentityExecution {
         artifact,
         terminal_result,
     })
 }
 
-fn map_copy_error(error: CopyIdentityError) -> AnalysisEngineError {
-    match error {
-        CopyIdentityError::CopyIsNotSourceIdentity
-        | CopyIdentityError::CopyIsNotTransition
-        | CopyIdentityError::InvalidCopyPayload
-        | _ => AnalysisEngineError::InvalidEvidence,
+fn require_copy_result(
+    actual: Result<(), CopyIdentityError>,
+    expected: Result<(), CopyIdentityError>,
+) -> Result<(), AnalysisEngineError> {
+    if actual != expected {
+        return Err(AnalysisEngineError::InvalidEvidence);
     }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         COPY_IDENTITY_ARTIFACT_BYTE_LIMIT, COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION,
-        COPY_IDENTITY_INFERENCE_STATUS, CopyIdentityArtifact,
+        COPY_IDENTITY_INFERENCE_STATUS, CopyIdentityArtifact, require_copy_result,
     };
     use crate::AnalysisEngineError;
+    use copy_identity::CopyIdentityError;
 
     fn artifact() -> CopyIdentityArtifact {
         CopyIdentityArtifact {
@@ -370,7 +368,17 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.document_count = 4;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.refused_as_source_count = 1;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.refused_as_transition_count = 1;
                 value
             },
             {
@@ -382,5 +390,21 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn copy_result_contract_rejects_mismatched_library_outcomes() {
+        assert_eq!(require_copy_result(Ok(()), Ok(())), Ok(()));
+        assert_eq!(
+            require_copy_result(Ok(()), Err(CopyIdentityError::CopyIsNotTransition)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_copy_result(
+                Err(CopyIdentityError::InvalidCopyPayload),
+                Err(CopyIdentityError::CopyIsNotSourceIdentity),
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }

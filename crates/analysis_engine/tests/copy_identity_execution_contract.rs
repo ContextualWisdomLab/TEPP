@@ -6,7 +6,7 @@ use analysis_engine::{
     execute_copy_identity_run,
 };
 use copy_identity::CopyKind;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
 fn cutoff() -> KnowledgeCutoff {
@@ -30,11 +30,20 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
         .expect("accepted")
 }
 
+fn document(id: &str, kind: CopyKind) -> CopyIdentityDocument {
+    CopyIdentityDocument::new(
+        id,
+        kind,
+        AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available"),
+    )
+    .expect("document")
+}
+
 fn mixed_documents() -> Vec<CopyIdentityDocument> {
     vec![
-        CopyIdentityDocument::new("source-a", CopyKind::SourceDocument).expect("source"),
-        CopyIdentityDocument::new("copy-b", CopyKind::TemplateCopy).expect("copy"),
-        CopyIdentityDocument::new("copy-c", CopyKind::TemplateCopy).expect("copy"),
+        document("source-a", CopyKind::SourceDocument),
+        document("copy-b", CopyKind::TemplateCopy),
+        document("copy-c", CopyKind::TemplateCopy),
     ]
 }
 
@@ -94,31 +103,53 @@ fn empty_source_only_copy_only_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let sources_only = vec![
-        CopyIdentityDocument::new("source-a", CopyKind::SourceDocument).expect("source"),
-        CopyIdentityDocument::new("source-b", CopyKind::SourceDocument).expect("source"),
+        document("source-a", CopyKind::SourceDocument),
+        document("source-b", CopyKind::SourceDocument),
     ];
     assert_eq!(
         execute(&request, &sources_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let copies_only = vec![
-        CopyIdentityDocument::new("copy-a", CopyKind::TemplateCopy).expect("copy"),
-        CopyIdentityDocument::new("copy-b", CopyKind::TemplateCopy).expect("copy"),
+        document("copy-a", CopyKind::TemplateCopy),
+        document("copy-b", CopyKind::TemplateCopy),
     ];
     assert_eq!(
         execute(&request, &copies_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
-        CopyIdentityDocument::new("same", CopyKind::SourceDocument).expect("source"),
-        CopyIdentityDocument::new("same", CopyKind::TemplateCopy).expect("copy"),
+        document("same", CopyKind::SourceDocument),
+        document("same", CopyKind::TemplateCopy),
     ];
     assert_eq!(
         execute(&request, &duplicates),
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        CopyIdentityDocument::new("", CopyKind::SourceDocument),
+        CopyIdentityDocument::new(
+            "",
+            CopyKind::SourceDocument,
+            AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available"),
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn future_available_documents_fail_closed() {
+    let request = request();
+    let mut documents = mixed_documents();
+    documents.push(
+        CopyIdentityDocument::new(
+            "future-copy",
+            CopyKind::TemplateCopy,
+            AvailableTime::parse_rfc3339("2026-08-02T00:00:00Z").expect("available"),
+        )
+        .expect("document"),
+    );
+    assert_eq!(
+        execute(&request, &documents),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 }
@@ -144,6 +175,19 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
         execute_copy_identity_run(
             &mismatched,
             &accepted(&mismatched),
+            "snapshot-copy-identity",
+            cutoff(),
+            &documents,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    let mut model_mismatch = request.clone();
+    model_mismatch.model_contract_version = "other-model".into();
+    assert_eq!(
+        execute_copy_identity_run(
+            &model_mismatch,
+            &accepted(&model_mismatch),
             "snapshot-copy-identity",
             cutoff(),
             &documents,
