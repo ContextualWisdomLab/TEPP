@@ -40,6 +40,8 @@ The executable standardised-manifest-variance slice recovers Driver et al. (2017
 
 The executable standardised-trait-variance slice recovers Driver et al. (2017, p. 16 `TRAITVARstd`) as `trait / trait = 1` after strictly positive `TRAITVAR` (Table 2 `φ_ξ`; §7.1; footnote 4; 2017-era `summary.ctsemFit.R` `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR`; JSS PDF re-opened 2026-08-26T17:45Z). Unlike `T0VARstd` there is no ridge addend. Unstandardised `TRAITVAR` is defined for a zero trait and is not that map. `p_0 / p_0 = 1` is the named `T0VARstd` first-occasion correlation and is not `TRAITVARstd` even when both equal 1. `t0_b² v` is `addedT0TIPREDVAR` and is not this correlation. Zero `TRAITVAR` and a non-event clock fail closed. `TRAITVAR` does not require `a < 0`. This is not ctsem estimation.
 
+The executable 2017-era `asymptotes=TRUE` `TIPREDEFFECT` rewrite recovers Driver et al. (2017) cran/ctsem 2.5.0 `summary.ctsemFit.R` `if(asymptotes==TRUE) TIPREDEFFECT <- -DRIFT %*% TIPREDEFFECT` as `−a · B` (form `a` first, then negate, then multiply by `B`; JSS PDF re-opened 2026-08-31T15:26Z). A zero coefficient is exactly zero even if `a ≥ 0`. Unstandardised `B` is not that rewrite. `asymTIPREDEFFECT` `-B / a` is the stored asymptotic parameterization and is not that rewrite. The finite-interval increment is not that rewrite. `TIPREDEFFECTstd` is not that rewrite. This is not ctsem estimation.
+
 Input/process/intervention/outcome paths obey event-time order. Temporal precedence, document linkage, event tracking, or model prediction alone do not justify causal language.
 
 ## Non-goals
