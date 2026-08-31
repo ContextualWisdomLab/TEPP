@@ -1,9 +1,9 @@
-# ADR 0029 — Scientific-acceptance loopback CLI
+# ADR 0030 — Scientific-acceptance loopback CLI
 
 **Decision status:** Accepted
 **Implementation maturity:** active-PR
 **Date:** 2026-08-31
-**Supersedes:** None; complements ADR 0027 and ADR 0028 for the operator-visible client. Does not supersede ADR 0014 claim-promotion authority and does not reuse ADR 0026, ADR 0027, or ADR 0028.
+**Supersedes:** None; complements ADR 0027 and ADR 0028 for the operator-visible client. Does not supersede ADR 0014 claim-promotion authority and does not reuse ADR 0026, ADR 0027, ADR 0028, or ADR 0029 (loopback cancel HTTP on live #361).
 
 ## Context
 
@@ -70,6 +70,7 @@ Rollback removes the CLI binary and client module; GET status and POST lifecycle
 
 ## Related authority
 
+- ADR 0029 owns the loopback cancel HTTP path (live #361).
 - ADR 0028 owns the HTTP write path.
 - ADR 0027 owns the GET status read.
 - ADR 0018 owns consumer-scoped ingress and metric-free `202 Accepted`.
