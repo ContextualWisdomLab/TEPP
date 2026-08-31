@@ -17,8 +17,9 @@
 //! `(ln|later| − ln|earlier|) / Δt`; the pairwise mean is incremental so
 //! two finite rates whose raw sum overflows stay representable;
 //! not Newton LS, not raw-process AR drift), extracts grand-mean-centered
-//! lagged residuals and a pairwise-mean log-rate after that CGM (Hamaker
-//! et al., 2015: not a within-person lag), remaps discrete
+//! `LaggedGrandMeanResidual` pairs and a pairwise-mean log-rate after that
+//! CGM (Hamaker et al., 2015, p. 104: not a within-person lag; not
+//! `LaggedWithinResidual`), remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
 //! exact scalar discrete effect of a constant predictor, recovers the
 //! first-order discrete effect of a time-varying predictor with matched
@@ -315,6 +316,8 @@ pub use event_time::DiscreteLagAndLogRate;
 pub use event_time::EventOccasion;
 /// Clock on which a structural lag may be computed.
 pub use event_time::LagClock;
+/// Grand-mean-centered lagged residual pair (not a within-person residual).
+pub use event_time::LaggedGrandMeanResidual;
 /// Already-centered lagged residual pair with an irregular event interval.
 pub use event_time::LaggedWithinResidual;
 /// Grand-mean-center consecutive event-time lags (not a within-person lag).

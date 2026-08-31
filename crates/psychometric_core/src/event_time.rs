@@ -261,11 +261,31 @@ pub struct ClusteredEventScore {
 ///
 /// `earlier_residual` and `later_residual` are within residuals the caller
 /// already formed. This type is not a raw score and is not re-centered.
+/// Grand-mean deviations are [`LaggedGrandMeanResidual`], not this type
+/// (Hamaker, Kuiper, & Grasman, 2015, p. 104).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LaggedWithinResidual {
     /// Earlier within residual.
     pub earlier_residual: f64,
     /// Later within residual.
+    pub later_residual: f64,
+    /// Strictly positive event-time interval. Intervals may be irregular.
+    pub event_delta: f64,
+}
+
+/// One grand-mean-centered lagged residual pair on event time.
+///
+/// Hamaker, Kuiper, and Grasman (2015, p. 104) show that lagged relations
+/// from deviations around shared (grand) means mix between-person
+/// differences with within-person change, and represent actual
+/// within-person relationships only if there are no trait-like
+/// between-person differences. This type is not [`LaggedWithinResidual`]
+/// and cannot enter [`recover_irregular_centered_residual_log_rate`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LaggedGrandMeanResidual {
+    /// Earlier grand-mean residual.
+    pub earlier_residual: f64,
+    /// Later grand-mean residual.
     pub later_residual: f64,
     /// Strictly positive event-time interval. Intervals may be irregular.
     pub event_delta: f64,
@@ -6802,6 +6822,48 @@ pub(crate) fn overflow_safe_running_mean(mean: f64, count: f64, value: f64) -> (
     }
 }
 
+/// Fold [`overflow_safe_running_mean`] over finite scores in the given order.
+fn fold_overflow_safe_mean(values: &[f64]) -> f64 {
+    let mut mean = 0.0_f64;
+    let mut count = 0.0_f64;
+    for &value in values {
+        (mean, count) = overflow_safe_running_mean(mean, count, value);
+    }
+    mean
+}
+
+/// Sample mean that stays finite when a raw sum of finite scores overflows.
+///
+/// Positives and negatives are averaged separately with
+/// [`overflow_safe_running_mean`] and combined by count, so `MAX` and
+/// `-MAX` cancel as `0.5 MAX + 0.5 (−MAX)` in either row order. Zeros
+/// contribute only to the count. Caller supplies finite values.
+pub(crate) fn overflow_safe_signed_mean<I>(scores: I) -> Result<f64, PsychometricError>
+where
+    I: IntoIterator<Item = f64>,
+{
+    let mut positives = Vec::new();
+    let mut negatives = Vec::new();
+    let mut zero_count = 0.0_f64;
+    for score in scores {
+        if score > 0.0 {
+            positives.push(score);
+        } else if score < 0.0 {
+            negatives.push(score);
+        } else {
+            zero_count += 1.0;
+        }
+    }
+    positives.sort_unstable_by(f64::total_cmp);
+    negatives.sort_unstable_by(f64::total_cmp);
+    let pos_n = positives.len() as f64;
+    let neg_n = negatives.len() as f64;
+    let n = pos_n + neg_n + zero_count;
+    let pos_mean = fold_overflow_safe_mean(&positives);
+    let neg_mean = fold_overflow_safe_mean(&negatives);
+    require_finite((pos_n / n).mul_add(pos_mean, (neg_n / n) * neg_mean))
+}
+
 /// Pairwise-mean exact log-rate after CWC on irregular event intervals.
 ///
 /// This is [`center_within_cluster_event_lags`] then the pairwise mean of
@@ -6903,12 +6965,19 @@ pub fn refuse_cwc_residual_log_rate_as_raw_process_drift(
 /// Grand-mean-center consecutive event-time lags inside each cluster.
 ///
 /// The sample grand mean is removed first (CGM). Consecutive residuals
-/// then become [`LaggedWithinResidual`] pairs on possibly irregular event
-/// intervals. Singleton clusters are skipped. Hamaker, Kuiper, and Grasman
-/// (2015) show that lagged relations from grand-mean deviations confound
-/// stable between-person differences with within-person change. The
-/// returned pairs are therefore not a license to recover a within-person
-/// lag. This is not CWC, not RI-CLPM, and not DSEM.
+/// then become [`LaggedGrandMeanResidual`] pairs on possibly irregular
+/// event intervals. Singleton clusters are skipped. When the raw score
+/// sum is finite the grand mean is that sum divided by the row count so
+/// coinciding cluster means match CWC. When the raw sum overflows,
+/// positives and negatives are averaged separately with
+/// [`overflow_safe_running_mean`] and combined by count, so cancelling
+/// `MAX` and `-MAX` scores keep a representable zero mean in either row
+/// order. Hamaker, Kuiper, and Grasman (2015, p. 104) show that lagged
+/// relations from grand-mean deviations confound stable between-person
+/// differences with within-person change. The returned pairs are
+/// therefore not [`LaggedWithinResidual`] and are not a license to
+/// recover a within-person lag. This is not CWC, not RI-CLPM, and not
+/// DSEM.
 ///
 /// # Errors
 ///
@@ -6916,11 +6985,12 @@ pub fn refuse_cwc_residual_log_rate_as_raw_process_drift(
 /// [`PsychometricError::InvalidNumericInput`] for empty, singleton-only, or
 /// non-finite rows, [`PsychometricError::InsufficientClusters`] when fewer
 /// than two clusters appear, and [`PsychometricError::NonPositiveInterval`]
-/// when any consecutive event interval is not strictly positive.
+/// when any consecutive event interval is not strictly positive. A finite
+/// grand mean whose residual overflows also fails closed.
 pub fn center_grand_mean_event_lags(
     rows: &[ClusteredEventScore],
     clock: LagClock,
-) -> Result<Vec<LaggedWithinResidual>, PsychometricError> {
+) -> Result<Vec<LaggedGrandMeanResidual>, PsychometricError> {
     if !clock.admits_structural_lag() {
         return Err(PsychometricError::EventTimeRequired);
     }
@@ -6939,10 +7009,11 @@ pub fn center_grand_mean_event_lags(
     if groups.len() < 2 {
         return Err(PsychometricError::InsufficientClusters);
     }
-    let grand_mean = score_sum / (rows.len() as f64);
-    if !grand_mean.is_finite() {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
+    let grand_mean = if score_sum.is_finite() {
+        score_sum / (rows.len() as f64)
+    } else {
+        overflow_safe_signed_mean(groups.values().flatten().map(|row| row.score))?
+    };
     let mut pairs = Vec::new();
     for occasions in groups.values_mut() {
         if occasions.len() < 2 {
@@ -6959,7 +7030,7 @@ pub fn center_grand_mean_event_lags(
             if !(earlier_residual.is_finite() & later_residual.is_finite()) {
                 return Err(PsychometricError::InvalidNumericInput);
             }
-            pairs.push(LaggedWithinResidual {
+            pairs.push(LaggedGrandMeanResidual {
                 earlier_residual,
                 later_residual,
                 event_delta,
@@ -6981,7 +7052,9 @@ pub fn center_grand_mean_event_lags(
 /// `(ln|later| − ln|earlier|) / Δt`. The pairwise mean is formed
 /// incrementally so two finite rates whose raw sum overflows stay
 /// representable. It is **not** CWC and is **not** a within-person lag
-/// (Hamaker, Kuiper, & Grasman, 2015). It is not DSEM.
+/// (Hamaker, Kuiper, & Grasman, 2015, p. 104). The pairs are
+/// [`LaggedGrandMeanResidual`], so they cannot enter
+/// [`recover_irregular_centered_residual_log_rate`]. It is not DSEM.
 ///
 /// # Errors
 ///
@@ -7038,6 +7111,8 @@ pub fn refuse_grand_mean_centered_log_rate_as_within_person_lag(
 /// The function does **not** center again. Curran and Bauer (2011, pp. 607–608)
 /// reject person-mean subtraction on a raw autoregressive series as the
 /// lagged within-person residual. Intervals may be irregular. This is not DSEM.
+/// Grand-mean pairs are [`LaggedGrandMeanResidual`] and cannot enter this
+/// helper (Hamaker, Kuiper, & Grasman, 2015, p. 104).
 ///
 /// # Errors
 ///
@@ -7134,9 +7209,10 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
         center_grand_mean_event_lags, center_within_cluster_event_lags, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, overflow_safe_running_mean,
-        recover_asymptotic_continuous_intercept,
+        overflow_safe_signed_mean, recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -8807,6 +8883,34 @@ mod tests {
         assert_eq!(n_mixed.to_bits(), 2.0_f64.to_bits());
     }
 
+    #[test]
+    fn overflow_safe_signed_mean_cancels_max_in_either_order() {
+        let positives_first = [f64::MAX, f64::MAX, -f64::MAX, -f64::MAX];
+        let negatives_first = [-f64::MAX, -f64::MAX, f64::MAX, f64::MAX];
+        let pos = overflow_safe_signed_mean(positives_first).expect("pos");
+        let neg = overflow_safe_signed_mean(negatives_first).expect("neg");
+        assert_eq!(pos.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(neg.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(
+            overflow_safe_signed_mean([f64::MAX; 4])
+                .expect("all max")
+                .to_bits(),
+            f64::MAX.to_bits()
+        );
+        assert_eq!(
+            overflow_safe_signed_mean([-f64::MAX; 4])
+                .expect("all neg")
+                .to_bits(),
+            (-f64::MAX).to_bits()
+        );
+        assert_eq!(
+            overflow_safe_signed_mean([f64::MAX, f64::MAX, 0.0, 0.0])
+                .expect("zeros")
+                .to_bits(),
+            (f64::MAX / 2.0).to_bits()
+        );
+    }
+
     fn overflowing_cwc_rate_rows(cluster_key: u64, growing: bool) -> [ClusteredEventScore; 3] {
         let delta = 1e-305_f64;
         let (first, second) = if growing {
@@ -9128,14 +9232,18 @@ mod tests {
         assert!(cgm.is_finite());
         let pairs = center_grand_mean_event_lags(&rows, LagClock::EventTime).expect("cgm pairs");
         assert_eq!(pairs.len(), 2);
-        assert!(pairs
-            .iter()
-            .all(|pair| same_sign_nonzero(pair.earlier_residual, pair.later_residual)));
+        assert!(
+            pairs
+                .iter()
+                .all(|pair| same_sign_nonzero(pair.earlier_residual, pair.later_residual))
+        );
         let cwc_pairs =
             center_within_cluster_event_lags(&rows, LagClock::EventTime).expect("cwc pairs");
-        assert!(cwc_pairs
-            .iter()
-            .all(|pair| !same_sign_nonzero(pair.earlier_residual, pair.later_residual)));
+        assert!(
+            cwc_pairs
+                .iter()
+                .all(|pair| !same_sign_nonzero(pair.earlier_residual, pair.later_residual))
+        );
     }
 
     #[test]
@@ -9194,15 +9302,18 @@ mod tests {
             .expect("cwc");
         assert!((cgm - cwc).abs() < 1e-15);
         let extracted = center_grand_mean_event_lags(&rows, LagClock::EventTime).expect("extract");
-        let admissible: Vec<LaggedWithinResidual> = extracted
+        let cwc_extracted =
+            center_within_cluster_event_lags(&rows, LagClock::EventTime).expect("cwc extract");
+        let admissible: Vec<LaggedWithinResidual> = cwc_extracted
             .iter()
             .copied()
             .filter(|pair| same_sign_nonzero(pair.earlier_residual, pair.later_residual))
             .collect();
-        let from_pairs =
+        let from_cwc_pairs =
             recover_irregular_centered_residual_log_rate(&admissible, LagClock::EventTime)
-                .expect("pairs");
-        assert!((cgm - from_pairs).abs() < 1e-15);
+                .expect("cwc pairs");
+        assert!((cwc - from_cwc_pairs).abs() < 1e-15);
+        assert_eq!(extracted.len(), cwc_extracted.len());
     }
 
     #[test]
@@ -9410,19 +9521,6 @@ mod tests {
         assert_eq!(
             center_grand_mean_event_lags(
                 &[
-                    clustered(1, 0.0, f64::MAX),
-                    clustered(1, 1.0, f64::MAX),
-                    clustered(2, 0.0, f64::MAX),
-                    clustered(2, 1.0, f64::MAX),
-                ],
-                LagClock::EventTime
-            ),
-            Err(PsychometricError::InvalidNumericInput),
-            "overflowing grand mean fails closed"
-        );
-        assert_eq!(
-            center_grand_mean_event_lags(
-                &[
                     clustered(2, 0.0, -f64::MAX),
                     clustered(1, 0.0, f64::MAX),
                     clustered(2, 1.0, -f64::MAX),
@@ -9449,6 +9547,109 @@ mod tests {
             ),
             Err(PsychometricError::NonPositiveInterval)
         );
+    }
+
+    #[test]
+    fn grand_mean_overflowing_sum_keeps_representable_mean() {
+        let pairs = center_grand_mean_event_lags(
+            &[
+                clustered(1, 0.0, f64::MAX),
+                clustered(1, 1.0, f64::MAX),
+                clustered(2, 0.0, f64::MAX),
+                clustered(2, 1.0, f64::MAX),
+            ],
+            LagClock::EventTime,
+        )
+        .expect("finite all-MAX grand mean");
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].earlier_residual.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(pairs[0].later_residual.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(
+            recover_grand_mean_centered_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, f64::MAX),
+                    clustered(1, 1.0, f64::MAX),
+                    clustered(2, 0.0, f64::MAX),
+                    clustered(2, 1.0, f64::MAX),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput),
+            "zero residuals after a finite all-MAX grand mean are not admissible"
+        );
+        let neg_pairs = center_grand_mean_event_lags(
+            &[
+                clustered(1, 0.0, -f64::MAX),
+                clustered(1, 1.0, -f64::MAX),
+                clustered(2, 0.0, -f64::MAX),
+                clustered(2, 1.0, -f64::MAX),
+            ],
+            LagClock::EventTime,
+        )
+        .expect("finite all-neg-MAX grand mean");
+        assert_eq!(neg_pairs.len(), 2);
+        assert_eq!(neg_pairs[0].earlier_residual.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(neg_pairs[0].later_residual.to_bits(), 0.0_f64.to_bits());
+        let zero_pairs = center_grand_mean_event_lags(
+            &[
+                clustered(1, 0.0, f64::MAX),
+                clustered(1, 1.0, f64::MAX),
+                clustered(2, 0.0, 0.0),
+                clustered(2, 1.0, 0.0),
+            ],
+            LagClock::EventTime,
+        )
+        .expect("zeros keep overflowing positives");
+        assert_eq!(zero_pairs.len(), 2);
+        assert_eq!(
+            zero_pairs[0].earlier_residual.to_bits(),
+            (f64::MAX / 2.0).to_bits()
+        );
+        assert_eq!(
+            zero_pairs[1].earlier_residual.to_bits(),
+            (-(f64::MAX / 2.0)).to_bits()
+        );
+    }
+
+    #[test]
+    fn grand_mean_centering_is_stable_across_score_order() {
+        let positives_first = [
+            clustered(1, 0.0, f64::MAX),
+            clustered(1, 1.0, f64::MAX),
+            clustered(2, 0.0, -f64::MAX),
+            clustered(2, 1.0, -f64::MAX),
+        ];
+        let negatives_first = [
+            clustered(2, 0.0, -f64::MAX),
+            clustered(2, 1.0, -f64::MAX),
+            clustered(1, 0.0, f64::MAX),
+            clustered(1, 1.0, f64::MAX),
+        ];
+        let positives =
+            center_grand_mean_event_lags(&positives_first, LagClock::EventTime).expect("pos");
+        let negatives =
+            center_grand_mean_event_lags(&negatives_first, LagClock::EventTime).expect("neg");
+        assert_eq!(positives, negatives);
+        assert_eq!(positives.len(), 2);
+        assert_eq!(positives[0].earlier_residual.to_bits(), f64::MAX.to_bits());
+        assert_eq!(positives[0].later_residual.to_bits(), f64::MAX.to_bits());
+        assert_eq!(
+            positives[1].earlier_residual.to_bits(),
+            (-f64::MAX).to_bits()
+        );
+        assert_eq!(positives[1].later_residual.to_bits(), (-f64::MAX).to_bits());
+        let recovered = recover_grand_mean_centered_irregular_residual_log_rate(
+            &positives_first,
+            LagClock::EventTime,
+        )
+        .expect("same-sign MAX pairs");
+        let recovered_neg = recover_grand_mean_centered_irregular_residual_log_rate(
+            &negatives_first,
+            LagClock::EventTime,
+        )
+        .expect("same-sign MAX pairs reversed");
+        assert_eq!(recovered.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(recovered_neg.to_bits(), 0.0_f64.to_bits());
     }
 
     #[test]
