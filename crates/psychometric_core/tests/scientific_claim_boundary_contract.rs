@@ -1,7 +1,6 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -29,6 +28,7 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_predetermined_later_observed_variance,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
@@ -113,11 +113,13 @@ use psychometric_core::{
     refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
+    refuse_measurement_error_as_predetermined_later_observed_variance,
     refuse_measurement_error_as_standardised_manifest_trait_variance,
     refuse_measurement_error_as_stationary_lagged_observed_covariance,
     refuse_measurement_error_as_stationary_later_observed_variance,
     refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
     refuse_observed_variance_as_standardised_manifest_variance,
+    refuse_predetermined_later_latent_variance_as_observed_variance,
     refuse_process_noise_as_unconditional_variance,
     refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance,
     refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
@@ -153,6 +155,7 @@ use psychometric_core::{
     refuse_stationary_later_latent_variance_as_lagged_covariance,
     refuse_stationary_later_latent_variance_as_observed_variance,
     refuse_stationary_later_latent_variance_as_process_noise,
+    refuse_stationary_later_observed_variance_as_predetermined_later_observed_variance,
     refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
@@ -181,6 +184,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -3008,6 +3012,97 @@ fn stationary_later_observed_variance_is_not_manifest_latent_or_lagged() {
         ),
         Err(
             psychometric_core::PsychometricError::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance
+        )
+    );
+}
+
+#[test]
+fn predetermined_later_observed_variance_is_not_manifest_latent_or_stationary() {
+    let trait_variance = 1.0_f64;
+    let initial = 2.0_f64;
+    let diffusion = 0.4_f64;
+    let log_rate = -0.134_488_942_f64;
+    let loading = 2.0_f64;
+    let measurement_error = 0.5_f64;
+    let event_delta = 1.0_f64;
+    let recovered = recover_predetermined_later_observed_variance(
+        loading,
+        trait_variance,
+        initial,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        event_delta,
+        measurement_error,
+        0.1,
+        LagClock::EventTime,
+    )
+    .expect("eq5-later-predetermined-T0VAR");
+    let evolved_state = recover_discrete_latent_variance(
+        initial,
+        diffusion,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("evolved");
+    let trait_plus = recover_trait_plus_state_latent_variance(trait_variance, evolved_state)
+        .expect("trait + evolved");
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("added");
+    let later_latent = trait_plus + added;
+    let stationary = recover_stationary_later_observed_variance(
+        loading,
+        trait_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        event_delta,
+        measurement_error,
+        0.1,
+        LagClock::EventTime,
+    )
+    .expect("eq5-later-stationary-T0VAR");
+    assert!(
+        (recovered - measurement_error).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of later §4.3 predetermined T0VAR): Var(y_t) is not MANIFESTVAR"
+    );
+    assert!(
+        (recovered - later_latent).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of later §4.3 predetermined T0VAR): Var(y_t) is not later T0VAR"
+    );
+    assert!(
+        (recovered - stationary).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of later §4.3 predetermined T0VAR): free p_0 is not the stationary later observed variance"
+    );
+    assert_eq!(
+        refuse_predetermined_later_latent_variance_as_observed_variance(later_latent, recovered),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterLatentVarianceIsNotObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_measurement_error_as_predetermined_later_observed_variance(
+            measurement_error,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::MeasurementErrorIsNotPredeterminedLaterObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_stationary_later_observed_variance_as_predetermined_later_observed_variance(
+            stationary, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StationaryLaterObservedVarianceIsNotPredeterminedLaterObservedVariance
         )
     );
 }
