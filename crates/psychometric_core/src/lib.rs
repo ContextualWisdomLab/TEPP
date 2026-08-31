@@ -261,6 +261,15 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers Eq. 5 of the 2017-era commented `discreteTRAITVAR` as
+//! `λ² (1 − e^{a Δt})² (trait / a²) + θ` (form `e^{a Δt}`, then
+//! `1 − e^{a Δt}` then square, then `1 / a` then square then
+//! multiply by `trait`, then multiply, then `λ²` plus `θ`; a zero
+//! loading is exactly `θ`; a zero trait is exactly `θ` even if
+//! `a ≥ 0`; `a ≥ 0` with a nonzero trait fails closed; do not
+//! export the unstandardised discrete trait; do not import
+//! unpublished `#330` / `#343` / `#347` helpers; JSS PDF re-opened
+//! 2026-08-31T05:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -367,6 +376,8 @@ pub use event_time::recover_discrete_process_noise;
 pub use event_time::recover_discrete_time_independent_predictor_effect;
 /// First-order discrete effect of a time-varying event-time predictor.
 pub use event_time::recover_discrete_time_varying_predictor_effect;
+/// Exact scalar Eq. 5 of 2017-era commented `discreteTRAITVAR` `λ² (1 − e^{a Δt})² (trait / a²) + θ`.
+pub use event_time::recover_discrete_trait_observed_variance;
 /// Mean local log-rate on a sorted event-time series.
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
@@ -600,6 +611,8 @@ pub use event_time::refuse_level_change_intercept_as_process_increment;
 pub use event_time::refuse_manifest_means_as_observed_mean;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.
 pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of 2017-era commented `discreteTRAITVAR`.
+pub use event_time::refuse_measurement_error_as_discrete_trait_observed_variance;
 /// Refuse treating Driver Eq. 5 measurement error as lagged observed covariance.
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
@@ -641,6 +654,8 @@ pub use event_time::refuse_standardised_manifest_variance_as_standardised_manife
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
+/// Refuse treating p. 16 `TRAITVARstd` as Eq. 5 of 2017-era commented `discreteTRAITVAR`.
+pub use event_time::refuse_standardised_trait_variance_as_discrete_trait_observed_variance;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_standardised_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -744,6 +759,10 @@ pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardise
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
 
+/// Refuse treating unstandardised 2017-era commented `discreteTRAITVAR` as Eq. 5 of that map.
+pub use event_time::refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance;
+/// Refuse treating untransformed `TRAITVAR` as Eq. 5 of 2017-era commented `discreteTRAITVAR`.
+pub use event_time::refuse_unstandardised_trait_variance_as_discrete_trait_observed_variance;
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
