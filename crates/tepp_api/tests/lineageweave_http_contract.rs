@@ -7,9 +7,11 @@ use std::thread;
 use std::time::Duration;
 
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunCancelRequest,
+    AnalysisRunLiveService, AnalysisRunRequest, AnalysisRunRetryLineage, AnalysisRunRetryRequest,
     ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE,
     NARUON_LIVE_HEADER_BYTE_LIMIT, lineageweave_analysis_run_exchange,
+    lineageweave_analysis_run_retry_lineage_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -152,4 +154,98 @@ fn live_listener_serves_lineageweave_over_loopback() {
         worker.join().expect("join").expect("served").status_code,
         202
     );
+}
+
+#[test]
+fn lineageweave_retry_lineage_exchange_uses_the_published_consumer_header_without_credentials() {
+    let exchange = lineageweave_analysis_run_retry_lineage_exchange(
+        "https://tepp.example.test",
+        "tepp-run-lineage",
+    )
+    .expect("lineageweave retry-lineage exchange");
+    assert_eq!(exchange.method, "GET");
+    assert_eq!(
+        exchange.target_url,
+        "https://tepp.example.test/v1/analysis-runs/tepp-run-lineage/retries"
+    );
+    assert!(exchange.body.is_empty());
+    assert!(
+        exchange
+            .headers
+            .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+    );
+    assert!(
+        !exchange
+            .headers
+            .contains(&("tepp-consumer".into(), NARUON_CONSUMER_CODE.into()))
+    );
+    assert!(exchange.headers.iter().all(|(name, _)| {
+        !matches!(
+            name.to_ascii_lowercase().as_str(),
+            "authorization" | "proxy-authorization" | "cookie" | "x-api-key" | "idempotency-key"
+        )
+    }));
+}
+
+#[test]
+fn live_listener_inspects_lineageweave_retry_lineage_and_isolates_consumers() {
+    let run = sample_run();
+    let mut service = AnalysisRunLiveService::new();
+    let lineageweave = service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &run));
+    assert_eq!(lineageweave.status_code, 202);
+    let accepted = AnalysisRunAccepted::from_json(&lineageweave.body).expect("accepted");
+    let inspect = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/{}/retries HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        accepted.run_id
+    );
+    let inspected = service.handle_http_request(&inspect);
+    assert_eq!(inspected.status_code, 200);
+    let lineage = AnalysisRunRetryLineage::from_json(&inspected.body).expect("lineage");
+    assert_eq!(lineage.run_id, accepted.run_id);
+    assert!(lineage.retries.is_empty());
+    assert!(!inspected.body.contains("rmse"));
+    assert!(!inspected.body.contains("scientific_acceptance"));
+    let naruon_inspect = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/{}/retries HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        accepted.run_id
+    );
+    assert_eq!(
+        service.handle_http_request(&naruon_inspect).status_code,
+        400
+    );
+
+    let cancel_body = AnalysisRunCancelRequest::new(&accepted.run_id, run.idempotency_key.as_str())
+        .expect("cancel dto")
+        .to_json()
+        .expect("cancel json");
+    let cancel = format!(
+        "POST {NARUON_ANALYSIS_RUN_PATH}/{}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{cancel_body}",
+        accepted.run_id,
+        run.idempotency_key,
+        cancel_body.len()
+    );
+    assert_eq!(service.handle_http_request(&cancel).status_code, 200);
+    let retry_key = "lineageweave-retry-lineage-idem";
+    let retry_body = AnalysisRunRetryRequest::new(&accepted.run_id, retry_key)
+        .expect("retry dto")
+        .to_json()
+        .expect("retry json");
+    let retry = format!(
+        "POST {NARUON_ANALYSIS_RUN_PATH}/{}/retry HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: {retry_key}\r\ncontent-length: {}\r\n\r\n{retry_body}",
+        accepted.run_id,
+        retry_body.len()
+    );
+    let retried = service.handle_http_request(&retry);
+    assert_eq!(retried.status_code, 202);
+    let child = AnalysisRunAccepted::from_json(&retried.body).expect("child");
+    let parent_inspect = service.handle_http_request(&inspect);
+    assert_eq!(parent_inspect.status_code, 200);
+    let payload = AnalysisRunRetryLineage::from_json(&parent_inspect.body).expect("children");
+    assert_eq!(payload.run_id, accepted.run_id);
+    assert_eq!(payload.retries.len(), 1);
+    assert_eq!(payload.retries[0].run_id, child.run_id);
+    assert!(!parent_inspect.body.contains("rmse"));
+    assert!(!parent_inspect.body.contains("scientific_acceptance"));
+    assert!(!parent_inspect.body.contains("tenant_workspace_id"));
+    assert!(!parent_inspect.body.contains("snapshot_id"));
 }
