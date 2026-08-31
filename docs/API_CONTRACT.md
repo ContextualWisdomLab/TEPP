@@ -105,10 +105,13 @@ key without scanning collection pages. `GET /v1/analysis-runs/{run_id}/parent`
 on the loopback listener returns the metric-free parent of that run so
 operators can inspect which listed run a retry child was cloned from. Original
 (never-retried) runs return `"parent": null`. `lineageweave_analysis_run_retry_parent_exchange`
-builds the same GET for LineageWeave. `NaruonLiveService` serves retry-parent GET
-for Naruon only and returns `"parent": null` on accepted creates; LineageWeave
-remains refused on that compatibility listener. GET-by-id remains a later slice
-on this protected-main lineage.
+builds the same GET for LineageWeave. `tepp-retry-parent parent` is the published
+CLI that mints those typed naruon/`LineageWeave` retry-parent exchanges onto
+spawned `tepp-loopback` TCP. Public bind hosts and `localhost` fail closed.
+`NaruonLiveService` serves retry-parent GET for Naruon only and returns
+`"parent": null` on accepted creates; LineageWeave remains refused on that
+compatibility listener. GET-by-id remains a later slice on this
+protected-main lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

@@ -9,7 +9,9 @@
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
-//! causality, or completed psychometric model results.
+//! causality, or completed psychometric model results. The published
+//! `tepp-retry-parent` CLI mints typed naruon/`LineageWeave` retry-parent GET
+//! exchanges onto spawned `tepp-loopback` TCP.
 
 mod analysis_result;
 mod analysis_run;
@@ -19,6 +21,7 @@ mod analysis_run_idempotency_lookup_http;
 mod analysis_run_live;
 mod analysis_run_retry_http;
 mod analysis_run_retry_lineage_http;
+mod analysis_run_retry_parent_cli;
 mod analysis_run_retry_parent_http;
 mod analysis_run_status_http;
 mod analysis_run_stored_request_http;
@@ -158,6 +161,22 @@ pub use analysis_run_retry_parent_http::AnalysisRunRetryParentItem;
 pub use analysis_run_retry_parent_http::naruon_analysis_run_retry_parent_exchange;
 /// Refuse scientific-metric keys on a retry-parent payload.
 pub use analysis_run_retry_parent_http::refuse_metrics_on_retry_parent_payload;
+/// Loopback retry-parent CLI invocation.
+pub use analysis_run_retry_parent_cli::AnalysisRunRetryParentCliInvocation;
+/// Loopback retry-parent CLI verb.
+pub use analysis_run_retry_parent_cli::AnalysisRunRetryParentCliVerb;
+/// Compose HTTP/1.1 retry-parent GET from a CLI invocation.
+pub use analysis_run_retry_parent_cli::compose_analysis_run_retry_parent_cli_http;
+/// Dispatch a retry-parent CLI invocation against an in-process listener.
+pub use analysis_run_retry_parent_cli::dispatch_analysis_run_retry_parent_cli;
+/// Execute a retry-parent CLI invocation over loopback TCP.
+pub use analysis_run_retry_parent_cli::execute_analysis_run_retry_parent_cli;
+/// Render a typed retry-parent exchange onto a loopback HTTP/1.1 request.
+pub use analysis_run_retry_parent_cli::loopback_http1_from_retry_parent_exchange;
+/// Read retry-parent CLI stdin; GET requires empty.
+pub use analysis_run_retry_parent_cli::read_analysis_run_retry_parent_cli_stdin;
+/// Filter retry-parent CLI stdout so inspect stays metric-free.
+pub use analysis_run_retry_parent_cli::render_analysis_run_retry_parent_cli_stdout;
 /// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
 /// Analysis-run stored-request contract version constant.
