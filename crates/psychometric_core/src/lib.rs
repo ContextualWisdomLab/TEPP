@@ -119,6 +119,18 @@
 //! (pp. 20–21; stable between-subject variance accounted for by a
 //! time-independent predictor with variance `v`; not `TRAITVAR`,
 //! not `asymDIFFUSION`, and not `-B z / a`),
+//! recovers the Driver Eq. 5 of §7.2 `addedTIPREDVAR` as
+//! `λ² (B / a)² v`
+//! (JSS PDF re-opened 2026-08-30T14:06Z; 2017-era
+//! `summary.ctsemFit.R` forms `addedTIPREDVAR` as
+//! `asymTIPREDEFFECT %*% TIPREDVAR %*% t(asymTIPREDEFFECT)`; form
+//! `(B / a)² v` first, then `(λ extra) λ` with `θ = 0`; a zero
+//! loading or zero extra is exactly zero; lasting asymptotic extra
+//! requires `a < 0`; `(B / a)² v` is the latent extra and is not
+//! this observed extra; `λ² t0_b² v` is Eq. 5 of `addedT0TIPREDVAR`
+//! and is not this extra; `λ² p + θ` is stationary observed
+//! variance and is not this extra; `MANIFESTVAR` `θ` is not this
+//! extra),
 //! recovers the Driver Table 2 `asymCINT` as `-κ / a`
 //! (p. 12; Eq. 3 as `Δt → ∞`; JSS PDF opened 2026-08-21T16:13Z;
 //! expected change in process means for a unit intercept; `a < 0`;
@@ -313,6 +325,8 @@ pub use event_time::LaggedWithinResidual;
 pub use event_time::map_discrete_lag_across_event_intervals;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
 pub use event_time::recover_asymptotic_continuous_intercept;
+/// Exact scalar Eq. 5 of §7.2 `addedTIPREDVAR` `λ² (B / a)² v`.
+pub use event_time::recover_asymptotic_time_independent_observed_variance;
 /// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
 pub use event_time::recover_asymptotic_time_independent_predictor_effect;
 /// Exact scalar §7.2 `addedTIPREDVAR` `(B / a)² v`.
@@ -474,6 +488,14 @@ pub use event_time::refuse_asymptotic_time_independent_effect_as_continuous_inte
 pub use event_time::refuse_asymptotic_time_independent_effect_as_discrete_effect;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `M x`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_time_dependent_impulse;
+/// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as the latent extra.
+pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_asymptotic_time_independent_variance;
+/// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as Eq. 5 of `addedT0TIPREDVAR`.
+pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_initial_time_independent_observed_variance;
+/// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as `MANIFESTVAR`.
+pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_measurement_error;
+/// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as stationary observed variance.
+pub use event_time::refuse_asymptotic_time_independent_observed_variance_as_stationary_observed_variance;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymTIPREDEFFECT`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_effect;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymDIFFUSION`.
