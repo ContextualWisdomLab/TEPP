@@ -19,6 +19,7 @@ mod analysis_run;
 mod analysis_run_live;
 mod analysis_run_status_cli;
 mod analysis_run_status_http;
+mod analysis_run_wait_cli;
 mod authorization;
 mod corpus_split_manifest;
 mod envelope;
@@ -92,6 +93,16 @@ pub use analysis_run_status_cli::read_analysis_run_status_cli_stdin;
 pub use analysis_run_status_cli::render_analysis_run_status_cli_stdout;
 /// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
+/// One validated wait CLI invocation.
+pub use analysis_run_wait_cli::AnalysisRunWaitCliInvocation;
+/// Loopback wait CLI verb.
+pub use analysis_run_wait_cli::AnalysisRunWaitCliVerb;
+/// Dispatch a wait CLI invocation against an in-process listener.
+pub use analysis_run_wait_cli::dispatch_analysis_run_wait_cli;
+/// Execute a wait CLI invocation over loopback TCP.
+pub use analysis_run_wait_cli::execute_analysis_run_wait_cli;
+/// Render wait CLI stdout with status metric-free gates.
+pub use analysis_run_wait_cli::render_analysis_run_wait_cli_stdout;
 /// Corpus-split leakage-audit contract version.
 pub use corpus_split_manifest::CORPUS_SPLIT_MANIFEST_CONTRACT_VERSION;
 /// Versioned corpus-split leakage-audit manifest.

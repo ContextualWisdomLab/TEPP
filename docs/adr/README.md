@@ -33,6 +33,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0027](0027-scientific-acceptance-http-status.md) | Scientific-acceptance loopback HTTP status path | Accepted | active-PR | GET `/v1/analysis-runs/{run_id}` stays metric-free on accepted/running; `tepp.scientific_acceptance.v1` only on succeeded `scientific_acceptance_v1`. |
 | [0028](0028-analysis-run-status-consumer-parity.md) | LineageWeave status-exchange and loopback TCP GET proof | Accepted | active-PR | Complements ADR 0027; does not open `NaruonLiveService` to GET. |
 | [0029](0029-analysis-run-status-cli.md) | Loopback `tepp-analysis-runs status` is GET-by-id client | Accepted | active-PR | Complements ADR 0027/0028; does not supersede ADR 0014. Unique on GET-status lineage. |
+| [0030](0030-analysis-run-wait-cli.md) | Loopback `tepp-analysis-runs wait` polls GET-by-id until terminal | Accepted | active-PR | Complements ADR 0029; does not supersede ADR 0014. Unique on GET-status lineage. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -146,6 +147,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **analysis-run scientific-acceptance GET:** ADR 0027.
 - **analysis-run status consumer parity:** ADR 0028.
 - **analysis-run status CLI:** ADR 0029.
+- **analysis-run wait CLI:** ADR 0030.
 
 ## Change and supersession rule
 

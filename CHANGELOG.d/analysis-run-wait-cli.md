@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-analysis-runs wait` polls metric-free status until succeeded or failed (ADR 0030). Timeout `0` fails closed on accepted/running. `tepp.scientific_acceptance.v1` only on succeeded `scientific_acceptance_v1`. Not status CLI, not GET-by-id HTTP, not persistence.
