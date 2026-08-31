@@ -12,6 +12,7 @@
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod location_membership_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -45,6 +46,13 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Location-membership artifact and execution contracts from this engine.
+pub use location_membership_artifact::{
+    LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT, LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
+    LOCATION_MEMBERSHIP_MODEL_CONTRACT_VERSION, LOCATION_MEMBERSHIP_OUTPUT_PROFILE,
+    LocationMembershipArtifact, LocationMembershipDocument, LocationMembershipExecution,
+    execute_location_membership_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +256,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A location-membership artifact violated its bounded schema or count invariants.
+    InvalidLocationMembershipArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +272,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidLocationMembershipArtifact => "invalid location-membership artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +691,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidLocationMembershipArtifact,
+                "invalid location-membership artifact",
             ),
         ];
         for (error, message) in messages {
