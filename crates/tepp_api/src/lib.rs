@@ -176,6 +176,8 @@ pub use lineage_pair_criterion::LineageTemporalProvenance;
 pub use lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
 /// Published Naruon modular-consumer identity.
 pub use lineageweave_http::NARUON_CONSUMER_CODE;
+/// Build a `LineageWeave` collection GET without provider credentials.
+pub use lineageweave_http::lineageweave_analysis_run_collection_exchange;
 /// Build a `LineageWeave` analysis-run exchange without provider credentials.
 pub use lineageweave_http::lineageweave_analysis_run_exchange;
 /// Build a `LineageWeave` project-history exchange without provider credentials.

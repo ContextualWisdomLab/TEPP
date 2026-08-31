@@ -32,6 +32,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
 | [0029](0029-analysis-run-cancel-http.md) | Loopback POST analysis-run cancel is metric-free cancelled status | Accepted | active-PR | Complements ADR 0018; does not supersede ADR 0014. ADR 0026–0028 live on other GAP-003A PRs. |
 | [0031](0031-analysis-run-collection-get.md) | Loopback GET analysis-run collection is metric-free enumeration | Accepted | active-PR | Complements ADR 0018/0029; does not supersede ADR 0014. ADR 0026–0030 live on other GAP-003A PRs. |
+| [0042](0042-analysis-run-collection-consumer-parity.md) | LineageWeave and Naruon compatibility-listener collection GET | Accepted | active-PR | Complements ADR 0031/0018; does not supersede ADR 0014. ADR 0026–0041 live on other PRs. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -144,6 +145,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
 - **analysis-run cancel HTTP:** ADR 0029.
 - **analysis-run collection GET:** ADR 0031.
+- **analysis-run collection consumer parity:** ADR 0042.
 
 ## Change and supersession rule
 

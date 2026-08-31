@@ -5,6 +5,11 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 
+use crate::analysis_run_collection_http::{
+    AnalysisRunCollection, AnalysisRunCollectionItem, is_analysis_run_collection_path,
+    parse_collection_page_cursor, parse_collection_page_limit,
+    refuse_metrics_on_collection_payload,
+};
 use crate::authorization::{
     AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
 };
@@ -16,7 +21,7 @@ use crate::live_http::{
 use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH};
 use crate::wire::{from_json, to_json};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, ApiError, ErrorEnvelope,
+    AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunStatusState, ApiError, ErrorEnvelope,
     requests_are_idempotent_matches,
 };
 
@@ -51,7 +56,7 @@ pub struct NaruonLiveResponse {
 /// Production interchange origins remain `https` only. This listener binds
 /// loopback TCP so tests and local standalone operation can prove request
 /// handling without claiming TLS termination or cross-service table access.
-/// This port only accepts versioned naruon POSTs.
+/// This port accepts versioned naruon POSTs and Naruon-only collection GET.
 #[derive(Debug)]
 pub struct NaruonLiveService {
     listener: Option<TcpListener>,
@@ -198,14 +203,21 @@ impl NaruonLiveService {
         let mut lines = header_block.split("\r\n");
         let request_line = lines.next().unwrap_or("");
         let (method, path) = parse_request_line(request_line)?;
+        let headers = parse_headers(lines)?;
+        if method == "GET" && is_analysis_run_collection_path(path) {
+            refuse_live_headers(&headers, self.bound_addr, false)?;
+            return self.list_analysis_runs(path, &headers, body);
+        }
+        if method == "GET" {
+            return Err(ApiError::InvalidWirePayload);
+        }
         if method != "POST" {
             return Err(ApiError::InvalidWirePayload);
         }
         if path != NARUON_ANALYSIS_RUN_PATH && path != NARUON_EXPORT_PATH {
             return Err(ApiError::InvalidWirePayload);
         }
-        let headers = parse_headers(lines)?;
-        refuse_live_headers(&headers, self.bound_addr)?;
+        refuse_live_headers(&headers, self.bound_addr, true)?;
         self.dispatch_path(path, &headers, body)
     }
 
@@ -250,6 +262,64 @@ impl NaruonLiveService {
         let body = accepted.to_json()?;
         self.accepted_runs.insert(replay_key, (request, accepted));
         Ok(NaruonLiveResponse::json(202, "Accepted", body))
+    }
+
+    fn list_analysis_runs(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if !is_analysis_run_collection_path(path) {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_collection_payload(body)?;
+        let limit =
+            parse_collection_page_limit(headers.get("tepp-page-limit").map(String::as_str))?;
+        let cursor =
+            parse_collection_page_cursor(headers.get("tepp-page-cursor").map(String::as_str))?;
+        let mut rows: Vec<&AnalysisRunAccepted> = self
+            .accepted_runs
+            .values()
+            .map(|(_, accepted)| accepted)
+            .collect();
+        rows.sort_by(|left, right| left.run_id.cmp(&right.run_id));
+        let start = match cursor {
+            Some(cursor) => {
+                let position = rows
+                    .iter()
+                    .position(|accepted| accepted.run_id == cursor)
+                    .ok_or(ApiError::InvalidWirePayload)?;
+                position + 1
+            }
+            None => 0,
+        };
+        let page = rows.get(start..).unwrap_or(&[]);
+        let (visible, remainder) = if page.len() > limit {
+            page.split_at(limit)
+        } else {
+            (page, &[] as &[&AnalysisRunAccepted])
+        };
+        let mut items = Vec::with_capacity(visible.len());
+        for accepted in visible {
+            items.push(AnalysisRunCollectionItem::new(
+                accepted.run_id.clone(),
+                AnalysisRunStatusState::Accepted,
+                accepted.idempotency_key.clone(),
+            )?);
+        }
+        let next_cursor = if remainder.is_empty() {
+            None
+        } else {
+            visible.last().map(|accepted| accepted.run_id.clone())
+        };
+        let collection = AnalysisRunCollection::new(items, next_cursor)?;
+        let response_body = collection.to_json()?;
+        refuse_metrics_on_collection_payload(&response_body)?;
+        Ok(NaruonLiveResponse::json(200, "OK", response_body))
     }
 
     fn authorize_export(
@@ -326,6 +396,7 @@ fn status_for(error: ApiError) -> (u16, &'static str) {
 fn refuse_live_headers(
     headers: &HashMap<String, String>,
     bound_addr: Option<SocketAddr>,
+    require_idempotency: bool,
 ) -> Result<(), ApiError> {
     validate_common_headers(headers, bound_addr)?;
     if header_value(headers, "tepp-consumer")? != NARUON_CONSUMER_CODE {
@@ -334,7 +405,9 @@ fn refuse_live_headers(
     if header_value(headers, "tepp-contract-version")? != "1" {
         return Err(ApiError::InvalidWirePayload);
     }
-    let _idempotency_key = header_value(headers, "idempotency-key")?;
+    if require_idempotency {
+        let _idempotency_key = header_value(headers, "idempotency-key")?;
+    }
     Ok(())
 }
 
@@ -530,5 +603,113 @@ mod tests {
                 .expect_err("accept"),
             ApiError::InvalidWirePayload
         );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn naruon_compatibility_listener_lists_accepted_runs() {
+        use crate::{ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunCollection, AnalysisRunRequest};
+
+        let run = AnalysisRunRequest {
+            contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
+            idempotency_key: "naruon-collection-idem".into(),
+            tenant_workspace_id: "naruon-collection-tenant".into(),
+            snapshot_id: "naruon-collection-snapshot".into(),
+            knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            model_contract_version: "tepp-analysis-run-v1".into(),
+            output_profile: "calibrated_event_measurement".into(),
+        };
+        let body = run.to_json().expect("run json");
+        let create = format!(
+            "POST /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: naruon-collection-idem\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let mut service = NaruonLiveService::new();
+        let empty = service.handle_http_request(
+            "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        );
+        assert_eq!(empty.status_code, 200);
+        let empty_page = AnalysisRunCollection::from_json(&empty.body).expect("empty");
+        assert!(empty_page.runs.is_empty());
+        assert!(empty_page.next_cursor.is_none());
+
+        let accepted = service.handle_http_request(&create);
+        assert_eq!(accepted.status_code, 202);
+        let run_id = serde_json::from_str::<serde_json::Value>(&accepted.body)
+            .expect("accepted json")["run_id"]
+            .as_str()
+            .expect("run_id")
+            .to_owned();
+
+        let listed = service.handle_http_request(
+            "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        );
+        assert_eq!(listed.status_code, 200);
+        let page = AnalysisRunCollection::from_json(&listed.body).expect("page");
+        assert_eq!(page.runs.len(), 1);
+        assert_eq!(page.runs[0].run_id, run_id);
+        assert_eq!(
+            page.runs[0].run_state,
+            crate::AnalysisRunStatusState::Accepted
+        );
+        assert_eq!(page.runs[0].idempotency_key, run.idempotency_key);
+        assert!(!listed.body.contains("rmse"));
+        assert!(!listed.body.contains("scientific_acceptance"));
+        assert!(!listed.body.contains("terminal_result"));
+        assert!(!listed.body.contains("tenant_workspace_id"));
+
+        let replay = service.handle_http_request(
+            "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        );
+        assert_eq!(replay.body, listed.body);
+
+        let lineageweave = service.handle_http_request(
+            "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: lineageweave\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        );
+        assert_eq!(lineageweave.status_code, 400);
+        assert_eq!(
+            service
+                .handle_http_request(
+                    "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{}"
+                )
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(
+                    "GET /v1/analysis-runs/missing HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                )
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(
+                    "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ntepp-page-cursor: missing\r\ncontent-length: 0\r\n\r\n"
+                )
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(
+                    "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ntepp-page-limit: 0\r\ncontent-length: 0\r\n\r\n"
+                )
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(
+                    "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ntepp-page-limit: 99\r\ncontent-length: 0\r\n\r\n"
+                )
+                .status_code,
+            413
+        );
+        let metrics = service.handle_http_request(
+            "GET /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 16\r\n\r\n{\"rmse\":0.1}",
+        );
+        assert_eq!(metrics.status_code, 400);
     }
 }
