@@ -261,6 +261,16 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era commented `asymptotes=TRUE` `TRAITVAR`
+//! rewrite as `a² · trait` (`summary.ctsemFit.R` comments
+//! `if(asymptotes==TRUE) TRAITVAR <- DRIFT %&% TRAITVAR`; `OpenMx`
+//! `%&%` is `t(A) %*% B %*% A`; form `a` first, then square, then
+//! multiply by `trait`; a zero trait is exactly zero even if
+//! `a ≥ 0`; `a ≥ 0` with a nonzero trait fails closed;
+//! unstandardised `TRAITVAR` is not that rewrite; `TRAITVARstd` is
+//! not that rewrite; `-q / (2 a)` is not that rewrite;
+//! `(B / a)² v` is not that rewrite; do not import unpublished
+//! `#330` helpers; JSS PDF re-opened 2026-08-31T05:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -311,6 +321,8 @@ pub use event_time::LagClock;
 pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar 2017-era commented `asymptotes=TRUE` `TRAITVAR` rewrite `a² · trait`.
+pub use event_time::recover_asymptotes_true_trait_variance;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
 pub use event_time::recover_asymptotic_continuous_intercept;
 /// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
@@ -474,6 +486,8 @@ pub use event_time::refuse_asymptotic_time_independent_effect_as_continuous_inte
 pub use event_time::refuse_asymptotic_time_independent_effect_as_discrete_effect;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `M x`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_time_dependent_impulse;
+/// Refuse treating §7.2 `addedTIPREDVAR` as the 2017-era commented `asymptotes=TRUE` `TRAITVAR` rewrite.
+pub use event_time::refuse_asymptotic_time_independent_predictor_variance_as_asymptotes_true_trait_variance;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymTIPREDEFFECT`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_effect;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `asymDIFFUSION`.
@@ -641,6 +655,8 @@ pub use event_time::refuse_standardised_manifest_variance_as_standardised_manife
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
+/// Refuse treating p. 16 `TRAITVARstd` as the 2017-era commented `asymptotes=TRUE` `TRAITVAR` rewrite.
+pub use event_time::refuse_standardised_trait_variance_as_asymptotes_true_trait_variance;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_standardised_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -687,6 +703,8 @@ pub use event_time::refuse_stationary_later_latent_variance_as_lagged_covariance
 pub use event_time::refuse_stationary_later_latent_variance_as_observed_variance;
 /// Refuse treating later-occasion §4.3 stationary `T0VAR` as finite-interval process noise.
 pub use event_time::refuse_stationary_later_latent_variance_as_process_noise;
+/// Refuse treating p. 16 `asymDIFFUSION` as the 2017-era commented `asymptotes=TRUE` `TRAITVAR` rewrite.
+pub use event_time::refuse_stationary_variance_as_asymptotes_true_trait_variance;
 /// Refuse treating Eq. 5 of `asymDIFFUSION` as Eq. 5 of §4.3 stationary `T0VAR`.
 pub use event_time::refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
@@ -744,6 +762,8 @@ pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardise
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
 
+/// Refuse treating unstandardised `TRAITVAR` as the 2017-era commented `asymptotes=TRUE` rewrite.
+pub use event_time::refuse_unstandardised_trait_variance_as_asymptotes_true_trait_variance;
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.

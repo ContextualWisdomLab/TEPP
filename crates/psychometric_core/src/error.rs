@@ -710,6 +710,29 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// 2017-era commented `if(asymptotes==TRUE) TRAITVAR <- DRIFT %&%
+    /// TRAITVAR` was requested for a non-stable drift. That rewrite
+    /// is `a² · trait` and converts the asymptotic-parameterization
+    /// stored `TRAITVAR` back to original `TRAITVAR`. Lasting
+    /// conversion requires `a < 0`. A zero trait is exactly zero
+    /// even if `a ≥ 0`.
+    AsymptotesTrueTraitVarianceRequiresStableDrift,
+    /// Unstandardised `TRAITVAR` was treated as the 2017-era
+    /// commented `asymptotes=TRUE` rewrite. `trait` is not
+    /// `a² · trait` when `a ≠ ±1`.
+    UnstandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance,
+    /// Driver p. 16 `TRAITVARstd` was treated as the 2017-era
+    /// commented `asymptotes=TRUE` `TRAITVAR` rewrite. `trait / trait
+    /// = 1` is not `a² · trait`.
+    StandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance,
+    /// Driver p. 16 `asymDIFFUSION` `-q / (2 a)` was treated as the
+    /// 2017-era commented `asymptotes=TRUE` `TRAITVAR` rewrite.
+    /// Stationary within-subject variance is not `a² · trait`.
+    StationaryVarianceIsNotAsymptotesTrueTraitVariance,
+    /// Driver §7.2 `addedTIPREDVAR` `(B / a)² v` was treated as the
+    /// 2017-era commented `asymptotes=TRUE` `TRAITVAR` rewrite.
+    /// Extra TI variance is not `a² · trait`.
+    AsymptoticTimeIndependentPredictorVarianceIsNotAsymptotesTrueTraitVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1257,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptotesTrueTraitVarianceRequiresStableDrift => {
+                "asymptotes-true trait variance requires a stable negative drift"
+            }
+            Self::UnstandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance => {
+                "unstandardised trait variance is not asymptotes-true trait variance"
+            }
+            Self::StandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance => {
+                "standardised trait variance is not asymptotes-true trait variance"
+            }
+            Self::StationaryVarianceIsNotAsymptotesTrueTraitVariance => {
+                "stationary within-subject variance is not asymptotes-true trait variance"
+            }
+            Self::AsymptoticTimeIndependentPredictorVarianceIsNotAsymptotesTrueTraitVariance => {
+                "asymptotic time-independent predictor variance is not asymptotes-true trait variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2109,33 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_trait_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptotesTrueTraitVarianceRequiresStableDrift.to_string(),
+            "asymptotes-true trait variance requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance
+                .to_string(),
+            "unstandardised trait variance is not asymptotes-true trait variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance
+                .to_string(),
+            "standardised trait variance is not asymptotes-true trait variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryVarianceIsNotAsymptotesTrueTraitVariance.to_string(),
+            "stationary within-subject variance is not asymptotes-true trait variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotAsymptotesTrueTraitVariance
+                .to_string(),
+            "asymptotic time-independent predictor variance is not asymptotes-true trait variance"
         );
     }
 }
