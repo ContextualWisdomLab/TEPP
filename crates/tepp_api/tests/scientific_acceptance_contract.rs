@@ -12,7 +12,7 @@ use tepp_api::{
 fn report() -> ScientificAcceptanceReport {
     ScientificAcceptanceReport {
         study_label: "gap-003a-api".into(),
-        rmse: 0.04,
+        rmse: 0.02,
         rmse_standard_error: 0.01,
         mean_bias: 0.0,
         bias_standard_error: 0.02,
@@ -26,7 +26,7 @@ fn report() -> ScientificAcceptanceReport {
 fn artifact() -> ScientificAcceptanceArtifact {
     ScientificAcceptanceArtifact {
         schema_version: SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION.into(),
-        run_id: "run-1".into(),
+        run_id: "tepp-validation-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
         binding_sha256: "a".repeat(64),
         snapshot_id: "snapshot-1".into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
@@ -55,7 +55,12 @@ fn request() -> AnalysisRunRequest {
 }
 
 fn accepted() -> AnalysisRunAccepted {
-    AnalysisRunAccepted::new("run-1", "accepted", "idem-1").expect("accepted")
+    AnalysisRunAccepted::new(
+        "tepp-validation-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "accepted",
+        "idem-1",
+    )
+    .expect("accepted")
 }
 
 fn summary() -> AnalysisResultSummary {
@@ -125,7 +130,8 @@ fn only_succeeded_terminal_may_carry_scientific_acceptance() {
     assert!(status.terminal_result.is_some());
 
     let mut mismatched = artifact();
-    mismatched.run_id = "other-run".into();
+    mismatched.run_id = "tepp-validation-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into();
+    mismatched.binding_sha256 = "b".repeat(64);
     assert_eq!(
         AnalysisRunTerminalResult::succeeded_scientific_acceptance(
             &request(),
@@ -134,6 +140,20 @@ fn only_succeeded_terminal_may_carry_scientific_acceptance() {
             "2026-08-02T03:04:05Z",
             summary(),
             mismatched,
+        ),
+        Err(ApiError::InvalidWirePayload)
+    );
+
+    let mut wrong_model = request();
+    wrong_model.model_contract_version = "other-model".into();
+    assert_eq!(
+        AnalysisRunTerminalResult::succeeded_scientific_acceptance(
+            &wrong_model,
+            &accepted(),
+            "artifact-1",
+            "2026-08-02T03:04:05Z",
+            summary(),
+            artifact(),
         ),
         Err(ApiError::InvalidWirePayload)
     );

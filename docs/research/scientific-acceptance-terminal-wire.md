@@ -8,10 +8,14 @@ This note doctors the second GAP-003A executable slice in `tepp_api`
 1. `AnalysisRunRequest` and `AnalysisRunAccepted` remain metric-free receipts;
 2. only a succeeded terminal result with output profile
    `scientific_acceptance_v1` may carry `tepp.scientific_acceptance.v1`;
-3. RMSE, bias, coverage, SE-gate, and nested report keys on a receipt fail
-   closed;
+3. RMSE, bias, both standard errors, coverage, Wilson bounds, temporal-order,
+   SE-gate, and nested report keys on a receipt fail closed;
 4. a scientific-acceptance profile without the artifact, a failed terminal with
-   the artifact, a digest mismatch, or an all-zero binding digest fail closed.
+   the artifact, a digest mismatch, an all-zero or `run_id`-mismatched binding
+   digest, a model that does not match the request, a future or malformed
+   cutoff, negative RMSE/SEs, out-of-range coverage, inverted Wilson bounds,
+   or an `se_gate_accepted` flag inconsistent with `|RMSE| ≤ k · SE(RMSE)`
+   fail closed.
 
 `analysis_engine` library binding remains on live PR #356. PostgreSQL
 persistence and Compose recovery remain GAP-003B. This slice does not promote
@@ -46,9 +50,11 @@ Technology, 2015).
 
 ## Verification
 
-- metric keys on request or accepted JSON fail closed;
+- metric keys on request or accepted JSON fail closed, including both
+  standard errors, Wilson upper, and temporal-order accuracy;
 - accepted/running status cannot carry a terminal artifact;
 - `succeeded_scientific_acceptance` round-trips with matching digest and
   schema;
 - profile mismatch, missing artifact, failed-terminal artifact, identity
-  mismatch, and digest tamper fail closed.
+  mismatch, model mismatch, future cutoff, impossible metrics, inconsistent
+  SE-gate flag, and digest tamper fail closed.

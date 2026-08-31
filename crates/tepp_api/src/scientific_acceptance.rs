@@ -6,6 +6,7 @@
 //! Persistence and Compose recovery remain GAP-003B.
 
 use crate::ApiError;
+use crate::analysis_run::require_rfc3339_knowledge_cutoff;
 use crate::wire::{from_json, require_byte_limit, require_nonempty, to_json_with_limit};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -22,16 +23,26 @@ pub const SCIENTIFIC_ACCEPTANCE_BACKEND: &str = "cpu";
 pub const SCIENTIFIC_ACCEPTANCE_PRECISION: &str = "f64";
 /// Default maximum serialized artifact size.
 pub const DEFAULT_SCIENTIFIC_ACCEPTANCE_BYTE_LIMIT: usize = 16 * 1024;
+/// Prefix of the hash-stable durable run identity echoed on the artifact.
+pub const SCIENTIFIC_ACCEPTANCE_RUN_ID_PREFIX: &str = "tepp-validation-";
+/// Hex characters taken from the binding digest for `run_id`.
+pub const SCIENTIFIC_ACCEPTANCE_RUN_ID_HEX_LEN: usize = 32;
+/// Largest finite SE-gate multiplier accepted on this wire.
+pub const MAX_SE_GATE_K: f64 = 8.0;
 
-const FORBIDDEN_RECEIPT_KEYS: [&str; 8] = [
+const FORBIDDEN_RECEIPT_KEYS: [&str; 12] = [
     "rmse",
+    "rmse_standard_error",
     "mean_bias",
+    "bias_standard_error",
     "interval_coverage",
+    "coverage_wilson_lower",
+    "coverage_wilson_upper",
+    "temporal_order_accuracy",
     "se_gate_accepted",
     "se_gate_k",
     "scientific_acceptance",
     "report",
-    "coverage_wilson_lower",
 ];
 
 /// Nested recovery report carried by the terminal artifact.
@@ -78,6 +89,24 @@ impl ScientificAcceptanceReport {
             if !value.is_finite() {
                 return Err(ApiError::InvalidWirePayload);
             }
+        }
+        if self.rmse < 0.0 || self.rmse_standard_error < 0.0 || self.bias_standard_error < 0.0 {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        for unit_interval in [
+            self.interval_coverage,
+            self.coverage_wilson_lower,
+            self.coverage_wilson_upper,
+            self.temporal_order_accuracy,
+        ] {
+            if !(0.0..=1.0).contains(&unit_interval) {
+                return Err(ApiError::InvalidWirePayload);
+            }
+        }
+        if self.coverage_wilson_lower > self.interval_coverage
+            || self.interval_coverage > self.coverage_wilson_upper
+        {
+            return Err(ApiError::InvalidWirePayload);
         }
         Ok(())
     }
@@ -169,18 +198,36 @@ impl ScientificAcceptanceArtifact {
             || self.eligible_evidence_count == 0
             || !self.se_gate_k.is_finite()
             || self.se_gate_k < 0.0
+            || self.se_gate_k > MAX_SE_GATE_K
         {
             return Err(ApiError::InvalidWirePayload);
         }
         require_nonempty(&self.run_id)?;
         require_nonempty(&self.snapshot_id)?;
-        require_nonempty(&self.knowledge_cutoff)?;
+        require_rfc3339_knowledge_cutoff(&self.knowledge_cutoff)?;
         if !is_canonical_sha256(&self.binding_sha256)
             || self.binding_sha256.bytes().all(|byte| byte == b'0')
         {
             return Err(ApiError::InvalidWirePayload);
         }
-        self.report.validate()
+        if self.run_id.len()
+            != SCIENTIFIC_ACCEPTANCE_RUN_ID_PREFIX.len() + SCIENTIFIC_ACCEPTANCE_RUN_ID_HEX_LEN
+            || !self.run_id.starts_with(SCIENTIFIC_ACCEPTANCE_RUN_ID_PREFIX)
+            || self.run_id.as_bytes()[SCIENTIFIC_ACCEPTANCE_RUN_ID_PREFIX.len()..]
+                != self.binding_sha256.as_bytes()[..SCIENTIFIC_ACCEPTANCE_RUN_ID_HEX_LEN]
+        {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        self.report.validate()?;
+        let expected_gate = se_gate_accepts(
+            self.report.rmse,
+            self.report.rmse_standard_error,
+            self.se_gate_k,
+        )?;
+        if self.se_gate_accepted != expected_gate {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        Ok(())
     }
 }
 
@@ -226,6 +273,23 @@ fn is_canonical_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn se_gate_accepts(rmse: f64, rmse_standard_error: f64, k: f64) -> Result<bool, ApiError> {
+    if ![rmse, rmse_standard_error, k]
+        .iter()
+        .all(|value| value.is_finite())
+    {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    if k < 0.0 || rmse_standard_error < 0.0 || rmse < 0.0 {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    if rmse_standard_error == 0.0 {
+        return Ok(rmse == 0.0);
+    }
+    let scale = rmse.max(rmse_standard_error).max(1.0);
+    Ok((rmse / scale) <= k * (rmse_standard_error / scale))
+}
+
 fn encode_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(bytes.len() * 2);
@@ -250,7 +314,7 @@ mod tests {
     fn report() -> ScientificAcceptanceReport {
         ScientificAcceptanceReport {
             study_label: "gap-003a-terminal".into(),
-            rmse: 0.04,
+            rmse: 0.02,
             rmse_standard_error: 0.01,
             mean_bias: 0.0,
             bias_standard_error: 0.02,
@@ -345,6 +409,36 @@ mod tests {
         let mut inf = artifact();
         inf.report.rmse = f64::INFINITY;
         assert_eq!(inf.to_json(), Err(ApiError::InvalidWirePayload));
+        let mut negative = artifact();
+        negative.report.rmse = -0.01;
+        assert_eq!(negative.to_json(), Err(ApiError::InvalidWirePayload));
+        let mut coverage = artifact();
+        coverage.report.interval_coverage = 1.2;
+        assert_eq!(coverage.to_json(), Err(ApiError::InvalidWirePayload));
+        let mut inverted = artifact();
+        inverted.report.coverage_wilson_lower = 0.99;
+        inverted.report.interval_coverage = 0.95;
+        inverted.report.coverage_wilson_upper = 0.90;
+        assert_eq!(inverted.to_json(), Err(ApiError::InvalidWirePayload));
+        let mut false_accept = artifact();
+        false_accept.report.rmse = 10.0;
+        false_accept.se_gate_accepted = true;
+        assert_eq!(false_accept.to_json(), Err(ApiError::InvalidWirePayload));
+        let mut false_reject = artifact();
+        false_reject.se_gate_accepted = false;
+        assert_eq!(false_reject.to_json(), Err(ApiError::InvalidWirePayload));
+        let mut future = artifact();
+        future.knowledge_cutoff = "2099-01-01T00:00:00Z".into();
+        assert_eq!(future.to_json(), Err(ApiError::InvalidWirePayload));
+        let mut malformed_cutoff = artifact();
+        malformed_cutoff.knowledge_cutoff = "not-a-time".into();
+        assert_eq!(
+            malformed_cutoff.to_json(),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let mut foreign_run = artifact();
+        foreign_run.run_id = "tepp-validation-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into();
+        assert_eq!(foreign_run.to_json(), Err(ApiError::InvalidWirePayload));
         let mut run = artifact();
         run.run_id.clear();
         assert_eq!(run.to_json(), Err(ApiError::InvalidWirePayload));
@@ -368,7 +462,10 @@ mod tests {
             r#"{"contract_version":1,"run_id":"r","run_state":"accepted","idempotency_key":"i"}"#
         ));
         assert!(receipt_json_carries_scientific_metrics(
-            r#"{"contract_version":1,"rmse":0.1}"#
+            r#"{"rmse_standard_error":0.1}"#
+        ));
+        assert!(receipt_json_carries_scientific_metrics(
+            r#"{"temporal_order_accuracy":1.0}"#
         ));
         assert!(receipt_json_carries_scientific_metrics(
             r#"{"scientific_acceptance":{}}"#

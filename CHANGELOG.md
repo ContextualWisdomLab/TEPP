@@ -38,7 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
-- `tepp_api` keeps `AnalysisRunRequest` / `AnalysisRunAccepted` metric-free and allows `tepp.scientific_acceptance.v1` only on a succeeded terminal result with output profile `scientific_acceptance_v1`. Receipt RMSE/bias/coverage/SE-gate keys, a scientific-acceptance profile without the artifact, a failed terminal carrying the artifact, an all-zero binding digest, and digest mismatch fail closed. This is the GAP-003A API wire slice for issue #166; `analysis_engine` library binding stays on live #356; persistence remains GAP-003B.
+- `tepp_api` keeps `AnalysisRunRequest` / `AnalysisRunAccepted` metric-free and allows `tepp.scientific_acceptance.v1` only on a succeeded terminal result with output profile `scientific_acceptance_v1`. Receipt RMSE/bias/coverage/SE-gate keys (including both standard errors, Wilson upper, and temporal-order accuracy), a scientific-acceptance profile without the artifact, a failed terminal carrying the artifact, an all-zero or run-id-mismatched binding digest, a model that does not match the request, a future or malformed cutoff, negative RMSE/SEs, out-of-range coverage, inverted Wilson bounds, and an `se_gate_accepted` flag inconsistent with `|RMSE| ≤ k · SE(RMSE)` fail closed. This is the GAP-003A API wire slice for issue #166; `analysis_engine` library binding stays on live #356; persistence remains GAP-003B.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 

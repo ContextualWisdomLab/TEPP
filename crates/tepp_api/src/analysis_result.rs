@@ -342,6 +342,7 @@ impl AnalysisRunTerminalResult {
                     || artifact.run_id != self.run_id
                     || artifact.snapshot_id != self.snapshot_id
                     || artifact.knowledge_cutoff != self.knowledge_cutoff
+                    || artifact.model != self.model_contract_version
                     || artifact.output_profile != self.output_profile
                     || artifact.sha256()?.as_str() != digest
                 {
