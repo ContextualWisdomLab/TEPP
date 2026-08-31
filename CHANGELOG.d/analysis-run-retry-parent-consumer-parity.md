@@ -1,0 +1,1 @@
+- `tepp_api` adds `lineageweave_analysis_run_retry_parent_exchange`, Naruon compatibility-listener retry-parent GET (`"parent": null` on accepted creates), and a `tepp-loopback` TCP create-cancel-retry-inspect proof (ADR 0044). Metric-free retry-parent fields are unchanged from ADR 0038. Not GET status, not lifecycle POST, not an ADR 0014 claim.
