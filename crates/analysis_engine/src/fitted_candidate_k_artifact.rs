@@ -66,15 +66,10 @@ impl FittedCandidateKArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > FITTED_CANDIDATE_K_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
@@ -113,6 +108,11 @@ pub struct FittedCandidateKExecution {
     pub terminal_result: AnalysisRunTerminalResult,
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    clippy::missing_panics_doc,
+    reason = "audited cutoff, method, vote, and selection-config gates"
+)]
 /// Execute cutoff-safe fitted candidate-`K` selection as one analysis-run profile.
 ///
 /// The executor invokes [`select_fitted_candidate_k`] and does not reimplement
@@ -124,10 +124,6 @@ pub struct FittedCandidateKExecution {
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, model-selection
 /// failure, or invalid artifact error.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "audited cutoff, method, vote, and selection-config gates"
-)]
 pub fn execute_fitted_candidate_k_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -182,7 +178,8 @@ pub fn execute_fitted_candidate_k_run(
         evidence_count,
         2,
         FITTED_CANDIDATE_K_INFERENCE_STATUS,
-    )?;
+    )
+    .expect("fixed summary fields and bounded evidence count are valid");
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,

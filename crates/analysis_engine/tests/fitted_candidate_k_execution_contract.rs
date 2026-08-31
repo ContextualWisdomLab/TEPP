@@ -222,6 +222,10 @@ fn separated_topics_select_true_k_and_refuse_llm_vote_as_authority() {
 fn execution_refuses_lexical_methods_and_failed_fits() {
     let request = request();
     assert_eq!(
+        execute(&request, "", &[]),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
         execute(&request, "tf-idf", &[]),
         Err(AnalysisEngineError::ModelSelection(
             ModelSelectionError::LexicalWeightForbidden
@@ -285,4 +289,21 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+
+    assert_eq!(
+        execute_fitted_candidate_k_run(
+            &request,
+            &accepted(&request),
+            "snapshot-fitted-candidate-k",
+            cutoff(),
+            &separated_topic_input(),
+            &recovery_config(),
+            "trsl_tm_reference",
+            &[],
+            "invalid",
+        ),
+        Err(AnalysisEngineError::Api(
+            tepp_api::ApiError::InvalidWirePayload
+        ))
+    );
 }

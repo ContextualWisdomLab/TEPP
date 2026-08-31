@@ -435,7 +435,8 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
+        MAX_EVIDENCE_UNITS, ModelSelectionError, TopicMeasurementError, add_membership_count,
+        execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -702,6 +703,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::ModelSelection(ModelSelectionError::NoSuccessfulFit),
+                "no fitted candidate produced a finite diagnostic",
             ),
             (
                 AnalysisEngineError::InvalidFittedCandidateKArtifact,
