@@ -6969,8 +6969,8 @@ pub fn refuse_cwc_residual_log_rate_as_raw_process_drift(
 /// event intervals. Singleton clusters are skipped. When the raw score
 /// sum is finite the grand mean is that sum divided by the row count so
 /// coinciding cluster means match CWC. When the raw sum overflows,
-/// positives and negatives are averaged separately with
-/// [`overflow_safe_running_mean`] and combined by count, so cancelling
+/// positives and negatives are averaged separately with the overflow-safe
+/// incremental mean and combined by count, so cancelling
 /// `MAX` and `-MAX` scores keep a representable zero mean in either row
 /// order. Hamaker, Kuiper, and Grasman (2015, p. 104) show that lagged
 /// relations from grand-mean deviations confound stable between-person
