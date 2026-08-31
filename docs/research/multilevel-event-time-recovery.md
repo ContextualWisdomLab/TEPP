@@ -108,7 +108,9 @@ This slice stays inside `psychometric_core`. It does not add a second invariance
 102. refuse unmatched sampling and constancy intervals for a time-varying predictor (Oud & Jansen, 2000, unread);
 103. refuse the difference quotient as a continuous-time rate;
 104. apply the same event-time map to CWC residuals (still not DSEM);
-105. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608).
+105. map already-centered lagged residuals with irregular event intervals without re-centering (Curran & Bauer, 2011, pp. 607–608);
+106. recover Eq. 5 of 2017-era commented `asymTOTALVAR` after `addedTIPREDVAR` as `λ²(-q / (2 a) + trait / a² + (B / a)² v)` with `θ = 0` (cran/ctsem 2.5.0 `summary.ctsemFit.R`; Driver et al., 2017, Eq. 5, p. 5; Eq. 1, p. 4; Eq. 4, p. 5; Table 2, p. 12; §4.3, p. 9; §7.2, pp. 20–21; JSS PDF re-opened 2026-08-31T05:20Z; form the three-term total inline; this crate does not currently export the unstandardised three-term recover; a zero loading or zero total is exactly zero; a non-event clock fails closed; `a ≥ 0` with a nonzero contribution fails closed);
+107. refuse treating unstandardised three-term `asymTOTALVAR` after `addedTIPREDVAR` as Eq. 5 of that total, refuse treating `λ² (B / a)² v` as that extra, refuse treating `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ` as that extra, and refuse treating `MANIFESTVAR` as that extra.
 
 ## Claim boundary
 
