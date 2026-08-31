@@ -23,8 +23,9 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
-    recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_initial_time_dependent_predictor_carry,
+    recover_discrete_time_varying_predictor_effect, recover_discrete_trait_variance,
+    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -61,9 +62,11 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
+    refuse_asymptotic_trait_variance_as_discrete_trait_variance,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+    refuse_discrete_process_noise_as_discrete_trait_variance,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -160,7 +163,8 @@ use psychometric_core::{
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
-    refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
+    refuse_trait_variance_as_discrete_trait_variance, refuse_trait_variance_as_process_noise,
+    refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
@@ -6538,5 +6542,52 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
     assert_eq!(
         recover_standardised_manifest_variance(0.4, non_event),
         Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn discrete_trait_variance_recovers_known_paper_map_at_machine_rmse() {
+    let log_rate = -0.5_f64;
+    let trait_variance = 1.0_f64;
+    let event_delta = 1.0_f64;
+    let recovered =
+        recover_discrete_trait_variance(trait_variance, log_rate, event_delta, LagClock::EventTime)
+            .expect("discreteTRAITVAR");
+    let truth =
+        (1.0 - (log_rate * event_delta).exp()).powi(2) * (trait_variance / (log_rate * log_rate));
+    let rmse = (recovered - truth).abs();
+    assert!(
+        rmse < 1e-12,
+        "machine-scale RMSE of commented discreteTRAITVAR"
+    );
+    let as_trait = (recovered - trait_variance).abs();
+    let asymptotic = trait_variance / (log_rate * log_rate);
+    let as_asymptotic = (recovered - asymptotic).abs();
+    let process_noise =
+        recover_discrete_process_noise(0.4, log_rate, event_delta, LagClock::EventTime)
+            .expect("Q_Δt");
+    let as_noise = (recovered - process_noise).abs();
+    assert!(rmse < as_trait);
+    assert!(rmse < as_asymptotic);
+    assert!(rmse < as_noise);
+    assert_eq!(
+        refuse_trait_variance_as_discrete_trait_variance(trait_variance, recovered),
+        Err(PsychometricError::DiscreteTraitVarianceIsNotTraitVariance)
+    );
+    assert_eq!(
+        refuse_asymptotic_trait_variance_as_discrete_trait_variance(asymptotic, recovered),
+        Err(PsychometricError::DiscreteTraitVarianceIsNotAsymptoticTraitVariance)
+    );
+    assert_eq!(
+        refuse_discrete_process_noise_as_discrete_trait_variance(process_noise, recovered),
+        Err(PsychometricError::DiscreteTraitVarianceIsNotDiscreteProcessNoise)
+    );
+    assert_eq!(
+        recover_discrete_trait_variance(1.0, -0.5, 1.0, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_trait_variance(1.0, 0.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::DiscreteTraitVarianceRequiresStableDrift)
     );
 }

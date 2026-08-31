@@ -20,7 +20,8 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
-    recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
+    recover_discrete_time_varying_predictor_effect, recover_discrete_trait_variance,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -58,9 +59,11 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
+    refuse_asymptotic_trait_variance_as_discrete_trait_variance,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
+    refuse_discrete_process_noise_as_discrete_trait_variance,
     refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
@@ -169,7 +172,8 @@ use psychometric_core::{
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
-    refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
+    refuse_trait_variance_as_discrete_trait_variance, refuse_trait_variance_as_process_noise,
+    refuse_trait_variance_as_stationary_within_subject,
     refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
     refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
@@ -3780,5 +3784,47 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
         )
+    );
+}
+
+#[test]
+fn discrete_trait_variance_is_not_trait_asymptotic_or_process_noise() {
+    let log_rate = -0.5_f64;
+    let trait_variance = 1.0_f64;
+    let event_delta = 1.0_f64;
+    let recovered =
+        recover_discrete_trait_variance(trait_variance, log_rate, event_delta, LagClock::EventTime)
+            .expect("discreteTRAITVAR");
+    let paper =
+        (1.0 - (log_rate * event_delta).exp()).powi(2) * (trait_variance / (log_rate * log_rate));
+    assert!(
+        (recovered - paper).abs() < 1e-12,
+        "2017-era commented discreteTRAITVAR is (1 − e^{{a Δt}})² · (trait / a²)"
+    );
+    let asymptotic = trait_variance / (log_rate * log_rate);
+    assert!(
+        (recovered - asymptotic).abs() > 1e-3,
+        "Driver et al. (2017, cran/ctsem 2.5.0): finite-interval discreteTRAITVAR is not unpublished asymTRAITVAR"
+    );
+    let process_noise =
+        recover_discrete_process_noise(0.4, log_rate, event_delta, LagClock::EventTime)
+            .expect("Q_Δt");
+    assert!(
+        (recovered - process_noise).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 3): discreteTRAITVAR is not Q_Δt"
+    );
+    assert_eq!(
+        refuse_trait_variance_as_discrete_trait_variance(trait_variance, recovered),
+        Err(psychometric_core::PsychometricError::DiscreteTraitVarianceIsNotTraitVariance)
+    );
+    assert_eq!(
+        refuse_asymptotic_trait_variance_as_discrete_trait_variance(asymptotic, recovered),
+        Err(
+            psychometric_core::PsychometricError::DiscreteTraitVarianceIsNotAsymptoticTraitVariance
+        )
+    );
+    assert_eq!(
+        refuse_discrete_process_noise_as_discrete_trait_variance(process_noise, recovered),
+        Err(psychometric_core::PsychometricError::DiscreteTraitVarianceIsNotDiscreteProcessNoise)
     );
 }
