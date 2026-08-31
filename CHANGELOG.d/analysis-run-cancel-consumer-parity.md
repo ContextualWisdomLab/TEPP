@@ -1,0 +1,1 @@
+- `tepp_api` adds `lineageweave_analysis_run_cancel_exchange`, Naruon compatibility-listener cancel, and a `tepp-loopback` TCP cancel proof (ADR 0030). Metric-free cancelled status is unchanged from ADR 0029. Not GET status, not lifecycle POST, not an ADR 0014 claim.

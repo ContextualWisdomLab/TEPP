@@ -3,9 +3,10 @@
 use crate::naruon_http::compose_https_target;
 use crate::project_history::build_project_history_exchange;
 use crate::{
-    AnalysisRunRequest, ApiError, NaruonHttpExchange, ProjectHistoryHttpExchange,
-    ProjectHistoryRequest, TEMPORAL_CONTEXT_CONTRACT_VERSION, TEMPORAL_CONTEXT_PATH,
-    TemporalContextRequest, naruon_analysis_run_exchange,
+    AnalysisRunCancelRequest, AnalysisRunRequest, ApiError, NaruonHttpExchange,
+    ProjectHistoryHttpExchange, ProjectHistoryRequest, TEMPORAL_CONTEXT_CONTRACT_VERSION,
+    TEMPORAL_CONTEXT_PATH, TemporalContextRequest, naruon_analysis_run_cancel_exchange,
+    naruon_analysis_run_exchange,
 };
 
 /// Stable consumer identity used by the Naruon adapter.
@@ -29,6 +30,29 @@ pub fn lineageweave_analysis_run_exchange(
     request: &AnalysisRunRequest,
 ) -> Result<NaruonHttpExchange, ApiError> {
     let mut exchange = naruon_analysis_run_exchange(origin, request)?;
+    let consumer_header = exchange
+        .headers
+        .iter_mut()
+        .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
+        .ok_or(ApiError::InvalidWirePayload)?;
+    LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
+    Ok(exchange)
+}
+
+/// Build a `LineageWeave` → TEPP analysis-run cancel exchange without credentials.
+///
+/// The function reuses TEPP's existing origin, body, and header validation,
+/// then replaces only the published modular-consumer identity. Cancellation
+/// remains a metric-free lifecycle command, not a measurement result.
+///
+/// # Errors
+///
+/// Returns the same fail-closed errors as [`naruon_analysis_run_cancel_exchange`].
+pub fn lineageweave_analysis_run_cancel_exchange(
+    origin: &str,
+    request: &AnalysisRunCancelRequest,
+) -> Result<NaruonHttpExchange, ApiError> {
+    let mut exchange = naruon_analysis_run_cancel_exchange(origin, request)?;
     let consumer_header = exchange
         .headers
         .iter_mut()
@@ -94,9 +118,11 @@ pub(crate) fn consumer_is_supported(consumer_code: &str) -> bool {
 mod tests {
     use super::{
         LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, consumer_is_supported,
-        lineageweave_analysis_run_exchange,
+        lineageweave_analysis_run_cancel_exchange, lineageweave_analysis_run_exchange,
     };
-    use crate::{ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError};
+    use crate::{
+        ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunCancelRequest, AnalysisRunRequest, ApiError,
+    };
 
     fn sample_run() -> AnalysisRunRequest {
         AnalysisRunRequest {
@@ -129,6 +155,33 @@ mod tests {
         );
         assert_eq!(
             lineageweave_analysis_run_exchange("http://tepp.example.test", &run),
+            Err(ApiError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn lineageweave_cancel_exchange_swaps_only_the_consumer_header() {
+        let request = AnalysisRunCancelRequest::new("tepp-run-1", "idem-1").expect("cancel");
+        let exchange =
+            lineageweave_analysis_run_cancel_exchange("https://tepp.example.test", &request)
+                .expect("exchange");
+        assert_eq!(exchange.method, "POST");
+        assert_eq!(
+            exchange.target_url,
+            "https://tepp.example.test/v1/analysis-runs/tepp-run-1/cancel"
+        );
+        assert!(
+            exchange
+                .headers
+                .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+        );
+        assert!(
+            !exchange
+                .headers
+                .contains(&("tepp-consumer".into(), NARUON_CONSUMER_CODE.into()))
+        );
+        assert_eq!(
+            lineageweave_analysis_run_cancel_exchange("http://tepp.example.test", &request),
             Err(ApiError::InvalidWirePayload)
         );
     }

@@ -14,6 +14,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | contextual-orchestrator interpretation port | [`docs/connectors/contextual-orchestrator-interpretation-port.md`](docs/connectors/contextual-orchestrator-interpretation-port.md) |
 | Orchestrator live HTTP doctoring | [`docs/research/orchestrator-live-http.md`](docs/research/orchestrator-live-http.md) |
 | Analysis-run cancel HTTP doctoring | [`docs/research/analysis-run-cancel-http.md`](docs/research/analysis-run-cancel-http.md) |
+| Analysis-run cancel consumer-parity doctoring | [`docs/research/analysis-run-cancel-consumer-parity.md`](docs/research/analysis-run-cancel-consumer-parity.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
 | Logical/physical ERD | [`docs/ERD.md`](docs/ERD.md) |
 | Security policy | [`SECURITY.md`](SECURITY.md) |

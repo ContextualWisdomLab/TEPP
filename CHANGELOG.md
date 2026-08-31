@@ -38,6 +38,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- `tepp_api` adds `lineageweave_analysis_run_cancel_exchange`, Naruon compatibility-listener cancel, and a `tepp-loopback` TCP cancel proof (ADR 0030). Metric-free cancelled status is unchanged from ADR 0029. Not GET status, not lifecycle POST, not an ADR 0014 claim.
+
 - `tepp_api` serves `POST /v1/analysis-runs/{run_id}/cancel` on the shared loopback listener (ADR 0029). Accepted and running runs become metric-free `cancelled` status. Succeeded, failed, and unknown runs cannot be cancelled. Cancel bodies refuse RMSE/bias/coverage/SE-gate/scientific-acceptance keys. GET status and running/terminal POST remain later GAP-003A slices; this is not an ADR 0014 claim.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.

@@ -5,6 +5,9 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 
+use crate::analysis_run_cancel_http::{
+    AnalysisRunCancelRequest, analysis_run_cancel_path_run_id, refuse_metrics_on_cancel_payload,
+};
 use crate::authorization::{
     AnalyticalPurpose, ExportAuthorizationRequest, authorize_export, require_export_allowed,
 };
@@ -16,8 +19,8 @@ use crate::live_http::{
 use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH};
 use crate::wire::{from_json, to_json};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, ApiError, ErrorEnvelope,
-    requests_are_idempotent_matches,
+    AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState, ApiError,
+    ErrorEnvelope, requests_are_idempotent_matches,
 };
 
 #[cfg(test)]
@@ -51,14 +54,24 @@ pub struct NaruonLiveResponse {
 /// Production interchange origins remain `https` only. This listener binds
 /// loopback TCP so tests and local standalone operation can prove request
 /// handling without claiming TLS termination or cross-service table access.
-/// This port only accepts versioned naruon POSTs.
+/// This port only accepts versioned naruon POSTs, including
+/// `POST /v1/analysis-runs/{run_id}/cancel` for metric-free cancellation.
 #[derive(Debug)]
 pub struct NaruonLiveService {
     listener: Option<TcpListener>,
     bound_addr: Option<SocketAddr>,
     next_run_serial: u64,
     next_request_serial: u64,
-    accepted_runs: HashMap<String, (AnalysisRunRequest, AnalysisRunAccepted)>,
+    accepted_runs: HashMap<String, NaruonLiveRun>,
+    runs_by_id: HashMap<String, String>,
+}
+
+/// One naruon-only accepted run and its current lifecycle state.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct NaruonLiveRun {
+    request: AnalysisRunRequest,
+    accepted: AnalysisRunAccepted,
+    run_state: AnalysisRunStatusState,
 }
 
 impl Default for NaruonLiveService {
@@ -77,6 +90,7 @@ impl NaruonLiveService {
             next_run_serial: 1,
             next_request_serial: 1,
             accepted_runs: HashMap::new(),
+            runs_by_id: HashMap::new(),
         }
     }
 
@@ -201,11 +215,17 @@ impl NaruonLiveService {
         if method != "POST" {
             return Err(ApiError::InvalidWirePayload);
         }
+        let headers = parse_headers(lines)?;
+        refuse_live_headers(&headers, self.bound_addr)?;
+        if matches!(
+            analysis_run_cancel_path_run_id(path),
+            Ok(_) | Err(ApiError::LimitExceeded)
+        ) {
+            return self.cancel_analysis_run(path, &headers, body);
+        }
         if path != NARUON_ANALYSIS_RUN_PATH && path != NARUON_EXPORT_PATH {
             return Err(ApiError::InvalidWirePayload);
         }
-        let headers = parse_headers(lines)?;
-        refuse_live_headers(&headers, self.bound_addr)?;
         self.dispatch_path(path, &headers, body)
     }
 
@@ -233,12 +253,12 @@ impl NaruonLiveService {
             return Err(ApiError::InvalidWirePayload);
         }
         let replay_key = tenant_idempotency_key(&request.tenant_workspace_id, idempotency_key);
-        if let Some((stored_request, stored_accepted)) = self.accepted_runs.get(&replay_key) {
-            if requests_are_idempotent_matches(stored_request, &request) {
+        if let Some(stored) = self.accepted_runs.get(&replay_key) {
+            if requests_are_idempotent_matches(&stored.request, &request) {
                 return Ok(NaruonLiveResponse::json(
                     202,
                     "Accepted",
-                    stored_accepted.to_json()?,
+                    stored.accepted.to_json()?,
                 ));
             }
             return Err(ApiError::InvalidWirePayload);
@@ -248,8 +268,78 @@ impl NaruonLiveService {
         let accepted =
             AnalysisRunAccepted::new(run_id, "accepted", request.idempotency_key.clone())?;
         let body = accepted.to_json()?;
-        self.accepted_runs.insert(replay_key, (request, accepted));
+        self.runs_by_id
+            .insert(accepted.run_id.clone(), replay_key.clone());
+        self.accepted_runs.insert(
+            replay_key,
+            NaruonLiveRun {
+                request,
+                accepted,
+                run_state: AnalysisRunStatusState::Accepted,
+            },
+        );
         Ok(NaruonLiveResponse::json(202, "Accepted", body))
+    }
+
+    fn cancel_analysis_run(
+        &mut self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let run_id = analysis_run_cancel_path_run_id(path)?;
+        refuse_metrics_on_cancel_payload(body)?;
+        let idempotency_key = header_value(headers, "idempotency-key")?;
+        if !body.trim().is_empty() {
+            let request = AnalysisRunCancelRequest::from_json(body)?;
+            if request.run_id != run_id || request.idempotency_key != idempotency_key {
+                return Err(ApiError::InvalidWirePayload);
+            }
+        }
+        let replay_key = self
+            .runs_by_id
+            .get(&run_id)
+            .cloned()
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let stored = self
+            .accepted_runs
+            .get_mut(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if stored.accepted.idempotency_key != idempotency_key {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        match stored.run_state {
+            AnalysisRunStatusState::Accepted | AnalysisRunStatusState::Running => {
+                stored.run_state = AnalysisRunStatusState::Cancelled;
+            }
+            AnalysisRunStatusState::Cancelled => {}
+            AnalysisRunStatusState::Succeeded | AnalysisRunStatusState::Failed => {
+                return Err(ApiError::InvalidWirePayload);
+            }
+        }
+        let status = AnalysisRunStatus::cancelled(&stored.accepted)?;
+        let status_json = status.to_json()?;
+        refuse_metrics_on_cancel_payload(&status_json)?;
+        Ok(NaruonLiveResponse::json(200, "OK", status_json))
+    }
+
+    #[cfg(test)]
+    fn force_naruon_run_state(
+        &mut self,
+        run_id: &str,
+        run_state: AnalysisRunStatusState,
+    ) -> Result<(), ApiError> {
+        let replay_key = self
+            .runs_by_id
+            .get(run_id)
+            .cloned()
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let stored = self
+            .accepted_runs
+            .get_mut(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        stored.run_state = run_state;
+        Ok(())
     }
 
     fn authorize_export(
@@ -530,5 +620,131 @@ mod tests {
                 .expect_err("accept"),
             ApiError::InvalidWirePayload
         );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn naruon_compatibility_listener_cancels_accepted_and_running_runs() {
+        use crate::{ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalysisRunStatusState};
+        let run = AnalysisRunRequest {
+            contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
+            idempotency_key: "naruon-cancel-idem".into(),
+            tenant_workspace_id: "naruon-cancel-tenant".into(),
+            snapshot_id: "naruon-cancel-snapshot".into(),
+            knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            model_contract_version: "topic-measurement-v1".into(),
+            output_profile: "naruon-consumer-validation-report".into(),
+        };
+        let body = run.to_json().expect("json");
+        let create = format!(
+            "POST /v1/analysis-runs HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{body}",
+            run.idempotency_key,
+            body.len()
+        );
+        let mut service = NaruonLiveService::new();
+        let accepted = service.handle_http_request(&create);
+        assert_eq!(accepted.status_code, 202);
+        let run_id = crate::AnalysisRunAccepted::from_json(&accepted.body)
+            .expect("accepted")
+            .run_id;
+        let first_run_id = run_id.clone();
+        let cancel = format!(
+            "POST /v1/analysis-runs/{run_id}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: 0\r\n\r\n",
+            run.idempotency_key
+        );
+        let cancelled = service.handle_http_request(&cancel);
+        assert_eq!(cancelled.status_code, 200);
+        assert!(cancelled.body.contains("\"run_state\":\"cancelled\""));
+        assert!(!cancelled.body.contains("rmse"));
+        let replay = service.handle_http_request(&cancel);
+        assert_eq!(replay.body, cancelled.body);
+
+        let mut running = NaruonLiveService::new();
+        let accepted = running.handle_http_request(&create);
+        let run_id = crate::AnalysisRunAccepted::from_json(&accepted.body)
+            .expect("accepted")
+            .run_id;
+        running
+            .force_naruon_run_state(&run_id, AnalysisRunStatusState::Running)
+            .expect("running");
+        let cancel = format!(
+            "POST /v1/analysis-runs/{run_id}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: 0\r\n\r\n",
+            run.idempotency_key
+        );
+        assert_eq!(running.handle_http_request(&cancel).status_code, 200);
+
+        for terminal in [
+            AnalysisRunStatusState::Succeeded,
+            AnalysisRunStatusState::Failed,
+        ] {
+            let mut terminal_service = NaruonLiveService::new();
+            let accepted = terminal_service.handle_http_request(&create);
+            let run_id = crate::AnalysisRunAccepted::from_json(&accepted.body)
+                .expect("accepted")
+                .run_id;
+            terminal_service
+                .force_naruon_run_state(&run_id, terminal)
+                .expect("terminal");
+            let cancel = format!(
+                "POST /v1/analysis-runs/{run_id}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: 0\r\n\r\n",
+                run.idempotency_key
+            );
+            assert_eq!(
+                terminal_service.handle_http_request(&cancel).status_code,
+                400
+            );
+        }
+
+        assert_eq!(
+            service.handle_http_request(
+                "POST /v1/analysis-runs/missing/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: naruon-cancel-idem\r\ncontent-length: 0\r\n\r\n"
+            ).status_code,
+            400
+        );
+        let lineageweave = format!(
+            "POST /v1/analysis-runs/{first_run_id}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: lineageweave\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: 0\r\n\r\n",
+            run.idempotency_key
+        );
+        assert_eq!(service.handle_http_request(&lineageweave).status_code, 400);
+        let metrics = format!(
+            "POST /v1/analysis-runs/{first_run_id}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: 12\r\n\r\n{{\"rmse\":0.1}}",
+            run.idempotency_key
+        );
+        assert_eq!(service.handle_http_request(&metrics).status_code, 400);
+        assert_eq!(
+            NaruonLiveService::new()
+                .force_naruon_run_state("missing", AnalysisRunStatusState::Running)
+                .expect_err("unknown"),
+            ApiError::InvalidWirePayload
+        );
+        let mut dangling = NaruonLiveService::new();
+        dangling
+            .runs_by_id
+            .insert("ghost".into(), "missing-replay".into());
+        assert_eq!(
+            dangling
+                .force_naruon_run_state("ghost", AnalysisRunStatusState::Running)
+                .expect_err("dangling"),
+            ApiError::InvalidWirePayload
+        );
+        let cancel_dangling = "POST /v1/analysis-runs/ghost/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: naruon-cancel-idem\r\ncontent-length: 0\r\n\r\n";
+        assert_eq!(
+            dangling.handle_http_request(cancel_dangling).status_code,
+            400
+        );
+        let oversized = format!(
+            "POST /v1/analysis-runs/{}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: k\r\ncontent-length: 0\r\n\r\n",
+            "a".repeat(129)
+        );
+        assert_eq!(service.handle_http_request(&oversized).status_code, 413);
+        let mismatch_body = format!(
+            "{{\"contract_version\":1,\"run_id\":\"{first_run_id}\",\"idempotency_key\":\"other\"}}"
+        );
+        let mismatch = format!(
+            "POST /v1/analysis-runs/{first_run_id}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: {}\r\n\r\n{mismatch_body}",
+            run.idempotency_key,
+            mismatch_body.len()
+        );
+        assert_eq!(service.handle_http_request(&mismatch).status_code, 400);
     }
 }

@@ -7,9 +7,10 @@ use std::thread;
 use std::time::Duration;
 
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
-    ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE,
-    NARUON_LIVE_HEADER_BYTE_LIMIT, lineageweave_analysis_run_exchange,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunCancelRequest,
+    AnalysisRunLiveService, AnalysisRunRequest, ApiError, LINEAGEWEAVE_CONSUMER_CODE,
+    NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
+    lineageweave_analysis_run_cancel_exchange, lineageweave_analysis_run_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -66,6 +67,34 @@ fn lineageweave_exchange_uses_the_published_consumer_header_without_credentials(
             "authorization" | "proxy-authorization" | "cookie" | "x-api-key"
         )
     }));
+}
+
+#[test]
+fn lineageweave_cancel_exchange_posts_the_published_consumer_without_credentials() {
+    let request = AnalysisRunCancelRequest::new("tepp-run-9", "shared-idempotency-key")
+        .expect("cancel request");
+    let exchange = lineageweave_analysis_run_cancel_exchange("https://tepp.example.test", &request)
+        .expect("lineageweave cancel");
+    assert_eq!(exchange.method, "POST");
+    assert_eq!(
+        exchange.target_url,
+        "https://tepp.example.test/v1/analysis-runs/tepp-run-9/cancel"
+    );
+    assert!(
+        exchange
+            .headers
+            .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+    );
+    assert!(exchange.headers.iter().all(|(name, _)| {
+        !matches!(
+            name.to_ascii_lowercase().as_str(),
+            "authorization" | "proxy-authorization" | "cookie" | "x-api-key"
+        )
+    }));
+    assert_eq!(
+        lineageweave_analysis_run_cancel_exchange("http://tepp.example.test", &request),
+        Err(ApiError::InvalidWirePayload)
+    );
 }
 
 #[test]

@@ -144,6 +144,38 @@ fn handle_http_accepts_analysis_run_and_replays_idempotent_retries() {
 }
 
 #[test]
+fn handle_http_cancels_accepted_naruon_runs_without_metrics() {
+    let mut service = NaruonLiveService::new();
+    let run = sample_run();
+    let created = service.handle_http_request(&analysis_http(&run));
+    let accepted = AnalysisRunAccepted::from_json(&created.body).expect("accepted");
+    let cancel_body = format!(
+        "{{\"contract_version\":1,\"run_id\":\"{}\",\"idempotency_key\":\"{}\"}}",
+        accepted.run_id, run.idempotency_key
+    );
+    let cancel = http_request(
+        "POST",
+        &format!("/v1/analysis-runs/{}/cancel", accepted.run_id),
+        &naruon_headers(&run.idempotency_key),
+        &cancel_body,
+    );
+    let cancelled = service.handle_http_request(&cancel);
+    assert_eq!(cancelled.status_code, 200);
+    assert!(cancelled.body.contains("\"run_state\":\"cancelled\""));
+    assert!(!cancelled.body.contains("rmse"));
+    assert!(!cancelled.body.contains("scientific_acceptance"));
+    let replay = service.handle_http_request(&cancel);
+    assert_eq!(replay.body, cancelled.body);
+    let wrong_key = http_request(
+        "POST",
+        &format!("/v1/analysis-runs/{}/cancel", accepted.run_id),
+        &naruon_headers("wrong-key"),
+        "",
+    );
+    assert_eq!(service.handle_http_request(&wrong_key).status_code, 400);
+}
+
+#[test]
 fn handle_http_keys_idempotency_replay_by_tenant_and_key() {
     let mut service = NaruonLiveService::new();
     let first = sample_run();
