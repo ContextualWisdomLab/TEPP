@@ -489,7 +489,43 @@ fn execution_refuses_point_estimates_empty_cutoff_receipt_mismatch_and_limits() 
         ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
+    assert_eq!(
+        LongitudinalEsemDsemDesign::new(
+            ConstructClass::Reflective,
+            MembershipDesign::Nested,
+            false,
+            ComponentLevel::Within,
+            LagClock::EventTime,
+            MeanInvarianceStatus::Strong,
+            "group-contrast",
+            "",
+            false,
+            false,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
 
+    let nested_collapse = design(
+        ConstructClass::Reflective,
+        MembershipDesign::Nested,
+        true,
+        ComponentLevel::Within,
+        LagClock::EventTime,
+        MeanInvarianceStatus::Strong,
+        false,
+        false,
+    );
+    assert!(
+        execute(
+            &request,
+            &accepted,
+            "snapshot-longitudinal-esem-dsem",
+            cutoff(),
+            &nested_collapse,
+            &eligible_observations(),
+        )
+        .is_ok()
+    );
     let mut early_request = request.clone();
     early_request.knowledge_cutoff = "2026-06-01T00:00:00Z".into();
     let too_early = KnowledgeCutoff::parse_rfc3339("2026-06-01T00:00:00Z").expect("cutoff");
@@ -535,5 +571,20 @@ fn execution_refuses_point_estimates_empty_cutoff_receipt_mismatch_and_limits() 
             &oversized,
         ),
         Err(AnalysisEngineError::LimitExceeded)
+    );
+
+    assert_eq!(
+        execute_longitudinal_esem_dsem_run(
+            &request,
+            &accepted,
+            "snapshot-longitudinal-esem-dsem",
+            cutoff(),
+            &valid_design(),
+            &eligible_observations(),
+            "invalid",
+        ),
+        Err(AnalysisEngineError::Api(
+            tepp_api::ApiError::InvalidWirePayload
+        ))
     );
 }

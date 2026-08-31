@@ -31,12 +31,14 @@ pub const LONGITUDINAL_ESEM_DSEM_OUTPUT_PROFILE: &str = "longitudinal_esem_dsem_
 pub const LONGITUDINAL_ESEM_DSEM_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const LONGITUDINAL_ESEM_DSEM_INFERENCE_STATUS: &str = "composed_engine_not_estimator";
 
-/// Run-level scientific design offered to one composition execution.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(
     clippy::struct_excessive_bools,
     reason = "independent fail-closed composition gates"
 )]
+/// Run-level scientific design offered to one composition execution.
+///
+/// The design records every fail-closed scientific gate before execution.
 pub struct LongitudinalEsemDsemDesign {
     construct_class: ConstructClass,
     membership_design: MembershipDesign,
@@ -62,6 +64,9 @@ impl LongitudinalEsemDsemDesign {
         clippy::fn_params_excessive_bools,
         reason = "audited composition gate sequence"
     )]
+    ///
+    /// Arguments preserve construct, membership, temporal, invariance, and
+    /// inference choices without silently replacing them with defaults.
     pub fn new(
         construct_class: ConstructClass,
         membership_design: MembershipDesign,
@@ -261,15 +266,10 @@ impl LongitudinalEsemDsemArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > LONGITUDINAL_ESEM_DSEM_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
@@ -306,17 +306,6 @@ impl LongitudinalEsemDsemArtifact {
 
 fn membership_design_wire_name_is_unknown(name: &str) -> bool {
     !matches!(name, "nested" | "cross_classified" | "multiple_membership")
-}
-
-fn membership_design_wire_name(
-    design: MembershipDesign,
-) -> Result<&'static str, AnalysisEngineError> {
-    match design {
-        MembershipDesign::Nested => Ok("nested"),
-        MembershipDesign::CrossClassified => Ok("cross_classified"),
-        MembershipDesign::MultipleMembership => Ok("multiple_membership"),
-        _ => Err(AnalysisEngineError::InvalidEvidence),
-    }
 }
 
 /// One completed composition artifact and its request-bound terminal result.
@@ -393,7 +382,8 @@ fn apply_composition_gates(design: &LongitudinalEsemDsemDesign) -> Result<(), An
         },
         design.comparison_scope(),
         design.model_version(),
-    )?;
+    )
+    .expect("design constructor requires nonempty invariance labels");
     compare_latent_means(&evidence)?;
     if design.treat_ols_as_dsem {
         return Err(AnalysisEngineError::InvalidEvidence);
@@ -405,6 +395,10 @@ fn apply_composition_gates(design: &LongitudinalEsemDsemDesign) -> Result<(), An
     Ok(())
 }
 
+#[expect(
+    clippy::missing_panics_doc,
+    reason = "fixed summary fields and bounded count are valid"
+)]
 /// Execute cutoff-safe longitudinal ESEM/DSEM engine composition.
 ///
 /// The caller supplies already-mapped posterior draws and an explicit
@@ -453,7 +447,7 @@ pub fn execute_longitudinal_esem_dsem_run(
         excluded_after_cutoff_count: eligible.excluded_after_cutoff_count,
         posterior_draw_mean,
         construct_class: design.construct_class.as_str().into(),
-        membership_design: membership_design_wire_name(design.membership_design)?.into(),
+        membership_design: design.membership_design.wire_name().into(),
         component_level: design.component_level.wire_name().into(),
         lag_clock: design.lag_clock.as_str().into(),
         invariance_status: design.invariance_status.as_str().into(),
@@ -465,7 +459,8 @@ pub fn execute_longitudinal_esem_dsem_run(
         eligible.observation_count,
         1,
         LONGITUDINAL_ESEM_DSEM_INFERENCE_STATUS,
-    )?;
+    )
+    .expect("fixed composition summary is valid");
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
