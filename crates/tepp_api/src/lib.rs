@@ -20,6 +20,7 @@ mod corpus_split_manifest;
 mod envelope;
 mod error;
 mod export;
+mod export_authorize_cli;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
 mod lineageweave_http;
@@ -95,6 +96,20 @@ pub use export::GraphMlExport;
 pub use export::JsonLdExport;
 /// Reproducibility manifest.
 pub use export::ReproducibilityManifest;
+/// One validated export-authorize CLI invocation.
+pub use export_authorize_cli::ExportAuthorizeCliInvocation;
+/// Loopback export-authorize CLI verb.
+pub use export_authorize_cli::ExportAuthorizeCliVerb;
+/// Compose loopback export POST bytes for a CLI invocation.
+pub use export_authorize_cli::compose_export_authorize_cli_http;
+/// Dispatch an export CLI invocation against an in-process naruon listener.
+pub use export_authorize_cli::dispatch_export_authorize_cli;
+/// Execute an export CLI invocation over loopback TCP.
+pub use export_authorize_cli::execute_export_authorize_cli;
+/// Read leftover stdin for the export CLI.
+pub use export_authorize_cli::read_export_authorize_cli_stdin;
+/// Render export CLI stdout with metric-free gates.
+pub use export_authorize_cli::render_export_authorize_cli_stdout;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;
