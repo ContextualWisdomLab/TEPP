@@ -8,8 +8,9 @@ use std::time::Duration;
 
 use tepp_api::{
     ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
-    ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE,
-    NARUON_LIVE_HEADER_BYTE_LIMIT, lineageweave_analysis_run_exchange,
+    AnalysisRunStoredRequest, ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH,
+    NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT, lineageweave_analysis_run_exchange,
+    lineageweave_analysis_run_stored_request_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -151,5 +152,65 @@ fn live_listener_serves_lineageweave_over_loopback() {
     assert_eq!(
         worker.join().expect("join").expect("served").status_code,
         202
+    );
+}
+
+#[test]
+fn lineageweave_stored_request_exchange_uses_the_published_consumer_header_without_credentials() {
+    let exchange = lineageweave_analysis_run_stored_request_exchange(
+        "https://tepp.example.test",
+        "tepp-run-lineage",
+    )
+    .expect("lineageweave stored-request exchange");
+    assert_eq!(exchange.method, "GET");
+    assert_eq!(
+        exchange.target_url,
+        "https://tepp.example.test/v1/analysis-runs/tepp-run-lineage/request"
+    );
+    assert!(exchange.body.is_empty());
+    assert!(
+        exchange
+            .headers
+            .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+    );
+    assert!(
+        !exchange
+            .headers
+            .contains(&("tepp-consumer".into(), NARUON_CONSUMER_CODE.into()))
+    );
+    assert!(exchange.headers.iter().all(|(name, _)| {
+        !matches!(
+            name.to_ascii_lowercase().as_str(),
+            "authorization" | "proxy-authorization" | "cookie" | "x-api-key" | "idempotency-key"
+        )
+    }));
+}
+
+#[test]
+fn live_listener_inspects_lineageweave_stored_request_and_isolates_consumers() {
+    let run = sample_run();
+    let mut service = AnalysisRunLiveService::new();
+    let lineageweave = service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &run));
+    assert_eq!(lineageweave.status_code, 202);
+    let accepted = AnalysisRunAccepted::from_json(&lineageweave.body).expect("accepted");
+    let inspect = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/{}/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        accepted.run_id
+    );
+    let inspected = service.handle_http_request(&inspect);
+    assert_eq!(inspected.status_code, 200);
+    let stored = AnalysisRunStoredRequest::from_json(&inspected.body).expect("stored");
+    assert_eq!(stored.run_id, accepted.run_id);
+    assert_eq!(stored.snapshot_id, run.snapshot_id);
+    assert_eq!(stored.output_profile, run.output_profile);
+    assert!(!inspected.body.contains("rmse"));
+    assert!(!inspected.body.contains("scientific_acceptance"));
+    let naruon_inspect = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/{}/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        accepted.run_id
+    );
+    assert_eq!(
+        service.handle_http_request(&naruon_inspect).status_code,
+        400
     );
 }
