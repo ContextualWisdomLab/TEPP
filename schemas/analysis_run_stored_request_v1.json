@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tepp.local/schemas/analysis_run_stored_request_v1.json",
+  "title": "AnalysisRunStoredRequestV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "run_id",
+    "run_state",
+    "idempotency_key",
+    "snapshot_id",
+    "knowledge_cutoff",
+    "model_contract_version",
+    "output_profile"
+  ],
+  "properties": {
+    "contract_version": { "type": "integer", "const": 1 },
+    "run_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" },
+    "run_state": {
+      "type": "string",
+      "enum": ["accepted", "running", "succeeded", "failed", "cancelled"]
+    },
+    "idempotency_key": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "snapshot_id": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "knowledge_cutoff": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "model_contract_version": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "output_profile": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+  }
+}

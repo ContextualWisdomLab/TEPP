@@ -18,6 +18,7 @@ mod analysis_run_collection_http;
 mod analysis_run_live;
 mod analysis_run_retry_http;
 mod analysis_run_status_http;
+mod analysis_run_stored_request_http;
 mod authorization;
 mod corpus_split_manifest;
 mod envelope;
@@ -118,6 +119,16 @@ pub use analysis_run_retry_http::naruon_analysis_run_retry_exchange;
 pub use analysis_run_retry_http::refuse_metrics_on_retry_payload;
 /// Analysis-run status HTTP exchange re-exports.
 pub use analysis_run_status_http::{ANALYSIS_RUN_ID_MAX_LEN, naruon_analysis_run_status_exchange};
+/// Analysis-run stored-request contract version constant.
+pub use analysis_run_stored_request_http::ANALYSIS_RUN_STORED_REQUEST_CONTRACT_VERSION;
+/// Maximum opaque run identity length on the stored-request path.
+pub use analysis_run_stored_request_http::ANALYSIS_RUN_STORED_REQUEST_ID_MAX_LEN;
+/// Versioned metric-free stored analysis-run create fields.
+pub use analysis_run_stored_request_http::AnalysisRunStoredRequest;
+/// Build a Naruon analysis-run stored-request GET exchange.
+pub use analysis_run_stored_request_http::naruon_analysis_run_stored_request_exchange;
+/// Refuse scientific-metric keys on a stored-request payload.
+pub use analysis_run_stored_request_http::refuse_metrics_on_stored_request_payload;
 /// Corpus-split leakage-audit contract version.
 pub use corpus_split_manifest::CORPUS_SPLIT_MANIFEST_CONTRACT_VERSION;
 /// Versioned corpus-split leakage-audit manifest.
