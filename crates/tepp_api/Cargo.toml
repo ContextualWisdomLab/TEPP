@@ -29,6 +29,12 @@ path = "src/bin/tepp_loopback.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "tepp-lifecycle"
+path = "src/bin/tepp_lifecycle.rs"
+test = false
+bench = false
+
 [lints]
 workspace = true
 

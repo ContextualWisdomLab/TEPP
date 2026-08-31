@@ -14,10 +14,12 @@
 //! only a succeeded status with profile `scientific_acceptance_v1` may return
 //! `tepp.scientific_acceptance.v1`. `POST /v1/analysis-runs/{run_id}/running`
 //! and `POST /v1/analysis-runs/{run_id}/terminal` record those statuses on the
-//! same loopback listener.
+//! same loopback listener. The published `tepp-lifecycle` CLI mints those POSTs
+//! onto spawned `tepp-loopback` TCP.
 
 mod analysis_result;
 mod analysis_run;
+mod analysis_run_lifecycle_cli;
 mod analysis_run_lifecycle_http;
 mod analysis_run_live;
 mod analysis_run_status_http;
@@ -76,6 +78,22 @@ pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 pub use analysis_run::requests_are_idempotent_matches;
 /// Require exact status binding to a request and accepted receipt.
 pub use analysis_run::require_status_binding;
+/// Loopback lifecycle CLI invocation.
+pub use analysis_run_lifecycle_cli::AnalysisRunLifecycleCliInvocation;
+/// Loopback lifecycle CLI verb.
+pub use analysis_run_lifecycle_cli::AnalysisRunLifecycleCliVerb;
+/// Compose one HTTP/1.1 lifecycle POST from a CLI invocation.
+pub use analysis_run_lifecycle_cli::compose_analysis_run_lifecycle_cli_http;
+/// Dispatch one lifecycle CLI invocation against an in-process listener.
+pub use analysis_run_lifecycle_cli::dispatch_analysis_run_lifecycle_cli;
+/// Execute one lifecycle CLI invocation over loopback TCP.
+pub use analysis_run_lifecycle_cli::execute_analysis_run_lifecycle_cli;
+/// Render a typed lifecycle exchange as loopback HTTP/1.1.
+pub use analysis_run_lifecycle_cli::loopback_http1_from_lifecycle_exchange;
+/// Read leftover stdin for the lifecycle CLI.
+pub use analysis_run_lifecycle_cli::read_analysis_run_lifecycle_cli_stdin;
+/// Filter lifecycle CLI stdout so receipts stay metric-free.
+pub use analysis_run_lifecycle_cli::render_analysis_run_lifecycle_cli_stdout;
 /// Lifecycle-transition contract version constant.
 pub use analysis_run_lifecycle_http::ANALYSIS_RUN_LIFECYCLE_CONTRACT_VERSION;
 /// Production HTTP running/terminal transition body.

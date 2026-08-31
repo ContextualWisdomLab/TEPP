@@ -29,6 +29,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
 | Live loopback lifecycle POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs/{run_id}/running` and `/terminal` (Naruon-only; LineageWeave uses `AnalysisRunLiveService`) | naruon → TEPP |
+| Loopback lifecycle CLI | `tepp_api` `tepp-lifecycle` → `POST /v1/analysis-runs/{run_id}/running` and `/terminal` | naruon → TEPP |
 
 Committed examples live under `examples/`. Schemas for analysis-run requests and corpus-split manifests live under `schemas/`.
 
