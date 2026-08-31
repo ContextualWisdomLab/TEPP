@@ -12,7 +12,7 @@ Leiden community detection on admitted positive topic–topic edges:
 3. aggregation of well-connected communities before the next local-move
    pass;
 4. co-assignment consensus across independently perturbed replicates
-   (Monti, 2003; Hennig, 2007) with an explicit caller-supplied
+   (Monti, Tamayo, Mesirov, & Golub, 2003; Hennig, 2007) with an explicit caller-supplied
    `edge_drop_probability`.
 
 Isolated topics stay unclustered. Negative-effect edges never enter the
@@ -26,13 +26,13 @@ Traag, V. A., Waltman, L., & van Eck, N. J. (2019). From Louvain to
 Leiden: Guaranteeing well-connected communities. *Scientific Reports, 9*,
 Article 5233. https://doi.org/10.1038/s41598-019-41695-z
 
-Monti, S. (2003). Consensus clustering: A resampling-based method for
+Monti, S., Tamayo, P., Mesirov, J., & Golub, T. (2003). Consensus clustering: A resampling-based method for
 class discovery and visualization of gene expression microarray data.
 *Machine Learning, 52*(1–2), 91–118.
 https://doi.org/10.1023/A:1023949509487
 
 Hennig, C. (2007). Cluster-wise assessment of cluster stability.
-*Computational Statistics & Data Analysis, 52*(1), 258–281.
+*Computational Statistics & Data Analysis, 52*(1), 258–271.
 https://doi.org/10.1016/j.csda.2006.11.025
 
 Newman, M. E. J., & Girvan, M. (2004). Finding and evaluating community
@@ -63,4 +63,8 @@ https://doi.org/10.1103/PhysRevE.69.026113
 - isolated topics keep a distinct unclustered assignment at consensus;
 - aggregation sums parallel supernode edges and keeps distinct neighbours;
 - the connectedness oracle rejects a disconnected community and accepts
-  singletons.
+  singletons;
+- aggregation continues when nodes moved even if the aggregate did not
+  shrink;
+- out-of-range and self-loop endpoints stay unclustered at consensus;
+- permuting equal edges does not change the consensus assignment.

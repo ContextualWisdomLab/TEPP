@@ -38,7 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
-- `network_analysis` replaces the greedy union-find consensus stand-in with Traag, Waltman, and van Eck (2019) Leiden modularity (γ = 1): fast local moving, refinement that keeps communities internally connected, and aggregation. Two cliques joined by a weak bridge stay two communities; union-find glued them. Isolated topics stay unclustered. The Monti (2003) / Hennig (2007) co-assignment wrapper is unchanged. This is not a graphical lasso, not a causal cluster, and not an export workflow.
+- `network_analysis` replaces the greedy union-find consensus stand-in with Traag, Waltman, and van Eck (2019) Leiden modularity (γ = 1): fast local moving, refinement that keeps communities internally connected, and aggregation. Two cliques joined by a weak bridge stay two communities; union-find glued them. Isolated topics stay unclustered. Co-assignment follows Monti, Tamayo, Mesirov, and Golub (2003) and Hennig (2007) with an explicit drop probability; the drop stream is independent of the per-replicate Leiden RNG, admitted edges are sorted, and out-of-range endpoints stay unclustered. This is not a graphical lasso, not a causal cluster, and not an export workflow.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 

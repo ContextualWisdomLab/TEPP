@@ -115,7 +115,7 @@ pub(crate) fn leiden_partition(
         let refined = refine_partition(&graph, &membership, rng);
         let (aggregate, next_membership, next_leaves) =
             aggregate_graph(&graph, &membership, &refined, &leaf_members);
-        if aggregate.node_count == graph.node_count && !moved {
+        if aggregation_level_is_stable(aggregate.node_count, graph.node_count, moved) {
             break;
         }
         if aggregate.node_count <= 1 {
@@ -129,6 +129,14 @@ pub(crate) fn leiden_partition(
     }
 
     project_original_labels(&leaf_members, &membership, topic_count)
+}
+
+/// Stop only when local moving made no change and refinement did not reduce
+/// the graph. A move that leaves the aggregate the same size continues so
+/// the next Leiden pass starts from the updated partition (Traag, Waltman,
+/// & van Eck, 2019).
+fn aggregation_level_is_stable(aggregate_nodes: usize, graph_nodes: usize, moved: bool) -> bool {
+    aggregate_nodes == graph_nodes && !moved
 }
 
 fn project_original_labels(
@@ -686,5 +694,18 @@ mod tests {
         assert!(!communities_connected(&edges, &[0, 0, 0, 0]));
         assert!(communities_connected(&edges, &[0, 0, 1, 1]));
         assert!(communities_connected(&edges, &[0, 1, 2, 3]));
+    }
+
+    #[test]
+    fn aggregation_continues_when_nodes_moved_on_a_same_size_level() {
+        // Unique-branch coverage of the `!moved` false arm: refinement
+        // did not shrink the graph, but local moving still changed the
+        // partition, so Leiden must not stop (Traag et al., 2019).
+        assert!(aggregation_level_is_stable(4, 4, false));
+        assert!(!aggregation_level_is_stable(4, 4, true));
+        assert!(!aggregation_level_is_stable(2, 4, false));
+        assert!(!aggregation_level_is_stable(1, 4, true));
+        assert!(aggregation_level_is_stable(1, 1, false));
+        assert!(!aggregation_level_is_stable(1, 1, true));
     }
 }
