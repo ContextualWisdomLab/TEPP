@@ -239,7 +239,7 @@ fn move_nodes_fast(graph: &Graph, membership: &mut [usize], rng: &mut u64) -> bo
                 best_community = candidate;
             }
         }
-        if best_community == from || best_delta <= 0.0 {
+        if best_community == from {
             continue;
         }
         membership[node] = best_community;
@@ -488,6 +488,7 @@ mod tests {
     fn out_of_range_self_and_nonpositive_edges_are_ignored() {
         let owned = vec![
             edge(0, 9, 1.0),
+            edge(9, 0, 1.0),
             edge(1, 1, 1.0),
             edge(0, 1, 0.0),
             edge(0, 1, -0.4),
