@@ -15,6 +15,7 @@ mod analysis_result;
 mod analysis_run;
 mod analysis_run_cancel_http;
 mod analysis_run_collection_http;
+mod analysis_run_idempotency_lookup_cli;
 mod analysis_run_idempotency_lookup_http;
 mod analysis_run_live;
 mod analysis_run_retry_http;
@@ -107,6 +108,20 @@ pub use analysis_run_collection_http::parse_collection_page_cursor;
 pub use analysis_run_collection_http::parse_collection_page_limit;
 /// Refuse scientific-metric keys on a collection payload.
 pub use analysis_run_collection_http::refuse_metrics_on_collection_payload;
+/// One validated idempotency-lookup CLI invocation.
+pub use analysis_run_idempotency_lookup_cli::AnalysisRunIdempotencyLookupCliInvocation;
+/// Loopback idempotency-lookup CLI verb.
+pub use analysis_run_idempotency_lookup_cli::AnalysisRunIdempotencyLookupCliVerb;
+/// Compose loopback lookup GET bytes for a CLI invocation.
+pub use analysis_run_idempotency_lookup_cli::compose_analysis_run_idempotency_lookup_cli_http;
+/// Dispatch a lookup CLI invocation against an in-process listener.
+pub use analysis_run_idempotency_lookup_cli::dispatch_analysis_run_idempotency_lookup_cli;
+/// Execute a lookup CLI invocation over loopback TCP.
+pub use analysis_run_idempotency_lookup_cli::execute_analysis_run_idempotency_lookup_cli;
+/// Read leftover stdin for the lookup CLI.
+pub use analysis_run_idempotency_lookup_cli::read_analysis_run_idempotency_lookup_cli_stdin;
+/// Render lookup CLI stdout with metric-free gates.
+pub use analysis_run_idempotency_lookup_cli::render_analysis_run_idempotency_lookup_cli_stdout;
 /// Analysis-run idempotency-lookup contract version constant.
 pub use analysis_run_idempotency_lookup_http::ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_CONTRACT_VERSION;
 /// Maximum opaque idempotency-key length on the lookup path.

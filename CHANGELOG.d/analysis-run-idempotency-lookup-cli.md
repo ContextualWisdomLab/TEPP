@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-analysis-runs lookup` resolves a metric-free run identity by idempotency key (ADR 0038). `run_id`/`run_state`/`idempotency_key` only. Refuses RMSE/bias/coverage/SE-gate keys and `tepp.scientific_acceptance.v1`. Not lookup HTTP, not stored-request CLI, not GET-by-id, not persistence.

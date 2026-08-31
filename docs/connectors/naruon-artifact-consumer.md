@@ -28,6 +28,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
 | HTTP analysis-run collection | `tepp_api` `naruon_analysis_run_collection_exchange` → `GET /v1/analysis-runs` | naruon → TEPP |
 | HTTP analysis-run cancel | `tepp_api` `naruon_analysis_run_cancel_exchange` → `POST /v1/analysis-runs/{run_id}/cancel` | naruon → TEPP |
+| CLI analysis-run idempotency lookup | `tepp_api` `tepp-analysis-runs lookup` → loopback `GET /v1/analysis-runs/by-idempotency/{idempotency_key}` | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
 
