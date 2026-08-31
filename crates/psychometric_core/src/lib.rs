@@ -119,6 +119,17 @@
 //! (pp. 20–21; stable between-subject variance accounted for by a
 //! time-independent predictor with variance `v`; not `TRAITVAR`,
 //! not `asymDIFFUSION`, and not `-B z / a`),
+//! recovers Eq. 5 of 2017-era commented `asymTOTALVAR` after
+//! `addedTIPREDVAR` as `λ²(-q / (2 a) + trait / a² + (B / a)² v)`
+//! with `θ = 0` (cran/ctsem 2.5.0 `summary.ctsemFit.R`; JSS PDF
+//! re-opened 2026-08-31T05:20Z; form the three-term total inline;
+//! this crate does not currently export the unstandardised
+//! three-term recover; a zero loading or zero total is exactly
+//! zero; unstandardised three-term total is not that observed
+//! extra; `λ² (B / a)² v` is Eq. 5 of `addedTIPREDVAR` and is not
+//! that extra; `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ` uses
+//! process-level `TRAITVAR` and is not that extra; `MANIFESTVAR`
+//! is not that extra),
 //! recovers the Driver Table 2 `asymCINT` as `-κ / a`
 //! (p. 12; Eq. 3 as `Δt → ∞`; JSS PDF opened 2026-08-21T16:13Z;
 //! expected change in process means for a unit intercept; `a < 0`;
@@ -317,6 +328,8 @@ pub use event_time::recover_asymptotic_continuous_intercept;
 pub use event_time::recover_asymptotic_time_independent_predictor_effect;
 /// Exact scalar §7.2 `addedTIPREDVAR` `(B / a)² v`.
 pub use event_time::recover_asymptotic_time_independent_predictor_variance;
+/// Exact scalar Eq. 5 of 2017-era commented `asymTOTALVAR` after `addedTIPREDVAR` `λ²(-q / (2 a) + trait / a² + (B / a)² v)`.
+pub use event_time::recover_asymptotic_total_observed_variance_after_added_time_independent_predictor;
 /// Exact scalar discrete effect of a constant event-time predictor.
 pub use event_time::recover_discrete_constant_predictor_effect;
 /// Exact scalar discrete intercept increment `A^{-1}[e^{A Δt} − I] κ`.
@@ -448,6 +461,8 @@ pub use event_time::recover_trait_plus_state_lagged_covariance;
 pub use event_time::recover_trait_plus_state_latent_variance;
 /// CWC-then-event-time local log-rate (not DSEM; not raw-process AR drift).
 pub use event_time::recover_within_residual_event_time_log_rate;
+/// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as Eq. 5 of three-term `asymTOTALVAR` after `addedTIPREDVAR`.
+pub use event_time::refuse_added_time_independent_observed_variance_as_asymptotic_total_observed_variance_after_added;
 /// Refuse treating the after-t0 extra-process contribution as `E(y_t)`.
 pub use event_time::refuse_after_extra_process_contribution_as_observed_mean;
 /// Refuse treating the evolved-plus-after-contribution latent mean as `E(y_t)`.
@@ -600,6 +615,8 @@ pub use event_time::refuse_level_change_intercept_as_process_increment;
 pub use event_time::refuse_manifest_means_as_observed_mean;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.
 pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of three-term `asymTOTALVAR` after `addedTIPREDVAR`.
+pub use event_time::refuse_measurement_error_as_asymptotic_total_observed_variance_after_added;
 /// Refuse treating Driver Eq. 5 measurement error as lagged observed covariance.
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
@@ -636,6 +653,10 @@ pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_
 pub use event_time::refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
+/// Refuse treating Eq. 5 of §4.3 stationary `T0VAR` as Eq. 5 of three-term `asymTOTALVAR` after `addedTIPREDVAR`.
+pub use event_time::refuse_stationary_initial_observed_variance_as_asymptotic_total_observed_variance_after_added;
+/// Refuse treating unstandardised three-term `asymTOTALVAR` after `addedTIPREDVAR` as Eq. 5 of that total.
+pub use event_time::refuse_unstandardised_asymptotic_total_variance_after_added_predictor_as_observed;
 
 /// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
