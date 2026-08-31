@@ -29,5 +29,11 @@ path = "src/bin/tepp_loopback.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "tepp-retry-lineage"
+path = "src/bin/tepp_retry_lineage.rs"
+test = false
+bench = false
+
 [lints]
 workspace = true

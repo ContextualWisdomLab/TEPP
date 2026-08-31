@@ -39,6 +39,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ## [Unreleased]
 
 - Loopback retry-lineage consumer parity: LineageWeave GET-retries exchange, Naruon compatibility-listener inspect (empty `retries` on accepted creates), and `tepp-loopback` TCP create-cancel-retry-inspect proof (ADR 0045).
+- Loopback retry-lineage CLI: published `tepp-retry-lineage` mints typed naruon/`LineageWeave` `GET /v1/analysis-runs/{run_id}/retries` onto spawned `tepp-loopback` TCP (ADR 0048). Inspect stays metric-free. Persistence remains GAP-003B.
 
 - `tepp_api` serves `GET /v1/analysis-runs` on the shared loopback listener (ADR 0031). Operators enumerate accepted, running, cancelled, and terminal runs as metric-free collection rows. Collection bodies refuse RMSE/bias/coverage/SE-gate/scientific-acceptance/`terminal_result` keys. GET-by-id and running/terminal POST remain later GAP-003A slices; this is not an ADR 0014 claim.
 

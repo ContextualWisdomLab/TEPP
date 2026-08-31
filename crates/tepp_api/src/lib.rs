@@ -9,7 +9,9 @@
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
-//! causality, or completed psychometric model results.
+//! causality, or completed psychometric model results. The published
+//! `tepp-retry-lineage` CLI mints typed naruon/`LineageWeave` retry-lineage GET
+//! exchanges onto spawned `tepp-loopback` TCP.
 
 mod analysis_result;
 mod analysis_run;
@@ -17,6 +19,7 @@ mod analysis_run_cancel_http;
 mod analysis_run_collection_http;
 mod analysis_run_live;
 mod analysis_run_retry_http;
+mod analysis_run_retry_lineage_cli;
 mod analysis_run_retry_lineage_http;
 mod analysis_run_status_http;
 mod analysis_run_stored_request_http;
@@ -118,6 +121,22 @@ pub use analysis_run_retry_http::AnalysisRunRetryRequest;
 pub use analysis_run_retry_http::naruon_analysis_run_retry_exchange;
 /// Refuse scientific-metric keys on a retry payload.
 pub use analysis_run_retry_http::refuse_metrics_on_retry_payload;
+/// Loopback retry-lineage CLI invocation.
+pub use analysis_run_retry_lineage_cli::AnalysisRunRetryLineageCliInvocation;
+/// Loopback retry-lineage CLI verb.
+pub use analysis_run_retry_lineage_cli::AnalysisRunRetryLineageCliVerb;
+/// Compose HTTP/1.1 retry-lineage GET from a CLI invocation.
+pub use analysis_run_retry_lineage_cli::compose_analysis_run_retry_lineage_cli_http;
+/// Dispatch a retry-lineage CLI invocation against an in-process listener.
+pub use analysis_run_retry_lineage_cli::dispatch_analysis_run_retry_lineage_cli;
+/// Execute a retry-lineage CLI invocation over loopback TCP.
+pub use analysis_run_retry_lineage_cli::execute_analysis_run_retry_lineage_cli;
+/// Render a typed retry-lineage exchange onto a loopback HTTP/1.1 request.
+pub use analysis_run_retry_lineage_cli::loopback_http1_from_retry_lineage_exchange;
+/// Read retry-lineage CLI stdin; GET requires empty.
+pub use analysis_run_retry_lineage_cli::read_analysis_run_retry_lineage_cli_stdin;
+/// Filter retry-lineage CLI stdout so inspect stays metric-free.
+pub use analysis_run_retry_lineage_cli::render_analysis_run_retry_lineage_cli_stdout;
 /// Analysis-run retry-lineage contract version constant.
 pub use analysis_run_retry_lineage_http::ANALYSIS_RUN_RETRY_LINEAGE_CONTRACT_VERSION;
 /// Maximum opaque run identity length on the retry-lineage path.

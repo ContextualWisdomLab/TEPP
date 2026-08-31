@@ -97,7 +97,9 @@ run before retry. `GET /v1/analysis-runs/{run_id}/retries` on the loopback
 listener returns metric-free direct retry children of that parent so operators
 can inspect lineage after retry. An empty `retries` array is `200` when the
 parent was never retried. `lineageweave_analysis_run_retry_lineage_exchange`
-builds the same GET for LineageWeave. `NaruonLiveService` serves retry-lineage GET
+builds the same GET for LineageWeave. `tepp-retry-lineage retries` is the published
+CLI that mints those typed naruon/`LineageWeave` retry-lineage exchanges onto
+spawned `tepp-loopback` TCP. `NaruonLiveService` serves retry-lineage GET
 for Naruon only and returns an empty `retries` array on accepted creates;
 LineageWeave remains refused on that compatibility listener. GET-by-id remains a later slice on this protected-main
 lineage.
