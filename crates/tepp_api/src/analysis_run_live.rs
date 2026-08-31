@@ -143,13 +143,20 @@ impl AnalysisRunLiveService {
         self.bound_addr.ok_or(ApiError::InvalidWirePayload)
     }
 
-    /// Accept and serve one HTTP/1.1 request.
+    /// Accept one loopback connection and read its HTTP request.
+    ///
+    /// Socket I/O failures return [`Err`]. Protocol framing failures return
+    /// `Ok((stream, Err(_)))` so the caller can still write a redacted envelope
+    /// on the accepted stream. Engine glue uses this so execute dispatch can
+    /// own the handler without borrowing the listener twice.
     ///
     /// # Errors
     ///
-    /// Returns a fail-closed API error when no socket is bound or socket I/O
-    /// fails. Protocol errors are returned as redacted HTTP responses.
-    pub fn serve_one(&mut self) -> Result<NaruonLiveResponse, ApiError> {
+    /// Returns [`ApiError::InvalidWirePayload`] when no socket is bound or the
+    /// accept/timeout syscalls fail.
+    pub fn accept_loopback_request(
+        &mut self,
+    ) -> Result<(std::net::TcpStream, Result<String, ApiError>), ApiError> {
         let listener = self.listener.as_ref().ok_or(ApiError::InvalidWirePayload)?;
         let (mut stream, _) = listener.accept().map_err(|error| map_io_error(&error))?;
         stream
@@ -158,15 +165,39 @@ impl AnalysisRunLiveService {
         stream
             .set_write_timeout(Some(NARUON_LIVE_IO_TIMEOUT))
             .map_err(|error| map_io_error(&error))?;
-        let response = match read_http_request_with_limit(&mut stream, MAX_LIVE_REQUEST_BODY_BYTES)
-        {
-            Ok(request) => self.handle_http_request(&request),
-            Err(error) => self.response_from_error(error),
-        };
+        let request = read_http_request_with_limit(&mut stream, MAX_LIVE_REQUEST_BODY_BYTES);
+        Ok((stream, request))
+    }
+
+    /// Write one HTTP/1.1 response on an accepted loopback stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApiError::InvalidWirePayload`] when the write or flush fails.
+    pub fn write_loopback_response(
+        stream: &mut std::net::TcpStream,
+        response: &NaruonLiveResponse,
+    ) -> Result<(), ApiError> {
         stream
             .write_all(&response.to_http_bytes())
             .map_err(|error| map_io_error(&error))?;
         stream.flush().map_err(|error| map_io_error(&error))?;
+        Ok(())
+    }
+
+    /// Accept and serve one HTTP/1.1 request.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed API error when no socket is bound or socket I/O
+    /// fails. Protocol errors are returned as redacted HTTP responses.
+    pub fn serve_one(&mut self) -> Result<NaruonLiveResponse, ApiError> {
+        let (mut stream, request) = self.accept_loopback_request()?;
+        let response = match request {
+            Ok(request) => self.handle_http_request(&request),
+            Err(error) => self.response_from_error(error),
+        };
+        Self::write_loopback_response(&mut stream, &response)?;
         Ok(response)
     }
 

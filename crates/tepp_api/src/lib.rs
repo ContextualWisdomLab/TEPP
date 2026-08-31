@@ -17,6 +17,7 @@
 //! same loopback listener. `POST /v1/analysis-runs/{run_id}/execute` is refused
 //! here; `analysis_engine` owns engine execution so a scientific-acceptance run
 //! can produce `tepp.scientific_acceptance.v1` without a caller-supplied artifact.
+//! The published `tepp-loopback` binary lives in `analysis_engine`.
 
 mod analysis_result;
 mod analysis_run;

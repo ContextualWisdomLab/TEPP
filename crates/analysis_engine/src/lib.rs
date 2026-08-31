@@ -11,7 +11,9 @@
 //! contracts and preserves their artifact meaning. Loopback
 //! [`ScientificAcceptanceLoopbackService`] executes scientific acceptance on an
 //! accepted analysis run so GET can return `tepp.scientific_acceptance.v1`
-//! without a caller-supplied artifact.
+//! without a caller-supplied artifact. The published `tepp-loopback` binary
+//! binds that wrapper so `POST /v1/analysis-runs/{run_id}/execute` is reachable
+//! on the loopback listener without embedding this crate.
 
 mod case_deletion_refit;
 mod lineage_criterion;

@@ -14,10 +14,11 @@ use crate::{
     VALIDATION_CPU_F64_MODEL, complete_validation_run, submit_validation_run,
 };
 use serde::Deserialize;
+use std::net::SocketAddr;
 use temporal_core::{AvailableTime, EventTime};
 use tepp_api::{
-    ANALYSIS_RUN_STATUS_PATH, AnalysisResultSummary, AnalysisRunStatus, AnalysisRunStatusState,
-    AnalysisRunTerminalResult, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
+    ANALYSIS_RUN_STATUS_PATH, AnalysisResultSummary, AnalysisRunLiveService, AnalysisRunStatus,
+    AnalysisRunStatusState, AnalysisRunTerminalResult, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
     DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope, NaruonLiveResponse,
     SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE, SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA,
     analysis_run_execute_path_run_id, parse_loopback_http_parts,
@@ -50,7 +51,7 @@ pub const ANALYSIS_RUN_EXECUTE_PATH_SUFFIX: &str = "execute";
 /// engine produces the artifact. `tepp_api` cannot depend on this crate.
 #[derive(Debug)]
 pub struct ScientificAcceptanceLoopbackService {
-    live: tepp_api::AnalysisRunLiveService,
+    live: AnalysisRunLiveService,
     next_request_serial: u64,
 }
 
@@ -65,28 +66,73 @@ impl ScientificAcceptanceLoopbackService {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            live: tepp_api::AnalysisRunLiveService::new(),
+            live: AnalysisRunLiveService::new(),
             next_request_serial: 1,
         }
     }
 
     /// Wrap an existing loopback listener.
     #[must_use]
-    pub fn from_live(live: tepp_api::AnalysisRunLiveService) -> Self {
+    pub fn from_live(live: AnalysisRunLiveService) -> Self {
         Self {
             live,
             next_request_serial: 1,
         }
     }
 
+    /// Bind a caller-supplied loopback address.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApiError::AuthorizationDenied`] for a non-loopback address
+    /// and [`ApiError::InvalidWirePayload`] when the socket cannot be opened.
+    pub fn bind(addr: SocketAddr) -> Result<Self, ApiError> {
+        Ok(Self::from_live(AnalysisRunLiveService::bind(addr)?))
+    }
+
+    /// Bind an ephemeral IPv4 loopback port.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApiError::InvalidWirePayload`] when the operating system
+    /// refuses the loopback bind.
+    pub fn bind_loopback() -> Result<Self, ApiError> {
+        Ok(Self::from_live(AnalysisRunLiveService::bind_loopback()?))
+    }
+
+    /// Return the bound loopback address.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ApiError::InvalidWirePayload`] when no socket is bound.
+    pub fn local_addr(&self) -> Result<SocketAddr, ApiError> {
+        self.live.local_addr()
+    }
+
+    /// Accept and serve one HTTP/1.1 request, including `/execute`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed API error when no socket is bound or socket I/O
+    /// fails. Protocol errors are returned as redacted HTTP responses.
+    pub fn serve_one(&mut self) -> Result<NaruonLiveResponse, ApiError> {
+        let (mut stream, request) = self.live.accept_loopback_request()?;
+        let response = match request {
+            Ok(request) => self.handle_http_request(&request),
+            Err(error) => self.response_from_error(error),
+        };
+        AnalysisRunLiveService::write_loopback_response(&mut stream, &response)?;
+        Ok(response)
+    }
+
     /// Return the inner loopback service.
     #[must_use]
-    pub fn live(&self) -> &tepp_api::AnalysisRunLiveService {
+    pub fn live(&self) -> &AnalysisRunLiveService {
         &self.live
     }
 
     /// Return the inner loopback service mutably.
-    pub fn live_mut(&mut self) -> &mut tepp_api::AnalysisRunLiveService {
+    pub fn live_mut(&mut self) -> &mut AnalysisRunLiveService {
         &mut self.live
     }
 

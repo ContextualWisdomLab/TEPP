@@ -8,7 +8,7 @@
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
+Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` is the `analysis_engine` binary that binds `ScientificAcceptanceLoopbackService` on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The packaged listener serves create, GET, running, terminal, temporal-context, project-history, and `POST /v1/analysis-runs/{run_id}/execute` so a `scientific_acceptance_v1` run produces `tepp.scientific_acceptance.v1` without embedding the library. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService`, `AnalysisRunLiveService`, or `ScientificAcceptanceLoopbackService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
 
 ## 2. Contract families
 
@@ -68,6 +68,7 @@ POST   /v1/temporal-context
 GET    /v1/analysis-runs/{run_id}
 POST   /v1/analysis-runs/{run_id}/running
 POST   /v1/analysis-runs/{run_id}/terminal
+POST   /v1/analysis-runs/{run_id}/execute
 POST   /v1/analysis-runs/{run_id}/cancel
 GET    /v1/model-artifacts/{artifact_id}
 GET    /v1/exports/{export_id}
@@ -110,7 +111,9 @@ execute psychometric estimation. `POST /v1/analysis-runs/{run_id}/execute` on
 loopback path that produces `tepp.scientific_acceptance.v1` for a
 `scientific_acceptance_v1` run without a caller-supplied artifact. The execute
 body carries corpus, recovery, seed, and the pre-registered SE-gate multiplier
-and refuses `scientific_acceptance_json`. Production TLS remains a later adapter.
+and refuses `scientific_acceptance_json`. The published `tepp-loopback` binary
+binds that wrapper so operators reach `/execute` without embedding
+`analysis_engine`. Production TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

@@ -29,6 +29,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
 | Live loopback scientific-acceptance execute | `analysis_engine` `ScientificAcceptanceLoopbackService` → `POST /v1/analysis-runs/{run_id}/execute` | naruon → TEPP |
+| Published `tepp-loopback` binary | `analysis_engine` `tepp-loopback` binds `ScientificAcceptanceLoopbackService` so `/execute` is reachable without embedding the library | naruon → TEPP |
 
 Committed examples live under `examples/`. Schemas for analysis-run requests and corpus-split manifests live under `schemas/`.
 
