@@ -25,7 +25,7 @@ use crate::{
     LINEAGEWEAVE_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT,
     NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_CONTRACT_VERSION,
     PROJECT_HISTORY_PATH, ProjectHistoryHttpExchange, ProjectHistoryProjection,
-    ProjectHistoryRequest, lineageweave_project_history_exchange,
+    ProjectHistoryRequest, lineageweave_project_history_exchange, project_history_projection,
 };
 
 const SCIENTIFIC_ACCEPTANCE_SCHEMA: &str = "tepp.scientific_acceptance.v1";
@@ -334,9 +334,7 @@ pub fn render_project_history_cli_stdout(
         return Err(ApiError::InvalidWirePayload);
     }
     let projection = ProjectHistoryProjection::from_json(&response.body)?;
-    if projection.project_key != invocation.request.project_key
-        || projection.focus_event_id != invocation.request.focus_event_id
-    {
+    if projection != project_history_projection(&invocation.request)? {
         return Err(ApiError::InvalidWirePayload);
     }
     projection.to_json()
@@ -870,6 +868,21 @@ mod tests {
                     status_code: 200,
                     reason_phrase: "OK",
                     body: String::new(),
+                }
+            )
+            .unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+        let mut later_cutoff =
+            crate::project_history_projection(&invocation.request).expect("projection");
+        later_cutoff.knowledge_cutoff = "2026-08-20T23:59:59Z".into();
+        assert_eq!(
+            render_project_history_cli_stdout(
+                &invocation,
+                &NaruonLiveResponse {
+                    status_code: 200,
+                    reason_phrase: "OK",
+                    body: later_cutoff.to_json().expect("projection json"),
                 }
             )
             .unwrap_err(),
