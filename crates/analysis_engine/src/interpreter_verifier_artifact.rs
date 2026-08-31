@@ -127,15 +127,10 @@ impl InterpreterVerifierArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > INTERPRETER_VERIFIER_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
