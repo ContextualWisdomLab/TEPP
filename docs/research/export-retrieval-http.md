@@ -19,7 +19,7 @@ remain later work.
 
 ## Internal contract evidence
 
-- ADR 0053 owns this retrieval GET.
+- ADR 0054 owns this retrieval GET.
 - ADR 0009 owns purpose-bound disclosure without blanket masking.
 - ADR 0011 owns the standalone/CWL MSA boundary.
 - `docs/API_CONTRACT.md` names `GET /v1/exports/{export_id}` as the target

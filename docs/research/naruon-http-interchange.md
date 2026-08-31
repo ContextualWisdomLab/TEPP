@@ -5,7 +5,7 @@
 naruon may submit analysis-run requests and request purpose-bound exports only
 through versioned `https` POST paths owned by TEPP. Export retrieval is the
 loopback `GET /v1/exports/{export_id}` identity route on
-`AnalysisRunLiveService` (ADR 0053). HTTP method, path, `Host`,
+`AnalysisRunLiveService` (ADR 0054). HTTP method, path, `Host`,
 and `Transfer-Encoding` semantics follow current HTTP semantics (Fielding,
 Nottingham, & Reschke, 2022). Knowledge-cutoff instants use RFC 3339
 (Klyne & Newman, 2002). Fail-closed refusal of table-access URLs,

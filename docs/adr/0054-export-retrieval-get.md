@@ -1,9 +1,9 @@
-# ADR 0053 — Loopback export retrieval GET path
+# ADR 0054 — Loopback export retrieval GET path
 
 **Decision status:** Accepted
 **Implementation maturity:** active-PR
 **Date:** 2026-08-31
-**Supersedes:** None; complements ADR 0009, ADR 0011, and ADR 0018 for the operator-visible jump from a purpose-bound export authorization to a durable export identity. Does not supersede ADR 0014 claim-promotion authority. ADR 0026–0052 remain on live GAP-003A engine-library, terminal-wire DTO, GET-by-id, lifecycle-POST, cancel, loopback-CLI, collection-GET, retry, stored-request, retry-lineage, lookup, retry-parent, wait-CLI, and analysis-run profile slices.
+**Supersedes:** None; complements ADR 0009, ADR 0011, and ADR 0018 for the operator-visible jump from a purpose-bound export authorization to a durable export identity. Does not supersede ADR 0014 claim-promotion authority. ADR 0026–0053 remain on live GAP-003A engine-library, terminal-wire DTO, GET-by-id, lifecycle-POST, cancel, loopback-CLI, collection-GET, retry, stored-request, retry-lineage, lookup, retry-parent, wait-CLI, and analysis-run profile slices.
 **Figma File ID:** N/A — this increment changes a Rust service crate and has no user-interface surface.
 **Storybook inventory:** N/A — no reusable web object or interaction changed.
 

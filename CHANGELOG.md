@@ -38,7 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
-- `tepp_api` loopback `GET /v1/exports/{export_id}` returns the metric-free identity of one purpose-bound export that `AnalysisRunLiveService` authorized, so operators can retrieve that export without scanning artifacts (ADR 0053). `NaruonLiveService` stays POST-only. GET-by-id remains refused. Not lifecycle POST, not cancel, not collection GET, not retry, not stored-request GET, not retry-lineage GET, not lookup GET, not retry-parent GET, not GAP-010 Figma/export, not persistence.
+- `tepp_api` loopback `GET /v1/exports/{export_id}` returns the metric-free identity of one purpose-bound export that `AnalysisRunLiveService` authorized, so operators can retrieve that export without scanning artifacts (ADR 0054). `NaruonLiveService` stays POST-only. GET-by-id remains refused. Not lifecycle POST, not cancel, not collection GET, not retry, not stored-request GET, not retry-lineage GET, not lookup GET, not retry-parent GET, not GAP-010 Figma/export, not persistence.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 
