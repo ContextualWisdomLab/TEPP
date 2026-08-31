@@ -261,6 +261,17 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era commented-out `asymTOTALVAR` as
+//! `-q / (2 a) + trait / a²` (2017-era `summary.ctsemFit.R` comments
+//! `asymTOTALVAR <- asymDIFFUSION + asymTRAITVAR` with
+//! `asymTRAITVAR <- solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))`;
+//! form `1 / a` first, then square, then multiply by `trait`, then
+//! add `asymDIFFUSION`; a zero trait and a zero diffusion is exactly
+//! zero even if `a ≥ 0`; `a ≥ 0` with a nonzero contribution fails
+//! closed; `trait + p` is §4.3 trait-plus-state and is not this map;
+//! `trait / a²` is `asymTRAITVAR` and is not this total when `q ≠ 0`;
+//! `-q / (2 a)` is `asymDIFFUSION` and is not this total when
+//! `trait ≠ 0`; JSS PDF re-opened 2026-08-31T03:10Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -317,6 +328,8 @@ pub use event_time::recover_asymptotic_continuous_intercept;
 pub use event_time::recover_asymptotic_time_independent_predictor_effect;
 /// Exact scalar §7.2 `addedTIPREDVAR` `(B / a)² v`.
 pub use event_time::recover_asymptotic_time_independent_predictor_variance;
+/// Exact scalar 2017-era commented-out `asymTOTALVAR` `-q / (2 a) + trait / a²`.
+pub use event_time::recover_asymptotic_total_variance;
 /// Exact scalar discrete effect of a constant event-time predictor.
 pub use event_time::recover_discrete_constant_predictor_effect;
 /// Exact scalar discrete intercept increment `A^{-1}[e^{A Δt} − I] κ`.
@@ -462,6 +475,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_as_discrete_increment
 pub use event_time::refuse_asymptotic_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating `τ + λ(−κ / a)` as Eq. 5 of §4.3 stationary `T0MEANS`.
 pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean;
+/// Refuse treating `asymDIFFUSION` as 2017-era `asymTOTALVAR`.
+pub use event_time::refuse_asymptotic_diffusion_as_asymptotic_total_variance;
 /// Refuse treating p. 16 `asymCINTstd` as `CINTstd`.
 pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `asymCINTstd` as `discreteCINTstd`.
@@ -480,6 +495,8 @@ pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_ef
 pub use event_time::refuse_asymptotic_time_independent_variance_as_stationary_within_subject;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `TRAITVAR`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_trait_variance;
+/// Refuse treating 2017-era `asymTRAITVAR` as 2017-era `asymTOTALVAR`.
+pub use event_time::refuse_asymptotic_trait_variance_as_asymptotic_total_variance;
 /// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
 pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 /// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.
@@ -717,6 +734,8 @@ pub use event_time::refuse_time_independent_observed_mean_as_initial_time_depend
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
+/// Refuse treating §4.3 trait-plus-state variance as 2017-era `asymTOTALVAR`.
+pub use event_time::refuse_trait_plus_state_variance_as_asymptotic_total_variance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
 pub use event_time::refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating Driver §4.3 trait variance as process noise.

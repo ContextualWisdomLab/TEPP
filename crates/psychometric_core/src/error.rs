@@ -710,6 +710,23 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// 2017-era commented-out `asymTOTALVAR` was requested for a
+    /// non-stable drift. The two-term map `-q / (2 a) + trait / a²`
+    /// requires `a < 0` whenever a contribution is nonzero.
+    AsymptoticTotalVarianceRequiresStableDrift,
+    /// Driver §4.3 trait-plus-state variance was treated as 2017-era
+    /// `asymTOTALVAR`. `trait + p` keeps `TRAITVAR` in process units;
+    /// the commented total uses `solve(DRIFT)` and is `p + trait / a²`.
+    TraitPlusStateVarianceIsNotAsymptoticTotalVariance,
+    /// Driver p. 16 `asymDIFFUSION` was treated as 2017-era
+    /// `asymTOTALVAR`. `-q / (2 a)` is the within-subject Lyapunov
+    /// variance, not the two-term total that adds `trait / a²`.
+    AsymptoticDiffusionIsNotAsymptoticTotalVariance,
+    /// 2017-era `asymTRAITVAR` was treated as 2017-era
+    /// `asymTOTALVAR`. `trait / a²` is the random-intercept
+    /// contribution, not the two-term total that adds
+    /// `asymDIFFUSION`.
+    AsymptoticTraitVarianceIsNotAsymptoticTotalVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1251,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptoticTotalVarianceRequiresStableDrift => {
+                "asymptotic total variance requires a stable negative drift"
+            }
+            Self::TraitPlusStateVarianceIsNotAsymptoticTotalVariance => {
+                "trait-plus-state variance is not asymptotic total variance"
+            }
+            Self::AsymptoticDiffusionIsNotAsymptoticTotalVariance => {
+                "asymptotic diffusion is not asymptotic total variance"
+            }
+            Self::AsymptoticTraitVarianceIsNotAsymptoticTotalVariance => {
+                "asymptotic trait variance is not asymptotic total variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2100,26 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotic_total_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptoticTotalVarianceRequiresStableDrift.to_string(),
+            "asymptotic total variance requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::TraitPlusStateVarianceIsNotAsymptoticTotalVariance.to_string(),
+            "trait-plus-state variance is not asymptotic total variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticDiffusionIsNotAsymptoticTotalVariance.to_string(),
+            "asymptotic diffusion is not asymptotic total variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTraitVarianceIsNotAsymptoticTotalVariance.to_string(),
+            "asymptotic trait variance is not asymptotic total variance"
         );
     }
 }
