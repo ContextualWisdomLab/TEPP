@@ -2,7 +2,7 @@
 
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
-    center_within_cluster_event_lags, ordinary_least_squares_slope,
+    center_grand_mean_event_lags, center_within_cluster_event_lags, ordinary_least_squares_slope,
     posterior_draw_point_estimate_mean, recover_asymptotic_continuous_intercept,
     recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -21,7 +21,9 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
-    recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
+    recover_discrete_time_varying_predictor_effect,
+    recover_grand_mean_centered_irregular_residual_log_rate,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -79,6 +81,7 @@ use psychometric_core::{
     refuse_extra_process_latent_mean_as_observed_mean,
     refuse_extra_process_observed_mean_as_after_extra_process_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_grand_mean_centered_log_rate_as_within_person_lag,
     refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
@@ -298,6 +301,104 @@ fn person_mean_subtraction_on_raw_ar_is_not_the_lagged_within_effect() {
     assert_eq!(
         refuse_cwc_residual_log_rate_as_raw_process_drift(pairwise, drift),
         Err(psychometric_core::PsychometricError::CwcResidualLogRateIsNotRawProcessDrift)
+    );
+}
+
+#[test]
+fn grand_mean_centered_lag_is_not_the_within_person_effect() {
+    let drift = -0.28_f64;
+    let centered = recover_irregular_centered_residual_log_rate(
+        &[LaggedWithinResidual {
+            earlier_residual: 1.0,
+            later_residual: (drift * 1.3).exp(),
+            event_delta: 1.3,
+        }],
+        LagClock::EventTime,
+    )
+    .expect("already centered");
+    assert!((centered - drift).abs() < 1e-12);
+
+    let raw = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 6.0 + 1.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 1.0,
+            score: 6.0 + drift.exp(),
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 2.0,
+            score: 6.0 + (drift * 2.0).exp(),
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: -3.0 + 1.2,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 1.0,
+            score: -3.0 + 1.2 * drift.exp(),
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 2.0,
+            score: -3.0 + 1.2 * (drift * 2.0).exp(),
+        },
+    ];
+    let cgm = recover_grand_mean_centered_irregular_residual_log_rate(&raw, LagClock::EventTime)
+        .expect("cgm");
+    let cwc =
+        recover_within_cluster_irregular_residual_log_rate(&raw, LagClock::EventTime).expect("cwc");
+    assert!(
+        (cgm - drift).abs() > 1e-6,
+        "Hamaker, Kuiper, & Grasman (2015, p. 104): CGM {cgm} must not equal within-person drift {drift}"
+    );
+    assert!(
+        (cgm - cwc).abs() > 1e-6,
+        "CGM {cgm} is not CWC {cwc} when between-person levels differ"
+    );
+    let t2 = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 10.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 1.0,
+            score: 12.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: 0.0,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 1.0,
+            score: 1.0,
+        },
+    ];
+    assert_eq!(
+        recover_within_cluster_irregular_residual_log_rate(&t2, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput),
+        "T=2 CWC is always r, −r"
+    );
+    let t2_cgm = recover_grand_mean_centered_irregular_residual_log_rate(&t2, LagClock::EventTime)
+        .expect("T=2 CGM same-sign");
+    assert!(t2_cgm.is_finite());
+    let extracted = center_grand_mean_event_lags(&t2, LagClock::EventTime).expect("extract");
+    assert!(extracted.iter().all(|pair| pair.earlier_residual != 0.0
+        && pair.later_residual != 0.0
+        && pair.earlier_residual.is_sign_positive() == pair.later_residual.is_sign_positive()));
+    assert_eq!(
+        refuse_grand_mean_centered_log_rate_as_within_person_lag(cgm, drift),
+        Err(psychometric_core::PsychometricError::GrandMeanCenteredLogRateIsNotWithinPersonLag)
     );
 }
 
