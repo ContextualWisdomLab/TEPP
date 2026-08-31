@@ -39,14 +39,14 @@ use psychometric_core::{
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
     recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
     recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_time_dependent_predictor_mean, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -5953,6 +5953,65 @@ fn standardised_manifest_mean_refuses_non_event_clocks_and_does_not_keep_zero_re
     );
     let zero =
         recover_standardised_manifest_mean(0.0, 1.6, LagClock::EventTime).expect("zero mean");
+    assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+}
+
+#[test]
+fn standardised_time_dependent_predictor_mean_recovers_driver_page_sixteen_after_positive_tdpredvar()
+ {
+    let mean = 0.8_f64;
+    let predictor_variance = 1.6_f64;
+    let recovered = recover_standardised_time_dependent_predictor_mean(
+        mean,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("TDPREDMEANSstd");
+    let expected = mean / predictor_variance.sqrt();
+    let error = (recovered - expected).abs();
+    assert!(
+        error < 1e-15,
+        "Driver et al. (2017, p. 16 TDPREDMEANSstd): RMSE {error} for μ_x / √v"
+    );
+    let unstd_rmse = (mean - expected).abs();
+    assert!(
+        error < unstd_rmse,
+        "Driver et al. (2017, p. 16): unstandardised TDPREDMEANS RMSE {unstd_rmse} must exceed TDPREDMEANSstd RMSE {error}"
+    );
+    let within =
+        recover_stationary_latent_variance(0.4, -0.25, LagClock::EventTime).expect("asymDIFFUSION");
+    let within_rmse = (mean / within.sqrt() - expected).abs();
+    assert!(
+        error < within_rmse,
+        "Driver et al. (2017, p. 16): μ_x / √asymDIFFUSION RMSE {within_rmse} must exceed TDPREDMEANSstd RMSE {error}"
+    );
+    let larger = recover_standardised_time_dependent_predictor_mean(mean, 6.4, LagClock::EventTime)
+        .expect("larger v");
+    assert!(
+        larger.abs() < recovered.abs(),
+        "Driver et al. (2017, footnote 4): larger predictor SD shrinks TDPREDMEANSstd"
+    );
+}
+
+#[test]
+fn standardised_time_dependent_predictor_mean_refuses_non_event_clocks_and_does_not_keep_zero_variance()
+ {
+    assert_eq!(
+        recover_standardised_time_dependent_predictor_mean(0.8, 1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_time_dependent_predictor_mean(0.8, 1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_time_dependent_predictor_mean(0.8, 0.0, LagClock::EventTime),
+        Err(
+            PsychometricError::StandardisedTimeDependentPredictorMeanRequiresPositiveTimeDependentPredictorVariance
+        )
+    );
+    let zero = recover_standardised_time_dependent_predictor_mean(0.0, 1.6, LagClock::EventTime)
+        .expect("zero mean");
     assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
 }
 
