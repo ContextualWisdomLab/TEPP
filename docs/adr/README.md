@@ -38,6 +38,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0037](0037-analysis-run-idempotency-lookup-get.md) | Loopback GET analysis-run idempotency-key lookup is metric-free identity resolve | Accepted | active-PR | Complements ADR 0018/0031/0032/0034/0035; does not supersede ADR 0014. ADR 0026–0036 live on other GAP-003A PRs. |
 | [0038](0038-analysis-run-retry-parent-get.md) | Loopback GET analysis-run retry-parent is metric-free child→parent inspect | Accepted | active-PR | Complements ADR 0018/0031/0032/0034/0035/0037; does not supersede ADR 0014. ADR 0026–0037 live on other GAP-003A PRs. |
 | [0044](0044-analysis-run-retry-parent-consumer-parity.md) | LineageWeave and Naruon compatibility-listener retry-parent GET | Accepted | active-PR | Complements ADR 0038/0018; does not supersede ADR 0014. ADR 0026–0043 live on other PRs. |
+| [0046](0046-analysis-run-retry-parent-cli.md) | Loopback analysis-run retry-parent CLI | Accepted | active-PR | Published `tepp-retry-parent` mints typed naruon/`LineageWeave` retry-parent GET exchanges onto spawned `tepp-loopback` TCP. Persistence remains GAP-003B. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -156,6 +157,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **analysis-run idempotency-key lookup GET:** ADR 0037.
 - **analysis-run retry-parent GET:** ADR 0038.
 - **analysis-run retry-parent consumer parity:** ADR 0044.
+- **analysis-run retry-parent CLI:** ADR 0046.
 
 ## Change and supersession rule
 

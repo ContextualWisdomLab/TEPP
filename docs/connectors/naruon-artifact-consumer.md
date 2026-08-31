@@ -29,6 +29,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | HTTP analysis-run collection | `tepp_api` `naruon_analysis_run_collection_exchange` → `GET /v1/analysis-runs` | naruon → TEPP |
 | HTTP analysis-run cancel | `tepp_api` `naruon_analysis_run_cancel_exchange` → `POST /v1/analysis-runs/{run_id}/cancel` | naruon → TEPP |
 | HTTP analysis-run retry-parent | `tepp_api` `naruon_analysis_run_retry_parent_exchange` → `GET /v1/analysis-runs/{run_id}/parent` | naruon → TEPP |
+| Typed retry-parent CLI on spawned `tepp-loopback` TCP | `tepp_api` `tepp-retry-parent` renders the typed GET onto the packaged loopback listener | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
 | Live loopback retry-parent GET | `tepp_api` `NaruonLiveService` → `GET /v1/analysis-runs/{run_id}/parent` (Naruon only; `"parent": null` on accepted creates) | naruon → TEPP |

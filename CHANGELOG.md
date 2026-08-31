@@ -38,6 +38,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- `tepp_api` GAP-003A retry-parent CLI slice (ADR 0046, active-PR, not implemented-main): published `tepp-retry-parent` mints typed naruon and `LineageWeave` `GET /v1/analysis-runs/{run_id}/parent` exchanges onto spawned `tepp-loopback` TCP so operators inspect a retry child's parent without hand-rolled HTTP. Public bind hosts, `localhost`, and non-`https` origins fail closed. Inspect stays metric-free (`"parent": null` when never retried). This does not duplicate retry-parent GET (#384), retry-parent consumer parity (#396), retry CLI (#394), retry HTTP (#369), or retry consumer parity (#393); persistence remains GAP-003B.
+
 - Loopback retry-parent consumer parity: LineageWeave GET-parent exchange, Naruon compatibility-listener inspect (`"parent": null` on accepted creates), and `tepp-loopback` TCP create-cancel-retry-inspect proof (ADR 0044).
 
 - `tepp_api` serves `GET /v1/analysis-runs` on the shared loopback listener (ADR 0031). Operators enumerate accepted, running, cancelled, and terminal runs as metric-free collection rows. Collection bodies refuse RMSE/bias/coverage/SE-gate/scientific-acceptance/`terminal_result` keys. GET-by-id and running/terminal POST remain later GAP-003A slices; this is not an ADR 0014 claim.
