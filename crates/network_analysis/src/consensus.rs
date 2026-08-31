@@ -1,12 +1,12 @@
-//! Co-assignment consensus clustering from repeated label-invariant partitions.
+//! Co-assignment consensus clustering from repeated Leiden partitions.
 //!
-//! Runs multiple rounds of deterministic greedy partitioning over
-//! randomly perturbed admitted positive edges, builds a co-assignment
-//! matrix across replicates, and derives consensus clusters by
-//! thresholding that matrix. The resampling-based consensus view and the
-//! stability rationale follow Monti (2003) and Hennig (2007); the edge
+//! Runs multiple rounds of Traag, Waltman, and van Eck (2019) Leiden
+//! modularity on randomly perturbed admitted positive edges, builds a
+//! co-assignment matrix across replicates, and derives consensus clusters
+//! by thresholding that matrix. The resampling-based consensus view and
+//! the stability rationale follow Monti (2003) and Hennig (2007); the edge
 //! perturbation probability is an explicit parameter with provenance,
-//! never an implicit constant.
+//! never an implicit constant. Union-find is not used.
 
 #![forbid(unsafe_code)]
 #![allow(
@@ -21,6 +21,7 @@
 
 use crate::edges::NetworkEdge;
 use crate::error::NetworkEstimatorError;
+use crate::leiden::leiden_partition;
 use std::collections::HashMap;
 
 /// Consensus clustering output.
@@ -35,13 +36,13 @@ pub struct ConsensusClusterOutput {
     pub co_assignment: Vec<Vec<f64>>,
 }
 
-/// Derive consensus clusters from repeatedly perturbed partitions.
+/// Derive consensus clusters from repeatedly perturbed Leiden partitions.
 ///
 /// Each replicate independently drops every admitted positive edge with
-/// probability `edge_drop_probability`, repartitions the surviving edges,
-/// and accumulates label-invariant co-assignment counts. The final
-/// assignment thresholds the co-assignment frequency at
-/// `consensus_threshold`.
+/// probability `edge_drop_probability`, repartitions the surviving edges
+/// with Leiden modularity (Traag et al., 2019), and accumulates
+/// label-invariant co-assignment counts. The final assignment thresholds
+/// the co-assignment frequency at `consensus_threshold`.
 ///
 /// # Arguments
 ///
@@ -113,7 +114,7 @@ pub fn consensus_clusters(
             })
             .collect();
 
-        let partition = greedy_union_partition(&perturbed, k_topics);
+        let partition = leiden_partition(&perturbed, k_topics, &mut state);
 
         for i in 0..k_topics {
             for j in 0..k_topics {
@@ -170,48 +171,6 @@ pub fn consensus_clusters(
         assignments,
         co_assignment: co_freq,
     })
-}
-
-/// Greedy union-find partition over edges sorted by descending effect.
-///
-/// This is a deterministic single-pass stand-in for Leiden until a vetted
-/// implementation is adopted; it makes no modularity-optimization claim.
-fn greedy_union_partition(edges: &[&NetworkEdge], k: usize) -> Vec<usize> {
-    let mut parent: Vec<usize> = (0..k).collect();
-
-    fn find(parent: &mut [usize], mut x: usize) -> usize {
-        while parent[x] != x {
-            parent[x] = parent[parent[x]];
-            x = parent[x];
-        }
-        x
-    }
-
-    fn union(parent: &mut [usize], a: usize, b: usize) {
-        let root_a = find(parent, a);
-        let root_b = find(parent, b);
-        if root_a != root_b {
-            parent[root_b] = root_a;
-        }
-    }
-
-    // Sort edges by descending effect.
-    let mut sorted: Vec<&NetworkEdge> = edges.to_vec();
-    sorted.sort_by(|a, b| b.effect.total_cmp(&a.effect));
-
-    for edge in &sorted {
-        union(&mut parent, edge.source, edge.target);
-    }
-
-    // Normalise labels to 0..n_clusters.
-    let mut label_map: HashMap<usize, usize> = HashMap::new();
-    parent
-        .iter()
-        .map(|&root| {
-            let len = label_map.len();
-            *label_map.entry(root).or_insert(len)
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -278,8 +237,8 @@ mod tests {
 
     #[test]
     fn redundant_edges_between_clustered_topics_are_harmless() {
-        // A duplicate edge forces the union step onto an already-merged
-        // pair; output must stay identical to the simple-chain case.
+        // A duplicate edge must not change the Leiden partition of a
+        // strongly connected triple.
         let chain = vec![edge(0, 1, 0.95), edge(1, 2, 0.9)];
         let duplicated = vec![edge(0, 1, 0.95), edge(1, 2, 0.9), edge(0, 2, 0.8)];
         let plain = consensus_clusters(&chain, 3, 20, 0.99, 0.0, 31).unwrap();
@@ -366,5 +325,31 @@ mod tests {
         let first = consensus_clusters(&chain, 3, 15, 0.6, 0.1, 7).unwrap();
         let second = consensus_clusters(&chain, 3, 15, 0.6, 0.1, 7).unwrap();
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn two_cliques_with_a_weak_bridge_stay_two_consensus_clusters() {
+        // Operator-visible GAP-009 remainder: union-find glued both
+        // triangles; Leiden modularity plus co-assignment keeps them
+        // apart under a high consensus threshold and no drop noise.
+        let planted = vec![
+            edge(0, 1, 1.0),
+            edge(1, 2, 1.0),
+            edge(0, 2, 1.0),
+            edge(3, 4, 1.0),
+            edge(4, 5, 1.0),
+            edge(3, 5, 1.0),
+            edge(2, 3, 0.01),
+        ];
+        let output = consensus_clusters(&planted, 6, 20, 0.8, 0.0, 17).unwrap();
+        assert_eq!(output.assignments[0], output.assignments[1]);
+        assert_eq!(output.assignments[1], output.assignments[2]);
+        assert_eq!(output.assignments[3], output.assignments[4]);
+        assert_eq!(output.assignments[4], output.assignments[5]);
+        assert_ne!(output.assignments[0], output.assignments[3]);
+        assert!(output.assignments[0].is_some());
+        assert!(output.assignments[3].is_some());
+        assert!(output.co_assignment[0][2] > 0.8);
+        assert!(output.co_assignment[0][3] < 0.8);
     }
 }

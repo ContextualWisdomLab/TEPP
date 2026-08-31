@@ -162,6 +162,8 @@ Hennig, C. (2007). Cluster-wise assessment of cluster stability. *Computational 
 
 Monti, S. (2003). Consensus clustering: A resampling-based method for class discovery and visualization of gene expression microarray data. *Machine Learning, 52*(1–2), 91–118. https://doi.org/10.1023/A:1023949509487
 
+Newman, M. E. J., & Girvan, M. (2004). Finding and evaluating community structure in networks. *Physical Review E, 69*(2), 026113. https://doi.org/10.1103/PhysRevE.69.026113
+
 Traag, V. A., Waltman, L., & van Eck, N. J. (2019). From Louvain to Leiden: Guaranteeing well-connected communities. *Scientific Reports, 9*, Article 5233. https://doi.org/10.1038/s41598-019-41695-z
 
 Raw topic proportions should not be analyzed with ordinary Euclidean distances;
@@ -180,9 +182,15 @@ credible intervals and selection fractions are percentile bootstrap
 quantities over posterior draws (Efron, 1979). Consensus clusters come
 from resampled co-assignment matrices with an explicit, caller-supplied
 perturbation probability rather than an implicit constant (Monti, 2003;
-Hennig, 2007). No numeric threshold or weight in this path is chosen by
-heuristic; each is either an explicit parameter with stated provenance
-or a value derived from these primary sources.
+Hennig, 2007). Each co-assignment replicate is a Traag, Waltman, and van
+Eck (2019) Leiden partition of the surviving positive edges under
+Newman–Girvan modularity with γ = 1; Louvain is rejected because it can
+emit internally disconnected communities, and union-find is rejected
+because it merges every surviving edge into one component and makes no
+modularity claim. Isolated topics remain unclustered. See
+`docs/research/leiden-consensus.md`. No numeric threshold or weight in
+this path is chosen by heuristic; each is either an explicit parameter
+with stated provenance or a value derived from these primary sources.
 
 ## Time, events, and topic detection and tracking
 
