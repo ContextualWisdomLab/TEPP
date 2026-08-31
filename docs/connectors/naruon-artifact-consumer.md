@@ -26,6 +26,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | GraphML relation export | `tepp_api` `GraphMlExport` | TEPP → naruon |
 | purpose-bound export auth | `tepp_api` `authorize_export` with `ModularServiceConsumer` | TEPP gate |
 | HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
+| HTTP analysis-run cancel | `tepp_api` `naruon_analysis_run_cancel_exchange` → `POST /v1/analysis-runs/{run_id}/cancel` | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
 
@@ -48,7 +49,9 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 - redefinition of reserved headers (`content-type`, `tepp-consumer`,
   `tepp-contract-version`, `idempotency-key`) via extra headers → reject;
 - export interchange without a nonempty per-export idempotency key → reject;
-- lexical method codes (`tfidf`, `bm25`, `keyword`) claiming TEPP inference → reject.
+- lexical method codes (`tfidf`, `bm25`, `keyword`) claiming TEPP inference → reject;
+- scientific-metric keys (`rmse`, `bias`, `coverage`, `se_gate`, `scientific_acceptance`, `report`) on a cancel body → reject;
+- cancel of a succeeded, failed, or unknown analysis run → reject.
 
 ## Authority sources
 

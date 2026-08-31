@@ -13,6 +13,7 @@
 
 mod analysis_result;
 mod analysis_run;
+mod analysis_run_cancel_http;
 mod analysis_run_live;
 mod analysis_run_status_http;
 mod authorization;
@@ -69,6 +70,16 @@ pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 pub use analysis_run::requests_are_idempotent_matches;
 /// Require exact status binding to a request and accepted receipt.
 pub use analysis_run::require_status_binding;
+/// Analysis-run cancel contract version constant.
+pub use analysis_run_cancel_http::ANALYSIS_RUN_CANCEL_CONTRACT_VERSION;
+/// Maximum opaque run identity length on the cancel path.
+pub use analysis_run_cancel_http::ANALYSIS_RUN_CANCEL_ID_MAX_LEN;
+/// Versioned analysis-run cancel request.
+pub use analysis_run_cancel_http::AnalysisRunCancelRequest;
+/// Build a Naruon analysis-run cancel exchange.
+pub use analysis_run_cancel_http::naruon_analysis_run_cancel_exchange;
+/// Refuse scientific-metric keys on a cancel payload.
+pub use analysis_run_cancel_http::refuse_metrics_on_cancel_payload;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
 /// Analysis-run status HTTP exchange re-exports.

@@ -1,0 +1,1 @@
+- `tepp_api` loopback `POST /v1/analysis-runs/{run_id}/cancel` returns metric-free cancelled status for accepted and running runs (ADR 0029). Succeeded/failed/unknown cancel fails closed. Not GET status, not lifecycle POST, not persistence.

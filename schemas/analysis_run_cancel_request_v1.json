@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tepp.local/schemas/analysis_run_cancel_request_v1.json",
+  "title": "AnalysisRunCancelRequestV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "run_id",
+    "idempotency_key"
+  ],
+  "properties": {
+    "contract_version": { "type": "integer", "const": 1 },
+    "run_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" },
+    "idempotency_key": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+  }
+}

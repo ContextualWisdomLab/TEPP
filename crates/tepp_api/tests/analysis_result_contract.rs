@@ -164,6 +164,10 @@ fn serialization_enforces_default_result_and_status_limits() {
         AnalysisRunStatus::accepted(&oversized_accepted),
         Err(ApiError::LimitExceeded)
     );
+    assert_eq!(
+        AnalysisRunStatus::cancelled(&oversized_accepted),
+        Err(ApiError::LimitExceeded)
+    );
 
     let mut near_limit_result = succeeded();
     let initial_size = near_limit_result.to_json().expect("initial result").len();
@@ -441,6 +445,30 @@ fn status_read_contract_round_trips_lifecycle_and_terminal_results() {
     assert_eq!(
         require_status_binding(&request(), &accepted(), &running_status),
         Ok(())
+    );
+
+    let cancelled_status = AnalysisRunStatus::cancelled(&accepted()).expect("cancelled status");
+    assert_eq!(
+        cancelled_status.run_state,
+        AnalysisRunStatusState::Cancelled
+    );
+    assert_eq!(cancelled_status.terminal_result, None);
+    assert_eq!(
+        require_status_binding(&request(), &accepted(), &cancelled_status),
+        Ok(())
+    );
+    let cancelled_json = cancelled_status.to_json().expect("cancelled json");
+    assert!(!cancelled_json.contains("rmse"));
+    assert!(!cancelled_json.contains("scientific_acceptance"));
+    assert_eq!(
+        AnalysisRunStatus::from_json(&cancelled_json).expect("cancelled decode"),
+        cancelled_status
+    );
+    let mut invalid_cancelled = cancelled_status;
+    invalid_cancelled.terminal_result = Some(succeeded());
+    assert_eq!(
+        invalid_cancelled.to_json(),
+        Err(ApiError::InvalidWirePayload)
     );
 
     for (result, expected_state) in [

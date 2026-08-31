@@ -67,6 +67,8 @@ pub enum AnalysisRunStatusState {
     Succeeded,
     /// The run completed without a measurement artifact.
     Failed,
+    /// The run was cancelled before a measurement artifact existed.
+    Cancelled,
 }
 
 /// Typed status/read response for an accepted analysis run.
@@ -231,6 +233,19 @@ impl AnalysisRunStatus {
         Self::new(accepted, AnalysisRunStatusState::Running, None)
     }
 
+    /// Construct a cancelled status from a durable receipt.
+    ///
+    /// Cancelled is a metric-free terminal-of-work state. It is not a
+    /// succeeded or failed measurement result and must not carry
+    /// `terminal_result`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed error when the receipt is invalid.
+    pub fn cancelled(accepted: &AnalysisRunAccepted) -> Result<Self, ApiError> {
+        Self::new(accepted, AnalysisRunStatusState::Cancelled, None)
+    }
+
     /// Construct a terminal status bound to the submitted request and receipt.
     ///
     /// # Errors
@@ -310,7 +325,9 @@ impl AnalysisRunStatus {
         require_nonempty(&self.run_id)?;
         require_nonempty(&self.idempotency_key)?;
         match self.run_state {
-            AnalysisRunStatusState::Accepted | AnalysisRunStatusState::Running => {
+            AnalysisRunStatusState::Accepted
+            | AnalysisRunStatusState::Running
+            | AnalysisRunStatusState::Cancelled => {
                 if self.terminal_result.is_some() {
                     return Err(ApiError::InvalidWirePayload);
                 }

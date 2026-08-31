@@ -8,7 +8,7 @@
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
+Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary and `POST /v1/analysis-runs/{run_id}/cancel` for metric-free cancellation of accepted or running runs. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships.
 
 ## 2. Contract families
 
@@ -73,11 +73,15 @@ GET    /v1/exports/{export_id}
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.
 
-The typed status/read contract returns `accepted`, `running`, `succeeded`, or
-`failed`. Accepted and running statuses contain no measurement result. A
-terminal status contains exactly one request-bound `AnalysisRunTerminalResult`;
-consumers validate its request, receipt, snapshot, cutoff, model, profile, and
-idempotency bindings before treating it as measurement evidence.
+The typed status/read contract returns `accepted`, `running`, `succeeded`,
+`failed`, or `cancelled`. Accepted, running, and cancelled statuses contain no
+measurement result. A succeeded or failed terminal status contains exactly one
+request-bound `AnalysisRunTerminalResult`; consumers validate its request,
+receipt, snapshot, cutoff, model, profile, and idempotency bindings before
+treating it as measurement evidence. `POST /v1/analysis-runs/{run_id}/cancel`
+on the loopback listener transitions accepted or running runs to cancelled;
+succeeded, failed, and unknown runs fail closed. GET status remains a later
+slice on this protected-main lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
