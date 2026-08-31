@@ -1,13 +1,13 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
-    recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
-    recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
+    recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
+    recover_discrete_lagged_latent_covariance, recover_discrete_latent_mean,
+    recover_discrete_latent_mean_with_extra_process,
     recover_discrete_latent_mean_with_extra_process_after,
     recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
     recover_discrete_latent_mean_with_initial_time_dependent_predictor,
@@ -19,6 +19,7 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_initial_time_dependent_predictor,
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
+    recover_discrete_time_dependent_predictor_effect,
     recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
@@ -61,6 +62,7 @@ use psychometric_core::{
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
+    refuse_discrete_lag_as_discrete_time_dependent_effect,
     refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
@@ -154,11 +156,14 @@ use psychometric_core::{
     refuse_stationary_later_latent_variance_as_observed_variance,
     refuse_stationary_later_latent_variance_as_process_noise,
     refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance,
+    refuse_time_dependent_coefficient_as_discrete_time_dependent_effect,
     refuse_time_dependent_impulse_as_continuous_intercept,
+    refuse_time_dependent_impulse_as_discrete_time_dependent_effect,
     refuse_time_dependent_impulse_as_time_independent_effect,
     refuse_time_dependent_impulse_as_time_varying_discrete_effect,
     refuse_time_dependent_impulse_carry_as_contemporaneous_impulse,
     refuse_time_dependent_impulse_carry_as_continuous_intercept,
+    refuse_time_dependent_impulse_carry_as_discrete_time_dependent_effect,
     refuse_time_dependent_impulse_carry_as_time_independent_effect,
     refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect,
     refuse_time_independent_coefficient_as_discrete_effect,
@@ -167,6 +172,7 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_time_varying_discrete_effect_as_discrete_time_dependent_effect,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
@@ -181,6 +187,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -3780,5 +3787,89 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
         )
+    );
+}
+
+#[test]
+fn discrete_time_dependent_effect_is_not_coefficient_impulse_carry_eq14_or_lag() {
+    let effect = 0.4_f64;
+    let log_rate = -0.5_f64;
+    let delta = 2.0_f64;
+    let recovered = recover_discrete_time_dependent_predictor_effect(
+        effect,
+        log_rate,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("discreteTDPREDEFFECT");
+    let expected = (log_rate * delta).exp() * effect;
+    assert!(
+        (recovered - expected).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era summary.ctsemFit.R lines 491–494): discreteTDPREDEFFECT is e^{{a Δt}} m"
+    );
+    let impulse = recover_time_dependent_predictor_impulse(effect, 3.0).expect("impulse");
+    let equation_fourteen = recover_discrete_time_varying_predictor_effect(
+        effect,
+        delta,
+        delta,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("eq14");
+    let discrete_lag =
+        recover_discrete_lag_from_log_rate(log_rate, delta, LagClock::EventTime).expect("lag");
+    let carry = recover_time_dependent_predictor_impulse_carry(
+        effect,
+        3.0,
+        log_rate,
+        delta,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("carry");
+    assert!((effect - recovered).abs() > 1e-3);
+    assert!((impulse - recovered).abs() > 1e-3);
+    assert!((carry - recovered).abs() > 1e-3);
+    assert!((equation_fourteen - recovered).abs() > 1e-3);
+    assert!((discrete_lag - recovered).abs() > 1e-3);
+    assert_eq!(
+        recover_discrete_time_dependent_predictor_effect(
+            effect,
+            log_rate,
+            delta,
+            LagClock::DocumentTime
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        refuse_time_dependent_coefficient_as_discrete_time_dependent_effect(effect, recovered),
+        Err(
+            psychometric_core::PsychometricError::TimeDependentCoefficientIsNotDiscreteTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_as_discrete_time_dependent_effect(impulse, recovered),
+        Err(
+            psychometric_core::PsychometricError::TimeDependentImpulseIsNotDiscreteTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_time_dependent_impulse_carry_as_discrete_time_dependent_effect(carry, recovered),
+        Err(
+            psychometric_core::PsychometricError::TimeDependentImpulseCarryIsNotDiscreteTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_time_varying_discrete_effect_as_discrete_time_dependent_effect(
+            equation_fourteen,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::TimeVaryingDiscreteEffectIsNotDiscreteTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_discrete_lag_as_discrete_time_dependent_effect(discrete_lag, recovered),
+        Err(psychometric_core::PsychometricError::DiscreteLagIsNotDiscreteTimeDependentEffect)
     );
 }

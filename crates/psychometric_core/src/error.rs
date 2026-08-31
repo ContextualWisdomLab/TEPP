@@ -710,6 +710,27 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Table 2 `TDPREDEFFECT` `M` was treated as 2017-era
+    /// `discreteTDPREDEFFECT`. The continuous coefficient is not
+    /// `e^{a Δt} m`.
+    TimeDependentCoefficientIsNotDiscreteTimeDependentEffect,
+    /// Driver Eq. 3 contemporaneous impulse `M x` was treated as
+    /// 2017-era `discreteTDPREDEFFECT`. The impulse includes the
+    /// predictor; the discrete coefficient does not.
+    TimeDependentImpulseIsNotDiscreteTimeDependentEffect,
+    /// Driver Eq. 1–2 impulse carry `e^{A(t−u)} M x` was treated as
+    /// 2017-era `discreteTDPREDEFFECT`. The carry includes the
+    /// predictor and uses `t − u`; the discrete coefficient uses
+    /// `Δt` and does not include `x`.
+    TimeDependentImpulseCarryIsNotDiscreteTimeDependentEffect,
+    /// Voelkle et al. (2012, Eq. 14) `a_yx Δt` was treated as
+    /// 2017-era `discreteTDPREDEFFECT`. The first-order product is
+    /// not `e^{a Δt} m`.
+    TimeVaryingDiscreteEffectIsNotDiscreteTimeDependentEffect,
+    /// Unstandardised `discreteDRIFT` `e^{a Δt}` was treated as
+    /// 2017-era `discreteTDPREDEFFECT`. The auto-effect is not
+    /// `e^{a Δt} m`.
+    DiscreteLagIsNotDiscreteTimeDependentEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1255,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::TimeDependentCoefficientIsNotDiscreteTimeDependentEffect => {
+                "unstandardised time-dependent predictor effect is not the discrete time-dependent predictor effect"
+            }
+            Self::TimeDependentImpulseIsNotDiscreteTimeDependentEffect => {
+                "contemporaneous time-dependent impulse is not the discrete time-dependent predictor effect"
+            }
+            Self::TimeDependentImpulseCarryIsNotDiscreteTimeDependentEffect => {
+                "time-dependent impulse carry is not the discrete time-dependent predictor effect"
+            }
+            Self::TimeVaryingDiscreteEffectIsNotDiscreteTimeDependentEffect => {
+                "time-varying predictor discrete effect is not the discrete time-dependent predictor effect"
+            }
+            Self::DiscreteLagIsNotDiscreteTimeDependentEffect => {
+                "discrete lag is not the discrete time-dependent predictor effect"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2107,31 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn discrete_time_dependent_effect_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::TimeDependentCoefficientIsNotDiscreteTimeDependentEffect.to_string(),
+            "unstandardised time-dependent predictor effect is not the discrete time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseIsNotDiscreteTimeDependentEffect.to_string(),
+            "contemporaneous time-dependent impulse is not the discrete time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentImpulseCarryIsNotDiscreteTimeDependentEffect
+                .to_string(),
+            "time-dependent impulse carry is not the discrete time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::TimeVaryingDiscreteEffectIsNotDiscreteTimeDependentEffect.to_string(),
+            "time-varying predictor discrete effect is not the discrete time-dependent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteLagIsNotDiscreteTimeDependentEffect.to_string(),
+            "discrete lag is not the discrete time-dependent predictor effect"
         );
     }
 }

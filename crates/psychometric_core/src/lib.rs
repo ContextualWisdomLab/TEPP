@@ -261,6 +261,12 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era `discreteTDPREDEFFECT` as `e^{a Δt} m`
+//! (`OpenMx::expm(DRIFT * timeInterval) %*% TDPREDEFFECT`; source
+//! lines 491–494; JSS PDF re-opened 2026-08-31T10:26Z; not `M`,
+//! not `M x`, not `e^{A(t−u)} M x`, not Voelkle Eq. 14, and not
+//! `discreteDRIFT` `e^{a Δt}`; a zero coefficient is exactly zero;
+//! a zero drift is `m`; underflow of `e^{a Δt}` to `+0` is kept),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -363,6 +369,8 @@ pub use event_time::recover_discrete_observed_mean_with_initial_time_independent
 pub use event_time::recover_discrete_observed_mean_with_time_independent_predictor;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
 pub use event_time::recover_discrete_process_noise;
+/// Exact scalar 2017-era `discreteTDPREDEFFECT` `e^{a Δt} m`.
+pub use event_time::recover_discrete_time_dependent_predictor_effect;
 /// Exact scalar discrete `TIPREDEFFECT` increment `A^{-1}[e^{A Δt} − I] B z`.
 pub use event_time::recover_discrete_time_independent_predictor_effect;
 /// First-order discrete effect of a time-varying event-time predictor.
@@ -488,6 +496,8 @@ pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating unstandardised `discreteDRIFT` as 2017-era `discreteTDPREDEFFECT`.
+pub use event_time::refuse_discrete_lag_as_discrete_time_dependent_effect;
 /// Refuse treating p. 16 `discreteCINTstd` as `asymCINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
@@ -691,6 +701,8 @@ pub use event_time::refuse_stationary_later_latent_variance_as_process_noise;
 pub use event_time::refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
 pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
+/// Refuse treating the Eq. 3 contemporaneous impulse as 2017-era `discreteTDPREDEFFECT`.
+pub use event_time::refuse_time_dependent_impulse_as_discrete_time_dependent_effect;
 /// Refuse treating Driver Eq. 3 impulse as `TIPREDEFFECT`.
 pub use event_time::refuse_time_dependent_impulse_as_time_independent_effect;
 /// Refuse treating Driver Eq. 3 impulse as Voelkle Eq. 14.
@@ -699,10 +711,14 @@ pub use event_time::refuse_time_dependent_impulse_as_time_varying_discrete_effec
 pub use event_time::refuse_time_dependent_impulse_carry_as_contemporaneous_impulse;
 /// Refuse treating Driver Eq. 1–2 impulse carry as `CINT`.
 pub use event_time::refuse_time_dependent_impulse_carry_as_continuous_intercept;
+/// Refuse treating the Eq. 1–2 impulse carry as 2017-era `discreteTDPREDEFFECT`.
+pub use event_time::refuse_time_dependent_impulse_carry_as_discrete_time_dependent_effect;
 /// Refuse treating Driver Eq. 1–2 impulse carry as `TIPREDEFFECT`.
 pub use event_time::refuse_time_dependent_impulse_carry_as_time_independent_effect;
 /// Refuse treating Driver Eq. 1–2 impulse carry as Voelkle Eq. 14.
 pub use event_time::refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect;
+/// Refuse treating Table 2 `TDPREDEFFECT` `M` as 2017-era `discreteTDPREDEFFECT`.
+pub use event_time::refuse_time_dependent_coefficient_as_discrete_time_dependent_effect;
 /// Refuse treating Driver Table 2 `TIPREDEFFECT` as the discrete increment.
 pub use event_time::refuse_time_independent_coefficient_as_discrete_effect;
 /// Refuse treating Driver Eq. 3 `TIPREDEFFECT` increment as `CINT`.
@@ -715,6 +731,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating Voelkle et al. (2012, Eq. 14) as 2017-era `discreteTDPREDEFFECT`.
+pub use event_time::refuse_time_varying_discrete_effect_as_discrete_time_dependent_effect;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
