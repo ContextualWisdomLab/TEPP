@@ -4,8 +4,8 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
-    ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
-    recover_asymptotic_time_independent_predictor_effect,
+    ordinary_least_squares_slope, recover_asymptotes_true_time_independent_effect,
+    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
@@ -54,6 +54,7 @@ use psychometric_core::{
     refuse_asymptotic_continuous_intercept_as_discrete_increment,
     refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
     refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
+    refuse_asymptotic_time_independent_effect_as_asymptotes_true_time_independent_effect,
     refuse_asymptotic_time_independent_effect_as_coefficient,
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -64,6 +65,7 @@ use psychometric_core::{
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+    refuse_discrete_time_independent_effect_as_asymptotes_true_time_independent_effect,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -122,6 +124,7 @@ use psychometric_core::{
     refuse_process_noise_as_unconditional_variance,
     refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
+    refuse_standardised_time_independent_effect_as_asymptotes_true_time_independent_effect,
     refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -164,6 +167,7 @@ use psychometric_core::{
     refuse_unmatched_time_varying_predictor_interval,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
+    refuse_unstandardised_time_independent_effect_as_asymptotes_true_time_independent_effect,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
 };
 
@@ -6537,6 +6541,134 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
     let non_event = clocks[non_event_index];
     assert_eq!(
         recover_standardised_manifest_variance(0.4, non_event),
+        Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn asymptotes_true_time_independent_effect_recovers_negated_drift_times_coefficient() {
+    let effect = 0.4_f64;
+    let log_rate = -0.5_f64;
+    let recovered =
+        recover_asymptotes_true_time_independent_effect(effect, log_rate, LagClock::EventTime)
+            .expect("asymptotes-true TIPREDEFFECT");
+    let recovered_error = rmse(&[0.2], &[recovered]);
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, 2017-era summary.ctsemFit.R): RMSE {recovered_error} for −a · B = 0.2"
+    );
+    let inverted =
+        recover_asymptotes_true_time_independent_effect(0.8, log_rate, LagClock::EventTime)
+            .expect("stored -B/a recovers B");
+    let inverted_error = rmse(&[effect], &[inverted]);
+    assert!(
+        inverted_error < 1e-15,
+        "Driver et al. (2017): stored −B/a recovers original B; RMSE {inverted_error}"
+    );
+    let unstandardised_error = rmse(&[0.2], &[effect]);
+    assert!(
+        recovered_error < unstandardised_error,
+        "Driver et al. (2017, Table 2): unstandardised B RMSE {unstandardised_error} must exceed rewrite RMSE {recovered_error}"
+    );
+    let asymptotic = recover_asymptotic_time_independent_predictor_effect(
+        effect,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTIPREDEFFECT");
+    let asymptotic_error = rmse(&[0.2], &[asymptotic]);
+    assert!(
+        recovered_error < asymptotic_error,
+        "Driver et al. (2017, §7.2): asymTIPREDEFFECT RMSE {asymptotic_error} must exceed rewrite RMSE {recovered_error}"
+    );
+    let discrete = recover_discrete_time_independent_predictor_effect(
+        effect,
+        1.0,
+        log_rate,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("discreteTIPREDEFFECT");
+    let discrete_error = rmse(&[0.2], &[discrete]);
+    assert!(
+        recovered_error < discrete_error,
+        "Driver et al. (2017, Eq. 3): discrete increment RMSE {discrete_error} must exceed rewrite RMSE {recovered_error}"
+    );
+    let process_sd = (-0.4_f64 / (2.0 * log_rate)).sqrt();
+    let standardised = effect / process_sd;
+    let standardised_error = rmse(&[0.2], &[standardised]);
+    assert!(
+        recovered_error < standardised_error,
+        "Driver et al. (2017, p. 16): TIPREDEFFECTstd RMSE {standardised_error} must exceed rewrite RMSE {recovered_error}"
+    );
+    assert_eq!(
+        refuse_unstandardised_time_independent_effect_as_asymptotes_true_time_independent_effect(
+            effect, recovered
+        ),
+        Err(
+            PsychometricError::UnstandardisedTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_asymptotes_true_time_independent_effect(
+            asymptotic, recovered
+        ),
+        Err(
+            PsychometricError::AsymptoticTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_discrete_time_independent_effect_as_asymptotes_true_time_independent_effect(
+            discrete, recovered
+        ),
+        Err(
+            PsychometricError::DiscreteTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_standardised_time_independent_effect_as_asymptotes_true_time_independent_effect(
+            standardised, recovered
+        ),
+        Err(
+            PsychometricError::StandardisedTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+        )
+    );
+}
+
+#[test]
+fn asymptotes_true_time_independent_effect_refuses_non_event_clocks_and_unstable_drift() {
+    assert_eq!(
+        recover_asymptotes_true_time_independent_effect(0.4, -0.5, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotes_true_time_independent_effect(0.4, -0.5, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotes_true_time_independent_effect(0.4, 0.5, LagClock::EventTime),
+        Err(PsychometricError::AsymptotesTrueTimeIndependentEffectRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotes_true_time_independent_effect(0.0, 0.5, LagClock::EventTime)
+            .expect("zero")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+}
+
+#[test]
+fn asymptotes_true_time_independent_effect_clock_path_is_runtime_opaque() {
+    let clocks = [
+        LagClock::SystemTime,
+        LagClock::DocumentTime,
+        LagClock::AssertionTime,
+    ];
+    let non_event_index = std::process::id() as usize % clocks.len();
+    let non_event = clocks[non_event_index];
+    assert_eq!(
+        recover_asymptotes_true_time_independent_effect(0.4, -0.5, non_event),
         Err(PsychometricError::EventTimeRequired)
     );
 }
