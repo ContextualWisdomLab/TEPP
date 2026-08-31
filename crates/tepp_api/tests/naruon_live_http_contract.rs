@@ -7,11 +7,11 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunRequest, AnalyticalPurpose,
-    ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, ExportAuthorizationRequest,
-    NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH, NARUON_LIVE_HEADER_BYTE_LIMIT,
-    NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, NaruonLiveService,
-    naruon_analysis_run_exchange, naruon_export_exchange,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunRetryParent,
+    AnalyticalPurpose, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope,
+    ExportAuthorizationRequest, NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH,
+    NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT,
+    NaruonLiveService, naruon_analysis_run_exchange, naruon_export_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -717,6 +717,46 @@ fn serve_one_maps_partial_request_timeout_to_limit_exceeded() {
     assert!(started.elapsed() >= NARUON_LIVE_IO_TIMEOUT);
     assert_eq!(served.status_code, 413);
     assert_eq!(envelope(&served.body).error_code(), "limit_exceeded");
+}
+
+#[test]
+fn handle_http_inspects_naruon_retry_parent_and_refuses_lineageweave() {
+    let mut service = NaruonLiveService::new();
+    let run = sample_run();
+    let created = service.handle_http_request(&analysis_http(&run));
+    assert_eq!(created.status_code, 202);
+    let accepted = AnalysisRunAccepted::from_json(&created.body).expect("accepted");
+    let inspect = http_request(
+        "GET",
+        &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/parent", accepted.run_id),
+        &[
+            ("Host".into(), "127.0.0.1".into()),
+            ("content-type".into(), "application/json".into()),
+            ("tepp-consumer".into(), "naruon".into()),
+            ("tepp-contract-version".into(), "1".into()),
+        ],
+        "",
+    );
+    let inspected = service.handle_http_request(&inspect);
+    assert_eq!(inspected.status_code, 200);
+    let parent = AnalysisRunRetryParent::from_json(&inspected.body).expect("parent");
+    assert_eq!(parent.run_id, accepted.run_id);
+    assert_eq!(parent.parent, None);
+    assert!(inspected.body.contains("\"parent\":null"));
+    assert!(!inspected.body.contains("rmse"));
+    assert!(!inspected.body.contains("scientific_acceptance"));
+    let lineageweave = http_request(
+        "GET",
+        &format!("{NARUON_ANALYSIS_RUN_PATH}/{}/parent", accepted.run_id),
+        &[
+            ("Host".into(), "127.0.0.1".into()),
+            ("content-type".into(), "application/json".into()),
+            ("tepp-consumer".into(), "lineageweave".into()),
+            ("tepp-contract-version".into(), "1".into()),
+        ],
+        "",
+    );
+    assert_eq!(service.handle_http_request(&lineageweave).status_code, 400);
 }
 
 struct TimeoutRead;

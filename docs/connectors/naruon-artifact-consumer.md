@@ -28,8 +28,10 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
 | HTTP analysis-run collection | `tepp_api` `naruon_analysis_run_collection_exchange` → `GET /v1/analysis-runs` | naruon → TEPP |
 | HTTP analysis-run cancel | `tepp_api` `naruon_analysis_run_cancel_exchange` → `POST /v1/analysis-runs/{run_id}/cancel` | naruon → TEPP |
+| HTTP analysis-run retry-parent | `tepp_api` `naruon_analysis_run_retry_parent_exchange` → `GET /v1/analysis-runs/{run_id}/parent` | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
+| Live loopback retry-parent GET | `tepp_api` `NaruonLiveService` → `GET /v1/analysis-runs/{run_id}/parent` (Naruon only; `"parent": null` on accepted creates) | naruon → TEPP |
 
 Committed examples live under `examples/`. Schemas for analysis-run requests and corpus-split manifests live under `schemas/`.
 
@@ -53,6 +55,7 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 - lexical method codes (`tfidf`, `bm25`, `keyword`) claiming TEPP inference → reject;
 - scientific-metric keys (`rmse`, `bias`, `coverage`, `se_gate`, `scientific_acceptance`, `report`) on a cancel body → reject;
 - scientific-metric keys (`rmse`, `bias`, `coverage`, `se_gate`, `scientific_acceptance`, `report`, `terminal_result`) on a collection body → reject;
+- scientific-metric keys (`rmse`, `bias`, `coverage`, `se_gate`, `scientific_acceptance`, `report`, `terminal_result`, `tenant_workspace_id`, `snapshot_id`, `retried_from`) on a retry-parent body → reject;
 - cancel of a succeeded, failed, or unknown analysis run → reject.
 
 ## Authority sources

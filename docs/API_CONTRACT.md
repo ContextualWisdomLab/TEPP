@@ -104,7 +104,10 @@ that used that key so operators can jump from a 202 receipt or retry child
 key without scanning collection pages. `GET /v1/analysis-runs/{run_id}/parent`
 on the loopback listener returns the metric-free parent of that run so
 operators can inspect which listed run a retry child was cloned from. Original
-(never-retried) runs return `"parent": null`. GET-by-id remains a later slice
+(never-retried) runs return `"parent": null`. `lineageweave_analysis_run_retry_parent_exchange`
+builds the same GET for LineageWeave. `NaruonLiveService` serves retry-parent GET
+for Naruon only and returns `"parent": null` on accepted creates; LineageWeave
+remains refused on that compatibility listener. GET-by-id remains a later slice
 on this protected-main lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side
