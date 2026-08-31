@@ -8,13 +8,16 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Two-group OLS invariance
+//! is invoked through [`psychometric_core`] and is not MGCFA.
 
 mod case_deletion_refit;
+mod invariance_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use psychometric_core::PsychometricError;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -41,6 +44,14 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Two-group OLS invariance artifact and execution contracts.
+pub use invariance_artifact::{
+    InvarianceObservation, TWO_GROUP_OLS_INVARIANCE_ARTIFACT_BYTE_LIMIT,
+    TWO_GROUP_OLS_INVARIANCE_ARTIFACT_SCHEMA_VERSION,
+    TWO_GROUP_OLS_INVARIANCE_MODEL_CONTRACT_VERSION, TWO_GROUP_OLS_INVARIANCE_OUTPUT_PROFILE,
+    TwoGroupOlsInvarianceArtifact, TwoGroupOlsInvarianceExecution,
+    execute_two_group_ols_invariance_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +259,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A psychometric recovery rejected the offered coordinates.
+    Psychometric(PsychometricError),
+    /// A two-group OLS invariance artifact violated its bounded schema.
+    InvalidTwoGroupOlsInvarianceArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +277,10 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::Psychometric(error) => return error.fmt(formatter),
+            Self::InvalidTwoGroupOlsInvarianceArtifact => {
+                "invalid two-group OLS invariance artifact"
+            }
         };
         formatter.write_str(message)
     }
@@ -278,6 +297,12 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<PsychometricError> for AnalysisEngineError {
+    fn from(error: PsychometricError) -> Self {
+        Self::Psychometric(error)
     }
 }
 
@@ -415,6 +440,7 @@ mod tests {
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
         MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
     };
+    use psychometric_core::PsychometricError;
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 
@@ -681,6 +707,14 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::Psychometric(PsychometricError::StrongInvarianceRequired),
+                "latent-mean comparison requires strong or strict invariance; metric/weak is not enough",
+            ),
+            (
+                AnalysisEngineError::InvalidTwoGroupOlsInvarianceArtifact,
+                "invalid two-group OLS invariance artifact",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -689,6 +723,11 @@ mod tests {
         assert_eq!(converted.to_string(), "invalid API wire payload");
         let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
         assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        let from_psych: AnalysisEngineError = PsychometricError::StrongInvarianceRequired.into();
+        assert_eq!(
+            from_psych.to_string(),
+            "latent-mean comparison requires strong or strict invariance; metric/weak is not enough"
+        );
         assert_eq!(
             add_membership_count(u64::MAX, 1),
             Err(AnalysisEngineError::ArithmeticOverflow)
