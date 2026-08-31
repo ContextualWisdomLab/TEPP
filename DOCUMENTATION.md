@@ -58,6 +58,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Episode-membership identity doctoring | [`docs/research/episode-membership-identity.md`](docs/research/episode-membership-identity.md) |
 | Entity/project target SQL doctoring | [`docs/research/entity-project-sql.md`](docs/research/entity-project-sql.md) |
 | Scientific claim-promotion gate doctoring | [`docs/research/scientific-claim-promotion-gates.md`](docs/research/scientific-claim-promotion-gates.md) |
+| Validation-run scientific-acceptance doctoring | [`docs/research/validation-run-scientific-acceptance.md`](docs/research/validation-run-scientific-acceptance.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
 | Relation absence is not negative evidence | [`docs/research/relation-absence-not-negative.md`](docs/research/relation-absence-not-negative.md) |
@@ -147,6 +148,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Episode-membership identity doctoring | [`docs/research/episode-membership-identity.md`](docs/research/episode-membership-identity.md) |
 | Entity/project target SQL doctoring | [`docs/research/entity-project-sql.md`](docs/research/entity-project-sql.md) |
 | Scientific claim-promotion gate doctoring | [`docs/research/scientific-claim-promotion-gates.md`](docs/research/scientific-claim-promotion-gates.md) |
+| Validation-run scientific-acceptance doctoring | [`docs/research/validation-run-scientific-acceptance.md`](docs/research/validation-run-scientific-acceptance.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Stopword-deletion doctoring | [`docs/research/stopword-deletion.md`](docs/research/stopword-deletion.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |

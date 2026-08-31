@@ -14,6 +14,7 @@ mod case_deletion_refit;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
+mod validation_run;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -26,6 +27,7 @@ use tepp_api::{
     ApiError,
 };
 use topic_measurement::TopicMeasurementError;
+use validation_core::ValidationError;
 
 /// One document admitted to exhaustive case-deletion fitting.
 pub use case_deletion_refit::CaseDeletionDocument;
@@ -57,6 +59,14 @@ pub use topic_lineage_artifact::{
     TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
     TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, TopicLineageArtifact,
     TopicLineageArtifactEdge, TopicLineageExecution, execute_topic_lineage_run,
+};
+/// Durable scientific-acceptance validation-run contracts.
+pub use validation_run::{
+    RecoveryObservation, SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE,
+    SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION, ScientificAcceptanceEvidence, VALIDATION_BACKEND,
+    VALIDATION_CPU_F64_MODEL, VALIDATION_PRECISION, VALIDATION_RUN_ID_HEX_LEN,
+    VALIDATION_RUN_ID_PREFIX, ValidationRunReceipt, WILSON_Z, complete_validation_run,
+    submit_validation_run,
 };
 
 /// Versioned artifact schema emitted by this engine.
@@ -248,6 +258,16 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A `validation_core` metric or report rejected the recovery vectors.
+    Validation(ValidationError),
+    /// Recovery was authored by an LLM and cannot become scientific evidence.
+    LlmAuthoredRecovery,
+    /// The corpus contained evidence, but none was available at the cutoff.
+    NoEligibleEvidence,
+    /// A completion receipt did not match the rebound scientific binding.
+    BindingMismatch,
+    /// The request did not select the scientific-acceptance profile and model.
+    InvalidValidationProfile,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +282,13 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::Validation(error) => return error.fmt(formatter),
+            Self::LlmAuthoredRecovery => {
+                "llm-authored recovery is not scientific acceptance evidence"
+            }
+            Self::NoEligibleEvidence => "no eligible evidence for validation run",
+            Self::BindingMismatch => "validation run binding mismatch",
+            Self::InvalidValidationProfile => "invalid scientific acceptance profile",
         };
         formatter.write_str(message)
     }
@@ -278,6 +305,12 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<ValidationError> for AnalysisEngineError {
+    fn from(error: ValidationError) -> Self {
+        Self::Validation(error)
     }
 }
 
@@ -402,7 +435,7 @@ fn format_digest(digest: impl AsRef<[u8]>) -> String {
     output
 }
 
-fn valid_identifier(value: &str) -> bool {
+pub(crate) fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty()
         && value.len() <= MAX_ANALYSIS_IDENTIFIER_BYTES
         && !value.chars().any(char::is_control)
@@ -681,6 +714,26 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::Validation(validation_core::ValidationError::InvalidInput),
+                "invalid validation input",
+            ),
+            (
+                AnalysisEngineError::LlmAuthoredRecovery,
+                "llm-authored recovery is not scientific acceptance evidence",
+            ),
+            (
+                AnalysisEngineError::NoEligibleEvidence,
+                "no eligible evidence for validation run",
+            ),
+            (
+                AnalysisEngineError::BindingMismatch,
+                "validation run binding mismatch",
+            ),
+            (
+                AnalysisEngineError::InvalidValidationProfile,
+                "invalid scientific acceptance profile",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -689,6 +742,9 @@ mod tests {
         assert_eq!(converted.to_string(), "invalid API wire payload");
         let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
         assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        let from_validation: AnalysisEngineError =
+            validation_core::ValidationError::InvalidInput.into();
+        assert_eq!(from_validation.to_string(), "invalid validation input");
         assert_eq!(
             add_membership_count(u64::MAX, 1),
             Err(AnalysisEngineError::ArithmeticOverflow)

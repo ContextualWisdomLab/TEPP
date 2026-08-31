@@ -22,6 +22,7 @@ tepp_api = { path = "../tepp_api", version = "0.2.0" }
 temporal_core = { path = "../temporal_core", version = "0.2.0" }
 topic_measurement = { path = "../topic_measurement", version = "0.2.0" }
 uuid.workspace = true
+validation_core = { path = "../validation_core", version = "0.2.0" }
 
 [dev-dependencies]
 corpus_split = { path = "../corpus_split", version = "0.2.0" }

@@ -82,6 +82,7 @@ dependencies = [
  "tepp_api",
  "topic_measurement",
  "uuid",
+ "validation_core",
 ]
 
 [[package]]
