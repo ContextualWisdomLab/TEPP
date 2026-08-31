@@ -1,4 +1,4 @@
-# ADR 0062 — Independent TDT link-criterion fitting as an analysis-run output profile
+# ADR 0063 — Independent TDT link-criterion fitting as an analysis-run output profile
 
 **Decision status:** Accepted
 **Implementation maturity:** active-PR — composed on this branch; not implemented-main

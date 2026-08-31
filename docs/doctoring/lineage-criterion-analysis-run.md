@@ -1,6 +1,6 @@
 # Independent TDT link-criterion analysis-run composition
 
-**Active slice:** ADR 0062 / `lineage_criterion_v1`
+**Active slice:** ADR 0063 / `lineage_criterion_v1`
 **Protected-main status:** not implemented-main
 
 `analysis_engine` already fits independently observed TDT link-criterion
