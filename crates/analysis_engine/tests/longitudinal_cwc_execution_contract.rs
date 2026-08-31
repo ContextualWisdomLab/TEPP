@@ -170,6 +170,10 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
         LongitudinalClusterScore::new(1, f64::NAN, 1.0, available("2026-07-01T00:00:00Z")),
         Err(AnalysisEngineError::InvalidEvidence)
     );
+    assert_eq!(
+        LongitudinalClusterScore::new(1, 1.0, f64::NAN, available("2026-07-01T00:00:00Z")),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
 
     let mut early_request = request.clone();
     early_request.knowledge_cutoff = "2026-06-01T00:00:00Z".into();
@@ -239,5 +243,24 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
             "2026-08-02T00:00:00Z",
         ),
         Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
+fn execution_refuses_invalid_completion_time() {
+    let request = request();
+    let accepted = accepted(&request);
+    assert_eq!(
+        execute_longitudinal_cwc_run(
+            &request,
+            &accepted,
+            "snapshot-longitudinal-cwc",
+            cutoff(),
+            &noiseless_rows(),
+            "invalid",
+        ),
+        Err(AnalysisEngineError::Api(
+            tepp_api::ApiError::InvalidWirePayload
+        ))
     );
 }

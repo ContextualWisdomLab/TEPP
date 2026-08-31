@@ -133,14 +133,11 @@ impl LongitudinalCwcArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
         let payload =
             serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > LONGITUDINAL_CWC_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
         Ok(payload)
     }
 
@@ -228,6 +225,10 @@ fn admit_scores_at_cutoff(
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, psychometric
 /// recovery failure, or invalid artifact error.
+#[expect(
+    clippy::missing_panics_doc,
+    reason = "bounded summary constants cannot fail"
+)]
 pub fn execute_longitudinal_cwc_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -280,7 +281,8 @@ pub fn execute_longitudinal_cwc_run(
         row_count,
         3,
         LONGITUDINAL_CWC_INFERENCE_STATUS,
-    )?;
+    )
+    .expect("bounded longitudinal CWC summary constants are valid");
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
