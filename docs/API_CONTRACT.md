@@ -85,7 +85,9 @@ succeeded, failed, and unknown runs fail closed. `GET /v1/analysis-runs` on
 the loopback listener returns a metric-free collection of those states so
 operators do not guess run identities. Collection bodies never carry
 `tepp.scientific_acceptance.v1`. GET-by-id remains a later slice on this
-protected-main lineage.
+protected-main lineage. The loopback `tepp-analysis-runs list` CLI is the
+operator-visible client for that collection GET; it does not duplicate the
+scientific-acceptance `tepp-analysis-run` CLI.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

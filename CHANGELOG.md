@@ -38,6 +38,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- `tepp_api` publishes `tepp-analysis-runs list` as the loopback client of `GET /v1/analysis-runs` (ADR 0032). Operators enumerate accepted, running, cancelled, and terminal runs as metric-free collection rows without writing raw HTTP. CLI stdout refuses RMSE/bias/coverage/SE-gate/scientific-acceptance/`terminal_result` keys. Not GET-by-id, not the scientific-acceptance CLI, and not an ADR 0014 claim.
+
 - `tepp_api` serves `GET /v1/analysis-runs` on the shared loopback listener (ADR 0031). Operators enumerate accepted, running, cancelled, and terminal runs as metric-free collection rows. Collection bodies refuse RMSE/bias/coverage/SE-gate/scientific-acceptance/`terminal_result` keys. GET-by-id and running/terminal POST remain later GAP-003A slices; this is not an ADR 0014 claim.
 
 - `tepp_api` serves `POST /v1/analysis-runs/{run_id}/cancel` on the shared loopback listener (ADR 0029). Accepted and running runs become metric-free `cancelled` status. Succeeded, failed, and unknown runs cannot be cancelled. Cancel bodies refuse RMSE/bias/coverage/SE-gate/scientific-acceptance keys. GET status and running/terminal POST remain later GAP-003A slices; this is not an ADR 0014 claim.
