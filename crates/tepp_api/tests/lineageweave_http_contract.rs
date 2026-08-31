@@ -7,9 +7,10 @@ use std::thread;
 use std::time::Duration;
 
 use tepp_api::{
-    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
-    ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE,
-    NARUON_LIVE_HEADER_BYTE_LIMIT, lineageweave_analysis_run_exchange,
+    ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunIdempotencyLookup,
+    AnalysisRunLiveService, AnalysisRunRequest, ApiError, LINEAGEWEAVE_CONSUMER_CODE,
+    NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
+    lineageweave_analysis_run_exchange, lineageweave_analysis_run_idempotency_lookup_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -152,4 +153,68 @@ fn live_listener_serves_lineageweave_over_loopback() {
         worker.join().expect("join").expect("served").status_code,
         202
     );
+}
+
+#[test]
+fn lineageweave_idempotency_lookup_exchange_uses_the_published_consumer_header_without_credentials()
+{
+    let exchange = lineageweave_analysis_run_idempotency_lookup_exchange(
+        "https://tepp.example.test",
+        "lineageweave-lookup-idem",
+    )
+    .expect("lineageweave idempotency-lookup exchange");
+    assert_eq!(exchange.method, "GET");
+    assert_eq!(
+        exchange.target_url,
+        "https://tepp.example.test/v1/analysis-runs/by-idempotency/lineageweave-lookup-idem"
+    );
+    assert!(exchange.body.is_empty());
+    assert!(
+        exchange
+            .headers
+            .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+    );
+    assert!(
+        !exchange
+            .headers
+            .contains(&("tepp-consumer".into(), NARUON_CONSUMER_CODE.into()))
+    );
+    assert!(exchange.headers.iter().all(|(name, _)| {
+        !matches!(
+            name.to_ascii_lowercase().as_str(),
+            "authorization" | "proxy-authorization" | "cookie" | "x-api-key" | "idempotency-key"
+        )
+    }));
+}
+
+#[test]
+fn live_listener_inspects_lineageweave_idempotency_lookup_and_isolates_consumers() {
+    let run = sample_run();
+    let mut service = AnalysisRunLiveService::new();
+    let lineageweave = service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &run));
+    assert_eq!(lineageweave.status_code, 202);
+    let accepted = AnalysisRunAccepted::from_json(&lineageweave.body).expect("accepted");
+    let inspect = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/by-idempotency/{} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        run.idempotency_key
+    );
+    let inspected = service.handle_http_request(&inspect);
+    assert_eq!(inspected.status_code, 200);
+    let lookup = AnalysisRunIdempotencyLookup::from_json(&inspected.body).expect("lookup");
+    assert_eq!(lookup.run_id, accepted.run_id);
+    assert_eq!(lookup.idempotency_key, run.idempotency_key);
+    assert!(!inspected.body.contains("rmse"));
+    assert!(!inspected.body.contains("scientific_acceptance"));
+    assert!(!inspected.body.contains("tenant_workspace_id"));
+    assert!(!inspected.body.contains("snapshot_id"));
+    let naruon_inspect = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/by-idempotency/{} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+        run.idempotency_key
+    );
+    assert_eq!(
+        service.handle_http_request(&naruon_inspect).status_code,
+        400
+    );
+    let replay = service.handle_http_request(&inspect);
+    assert_eq!(replay.body, inspected.body);
 }

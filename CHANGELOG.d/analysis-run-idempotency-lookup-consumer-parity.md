@@ -1,0 +1,1 @@
+- `tepp_api` adds `lineageweave_analysis_run_idempotency_lookup_exchange`, Naruon compatibility-listener idempotency-lookup GET (accepted creates return a real `run_id`), and a `tepp-loopback` TCP create-then-GET proof (ADR 0047). Metric-free lookup fields are unchanged from ADR 0037. Not GET status, not lifecycle POST, not an ADR 0014 claim.
