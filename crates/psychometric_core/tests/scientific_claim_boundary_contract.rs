@@ -2,8 +2,8 @@
 
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
-    ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
-    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
+    posterior_draw_point_estimate_mean, recover_asymptotic_continuous_intercept,
+    recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
@@ -20,7 +20,8 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
-    recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
+    recover_discrete_time_varying_predictor_effect, recover_grand_mean_pooled_slope,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -76,6 +77,7 @@ use psychometric_core::{
     refuse_extra_process_latent_mean_as_observed_mean,
     refuse_extra_process_observed_mean_as_after_extra_process_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_grand_mean_pooled_slope_as_within_cluster_effect,
     refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
@@ -290,9 +292,7 @@ fn cwc_cluster_mean_coefficient_is_not_the_between_cluster_effect() {
         },
     ];
     let recovered = recover_cluster_mean_within_between_slopes(&rows).expect("cwc");
-    let predictors: Vec<f64> = rows.iter().map(|row| row.predictor).collect();
-    let outcomes: Vec<f64> = rows.iter().map(|row| row.outcome).collect();
-    let pooled = ordinary_least_squares_slope(&predictors, &outcomes).expect("pooled");
+    let pooled = recover_grand_mean_pooled_slope(&rows).expect("pooled");
     assert!(
         (recovered.contextual_effect - recovered.between_slope).abs() > 1e-9,
         "Enders & Tofighi (2007, Table 2, pp. 124–127): CWC γ01 is contextual, not between"
@@ -302,9 +302,17 @@ fn cwc_cluster_mean_coefficient_is_not_the_between_cluster_effect() {
         "pooled OLS must not be treated as the CWC contextual effect"
     );
     assert!(
+        (pooled - recovered.within_slope).abs() > 1e-9,
+        "Enders & Tofighi (2007, p. 125): grand-mean pooled βt is not the within-cluster slope"
+    );
+    assert!(
         ((recovered.contextual_effect + recovered.within_slope) - recovered.between_slope).abs()
             < 1e-15,
         "adding CWC γ01 to γ10 must recover the between-cluster slope"
+    );
+    assert_eq!(
+        refuse_grand_mean_pooled_slope_as_within_cluster_effect(pooled, recovered.within_slope),
+        Err(psychometric_core::PsychometricError::GrandMeanPooledSlopeIsNotWithinClusterEffect)
     );
 }
 

@@ -5,7 +5,7 @@
 This slice stays inside `psychometric_core`. It does not add a second invariance crate and does not recreate `#78` `longitudinal_core` or `#80` `irregular_time`.
 
 1. recover within-cluster and between-cluster OLS slopes after centering within cluster (CWC);
-2. recover the CWC contextual effect as `between − within` (Enders & Tofighi, 2007, Table 2);
+2. recover the CWC contextual effect as `between − within` (Enders & Tofighi, 2007, Table 2) and name the grand-mean pooled OLS slope as the uninterpretable blend of within and between (p. 125), refusing it as a within-cluster effect;
 3. recover a Kish-weighted least-squares slope and report Kish ESS as the information diagnostic;
 4. map a discrete lag-1 coefficient through the exact scalar exponential on **event time only**;
 5. recover the exact scalar forward map `φ(Δt) = exp(a Δt)` and remap a discrete lag onto another event interval through that log-rate;
@@ -134,7 +134,8 @@ The Voelkle et al. (2012) ZORA accepted manuscript was re-opened 2026-08-18T21:0
 
 ## Formula notes
 
-- **CWC.** For cluster \(i\) and occasion \(t\), \(x_{it}^{w} = x_{it}-\bar x_{i}\) and \(y_{it}^{w} = y_{it}-\bar y_{i}\). The within slope is OLS of \(y^{w}\) on \(x^{w}\). The between slope is OLS of the cluster means. A grand-mean pooled slope confounds the two.
+- **CWC.** For cluster \(i\) and occasion \(t\), \(x_{it}^{w} = x_{it}-\bar x_{i}\) and \(y_{it}^{w} = y_{it}-\bar y_{i}\). The within slope is OLS of \(y^{w}\) on \(x^{w}\). The between slope is OLS of the cluster means.
+- **Grand-mean pooled slope.** Enders and Tofighi (2007, p. 125; PDF opened 2026-08-31T00:20Z from OSF `mt5z3`) quote Raudenbush and Bryk (2002, pp. 137–139): the total OLS slope that ignores nesting is generally an uninterpretable blend of \(\hat\beta_w\) and \(\hat\beta_b\). The hierarchical estimator under grand-mean centering without cluster means is likewise neither \(\beta_w\) nor \(\beta_b\). This crate reports the OLS analogue \(\hat\beta_t\) (ordinary least squares of outcome on predictor, ignoring cluster membership). Grand-mean centering the coordinates does not change an OLS slope. It is not CWC \(\gamma_{10}\), not the between-cluster slope, not the CWC contextual effect, and not the multilevel maximum-likelihood CGM \(\gamma_{10}\). Treating \(\hat\beta_t\) as the within-cluster effect fails closed. Raudenbush and Bryk (2002) remains unread; the quotation is from the opened Enders PDF.
 - **Contextual effect.** Enders and Tofighi (2007, Table 2, pp. 124–127): under CWC, the cluster-mean coefficient \(\gamma_{01}\) is the contextual effect (expected difference between two people with the same individual \(X\) from groups one unit apart on \(\bar X\)). Under CGM the same symbol is the between-cluster effect. The OLS identity is \(\gamma_{01}^{\mathrm{CWC}}=\beta_{\mathrm{between}}-\beta_{\mathrm{within}}\). Adding the CWC contextual coefficient to the within slope recovers the between-cluster slope. This crate reports the OLS analogue; it does not estimate their multilevel maximum-likelihood model.
 - **Kish ESS.** \(\mathrm{ESS}=(\sum w)^{2}/\sum w^{2}\) on non-negative finite weights. WLS uses the weights in the slope; ESS is not a second slope.
 - **Exact scalar map.** Voelkle et al. (2012, Eq. 7) and Driver et al. (2017, Eq. 3): \(\varphi = A^{*}(\Delta t)=\exp(a\,\Delta t)\). The inverse is \(a=\ln\varphi/\Delta t\). The forward map is the same equation. The real exponential is strictly positive; a binary64 underflow to `+0` is refused because the inverse logarithm does not exist at zero. The difference quotient \((x(t+\Delta t)-x(t))/\Delta t\) is refused.
@@ -189,6 +190,7 @@ The Voelkle et al. (2012) ZORA accepted manuscript was re-opened 2026-08-18T21:0
 ## Verification
 
 - noiseless CWC recovers known within, between, and contextual slopes with smaller computed RMSE than a pooled OLS collapse;
+- the named grand-mean pooled slope recovers a noiseless blend that is not CWC within, not between, and not contextual, and refusing it as a within-cluster effect fails closed;
 - the CWC contextual effect is not equal to the between-cluster slope when the within slope is nonzero, and contextual + within recovers between;
 - Kish WLS recovers a known slope;
 - the exact scalar map recovers a known drift on event time and refuses every other clock plus the difference quotient;
