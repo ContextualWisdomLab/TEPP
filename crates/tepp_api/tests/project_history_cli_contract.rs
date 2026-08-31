@@ -98,14 +98,9 @@ fn project_history_cli_refuses_non_loopback_unknown_verbs_and_metrics() {
 #[test]
 fn project_history_binary_queries_loopback_and_rejects_unknown_verbs() {
     let binary = env!("CARGO_BIN_EXE_tepp-project-history");
-    assert!(
-        !Command::new(binary)
-            .arg("unknown")
-            .output()
-            .expect("run")
-            .status
-            .success()
-    );
+    let rejected = Command::new(binary).arg("unknown").output().expect("run");
+    assert!(!rejected.status.success());
+    assert!(!rejected.stderr.is_empty());
 
     let mut service = AnalysisRunLiveService::bind_loopback().expect("bind");
     let host = service.local_addr().expect("address").to_string();

@@ -393,7 +393,7 @@ fn validate_bounded_text(value: &str, maximum_bytes: usize) -> Result<(), ApiErr
 
 fn validate_http_field_value(value: &str, maximum_bytes: usize) -> Result<(), ApiError> {
     validate_bounded_text(value, maximum_bytes)?;
-    (!value.chars().any(char::is_control))
+    (value.trim() == value && !value.chars().any(char::is_control))
         .then_some(())
         .ok_or(ApiError::InvalidWirePayload)
 }
@@ -720,6 +720,10 @@ mod tests {
         assert_eq!(injected.to_json(), Err(ApiError::InvalidWirePayload));
         assert_eq!(
             validate_http_field_value("safe\0value", 256),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_http_field_value(" padded", 256),
             Err(ApiError::InvalidWirePayload)
         );
     }

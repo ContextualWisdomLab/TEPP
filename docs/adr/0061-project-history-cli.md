@@ -66,8 +66,10 @@ adapter; `NaruonLiveService` stays POST-only for analysis-run and export.
 ## Failure and recovery
 
 Non-loopback hosts return authorization denied. Unknown verbs, empty stdin,
-credential flags, naruon consumer codes, and events unavailable at cutoff fail
-closed. The in-memory listener is not durable.
+credential flags, padded or control-bearing idempotency keys, naruon consumer
+codes, and events unavailable at cutoff fail closed. Failures emit the stable,
+redacted API error on stderr and never echo an upstream body to stdout. The
+in-memory listener is not durable.
 
 ## Security, privacy, scientific-integrity, and governance impact
 
