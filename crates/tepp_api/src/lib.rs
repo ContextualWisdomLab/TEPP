@@ -14,10 +14,12 @@
 //! only a succeeded status with profile `scientific_acceptance_v1` may return
 //! `tepp.scientific_acceptance.v1`. `POST /v1/analysis-runs/{run_id}/running`
 //! and `POST /v1/analysis-runs/{run_id}/terminal` record those statuses on the
-//! same loopback listener.
+//! same loopback listener. The `tepp-analysis-run` CLI is the operator-visible
+//! loopback client for those verbs.
 
 mod analysis_result;
 mod analysis_run;
+mod analysis_run_cli;
 mod analysis_run_lifecycle_http;
 mod analysis_run_live;
 mod analysis_run_status_http;
@@ -76,6 +78,20 @@ pub use analysis_run::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 pub use analysis_run::requests_are_idempotent_matches;
 /// Require exact status binding to a request and accepted receipt.
 pub use analysis_run::require_status_binding;
+/// Loopback analysis-run CLI invocation.
+pub use analysis_run_cli::AnalysisRunCliInvocation;
+/// Loopback analysis-run CLI verb.
+pub use analysis_run_cli::AnalysisRunCliVerb;
+/// Compose one HTTP/1.1 request for a CLI invocation.
+pub use analysis_run_cli::compose_analysis_run_cli_http;
+/// Dispatch a CLI invocation against an in-process loopback service.
+pub use analysis_run_cli::dispatch_analysis_run_cli;
+/// Execute a CLI invocation over loopback TCP.
+pub use analysis_run_cli::execute_analysis_run_cli;
+/// Read CLI stdin according to verb and terminal state.
+pub use analysis_run_cli::read_analysis_run_cli_stdin;
+/// Filter CLI stdout so scientific acceptance prints only when authorized.
+pub use analysis_run_cli::render_analysis_run_cli_stdout;
 /// Lifecycle-transition contract version constant.
 pub use analysis_run_lifecycle_http::ANALYSIS_RUN_LIFECYCLE_CONTRACT_VERSION;
 /// Production HTTP running/terminal transition body.

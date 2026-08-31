@@ -105,7 +105,11 @@ bodies stay metric-free, and only a succeeded status with profile
 `POST /v1/analysis-runs/{run_id}/running` and
 `POST /v1/analysis-runs/{run_id}/terminal` are the production loopback
 status-update path that records those statuses; they do not persist and do not
-execute psychometric estimation. Production TLS remains a later adapter.
+execute psychometric estimation. The loopback `tepp-analysis-run` CLI is the
+operator-visible client for create, running, terminal, and status on that
+listener: create and running stay metric-free, and only a succeeded status
+with profile `scientific_acceptance_v1` may print `tepp.scientific_acceptance.v1`.
+Production TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

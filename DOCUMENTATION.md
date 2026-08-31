@@ -73,6 +73,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Analysis engine gap-closure doctoring | [`docs/doctoring/analysis-engine-gap-closure.md`](docs/doctoring/analysis-engine-gap-closure.md) |
 | Corpus-split leakage-audit wire doctoring | [`docs/research/corpus-split-manifest-wire.md`](docs/research/corpus-split-manifest-wire.md) |
 | Unicode canonical-identity doctoring | [`docs/research/unicode-canonical-identity.md`](docs/research/unicode-canonical-identity.md) |
+| Scientific-acceptance loopback CLI doctoring | [`docs/research/scientific-acceptance-loopback-cli.md`](docs/research/scientific-acceptance-loopback-cli.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
 ## Maturity vocabulary
@@ -155,6 +156,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Corpus-split leakage-audit wire doctoring | [`docs/research/corpus-split-manifest-wire.md`](docs/research/corpus-split-manifest-wire.md) |
 | Unicode canonical-identity doctoring | [`docs/research/unicode-canonical-identity.md`](docs/research/unicode-canonical-identity.md) |
+| Scientific-acceptance loopback CLI doctoring | [`docs/research/scientific-acceptance-loopback-cli.md`](docs/research/scientific-acceptance-loopback-cli.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
 ## Maturity vocabulary
