@@ -28,6 +28,7 @@ mod naruon_http;
 mod naruon_live;
 mod orchestration;
 mod project_history;
+mod project_history_collection_http;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
@@ -230,6 +231,30 @@ pub use project_history::ProjectHistoryProjection;
 pub use project_history::ProjectHistoryRequest;
 /// Build a cutoff-safe project-history projection.
 pub use project_history::project_history_projection;
+/// Maximum opaque cursor length on project-history collection GET.
+pub use project_history_collection_http::PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN;
+/// Default page size for project-history collection GET.
+pub use project_history_collection_http::PROJECT_HISTORY_COLLECTION_DEFAULT_LIMIT;
+/// Fixed non-causal inference status on collection rows.
+pub use project_history_collection_http::PROJECT_HISTORY_COLLECTION_INFERENCE_STATUS;
+/// Maximum page size for project-history collection GET.
+pub use project_history_collection_http::PROJECT_HISTORY_COLLECTION_MAX_LIMIT;
+/// Metric-free project-history collection page.
+pub use project_history_collection_http::ProjectHistoryCollection;
+/// One metric-free project-history collection row.
+pub use project_history_collection_http::ProjectHistoryCollectionItem;
+/// Whether a path is the project-history collection resource.
+pub use project_history_collection_http::is_project_history_collection_path;
+/// `LineageWeave` GET exchange for project-history collection.
+pub use project_history_collection_http::lineageweave_project_history_collection_exchange;
+/// Page stored project-history collection rows.
+pub use project_history_collection_http::page_project_history_collection_items;
+/// Parse the exclusive project-history collection cursor header.
+pub use project_history_collection_http::parse_project_history_collection_page_cursor;
+/// Parse the project-history collection page-limit header.
+pub use project_history_collection_http::parse_project_history_collection_page_limit;
+/// Refuse metric, evidence, and causal-score keys on collection JSON.
+pub use project_history_collection_http::refuse_metrics_on_project_history_collection_payload;
 /// Maximum posterior Project Journey artifact size.
 pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
 /// Exact posterior Project Journey schema identity.
