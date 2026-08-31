@@ -261,6 +261,22 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver p. 16 `TDPREDVARstd` as `v / v = 1`
+//! after strictly positive `TDPREDVAR` (Table 2 names `TDPREDVAR`
+//! the variance / covariance of time-dependent predictors;
+//! 2017-era `summary.ctsemFit.R` forms `TDPREDVARstd` whenever
+//! `verbose = TRUE` and `n.TDpred > 0` as
+//! `solve(sqrt(TDPREDVARdiag)) %&% TDPREDVAR` with
+//! `TDPREDVARdiag = diag((diag(TDPREDVAR))+diag(ridging,n.TDpred))`;
+//! unlike `TRAITVARstd` that formation adds ridging; the default
+//! ridge is 0; `dimnames` are `TDpredNames`; the 2017-era ridge
+//! length `n.TDpred` rather than `n.TDpred × Tpoints` is a source
+//! bug; unstandardised `TDPREDVAR` is defined for a zero predictor
+//! and is not that map; `v / v = 1` is `TIPREDVARstd` and is not
+//! that map even when both equal 1; `θ / θ = 1` is `MANIFESTVARstd`
+//! and is not that map even when both equal 1; zero `TDPREDVAR`
+//! fails closed; a non-event clock fails closed; `TDPREDVAR` does
+//! not require `a < 0`; JSS PDF re-opened 2026-08-31T01:16Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -417,6 +433,8 @@ pub use event_time::recover_standardised_manifest_mean;
 pub use event_time::recover_standardised_manifest_trait_variance;
 /// Exact scalar p. 16 `MANIFESTVARstd` `θ/...` after strictly positive `MANIFESTVAR`.
 pub use event_time::recover_standardised_manifest_variance;
+/// Exact scalar p. 16 `TDPREDVARstd` `v / v = 1` after strictly positive `TDPREDVAR`.
+pub use event_time::recover_standardised_time_dependent_predictor_variance;
 
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
@@ -639,8 +657,12 @@ pub use event_time::refuse_standardised_manifest_variance_as_standardised_manife
 
 /// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
+/// Refuse treating p. 16 `MANIFESTVARstd` as `TDPREDVARstd`.
+pub use event_time::refuse_standardised_manifest_variance_as_standardised_time_dependent_predictor_variance;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
+/// Refuse treating p. 16 `TIPREDVARstd` as `TDPREDVARstd`.
+pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_time_dependent_predictor_variance;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_standardised_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -743,6 +765,8 @@ pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest
 pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
+/// Refuse treating unstandardised `TDPREDVAR` as p. 16 `TDPREDVARstd`.
+pub use event_time::refuse_unstandardised_time_dependent_predictor_variance_as_standardised_time_dependent_predictor_variance;
 
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
