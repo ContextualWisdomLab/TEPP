@@ -1,0 +1,1 @@
+- `tepp_api` adds `lineageweave_analysis_run_retry_lineage_exchange`, Naruon compatibility-listener retry-lineage GET (empty `retries` on accepted creates), and a `tepp-loopback` TCP create-cancel-retry-inspect proof (ADR 0045). Metric-free retry-lineage fields are unchanged from ADR 0035. Not GET status, not lifecycle POST, not an ADR 0014 claim.
