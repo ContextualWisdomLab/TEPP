@@ -113,7 +113,10 @@ loopback path that produces `tepp.scientific_acceptance.v1` for a
 body carries corpus, recovery, seed, and the pre-registered SE-gate multiplier
 and refuses `scientific_acceptance_json`. The published `tepp-loopback` binary
 binds that wrapper so operators reach `/execute` without embedding
-`analysis_engine`. Production TLS remains a later adapter.
+`analysis_engine`. `naruon_analysis_run_execute_exchange` and
+`lineageweave_analysis_run_execute_exchange` are the typed credential-free
+consumer contracts for that POST; they refuse LLM recovery, receipt metric
+keys, and non-`https` origins. Production TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

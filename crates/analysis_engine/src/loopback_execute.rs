@@ -9,19 +9,21 @@
 //! without a caller-supplied terminal payload. Persistence remains GAP-003B.
 
 use crate::{
-    AnalysisCorpus, AnalysisEngineError, AnalysisEvidenceUnit, RecoveryObservation,
+    AnalysisCorpus, AnalysisEngineError, AnalysisEvidenceUnit, MAX_SE_GATE_K, RecoveryObservation,
     SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE, SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION,
     VALIDATION_CPU_F64_MODEL, complete_validation_run, submit_validation_run,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use temporal_core::{AvailableTime, EventTime};
 use tepp_api::{
-    ANALYSIS_RUN_STATUS_PATH, AnalysisResultSummary, AnalysisRunLiveService, AnalysisRunStatus,
-    AnalysisRunStatusState, AnalysisRunTerminalResult, ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT,
-    DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope, NaruonLiveResponse,
+    ANALYSIS_RUN_ID_MAX_LEN, ANALYSIS_RUN_STATUS_PATH, AnalysisResultSummary,
+    AnalysisRunLiveService, AnalysisRunStatus, AnalysisRunStatusState, AnalysisRunTerminalResult,
+    ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope,
+    LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, NaruonHttpExchange, NaruonLiveResponse,
     SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE, SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA,
-    analysis_run_execute_path_run_id, parse_loopback_http_parts,
+    analysis_run_execute_path_run_id, naruon_analysis_run_status_exchange,
+    parse_loopback_http_parts,
 };
 
 /// Result-metric keys that must not appear on an execute request object.
@@ -262,44 +264,118 @@ impl ScientificAcceptanceLoopbackService {
     }
 }
 
-/// Supported execute-body contract version.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+/// Execute-body contract naruon and `LineageWeave` may POST to `/execute`.
+///
+/// The body carries corpus, recovery, seed, and the pre-registered SE-gate
+/// multiplier. It must not carry `scientific_acceptance_json` or receipt
+/// metric keys. LLM-authored recovery is refused.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
-struct ScientificAcceptanceExecuteRequest {
-    contract_version: u16,
-    run_id: String,
-    idempotency_key: String,
-    seed: u64,
-    se_gate_k: f64,
-    completed_at: String,
-    study_label: String,
-    authored_by_llm: bool,
-    corpus: ExecuteCorpus,
-    truth: Vec<f64>,
-    recovered: Vec<f64>,
-    interval_lower: Vec<f64>,
-    interval_upper: Vec<f64>,
-    truth_times: Vec<f64>,
-    recovered_times: Vec<f64>,
+pub struct ScientificAcceptanceExecuteRequest {
+    /// Semantic contract version for this payload family.
+    pub contract_version: u16,
+    /// Opaque server-assigned run identity.
+    pub run_id: String,
+    /// Exact request idempotency key.
+    pub idempotency_key: String,
+    /// Deterministic engine seed bound into the validation run.
+    pub seed: u64,
+    /// Pre-registered SE-gate multiplier. Not a receipt metric.
+    pub se_gate_k: f64,
+    /// RFC 3339 completion timestamp recorded on the terminal status.
+    pub completed_at: String,
+    /// Study label stamped onto the recovery observation.
+    pub study_label: String,
+    /// LLM-authored recovery is refused and must be `false`.
+    pub authored_by_llm: bool,
+    /// Cutoff-eligible evidence corpus.
+    pub corpus: ScientificAcceptanceExecuteCorpus,
+    /// Known-truth recovery vector.
+    pub truth: Vec<f64>,
+    /// Recovered vector stamped to the same run.
+    pub recovered: Vec<f64>,
+    /// Interval lower bounds.
+    pub interval_lower: Vec<f64>,
+    /// Interval upper bounds.
+    pub interval_upper: Vec<f64>,
+    /// Known-truth event times.
+    pub truth_times: Vec<f64>,
+    /// Recovered event times.
+    pub recovered_times: Vec<f64>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+/// Evidence corpus carried on an execute request.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-struct ExecuteCorpus {
-    snapshot_id: String,
-    evidence_units: Vec<ExecuteEvidenceUnit>,
+pub struct ScientificAcceptanceExecuteCorpus {
+    /// Snapshot identity that must match the accepted run.
+    pub snapshot_id: String,
+    /// Evidence units offered to the cutoff-safe engine.
+    pub evidence_units: Vec<ScientificAcceptanceExecuteEvidenceUnit>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+/// One evidence unit on an execute corpus.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-struct ExecuteEvidenceUnit {
-    evidence_id: String,
-    event_time: String,
-    available_time: String,
-    membership_count: u32,
+pub struct ScientificAcceptanceExecuteEvidenceUnit {
+    /// Opaque evidence identity.
+    pub evidence_id: String,
+    /// RFC 3339 event time.
+    pub event_time: String,
+    /// RFC 3339 availability time.
+    pub available_time: String,
+    /// Multiple-membership count preserved by the engine.
+    pub membership_count: u32,
 }
 
-impl ExecuteCorpus {
+impl ScientificAcceptanceExecuteRequest {
+    /// Parse and validate an execute body with the default byte limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns wire, version, limit, metric-key, LLM, or field-validation errors.
+    pub fn from_json(payload: &str) -> Result<Self, ApiError> {
+        parse_execute_body(payload)
+    }
+
+    /// Serialize this execute body after complete validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns validation, metric-key, or serialization errors.
+    pub fn to_json(&self) -> Result<String, ApiError> {
+        self.validate()?;
+        let payload = serde_json::to_string(self).map_err(|_| ApiError::InvalidWirePayload)?;
+        if payload.len() > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
+            return Err(ApiError::LimitExceeded);
+        }
+        refuse_result_metrics_on_execute(&payload)?;
+        Ok(payload)
+    }
+
+    fn validate(&self) -> Result<(), ApiError> {
+        if self.contract_version != ANALYSIS_RUN_EXECUTE_CONTRACT_VERSION {
+            return Err(ApiError::UnsupportedContractVersion);
+        }
+        if self.run_id.is_empty()
+            || self.idempotency_key.is_empty()
+            || self.completed_at.is_empty()
+            || self.study_label.is_empty()
+            || self.corpus.snapshot_id.is_empty()
+        {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if self.authored_by_llm || !self.se_gate_k.is_finite() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if self.se_gate_k < 0.0 || self.se_gate_k > MAX_SE_GATE_K {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        Ok(())
+    }
+}
+
+impl ScientificAcceptanceExecuteCorpus {
     fn to_corpus(&self) -> Result<AnalysisCorpus, AnalysisEngineError> {
         let mut units = Vec::with_capacity(self.evidence_units.len());
         for unit in &self.evidence_units {
@@ -318,6 +394,65 @@ impl ExecuteCorpus {
     }
 }
 
+/// Build a naruon → TEPP scientific-acceptance execute exchange.
+///
+/// The builder reuses the published status-path origin and run-identity
+/// gates, then POSTs `/execute` with a metric-free engine body. It does not
+/// inject credentials.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin, a
+/// table-access URL, an invalid execute body, or LLM recovery, and
+/// [`ApiError::LimitExceeded`] when the run identity exceeds
+/// [`ANALYSIS_RUN_ID_MAX_LEN`].
+pub fn naruon_analysis_run_execute_exchange(
+    origin: &str,
+    execute: &ScientificAcceptanceExecuteRequest,
+) -> Result<NaruonHttpExchange, ApiError> {
+    execute.validate()?;
+    if execute.run_id.len() > ANALYSIS_RUN_ID_MAX_LEN {
+        return Err(ApiError::LimitExceeded);
+    }
+    let mut exchange =
+        naruon_analysis_run_status_exchange(origin, &execute.run_id, &execute.idempotency_key)?;
+    let consumer = exchange
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
+        .map(|(_, value)| value.as_str())
+        .ok_or(ApiError::InvalidWirePayload)?;
+    if consumer != NARUON_CONSUMER_CODE {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    exchange.method = "POST";
+    exchange.target_url = format!("{}/{ANALYSIS_RUN_EXECUTE_PATH_SUFFIX}", exchange.target_url);
+    exchange.body = execute.to_json()?;
+    Ok(exchange)
+}
+
+/// Build a `LineageWeave` → TEPP scientific-acceptance execute exchange.
+///
+/// Reuses the naruon execute builder and replaces only the published
+/// modular-consumer identity.
+///
+/// # Errors
+///
+/// Returns the same fail-closed errors as [`naruon_analysis_run_execute_exchange`].
+pub fn lineageweave_analysis_run_execute_exchange(
+    origin: &str,
+    execute: &ScientificAcceptanceExecuteRequest,
+) -> Result<NaruonHttpExchange, ApiError> {
+    let mut exchange = naruon_analysis_run_execute_exchange(origin, execute)?;
+    let consumer_header = exchange
+        .headers
+        .iter_mut()
+        .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
+        .ok_or(ApiError::InvalidWirePayload)?;
+    LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
+    Ok(exchange)
+}
+
 fn parse_execute_body(body: &str) -> Result<ScientificAcceptanceExecuteRequest, ApiError> {
     if body.len() > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
         return Err(ApiError::LimitExceeded);
@@ -325,16 +460,7 @@ fn parse_execute_body(body: &str) -> Result<ScientificAcceptanceExecuteRequest, 
     refuse_result_metrics_on_execute(body)?;
     let execute: ScientificAcceptanceExecuteRequest =
         serde_json::from_str(body).map_err(|_| ApiError::InvalidWirePayload)?;
-    if execute.contract_version != ANALYSIS_RUN_EXECUTE_CONTRACT_VERSION {
-        return Err(ApiError::UnsupportedContractVersion);
-    }
-    if execute.run_id.is_empty()
-        || execute.idempotency_key.is_empty()
-        || execute.completed_at.is_empty()
-        || execute.study_label.is_empty()
-    {
-        return Err(ApiError::InvalidWirePayload);
-    }
+    execute.validate()?;
     Ok(execute)
 }
 

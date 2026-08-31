@@ -13,7 +13,8 @@
 //! accepted analysis run so GET can return `tepp.scientific_acceptance.v1`
 //! without a caller-supplied artifact. The published `tepp-loopback` binary
 //! binds that wrapper so `POST /v1/analysis-runs/{run_id}/execute` is reachable
-//! on the loopback listener without embedding this crate.
+//! on the loopback listener without embedding this crate. Naruon and
+//! `LineageWeave` mint that POST through typed execute exchanges in this crate.
 
 mod case_deletion_refit;
 mod lineage_criterion;
@@ -57,7 +58,9 @@ pub use lineage_criterion::{
 /// Loopback engine-execute contracts for scientific acceptance.
 pub use loopback_execute::{
     ANALYSIS_RUN_EXECUTE_CONTRACT_VERSION, ANALYSIS_RUN_EXECUTE_PATH_SUFFIX,
-    ScientificAcceptanceLoopbackService,
+    ScientificAcceptanceExecuteCorpus, ScientificAcceptanceExecuteEvidenceUnit,
+    ScientificAcceptanceExecuteRequest, ScientificAcceptanceLoopbackService,
+    lineageweave_analysis_run_execute_exchange, naruon_analysis_run_execute_exchange,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
