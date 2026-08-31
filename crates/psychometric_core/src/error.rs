@@ -33,6 +33,11 @@ pub enum PsychometricError {
     UnmatchedTimeVaryingInterval,
     /// Fewer than two clusters were supplied for a within/between decomposition.
     InsufficientClusters,
+    /// Enders and Tofighi (2007, p. 125) grand-mean pooled OLS slope was
+    /// treated as the within-cluster (Level 1) effect. That total slope is
+    /// generally an uninterpretable blend of the within-cluster and
+    /// between-cluster slopes (quoting Raudenbush & Bryk, 2002, pp. 138–139).
+    GrandMeanPooledSlopeIsNotWithinClusterEffect,
     /// A membership or survey weight is empty, negative, or non-finite.
     InvalidWeight,
     /// An event-time interval is non-positive.
@@ -739,6 +744,9 @@ impl fmt::Display for PsychometricError {
                 "time-varying predictor discrete effect requires matching sampling and constancy intervals"
             }
             Self::InsufficientClusters => "within/between recovery requires at least two clusters",
+            Self::GrandMeanPooledSlopeIsNotWithinClusterEffect => {
+                "grand-mean pooled OLS slope is not the within-cluster effect"
+            }
             Self::InvalidWeight => "invalid non-negative finite psychometric weight",
             Self::NonPositiveInterval => "event-time interval must be strictly positive",
             Self::InsufficientDraws => {
@@ -1291,6 +1299,10 @@ mod tests {
         assert_eq!(
             PsychometricError::InsufficientClusters.to_string(),
             "within/between recovery requires at least two clusters"
+        );
+        assert_eq!(
+            PsychometricError::GrandMeanPooledSlopeIsNotWithinClusterEffect.to_string(),
+            "grand-mean pooled OLS slope is not the within-cluster effect"
         );
         assert_eq!(
             PsychometricError::InvalidWeight.to_string(),

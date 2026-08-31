@@ -24,7 +24,8 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_initial_time_dependent_predictor_carry,
+    recover_event_time_discrete_lag_and_log_rate, recover_grand_mean_pooled_slope,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -77,6 +78,7 @@ use psychometric_core::{
     refuse_extra_process_latent_mean_as_observed_mean,
     refuse_extra_process_observed_mean_as_after_extra_process_observed_mean,
     refuse_finite_interval_process_noise_as_stationary_variance,
+    refuse_grand_mean_pooled_slope_as_within_cluster_effect,
     refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
@@ -210,9 +212,7 @@ fn cluster_mean_cwc_recovers_known_within_between_and_contextual() {
         "contextual RMSE {contextual_error}"
     );
 
-    let predictors: Vec<f64> = rows.iter().map(|row| row.predictor).collect();
-    let outcomes: Vec<f64> = rows.iter().map(|row| row.outcome).collect();
-    let pooled = ordinary_least_squares_slope(&predictors, &outcomes).expect("pooled");
+    let pooled = recover_grand_mean_pooled_slope(&rows).expect("pooled");
     let pooled_within_error = rmse(&[true_within], &[pooled]);
     let pooled_between_error = rmse(&[true_between], &[pooled]);
     let pooled_contextual_error = rmse(&[true_contextual], &[pooled]);
@@ -231,6 +231,10 @@ fn cluster_mean_cwc_recovers_known_within_between_and_contextual() {
     assert!(
         (recovered.contextual_effect - recovered.between_slope).abs() > 1e-9,
         "Enders & Tofighi (2007, Table 2): CWC contextual must not equal the between-cluster slope"
+    );
+    assert_eq!(
+        refuse_grand_mean_pooled_slope_as_within_cluster_effect(pooled, recovered.within_slope),
+        Err(PsychometricError::GrandMeanPooledSlopeIsNotWithinClusterEffect)
     );
 }
 
