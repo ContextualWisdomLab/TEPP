@@ -116,7 +116,9 @@ binds that wrapper so operators reach `/execute` without embedding
 `analysis_engine`. `naruon_analysis_run_execute_exchange` and
 `lineageweave_analysis_run_execute_exchange` are the typed credential-free
 consumer contracts for that POST; they refuse LLM recovery, receipt metric
-keys, and non-`https` origins. Production TLS remains a later adapter.
+keys, and non-`https` origins. `loopback_http1_from_execute_exchange` renders
+those exchanges onto the spawned `tepp-loopback` TCP listener; public bind
+hosts and `localhost` fail closed. Production TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

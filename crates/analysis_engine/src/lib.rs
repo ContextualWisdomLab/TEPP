@@ -14,7 +14,8 @@
 //! without a caller-supplied artifact. The published `tepp-loopback` binary
 //! binds that wrapper so `POST /v1/analysis-runs/{run_id}/execute` is reachable
 //! on the loopback listener without embedding this crate. Naruon and
-//! `LineageWeave` mint that POST through typed execute exchanges in this crate.
+//! `LineageWeave` mint that POST through typed execute exchanges in this crate
+//! and render them onto the spawned `tepp-loopback` TCP listener.
 
 mod case_deletion_refit;
 mod lineage_criterion;
@@ -60,7 +61,8 @@ pub use loopback_execute::{
     ANALYSIS_RUN_EXECUTE_CONTRACT_VERSION, ANALYSIS_RUN_EXECUTE_PATH_SUFFIX,
     ScientificAcceptanceExecuteCorpus, ScientificAcceptanceExecuteEvidenceUnit,
     ScientificAcceptanceExecuteRequest, ScientificAcceptanceLoopbackService,
-    lineageweave_analysis_run_execute_exchange, naruon_analysis_run_execute_exchange,
+    lineageweave_analysis_run_execute_exchange, loopback_http1_from_execute_exchange,
+    loopback_http1_from_naruon_exchange, naruon_analysis_run_execute_exchange,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{

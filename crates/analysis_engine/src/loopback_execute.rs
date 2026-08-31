@@ -7,23 +7,26 @@
 //! corpus, recovery vectors, seed, and the pre-registered SE-gate multiplier.
 //! It must not carry `scientific_acceptance_json`. GET then returns the artifact
 //! without a caller-supplied terminal payload. Persistence remains GAP-003B.
+//! Typed naruon/`LineageWeave` execute exchanges render onto the published
+//! `tepp-loopback` TCP listener through [`loopback_http1_from_execute_exchange`].
 
 use crate::{
-    AnalysisCorpus, AnalysisEngineError, AnalysisEvidenceUnit, MAX_SE_GATE_K, RecoveryObservation,
-    SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE, SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION,
-    VALIDATION_CPU_F64_MODEL, complete_validation_run, submit_validation_run,
+    complete_validation_run, submit_validation_run, AnalysisCorpus, AnalysisEngineError,
+    AnalysisEvidenceUnit, RecoveryObservation, MAX_SE_GATE_K, SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE,
+    SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION, VALIDATION_CPU_F64_MODEL,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 use std::net::SocketAddr;
 use temporal_core::{AvailableTime, EventTime};
 use tepp_api::{
-    ANALYSIS_RUN_ID_MAX_LEN, ANALYSIS_RUN_STATUS_PATH, AnalysisResultSummary,
-    AnalysisRunLiveService, AnalysisRunStatus, AnalysisRunStatusState, AnalysisRunTerminalResult,
-    ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope,
-    LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, NaruonHttpExchange, NaruonLiveResponse,
-    SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE, SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA,
     analysis_run_execute_path_run_id, naruon_analysis_run_status_exchange,
-    parse_loopback_http_parts,
+    parse_loopback_http_parts, AnalysisResultSummary, AnalysisRunLiveService, AnalysisRunStatus,
+    AnalysisRunStatusState, AnalysisRunTerminalResult, ApiError, ErrorEnvelope, NaruonHttpExchange,
+    NaruonLiveResponse, ANALYSIS_RUN_ID_MAX_LEN, ANALYSIS_RUN_STATUS_PATH,
+    DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
+    LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE,
+    SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA,
 };
 
 /// Result-metric keys that must not appear on an execute request object.
@@ -451,6 +454,130 @@ pub fn lineageweave_analysis_run_execute_exchange(
         .ok_or(ApiError::InvalidWirePayload)?;
     LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
     Ok(exchange)
+}
+
+/// Render a typed naruon/`LineageWeave` exchange as HTTP/1.1 for a bound
+/// loopback listener.
+///
+/// The exchange keeps its HTTPS origin contract. Only the HTTP/1.1 `Host`
+/// is the loopback bind address printed by `tepp-loopback`. Public or
+/// non-loopback hosts fail closed before any socket is opened.
+///
+/// # Errors
+///
+/// Returns [`ApiError::AuthorizationDenied`] for a non-loopback host or a
+/// credential-bearing header, [`ApiError::LimitExceeded`] when the body
+/// exceeds [`DEFAULT_ANALYSIS_RUN_BYTE_LIMIT`], and
+/// [`ApiError::InvalidWirePayload`] for an empty method, a non-`https`
+/// target, or a missing path.
+pub fn loopback_http1_from_naruon_exchange(
+    exchange: &NaruonHttpExchange,
+    loopback_host: &str,
+) -> Result<String, ApiError> {
+    let host = require_loopback_host(loopback_host)?;
+    refuse_exchange_credential_headers(&exchange.headers)?;
+    if exchange.method.is_empty() {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    let path = exchange_https_path(&exchange.target_url)?;
+    if exchange.body.len() > DEFAULT_ANALYSIS_RUN_BYTE_LIMIT {
+        return Err(ApiError::LimitExceeded);
+    }
+    let mut request = String::new();
+    write!(
+        request,
+        "{} {path} HTTP/1.1\r\nHost: {host}\r\n",
+        exchange.method
+    )
+    .map_err(|_| ApiError::InvalidWirePayload)?;
+    for (name, value) in &exchange.headers {
+        if name.eq_ignore_ascii_case("host") || name.eq_ignore_ascii_case("content-length") {
+            continue;
+        }
+        write!(request, "{name}: {value}\r\n").map_err(|_| ApiError::InvalidWirePayload)?;
+    }
+    write!(
+        request,
+        "content-length: {}\r\n\r\n{}",
+        exchange.body.len(),
+        exchange.body
+    )
+    .map_err(|_| ApiError::InvalidWirePayload)?;
+    Ok(request)
+}
+
+/// Render a typed execute exchange onto the published `tepp-loopback` listener.
+///
+/// Requires POST `/execute` with a naruon or `LineageWeave` consumer identity.
+/// Public bind hosts fail closed.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] when the exchange is not a POST
+/// `/execute` for naruon or `LineageWeave`. Other failures match
+/// [`loopback_http1_from_naruon_exchange`].
+pub fn loopback_http1_from_execute_exchange(
+    exchange: &NaruonHttpExchange,
+    loopback_host: &str,
+) -> Result<String, ApiError> {
+    require_execute_loopback_exchange(exchange)?;
+    loopback_http1_from_naruon_exchange(exchange, loopback_host)
+}
+
+fn require_execute_loopback_exchange(exchange: &NaruonHttpExchange) -> Result<(), ApiError> {
+    if exchange.method != "POST" {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    let path = exchange_https_path(&exchange.target_url)?;
+    if path.rsplit('/').next() != Some(ANALYSIS_RUN_EXECUTE_PATH_SUFFIX)
+        || !path.starts_with(ANALYSIS_RUN_STATUS_PATH)
+    {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    let consumer = exchange
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
+        .map(|(_, value)| value.as_str())
+        .ok_or(ApiError::InvalidWirePayload)?;
+    if consumer != NARUON_CONSUMER_CODE && consumer != LINEAGEWEAVE_CONSUMER_CODE {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    Ok(())
+}
+
+fn require_loopback_host(host: &str) -> Result<&str, ApiError> {
+    let host = host.trim();
+    let addr: SocketAddr = host.parse().map_err(|_| ApiError::InvalidWirePayload)?;
+    if addr.ip().is_loopback() {
+        Ok(host)
+    } else {
+        Err(ApiError::AuthorizationDenied)
+    }
+}
+
+fn exchange_https_path(target_url: &str) -> Result<&str, ApiError> {
+    let rest = target_url
+        .strip_prefix("https://")
+        .ok_or(ApiError::InvalidWirePayload)?;
+    let path = rest
+        .find('/')
+        .map(|index| &rest[index..])
+        .ok_or(ApiError::InvalidWirePayload)?;
+    if path.is_empty() {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    Ok(path)
+}
+
+fn refuse_exchange_credential_headers(headers: &[(String, String)]) -> Result<(), ApiError> {
+    for (name, _) in headers {
+        let lower = name.to_ascii_lowercase();
+        if lower.contains("authorization") || lower.contains("token") || lower.contains("copilot") {
+            return Err(ApiError::AuthorizationDenied);
+        }
+    }
+    Ok(())
 }
 
 fn parse_execute_body(body: &str) -> Result<ScientificAcceptanceExecuteRequest, ApiError> {
