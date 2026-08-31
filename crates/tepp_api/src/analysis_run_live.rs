@@ -2,31 +2,50 @@
 //!
 //! This module keeps the Naruon compatibility listener intact while providing
 //! the shared `/v1/analysis-runs` and cutoff-safe `/v1/temporal-context`
-//! boundaries needed by Naruon and `LineageWeave`. It accepts transport
-//! acknowledgements and temporal evidence context only; completed psychometric
-//! results remain outside this crate.
+//! boundaries needed by Naruon and `LineageWeave`. `POST /v1/analysis-runs`
+//! accepts transport acknowledgements only. `GET /v1/analysis-runs/{run_id}`
+//! returns metric-free accepted/running status, and may return
+//! `tepp.scientific_acceptance.v1` only on a succeeded status whose request
+//! profile is `scientific_acceptance_v1`. Completed psychometric estimation
+//! remains outside this crate.
 
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
 
+use crate::analysis_run_status_http::analysis_run_status_path_run_id;
 use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};
 use crate::live_http::{
     header_value, map_io_error, parse_headers, parse_request_line, read_http_request_with_limit,
     split_request_with_limit, validate_common_headers,
 };
 use crate::naruon_http::NARUON_ANALYSIS_RUN_PATH;
+use crate::scientific_acceptance_http::{refuse_metrics_on_receipt, status_http_json};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
-    ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_PATH,
-    ProjectHistoryProjection, ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH, TemporalContextRequest,
-    build_temporal_context, project_history_projection, requests_are_idempotent_matches,
+    AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunStatus, ApiError,
+    DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse,
+    PROJECT_HISTORY_PATH, ProjectHistoryProjection, ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH,
+    TemporalContextRequest, build_temporal_context, project_history_projection,
+    requests_are_idempotent_matches,
 };
+
+#[cfg(test)]
+use crate::require_status_binding;
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
 
 #[cfg(test)]
 use crate::live_http::{declared_content_length, host_implies_table_access, split_header_line};
+
+/// One accepted loopback analysis run and its current status/read body.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct LiveAnalysisRun {
+    consumer: String,
+    request: AnalysisRunRequest,
+    accepted: AnalysisRunAccepted,
+    status: AnalysisRunStatus,
+    scientific_acceptance_json: Option<String>,
+}
 
 /// Loopback HTTP/1.1 analysis-run service shared by published CWL consumers.
 ///
@@ -39,7 +58,8 @@ pub struct AnalysisRunLiveService {
     bound_addr: Option<SocketAddr>,
     next_run_serial: u64,
     next_request_serial: u64,
-    accepted_runs: HashMap<String, (AnalysisRunRequest, AnalysisRunAccepted)>,
+    accepted_runs: HashMap<String, LiveAnalysisRun>,
+    runs_by_id: HashMap<String, String>,
     accepted_project_histories: HashMap<String, (ProjectHistoryRequest, ProjectHistoryProjection)>,
 }
 
@@ -59,6 +79,7 @@ impl AnalysisRunLiveService {
             next_run_serial: 1,
             next_request_serial: 1,
             accepted_runs: HashMap::new(),
+            runs_by_id: HashMap::new(),
             accepted_project_histories: HashMap::new(),
         }
     }
@@ -143,6 +164,10 @@ impl AnalysisRunLiveService {
         let (header_block, body) = split_request_with_limit(request, MAX_LIVE_REQUEST_BODY_BYTES)?;
         let mut lines = header_block.split("\r\n");
         let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
+        let headers = parse_headers(&mut lines)?;
+        if method == "GET" {
+            return self.read_analysis_run_status(path, &headers, body);
+        }
         if method != "POST"
             || (path != NARUON_ANALYSIS_RUN_PATH
                 && path != TEMPORAL_CONTEXT_PATH
@@ -150,7 +175,6 @@ impl AnalysisRunLiveService {
         {
             return Err(ApiError::InvalidWirePayload);
         }
-        let headers = parse_headers(&mut lines)?;
         let consumer = require_headers(
             &headers,
             self.bound_addr,
@@ -176,6 +200,7 @@ impl AnalysisRunLiveService {
         headers: &HashMap<String, String>,
         body: &str,
     ) -> Result<NaruonLiveResponse, ApiError> {
+        refuse_metrics_on_receipt(body)?;
         let request = AnalysisRunRequest::from_json(body)?;
         let idempotency_key = header_value(headers, "idempotency-key")?;
         if idempotency_key != request.idempotency_key {
@@ -186,19 +211,102 @@ impl AnalysisRunLiveService {
             &request.tenant_workspace_id,
             idempotency_key,
         );
-        if let Some((stored_request, stored_accepted)) = self.accepted_runs.get(&replay_key) {
-            if requests_are_idempotent_matches(stored_request, &request) {
-                return Ok(json_response(202, "Accepted", stored_accepted.to_json()?));
+        if let Some(stored) = self.accepted_runs.get(&replay_key) {
+            if requests_are_idempotent_matches(&stored.request, &request) {
+                let accepted_json = stored.accepted.to_json()?;
+                refuse_metrics_on_receipt(&accepted_json)?;
+                return Ok(json_response(202, "Accepted", accepted_json));
             }
             return Err(ApiError::InvalidWirePayload);
         }
         let run_id = format!("tepp-run-{}", self.next_run_serial);
         self.next_run_serial += 1;
+        if self.runs_by_id.contains_key(&run_id) {
+            return Err(ApiError::InvalidWirePayload);
+        }
         let accepted =
-            AnalysisRunAccepted::new(run_id, "accepted", request.idempotency_key.clone())?;
-        let response_body = accepted.to_json()?;
-        self.accepted_runs.insert(replay_key, (request, accepted));
-        Ok(json_response(202, "Accepted", response_body))
+            AnalysisRunAccepted::new(run_id.clone(), "accepted", request.idempotency_key.clone())?;
+        let accepted_json = accepted.to_json()?;
+        refuse_metrics_on_receipt(&accepted_json)?;
+        let status = AnalysisRunStatus::accepted(&accepted)?;
+        self.runs_by_id.insert(run_id, replay_key.clone());
+        self.accepted_runs.insert(
+            replay_key,
+            LiveAnalysisRun {
+                consumer: consumer.to_owned(),
+                request,
+                accepted,
+                status,
+                scientific_acceptance_json: None,
+            },
+        );
+        Ok(json_response(202, "Accepted", accepted_json))
+    }
+
+    fn read_analysis_run_status(
+        &mut self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if !body.is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let run_id = analysis_run_status_path_run_id(path)?;
+        let consumer = require_headers(headers, self.bound_addr, true)?;
+        let idempotency_key = header_value(headers, "idempotency-key")?;
+        let replay_key = self
+            .runs_by_id
+            .get(&run_id)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let stored = self
+            .accepted_runs
+            .get(replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if stored.consumer != consumer || stored.accepted.idempotency_key != idempotency_key {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let response_body = status_http_json(
+            &stored.status,
+            &stored.request,
+            stored.scientific_acceptance_json.as_deref(),
+        )?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
+    /// Record a loopback lifecycle transition for an already accepted run.
+    ///
+    /// Tests and the in-memory listener use this helper because completed
+    /// psychometric execution remains outside this crate. HTTP GET is the only
+    /// operator-visible status path.
+    #[cfg(test)]
+    pub(crate) fn record_loopback_status(
+        &mut self,
+        run_id: &str,
+        status: AnalysisRunStatus,
+        scientific_acceptance_json: Option<String>,
+    ) -> Result<(), ApiError> {
+        let replay_key = self
+            .runs_by_id
+            .get(run_id)
+            .ok_or(ApiError::InvalidWirePayload)?
+            .clone();
+        let stored = self
+            .accepted_runs
+            .get_mut(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if stored.accepted.run_id != run_id {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        require_status_binding(&stored.request, &stored.accepted, &status)?;
+        let _ = status_http_json(
+            &status,
+            &stored.request,
+            scientific_acceptance_json.as_deref(),
+        )?;
+        stored.status = status;
+        stored.scientific_acceptance_json = scientific_acceptance_json;
+        Ok(())
     }
 
     fn accept_project_history(
@@ -316,11 +424,14 @@ mod tests {
     };
     use crate::live_http::{host_is_loopback, read_http_request, split_request};
     use crate::{
-        ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError,
+        ANALYSIS_RUN_CONTRACT_VERSION, AnalysisResultSummary, AnalysisRunAccepted,
+        AnalysisRunRequest, AnalysisRunStatus, AnalysisRunTerminalResult, ApiError,
         DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, LINEAGEWEAVE_CONSUMER_CODE,
         NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
-        NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, TEMPORAL_CONTEXT_PATH,
+        NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE,
+        SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA, TEMPORAL_CONTEXT_PATH,
     };
+    use sha2::{Digest, Sha256};
 
     fn sample_run() -> AnalysisRunRequest {
         AnalysisRunRequest {
@@ -341,6 +452,39 @@ mod tests {
         }
         write!(request, "content-length: {}\r\n\r\n{body}", body.len()).expect("body");
         request
+    }
+
+    fn http_get(path: &str, headers: &[(&str, &str)]) -> String {
+        let mut request = format!("GET {path} HTTP/1.1\r\n");
+        for (name, value) in headers {
+            write!(request, "{name}: {value}\r\n").expect("header");
+        }
+        request.push_str("content-length: 0\r\n\r\n");
+        request
+    }
+
+    fn status_get(run_id: &str, consumer: &str, idempotency_key: &str) -> String {
+        http_get(
+            &format!("{NARUON_ANALYSIS_RUN_PATH}/{run_id}"),
+            &[
+                ("Host", "127.0.0.1"),
+                ("content-type", "application/json"),
+                ("tepp-consumer", consumer),
+                ("tepp-contract-version", "1"),
+                ("idempotency-key", idempotency_key),
+            ],
+        )
+    }
+
+    fn sha256_hex(bytes: &[u8]) -> String {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let digest = Sha256::digest(bytes);
+        let mut encoded = String::with_capacity(64);
+        for byte in digest {
+            encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+            encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+        }
+        encoded
     }
 
     fn valid_request(run: &AnalysisRunRequest, consumer: &str, host: &str) -> String {
@@ -936,6 +1080,249 @@ mod tests {
             envelope(&timeout_response.body).error_code(),
             "limit_exceeded"
         );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn get_status_keeps_receipts_metric_free_and_gates_scientific_acceptance() {
+        let mut run = sample_run();
+        run.output_profile = SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE.into();
+        let mut service = AnalysisRunLiveService::new();
+        let accepted =
+            service.handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"));
+        assert_eq!(accepted.status_code, 202);
+        assert!(!accepted.body.contains("scientific_acceptance"));
+        assert!(!accepted.body.contains("rmse"));
+        let accepted_dto = AnalysisRunAccepted::from_json(&accepted.body).expect("accepted");
+        let get_accepted = service.handle_http_request(&status_get(
+            &accepted_dto.run_id,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        ));
+        assert_eq!(get_accepted.status_code, 200);
+        assert!(get_accepted.body.contains("\"accepted\""));
+        assert!(!get_accepted.body.contains("scientific_acceptance"));
+        assert!(!get_accepted.body.contains("rmse"));
+
+        let encoded = service.handle_http_request(&http_get(
+            &format!("{NARUON_ANALYSIS_RUN_PATH}/tepp-run-%31"),
+            &[
+                ("Host", "127.0.0.1"),
+                ("content-type", "application/json"),
+                ("tepp-consumer", NARUON_CONSUMER_CODE),
+                ("tepp-contract-version", "1"),
+                ("idempotency-key", run.idempotency_key.as_str()),
+            ],
+        ));
+        assert_eq!(encoded.status_code, 200);
+
+        let running = AnalysisRunStatus::running(&accepted_dto).expect("running");
+        service
+            .record_loopback_status(&accepted_dto.run_id, running, None)
+            .expect("running recorded");
+        let get_running = service.handle_http_request(&status_get(
+            &accepted_dto.run_id,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        ));
+        assert_eq!(get_running.status_code, 200);
+        assert!(get_running.body.contains("\"running\""));
+        assert!(!get_running.body.contains("scientific_acceptance"));
+
+        let artifact = format!(
+            r#"{{"schema_version":"{SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA}","output_profile":"{SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE}","binding_sha256":"{}","run_id":"{}"}}"#,
+            "ab".repeat(32),
+            accepted_dto.run_id
+        );
+        let digest = sha256_hex(artifact.as_bytes());
+        let terminal = AnalysisRunTerminalResult::succeeded(
+            &run,
+            &accepted_dto,
+            "artifact-live-1",
+            digest,
+            SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA,
+            "2026-08-02T03:04:05Z",
+            AnalysisResultSummary::new("scientific_acceptance", 4, 8, "validated")
+                .expect("summary"),
+        )
+        .expect("terminal");
+        let succeeded =
+            AnalysisRunStatus::terminal(&run, &accepted_dto, terminal).expect("succeeded");
+        service
+            .record_loopback_status(&accepted_dto.run_id, succeeded, Some(artifact.clone()))
+            .expect("succeeded recorded");
+        let get_succeeded = service.handle_http_request(&status_get(
+            &accepted_dto.run_id,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        ));
+        assert_eq!(get_succeeded.status_code, 200);
+        assert!(
+            get_succeeded
+                .body
+                .contains(SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA)
+        );
+        assert!(get_succeeded.body.contains("scientific_acceptance"));
+
+        let failed = AnalysisRunTerminalResult::failed(
+            &run,
+            &accepted_dto,
+            "2026-08-02T03:04:05Z",
+            "estimation_failed",
+        )
+        .expect("failed");
+        let failed_status =
+            AnalysisRunStatus::terminal(&run, &accepted_dto, failed).expect("failed status");
+        assert_eq!(
+            service.record_loopback_status(&accepted_dto.run_id, failed_status, Some(artifact),),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        assert_eq!(
+            service
+                .handle_http_request(&status_get(
+                    &accepted_dto.run_id,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&status_get(
+                    &accepted_dto.run_id,
+                    NARUON_CONSUMER_CODE,
+                    "wrong-key",
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&status_get(
+                    "missing-run",
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        let mut with_body = status_get(
+            &accepted_dto.run_id,
+            NARUON_CONSUMER_CODE,
+            run.idempotency_key.as_str(),
+        );
+        with_body = with_body.replace("content-length: 0", "content-length: 1");
+        with_body.push('x');
+        assert_eq!(service.handle_http_request(&with_body).status_code, 400);
+        assert_eq!(
+            service
+                .handle_http_request(&http_get(
+                    NARUON_ANALYSIS_RUN_PATH,
+                    &[
+                        ("Host", "127.0.0.1"),
+                        ("content-type", "application/json"),
+                        ("tepp-consumer", NARUON_CONSUMER_CODE),
+                        ("tepp-contract-version", "1"),
+                        ("idempotency-key", run.idempotency_key.as_str()),
+                    ],
+                ))
+                .status_code,
+            400
+        );
+
+        let metric_body = run
+            .to_json()
+            .expect("json")
+            .replacen('{', r#"{"rmse":0.1,"#, 1);
+        assert_eq!(
+            service
+                .handle_http_request(&http_request(
+                    &metric_body,
+                    &[
+                        ("Host", "127.0.0.1"),
+                        ("content-type", "application/json"),
+                        ("tepp-consumer", NARUON_CONSUMER_CODE),
+                        ("tepp-contract-version", "1"),
+                        ("idempotency-key", run.idempotency_key.as_str()),
+                    ],
+                ))
+                .status_code,
+            400
+        );
+
+        assert_eq!(
+            service.record_loopback_status("missing", failed_status_placeholder(), None),
+            Err(ApiError::InvalidWirePayload)
+        );
+        service
+            .runs_by_id
+            .insert("ghost".into(), "missing-replay".into());
+        assert_eq!(
+            service
+                .handle_http_request(&status_get(
+                    "ghost",
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service.record_loopback_status("ghost", failed_status_placeholder(), None),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let replay = service
+            .runs_by_id
+            .get(&accepted_dto.run_id)
+            .expect("replay")
+            .clone();
+        service.runs_by_id.insert("tepp-run-other".into(), replay);
+        assert_eq!(
+            service.record_loopback_status(
+                "tepp-run-other",
+                AnalysisRunStatus::accepted(&accepted_dto).expect("status"),
+                None,
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+
+        let mut collision = AnalysisRunLiveService::new();
+        collision
+            .runs_by_id
+            .insert("tepp-run-1".into(), "preloaded".into());
+        collision.next_run_serial = 1;
+        assert_eq!(
+            collision
+                .handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&http_get(
+                    &format!("{NARUON_ANALYSIS_RUN_PATH}/{}", accepted_dto.run_id),
+                    &[
+                        ("Host", "127.0.0.1"),
+                        ("content-type", "application/json"),
+                        ("tepp-consumer", NARUON_CONSUMER_CODE),
+                        ("tepp-contract-version", "1"),
+                        ("idempotency-key", run.idempotency_key.as_str()),
+                        ("authorization", "Bearer secret"),
+                    ],
+                ))
+                .status_code,
+            403
+        );
+    }
+
+    fn failed_status_placeholder() -> AnalysisRunStatus {
+        let request = sample_run();
+        let accepted =
+            AnalysisRunAccepted::new("missing", "accepted", request.idempotency_key.clone())
+                .expect("accepted");
+        AnalysisRunStatus::accepted(&accepted).expect("status")
     }
 
     struct ScriptedRead {

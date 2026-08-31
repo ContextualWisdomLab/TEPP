@@ -65,6 +65,74 @@ fn encode_path_segment(value: &str) -> String {
     out
 }
 
+/// Decode one status-path segment and refuse empty, slash, or hostile values.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for truncated encodings, non-UTF-8
+/// octets, empty results, or a decoded slash/NUL.
+pub(crate) fn decode_path_segment(value: &str) -> Result<String, ApiError> {
+    let mut out = Vec::with_capacity(value.len());
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' => {
+                if index + 2 >= bytes.len() {
+                    return Err(ApiError::InvalidWirePayload);
+                }
+                let hi = from_hex(bytes[index + 1])?;
+                let lo = from_hex(bytes[index + 2])?;
+                out.push((hi << 4) | lo);
+                index += 3;
+            }
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(bytes[index]);
+                index += 1;
+            }
+            _ => return Err(ApiError::InvalidWirePayload),
+        }
+    }
+    let decoded = String::from_utf8(out).map_err(|_| ApiError::InvalidWirePayload)?;
+    if decoded.is_empty() || decoded.contains('/') || decoded.contains('\0') {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    Ok(decoded)
+}
+
+fn from_hex(byte: u8) -> Result<u8, ApiError> {
+    match byte {
+        b'0'..=b'9' => Ok(byte - b'0'),
+        b'a'..=b'f' => Ok(byte - b'a' + 10),
+        b'A'..=b'F' => Ok(byte - b'A' + 10),
+        _ => Err(ApiError::InvalidWirePayload),
+    }
+}
+
+/// Extract the opaque run identity from `GET /v1/analysis-runs/{run_id}`.
+///
+/// # Errors
+///
+/// Returns [`ApiError::InvalidWirePayload`] for a collection path, extra
+/// segments, or a hostile encoding, and [`ApiError::LimitExceeded`] when the
+/// decoded identity exceeds [`ANALYSIS_RUN_ID_MAX_LEN`].
+pub(crate) fn analysis_run_status_path_run_id(path: &str) -> Result<String, ApiError> {
+    let remainder = path
+        .strip_prefix(ANALYSIS_RUN_STATUS_PATH)
+        .ok_or(ApiError::InvalidWirePayload)?;
+    let encoded = remainder
+        .strip_prefix('/')
+        .ok_or(ApiError::InvalidWirePayload)?;
+    if encoded.is_empty() || encoded.contains('/') {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    let run_id = decode_path_segment(encoded)?;
+    if run_id.len() > ANALYSIS_RUN_ID_MAX_LEN {
+        return Err(ApiError::LimitExceeded);
+    }
+    Ok(run_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,5 +179,65 @@ mod tests {
         let big = "a".repeat(ANALYSIS_RUN_ID_MAX_LEN + 1);
         let result = naruon_analysis_run_status_exchange("https://t.example.com", &big, "k");
         assert_eq!(result.unwrap_err(), ApiError::LimitExceeded);
+    }
+
+    #[test]
+    fn decodes_status_path_identities_and_refuses_hostile_segments() {
+        assert_eq!(
+            analysis_run_status_path_run_id("/v1/analysis-runs/tepp-run-1").expect("plain"),
+            "tepp-run-1"
+        );
+        assert_eq!(
+            decode_path_segment("run%2dabc").expect("lower hex"),
+            "run-abc"
+        );
+        assert_eq!(
+            decode_path_segment("run%2Dabc").expect("upper hex"),
+            "run-abc"
+        );
+        assert_eq!(
+            analysis_run_status_path_run_id("/v1/analysis-runs"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            analysis_run_status_path_run_id("/v1/other/tepp-run-1"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            analysis_run_status_path_run_id("/v1/analysis-runs/"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            analysis_run_status_path_run_id("/v1/analysis-runs/a/b"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            analysis_run_status_path_run_id("/v1/analysis-runs/%2F"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(decode_path_segment("%"), Err(ApiError::InvalidWirePayload));
+        assert_eq!(decode_path_segment("%2"), Err(ApiError::InvalidWirePayload));
+        assert_eq!(
+            decode_path_segment("%ZZ"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            decode_path_segment("run id"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            decode_path_segment("%00"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        let oversized = "a".repeat(ANALYSIS_RUN_ID_MAX_LEN + 1);
+        assert_eq!(
+            analysis_run_status_path_run_id(&format!("/v1/analysis-runs/{oversized}")),
+            Err(ApiError::LimitExceeded)
+        );
+        let invalid_utf8 = "%FF";
+        assert_eq!(
+            decode_path_segment(invalid_utf8),
+            Err(ApiError::InvalidWirePayload)
+        );
     }
 }

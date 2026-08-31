@@ -412,7 +412,7 @@ Fielding, R., Nottingham, M., & Reschke, J. (Eds.). (2022). *HTTP semantics* (RF
 
 Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC 3339). IETF. https://doi.org/10.17487/RFC3339
 
-TEPP uses RFC 9110 for live `Host` and `Transfer-Encoding` refusal on the naruon loopback listener, and RFC 3339 via `temporal_core::KnowledgeCutoff` so a buyer cannot submit `"k"` or a future-dated cutoff as an analysis-run clock.
+TEPP uses RFC 9110 for live `Host` and `Transfer-Encoding` refusal on the naruon loopback listener, RFC 9110 §9.3.1 GET as a safe analysis-run status read that refuses a request body, and RFC 3339 via `temporal_core::KnowledgeCutoff` so a future-dated cutoff cannot be submitted as an analysis-run clock.
 
 ## Security, accessibility, and software supply chain
 

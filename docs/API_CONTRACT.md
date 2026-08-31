@@ -96,8 +96,11 @@ The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 terminal status contains exactly one request-bound
 `AnalysisRunTerminalResult`; consumers must validate its request, receipt,
 snapshot, cutoff, model, profile, and idempotency bindings before treating the
-run as measurement evidence. The Rust DTO is available before the future HTTP
-service is deployed.
+run as measurement evidence. The loopback `AnalysisRunLiveService` now serves
+`GET /v1/analysis-runs/{run_id}` for those statuses: accepted and running GET
+bodies stay metric-free, and only a succeeded status with profile
+`scientific_acceptance_v1` may return `tepp.scientific_acceptance.v1`. Production
+TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

@@ -9,7 +9,10 @@
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
-//! causality, or completed psychometric model results.
+//! causality, or completed psychometric model results. `GET /v1/analysis-runs/{run_id}`
+//! on the loopback listener keeps accepted and running statuses metric-free;
+//! only a succeeded status with profile `scientific_acceptance_v1` may return
+//! `tepp.scientific_acceptance.v1`.
 
 mod analysis_result;
 mod analysis_run;
@@ -30,6 +33,7 @@ mod orchestration;
 mod project_history;
 mod project_journey;
 mod provider_payload;
+mod scientific_acceptance_http;
 mod temporal_context;
 mod wire;
 
@@ -95,6 +99,14 @@ pub use export::GraphMlExport;
 pub use export::JsonLdExport;
 /// Reproducibility manifest.
 pub use export::ReproducibilityManifest;
+/// Output profile that authorizes scientific-acceptance on a loopback GET.
+pub use scientific_acceptance_http::SCIENTIFIC_ACCEPTANCE_HTTP_PROFILE;
+/// Schema identity returned on a succeeded scientific-acceptance GET.
+pub use scientific_acceptance_http::SCIENTIFIC_ACCEPTANCE_HTTP_SCHEMA;
+/// Detect scientific-metric keys on a receipt JSON object.
+pub use scientific_acceptance_http::receipt_json_carries_scientific_metrics;
+/// Refuse scientific-metric keys on request, accepted, or non-terminal status JSON.
+pub use scientific_acceptance_http::refuse_metrics_on_receipt;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;
