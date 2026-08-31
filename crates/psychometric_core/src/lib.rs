@@ -311,6 +311,8 @@ pub use event_time::LagClock;
 pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite `−2 a · q`.
+pub use event_time::recover_asymptotes_true_continuous_diffusion;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
 pub use event_time::recover_asymptotic_continuous_intercept;
 /// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
@@ -462,6 +464,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_as_discrete_increment
 pub use event_time::refuse_asymptotic_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating `τ + λ(−κ / a)` as Eq. 5 of §4.3 stationary `T0MEANS`.
 pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean;
+/// Refuse treating p. 16 `asymDIFFUSION` as the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+pub use event_time::refuse_asymptotic_diffusion_as_asymptotes_true_continuous_diffusion;
 /// Refuse treating p. 16 `asymCINTstd` as `CINTstd`.
 pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `asymCINTstd` as `discreteCINTstd`.
@@ -488,6 +492,8 @@ pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating Eq. 4 `discreteDIFFUSION` as the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+pub use event_time::refuse_discrete_process_noise_as_asymptotes_true_continuous_diffusion;
 /// Refuse treating p. 16 `discreteCINTstd` as `asymCINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
@@ -618,6 +624,8 @@ pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 pub use event_time::refuse_process_noise_as_unconditional_variance;
 /// Refuse treating p. 16 `asymDIFFUSIONstd` as `T0VARstd`.
 pub use event_time::refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance;
+/// Refuse treating p. 16 `DIFFUSIONstd` as the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+pub use event_time::refuse_standardised_continuous_diffusion_as_asymptotes_true_continuous_diffusion;
 /// Refuse treating p. 16 `DIFFUSIONstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `CINTstd` as `asymCINTstd`.
@@ -729,6 +737,8 @@ pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating unstandardised `asymDIFFUSION` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion;
+/// Refuse treating unstandardised `DIFFUSION` as the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+pub use event_time::refuse_unstandardised_continuous_diffusion_as_asymptotes_true_continuous_diffusion;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
