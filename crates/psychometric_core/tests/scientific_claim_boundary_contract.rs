@@ -1,7 +1,6 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -29,6 +28,7 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_predetermined_lagged_latent_covariance,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
@@ -61,6 +61,7 @@ use psychometric_core::{
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
+    refuse_decayed_predetermined_total_as_predetermined_lagged_latent_covariance,
     refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
@@ -118,6 +119,7 @@ use psychometric_core::{
     refuse_measurement_error_as_stationary_later_observed_variance,
     refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
     refuse_observed_variance_as_standardised_manifest_variance,
+    refuse_predetermined_later_latent_variance_as_predetermined_lagged_latent_covariance,
     refuse_process_noise_as_unconditional_variance,
     refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance,
     refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
@@ -147,6 +149,7 @@ use psychometric_core::{
     refuse_stationary_initial_observed_variance_as_stationary_lagged_observed_covariance,
     refuse_stationary_lagged_latent_covariance_as_decayed_stationary_variance,
     refuse_stationary_lagged_latent_covariance_as_observed_covariance,
+    refuse_stationary_lagged_latent_covariance_as_predetermined_lagged_latent_covariance,
     refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance,
     refuse_stationary_lagged_observed_covariance_as_stationary_later_observed_variance,
     refuse_stationary_later_latent_variance_as_discrete_variance,
@@ -181,6 +184,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -3008,6 +3012,98 @@ fn stationary_later_observed_variance_is_not_manifest_latent_or_lagged() {
         ),
         Err(
             psychometric_core::PsychometricError::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance
+        )
+    );
+}
+
+#[test]
+fn predetermined_lagged_latent_covariance_is_not_stationary_later_or_decayed() {
+    let trait_variance = 1.0_f64;
+    let initial = 2.0_f64;
+    let diffusion = 0.4_f64;
+    let log_rate = -0.134_488_942_f64;
+    let event_delta = 1.0_f64;
+    let recovered = recover_predetermined_lagged_latent_covariance(
+        trait_variance,
+        initial,
+        -0.225,
+        1.0,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("lagged-predetermined-T0VAR");
+    let stationary = recover_stationary_lagged_latent_covariance(
+        trait_variance,
+        diffusion,
+        -0.225,
+        1.0,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("stationary lagged T0VAR");
+    let evolved = recover_discrete_latent_variance(
+        initial,
+        diffusion,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("e^{2 a Δt} p_0 + Q_Δt");
+    let trait_plus_later =
+        recover_trait_plus_state_latent_variance(trait_variance, evolved).expect("trait + later");
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("added");
+    let later_latent = trait_plus_later + added;
+    let first_occasion = trait_variance + initial + added;
+    let decayed = recover_discrete_lagged_latent_covariance(
+        first_occasion,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("e^{a Δt}(trait + p_0 + added)");
+    assert!(
+        (recovered - stationary).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 predetermined lagged T0VAR): free p_0 is not −q/(2a)"
+    );
+    assert!(
+        (recovered - later_latent).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 predetermined lagged T0VAR): lagged omits Q_Δt"
+    );
+    assert!(
+        (recovered - decayed).abs() > 1e-3,
+        "Driver et al. (2017, §4.3 predetermined lagged T0VAR): trait and addedTIPREDVAR do not decay"
+    );
+    assert_eq!(
+        refuse_stationary_lagged_latent_covariance_as_predetermined_lagged_latent_covariance(
+            stationary, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StationaryLaggedLatentCovarianceIsNotPredeterminedLaggedLatentCovariance
+        )
+    );
+    assert_eq!(
+        refuse_predetermined_later_latent_variance_as_predetermined_lagged_latent_covariance(
+            later_latent,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::PredeterminedLaterLatentVarianceIsNotPredeterminedLaggedLatentCovariance
+        )
+    );
+    assert_eq!(
+        refuse_decayed_predetermined_total_as_predetermined_lagged_latent_covariance(
+            decayed, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::DecayedPredeterminedTotalIsNotPredeterminedLaggedLatentCovariance
         )
     );
 }
