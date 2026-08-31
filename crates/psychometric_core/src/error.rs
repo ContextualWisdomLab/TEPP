@@ -710,6 +710,36 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// 2017-era commented `asymTOTALVARstd` was requested with a
+    /// non-positive three-term total. Unstandardised
+    /// `asymTOTALVAR` is defined for a zero total; footnote 4
+    /// standardisation requires strictly positive total.
+    StandardisedAsymptoticTotalVarianceRequiresPositiveAsymptoticTotalVariance,
+    /// 2017-era commented `asymTOTALVARstd` was requested for a
+    /// non-stable drift. The three-term total
+    /// `-q / (2 a) + trait / a² + (B / a)² v` requires `a < 0`
+    /// whenever a contribution is nonzero.
+    StandardisedAsymptoticTotalVarianceRequiresStableDrift,
+    /// 2017-era unstandardised three-term `asymTOTALVAR` was treated
+    /// as commented `asymTOTALVARstd`. Unstandardised total is
+    /// defined for a zero total; standardised total is not. Equal
+    /// numbers when `total = 1` remain distinct named quantities.
+    UnstandardisedAsymptoticTotalVarianceIsNotStandardisedAsymptoticTotalVariance,
+    /// Driver p. 16 `addedTIPREDVARstd` was treated as 2017-era
+    /// commented `asymTOTALVARstd`. Both scalar correlations equal
+    /// 1 after a strictly positive relevant variance.
+    /// `addedTIPREDVARstd` standardises `(B / a)² v` alone.
+    /// `asymTOTALVARstd` standardises the three-term total. Equal
+    /// numbers remain distinct named quantities.
+    StandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTotalVariance,
+    /// Driver p. 16 `asymDIFFUSIONstd` was treated as 2017-era
+    /// commented `asymTOTALVARstd`. Both scalar correlations equal
+    /// 1 after a strictly positive relevant variance.
+    /// `asymDIFFUSIONstd` standardises within-subject
+    /// `asymDIFFUSION`. `asymTOTALVARstd` standardises the
+    /// three-term total. Equal numbers remain distinct named
+    /// quantities.
+    StandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticTotalVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1264,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedAsymptoticTotalVarianceRequiresPositiveAsymptoticTotalVariance => {
+                "standardised asymptotic total variance requires strictly positive asymptotic total variance"
+            }
+            Self::StandardisedAsymptoticTotalVarianceRequiresStableDrift => {
+                "standardised asymptotic total variance requires a stable negative drift"
+            }
+            Self::UnstandardisedAsymptoticTotalVarianceIsNotStandardisedAsymptoticTotalVariance => {
+                "unstandardised asymptotic total variance is not standardised asymptotic total variance"
+            }
+            Self::StandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTotalVariance => {
+                "standardised time-independent predictor variance is not standardised asymptotic total variance"
+            }
+            Self::StandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticTotalVariance => {
+                "standardised asymptotic diffusion is not standardised asymptotic total variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2116,34 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_asymptotic_total_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticTotalVarianceRequiresPositiveAsymptoticTotalVariance
+                .to_string(),
+            "standardised asymptotic total variance requires strictly positive asymptotic total variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticTotalVarianceRequiresStableDrift.to_string(),
+            "standardised asymptotic total variance requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedAsymptoticTotalVarianceIsNotStandardisedAsymptoticTotalVariance
+                .to_string(),
+            "unstandardised asymptotic total variance is not standardised asymptotic total variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTotalVariance
+                .to_string(),
+            "standardised time-independent predictor variance is not standardised asymptotic total variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticTotalVariance
+                .to_string(),
+            "standardised asymptotic diffusion is not standardised asymptotic total variance"
         );
     }
 }
