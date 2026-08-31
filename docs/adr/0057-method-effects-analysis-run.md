@@ -27,9 +27,11 @@ Add the `method_effects_v1` analysis-run output profile to
   construction;
 - generates the CPU truth corpus and admits documents through
   `refuse_unavailable_document` without reimplementing method-effect labels;
+- rejects configurations whose conservative event/document/membership/relation
+  row bound exceeds 1,000,000 before generator allocation;
 - emits a canonical SHA-256-digested `tepp.method_effects.v1` artifact with
-  seed, config/content digests, original/revision/translation/template-copy
-  counts, and inference status
+  seed, config digest, a digest over exactly the cutoff-admitted documents,
+  original/revision/translation/template-copy counts, and inference status
   `simulation_method_effect_labels_not_estimator_model`;
 - does not invent an estimator-side method model, select GPU backends, draw
   MCMC, or emit topic birth/split/merge events.
@@ -55,13 +57,14 @@ Operators can request cutoff-safe method-effect counts as a digest-bound
 terminal result. The artifact does not claim an estimator-side method model,
 GPU parity, MCMC, or topic birth/split/merge. Snapshot/profile/cutoff
 mismatch, empty/undersized available corpora, and missing originals fail
-closed.
+closed. Malformed digests and over-budget generation also fail closed.
 
 ## Verification
 
 The PR includes Rust unit and integration tests for digest-bound mixed
 method-effect corpora, empty-available and singleton-original refusal,
-snapshot / profile / cutoff mismatch, and artifact tampering. Run:
+snapshot / profile / cutoff mismatch, admitted-population digest binding,
+pre-allocation row limits, and artifact tampering. Run:
 
 ```text
 cargo fmt --all -- --check

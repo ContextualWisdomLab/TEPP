@@ -6,9 +6,7 @@ use temporal_core::KnowledgeCutoff;
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
-use tepp_simulation::{
-    DocumentMethodEffect, SimulationConfig, SimulationError, generate, refuse_unavailable_document,
-};
+use tepp_simulation::{SimulationConfig, digest_documents, generate};
 
 use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
 
@@ -20,7 +18,17 @@ pub const METHOD_EFFECTS_MODEL_CONTRACT_VERSION: &str = "method_effects_v1";
 pub const METHOD_EFFECTS_OUTPUT_PROFILE: &str = "method_effects_v1";
 /// Maximum canonical artifact JSON size.
 pub const METHOD_EFFECTS_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
+/// Maximum generated event, document, membership, and relation rows per run.
+pub const METHOD_EFFECTS_GENERATED_ROW_LIMIT: u64 = 1_000_000;
 const METHOD_EFFECTS_INFERENCE_STATUS: &str = "simulation_method_effect_labels_not_estimator_model";
+
+#[derive(Clone, Copy)]
+enum MethodEffectBucket {
+    Original,
+    Revision,
+    Translation,
+    TemplateCopy,
+}
 
 /// Completed, bounded method-effect census for analysis-run clients.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -82,9 +90,6 @@ impl MethodEffectsArtifact {
         self.validate()?;
         let payload =
             serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > METHOD_EFFECTS_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
         Ok(payload)
     }
 
@@ -112,10 +117,8 @@ impl MethodEffectsArtifact {
             || !valid_identifier(&self.run_id)
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
-            || !valid_identifier(&self.config_digest)
-            || self.config_digest.len() != 64
-            || !valid_identifier(&self.content_digest)
-            || self.content_digest.len() != 64
+            || !is_sha256(&self.config_digest)
+            || !is_sha256(&self.content_digest)
             || self.document_count < 2
             || self.original_count == 0
             || kind_sum != Some(self.document_count)
@@ -139,9 +142,9 @@ pub struct MethodEffectsExecution {
 
 /// Execute cutoff-safe simulation method-effect labels as one analysis-run profile.
 ///
-/// The executor invokes [`generate`] and [`refuse_unavailable_document`] already
-/// on protected main. It does not invent an estimator-side method model, GPU
-/// kernels, MCMC, or topic birth/split/merge events.
+/// The executor invokes [`generate`] and the manifest's cutoff-eligible document
+/// projection already on protected main. It does not invent an estimator-side
+/// method model, GPU kernels, MCMC, or topic birth/split/merge events.
 ///
 /// # Errors
 ///
@@ -167,28 +170,27 @@ pub fn execute_method_effects_run(
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
+    require_generation_budget(config)?;
 
-    let manifest = generate(config).map_err(map_simulation_error)?;
+    let manifest = generate(config).map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    let eligible_documents = manifest.documents_eligible_at_cutoff(&knowledge_cutoff);
     let mut original_count = 0_u64;
     let mut revision_count = 0_u64;
     let mut translation_count = 0_u64;
     let mut template_copy_count = 0_u64;
     let mut derivative_count = 0_u64;
     let mut document_count = 0_u64;
-    for document in manifest.documents() {
-        if refuse_unavailable_document(document, &knowledge_cutoff).is_err() {
-            continue;
-        }
+    for document in &eligible_documents {
         document_count = document_count
             .checked_add(1)
             .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-        match document.method_effect() {
-            DocumentMethodEffect::Original => {
+        match method_effect_bucket(document.method_effect().wire_name())? {
+            MethodEffectBucket::Original => {
                 original_count = original_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
             }
-            DocumentMethodEffect::Revision => {
+            MethodEffectBucket::Revision => {
                 revision_count = revision_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
@@ -196,7 +198,7 @@ pub fn execute_method_effects_run(
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
             }
-            DocumentMethodEffect::Translation => {
+            MethodEffectBucket::Translation => {
                 translation_count = translation_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
@@ -204,7 +206,7 @@ pub fn execute_method_effects_run(
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
             }
-            DocumentMethodEffect::TemplateCopy => {
+            MethodEffectBucket::TemplateCopy => {
                 template_copy_count = template_copy_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
@@ -212,10 +214,9 @@ pub fn execute_method_effects_run(
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
             }
-            _ => return Err(AnalysisEngineError::InvalidEvidence),
         }
     }
-    if document_count < 2 || original_count == 0 {
+    if document_count < 2 {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
 
@@ -226,7 +227,7 @@ pub fn execute_method_effects_run(
         knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
         seed: manifest.seed(),
         config_digest: manifest.config_digest().to_owned(),
-        content_digest: manifest.content_digest().to_owned(),
+        content_digest: digest_documents(&eligible_documents),
         document_count,
         original_count,
         revision_count,
@@ -236,33 +237,61 @@ pub fn execute_method_effects_run(
         inference_status: METHOD_EFFECTS_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "method_effects",
-        document_count,
-        6,
-        METHOD_EFFECTS_INFERENCE_STATUS,
-    )?;
-    let terminal_result = AnalysisRunTerminalResult::succeeded(
-        request,
-        accepted,
-        format!("method_effects_artifact_{}", &digest[..16]),
-        digest,
-        METHOD_EFFECTS_ARTIFACT_SCHEMA_VERSION,
-        completed_at,
-        summary,
-    )?;
+    #[rustfmt::skip]
+    let summary = AnalysisResultSummary::new("method_effects", document_count, 6, METHOD_EFFECTS_INFERENCE_STATUS)?;
+    #[rustfmt::skip]
+    let terminal_result = AnalysisRunTerminalResult::succeeded(request, accepted, format!("method_effects_artifact_{}", &digest[..16]), digest, METHOD_EFFECTS_ARTIFACT_SCHEMA_VERSION, completed_at, summary)?;
     Ok(MethodEffectsExecution {
         artifact,
         terminal_result,
     })
 }
 
-fn map_simulation_error(error: SimulationError) -> AnalysisEngineError {
-    match error {
-        SimulationError::InvalidConfiguration
-        | SimulationError::TemporalInvariantViolation
-        | SimulationError::ManifestInvariantViolation
-        | _ => AnalysisEngineError::InvalidEvidence,
+fn require_generation_budget(config: SimulationConfig) -> Result<(), AnalysisEngineError> {
+    let events = u64::from(config.event_count());
+    let originals = events
+        .checked_mul(u64::from(config.documents_per_event()))
+        .ok_or(AnalysisEngineError::LimitExceeded)?;
+    let documents = originals
+        .checked_mul(4)
+        .ok_or(AnalysisEngineError::LimitExceeded)?;
+    let memberships = documents
+        .checked_mul(u64::from(config.membership_targets()))
+        .ok_or(AnalysisEngineError::LimitExceeded)?;
+    let relations = originals
+        .checked_mul(8)
+        .and_then(|value| {
+            events
+                .checked_mul(3)
+                .and_then(|events| value.checked_add(events))
+        })
+        .and_then(|value| value.checked_add(1))
+        .ok_or(AnalysisEngineError::LimitExceeded)?;
+    let generated_rows = events
+        .checked_add(documents)
+        .and_then(|value| value.checked_add(memberships))
+        .and_then(|value| value.checked_add(relations))
+        .ok_or(AnalysisEngineError::LimitExceeded)?;
+    if generated_rows > METHOD_EFFECTS_GENERATED_ROW_LIMIT {
+        return Err(AnalysisEngineError::LimitExceeded);
+    }
+    Ok(())
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+}
+
+fn method_effect_bucket(value: &str) -> Result<MethodEffectBucket, AnalysisEngineError> {
+    match value {
+        "original" => Ok(MethodEffectBucket::Original),
+        "revision" => Ok(MethodEffectBucket::Revision),
+        "translation" => Ok(MethodEffectBucket::Translation),
+        "template_copy" => Ok(MethodEffectBucket::TemplateCopy),
+        _ => Err(AnalysisEngineError::InvalidEvidence),
     }
 }
 
@@ -270,7 +299,7 @@ fn map_simulation_error(error: SimulationError) -> AnalysisEngineError {
 mod tests {
     use super::{
         METHOD_EFFECTS_ARTIFACT_BYTE_LIMIT, METHOD_EFFECTS_ARTIFACT_SCHEMA_VERSION,
-        METHOD_EFFECTS_INFERENCE_STATUS, MethodEffectsArtifact,
+        METHOD_EFFECTS_INFERENCE_STATUS, MethodEffectsArtifact, method_effect_bucket,
     };
     use crate::AnalysisEngineError;
 
@@ -345,12 +374,17 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
-                value.config_digest.clear();
+                value.config_digest = "g".repeat(64);
                 value
             },
             {
                 let mut value = artifact.clone();
-                value.content_digest = "short".into();
+                value.content_digest = "A".repeat(64);
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.config_digest = "short".into();
                 value
             },
             {
@@ -361,6 +395,11 @@ mod tests {
             {
                 let mut value = artifact.clone();
                 value.original_count = 0;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.document_count = 5;
                 value
             },
             {
@@ -377,5 +416,10 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn unknown_method_effect_names_fail_closed() {
+        assert!(method_effect_bucket("unknown").is_err());
     }
 }

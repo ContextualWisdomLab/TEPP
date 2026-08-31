@@ -9,6 +9,10 @@
 cutoff-safe analysis-run profile so operators can request a digest-bound
 identity artifact.
 
+The artifact content digest covers exactly the documents admitted at the
+knowledge cutoff. A conservative 1,000,000-row execution budget is checked
+before allocating the generated corpus.
+
 The artifact inference status is
 `simulation_method_effect_labels_not_estimator_model`. This is not an
 estimator-side method model, not GPU, not MCMC, and not topic
