@@ -1,0 +1,1 @@
+- `tepp_api` loopback `GET /v1/analysis-runs` enumerates metric-free accepted, running, cancelled, and terminal runs (ADR 0031). Collection bodies refuse RMSE/bias/coverage/SE-gate/scientific-acceptance keys. Not GET-by-id, not lifecycle POST, not persistence.

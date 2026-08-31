@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tepp.local/schemas/analysis_run_collection_v1.json",
+  "title": "AnalysisRunCollectionV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "runs"
+  ],
+  "properties": {
+    "contract_version": { "type": "integer", "const": 1 },
+    "runs": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["run_id", "run_state", "idempotency_key"],
+        "properties": {
+          "run_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" },
+          "run_state": {
+            "type": "string",
+            "enum": ["accepted", "running", "succeeded", "failed", "cancelled"]
+          },
+          "idempotency_key": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" }
+        }
+      }
+    },
+    "next_cursor": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" }
+  }
+}
