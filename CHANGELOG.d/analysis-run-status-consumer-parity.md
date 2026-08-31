@@ -1,0 +1,1 @@
+- `tepp_api` adds `lineageweave_analysis_run_status_exchange` and a `tepp-loopback` TCP GET-status proof (ADR 0028). Metric-free accepted/running GET is unchanged from ADR 0027. `NaruonLiveService` stays POST-only. Not lifecycle POST, not cancel, not an ADR 0014 claim.

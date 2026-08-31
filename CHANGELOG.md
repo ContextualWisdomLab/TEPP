@@ -38,6 +38,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- `tepp_api` adds `lineageweave_analysis_run_status_exchange` and a `tepp-loopback` TCP GET-status proof (ADR 0028). Metric-free accepted/running GET is unchanged from ADR 0027. `NaruonLiveService` stays POST-only. Not lifecycle POST, not cancel, not an ADR 0014 claim.
+
 - `tepp_api` loopback `AnalysisRunLiveService` now serves `GET /v1/analysis-runs/{run_id}` so accepted/running statuses stay metric-free and only a succeeded status with profile `scientific_acceptance_v1` may return `tepp.scientific_acceptance.v1`. Receipt RMSE/bias/coverage/SE-gate keys, a GET body, failed-plus-artifact emission, an all-zero digest, and digest mismatch fail closed. This is the GAP-003A HTTP status slice for issue #166; it does not duplicate the `analysis_engine` library bind (#356) or the terminal-result DTO wire (#358); persistence remains GAP-003B.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.

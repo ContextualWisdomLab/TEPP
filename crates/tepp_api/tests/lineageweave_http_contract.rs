@@ -10,6 +10,7 @@ use tepp_api::{
     ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunAccepted, AnalysisRunLiveService, AnalysisRunRequest,
     ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE,
     NARUON_LIVE_HEADER_BYTE_LIMIT, lineageweave_analysis_run_exchange,
+    lineageweave_analysis_run_status_exchange,
 };
 
 fn sample_run() -> AnalysisRunRequest {
@@ -69,6 +70,37 @@ fn lineageweave_exchange_uses_the_published_consumer_header_without_credentials(
 }
 
 #[test]
+fn lineageweave_status_exchange_gets_the_published_consumer_without_credentials() {
+    let exchange = lineageweave_analysis_run_status_exchange(
+        "https://tepp.example.test",
+        "tepp-run-9",
+        "shared-idempotency-key",
+    )
+    .expect("lineageweave status");
+    assert_eq!(exchange.method, "GET");
+    assert_eq!(
+        exchange.target_url,
+        "https://tepp.example.test/v1/analysis-runs/tepp-run-9"
+    );
+    assert!(exchange.body.is_empty());
+    assert!(
+        exchange
+            .headers
+            .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+    );
+    assert!(exchange.headers.iter().all(|(name, _)| {
+        !matches!(
+            name.to_ascii_lowercase().as_str(),
+            "authorization" | "proxy-authorization" | "cookie" | "x-api-key"
+        )
+    }));
+    assert_eq!(
+        lineageweave_analysis_run_status_exchange("http://tepp.example.test", "tepp-run-9", "k"),
+        Err(ApiError::InvalidWirePayload)
+    );
+}
+
+#[test]
 fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     let loopback = AnalysisRunLiveService::bind_loopback().expect("loopback bind");
     assert!(
@@ -108,6 +140,16 @@ fn live_listener_accepts_lineageweave_and_isolates_consumer_idempotency() {
     let conflict_response =
         service.handle_http_request(&http_request(LINEAGEWEAVE_CONSUMER_CODE, &conflict));
     assert_eq!(conflict_response.status_code, 400);
+
+    let status = service.handle_http_request(&format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/{} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: {}\r\ncontent-length: 0\r\n\r\n",
+        lineageweave_accepted.run_id,
+        run.idempotency_key
+    ));
+    assert_eq!(status.status_code, 200);
+    assert!(status.body.contains("\"accepted\""));
+    assert!(!status.body.contains("rmse"));
+    assert!(!status.body.contains("scientific_acceptance"));
 }
 
 #[test]
