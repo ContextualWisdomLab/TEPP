@@ -1,0 +1,1 @@
+- `tepp_api` loopback `GET /v1/analysis-runs/{run_id}/request` returns metric-free stored create fields (snapshot, cutoff, model contract, output profile) so operators can inspect a listed run before retry (ADR 0034). GET-by-id remains refused. Not lifecycle POST, not cancel, not collection GET, not retry, not persistence.

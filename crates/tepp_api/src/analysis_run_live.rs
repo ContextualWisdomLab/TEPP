@@ -9,7 +9,9 @@
 //! metric-free `cancelled` status. `GET /v1/analysis-runs` enumerates those
 //! runs without guessing identities. `POST /v1/analysis-runs/{run_id}/retry`
 //! clones a failed or cancelled run into a new metric-free `202 Accepted`.
-//! GET-by-id and running/terminal POST transitions remain later slices.
+//! `GET /v1/analysis-runs/{run_id}/request` returns metric-free stored create
+//! fields so operators can inspect snapshot, cutoff, model, and profile before
+//! retry. GET-by-id and running/terminal POST transitions remain later slices.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -25,6 +27,10 @@ use crate::analysis_run_collection_http::{
 };
 use crate::analysis_run_retry_http::{
     AnalysisRunRetryRequest, analysis_run_retry_path_run_id, refuse_metrics_on_retry_payload,
+};
+use crate::analysis_run_stored_request_http::{
+    AnalysisRunStoredRequest, analysis_run_stored_request_path_run_id,
+    refuse_metrics_on_stored_request_payload,
 };
 use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};
 use crate::live_http::{
@@ -173,6 +179,12 @@ impl AnalysisRunLiveService {
         let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
         let headers = parse_headers(&mut lines)?;
         if method == "GET" {
+            if matches!(
+                analysis_run_stored_request_path_run_id(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.read_analysis_run_stored_request(path, &headers, body);
+            }
             return self.list_analysis_runs(path, &headers, body);
         }
         if method != "POST" {
@@ -383,6 +395,44 @@ impl AnalysisRunLiveService {
         Ok(json_response(202, "Accepted", response_body))
     }
 
+    fn read_analysis_run_stored_request(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let run_id = analysis_run_stored_request_path_run_id(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        refuse_metrics_on_stored_request_payload(body)?;
+        let replay_key = self
+            .runs_by_id
+            .get(&run_id)
+            .cloned()
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let stored = self
+            .accepted_runs
+            .get(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if stored.consumer != consumer {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let payload = AnalysisRunStoredRequest::new(
+            stored.accepted.run_id.clone(),
+            stored.run_state,
+            stored.accepted.idempotency_key.clone(),
+            stored.request.snapshot_id.clone(),
+            stored.request.knowledge_cutoff.clone(),
+            stored.request.model_contract_version.clone(),
+            stored.request.output_profile.clone(),
+        )?;
+        let response_body = payload.to_json()?;
+        refuse_metrics_on_stored_request_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
     fn list_analysis_runs(
         &self,
         path: &str,
@@ -444,9 +494,9 @@ impl AnalysisRunLiveService {
 
     /// Test-only seam that records a non-accepted loopback state.
     ///
-    /// Used to prove cancel, collection, and retry of running, succeeded,
-    /// failed, and cancelled runs without duplicating the live POST
-    /// running/terminal lifecycle slice.
+    /// Used to prove cancel, collection, retry, and stored-request inspect of
+    /// running, succeeded, failed, and cancelled runs without duplicating the
+    /// live POST running/terminal lifecycle slice.
     #[cfg(test)]
     fn force_loopback_run_state(
         &mut self,
@@ -1634,6 +1684,151 @@ mod tests {
         assert_eq!(child_row.idempotency_key, retry_key);
         assert!(!listed.body.contains("scientific_acceptance"));
         assert!(!listed.body.contains("rmse"));
+    }
+
+    fn stored_request_http(run_id: &str, consumer: &str, extra: &[(&str, &str)]) -> String {
+        let mut request = format!("GET {NARUON_ANALYSIS_RUN_PATH}/{run_id}/request HTTP/1.1\r\n");
+        write!(
+            request,
+            "Host: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\n"
+        )
+        .expect("stored-request headers");
+        for (name, value) in extra {
+            write!(request, "{name}: {value}\r\n").expect("extra header");
+        }
+        request.push_str("content-length: 0\r\n\r\n");
+        request
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn handler_covers_metric_free_stored_request_get() {
+        use crate::{AnalysisRunStatusState, AnalysisRunStoredRequest};
+
+        let run = sample_run();
+        let mut service = AnalysisRunLiveService::new();
+        let accepted =
+            service.handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"));
+        assert_eq!(accepted.status_code, 202);
+        let run_id = serde_json::from_str::<serde_json::Value>(&accepted.body)
+            .expect("accepted json")["run_id"]
+            .as_str()
+            .expect("run_id")
+            .to_owned();
+
+        let inspected =
+            service.handle_http_request(&stored_request_http(&run_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(inspected.status_code, 200);
+        let stored = AnalysisRunStoredRequest::from_json(&inspected.body).expect("stored");
+        assert_eq!(stored.run_id, run_id);
+        assert_eq!(stored.run_state, AnalysisRunStatusState::Accepted);
+        assert_eq!(stored.idempotency_key, run.idempotency_key);
+        assert_eq!(stored.snapshot_id, run.snapshot_id);
+        assert_eq!(stored.knowledge_cutoff, run.knowledge_cutoff);
+        assert_eq!(stored.model_contract_version, run.model_contract_version);
+        assert_eq!(stored.output_profile, run.output_profile);
+        assert!(!inspected.body.contains("rmse"));
+        assert!(!inspected.body.contains("scientific_acceptance"));
+        assert!(!inspected.body.contains("terminal_result"));
+        assert!(!inspected.body.contains("tenant_workspace_id"));
+
+        service
+            .force_loopback_run_state(&run_id, AnalysisRunStatusState::Failed)
+            .expect("force failed");
+        let failed =
+            service.handle_http_request(&stored_request_http(&run_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(failed.status_code, 200);
+        assert_eq!(
+            AnalysisRunStoredRequest::from_json(&failed.body)
+                .expect("failed stored")
+                .run_state,
+            AnalysisRunStatusState::Failed
+        );
+
+        let mut cancelled_run = run.clone();
+        cancelled_run.idempotency_key = "analysis-live-idem-002".into();
+        let cancelled_accepted = service.handle_http_request(&valid_request(
+            &cancelled_run,
+            NARUON_CONSUMER_CODE,
+            "127.0.0.1",
+        ));
+        let cancelled_id = serde_json::from_str::<serde_json::Value>(&cancelled_accepted.body)
+            .expect("cancelled accepted")["run_id"]
+            .as_str()
+            .expect("id")
+            .to_owned();
+        service
+            .force_loopback_run_state(&cancelled_id, AnalysisRunStatusState::Cancelled)
+            .expect("force cancelled");
+        let cancelled = service.handle_http_request(&stored_request_http(
+            &cancelled_id,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(cancelled.status_code, 200);
+        let cancelled_stored =
+            AnalysisRunStoredRequest::from_json(&cancelled.body).expect("cancelled stored");
+        assert_eq!(
+            cancelled_stored.run_state,
+            AnalysisRunStatusState::Cancelled
+        );
+        assert_eq!(cancelled_stored.snapshot_id, run.snapshot_id);
+        assert_eq!(cancelled_stored.output_profile, run.output_profile);
+
+        assert_eq!(
+            service
+                .handle_http_request(&stored_request_http(
+                    &run_id,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    &[],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&stored_request_http(
+                    "missing-run",
+                    NARUON_CONSUMER_CODE,
+                    &[],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/{run_id} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "POST {NARUON_ANALYSIS_RUN_PATH}/{run_id}/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/{run_id}/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}"
+                ))
+                .status_code,
+            400
+        );
+        let oversized = "a".repeat(129);
+        assert_eq!(
+            service
+                .handle_http_request(&stored_request_http(&oversized, NARUON_CONSUMER_CODE, &[],))
+                .status_code,
+            413
+        );
+        let listed = service.handle_http_request(&collection_http(NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(listed.status_code, 200);
+        assert!(!listed.body.contains("snapshot_id"));
     }
 
     #[test]
