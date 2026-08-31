@@ -1,0 +1,1 @@
+- `tepp_api` loopback `GET /v1/analysis-runs/{run_id}/retries` returns metric-free direct retry children of a listed parent so operators can inspect lineage after retry (ADR 0035). Empty `retries` is `200` when the parent was never retried. GET-by-id remains refused. Not lifecycle POST, not cancel, not collection GET, not retry POST, not stored-request GET, not persistence.
