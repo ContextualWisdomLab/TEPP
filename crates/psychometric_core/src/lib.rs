@@ -156,6 +156,21 @@
 //! `λ²(−q / (2 a)) + θ` is not that observed variance when
 //! `TRAITVAR` or `addedTIPREDVAR` is nonzero; `MANIFESTVAR` is not
 //! `Var(y_0)`; the constrained latent variance is not `Var(y_0)`),
+//! recovers Equation 5 of 2017-era commented three-term
+//! `asymTOTALVAR` with `MANIFESTTRAITVAR` as
+//! `λ²(−q / (2 a) + trait / a² + (B / a)² v) + θ + ψ`
+//! (Eq. 5, p. 5; §4.3, p. 9; §7.2, pp. 20–21; p. 16; Table 2, p. 12;
+//! 2017-era `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-31T05:20Z;
+//! form `−q / (2 a) + trait / a² + (B / a)² v` inline, then `λ²` of
+//! that total plus `θ + ψ`; a zero loading is exactly `θ + ψ`;
+//! all-zero latent contributions return `θ + ψ` even if `a ≥ 0`;
+//! `a ≥ 0` with any nonzero contribution fails closed;
+//! `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ` is Eq. 5 of
+//! stationary `T0VAR` and is not this map;
+//! `λ²(−q / (2 a) + trait / a² + (B / a)² v) + θ` omits `Ψ_τ` and
+//! is not this map; `MANIFESTVAR` is not `Var(y)`;
+//! `MANIFESTTRAITVAR` is not `Var(y)`; the unstandardised
+//! three-term total is not `Var(y)`),
 //! recovers the Driver Eq. 3–4 lagged covariance of that constrained
 //! process as `trait + e^{a Δt}(−q / (2 a)) + (B / a)² v`
 //! (JSS PDF re-opened 2026-08-22T19:13Z; form the lagged
@@ -317,6 +332,8 @@ pub use event_time::recover_asymptotic_continuous_intercept;
 pub use event_time::recover_asymptotic_time_independent_predictor_effect;
 /// Exact scalar §7.2 `addedTIPREDVAR` `(B / a)² v`.
 pub use event_time::recover_asymptotic_time_independent_predictor_variance;
+/// Exact scalar Eq. 5 of 2017-era three-term `asymTOTALVAR` with `MANIFESTTRAITVAR` `λ²(−q / (2 a) + trait / a² + (B / a)² v) + θ + ψ`.
+pub use event_time::recover_asymptotic_total_observed_variance_with_manifest_trait;
 /// Exact scalar discrete effect of a constant event-time predictor.
 pub use event_time::recover_discrete_constant_predictor_effect;
 /// Exact scalar discrete intercept increment `A^{-1}[e^{A Δt} − I] κ`.
@@ -480,6 +497,8 @@ pub use event_time::refuse_asymptotic_time_independent_variance_as_asymptotic_ef
 pub use event_time::refuse_asymptotic_time_independent_variance_as_stationary_within_subject;
 /// Refuse treating §7.2 `addedTIPREDVAR` as `TRAITVAR`.
 pub use event_time::refuse_asymptotic_time_independent_variance_as_trait_variance;
+/// Refuse treating Eq. 5 of 2017-era three-term `asymTOTALVAR` with `ψ = 0` as Eq. 5 with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_asymptotic_total_observed_variance_without_manifest_trait_as_asymptotic_total_observed_variance_with_manifest_trait;
 /// Refuse treating Driver Table 2 `CINT` as the discrete mean increment.
 pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 /// Refuse treating Driver Table 2 `CINT` as `T0MEANS`.
@@ -598,8 +617,12 @@ pub use event_time::refuse_level_change_intercept_as_impulse;
 pub use event_time::refuse_level_change_intercept_as_process_increment;
 /// Refuse treating Driver Eq. 5 `MANIFESTMEANS` as `E(y)`.
 pub use event_time::refuse_manifest_means_as_observed_mean;
+/// Refuse treating `MANIFESTTRAITVAR` as Eq. 5 of 2017-era three-term `asymTOTALVAR` with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_manifest_trait_variance_as_asymptotic_total_observed_variance_with_manifest_trait;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.
 pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of 2017-era three-term `asymTOTALVAR` with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_measurement_error_as_asymptotic_total_observed_variance_with_manifest_trait;
 /// Refuse treating Driver Eq. 5 measurement error as lagged observed covariance.
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
@@ -667,6 +690,8 @@ pub use event_time::refuse_stationary_initial_latent_variance_as_stationary_with
 pub use event_time::refuse_stationary_initial_latent_variance_as_trait_variance;
 /// Refuse treating Eq. 5 of §4.3 stationary `T0MEANS` as `MANIFESTMEANS`.
 pub use event_time::refuse_stationary_initial_observed_mean_as_manifest_means;
+/// Refuse treating Eq. 5 of §4.3 stationary `T0VAR` as Eq. 5 of 2017-era three-term `asymTOTALVAR` with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_stationary_initial_observed_variance_as_asymptotic_total_observed_variance_with_manifest_trait;
 /// Refuse treating Eq. 5 of §4.3 stationary `T0VAR` as `MANIFESTVAR`.
 pub use event_time::refuse_stationary_initial_observed_variance_as_measurement_error;
 /// Refuse treating Eq. 5 of contemporaneous §4.3 stationary `T0VAR` as lagged observed covariance.
@@ -729,6 +754,8 @@ pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating unstandardised `asymDIFFUSION` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion;
+/// Refuse treating unstandardised 2017-era three-term `asymTOTALVAR` as Eq. 5 of that total with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_unstandardised_asymptotic_total_variance_as_asymptotic_total_observed_variance_with_manifest_trait;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
