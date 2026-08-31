@@ -23,8 +23,10 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
-    recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_initial_time_dependent_predictor_carry,
+    recover_discrete_time_varying_predictor_effect,
+    recover_discrete_trait_observed_variance_with_manifest_trait,
+    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -64,6 +66,7 @@ use psychometric_core::{
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+    refuse_discrete_trait_observed_variance_without_manifest_trait_as_discrete_trait_observed_variance_with_manifest_trait,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -111,7 +114,10 @@ use psychometric_core::{
     refuse_level_change_increment_as_process_increment,
     refuse_level_change_intercept_as_free_continuous_intercept,
     refuse_level_change_intercept_as_impulse, refuse_level_change_intercept_as_process_increment,
-    refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
+    refuse_manifest_means_as_observed_mean,
+    refuse_manifest_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait,
+    refuse_manifest_trait_variance_as_measurement_error,
+    refuse_measurement_error_as_discrete_trait_observed_variance_with_manifest_trait,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
     refuse_measurement_error_as_standardised_manifest_trait_variance,
@@ -162,6 +168,7 @@ use psychometric_core::{
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
+    refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
@@ -5139,6 +5146,273 @@ fn stationary_initial_observed_variance_refuses_unstable_drift_and_non_event_clo
             LagClock::EventTime
         ),
         Ok(0.6)
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn discrete_trait_observed_variance_with_manifest_trait_recovers_equation_five_of_commented_map() {
+    let loading = 2.0_f64;
+    let trait_variance = 1.0_f64;
+    let log_rate = -0.5_f64;
+    let event_delta = 1.0_f64;
+    let measurement_error = 0.3_f64;
+    let manifest_trait = 0.5_f64;
+    let recovered = recover_discrete_trait_observed_variance_with_manifest_trait(
+        loading,
+        trait_variance,
+        log_rate,
+        event_delta,
+        measurement_error,
+        manifest_trait,
+        LagClock::EventTime,
+    )
+    .expect("Eq. 5 of discreteTRAITVAR with ψ");
+    let unstandardised =
+        (1.0 - (log_rate * event_delta).exp()).powi(2) * (trait_variance / (log_rate * log_rate));
+    let paper = recover_manifest_trait_plus_state_observed_variance(
+        loading,
+        unstandardised,
+        measurement_error,
+        manifest_trait,
+    )
+    .expect("λ² extra + θ + ψ");
+    let recovered_error = rmse(&[paper], &[recovered]);
+    assert!(
+        recovered_error < 1e-12,
+        "2017-era summary.ctsemFit.R: Eq. 5 of discreteTRAITVAR + ψ RMSE {recovered_error}: got {recovered}"
+    );
+    assert!(
+        rmse(&[3.277_089_947_938_807_8], &[recovered]) < 1e-12,
+        "a=-0.5, trait=1, Δt=1, λ=2, θ=0.3, ψ=0.5 recovers ~3.277: got {recovered}"
+    );
+    assert!(
+        rmse(&[unstandardised], &[recovered]) > recovered_error,
+        "unstandardised discreteTRAITVAR RMSE must exceed Eq. 5 RMSE"
+    );
+    let without_psi =
+        recover_manifest_observed_variance(loading, unstandardised, measurement_error)
+            .expect("eq5-psi0");
+    assert!(
+        rmse(&[without_psi], &[recovered]) > recovered_error,
+        "Eq. 5 with ψ = 0 RMSE must exceed Eq. 5 with ψ RMSE"
+    );
+    let later = recover_discrete_trait_observed_variance_with_manifest_trait(
+        loading,
+        trait_variance,
+        log_rate,
+        2.0,
+        measurement_error,
+        manifest_trait,
+        LagClock::EventTime,
+    )
+    .expect("later Δt");
+    assert!(
+        later > recovered,
+        "a later event interval increases (1 − e^{{a Δt}})² toward 1"
+    );
+    let zero_loading = recover_discrete_trait_observed_variance_with_manifest_trait(
+        0.0,
+        trait_variance,
+        0.5,
+        event_delta,
+        measurement_error,
+        manifest_trait,
+        LagClock::EventTime,
+    )
+    .expect("zero loading");
+    assert!(
+        (zero_loading - (measurement_error + manifest_trait)).abs() < 1e-15,
+        "zero loading is exactly θ + ψ even if a ≥ 0: got {zero_loading}"
+    );
+    let zero_trait = recover_discrete_trait_observed_variance_with_manifest_trait(
+        loading,
+        0.0,
+        0.5,
+        event_delta,
+        measurement_error,
+        manifest_trait,
+        LagClock::EventTime,
+    )
+    .expect("zero trait");
+    assert!(
+        (zero_trait - (measurement_error + manifest_trait)).abs() < 1e-15,
+        "zero trait is exactly θ + ψ even if a ≥ 0: got {zero_trait}"
+    );
+    assert_eq!(
+        refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait(
+            unstandardised,
+            recovered
+        ),
+        Err(
+            PsychometricError::UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait
+        )
+    );
+    assert_eq!(
+        refuse_discrete_trait_observed_variance_without_manifest_trait_as_discrete_trait_observed_variance_with_manifest_trait(
+            without_psi,
+            recovered
+        ),
+        Err(
+            PsychometricError::DiscreteTraitObservedVarianceWithoutManifestTraitIsNotDiscreteTraitObservedVarianceWithManifestTrait
+        )
+    );
+    assert_eq!(
+        refuse_measurement_error_as_discrete_trait_observed_variance_with_manifest_trait(
+            measurement_error,
+            recovered
+        ),
+        Err(PsychometricError::MeasurementErrorIsNotDiscreteTraitObservedVarianceWithManifestTrait)
+    );
+    assert_eq!(
+        refuse_manifest_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait(
+            manifest_trait,
+            recovered
+        ),
+        Err(
+            PsychometricError::ManifestTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait
+        )
+    );
+    let underflow = recover_discrete_trait_observed_variance_with_manifest_trait(
+        loading,
+        trait_variance,
+        -800.0,
+        1.0,
+        measurement_error,
+        manifest_trait,
+        LagClock::EventTime,
+    )
+    .expect("underflow keeps λ² trait/a² + θ + ψ");
+    assert!(rmse(&[0.800_006_25], &[underflow]) < 1e-18);
+    assert_eq!(
+        recover_discrete_lag_from_log_rate(-800.0, 1.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn discrete_trait_observed_variance_with_manifest_trait_refuses_unstable_drift_and_non_event_clocks()
+ {
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            2.0,
+            1.0,
+            -0.5,
+            1.0,
+            0.3,
+            0.5,
+            LagClock::SystemTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            2.0,
+            1.0,
+            0.0,
+            1.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::DiscreteTraitObservedVarianceWithManifestTraitRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            2.0,
+            1.0,
+            0.5,
+            1.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::DiscreteTraitObservedVarianceWithManifestTraitRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            0.0,
+            1.0,
+            0.5,
+            1.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Ok(0.8)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            2.0,
+            0.0,
+            0.5,
+            1.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Ok(0.8)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            2.0,
+            1.0,
+            -0.5,
+            0.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            2.0,
+            -1.0,
+            -0.5,
+            1.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            f64::NAN,
+            1.0,
+            -0.5,
+            1.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            2.0,
+            1.0,
+            -f64::from_bits(1),
+            1.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance_with_manifest_trait(
+            f64::MAX,
+            1.0,
+            -0.5,
+            1.0,
+            0.3,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }
 

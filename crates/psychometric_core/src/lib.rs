@@ -156,6 +156,19 @@
 //! `λ²(−q / (2 a)) + θ` is not that observed variance when
 //! `TRAITVAR` or `addedTIPREDVAR` is nonzero; `MANIFESTVAR` is not
 //! `Var(y_0)`; the constrained latent variance is not `Var(y_0)`),
+//! recovers Eq. 5 of 2017-era commented `discreteTRAITVAR` with
+//! `MANIFESTTRAITVAR` as
+//! `λ² (1 − e^{a Δt})² (trait / a²) + θ + ψ`
+//! (cran/ctsem 2.5.0 `summary.ctsemFit.R`; Eq. 5, p. 5; Table 2, p. 12
+//! `TRAITVAR` `φ_ξ` and `MANIFESTTRAITVAR` `Ψ_τ`; JSS PDF re-opened
+//! 2026-08-31T05:35Z; form `1 / a` first, then square, then multiply
+//! by `trait`, then `expm1(a Δt)²` of that extra, then
+//! `λ² extra + θ + ψ`; do not import unpublished `asymTRAITVAR` /
+//! `discreteTRAITVAR`; a zero loading or zero trait is exactly
+//! `θ + ψ` even if `a ≥ 0`; `a ≥ 0` with a nonzero trait fails
+//! closed; unstandardised `discreteTRAITVAR` is not that observed
+//! extra; Eq. 5 with `ψ = 0` is not that extra; `MANIFESTVAR` is not
+//! that extra; `MANIFESTTRAITVAR` is not that extra),
 //! recovers the Driver Eq. 3–4 lagged covariance of that constrained
 //! process as `trait + e^{a Δt}(−q / (2 a)) + (B / a)² v`
 //! (JSS PDF re-opened 2026-08-22T19:13Z; form the lagged
@@ -367,6 +380,8 @@ pub use event_time::recover_discrete_process_noise;
 pub use event_time::recover_discrete_time_independent_predictor_effect;
 /// First-order discrete effect of a time-varying event-time predictor.
 pub use event_time::recover_discrete_time_varying_predictor_effect;
+/// Exact scalar Eq. 5 of 2017-era commented `discreteTRAITVAR` with `MANIFESTTRAITVAR`.
+pub use event_time::recover_discrete_trait_observed_variance_with_manifest_trait;
 /// Mean local log-rate on a sorted event-time series.
 pub use event_time::recover_event_series_mean_log_rate;
 /// Exact scalar pair `(φ, a)` on event time.
@@ -492,6 +507,8 @@ pub use event_time::refuse_difference_quotient_as_local_rate;
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating Eq. 5 of 2017-era `discreteTRAITVAR` with `ψ = 0` as Eq. 5 with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_discrete_trait_observed_variance_without_manifest_trait_as_discrete_trait_observed_variance_with_manifest_trait;
 /// Refuse treating evolved `τ + λ μ_t` as the after-t0 extra-process observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the extra-process observed mean.
@@ -598,8 +615,12 @@ pub use event_time::refuse_level_change_intercept_as_impulse;
 pub use event_time::refuse_level_change_intercept_as_process_increment;
 /// Refuse treating Driver Eq. 5 `MANIFESTMEANS` as `E(y)`.
 pub use event_time::refuse_manifest_means_as_observed_mean;
+/// Refuse treating `MANIFESTTRAITVAR` as Eq. 5 of 2017-era `discreteTRAITVAR` with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_manifest_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.
 pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of 2017-era `discreteTRAITVAR` with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_measurement_error_as_discrete_trait_observed_variance_with_manifest_trait;
 /// Refuse treating Driver Eq. 5 measurement error as lagged observed covariance.
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
@@ -733,6 +754,8 @@ pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_a
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
 pub use event_time::refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating unstandardised 2017-era `discreteTRAITVAR` as Eq. 5 of that extra with `MANIFESTTRAITVAR`.
+pub use event_time::refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait;
 /// Refuse treating unstandardised `T0MEANS` as `T0MEANSstd`.
 pub use event_time::refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean;
 /// Refuse treating unstandardised `T0VAR` as `T0VARstd`.

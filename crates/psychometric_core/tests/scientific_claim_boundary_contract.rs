@@ -20,7 +20,9 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
-    recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
+    recover_discrete_time_varying_predictor_effect,
+    recover_discrete_trait_observed_variance_with_manifest_trait,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -63,6 +65,7 @@ use psychometric_core::{
     refuse_continuous_intercept_as_manifest_means,
     refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
+    refuse_discrete_trait_observed_variance_without_manifest_trait_as_discrete_trait_observed_variance_with_manifest_trait,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -110,7 +113,10 @@ use psychometric_core::{
     refuse_level_change_increment_as_process_increment,
     refuse_level_change_intercept_as_free_continuous_intercept,
     refuse_level_change_intercept_as_impulse, refuse_level_change_intercept_as_process_increment,
-    refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
+    refuse_manifest_means_as_observed_mean,
+    refuse_manifest_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait,
+    refuse_manifest_trait_variance_as_measurement_error,
+    refuse_measurement_error_as_discrete_trait_observed_variance_with_manifest_trait,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
     refuse_measurement_error_as_standardised_manifest_trait_variance,
@@ -174,6 +180,7 @@ use psychometric_core::{
     refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
     refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
+    refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait,
     refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
     refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
@@ -2670,6 +2677,84 @@ fn stationary_initial_observed_variance_is_not_manifest_latent_evolved_or_free()
         ),
         Err(
             psychometric_core::PsychometricError::InitialObservedVarianceIsNotStationaryInitialObservedVariance
+        )
+    );
+}
+
+#[test]
+fn discrete_trait_observed_variance_with_manifest_trait_is_not_unstandardised_without_psi_or_named_variances()
+ {
+    let loading = 2.0_f64;
+    let trait_variance = 1.0_f64;
+    let log_rate = -0.5_f64;
+    let event_delta = 1.0_f64;
+    let measurement_error = 0.3_f64;
+    let manifest_trait = 0.5_f64;
+    let recovered = recover_discrete_trait_observed_variance_with_manifest_trait(
+        loading,
+        trait_variance,
+        log_rate,
+        event_delta,
+        measurement_error,
+        manifest_trait,
+        LagClock::EventTime,
+    )
+    .expect("Eq. 5 of discreteTRAITVAR with ψ");
+    let unstandardised =
+        (1.0 - (log_rate * event_delta).exp()).powi(2) * (trait_variance / (log_rate * log_rate));
+    let without_psi =
+        recover_manifest_observed_variance(loading, unstandardised, measurement_error)
+            .expect("eq5-psi0");
+    assert!(
+        (recovered - unstandardised).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of commented discreteTRAITVAR with ψ): λ² extra + θ + ψ is not the latent extra"
+    );
+    assert!(
+        (recovered - without_psi).abs() > 0.4,
+        "Driver et al. (2017, Eq. 5 of commented discreteTRAITVAR with ψ): observed extra with ψ is not that extra with ψ = 0"
+    );
+    assert!(
+        (recovered - measurement_error).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of commented discreteTRAITVAR with ψ): observed extra is not MANIFESTVAR"
+    );
+    assert!(
+        (recovered - manifest_trait).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 of commented discreteTRAITVAR with ψ): observed extra is not MANIFESTTRAITVAR"
+    );
+    assert_eq!(
+        refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait(
+            unstandardised,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait
+        )
+    );
+    assert_eq!(
+        refuse_discrete_trait_observed_variance_without_manifest_trait_as_discrete_trait_observed_variance_with_manifest_trait(
+            without_psi,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::DiscreteTraitObservedVarianceWithoutManifestTraitIsNotDiscreteTraitObservedVarianceWithManifestTrait
+        )
+    );
+    assert_eq!(
+        refuse_measurement_error_as_discrete_trait_observed_variance_with_manifest_trait(
+            measurement_error,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::MeasurementErrorIsNotDiscreteTraitObservedVarianceWithManifestTrait
+        )
+    );
+    assert_eq!(
+        refuse_manifest_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait(
+            manifest_trait,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::ManifestTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait
         )
     );
 }
