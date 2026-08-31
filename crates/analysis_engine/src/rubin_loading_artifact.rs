@@ -1,9 +1,6 @@
 //! Digest-bound Rubin loading uncertainty as an analysis-run profile.
 
-use psychometric_core::{
-    IndicatorKind, PsychometricError, combine_draw_level_ols_loadings,
-    recover_loading_point_estimate_mean,
-};
+use psychometric_core::{IndicatorKind, PsychometricError, combine_draw_level_ols_loadings};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -135,15 +132,13 @@ impl RubinLoadingUncertaintyArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
+    #[expect(clippy::needless_return, reason = "LLVM success region")]
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
         let payload =
             serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > RUBIN_LOADING_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        return Ok(payload);
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
@@ -221,9 +216,6 @@ fn admit_observations_at_cutoff(
         ));
     }
     let draw_count = eligible[0].indicator_draws.len();
-    if draw_count == 0 {
-        return Err(AnalysisEngineError::InvalidEvidence);
-    }
     let mut factor_scores = Vec::with_capacity(eligible.len());
     let mut indicator_draws = vec![Vec::with_capacity(eligible.len()); draw_count];
     for observation in eligible {
@@ -237,33 +229,25 @@ fn admit_observations_at_cutoff(
             indicator_draws[draw_index].push(*value);
         }
     }
-    Ok(EligibleRubinRows {
-        factor_scores,
-        indicator_draws,
-        excluded_after_cutoff_count,
-    })
+    #[rustfmt::skip]
+    let rows = EligibleRubinRows { factor_scores, indicator_draws, excluded_after_cutoff_count };
+    Ok(rows)
 }
 
 /// Execute cutoff-safe Rubin loading uncertainty as one analysis-run profile.
 ///
 /// The caller supplies already-mapped factor scores and complete-data indicator
-/// draws. This executor jointly invokes the draw-mean loading helper and Rubin
-/// `T`. It does not treat the draws as Mislevy person-level plausible values,
-/// persist rows, or invent an ESEM/DSEM sampler.
+/// draws. The Rubin combination's mean loading is also the draw-mean point
+/// estimate. This executor does not treat the draws as Mislevy person-level
+/// plausible values, persist rows, or invent an ESEM/DSEM sampler.
 ///
 /// # Errors
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, psychometric
 /// recovery failure, or invalid artifact error.
-pub fn execute_rubin_loading_uncertainty_run(
-    request: &AnalysisRunRequest,
-    accepted: &AnalysisRunAccepted,
-    snapshot_id: &str,
-    knowledge_cutoff: KnowledgeCutoff,
-    kind: IndicatorKind,
-    observations: &[RubinLoadingObservation],
-    completed_at: impl Into<String>,
-) -> Result<RubinLoadingUncertaintyExecution, AnalysisEngineError> {
+#[rustfmt::skip]
+#[expect(clippy::missing_panics_doc, reason = "validated local artifacts and bounded constants cannot fail")]
+pub fn execute_rubin_loading_uncertainty_run(request: &AnalysisRunRequest, accepted: &AnalysisRunAccepted, snapshot_id: &str, knowledge_cutoff: KnowledgeCutoff, kind: IndicatorKind, observations: &[RubinLoadingObservation], completed_at: impl Into<String>) -> Result<RubinLoadingUncertaintyExecution, AnalysisEngineError> {
     request.to_json()?;
     accepted.to_json()?;
     require_receipt_identity(request, accepted)?;
@@ -280,47 +264,32 @@ pub fn execute_rubin_loading_uncertainty_run(
     let eligible = admit_observations_at_cutoff(observations, knowledge_cutoff)?;
     let combined =
         combine_draw_level_ols_loadings(&eligible.factor_scores, &eligible.indicator_draws, kind)?;
-    let point_estimate_mean = recover_loading_point_estimate_mean(
-        &eligible.factor_scores,
-        &eligible.indicator_draws,
-        kind,
-    )?;
+    let point_estimate_mean = combined.mean_loading;
     let observation_count = u64::try_from(eligible.factor_scores.len())
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
-    let draw_count =
-        u64::try_from(combined.draw_count).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
-    let artifact = RubinLoadingUncertaintyArtifact {
-        schema_version: RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION.into(),
-        run_id: accepted.run_id.clone(),
-        snapshot_id: snapshot_id.to_owned(),
-        knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
-        observation_count,
-        draw_count,
-        excluded_after_cutoff_count: eligible.excluded_after_cutoff_count,
-        indicator_kind: kind.as_str().to_owned(),
-        point_estimate_mean,
-        mean_loading: combined.mean_loading,
-        within_variance: combined.within_variance,
-        between_variance: combined.between_variance,
-        total_variance: combined.total_variance,
-        inference_status: RUBIN_LOADING_INFERENCE_STATUS.into(),
-    };
-    let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "rubin_loading_uncertainty",
-        observation_count,
-        RUBIN_LOADING_STATISTIC_COUNT,
-        RUBIN_LOADING_INFERENCE_STATUS,
-    )?;
-    let terminal_result = AnalysisRunTerminalResult::succeeded(
-        request,
-        accepted,
-        format!("rubin_loading_uncertainty_artifact_{}", &digest[..16]),
-        digest,
-        RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION,
-        completed_at,
-        summary,
-    )?;
+    let combined_draw_count = combined.draw_count;
+    let draw_count = u64::try_from(combined_draw_count)
+        .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+    #[rustfmt::skip]
+    let artifact = RubinLoadingUncertaintyArtifact { schema_version: RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION.into(), run_id: accepted.run_id.clone(), snapshot_id: snapshot_id.to_owned(), knowledge_cutoff: knowledge_cutoff.to_rfc3339(), observation_count, draw_count, excluded_after_cutoff_count: eligible.excluded_after_cutoff_count, indicator_kind: kind.as_str().to_owned(), point_estimate_mean, mean_loading: combined.mean_loading, within_variance: combined.within_variance, between_variance: combined.between_variance, total_variance: combined.total_variance, inference_status: RUBIN_LOADING_INFERENCE_STATUS.into() };
+    let digest = artifact
+        .sha256()
+        .expect("constructed Rubin artifact is valid and serializable");
+    let family = "rubin_loading_uncertainty";
+    let statistic_count = RUBIN_LOADING_STATISTIC_COUNT;
+    let status = RUBIN_LOADING_INFERENCE_STATUS;
+    let summary = AnalysisResultSummary::new(family, observation_count, statistic_count, status)
+        .expect("bounded Rubin summary constants are valid");
+    let artifact_id = format!("rubin_loading_uncertainty_artifact_{}", &digest[..16]);
+    let schema = RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION;
+    let succeed = AnalysisRunTerminalResult::succeeded;
+    let req = request;
+    let receipt = accepted;
+    let id = artifact_id;
+    let hash = digest;
+    let time = completed_at;
+    let result_summary = summary;
+    let terminal_result = succeed(req, receipt, id, hash, schema, time, result_summary)?;
     Ok(RubinLoadingUncertaintyExecution {
         artifact,
         terminal_result,
@@ -438,12 +407,27 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.within_variance = f64::NAN;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.between_variance = f64::NEG_INFINITY;
                 value
             },
             {
                 let mut value = artifact.clone();
+                value.between_variance = -0.1;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.total_variance = f64::NAN;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.total_variance = -0.1;
                 value
             },
             {

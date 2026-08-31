@@ -316,3 +316,23 @@ fn execution_refuses_receipt_mismatch_and_oversized_corpus() {
         Err(AnalysisEngineError::LimitExceeded)
     );
 }
+
+#[test]
+fn execution_refuses_invalid_completion_time() {
+    let request = request();
+    let accepted = accepted(&request);
+    assert_eq!(
+        execute_rubin_loading_uncertainty_run(
+            &request,
+            &accepted,
+            "snapshot-rubin-loading",
+            cutoff(),
+            IndicatorKind::AdditiveLogRatio,
+            &noiseless_rows(),
+            "invalid",
+        ),
+        Err(AnalysisEngineError::Api(
+            tepp_api::ApiError::InvalidWirePayload
+        ))
+    );
+}
