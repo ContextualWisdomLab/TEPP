@@ -20,6 +20,7 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 tepp_api = { path = "../tepp_api", version = "0.2.0" }
 temporal_core = { path = "../temporal_core", version = "0.2.0" }
+tepp_simulation = { path = "../tepp_simulation", version = "0.2.0" }
 topic_measurement = { path = "../topic_measurement", version = "0.2.0" }
 uuid.workspace = true
 
