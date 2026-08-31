@@ -29,5 +29,11 @@ path = "src/bin/tepp_loopback.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "tepp-retry"
+path = "src/bin/tepp_retry.rs"
+test = false
+bench = false
+
 [lints]
 workspace = true
