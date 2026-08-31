@@ -1,15 +1,16 @@
 //! Bind immutable evidence to a durable scientific-acceptance validation run.
 //!
 //! This is the first GAP-003A slice: cutoff-safe evidence, tenant workspace,
-//! output profile, model, seed, backend, and precision hash to one durable run
-//! identity. The accepted receipt carries no scientific metrics. Completion
-//! asks `validation_core` for RMSE, bias, coverage, temporal-order accuracy,
-//! and an SE-aware gate, then emits `tepp.scientific_acceptance.v1`. Recovery
-//! vectors must be stamped with that same run identity; a different run,
-//! model, snapshot, seed, tenant, profile, or eligible evidence set fails
-//! closed. LLM-authored recovery, non-finite inputs, empty or duplicate
-//! evidence, snapshot mismatch, oversized recovery, and cutoff-empty corpora
-//! fail closed. Postgres persistence remains GAP-003B.
+//! output profile, model, seed, backend, precision, and the SE-gate multiplier
+//! hash to one durable run identity. The accepted receipt carries no scientific
+//! metrics. Completion asks `validation_core` for RMSE, bias, coverage,
+//! temporal-order accuracy, and an SE-aware gate, then emits
+//! `tepp.scientific_acceptance.v1`. Recovery vectors must be stamped with that
+//! same run identity and the pre-registered multiplier; a different run, model,
+//! snapshot, seed, tenant, profile, eligible evidence set, or post-hoc `k`
+//! fails closed. LLM-authored recovery, non-finite inputs, empty or duplicate
+//! evidence, snapshot mismatch, oversized recovery, oversized `k`, and
+//! cutoff-empty corpora fail closed. Postgres persistence remains GAP-003B.
 
 use crate::{AnalysisCorpus, AnalysisEngineError, valid_identifier};
 use serde::Serialize;
@@ -42,33 +43,29 @@ pub const VALIDATION_RUN_ID_HEX_LEN: usize = 32;
 pub const WILSON_Z: f64 = 1.96;
 /// Maximum length of one recovery, interval, or event-time vector.
 pub const MAX_RECOVERY_VECTOR_LEN: usize = 10_000;
+/// Largest finite SE-gate multiplier that may be pre-registered on a run.
+///
+/// Conventional three-SE gates sit inside this bound. A larger `k` would make
+/// `|RMSE| ≤ k · SE(RMSE)` an effectively unlimited post-hoc acceptance rule.
+pub const MAX_SE_GATE_K: f64 = 8.0;
 
 /// Durable identity of one submitted validation run. Receipts never carry
-/// scientific metrics.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+/// scientific metrics. Fields are private so callers cannot rewrite the
+/// binding or the pre-registered SE-gate multiplier after submit.
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ValidationRunReceipt {
-    /// Hash-stable run identity `tepp-validation-{32 hex}`.
-    pub run_id: String,
-    /// Lowercase SHA-256 of the canonical binding.
-    pub binding_sha256: String,
-    /// Tenant workspace that owns the run.
-    pub tenant_workspace_id: String,
-    /// Immutable source snapshot identity.
-    pub snapshot_id: String,
-    /// Historical cutoff applied to availability.
-    pub knowledge_cutoff: String,
-    /// Bound model identity.
-    pub model: String,
-    /// Bound numeric seed.
-    pub seed: u64,
-    /// Bound compute backend.
-    pub backend: String,
-    /// Bound numeric precision.
-    pub precision: String,
-    /// Requested output profile.
-    pub output_profile: String,
-    /// Number of cutoff-eligible evidence identities.
-    pub eligible_evidence_count: u64,
+    run_id: String,
+    binding_sha256: String,
+    tenant_workspace_id: String,
+    snapshot_id: String,
+    knowledge_cutoff: String,
+    model: String,
+    seed: u64,
+    backend: String,
+    precision: String,
+    output_profile: String,
+    eligible_evidence_count: u64,
+    se_gate_k: f64,
 }
 
 impl ValidationRunReceipt {
@@ -148,9 +145,15 @@ impl ValidationRunReceipt {
         self.eligible_evidence_count
     }
 
+    /// Return the pre-registered SE-gate multiplier.
+    #[must_use]
+    pub const fn se_gate_k(&self) -> f64 {
+        self.se_gate_k
+    }
+
     fn identity_record(&self) -> String {
         format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:016x}",
             self.run_id,
             self.binding_sha256,
             self.tenant_workspace_id,
@@ -161,7 +164,8 @@ impl ValidationRunReceipt {
             self.backend,
             self.precision,
             self.output_profile,
-            self.eligible_evidence_count
+            self.eligible_evidence_count,
+            self.se_gate_k.to_bits()
         )
     }
 }
@@ -185,18 +189,19 @@ pub struct RecoveryObservation {
 impl RecoveryObservation {
     /// Construct a recovery observation stamped to one submitted receipt.
     ///
-    /// LLM authorship is recorded here and refused at completion. Non-finite
-    /// `se_gate_k`, a negative multiplier, or an oversized vector fail closed
-    /// immediately. Completing a different run, model, snapshot, seed, tenant,
-    /// profile, or eligible evidence set fails later as a binding mismatch.
+    /// LLM authorship is recorded here and refused at completion. The SE-gate
+    /// multiplier must equal the pre-registered receipt value; a post-hoc `k`
+    /// is a binding mismatch. Empty, length-mismatched, or oversized vectors
+    /// fail closed immediately.
     ///
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::InvalidEvidence`] for an empty, oversized,
-    /// or control-bearing study label,
+    /// or control-bearing study label or for empty/mismatched vectors,
     /// [`AnalysisEngineError::LimitExceeded`] when any vector exceeds
-    /// [`MAX_RECOVERY_VECTOR_LEN`], and
-    /// [`AnalysisEngineError::Validation`] for a non-finite or negative SE
+    /// [`MAX_RECOVERY_VECTOR_LEN`], [`AnalysisEngineError::BindingMismatch`]
+    /// when `se_gate_k` differs from the receipt, and
+    /// [`AnalysisEngineError::Validation`] for a non-finite or out-of-policy SE
     /// multiplier.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -215,28 +220,24 @@ impl RecoveryObservation {
         if !valid_identifier(&study_label) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        if [
+        let lengths = [
             truth.len(),
             recovered.len(),
             interval_lower.len(),
             interval_upper.len(),
             truth_times.len(),
             recovered_times.len(),
-        ]
-        .into_iter()
-        .any(|len| len > MAX_RECOVERY_VECTOR_LEN)
-        {
+        ];
+        if lengths.iter().any(|len| *len > MAX_RECOVERY_VECTOR_LEN) {
             return Err(AnalysisEngineError::LimitExceeded);
         }
-        if !se_gate_k.is_finite() {
-            return Err(AnalysisEngineError::Validation(
-                ValidationError::InvalidInput,
-            ));
+        let n = truth.len();
+        if n == 0 || lengths.iter().any(|len| *len != n) {
+            return Err(AnalysisEngineError::InvalidEvidence);
         }
-        if se_gate_k < 0.0 {
-            return Err(AnalysisEngineError::Validation(
-                ValidationError::InvalidConfiguration,
-            ));
+        let se_gate_k = require_se_gate_k(se_gate_k)?;
+        if se_gate_k.to_bits() != receipt.se_gate_k.to_bits() {
+            return Err(AnalysisEngineError::BindingMismatch);
         }
         Ok(Self {
             run_id: receipt.run_id.clone(),
@@ -486,6 +487,7 @@ struct CanonicalBinding {
     backend: String,
     precision: String,
     output_profile: String,
+    se_gate_k: f64,
     eligible_ids: Vec<String>,
 }
 
@@ -516,6 +518,7 @@ impl CanonicalBinding {
         let _ = writeln!(canonical, "backend={}", self.backend);
         let _ = writeln!(canonical, "precision={}", self.precision);
         let _ = writeln!(canonical, "profile={}", self.output_profile);
+        let _ = writeln!(canonical, "se_gate_k={:016x}", self.se_gate_k.to_bits());
         for identity in &self.eligible_ids {
             let _ = writeln!(canonical, "evidence={identity}");
         }
@@ -524,7 +527,7 @@ impl CanonicalBinding {
 
     fn identity_record(&self, digest_hex: &str, run_id: &str) -> String {
         format!(
-            "{run_id}\n{digest_hex}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+            "{run_id}\n{digest_hex}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{:016x}",
             self.tenant_workspace_id,
             self.snapshot_id,
             self.knowledge_cutoff,
@@ -533,7 +536,8 @@ impl CanonicalBinding {
             self.backend,
             self.precision,
             self.output_profile,
-            self.eligible_count()
+            self.eligible_count(),
+            self.se_gate_k.to_bits()
         )
     }
 }
@@ -546,14 +550,15 @@ impl CanonicalBinding {
 /// # Errors
 ///
 /// Returns a fail-closed engine error for an invalid request, wrong output
-/// profile or model, snapshot mismatch, duplicate or empty evidence, or a
-/// cutoff that admits no evidence.
+/// profile or model, an out-of-policy SE-gate multiplier, snapshot mismatch,
+/// duplicate or empty evidence, or a cutoff that admits no evidence.
 pub fn submit_validation_run(
     request: &AnalysisRunRequest,
     corpus: &AnalysisCorpus,
     seed: u64,
+    se_gate_k: f64,
 ) -> Result<ValidationRunReceipt, AnalysisEngineError> {
-    let binding = bind_validation_run(request, corpus, seed)?;
+    let binding = bind_validation_run(request, corpus, seed, se_gate_k)?;
     let binding_sha256 = binding.digest_hex();
     let run_id = CanonicalBinding::run_id(&binding_sha256);
     let eligible_evidence_count = binding.eligible_count();
@@ -569,6 +574,7 @@ pub fn submit_validation_run(
         precision: binding.precision,
         output_profile: binding.output_profile,
         eligible_evidence_count,
+        se_gate_k: binding.se_gate_k,
     })
 }
 
@@ -591,11 +597,12 @@ pub fn complete_validation_run(
     }
     if observation.run_id != receipt.run_id
         || observation.binding_sha256 != receipt.binding_sha256
+        || observation.se_gate_k.to_bits() != receipt.se_gate_k.to_bits()
         || receipt.output_profile != SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE
     {
         return Err(AnalysisEngineError::BindingMismatch);
     }
-    let binding = bind_validation_run(request, corpus, receipt.seed)?;
+    let binding = bind_validation_run(request, corpus, receipt.seed, receipt.se_gate_k)?;
     let binding_sha256 = binding.digest_hex();
     let run_id = CanonicalBinding::run_id(&binding_sha256);
     if receipt.identity_record() != binding.identity_record(&binding_sha256, &run_id) {
@@ -606,7 +613,7 @@ pub fn complete_validation_run(
         report.rmse,
         0.0,
         report.rmse_standard_error,
-        observation.se_gate_k,
+        receipt.se_gate_k,
     )?;
     let eligible_evidence_count = binding.eligible_count();
     let evidence = ScientificAcceptanceEvidence {
@@ -624,19 +631,35 @@ pub fn complete_validation_run(
         output_profile: SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE.to_owned(),
         eligible_evidence_count,
         se_gate_accepted,
-        se_gate_k: observation.se_gate_k,
+        se_gate_k: receipt.se_gate_k,
         report,
     };
     evidence.to_json()?;
     Ok(evidence)
 }
 
+fn require_se_gate_k(se_gate_k: f64) -> Result<f64, AnalysisEngineError> {
+    if !se_gate_k.is_finite() {
+        return Err(AnalysisEngineError::Validation(
+            ValidationError::InvalidInput,
+        ));
+    }
+    if se_gate_k < 0.0 || se_gate_k > MAX_SE_GATE_K {
+        return Err(AnalysisEngineError::Validation(
+            ValidationError::InvalidConfiguration,
+        ));
+    }
+    Ok(if se_gate_k == 0.0 { 0.0 } else { se_gate_k })
+}
+
 fn bind_validation_run(
     request: &AnalysisRunRequest,
     corpus: &AnalysisCorpus,
     seed: u64,
+    se_gate_k: f64,
 ) -> Result<CanonicalBinding, AnalysisEngineError> {
     request.to_json()?;
+    let se_gate_k = require_se_gate_k(se_gate_k)?;
     let requested = format!(
         "{}\n{}",
         request.output_profile, request.model_contract_version
@@ -675,6 +698,7 @@ fn bind_validation_run(
         backend: VALIDATION_BACKEND.to_owned(),
         precision: VALIDATION_PRECISION.to_owned(),
         output_profile: SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE.to_owned(),
+        se_gate_k,
         eligible_ids: eligible.into_iter().collect(),
     })
 }
@@ -734,10 +758,10 @@ fn format_hex(digest: impl AsRef<[u8]>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_RECOVERY_VECTOR_LEN, RecoveryObservation, SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE,
-        SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION, VALIDATION_BACKEND, VALIDATION_CPU_F64_MODEL,
-        VALIDATION_PRECISION, VALIDATION_RUN_ID_PREFIX, WILSON_Z, complete_validation_run,
-        submit_validation_run,
+        MAX_RECOVERY_VECTOR_LEN, MAX_SE_GATE_K, RecoveryObservation,
+        SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE, SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION,
+        VALIDATION_BACKEND, VALIDATION_CPU_F64_MODEL, VALIDATION_PRECISION,
+        VALIDATION_RUN_ID_PREFIX, WILSON_Z, complete_validation_run, submit_validation_run,
     };
     use crate::{
         AnalysisCorpus, AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
@@ -828,8 +852,8 @@ mod tests {
             unit("evidence-a", "2026-07-10T00:00:00Z"),
             unit("evidence-b", "2026-07-15T00:00:00Z"),
         ]);
-        let receipt_a = submit_validation_run(&request(), &first, 7).expect("submit a");
-        let receipt_b = submit_validation_run(&request(), &second, 7).expect("submit b");
+        let receipt_a = submit_validation_run(&request(), &first, 7, 3.0).expect("submit a");
+        let receipt_b = submit_validation_run(&request(), &second, 7, 3.0).expect("submit b");
         assert_eq!(receipt_a.run_id(), receipt_b.run_id());
         assert_eq!(receipt_a.binding_sha256(), receipt_b.binding_sha256());
         assert!(receipt_a.run_id().starts_with(VALIDATION_RUN_ID_PREFIX));
@@ -849,16 +873,21 @@ mod tests {
             receipt_a.output_profile(),
             SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE
         );
+        assert!((receipt_a.se_gate_k() - 3.0).abs() < f64::EPSILON);
         let json = receipt_a.to_json().expect("json");
         assert!(!json.contains("rmse"));
         assert!(!json.contains("bias"));
         assert!(!json.contains("coverage"));
-        let other_seed = submit_validation_run(&request(), &first, 8).expect("seed");
+        let other_seed = submit_validation_run(&request(), &first, 8, 3.0).expect("seed");
         assert_ne!(receipt_a.run_id(), other_seed.run_id());
         let mut other_tenant = request();
         other_tenant.tenant_workspace_id = "tenant-workspace-2".into();
-        let other_tenant_receipt = submit_validation_run(&other_tenant, &first, 7).expect("tenant");
+        let other_tenant_receipt =
+            submit_validation_run(&other_tenant, &first, 7, 3.0).expect("tenant");
         assert_ne!(receipt_a.run_id(), other_tenant_receipt.run_id());
+        let other_k = submit_validation_run(&request(), &first, 7, 4.0).expect("other k");
+        assert_ne!(receipt_a.run_id(), other_k.run_id());
+        assert!((other_k.se_gate_k() - 4.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -867,7 +896,7 @@ mod tests {
             unit("evidence-a", "2026-07-10T00:00:00Z"),
             unit("evidence-b", "2026-07-15T00:00:00Z"),
         ]);
-        let receipt = submit_validation_run(&request(), &offered, 11).expect("submit");
+        let receipt = submit_validation_run(&request(), &offered, 11, 3.0).expect("submit");
         let observation = recovery(
             &receipt,
             vec![0.70, 0.55, 0.40, -0.20, 0.85],
@@ -919,7 +948,7 @@ mod tests {
             &receipt,
             vec![0.0, 1.0, 2.0, 3.0, 4.0],
             vec![10.0, 11.0, 12.0, 13.0, 14.0],
-            1.0,
+            3.0,
         );
         let refused =
             complete_validation_run(&receipt, &request(), &offered, &rejected).expect("refused");
@@ -933,13 +962,13 @@ mod tests {
         let mut wrong_profile = request();
         wrong_profile.output_profile = "validation-report".into();
         assert_eq!(
-            submit_validation_run(&wrong_profile, &offered, 1),
+            submit_validation_run(&wrong_profile, &offered, 1, 3.0),
             Err(AnalysisEngineError::InvalidValidationProfile)
         );
         let mut wrong_model = request();
         wrong_model.model_contract_version = "temporal-evidence-v1".into();
         assert_eq!(
-            submit_validation_run(&wrong_model, &offered, 1),
+            submit_validation_run(&wrong_model, &offered, 1, 3.0),
             Err(AnalysisEngineError::InvalidValidationProfile)
         );
         let mismatched = AnalysisCorpus::new(
@@ -948,7 +977,7 @@ mod tests {
         )
         .expect("other");
         assert_eq!(
-            submit_validation_run(&request(), &mismatched, 1),
+            submit_validation_run(&request(), &mismatched, 1, 3.0),
             Err(AnalysisEngineError::SnapshotMismatch)
         );
         let duplicate = corpus(vec![
@@ -956,29 +985,29 @@ mod tests {
             unit("same", "2026-07-11T00:00:00Z"),
         ]);
         assert_eq!(
-            submit_validation_run(&request(), &duplicate, 1),
+            submit_validation_run(&request(), &duplicate, 1, 3.0),
             Err(AnalysisEngineError::DuplicateEvidence)
         );
         let empty = AnalysisCorpus::new("snapshot-1", Vec::new()).expect("empty");
         assert_eq!(
-            submit_validation_run(&request(), &empty, 1),
+            submit_validation_run(&request(), &empty, 1, 3.0),
             Err(AnalysisEngineError::InvalidEvidence)
         );
         let late = corpus(vec![unit("late", "2026-08-02T00:00:00Z")]);
         assert_eq!(
-            submit_validation_run(&request(), &late, 1),
+            submit_validation_run(&request(), &late, 1, 3.0),
             Err(AnalysisEngineError::NoEligibleEvidence)
         );
         let mut invalid_request = request();
         invalid_request.idempotency_key.clear();
         assert!(matches!(
-            submit_validation_run(&invalid_request, &offered, 1),
+            submit_validation_run(&invalid_request, &offered, 1, 3.0),
             Err(AnalysisEngineError::Api(_))
         ));
         let mut invalid_cutoff = request();
         invalid_cutoff.knowledge_cutoff = "not-a-time".into();
         assert!(matches!(
-            submit_validation_run(&invalid_cutoff, &offered, 1),
+            submit_validation_run(&invalid_cutoff, &offered, 1, 3.0),
             Err(AnalysisEngineError::Api(_))
         ));
     }
@@ -989,7 +1018,7 @@ mod tests {
             unit("evidence-a", "2026-07-10T00:00:00Z"),
             unit("evidence-b", "2026-07-15T00:00:00Z"),
         ]);
-        let receipt = submit_validation_run(&request(), &offered, 3).expect("submit");
+        let receipt = submit_validation_run(&request(), &offered, 3, 3.0).expect("submit");
         let llm = RecoveryObservation::new(
             &receipt,
             "llm-study",
@@ -1021,6 +1050,12 @@ mod tests {
             complete_validation_run(&profile_tampered, &request(), &offered, &observation),
             Err(AnalysisEngineError::BindingMismatch)
         );
+        let mut k_tampered = observation.clone();
+        k_tampered.se_gate_k = 8.0;
+        assert_eq!(
+            complete_validation_run(&receipt, &request(), &offered, &k_tampered),
+            Err(AnalysisEngineError::BindingMismatch)
+        );
     }
 
     #[test]
@@ -1030,22 +1065,23 @@ mod tests {
             unit("evidence-a", "2026-07-10T00:00:00Z"),
             unit("evidence-b", "2026-07-15T00:00:00Z"),
         ]);
-        let receipt_a = submit_validation_run(&request(), &first, 3).expect("a");
-        let receipt_b = submit_validation_run(&request(), &second, 3).expect("b");
+        let receipt_a = submit_validation_run(&request(), &first, 3, 3.0).expect("a");
+        let receipt_b = submit_validation_run(&request(), &second, 3, 3.0).expect("b");
         assert_ne!(receipt_a.run_id(), receipt_b.run_id());
         let foreign = recovery(&receipt_a, vec![1.0, 2.0, 3.0], vec![1.0, 2.0, 3.0], 3.0);
         assert_eq!(
             complete_validation_run(&receipt_b, &request(), &second, &foreign),
             Err(AnalysisEngineError::BindingMismatch)
         );
-        let other_seed = submit_validation_run(&request(), &first, 9).expect("seed");
+        let other_seed = submit_validation_run(&request(), &first, 9, 3.0).expect("seed");
         assert_eq!(
             complete_validation_run(&other_seed, &request(), &first, &foreign),
             Err(AnalysisEngineError::BindingMismatch)
         );
         let mut other_tenant = request();
         other_tenant.tenant_workspace_id = "tenant-workspace-other".into();
-        let other_tenant_receipt = submit_validation_run(&other_tenant, &first, 3).expect("tenant");
+        let other_tenant_receipt =
+            submit_validation_run(&other_tenant, &first, 3, 3.0).expect("tenant");
         assert_eq!(
             complete_validation_run(&other_tenant_receipt, &other_tenant, &first, &foreign),
             Err(AnalysisEngineError::BindingMismatch)
@@ -1058,7 +1094,7 @@ mod tests {
             unit("evidence-a", "2026-07-10T00:00:00Z"),
             unit("evidence-b", "2026-07-15T00:00:00Z"),
         ]);
-        let receipt = submit_validation_run(&request(), &offered, 3).expect("submit");
+        let receipt = submit_validation_run(&request(), &offered, 3, 3.0).expect("submit");
         let nan = RecoveryObservation::new(
             &receipt,
             "nan-study",
@@ -1121,5 +1157,67 @@ mod tests {
         );
         let converted: AnalysisEngineError = ValidationError::InvalidInput.into();
         assert_eq!(converted.to_string(), "invalid validation input");
+    }
+
+    #[test]
+    fn se_gate_k_is_pre_registered_and_empty_vectors_fail_closed() {
+        let offered = corpus(vec![
+            unit("evidence-a", "2026-07-10T00:00:00Z"),
+            unit("evidence-b", "2026-07-15T00:00:00Z"),
+        ]);
+        let receipt = submit_validation_run(&request(), &offered, 3, 3.0).expect("submit");
+        assert_eq!(
+            two_point(&receipt, "huge-k", MAX_SE_GATE_K + 0.01, false),
+            Err(AnalysisEngineError::Validation(
+                ValidationError::InvalidConfiguration
+            ))
+        );
+        assert_eq!(
+            two_point(&receipt, "post-hoc-k", 4.0, false),
+            Err(AnalysisEngineError::BindingMismatch)
+        );
+        assert_eq!(
+            submit_validation_run(&request(), &offered, 3, MAX_SE_GATE_K + 0.01),
+            Err(AnalysisEngineError::Validation(
+                ValidationError::InvalidConfiguration
+            ))
+        );
+        assert_eq!(
+            submit_validation_run(&request(), &offered, 3, f64::NAN),
+            Err(AnalysisEngineError::Validation(
+                ValidationError::InvalidInput
+            ))
+        );
+        assert!(submit_validation_run(&request(), &offered, 3, MAX_SE_GATE_K).is_ok());
+        assert_eq!(
+            RecoveryObservation::new(
+                &receipt,
+                "empty",
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                3.0,
+                false,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            RecoveryObservation::new(
+                &receipt,
+                "mismatch",
+                vec![1.0, 2.0],
+                vec![1.0],
+                vec![0.0, 1.0],
+                vec![2.0, 3.0],
+                vec![1.0, 2.0],
+                vec![1.0, 2.0],
+                3.0,
+                false,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }

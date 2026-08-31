@@ -41,8 +41,9 @@ fn durable_run_binds_cutoff_eligible_evidence_and_emits_acceptance_evidence() {
         ],
     )
     .expect("corpus");
-    let receipt = submit_validation_run(&request(), &corpus, 42).expect("submit");
+    let receipt = submit_validation_run(&request(), &corpus, 42, 3.0).expect("submit");
     assert_eq!(receipt.eligible_evidence_count(), 2);
+    assert!((receipt.se_gate_k() - 3.0).abs() < f64::EPSILON);
     assert!(!receipt.to_json().expect("json").contains("rmse"));
     let observation = RecoveryObservation::new(
         &receipt,
@@ -77,7 +78,7 @@ fn llm_authored_recovery_and_cutoff_empty_corpora_fail_closed() {
     )
     .expect("corpus");
     assert_eq!(
-        submit_validation_run(&request(), &corpus, 1),
+        submit_validation_run(&request(), &corpus, 1, 3.0),
         Err(AnalysisEngineError::NoEligibleEvidence)
     );
     let eligible = AnalysisCorpus::new(
@@ -85,7 +86,7 @@ fn llm_authored_recovery_and_cutoff_empty_corpora_fail_closed() {
         vec![unit("evidence-1", "2026-07-10T00:00:00Z")],
     )
     .expect("eligible");
-    let receipt = submit_validation_run(&request(), &eligible, 1).expect("submit");
+    let receipt = submit_validation_run(&request(), &eligible, 1, 3.0).expect("submit");
     let llm = RecoveryObservation::new(
         &receipt,
         "llm-contract",
@@ -120,8 +121,8 @@ fn recovery_from_a_different_run_or_tenant_fails_closed() {
         ],
     )
     .expect("second");
-    let receipt_a = submit_validation_run(&request(), &first, 1).expect("a");
-    let receipt_b = submit_validation_run(&request(), &second, 1).expect("b");
+    let receipt_a = submit_validation_run(&request(), &first, 1, 3.0).expect("a");
+    let receipt_b = submit_validation_run(&request(), &second, 1, 3.0).expect("b");
     let foreign = RecoveryObservation::new(
         &receipt_a,
         "foreign-recovery",
@@ -141,10 +142,27 @@ fn recovery_from_a_different_run_or_tenant_fails_closed() {
     );
     let mut other_tenant = request();
     other_tenant.tenant_workspace_id = "tenant-workspace-other".into();
-    let other_receipt = submit_validation_run(&other_tenant, &first, 1).expect("tenant");
+    let other_receipt = submit_validation_run(&other_tenant, &first, 1, 3.0).expect("tenant");
     assert_ne!(receipt_a.run_id(), other_receipt.run_id());
     assert_eq!(
         complete_validation_run(&other_receipt, &other_tenant, &first, &foreign),
+        Err(AnalysisEngineError::BindingMismatch)
+    );
+    let other_k = submit_validation_run(&request(), &first, 1, 4.0).expect("other k");
+    assert_ne!(receipt_a.run_id(), other_k.run_id());
+    assert_eq!(
+        RecoveryObservation::new(
+            &receipt_a,
+            "post-hoc-k",
+            vec![1.0, 2.0, 3.0],
+            vec![1.0, 2.0, 3.0],
+            vec![0.5, 1.5, 2.5],
+            vec![1.5, 2.5, 3.5],
+            vec![1.0, 2.0, 3.0],
+            vec![1.0, 2.0, 3.0],
+            4.0,
+            false,
+        ),
         Err(AnalysisEngineError::BindingMismatch)
     );
 }

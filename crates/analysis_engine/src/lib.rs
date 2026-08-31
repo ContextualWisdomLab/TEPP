@@ -62,11 +62,11 @@ pub use topic_lineage_artifact::{
 };
 /// Durable scientific-acceptance validation-run contracts.
 pub use validation_run::{
-    MAX_RECOVERY_VECTOR_LEN, RecoveryObservation, SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE,
-    SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION, ScientificAcceptanceEvidence, VALIDATION_BACKEND,
-    VALIDATION_CPU_F64_MODEL, VALIDATION_PRECISION, VALIDATION_RUN_ID_HEX_LEN,
-    VALIDATION_RUN_ID_PREFIX, ValidationRunReceipt, WILSON_Z, complete_validation_run,
-    submit_validation_run,
+    MAX_RECOVERY_VECTOR_LEN, MAX_SE_GATE_K, RecoveryObservation,
+    SCIENTIFIC_ACCEPTANCE_OUTPUT_PROFILE, SCIENTIFIC_ACCEPTANCE_SCHEMA_VERSION,
+    ScientificAcceptanceEvidence, VALIDATION_BACKEND, VALIDATION_CPU_F64_MODEL,
+    VALIDATION_PRECISION, VALIDATION_RUN_ID_HEX_LEN, VALIDATION_RUN_ID_PREFIX,
+    ValidationRunReceipt, WILSON_Z, complete_validation_run, submit_validation_run,
 };
 
 /// Versioned artifact schema emitted by this engine.
