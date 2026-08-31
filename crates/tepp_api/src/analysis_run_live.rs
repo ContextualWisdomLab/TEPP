@@ -12,8 +12,9 @@
 //! `GET /v1/analysis-runs/{run_id}/request` returns metric-free stored create
 //! fields so operators can inspect snapshot, cutoff, model, and profile before
 //! retry. `GET /v1/analysis-runs/{run_id}/retries` returns metric-free direct
-//! retry children of a listed parent. GET-by-id and running/terminal POST
-//! transitions remain later slices.
+//! retry children of a listed parent. `GET /v1/analysis-runs/by-idempotency/{key}`
+//! returns the metric-free identity of the unique run that used that key.
+//! GET-by-id and running/terminal POST transitions remain later slices.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -26,6 +27,10 @@ use crate::analysis_run_collection_http::{
     AnalysisRunCollection, AnalysisRunCollectionItem, is_analysis_run_collection_path,
     parse_collection_page_cursor, parse_collection_page_limit,
     refuse_metrics_on_collection_payload,
+};
+use crate::analysis_run_idempotency_lookup_http::{
+    AnalysisRunIdempotencyLookup, analysis_run_idempotency_lookup_path_key,
+    refuse_metrics_on_idempotency_lookup_payload,
 };
 use crate::analysis_run_retry_http::{
     AnalysisRunRetryRequest, analysis_run_retry_path_run_id, refuse_metrics_on_retry_payload,
@@ -197,6 +202,12 @@ impl AnalysisRunLiveService {
                 Ok(_) | Err(ApiError::LimitExceeded)
             ) {
                 return self.read_analysis_run_stored_request(path, &headers, body);
+            }
+            if matches!(
+                analysis_run_idempotency_lookup_path_key(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.lookup_analysis_run_by_idempotency(path, &headers, body);
             }
             return self.list_analysis_runs(path, &headers, body);
         }
@@ -500,6 +511,39 @@ impl AnalysisRunLiveService {
         Ok(json_response(200, "OK", response_body))
     }
 
+    fn lookup_analysis_run_by_idempotency(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let idempotency_key = analysis_run_idempotency_lookup_path_key(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        refuse_metrics_on_idempotency_lookup_payload(body)?;
+        let mut matches: Vec<&LiveAnalysisRun> = self
+            .accepted_runs
+            .values()
+            .filter(|stored| {
+                stored.consumer == consumer && stored.accepted.idempotency_key == idempotency_key
+            })
+            .collect();
+        if matches.len() != 1 {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let stored = matches.remove(0);
+        let payload = AnalysisRunIdempotencyLookup::new(
+            stored.accepted.run_id.clone(),
+            stored.run_state,
+            stored.accepted.idempotency_key.clone(),
+        )?;
+        let response_body = payload.to_json()?;
+        refuse_metrics_on_idempotency_lookup_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
     fn list_analysis_runs(
         &self,
         path: &str,
@@ -561,9 +605,10 @@ impl AnalysisRunLiveService {
 
     /// Test-only seam that records a non-accepted loopback state.
     ///
-    /// Used to prove cancel, collection, retry, stored-request inspect, and
-    /// retry-lineage inspect of running, succeeded, failed, and cancelled runs
-    /// without duplicating the live POST running/terminal lifecycle slice.
+    /// Used to prove cancel, collection, retry, stored-request inspect,
+    /// retry-lineage inspect, and idempotency-key lookup of running,
+    /// succeeded, failed, and cancelled runs without duplicating the live
+    /// POST running/terminal lifecycle slice.
     #[cfg(test)]
     fn force_loopback_run_state(
         &mut self,
@@ -2082,6 +2127,170 @@ mod tests {
         ));
         assert_eq!(stored.status_code, 200);
         assert!(!stored.body.contains("retries"));
+    }
+
+    fn idempotency_lookup_http(key: &str, consumer: &str, extra: &[(&str, &str)]) -> String {
+        let mut request =
+            format!("GET {NARUON_ANALYSIS_RUN_PATH}/by-idempotency/{key} HTTP/1.1\r\n");
+        write!(
+            request,
+            "Host: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\n"
+        )
+        .expect("idempotency-lookup headers");
+        for (name, value) in extra {
+            write!(request, "{name}: {value}\r\n").expect("extra header");
+        }
+        request.push_str("content-length: 0\r\n\r\n");
+        request
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn handler_covers_metric_free_idempotency_lookup_get() {
+        use crate::{
+            AnalysisRunIdempotencyLookup, AnalysisRunRetryRequest, AnalysisRunStatusState,
+        };
+
+        let run = sample_run();
+        let mut service = AnalysisRunLiveService::new();
+        let accepted =
+            service.handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"));
+        assert_eq!(accepted.status_code, 202);
+        let parent_id = serde_json::from_str::<serde_json::Value>(&accepted.body)
+            .expect("accepted json")["run_id"]
+            .as_str()
+            .expect("run_id")
+            .to_owned();
+
+        let looked_up = service.handle_http_request(&idempotency_lookup_http(
+            &run.idempotency_key,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(looked_up.status_code, 200);
+        let lookup = AnalysisRunIdempotencyLookup::from_json(&looked_up.body).expect("lookup");
+        assert_eq!(lookup.run_id, parent_id);
+        assert_eq!(lookup.run_state, AnalysisRunStatusState::Accepted);
+        assert_eq!(lookup.idempotency_key, run.idempotency_key);
+        assert!(!looked_up.body.contains("rmse"));
+        assert!(!looked_up.body.contains("scientific_acceptance"));
+        assert!(!looked_up.body.contains("snapshot_id"));
+        assert!(!looked_up.body.contains("tenant_workspace_id"));
+        assert!(!looked_up.body.contains("retried_from"));
+
+        service
+            .force_loopback_run_state(&parent_id, AnalysisRunStatusState::Failed)
+            .expect("force failed");
+        let failed = service.handle_http_request(&idempotency_lookup_http(
+            &run.idempotency_key,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(failed.status_code, 200);
+        assert_eq!(
+            AnalysisRunIdempotencyLookup::from_json(&failed.body)
+                .expect("failed lookup")
+                .run_state,
+            AnalysisRunStatusState::Failed
+        );
+
+        let retry_key = "analysis-live-idem-lookup-retry-001";
+        let retry_body = AnalysisRunRetryRequest::new(&parent_id, retry_key)
+            .expect("retry dto")
+            .to_json()
+            .expect("retry json");
+        let retried = service.handle_http_request(&retry_http(
+            &parent_id,
+            &retry_body,
+            NARUON_CONSUMER_CODE,
+            retry_key,
+        ));
+        assert_eq!(retried.status_code, 202);
+        let child_id = serde_json::from_str::<serde_json::Value>(&retried.body)
+            .expect("child json")["run_id"]
+            .as_str()
+            .expect("child id")
+            .to_owned();
+        let child_lookup = service.handle_http_request(&idempotency_lookup_http(
+            retry_key,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(child_lookup.status_code, 200);
+        let child = AnalysisRunIdempotencyLookup::from_json(&child_lookup.body).expect("child");
+        assert_eq!(child.run_id, child_id);
+        assert_eq!(child.idempotency_key, retry_key);
+        assert_eq!(child.run_state, AnalysisRunStatusState::Accepted);
+
+        assert_eq!(
+            service
+                .handle_http_request(&idempotency_lookup_http(
+                    &run.idempotency_key,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    &[],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&idempotency_lookup_http(
+                    "missing-key",
+                    NARUON_CONSUMER_CODE,
+                    &[],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/{parent_id} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "POST {NARUON_ANALYSIS_RUN_PATH}/by-idempotency/{key} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+                    key = run.idempotency_key
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/by-idempotency/{key} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}",
+                    key = run.idempotency_key
+                ))
+                .status_code,
+            400
+        );
+        let oversized = "a".repeat(129);
+        assert_eq!(
+            service
+                .handle_http_request(&idempotency_lookup_http(
+                    &oversized,
+                    NARUON_CONSUMER_CODE,
+                    &[],
+                ))
+                .status_code,
+            413
+        );
+        let listed = service.handle_http_request(&collection_http(NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(listed.status_code, 200);
+        assert!(!listed.body.contains("by-idempotency"));
+        let stored = service.handle_http_request(&stored_request_http(
+            &parent_id,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(stored.status_code, 200);
+        let lineage =
+            service.handle_http_request(&retry_lineage_http(&parent_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(lineage.status_code, 200);
     }
 
     #[test]

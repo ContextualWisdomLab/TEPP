@@ -15,6 +15,7 @@ mod analysis_result;
 mod analysis_run;
 mod analysis_run_cancel_http;
 mod analysis_run_collection_http;
+mod analysis_run_idempotency_lookup_http;
 mod analysis_run_live;
 mod analysis_run_retry_http;
 mod analysis_run_retry_lineage_http;
@@ -106,6 +107,18 @@ pub use analysis_run_collection_http::parse_collection_page_cursor;
 pub use analysis_run_collection_http::parse_collection_page_limit;
 /// Refuse scientific-metric keys on a collection payload.
 pub use analysis_run_collection_http::refuse_metrics_on_collection_payload;
+/// Analysis-run idempotency-lookup contract version constant.
+pub use analysis_run_idempotency_lookup_http::ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_CONTRACT_VERSION;
+/// Maximum opaque idempotency-key length on the lookup path.
+pub use analysis_run_idempotency_lookup_http::ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN;
+/// Reserved collection-relative prefix for idempotency-key lookup.
+pub use analysis_run_idempotency_lookup_http::ANALYSIS_RUN_IDEMPOTENCY_LOOKUP_PREFIX;
+/// Versioned metric-free identity of one analysis run found by idempotency key.
+pub use analysis_run_idempotency_lookup_http::AnalysisRunIdempotencyLookup;
+/// Build a Naruon analysis-run idempotency-lookup GET exchange.
+pub use analysis_run_idempotency_lookup_http::naruon_analysis_run_idempotency_lookup_exchange;
+/// Refuse scientific-metric keys on an idempotency-lookup payload.
+pub use analysis_run_idempotency_lookup_http::refuse_metrics_on_idempotency_lookup_payload;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
 /// Analysis-run retry contract version constant.
