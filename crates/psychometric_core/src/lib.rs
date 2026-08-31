@@ -261,6 +261,21 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver p. 16 `addedTIPREDVARstd` as
+//! `extra / extra = 1` after strictly positive §7.2
+//! `addedTIPREDVAR` `(B / a)² v` (p. 16; §7.2, pp. 20–21; Table 2,
+//! p. 12; footnote 4; 2017-era `summary.ctsemFit.R` forms
+//! `addedTIPREDVARstd` as
+//! `solve(sqrt(diag(addedTIPREDVAR) + ridging)) %&% addedTIPREDVAR`;
+//! `OpenMx` `%&%` is `t(A) %*% B %*% A`; default ridge is 0;
+//! unstandardised extra is defined for a zero extra and is not that
+//! map; `trait / trait = 1` is `TRAITVARstd` and is not that map
+//! even when both equal 1; `t0_b² v` is `addedT0TIPREDVAR` and is
+//! not that map; `λ² (B / a)² v` is Eq. 5 of the extra and is not
+//! that correlation; the printed 2-latent extra 2.838 is not this
+//! scalar 1; zero extra fails closed; a non-event clock fails
+//! closed; `a ≥ 0` with a nonzero extra fails closed; JSS PDF
+//! re-opened 2026-08-30T12:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -403,6 +418,8 @@ pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 /// Exact scalar p. 16 `asymDIFFUSIONstd` `p / p = 1` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_asymptotic_diffusion;
+/// Exact scalar p. 16 `addedTIPREDVARstd` `extra / extra = 1` after strictly positive extra.
+pub use event_time::recover_standardised_asymptotic_time_independent_predictor_variance;
 /// Exact scalar p. 16 `CINTstd` `κ / √p`.
 pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
@@ -570,6 +587,8 @@ pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
 pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating first-occasion TI observed mean as the first-occasion TD observed mean.
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
+/// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `addedTIPREDVARstd`.
+pub use event_time::refuse_initial_time_independent_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
@@ -641,6 +660,8 @@ pub use event_time::refuse_standardised_manifest_variance_as_standardised_manife
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
+/// Refuse treating p. 16 `TRAITVARstd` as `addedTIPREDVARstd`.
+pub use event_time::refuse_standardised_trait_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_standardised_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -729,6 +750,8 @@ pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating unstandardised `asymDIFFUSION` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion;
+/// Refuse treating unstandardised `addedTIPREDVAR` as `addedTIPREDVARstd`.
+pub use event_time::refuse_unstandardised_asymptotic_time_independent_variance_as_standardised_asymptotic_time_independent_variance;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.

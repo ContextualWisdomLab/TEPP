@@ -710,6 +710,30 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Driver p. 16 `addedTIPREDVARstd` was requested without a
+    /// strictly positive extra. Unlike `TRAITVAR` /
+    /// `MANIFESTTRAITVAR`, the 2017-era source still forms
+    /// `addedTIPREDVARstd` when extra is 0; `solve(sqrt(0))` fails.
+    /// Footnote 4 standardisation requires strictly positive
+    /// `addedTIPREDVAR`.
+    StandardisedAsymptoticTimeIndependentVarianceRequiresPositiveAddedVariance,
+    /// Driver §7.2 unstandardised `addedTIPREDVAR` `(B / a)² v` was
+    /// treated as p. 16 `addedTIPREDVARstd`. Unstandardised extra is
+    /// defined for a zero coefficient and for zero predictor
+    /// variance; standardised `addedTIPREDVAR` is not.
+    UnstandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTimeIndependentVariance,
+    /// Driver p. 16 `TRAITVARstd` was treated as p. 16
+    /// `addedTIPREDVARstd`. Equal numbers when both correlations
+    /// equal 1 are still distinct named quantities.
+    /// `addedTIPREDVARstd` is the correlation form of extra TI
+    /// process variance; `TRAITVARstd` is the correlation form of
+    /// between-subject `TRAITVAR`.
+    StandardisedTraitVarianceIsNotStandardisedAsymptoticTimeIndependentVariance,
+    /// Driver 2017-era `addedT0TIPREDVAR` `t0_b² v` was treated as
+    /// p. 16 `addedTIPREDVARstd`. Extra first-occasion TI variance
+    /// is not the correlation form of asymptotic extra
+    /// `addedTIPREDVAR`.
+    InitialTimeIndependentVarianceIsNotStandardisedAsymptoticTimeIndependentVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1258,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedAsymptoticTimeIndependentVarianceRequiresPositiveAddedVariance => {
+                "standardised added time-independent predictor variance requires strictly positive extra variance"
+            }
+            Self::UnstandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTimeIndependentVariance => {
+                "unstandardised added time-independent predictor variance is not standardised added time-independent predictor variance"
+            }
+            Self::StandardisedTraitVarianceIsNotStandardisedAsymptoticTimeIndependentVariance => {
+                "standardised trait variance is not standardised added time-independent predictor variance"
+            }
+            Self::InitialTimeIndependentVarianceIsNotStandardisedAsymptoticTimeIndependentVariance => {
+                "initial time-independent predictor variance is not standardised added time-independent predictor variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2107,30 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_added_time_independent_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticTimeIndependentVarianceRequiresPositiveAddedVariance
+                .to_string(),
+            "standardised added time-independent predictor variance requires strictly positive extra variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTimeIndependentVariance
+                .to_string(),
+            "unstandardised added time-independent predictor variance is not standardised added time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTraitVarianceIsNotStandardisedAsymptoticTimeIndependentVariance
+                .to_string(),
+            "standardised trait variance is not standardised added time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedAsymptoticTimeIndependentVariance
+                .to_string(),
+            "initial time-independent predictor variance is not standardised added time-independent predictor variance"
         );
     }
 }
