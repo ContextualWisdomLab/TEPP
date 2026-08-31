@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-analysis-runs stored-request` inspects metric-free stored create fields (ADR 0041). Snapshot/cutoff/model/profile only. Refuses RMSE/bias/coverage/SE-gate keys and `tepp.scientific_acceptance.v1`. Not stored-request HTTP, not retry CLI, not GET-by-id, not persistence.
