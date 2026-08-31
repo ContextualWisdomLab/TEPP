@@ -90,6 +90,9 @@ operator-visible client for that collection GET; it does not duplicate the
 scientific-acceptance `tepp-analysis-run` CLI. The loopback
 `tepp-analysis-runs cancel` CLI is the operator-visible client for
 `POST /v1/analysis-runs/{run_id}/cancel`; cancel stdout stays metric-free and
+never prints `tepp.scientific_acceptance.v1`. The loopback
+`tepp-analysis-runs create` CLI is the operator-visible client for
+`POST /v1/analysis-runs`; create stdout stays metric-free `202 Accepted` and
 never prints `tepp.scientific_acceptance.v1`.
 
 The stacked `analysis_engine` slice provides the first executable service-side
