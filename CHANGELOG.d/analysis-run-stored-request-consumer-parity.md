@@ -1,0 +1,1 @@
+- `tepp_api` adds `lineageweave_analysis_run_stored_request_exchange`, Naruon compatibility-listener stored-request GET, and a `tepp-loopback` TCP inspect proof (ADR 0040). Metric-free stored-request fields are unchanged from ADR 0034. Not GET status, not lifecycle POST, not an ADR 0014 claim.

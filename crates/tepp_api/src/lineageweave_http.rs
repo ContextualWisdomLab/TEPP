@@ -1,5 +1,6 @@
 //! Published modular-consumer identity and `LineageWeave` TEPP exchanges.
 
+use crate::analysis_run_stored_request_http::naruon_analysis_run_stored_request_exchange;
 use crate::naruon_http::compose_https_target;
 use crate::project_history::build_project_history_exchange;
 use crate::{
@@ -29,6 +30,29 @@ pub fn lineageweave_analysis_run_exchange(
     request: &AnalysisRunRequest,
 ) -> Result<NaruonHttpExchange, ApiError> {
     let mut exchange = naruon_analysis_run_exchange(origin, request)?;
+    let consumer_header = exchange
+        .headers
+        .iter_mut()
+        .find(|(name, _)| name.eq_ignore_ascii_case("tepp-consumer"))
+        .ok_or(ApiError::InvalidWirePayload)?;
+    LINEAGEWEAVE_CONSUMER_CODE.clone_into(&mut consumer_header.1);
+    Ok(exchange)
+}
+
+/// Build a `LineageWeave` → TEPP stored-request GET without credentials.
+///
+/// The function reuses TEPP's existing origin and identity validation, then
+/// replaces only the published modular-consumer identity. The response remains
+/// a metric-free inspect of stored create fields, not a measurement result.
+///
+/// # Errors
+///
+/// Returns the same fail-closed errors as [`naruon_analysis_run_stored_request_exchange`].
+pub fn lineageweave_analysis_run_stored_request_exchange(
+    origin: &str,
+    run_id: &str,
+) -> Result<NaruonHttpExchange, ApiError> {
+    let mut exchange = naruon_analysis_run_stored_request_exchange(origin, run_id)?;
     let consumer_header = exchange
         .headers
         .iter_mut()
@@ -94,7 +118,7 @@ pub(crate) fn consumer_is_supported(consumer_code: &str) -> bool {
 mod tests {
     use super::{
         LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, consumer_is_supported,
-        lineageweave_analysis_run_exchange,
+        lineageweave_analysis_run_exchange, lineageweave_analysis_run_stored_request_exchange,
     };
     use crate::{ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError};
 
@@ -129,6 +153,48 @@ mod tests {
         );
         assert_eq!(
             lineageweave_analysis_run_exchange("http://tepp.example.test", &run),
+            Err(ApiError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn lineageweave_stored_request_exchange_swaps_only_the_consumer_header() {
+        let exchange = lineageweave_analysis_run_stored_request_exchange(
+            "https://tepp.example.test",
+            "tepp-run-1",
+        )
+        .expect("exchange");
+        assert_eq!(exchange.method, "GET");
+        assert_eq!(
+            exchange.target_url,
+            "https://tepp.example.test/v1/analysis-runs/tepp-run-1/request"
+        );
+        assert!(exchange.body.is_empty());
+        assert!(
+            exchange
+                .headers
+                .contains(&("tepp-consumer".into(), LINEAGEWEAVE_CONSUMER_CODE.into()))
+        );
+        assert!(
+            !exchange
+                .headers
+                .contains(&("tepp-consumer".into(), NARUON_CONSUMER_CODE.into()))
+        );
+        assert!(exchange.headers.iter().all(|(name, _)| {
+            !matches!(
+                name.to_ascii_lowercase().as_str(),
+                "authorization" | "proxy-authorization" | "cookie" | "x-api-key"
+            )
+        }));
+        assert_eq!(
+            lineageweave_analysis_run_stored_request_exchange(
+                "http://tepp.example.test",
+                "tepp-run-1"
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            lineageweave_analysis_run_stored_request_exchange("https://tepp.example.test", ""),
             Err(ApiError::InvalidWirePayload)
         );
     }
