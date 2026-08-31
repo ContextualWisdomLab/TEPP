@@ -8,13 +8,17 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. The `tdt_chronos_workflow_v1`
+//! profile binds ADR 0016 composition without inventing an extractor or promoting
+//! the workflow to an event instance or state transition.
 
 mod case_deletion_refit;
+mod event_intelligence_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use event_core::EventError;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -41,6 +45,13 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Digest-bound TDT/CHRONOS workflow artifact and execution contracts.
+pub use event_intelligence_artifact::{
+    EVENT_INTELLIGENCE_ARTIFACT_BYTE_LIMIT, EVENT_INTELLIGENCE_ARTIFACT_SCHEMA_VERSION,
+    EVENT_INTELLIGENCE_MODEL_CONTRACT_VERSION, EVENT_INTELLIGENCE_OUTPUT_PROFILE,
+    EventIntelligenceArtifact, EventIntelligenceExecution, EventIntelligenceRunInput,
+    execute_event_intelligence_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +259,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// Event-intelligence composition or cutoff filtering failed closed.
+    Event(EventError),
+    /// A TDT/CHRONOS workflow artifact violated its bounded schema or claim boundary.
+    InvalidEventIntelligenceArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +277,8 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::Event(error) => return error.fmt(formatter),
+            Self::InvalidEventIntelligenceArtifact => "invalid event intelligence artifact",
         };
         formatter.write_str(message)
     }
@@ -278,6 +295,12 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<EventError> for AnalysisEngineError {
+    fn from(error: EventError) -> Self {
+        Self::Event(error)
     }
 }
 
@@ -681,6 +704,14 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::Event(event_core::EventError::InvalidWirePayload),
+                "invalid event wire payload",
+            ),
+            (
+                AnalysisEngineError::InvalidEventIntelligenceArtifact,
+                "invalid event intelligence artifact",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -689,6 +720,8 @@ mod tests {
         assert_eq!(converted.to_string(), "invalid API wire payload");
         let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
         assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        let from_event: AnalysisEngineError = event_core::EventError::InvalidWirePayload.into();
+        assert_eq!(from_event.to_string(), "invalid event wire payload");
         assert_eq!(
             add_membership_count(u64::MAX, 1),
             Err(AnalysisEngineError::ArithmeticOverflow)
