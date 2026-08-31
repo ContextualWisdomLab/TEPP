@@ -4853,6 +4853,197 @@ pub fn refuse_initial_observed_variance_as_stationary_initial_observed_variance(
     Err(PsychometricError::InitialObservedVarianceIsNotStationaryInitialObservedVariance)
 }
 
+/// Exact scalar Eq. 5 of 2017-era commented `discreteTRAITVAR` with
+/// `MANIFESTTRAITVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 1, p. 4;
+/// Table 2, p. 12 `TRAITVAR` `φ_ξ` and `MANIFESTTRAITVAR` `Ψ_τ`;
+/// §4.3, p. 9; JSS PDF re-opened 2026-08-31T05:35Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `y_i(t) = τ + Λ η_i(t) + ε_i(t)` with `ε ~ N(0, Θ)` and
+/// `τ_i ~ N(μ_τ, Ψ_τ)`. cran/ctsem 2.5.0 `summary.ctsemFit.R`
+/// comments (not in the active `outlist`):
+///
+/// ```text
+/// asymTRAITVAR <- solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))
+/// discreteTRAITVAR <- (I − expm(DRIFT * timeInterval)) %*%
+///     asymTRAITVAR %*% t(I − expm(DRIFT * timeInterval))
+/// ```
+///
+/// The scalar latent extra is `(1 − e^{a Δt})² · (trait / a²)`.
+/// Equation 5 of that extra with `MANIFESTTRAITVAR` is
+/// `λ² (1 − e^{a Δt})² (trait / a²) + θ + ψ`. Form `1 / a` first,
+/// then square, then multiply by `trait` (do not import unpublished
+/// `asymTRAITVAR` / `discreteTRAITVAR` helpers). Then form
+/// `expm1(a Δt)` and square, then multiply. Then
+/// [`recover_manifest_trait_plus_state_observed_variance`]. Do not
+/// form `λ²` first. Do not call
+/// [`recover_discrete_lag_from_log_rate`]: binary64 underflow of
+/// `e^{a Δt}` to `+0` is a vanishing lag and is not a discrete `φ`,
+/// but the `Δt → ∞` limit of the latent extra is `trait / a²` and is
+/// kept, so Eq. 5 of that underflow is `λ² (trait / a²) + θ + ψ`. A
+/// zero loading or zero trait is exactly `θ + ψ` even if `a ≥ 0`.
+/// `a ≥ 0` with a nonzero trait fails closed. Unstandardised
+/// `discreteTRAITVAR` is the latent extra, not this observed extra.
+/// Equation 5 with `ψ = 0` is `λ²` of that extra plus `θ` and is
+/// not this map. `MANIFESTVAR` is not `Var(y)`. `MANIFESTTRAITVAR`
+/// is not `Var(y)`. This is not a Kalman filter, not a matrix
+/// `expm`, not ESEM estimation, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock, [`PsychometricError::NonPositiveInterval`] when
+/// `event_delta` is not strictly positive,
+/// [`PsychometricError::DiscreteTraitObservedVarianceWithManifestTraitRequiresStableDrift`]
+/// when the trait is nonzero and the drift is not strictly negative,
+/// and [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, a variance is negative, or `1 / a` or a product
+/// overflows. Propagates
+/// [`recover_manifest_trait_plus_state_observed_variance`].
+pub fn recover_discrete_trait_observed_variance_with_manifest_trait(
+    loading: f64,
+    trait_variance: f64,
+    log_rate: f64,
+    event_delta: f64,
+    measurement_error_variance: f64,
+    manifest_trait_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !loading.is_finite()
+        || !trait_variance.is_finite()
+        || trait_variance < 0.0
+        || !log_rate.is_finite()
+        || !measurement_error_variance.is_finite()
+        || measurement_error_variance < 0.0
+        || !manifest_trait_variance.is_finite()
+        || manifest_trait_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if loading == 0.0 || trait_variance == 0.0 {
+        return recover_manifest_trait_plus_state_observed_variance(
+            loading,
+            0.0,
+            measurement_error_variance,
+            manifest_trait_variance,
+        );
+    }
+    if log_rate >= 0.0 {
+        return Err(
+            PsychometricError::DiscreteTraitObservedVarianceWithManifestTraitRequiresStableDrift,
+        );
+    }
+    let inverse = require_finite(1.0 / log_rate)?;
+    let squared = require_finite(inverse * inverse)?;
+    let asymptotic_trait = require_finite(squared * trait_variance)?;
+    let increment_argument = log_rate * event_delta;
+    if !increment_argument.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // (1 − e^{a Δt})² = expm1(a Δt)². Underflow of e^{a Δt} to +0
+    // yields expm1 = −1, so the latent extra keeps trait / a².
+    let increment = increment_argument.exp_m1();
+    let scale = require_finite(increment * increment)?;
+    let discrete_trait = require_finite(scale * asymptotic_trait)?;
+    recover_manifest_trait_plus_state_observed_variance(
+        loading,
+        discrete_trait,
+        measurement_error_variance,
+        manifest_trait_variance,
+    )
+}
+
+/// Refuse treating unstandardised 2017-era `discreteTRAITVAR` as
+/// Eq. 5 of that extra with `MANIFESTTRAITVAR`.
+///
+/// `(1 − e^{a Δt})² · (trait / a²)` is the latent extra. Equation 5
+/// maps `Var(y) = λ²` of that extra plus `θ + ψ`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait`].
+pub fn refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait(
+    unstandardised_discrete_trait_variance: f64,
+    discrete_trait_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_discrete_trait_variance,
+        discrete_trait_observed_variance,
+    );
+    Err(
+        PsychometricError::UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait,
+    )
+}
+
+/// Refuse treating Eq. 5 of 2017-era `discreteTRAITVAR` with
+/// `ψ = 0` as Eq. 5 of that extra with `MANIFESTTRAITVAR`.
+///
+/// `λ² (1 − e^{a Δt})² (trait / a²) + θ` omits `Ψ_τ`. Table 2 names
+/// `MANIFESTTRAITVAR` separately from `MANIFESTVAR`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::DiscreteTraitObservedVarianceWithoutManifestTraitIsNotDiscreteTraitObservedVarianceWithManifestTrait`].
+pub fn refuse_discrete_trait_observed_variance_without_manifest_trait_as_discrete_trait_observed_variance_with_manifest_trait(
+    observed_variance_without_manifest_trait: f64,
+    discrete_trait_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        observed_variance_without_manifest_trait,
+        discrete_trait_observed_variance,
+    );
+    Err(
+        PsychometricError::DiscreteTraitObservedVarianceWithoutManifestTraitIsNotDiscreteTraitObservedVarianceWithManifestTrait,
+    )
+}
+
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of 2017-era
+/// `discreteTRAITVAR` with `MANIFESTTRAITVAR`.
+///
+/// Table 2 names `θ` `MANIFESTVAR`.
+/// `λ² (1 − e^{a Δt})² (trait / a²) + θ + ψ` is not `θ` when the
+/// loading, latent extra, or `ψ` is nonzero.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::MeasurementErrorIsNotDiscreteTraitObservedVarianceWithManifestTrait`].
+pub fn refuse_measurement_error_as_discrete_trait_observed_variance_with_manifest_trait(
+    measurement_error_variance: f64,
+    discrete_trait_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (measurement_error_variance, discrete_trait_observed_variance);
+    Err(PsychometricError::MeasurementErrorIsNotDiscreteTraitObservedVarianceWithManifestTrait)
+}
+
+/// Refuse treating `MANIFESTTRAITVAR` as Eq. 5 of 2017-era
+/// `discreteTRAITVAR` with `MANIFESTTRAITVAR`.
+///
+/// Table 2 names `ψ` `MANIFESTTRAITVAR`.
+/// `λ² (1 − e^{a Δt})² (trait / a²) + θ + ψ` is not `ψ` when the
+/// loading and latent extra are nonzero.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ManifestTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait`].
+pub fn refuse_manifest_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait(
+    manifest_trait_variance: f64,
+    discrete_trait_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (manifest_trait_variance, discrete_trait_observed_variance);
+    Err(PsychometricError::ManifestTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait)
+}
+
 /// Exact scalar lagged covariance of §4.3 / p. 16 stationary
 /// `T0VAR`.
 ///
@@ -6875,8 +7066,9 @@ mod tests {
         recover_discrete_observed_mean_with_initial_time_independent_predictor,
         recover_discrete_observed_mean_with_time_independent_predictor,
         recover_discrete_process_noise, recover_discrete_time_independent_predictor_effect,
-        recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-        recover_event_time_discrete_lag_and_log_rate,
+        recover_discrete_time_varying_predictor_effect,
+        recover_discrete_trait_observed_variance_with_manifest_trait,
+        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_initial_time_dependent_predictor_carry,
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_predictor_carry,
@@ -6920,6 +7112,7 @@ mod tests {
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
         refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
+        refuse_discrete_trait_observed_variance_without_manifest_trait_as_discrete_trait_observed_variance_with_manifest_trait,
         refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
         refuse_evolved_observed_mean_as_extra_process_observed_mean,
         refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -6970,7 +7163,9 @@ mod tests {
         refuse_level_change_intercept_as_free_continuous_intercept,
         refuse_level_change_intercept_as_impulse,
         refuse_level_change_intercept_as_process_increment, refuse_manifest_means_as_observed_mean,
+        refuse_manifest_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait,
         refuse_manifest_trait_variance_as_measurement_error,
+        refuse_measurement_error_as_discrete_trait_observed_variance_with_manifest_trait,
         refuse_measurement_error_as_lagged_observed_covariance,
         refuse_measurement_error_as_observed_variance,
         refuse_measurement_error_as_standardised_manifest_trait_variance,
@@ -7034,6 +7229,7 @@ mod tests {
         refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
         refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait,
         refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
@@ -11409,6 +11605,474 @@ mod tests {
                 -0.5,
                 0.5,
                 0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn discrete_trait_observed_variance_with_manifest_trait_recovers_equation_five_of_commented_map()
+     {
+        // cran/ctsem 2.5.0 comments
+        // (I − expm(DRIFT Δt)) %*% asymTRAITVAR %*% t(...) with
+        // asymTRAITVAR = solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT)).
+        // Scalar latent extra: (1 − e^{a Δt})² · (trait / a²).
+        // Equation 5 of that extra with MANIFESTTRAITVAR is
+        // λ² extra + θ + ψ.
+        let loading = 2.0_f64;
+        let log_rate = -0.5_f64;
+        let trait_variance = 1.0_f64;
+        let event_delta = 1.0_f64;
+        let measurement_error = 0.3_f64;
+        let manifest_trait = 0.5_f64;
+        let recovered = recover_discrete_trait_observed_variance_with_manifest_trait(
+            loading,
+            trait_variance,
+            log_rate,
+            event_delta,
+            measurement_error,
+            manifest_trait,
+            LagClock::EventTime,
+        )
+        .expect("Eq. 5 of discreteTRAITVAR with ψ");
+        let unstandardised = (1.0 - (log_rate * event_delta).exp()).powi(2)
+            * (trait_variance / (log_rate * log_rate));
+        let without_psi =
+            recover_manifest_observed_variance(loading, unstandardised, measurement_error)
+                .expect("eq5-psi0");
+        let paper = recover_manifest_trait_plus_state_observed_variance(
+            loading,
+            unstandardised,
+            measurement_error,
+            manifest_trait,
+        )
+        .expect("λ² extra + θ + ψ");
+        assert!(
+            (recovered - paper).abs() < 1e-12,
+            "Eq. 5 of 2017-era commented discreteTRAITVAR with ψ is λ² extra + θ + ψ"
+        );
+        assert!(
+            (recovered - 3.277_089_947_938_807_8).abs() < 1e-12,
+            "a=-0.5, trait=1, Δt=1, λ=2, θ=0.3, ψ=0.5 recovers ~3.277: got {recovered}"
+        );
+        assert!((without_psi - 2.777_089_947_938_807_6).abs() < 1e-12);
+        assert!(
+            (recovered - unstandardised).abs() > 1e-3,
+            "unstandardised discreteTRAITVAR is not Eq. 5 of that extra with ψ"
+        );
+        assert!(
+            (recovered - without_psi).abs() > 0.4,
+            "Eq. 5 with ψ = 0 is not Eq. 5 with MANIFESTTRAITVAR"
+        );
+        let later = recover_discrete_trait_observed_variance_with_manifest_trait(
+            loading,
+            trait_variance,
+            log_rate,
+            2.0,
+            measurement_error,
+            manifest_trait,
+            LagClock::EventTime,
+        )
+        .expect("later Δt");
+        assert!(
+            later > recovered,
+            "a later event interval increases (1 − e^{{a Δt}})² toward 1"
+        );
+        let inverse = 1.0 / log_rate;
+        let asymptotic = inverse * inverse * trait_variance;
+        let asymptotic_observed = recover_manifest_trait_plus_state_observed_variance(
+            loading,
+            asymptotic,
+            measurement_error,
+            manifest_trait,
+        )
+        .expect("λ² trait/a² + θ + ψ");
+        assert!(
+            (recovered - asymptotic_observed).abs() > 1e-3,
+            "finite-interval Eq. 5 is not unpublished λ² (trait / a²) + θ + ψ"
+        );
+        assert!(
+            later < asymptotic_observed,
+            "later Δt increases toward λ² (trait / a²) + θ + ψ without reaching it at Δt=2"
+        );
+        let zero_psi = recover_discrete_trait_observed_variance_with_manifest_trait(
+            loading,
+            trait_variance,
+            log_rate,
+            event_delta,
+            measurement_error,
+            0.0,
+            LagClock::EventTime,
+        )
+        .expect("eq5-zero-psi");
+        assert!((zero_psi - without_psi).abs() < 1e-15);
+        let doubled_psi = recover_discrete_trait_observed_variance_with_manifest_trait(
+            loading,
+            trait_variance,
+            log_rate,
+            event_delta,
+            measurement_error,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("eq5-doubled-psi");
+        assert!(doubled_psi > recovered);
+        assert!((recovered - measurement_error).abs() > 1.0);
+        assert!((recovered - manifest_trait).abs() > 1.0);
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                0.0,
+                trait_variance,
+                0.5,
+                event_delta,
+                measurement_error,
+                manifest_trait,
+                LagClock::EventTime,
+            ),
+            Ok(measurement_error + manifest_trait)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                loading,
+                0.0,
+                0.5,
+                event_delta,
+                measurement_error,
+                manifest_trait,
+                LagClock::EventTime,
+            ),
+            Ok(measurement_error + manifest_trait)
+        );
+        assert_eq!(
+            refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait(
+                unstandardised,
+                recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait
+            )
+        );
+        assert_eq!(
+            refuse_discrete_trait_observed_variance_without_manifest_trait_as_discrete_trait_observed_variance_with_manifest_trait(
+                without_psi,
+                recovered
+            ),
+            Err(
+                PsychometricError::DiscreteTraitObservedVarianceWithoutManifestTraitIsNotDiscreteTraitObservedVarianceWithManifestTrait
+            )
+        );
+        assert_eq!(
+            refuse_measurement_error_as_discrete_trait_observed_variance_with_manifest_trait(
+                measurement_error,
+                recovered
+            ),
+            Err(
+                PsychometricError::MeasurementErrorIsNotDiscreteTraitObservedVarianceWithManifestTrait
+            )
+        );
+        assert_eq!(
+            refuse_manifest_trait_variance_as_discrete_trait_observed_variance_with_manifest_trait(
+                manifest_trait,
+                recovered
+            ),
+            Err(
+                PsychometricError::ManifestTraitVarianceIsNotDiscreteTraitObservedVarianceWithManifestTrait
+            )
+        );
+        // Underflow of e^{a Δt} to +0 keeps λ² (trait / a²) + θ + ψ
+        // and is not a discrete lag (recover_discrete_lag_from_log_rate
+        // fails).
+        let underflow = recover_discrete_trait_observed_variance_with_manifest_trait(
+            loading,
+            trait_variance,
+            -800.0,
+            1.0,
+            measurement_error,
+            manifest_trait,
+            LagClock::EventTime,
+        )
+        .expect("underflow keeps λ² trait/a² + θ + ψ");
+        let underflow_limit = (loading * loading) * (trait_variance / ((-800.0) * (-800.0)))
+            + measurement_error
+            + manifest_trait;
+        assert!((underflow - underflow_limit).abs() < 1e-18);
+        assert!((underflow - 0.800_006_25).abs() < 1e-18);
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(-800.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn discrete_trait_observed_variance_with_manifest_trait_fails_closed_when_unstandardised_is_defined()
+     {
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                0.0,
+                1.0,
+                0.0,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Ok(0.8)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                0.0,
+                1.0,
+                0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Ok(0.8)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                0.0,
+                0.0,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Ok(0.8)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                0.0,
+                0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Ok(0.8)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                0.0,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::DiscreteTraitObservedVarianceWithManifestTraitRequiresStableDrift
+            )
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::DiscreteTraitObservedVarianceWithManifestTraitRequiresStableDrift
+            )
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -0.5,
+                0.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -0.5,
+                -1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                -1.0,
+                -0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                f64::NAN,
+                1.0,
+                -0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                f64::NAN,
+                -0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                f64::NAN,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -0.5,
+                f64::NAN,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -0.5,
+                1.0,
+                -0.1,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -0.5,
+                1.0,
+                0.3,
+                -0.1,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -0.5,
+                1.0,
+                f64::NAN,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -0.5,
+                1.0,
+                0.3,
+                f64::NAN,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -f64::from_bits(1),
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                f64::MAX,
+                1.0,
+                -0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                f64::MAX,
+                -0.5,
+                1.0,
+                0.3,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_observed_variance_with_manifest_trait(
+                2.0,
+                1.0,
+                -1e308,
+                1e308,
+                0.3,
+                0.5,
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
