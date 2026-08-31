@@ -73,7 +73,9 @@ version = "0.2.0"
 dependencies = [
  "corpus_split",
  "event_core",
+ "longitudinal_core",
  "membership_core",
+ "psychometric_core",
  "relation_graph",
  "serde",
  "serde_json",
