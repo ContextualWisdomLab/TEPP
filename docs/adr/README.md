@@ -36,6 +36,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0034](0034-analysis-run-stored-request-get.md) | Loopback GET analysis-run stored-request is metric-free inspect | Accepted | active-PR | Complements ADR 0018/0031/0032; does not supersede ADR 0014. ADR 0026–0033 live on other GAP-003A PRs. |
 | [0035](0035-analysis-run-retry-lineage-get.md) | Loopback GET analysis-run retry-lineage is metric-free parent/child inspect | Accepted | active-PR | Complements ADR 0018/0031/0032/0034; does not supersede ADR 0014. ADR 0026–0034 live on other GAP-003A PRs. |
 | [0037](0037-analysis-run-idempotency-lookup-get.md) | Loopback GET analysis-run idempotency-key lookup is metric-free identity resolve | Accepted | active-PR | Complements ADR 0018/0031/0032/0034/0035; does not supersede ADR 0014. ADR 0026–0036 live on other GAP-003A PRs. |
+| [0038](0038-analysis-run-retry-parent-get.md) | Loopback GET analysis-run retry-parent is metric-free child→parent inspect | Accepted | active-PR | Complements ADR 0018/0031/0032/0034/0035/0037; does not supersede ADR 0014. ADR 0026–0037 live on other GAP-003A PRs. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -152,6 +153,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **analysis-run stored-request GET:** ADR 0034.
 - **analysis-run retry-lineage GET:** ADR 0035.
 - **analysis-run idempotency-key lookup GET:** ADR 0037.
+- **analysis-run retry-parent GET:** ADR 0038.
 
 ## Change and supersession rule
 

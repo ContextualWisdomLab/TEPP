@@ -14,7 +14,9 @@
 //! retry. `GET /v1/analysis-runs/{run_id}/retries` returns metric-free direct
 //! retry children of a listed parent. `GET /v1/analysis-runs/by-idempotency/{key}`
 //! returns the metric-free identity of the unique run that used that key.
-//! GET-by-id and running/terminal POST transitions remain later slices.
+//! `GET /v1/analysis-runs/{run_id}/parent` returns the metric-free parent of a
+//! listed run (`null` when the run was never retried). GET-by-id and
+//! running/terminal POST transitions remain later slices.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -38,6 +40,10 @@ use crate::analysis_run_retry_http::{
 use crate::analysis_run_retry_lineage_http::{
     AnalysisRunRetryLineage, AnalysisRunRetryLineageItem, analysis_run_retry_lineage_path_run_id,
     refuse_metrics_on_retry_lineage_payload,
+};
+use crate::analysis_run_retry_parent_http::{
+    AnalysisRunRetryParent, AnalysisRunRetryParentItem, analysis_run_retry_parent_path_run_id,
+    refuse_metrics_on_retry_parent_payload,
 };
 use crate::analysis_run_stored_request_http::{
     AnalysisRunStoredRequest, analysis_run_stored_request_path_run_id,
@@ -202,6 +208,12 @@ impl AnalysisRunLiveService {
                 Ok(_) | Err(ApiError::LimitExceeded)
             ) {
                 return self.read_analysis_run_stored_request(path, &headers, body);
+            }
+            if matches!(
+                analysis_run_retry_parent_path_run_id(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.read_analysis_run_retry_parent(path, &headers, body);
             }
             if matches!(
                 analysis_run_idempotency_lookup_path_key(path),
@@ -544,6 +556,67 @@ impl AnalysisRunLiveService {
         Ok(json_response(200, "OK", response_body))
     }
 
+    fn read_analysis_run_retry_parent(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let run_id = analysis_run_retry_parent_path_run_id(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        refuse_metrics_on_retry_parent_payload(body)?;
+        let replay_key = self
+            .runs_by_id
+            .get(&run_id)
+            .cloned()
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let (child_id, child_state, child_key, child_consumer, parent_run_id) = {
+            let stored = self
+                .accepted_runs
+                .get(&replay_key)
+                .ok_or(ApiError::InvalidWirePayload)?;
+            (
+                stored.accepted.run_id.clone(),
+                stored.run_state,
+                stored.accepted.idempotency_key.clone(),
+                stored.consumer.clone(),
+                stored.retried_from_run_id.clone(),
+            )
+        };
+        if child_consumer != consumer {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let parent_item = match parent_run_id {
+            None => None,
+            Some(parent_id) => {
+                let parent_replay_key = self
+                    .runs_by_id
+                    .get(&parent_id)
+                    .cloned()
+                    .ok_or(ApiError::InvalidWirePayload)?;
+                let parent = self
+                    .accepted_runs
+                    .get(&parent_replay_key)
+                    .ok_or(ApiError::InvalidWirePayload)?;
+                if parent.consumer != consumer {
+                    return Err(ApiError::InvalidWirePayload);
+                }
+                Some(AnalysisRunRetryParentItem::new(
+                    parent.accepted.run_id.clone(),
+                    parent.run_state,
+                    parent.accepted.idempotency_key.clone(),
+                )?)
+            }
+        };
+        let payload = AnalysisRunRetryParent::new(child_id, child_state, child_key, parent_item)?;
+        let response_body = payload.to_json()?;
+        refuse_metrics_on_retry_parent_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
     fn list_analysis_runs(
         &self,
         path: &str,
@@ -606,9 +679,9 @@ impl AnalysisRunLiveService {
     /// Test-only seam that records a non-accepted loopback state.
     ///
     /// Used to prove cancel, collection, retry, stored-request inspect,
-    /// retry-lineage inspect, and idempotency-key lookup of running,
-    /// succeeded, failed, and cancelled runs without duplicating the live
-    /// POST running/terminal lifecycle slice.
+    /// retry-lineage inspect, idempotency-key lookup, and retry-parent
+    /// inspect of running, succeeded, failed, and cancelled runs without
+    /// duplicating the live POST running/terminal lifecycle slice.
     #[cfg(test)]
     fn force_loopback_run_state(
         &mut self,
@@ -2291,6 +2364,164 @@ mod tests {
         let lineage =
             service.handle_http_request(&retry_lineage_http(&parent_id, NARUON_CONSUMER_CODE, &[]));
         assert_eq!(lineage.status_code, 200);
+    }
+
+    fn retry_parent_http(run_id: &str, consumer: &str, extra: &[(&str, &str)]) -> String {
+        let mut request = format!("GET {NARUON_ANALYSIS_RUN_PATH}/{run_id}/parent HTTP/1.1\r\n");
+        write!(
+            request,
+            "Host: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\n"
+        )
+        .expect("retry-parent headers");
+        for (name, value) in extra {
+            write!(request, "{name}: {value}\r\n").expect("extra header");
+        }
+        request.push_str("content-length: 0\r\n\r\n");
+        request
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn handler_covers_metric_free_retry_parent_get() {
+        use crate::{AnalysisRunRetryParent, AnalysisRunRetryRequest, AnalysisRunStatusState};
+
+        let run = sample_run();
+        let mut service = AnalysisRunLiveService::new();
+        let accepted =
+            service.handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"));
+        assert_eq!(accepted.status_code, 202);
+        let parent_id = serde_json::from_str::<serde_json::Value>(&accepted.body)
+            .expect("accepted json")["run_id"]
+            .as_str()
+            .expect("run_id")
+            .to_owned();
+
+        let original =
+            service.handle_http_request(&retry_parent_http(&parent_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(original.status_code, 200);
+        let original_payload =
+            AnalysisRunRetryParent::from_json(&original.body).expect("original parent");
+        assert_eq!(original_payload.run_id, parent_id);
+        assert_eq!(original_payload.run_state, AnalysisRunStatusState::Accepted);
+        assert_eq!(original_payload.idempotency_key, run.idempotency_key);
+        assert_eq!(original_payload.parent, None);
+        assert!(original.body.contains("\"parent\":null"));
+        assert!(!original.body.contains("rmse"));
+        assert!(!original.body.contains("scientific_acceptance"));
+        assert!(!original.body.contains("snapshot_id"));
+        assert!(!original.body.contains("tenant_workspace_id"));
+        assert!(!original.body.contains("retried_from"));
+
+        service
+            .force_loopback_run_state(&parent_id, AnalysisRunStatusState::Failed)
+            .expect("force failed");
+        let retry_key = "analysis-live-retry-parent-retry-001";
+        let retry_body = AnalysisRunRetryRequest::new(&parent_id, retry_key)
+            .expect("retry dto")
+            .to_json()
+            .expect("retry json");
+        let retried = service.handle_http_request(&retry_http(
+            &parent_id,
+            &retry_body,
+            NARUON_CONSUMER_CODE,
+            retry_key,
+        ));
+        assert_eq!(retried.status_code, 202);
+        let child_id = serde_json::from_str::<serde_json::Value>(&retried.body)
+            .expect("child json")["run_id"]
+            .as_str()
+            .expect("child id")
+            .to_owned();
+
+        let child =
+            service.handle_http_request(&retry_parent_http(&child_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(child.status_code, 200);
+        let child_payload = AnalysisRunRetryParent::from_json(&child.body).expect("child parent");
+        assert_eq!(child_payload.run_id, child_id);
+        assert_eq!(child_payload.run_state, AnalysisRunStatusState::Accepted);
+        assert_eq!(child_payload.idempotency_key, retry_key);
+        let parent_item = child_payload.parent.expect("parent present");
+        assert_eq!(parent_item.run_id, parent_id);
+        assert_eq!(parent_item.run_state, AnalysisRunStatusState::Failed);
+        assert_eq!(parent_item.idempotency_key, run.idempotency_key);
+        assert!(!child.body.contains("retried_from"));
+        assert!(!child.body.contains("snapshot_id"));
+
+        let still_original =
+            service.handle_http_request(&retry_parent_http(&parent_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(still_original.status_code, 200);
+        assert_eq!(
+            AnalysisRunRetryParent::from_json(&still_original.body)
+                .expect("parent still original")
+                .parent,
+            None
+        );
+
+        assert_eq!(
+            service
+                .handle_http_request(&retry_parent_http(
+                    &child_id,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    &[],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&retry_parent_http("missing-run", NARUON_CONSUMER_CODE, &[],))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/{parent_id} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "POST {NARUON_ANALYSIS_RUN_PATH}/{parent_id}/parent HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/{parent_id}/parent HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}"
+                ))
+                .status_code,
+            400
+        );
+        let oversized = "a".repeat(129);
+        assert_eq!(
+            service
+                .handle_http_request(&retry_parent_http(&oversized, NARUON_CONSUMER_CODE, &[]))
+                .status_code,
+            413
+        );
+        let listed = service.handle_http_request(&collection_http(NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(listed.status_code, 200);
+        assert!(!listed.body.contains("retried_from"));
+        let stored = service.handle_http_request(&stored_request_http(
+            &parent_id,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(stored.status_code, 200);
+        let lineage =
+            service.handle_http_request(&retry_lineage_http(&parent_id, NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(lineage.status_code, 200);
+        let lookup = service.handle_http_request(&idempotency_lookup_http(
+            retry_key,
+            NARUON_CONSUMER_CODE,
+            &[],
+        ));
+        assert_eq!(lookup.status_code, 200);
     }
 
     #[test]

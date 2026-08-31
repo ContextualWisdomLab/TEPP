@@ -19,6 +19,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Analysis-run stored-request HTTP doctoring | [`docs/research/analysis-run-stored-request-http.md`](docs/research/analysis-run-stored-request-http.md) |
 | Analysis-run retry-lineage HTTP doctoring | [`docs/research/analysis-run-retry-lineage-http.md`](docs/research/analysis-run-retry-lineage-http.md) |
 | Analysis-run idempotency-key lookup HTTP doctoring | [`docs/research/analysis-run-idempotency-lookup-http.md`](docs/research/analysis-run-idempotency-lookup-http.md) |
+| Analysis-run retry-parent HTTP doctoring | [`docs/research/analysis-run-retry-parent-http.md`](docs/research/analysis-run-retry-parent-http.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
 | Logical/physical ERD | [`docs/ERD.md`](docs/ERD.md) |
 | Security policy | [`SECURITY.md`](SECURITY.md) |
