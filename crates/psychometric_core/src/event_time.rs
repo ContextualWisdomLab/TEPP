@@ -190,7 +190,13 @@
 //! mean when `u ≠ t0`; `e^{a(t−u)} m x` is a Dirac on the original
 //! process, not this `DRIFT` drive). The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
-//! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
+//! The 2017-era commented `asymTOTALVARstd` is `total / total = 1`
+//! after strictly positive three-term `asymTOTALVAR`
+//! `-q / (2 a) + trait / a² + (B / a)² v` (cran/ctsem 2.5.0
+//! `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-31T05:05Z). Form
+//! the three-term total inline. Unstandardised three-term total,
+//! `addedTIPREDVARstd`, and `asymDIFFUSIONstd` are not that
+//! correlation. The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
 
 use std::collections::BTreeMap;
@@ -2036,6 +2042,212 @@ pub fn recover_standardised_trait_variance(
     let inverse_sd = require_finite(1.0 / process_sd)?;
     let scaled = require_finite(inverse_sd * trait_variance)?;
     require_finite(scaled * inverse_sd)
+}
+
+/// Exact scalar 2017-era commented `asymTOTALVARstd`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 1, p. 4; Eq. 4, p. 5;
+/// Table 2, p. 12; §4.3, p. 9; §7.2, pp. 20–21; p. 16; footnote 4;
+/// 2017-era ctsem `summary.ctsemFit.R`; JSS PDF re-opened
+/// 2026-08-31T05:05Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// print standardised matrices with the suffix `std` when
+/// appropriate. Footnote 4 standardises using only the relevant
+/// variance. cran/ctsem 2.5.0 comments
+/// `asymTOTALVAR <- asymDIFFUSION + asymTRAITVAR` with
+/// `asymTRAITVAR <- solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))`,
+/// then later comments
+/// `asymTOTALVAR <- asymTOTALVAR + addedTIPREDVAR`, then
+/// `asymTOTALVARstd <- solve(sqrt(diag(asymTOTALVAR)+ridging)) %&%
+/// asymTOTALVAR`. `OpenMx` `%&%` is `t(A) %*% B %*% A`. The default
+/// `ridging = FALSE` adds 0. The scalar three-term total is
+/// `-q / (2 a) + trait / a² + (B / a)² v`. The scalar correlation
+/// is `total / total = 1` after strictly positive total. Form the
+/// three-term total inline (`1 / a`, then square, then multiply by
+/// `trait`, then add `asymDIFFUSION`, then include
+/// `addedTIPREDVAR`, then add). Then `1 / √total`, then
+/// `(1 / √total) total (1 / √total)`. This crate does not currently
+/// export `recover_asymptotic_total_variance_after_added_time_independent_predictor`
+/// or `recover_asymptotic_trait_variance`; form those terms from
+/// published-on-main maps and an inline `solve(DRIFT)` square.
+/// Unstandardised three-term total is defined for a zero total;
+/// standardised total is not. Zero total has no positive SD and
+/// fails closed. A zero extra with positive two-term total is kept
+/// as 1. A zero two-term total with positive extra is kept as 1.
+/// Distinct positive totals recover the same 1. `a ≥ 0` with a
+/// nonzero contribution cannot hold a finite Lyapunov /
+/// `solve(DRIFT)` map and fails closed. A non-event clock fails
+/// closed. `(B / a)² v / (B / a)² v = 1` is `addedTIPREDVARstd`
+/// and recovers the same number and remains a distinct named
+/// quantity. `p / p = 1` is `asymDIFFUSIONstd` and recovers the
+/// same number and remains a distinct named quantity. This is not
+/// a Kalman filter, not a matrix `expm`, not DSEM, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event
+/// clock,
+/// [`PsychometricError::StandardisedAsymptoticTotalVarianceRequiresPositiveAsymptoticTotalVariance`]
+/// when the three-term total is zero,
+/// [`PsychometricError::StandardisedAsymptoticTotalVarianceRequiresStableDrift`]
+/// when the drift is not strictly negative and a contribution is
+/// nonzero, and [`PsychometricError::InvalidNumericInput`] when an
+/// input is non-finite, a variance is negative, or a product or
+/// sum overflows.
+pub fn recover_standardised_asymptotic_total_variance(
+    trait_variance: f64,
+    continuous_diffusion: f64,
+    time_independent_effect: f64,
+    predictor_variance: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !trait_variance.is_finite() || trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !continuous_diffusion.is_finite() || continuous_diffusion < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !time_independent_effect.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !predictor_variance.is_finite() || predictor_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let ti_extra_is_zero = time_independent_effect == 0.0 || predictor_variance == 0.0;
+    if trait_variance == 0.0 && continuous_diffusion == 0.0 && ti_extra_is_zero {
+        return Err(
+            PsychometricError::StandardisedAsymptoticTotalVarianceRequiresPositiveAsymptoticTotalVariance,
+        );
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::StandardisedAsymptoticTotalVarianceRequiresStableDrift);
+    }
+    let stationary = if continuous_diffusion == 0.0 {
+        0.0
+    } else {
+        recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?
+    };
+    let asymptotic_trait = if trait_variance == 0.0 {
+        0.0
+    } else {
+        let inverse_rate = require_finite(1.0 / log_rate)?;
+        let inverse_rate_squared = require_finite(inverse_rate * inverse_rate)?;
+        require_finite(inverse_rate_squared * trait_variance)?
+    };
+    let two_term = if stationary == 0.0 {
+        asymptotic_trait
+    } else if asymptotic_trait == 0.0 {
+        stationary
+    } else {
+        require_finite(stationary + asymptotic_trait)?
+    };
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        clock,
+    )?;
+    let total = if added == 0.0 {
+        two_term
+    } else if two_term == 0.0 {
+        added
+    } else {
+        require_finite(two_term + added)?
+    };
+    if total == 0.0 {
+        return Err(
+            PsychometricError::StandardisedAsymptoticTotalVarianceRequiresPositiveAsymptoticTotalVariance,
+        );
+    }
+    let process_sd = total.sqrt();
+    let inverse_sd = require_finite(1.0 / process_sd)?;
+    let scaled = require_finite(inverse_sd * total)?;
+    require_finite(scaled * inverse_sd)
+}
+
+/// Refuse treating unstandardised three-term `asymTOTALVAR` as
+/// 2017-era commented `asymTOTALVARstd`.
+///
+/// Unstandardised `-q / (2 a) + trait / a² + (B / a)² v` is
+/// defined for a zero total. Footnote 4 `asymTOTALVARstd` requires
+/// strictly positive total. Equal numbers when `total = 1` remain
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedAsymptoticTotalVarianceIsNotStandardisedAsymptoticTotalVariance`].
+pub fn refuse_unstandardised_asymptotic_total_variance_as_standardised_asymptotic_total_variance(
+    unstandardised_asymptotic_total_variance: f64,
+    standardised_asymptotic_total_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_asymptotic_total_variance,
+        standardised_asymptotic_total_variance,
+    );
+    Err(
+        PsychometricError::UnstandardisedAsymptoticTotalVarianceIsNotStandardisedAsymptoticTotalVariance,
+    )
+}
+
+/// Refuse treating p. 16 `addedTIPREDVARstd` as 2017-era commented
+/// `asymTOTALVARstd`.
+///
+/// Both scalar correlations equal 1 after a strictly positive
+/// relevant variance. `addedTIPREDVARstd` standardises
+/// `(B / a)² v` alone. `asymTOTALVARstd` standardises the
+/// three-term total. Equal numbers remain distinct named
+/// quantities. This crate does not currently export
+/// `recover_standardised_asymptotic_time_independent_predictor_variance`;
+/// the refuse still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTotalVariance`].
+pub fn refuse_standardised_asymptotic_time_independent_variance_as_standardised_asymptotic_total_variance(
+    standardised_added_predictor_variance: f64,
+    standardised_asymptotic_total_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_added_predictor_variance,
+        standardised_asymptotic_total_variance,
+    );
+    Err(
+        PsychometricError::StandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTotalVariance,
+    )
+}
+
+/// Refuse treating p. 16 `asymDIFFUSIONstd` as 2017-era commented
+/// `asymTOTALVARstd`.
+///
+/// Both scalar correlations equal 1 after a strictly positive
+/// relevant variance. `asymDIFFUSIONstd` standardises
+/// within-subject `asymDIFFUSION`. `asymTOTALVARstd` standardises
+/// the three-term total. Equal numbers remain distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticTotalVariance`].
+pub fn refuse_standardised_asymptotic_diffusion_as_standardised_asymptotic_total_variance(
+    standardised_asymptotic_diffusion: f64,
+    standardised_asymptotic_total_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_asymptotic_diffusion,
+        standardised_asymptotic_total_variance,
+    );
+    Err(PsychometricError::StandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticTotalVariance)
 }
 
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
@@ -6887,7 +7099,8 @@ mod tests {
         recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
         recover_standardised_asymptotic_continuous_intercept,
-        recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
+        recover_standardised_asymptotic_diffusion, recover_standardised_asymptotic_total_variance,
+        recover_standardised_continuous_intercept,
         recover_standardised_discrete_continuous_intercept,
         recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
         recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
@@ -6979,7 +7192,9 @@ mod tests {
         refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance,
+        refuse_standardised_asymptotic_diffusion_as_standardised_asymptotic_total_variance,
         refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance,
+        refuse_standardised_asymptotic_time_independent_variance_as_standardised_asymptotic_total_variance,
         refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
         refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
@@ -7032,6 +7247,7 @@ mod tests {
         refuse_unmatched_time_varying_predictor_interval,
         refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
+        refuse_unstandardised_asymptotic_total_variance_as_standardised_asymptotic_total_variance,
         refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
@@ -16126,6 +16342,254 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_trait_variance(f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn standardised_asymptotic_total_variance_recovers_driver_commented_correlation() {
+        // cran/ctsem 2.5.0 summary.ctsemFit.R comments
+        // asymTOTALVAR <- asymDIFFUSION + asymTRAITVAR then
+        // asymTOTALVAR <- asymTOTALVAR + addedTIPREDVAR then
+        // asymTOTALVARstd <- solve(sqrt(diag(asymTOTALVAR)+ridging)) %&%
+        // asymTOTALVAR. Scalar: total/total = 1 after strictly
+        // positive three-term total. Form three-term inline.
+        let trait_variance = 1.0_f64;
+        let continuous_diffusion = 0.4_f64;
+        let time_independent_effect = 0.5_f64;
+        let predictor_variance = 1.0_f64;
+        let log_rate = -0.5_f64;
+        let recovered = recover_standardised_asymptotic_total_variance(
+            trait_variance,
+            continuous_diffusion,
+            time_independent_effect,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTOTALVARstd");
+        assert!((recovered - 1.0).abs() < 1e-15);
+        let larger = recover_standardised_asymptotic_total_variance(
+            4.0,
+            1.6,
+            1.0,
+            1.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTOTALVARstd larger total");
+        assert!((larger - recovered).abs() < 1e-15);
+        let zero_extra = recover_standardised_asymptotic_total_variance(
+            trait_variance,
+            continuous_diffusion,
+            0.0,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTOTALVARstd zero extra");
+        assert!((zero_extra - recovered).abs() < 1e-15);
+        let added_only = recover_standardised_asymptotic_total_variance(
+            0.0,
+            0.0,
+            time_independent_effect,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTOTALVARstd added only");
+        assert!((added_only - recovered).abs() < 1e-15);
+        let stationary =
+            recover_stationary_latent_variance(continuous_diffusion, log_rate, LagClock::EventTime)
+                .expect("asymDIFFUSION");
+        let inverse_rate = 1.0 / log_rate;
+        let asymptotic_trait = inverse_rate * inverse_rate * trait_variance;
+        let added = recover_asymptotic_time_independent_predictor_variance(
+            time_independent_effect,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("addedTIPREDVAR");
+        let unstandardised = stationary + asymptotic_trait + added;
+        assert!((unstandardised - 5.4).abs() < 1e-15);
+        assert!((unstandardised - recovered).abs() > 1e-3);
+        let added_std = 1.0_f64;
+        let diffusion_std = recover_standardised_asymptotic_diffusion(
+            continuous_diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymDIFFUSIONstd");
+        assert!((added_std - recovered).abs() < 1e-15);
+        assert!((diffusion_std - recovered).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_asymptotic_total_variance_as_standardised_asymptotic_total_variance(
+                unstandardised,
+                recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedAsymptoticTotalVarianceIsNotStandardisedAsymptoticTotalVariance
+            )
+        );
+        assert_eq!(
+            refuse_standardised_asymptotic_time_independent_variance_as_standardised_asymptotic_total_variance(
+                added_std,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedAsymptoticTimeIndependentVarianceIsNotStandardisedAsymptoticTotalVariance
+            )
+        );
+        assert_eq!(
+            refuse_standardised_asymptotic_diffusion_as_standardised_asymptotic_total_variance(
+                diffusion_std,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedAsymptoticDiffusionIsNotStandardisedAsymptoticTotalVariance
+            )
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn standardised_asymptotic_total_variance_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedAsymptoticTotalVarianceRequiresPositiveAsymptoticTotalVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.25,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedAsymptoticTotalVarianceRequiresPositiveAsymptoticTotalVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                1.0,
+                0.4,
+                0.5,
+                1.0,
+                -0.5,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                1.0,
+                0.4,
+                0.5,
+                1.0,
+                0.25,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::StandardisedAsymptoticTotalVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                1.0,
+                0.4,
+                0.5,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::StandardisedAsymptoticTotalVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                -1.0,
+                0.4,
+                0.5,
+                1.0,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                1.0,
+                -0.4,
+                0.5,
+                1.0,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                1.0,
+                0.4,
+                0.5,
+                -1.0,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                f64::NAN,
+                0.4,
+                0.5,
+                1.0,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                1.0,
+                0.4,
+                f64::NAN,
+                1.0,
+                -0.5,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                1.0,
+                0.4,
+                0.5,
+                1.0,
+                f64::NAN,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_asymptotic_total_variance(
+                1e200,
+                0.0,
+                0.0,
+                0.0,
+                -1e-200,
+                LagClock::EventTime
+            ),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
