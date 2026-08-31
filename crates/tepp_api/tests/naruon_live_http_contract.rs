@@ -719,6 +719,36 @@ fn serve_one_maps_partial_request_timeout_to_limit_exceeded() {
     assert_eq!(envelope(&served.body).error_code(), "limit_exceeded");
 }
 
+#[test]
+fn handle_http_refuses_lineageweave_get_and_accepted_retry() {
+    let mut service = NaruonLiveService::new();
+    let run = sample_run();
+    let created = service.handle_http_request(&analysis_http(&run));
+    assert_eq!(created.status_code, 202);
+    let parent = AnalysisRunAccepted::from_json(&created.body).expect("parent");
+
+    let accepted_retry = format!(
+        "POST {NARUON_ANALYSIS_RUN_PATH}/{}/retry HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: naruon-retry-too-early\r\ncontent-length: 0\r\n\r\n",
+        parent.run_id
+    );
+    assert_eq!(
+        service.handle_http_request(&accepted_retry).status_code,
+        400
+    );
+
+    let lineageweave = format!(
+        "POST {NARUON_ANALYSIS_RUN_PATH}/{}/retry HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: lineageweave\r\ntepp-contract-version: 1\r\nidempotency-key: naruon-retry-foreign\r\ncontent-length: 0\r\n\r\n",
+        parent.run_id
+    );
+    assert_eq!(service.handle_http_request(&lineageweave).status_code, 400);
+
+    let get = format!(
+        "GET {NARUON_ANALYSIS_RUN_PATH}/{}/retry HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: naruon-retry-get\r\ncontent-length: 0\r\n\r\n",
+        parent.run_id
+    );
+    assert_eq!(service.handle_http_request(&get).status_code, 400);
+}
+
 struct TimeoutRead;
 
 impl Read for TimeoutRead {

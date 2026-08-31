@@ -1,0 +1,1 @@
+- `tepp_api` adds `lineageweave_analysis_run_retry_exchange`, Naruon compatibility-listener retry, and a `tepp-loopback` TCP retry proof (ADR 0033). Metric-free child `202 Accepted` is unchanged from ADR 0032. Not GET status, not lifecycle POST, not an ADR 0014 claim.

@@ -189,6 +189,8 @@ pub use lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
 pub use lineageweave_http::NARUON_CONSUMER_CODE;
 /// Build a `LineageWeave` analysis-run exchange without provider credentials.
 pub use lineageweave_http::lineageweave_analysis_run_exchange;
+/// Build a `LineageWeave` analysis-run retry exchange without provider credentials.
+pub use lineageweave_http::lineageweave_analysis_run_retry_exchange;
 /// Build a `LineageWeave` project-history exchange without provider credentials.
 pub use lineageweave_http::lineageweave_project_history_exchange;
 /// Build a credential-free `LineageWeave` temporal-context exchange.
