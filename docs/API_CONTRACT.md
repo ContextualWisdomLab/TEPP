@@ -84,8 +84,10 @@ on the loopback listener transitions accepted or running runs to cancelled;
 succeeded, failed, and unknown runs fail closed. `GET /v1/analysis-runs` on
 the loopback listener returns a metric-free collection of those states so
 operators do not guess run identities. Collection bodies never carry
-`tepp.scientific_acceptance.v1`. GET-by-id remains a later slice on this
-protected-main lineage.
+`tepp.scientific_acceptance.v1`. `lineageweave_analysis_run_collection_exchange`
+builds the same GET for LineageWeave. `NaruonLiveService` serves collection GET
+for Naruon only; LineageWeave remains refused on that compatibility listener.
+GET-by-id remains a later slice on this protected-main lineage.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

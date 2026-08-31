@@ -1,0 +1,1 @@
+- `tepp_api` adds `lineageweave_analysis_run_collection_exchange`, Naruon compatibility-listener collection GET, and a `tepp-loopback` TCP list proof (ADR 0042). Metric-free collection rows are unchanged from ADR 0031. Not GET status, not lifecycle POST, not an ADR 0014 claim.
