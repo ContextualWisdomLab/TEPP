@@ -1094,6 +1094,15 @@ mod tests {
         assert!(!accepted.body.contains("scientific_acceptance"));
         assert!(!accepted.body.contains("rmse"));
         let accepted_dto = AnalysisRunAccepted::from_json(&accepted.body).expect("accepted");
+        assert_eq!(
+            service
+                .handle_http_request(
+                    &valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1",)
+                        .replacen("POST", "PUT", 1)
+                )
+                .status_code,
+            400
+        );
         let get_accepted = service.handle_http_request(&status_get(
             &accepted_dto.run_id,
             NARUON_CONSUMER_CODE,
@@ -1103,6 +1112,28 @@ mod tests {
         assert!(get_accepted.body.contains("\"accepted\""));
         assert!(!get_accepted.body.contains("scientific_acceptance"));
         assert!(!get_accepted.body.contains("rmse"));
+        service
+            .accepted_runs
+            .values_mut()
+            .next()
+            .expect("stored run")
+            .scientific_acceptance_json = Some("{}".into());
+        assert_eq!(
+            service
+                .handle_http_request(&status_get(
+                    &accepted_dto.run_id,
+                    NARUON_CONSUMER_CODE,
+                    run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+        service
+            .accepted_runs
+            .values_mut()
+            .next()
+            .expect("stored run")
+            .scientific_acceptance_json = None;
 
         let encoded = service.handle_http_request(&http_get(
             &format!("{NARUON_ANALYSIS_RUN_PATH}/tepp-run-%31"),

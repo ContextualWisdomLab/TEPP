@@ -481,33 +481,41 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         let mut failed_terminal = status.clone();
-        if let Some(terminal) = failed_terminal.terminal_result.as_mut() {
-            terminal.run_state = AnalysisRunTerminalState::Failed;
-        }
+        failed_terminal
+            .terminal_result
+            .as_mut()
+            .expect("terminal")
+            .run_state = AnalysisRunTerminalState::Failed;
         assert_eq!(
             status_http_json(&failed_terminal, &profile_request, Some(&artifact)),
             Err(ApiError::InvalidWirePayload)
         );
         let mut missing_digest = status.clone();
-        if let Some(terminal) = missing_digest.terminal_result.as_mut() {
-            terminal.result_sha256 = None;
-        }
+        missing_digest
+            .terminal_result
+            .as_mut()
+            .expect("terminal")
+            .result_sha256 = None;
         assert_eq!(
             status_http_json(&missing_digest, &profile_request, Some(&artifact)),
             Err(ApiError::InvalidWirePayload)
         );
         let mut missing_schema = status.clone();
-        if let Some(terminal) = missing_schema.terminal_result.as_mut() {
-            terminal.result_schema_version = None;
-        }
+        missing_schema
+            .terminal_result
+            .as_mut()
+            .expect("terminal")
+            .result_schema_version = None;
         assert_eq!(
             status_http_json(&missing_schema, &profile_request, Some(&artifact)),
             Err(ApiError::InvalidWirePayload)
         );
         let mut other_profile_terminal = status.clone();
-        if let Some(terminal) = other_profile_terminal.terminal_result.as_mut() {
-            terminal.output_profile = "calibrated_event_measurement".into();
-        }
+        other_profile_terminal
+            .terminal_result
+            .as_mut()
+            .expect("terminal")
+            .output_profile = "calibrated_event_measurement".into();
         assert_eq!(
             status_http_json(&other_profile_terminal, &profile_request, Some(&artifact)),
             Err(ApiError::InvalidWirePayload)

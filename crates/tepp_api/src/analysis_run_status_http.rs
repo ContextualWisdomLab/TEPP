@@ -217,6 +217,7 @@ mod tests {
         );
         assert_eq!(decode_path_segment("%"), Err(ApiError::InvalidWirePayload));
         assert_eq!(decode_path_segment("%2"), Err(ApiError::InvalidWirePayload));
+        assert_eq!(decode_path_segment(""), Err(ApiError::InvalidWirePayload));
         assert_eq!(
             decode_path_segment("%ZZ"),
             Err(ApiError::InvalidWirePayload)
