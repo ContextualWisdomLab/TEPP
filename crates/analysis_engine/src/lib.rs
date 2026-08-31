@@ -8,9 +8,12 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Joint Gaussian Laplace
+//! plausible-value draws are invoked through `topic_measurement` and are not
+//! MCMC.
 
 mod case_deletion_refit;
+mod joint_posterior_draws_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -41,6 +44,12 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Joint posterior Laplace-draw artifact and execution contracts from this engine.
+pub use joint_posterior_draws_artifact::{
+    JOINT_POSTERIOR_DRAWS_ARTIFACT_BYTE_LIMIT, JOINT_POSTERIOR_DRAWS_ARTIFACT_SCHEMA_VERSION,
+    JOINT_POSTERIOR_DRAWS_MODEL_CONTRACT_VERSION, JOINT_POSTERIOR_DRAWS_OUTPUT_PROFILE,
+    JointPosteriorDrawsArtifact, JointPosteriorDrawsExecution, execute_joint_posterior_draws_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +257,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A joint-posterior-draw artifact violated its bounded schema or counts.
+    InvalidJointPosteriorDrawsArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +273,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidJointPosteriorDrawsArtifact => "invalid joint posterior draws artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +692,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidJointPosteriorDrawsArtifact,
+                "invalid joint posterior draws artifact",
             ),
         ];
         for (error, message) in messages {
