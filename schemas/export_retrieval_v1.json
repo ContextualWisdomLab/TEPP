@@ -16,7 +16,7 @@
     "contract_version": { "type": "integer", "const": 1 },
     "export_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" },
     "artifact_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" },
-    "decision_code": { "type": "string", "minLength": 1, "pattern": ".*\\S.*" },
+    "decision_code": { "type": "string", "const": "purpose_bound_export_allowed" },
     "purpose": {
       "type": "string",
       "enum": [

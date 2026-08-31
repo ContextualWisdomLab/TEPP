@@ -23,8 +23,9 @@ Figma/export is a visual-analytics workflow and is not this HTTP identity.
 `AnalysisRunLiveService` (`tepp-loopback`) serves naruon-only export routes on
 loopback:
 
-- `POST /v1/exports` mints an opaque `export_id`, stores a metric-free
-  retrieval receipt in memory, and returns HTTP 200 with that receipt.
+- `POST /v1/exports` mints an unguessable UUID v7 bearer-capability
+  `export_id`, stores a metric-free retrieval receipt in memory, and returns
+  HTTP 200 with that receipt.
 - `GET /v1/exports/{export_id}` returns the same metric-free receipt.
 - The payload is `export_id`, `artifact_id`, `decision_code`, `purpose`, and
   `idempotency_key`.
@@ -36,9 +37,11 @@ loopback:
 - Empty GET bodies only. Query strings, collection GET `/v1/exports`,
   GET-by-id analysis-run paths, POST `/v1/exports/{export_id}`, and nonempty
   GET bodies fail closed.
-- The identity travels in the path. The NARUON GET exchange does not send an
-  `idempotency-key` header or credentials.
-- Unknown identities fail closed. Persistence remains GAP-003B.
+- The bearer capability travels in the path. The NARUON GET exchange does not
+  send an `idempotency-key` header or additional credential headers.
+- Unknown capabilities fail closed. Possession grants retrieval of only the
+  metric-free receipt, so callers must treat the path as sensitive. Persistence
+  remains GAP-003B.
 
 ## Non-goals
 
@@ -84,7 +87,8 @@ scientific-acceptance artifact from a retrieval payload.
 ## Security, privacy, scientific-integrity, and governance impact
 
 - No credential headers cross the consumer boundary.
-- Export retrieval remains loopback-only, size-bounded, naruon-scoped, and
+- Export retrieval remains loopback-only, unguessable-capability protected,
+  size-bounded, naruon-scoped, and
   content-redacting.
 - HTTP `200` on a retrieval payload is not measurement evidence and is not
   release evidence.

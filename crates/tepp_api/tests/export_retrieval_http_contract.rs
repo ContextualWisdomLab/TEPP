@@ -77,6 +77,10 @@ fn export_retrieval_contract_refuses_table_access_and_metric_keys() {
         Err(ApiError::InvalidWirePayload)
     );
     assert_eq!(
+        refuse_metrics_on_export_retrieval_payload(r#"{"nested":{"rmse":1.0}}"#),
+        Err(ApiError::InvalidWirePayload)
+    );
+    assert_eq!(
         refuse_metrics_on_export_retrieval_payload(r#"{"includes_source_text":true}"#),
         Err(ApiError::InvalidWirePayload)
     );

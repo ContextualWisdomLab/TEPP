@@ -49,6 +49,7 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 - redefinition of reserved headers (`content-type`, `tepp-consumer`,
   `tepp-contract-version`, `idempotency-key`) via extra headers → reject;
 - export interchange without a nonempty per-export idempotency key → reject;
+- export retrieval without the server-minted UUID v7 bearer capability → reject;
 - lexical method codes (`tfidf`, `bm25`, `keyword`) claiming TEPP inference → reject.
 
 ## Authority sources

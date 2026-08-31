@@ -23,6 +23,9 @@ pub const EXPORT_RETRIEVAL_ID_MAX_LEN: usize = 128;
 /// Supported export-retrieval contract version.
 pub const EXPORT_RETRIEVAL_CONTRACT_VERSION: u16 = 1;
 
+/// The only authorization decision that may mint a retrieval receipt.
+pub const EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE: &str = "purpose_bound_export_allowed";
+
 const FORBIDDEN_EXPORT_RETRIEVAL_KEYS: [&str; 16] = [
     "rmse",
     "rmse_standard_error",
@@ -136,6 +139,9 @@ impl ExportRetrieval {
         if !purpose_is_known(&self.purpose) {
             return Err(ApiError::InvalidWirePayload);
         }
+        if self.decision_code != EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE {
+            return Err(ApiError::AuthorizationDenied);
+        }
         if self.export_id.len() > EXPORT_RETRIEVAL_ID_MAX_LEN
             || self.artifact_id.len() > EXPORT_RETRIEVAL_ID_MAX_LEN
             || self.idempotency_key.len() > EXPORT_RETRIEVAL_ID_MAX_LEN
@@ -171,16 +177,24 @@ pub fn refuse_metrics_on_export_retrieval_payload(payload: &str) -> Result<(), A
     }
     let value: serde_json::Value =
         serde_json::from_str(payload).map_err(|_| ApiError::InvalidWirePayload)?;
-    let Some(object) = value.as_object() else {
+    if !value.is_object() {
         return Err(ApiError::InvalidWirePayload);
-    };
-    if FORBIDDEN_EXPORT_RETRIEVAL_KEYS
-        .iter()
-        .any(|key| object.contains_key(*key))
-    {
+    }
+    if contains_forbidden_export_key(&value) {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(())
+}
+
+fn contains_forbidden_export_key(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Object(object) => object.iter().any(|(key, value)| {
+            FORBIDDEN_EXPORT_RETRIEVAL_KEYS.contains(&key.as_str())
+                || contains_forbidden_export_key(value)
+        }),
+        serde_json::Value::Array(values) => values.iter().any(contains_forbidden_export_key),
+        _ => false,
+    }
 }
 
 /// Extract the opaque export identity from `GET /v1/exports/{export_id}`.
@@ -284,7 +298,7 @@ fn decode_path_segment(value: &str) -> Result<String, ApiError> {
         }
     }
     let decoded = String::from_utf8(out).map_err(|_| ApiError::InvalidWirePayload)?;
-    if decoded.is_empty() || decoded.contains('/') || decoded.contains('\0') {
+    if decoded.contains('/') || decoded.contains('\0') {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(decoded)
@@ -302,18 +316,19 @@ fn from_hex(byte: u8) -> Result<u8, ApiError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        EXPORT_RETRIEVAL_CONTRACT_VERSION, EXPORT_RETRIEVAL_ID_MAX_LEN, ExportRetrieval,
-        export_retrieval_path_id, naruon_export_retrieval_exchange,
-        refuse_metrics_on_export_retrieval_payload,
+        EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE, EXPORT_RETRIEVAL_CONTRACT_VERSION,
+        EXPORT_RETRIEVAL_ID_MAX_LEN, ExportRetrieval, export_retrieval_path_id,
+        naruon_export_retrieval_exchange, refuse_metrics_on_export_retrieval_payload,
     };
     use crate::ApiError;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn retrieval_round_trips_and_refuses_metrics() {
         let retrieval = ExportRetrieval::new(
             "export-1",
             "artifact-1",
-            "purpose_bound_export_allowed",
+            EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
             "modular_service_consumer",
             "export-idem-1",
         )
@@ -331,27 +346,96 @@ mod tests {
         assert_eq!(refuse_metrics_on_export_retrieval_payload(&json), Ok(()));
         assert_eq!(refuse_metrics_on_export_retrieval_payload(""), Ok(()));
         assert_eq!(
+            refuse_metrics_on_export_retrieval_payload(r#"{"nested":["safe"]}"#),
+            Ok(())
+        );
+        assert_eq!(
             refuse_metrics_on_export_retrieval_payload(r#"{"rmse":1.0}"#),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            ExportRetrieval::new("", "a", "c", "modular_service_consumer", "k"),
+            refuse_metrics_on_export_retrieval_payload(r#"{"nested":{"rmse":1.0}}"#),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            ExportRetrieval::new("e", "a", "c", "unknown_purpose", "k"),
+            refuse_metrics_on_export_retrieval_payload(r#"{"nested":[{"rmse":1.0}]}"#),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            refuse_metrics_on_export_retrieval_payload("[]"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            ExportRetrieval::new(
+                "",
+                "a",
+                EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
+                "modular_service_consumer",
+                "k"
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            ExportRetrieval::new("e", "a", "denied", "modular_service_consumer", "k"),
+            Err(ApiError::AuthorizationDenied)
+        );
+        assert_eq!(
+            ExportRetrieval::new(
+                "e",
+                "a",
+                EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
+                "unknown_purpose",
+                "k"
+            ),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
             ExportRetrieval::new(
                 "e".repeat(EXPORT_RETRIEVAL_ID_MAX_LEN + 1),
                 "a",
-                "c",
+                EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
                 "modular_service_consumer",
                 "k",
             ),
             Err(ApiError::LimitExceeded)
         );
+        assert_eq!(
+            ExportRetrieval::new(
+                "e",
+                "a".repeat(EXPORT_RETRIEVAL_ID_MAX_LEN + 1),
+                EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
+                "modular_service_consumer",
+                "k",
+            ),
+            Err(ApiError::LimitExceeded)
+        );
+        assert_eq!(
+            ExportRetrieval::new(
+                "e",
+                "a",
+                EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
+                "modular_service_consumer",
+                "k".repeat(EXPORT_RETRIEVAL_ID_MAX_LEN + 1),
+            ),
+            Err(ApiError::LimitExceeded)
+        );
+        for purpose in [
+            "scientific_validation",
+            "operational_monitoring",
+            "partner_disclosure",
+            "modular_service_consumer",
+        ] {
+            assert!(
+                ExportRetrieval::new(
+                    "e",
+                    "a",
+                    EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
+                    purpose,
+                    "k"
+                )
+                .is_ok()
+            );
+        }
     }
 
     #[test]
@@ -373,6 +457,26 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            export_retrieval_path_id("/v1/exports/%"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            export_retrieval_path_id("/v1/exports/%00"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            export_retrieval_path_id("/v1/exports/%2f"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            export_retrieval_path_id("/v1/exports/%GG"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            export_retrieval_path_id("/v1/exports/!"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             export_retrieval_path_id("/v1/analysis-runs/export-1"),
             Err(ApiError::InvalidWirePayload)
         );
@@ -391,14 +495,13 @@ mod tests {
             "https://tepp.example.test/v1/exports/export-1"
         );
         assert!(exchange.body.is_empty());
-        assert!(
-            !exchange
-                .headers
-                .iter()
-                .any(|(name, _)| name.contains("idempotency")
-                    || name.contains("authorization")
-                    || name.contains("token")
-                    || name.contains("copilot"))
+        assert_eq!(
+            exchange.headers,
+            vec![
+                ("content-type".into(), "application/json".into()),
+                ("tepp-consumer".into(), "naruon".into()),
+                ("tepp-contract-version".into(), "1".into()),
+            ]
         );
         assert_eq!(
             naruon_export_retrieval_exchange("http://tepp.example.test", "export-1"),

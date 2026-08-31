@@ -34,7 +34,6 @@ const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct StoredExport {
-    consumer: String,
     request: ExportAuthorizationRequest,
     retrieval: ExportRetrieval,
 }
@@ -53,7 +52,6 @@ pub struct AnalysisRunLiveService {
     bound_addr: Option<SocketAddr>,
     next_run_serial: u64,
     next_request_serial: u64,
-    next_export_serial: u64,
     accepted_runs: HashMap<String, (AnalysisRunRequest, AnalysisRunAccepted)>,
     accepted_project_histories: HashMap<String, (ProjectHistoryRequest, ProjectHistoryProjection)>,
     authorized_exports: HashMap<String, StoredExport>,
@@ -75,7 +73,6 @@ impl AnalysisRunLiveService {
             bound_addr: None,
             next_run_serial: 1,
             next_request_serial: 1,
-            next_export_serial: 1,
             accepted_runs: HashMap::new(),
             accepted_project_histories: HashMap::new(),
             authorized_exports: HashMap::new(),
@@ -300,8 +297,7 @@ impl AnalysisRunLiveService {
             }
             return Err(ApiError::InvalidWirePayload);
         }
-        let export_id = format!("tepp-export-{}", self.next_export_serial);
-        self.next_export_serial += 1;
+        let export_id = uuid::Uuid::now_v7().hyphenated().to_string();
         let retrieval = ExportRetrieval::new(
             export_id.clone(),
             request.artifact_id.clone(),
@@ -312,14 +308,8 @@ impl AnalysisRunLiveService {
         let response_body = retrieval.to_json()?;
         refuse_metrics_on_export_retrieval_payload(&response_body)?;
         self.exports_by_id.insert(export_id, replay_key.clone());
-        self.authorized_exports.insert(
-            replay_key,
-            StoredExport {
-                consumer: consumer.to_owned(),
-                request,
-                retrieval,
-            },
-        );
+        self.authorized_exports
+            .insert(replay_key, StoredExport { request, retrieval });
         Ok(json_response(200, "OK", response_body))
     }
 
@@ -347,9 +337,6 @@ impl AnalysisRunLiveService {
             .authorized_exports
             .get(&replay_key)
             .ok_or(ApiError::InvalidWirePayload)?;
-        if stored.consumer != consumer {
-            return Err(ApiError::InvalidWirePayload);
-        }
         let response_body = stored.retrieval.to_json()?;
         refuse_metrics_on_export_retrieval_payload(&response_body)?;
         Ok(json_response(200, "OK", response_body))
@@ -589,6 +576,14 @@ mod tests {
             service
                 .handle_http_request(&format!(
                     "GET {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "PUT {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\ncontent-length: 0\r\n\r\n"
                 ))
                 .status_code,
             400
@@ -1080,6 +1075,9 @@ mod tests {
         ));
         assert_eq!(posted.status_code, 200);
         let retrieval = ExportRetrieval::from_json(&posted.body).expect("posted retrieval");
+        let parsed_export_id =
+            uuid::Uuid::parse_str(&retrieval.export_id).expect("UUID capability");
+        assert_eq!(parsed_export_id.get_version_num(), 7);
         assert_eq!(retrieval.artifact_id, "artifact-live-1");
         assert_eq!(retrieval.purpose, "modular_service_consumer");
         assert_eq!(retrieval.decision_code, "purpose_bound_export_allowed");
@@ -1210,6 +1208,16 @@ mod tests {
             "principal-analyst-1",
         ));
         assert_eq!(principal_as_key.status_code, 400);
+        assert_eq!(
+            service
+                .handle_http_request(&export_post_http(
+                    &body,
+                    NARUON_CONSUMER_CODE,
+                    &"k".repeat(crate::EXPORT_RETRIEVAL_ID_MAX_LEN + 1),
+                ))
+                .status_code,
+            413
+        );
     }
 
     fn export_post_http(body: &str, consumer: &str, idempotency_key: &str) -> String {
