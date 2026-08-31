@@ -14,6 +14,7 @@
 mod analysis_result;
 mod analysis_run;
 mod analysis_run_cancel_http;
+mod analysis_run_collection_http;
 mod analysis_run_live;
 mod analysis_run_status_http;
 mod authorization;
@@ -80,6 +81,28 @@ pub use analysis_run_cancel_http::AnalysisRunCancelRequest;
 pub use analysis_run_cancel_http::naruon_analysis_run_cancel_exchange;
 /// Refuse scientific-metric keys on a cancel payload.
 pub use analysis_run_cancel_http::refuse_metrics_on_cancel_payload;
+/// Analysis-run collection contract version constant.
+pub use analysis_run_collection_http::ANALYSIS_RUN_COLLECTION_CONTRACT_VERSION;
+/// Maximum exclusive collection cursor length.
+pub use analysis_run_collection_http::ANALYSIS_RUN_COLLECTION_CURSOR_MAX_LEN;
+/// Default collection page size.
+pub use analysis_run_collection_http::ANALYSIS_RUN_COLLECTION_DEFAULT_LIMIT;
+/// Maximum collection page size.
+pub use analysis_run_collection_http::ANALYSIS_RUN_COLLECTION_MAX_LIMIT;
+/// Versioned metric-free analysis-run collection page.
+pub use analysis_run_collection_http::AnalysisRunCollection;
+/// One metric-free collection row.
+pub use analysis_run_collection_http::AnalysisRunCollectionItem;
+/// True when the path is exactly the analysis-run collection resource.
+pub use analysis_run_collection_http::is_analysis_run_collection_path;
+/// Build a Naruon analysis-run collection GET exchange.
+pub use analysis_run_collection_http::naruon_analysis_run_collection_exchange;
+/// Parse the exclusive collection page cursor.
+pub use analysis_run_collection_http::parse_collection_page_cursor;
+/// Parse the collection page limit.
+pub use analysis_run_collection_http::parse_collection_page_limit;
+/// Refuse scientific-metric keys on a collection payload.
+pub use analysis_run_collection_http::refuse_metrics_on_collection_payload;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
 /// Analysis-run status HTTP exchange re-exports.

@@ -6,7 +6,8 @@
 //! acknowledgements and temporal evidence context only; completed psychometric
 //! results remain outside this crate. `POST /v1/analysis-runs/{run_id}/cancel`
 //! is the operator-visible cancel path: accepted and running runs become
-//! metric-free `cancelled` status. GET status and running/terminal POST
+//! metric-free `cancelled` status. `GET /v1/analysis-runs` enumerates those
+//! runs without guessing identities. GET-by-id and running/terminal POST
 //! transitions remain later slices.
 
 use std::collections::HashMap;
@@ -15,6 +16,11 @@ use std::net::{SocketAddr, TcpListener};
 
 use crate::analysis_run_cancel_http::{
     AnalysisRunCancelRequest, analysis_run_cancel_path_run_id, refuse_metrics_on_cancel_payload,
+};
+use crate::analysis_run_collection_http::{
+    AnalysisRunCollection, AnalysisRunCollectionItem, is_analysis_run_collection_path,
+    parse_collection_page_cursor, parse_collection_page_limit,
+    refuse_metrics_on_collection_payload,
 };
 use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};
 use crate::live_http::{
@@ -161,10 +167,13 @@ impl AnalysisRunLiveService {
         let (header_block, body) = split_request_with_limit(request, MAX_LIVE_REQUEST_BODY_BYTES)?;
         let mut lines = header_block.split("\r\n");
         let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
+        let headers = parse_headers(&mut lines)?;
+        if method == "GET" {
+            return self.list_analysis_runs(path, &headers, body);
+        }
         if method != "POST" {
             return Err(ApiError::InvalidWirePayload);
         }
-        let headers = parse_headers(&mut lines)?;
         if matches!(
             analysis_run_cancel_path_run_id(path),
             Ok(_) | Err(ApiError::LimitExceeded)
@@ -280,10 +289,70 @@ impl AnalysisRunLiveService {
         Ok(json_response(200, "OK", response_body))
     }
 
+    fn list_analysis_runs(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if !is_analysis_run_collection_path(path) {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        refuse_metrics_on_collection_payload(body)?;
+        let limit =
+            parse_collection_page_limit(headers.get("tepp-page-limit").map(String::as_str))?;
+        let cursor =
+            parse_collection_page_cursor(headers.get("tepp-page-cursor").map(String::as_str))?;
+        let mut rows: Vec<&LiveAnalysisRun> = self
+            .accepted_runs
+            .values()
+            .filter(|stored| stored.consumer == consumer)
+            .collect();
+        rows.sort_by(|left, right| left.accepted.run_id.cmp(&right.accepted.run_id));
+        let start = match cursor {
+            Some(cursor) => {
+                let position = rows
+                    .iter()
+                    .position(|stored| stored.accepted.run_id == cursor)
+                    .ok_or(ApiError::InvalidWirePayload)?;
+                position + 1
+            }
+            None => 0,
+        };
+        let page = rows.get(start..).unwrap_or(&[]);
+        let (visible, remainder) = if page.len() > limit {
+            page.split_at(limit)
+        } else {
+            (page, &[] as &[&LiveAnalysisRun])
+        };
+        let mut items = Vec::with_capacity(visible.len());
+        for stored in visible {
+            items.push(AnalysisRunCollectionItem::new(
+                stored.accepted.run_id.clone(),
+                stored.run_state,
+                stored.accepted.idempotency_key.clone(),
+            )?);
+        }
+        let next_cursor = if remainder.is_empty() {
+            None
+        } else {
+            visible.last().map(|stored| stored.accepted.run_id.clone())
+        };
+        let collection = AnalysisRunCollection::new(items, next_cursor)?;
+        let response_body = collection.to_json()?;
+        refuse_metrics_on_collection_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
     /// Test-only seam that records a non-accepted loopback state.
     ///
-    /// Used to prove cancel of running, succeeded, and failed runs without
-    /// duplicating the live POST running/terminal lifecycle slice.
+    /// Used to prove cancel and collection of running, succeeded, failed, and
+    /// cancelled runs without duplicating the live POST running/terminal
+    /// lifecycle slice.
     #[cfg(test)]
     fn force_loopback_run_state(
         &mut self,
@@ -1013,6 +1082,208 @@ mod tests {
                     "",
                     NARUON_CONSUMER_CODE,
                     run.idempotency_key.as_str(),
+                ))
+                .status_code,
+            400
+        );
+    }
+
+    fn collection_http(consumer: &str, extra: &[(&str, &str)]) -> String {
+        let mut request = format!("GET {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\n");
+        write!(
+            request,
+            "Host: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\n"
+        )
+        .expect("collection headers");
+        for (name, value) in extra {
+            write!(request, "{name}: {value}\r\n").expect("extra header");
+        }
+        request.push_str("content-length: 0\r\n\r\n");
+        request
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn handler_covers_metric_free_collection_get() {
+        use crate::{AnalysisRunCollection, AnalysisRunStatusState};
+
+        let run = sample_run();
+        let mut service = AnalysisRunLiveService::new();
+        let empty = service.handle_http_request(&collection_http(NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(empty.status_code, 200);
+        let empty_page = AnalysisRunCollection::from_json(&empty.body).expect("empty");
+        assert!(empty_page.runs.is_empty());
+        assert_eq!(empty_page.next_cursor, None);
+        assert!(!empty.body.contains("scientific_acceptance"));
+        assert!(!empty.body.contains("rmse"));
+        assert!(!empty.body.contains("terminal_result"));
+
+        let accepted =
+            service.handle_http_request(&valid_request(&run, NARUON_CONSUMER_CODE, "127.0.0.1"));
+        assert_eq!(accepted.status_code, 202);
+        let mut second = run.clone();
+        second.idempotency_key = "analysis-live-idem-002".into();
+        assert_eq!(
+            service
+                .handle_http_request(&valid_request(&second, NARUON_CONSUMER_CODE, "127.0.0.1"))
+                .status_code,
+            202
+        );
+        let mut third = run.clone();
+        third.idempotency_key = "analysis-live-idem-003".into();
+        assert_eq!(
+            service
+                .handle_http_request(&valid_request(&third, NARUON_CONSUMER_CODE, "127.0.0.1"))
+                .status_code,
+            202
+        );
+        service
+            .force_loopback_run_state("tepp-run-2", AnalysisRunStatusState::Running)
+            .expect("running");
+        service
+            .force_loopback_run_state("tepp-run-3", AnalysisRunStatusState::Cancelled)
+            .expect("cancelled");
+        let mut failed = run.clone();
+        failed.idempotency_key = "analysis-live-idem-004".into();
+        assert_eq!(
+            service
+                .handle_http_request(&valid_request(&failed, NARUON_CONSUMER_CODE, "127.0.0.1"))
+                .status_code,
+            202
+        );
+        service
+            .force_loopback_run_state("tepp-run-4", AnalysisRunStatusState::Failed)
+            .expect("failed");
+        let mut succeeded = run.clone();
+        succeeded.idempotency_key = "analysis-live-idem-005".into();
+        assert_eq!(
+            service
+                .handle_http_request(&valid_request(
+                    &succeeded,
+                    NARUON_CONSUMER_CODE,
+                    "127.0.0.1"
+                ))
+                .status_code,
+            202
+        );
+        service
+            .force_loopback_run_state("tepp-run-5", AnalysisRunStatusState::Succeeded)
+            .expect("succeeded");
+        assert_eq!(
+            service
+                .handle_http_request(&valid_request(
+                    &run,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    "127.0.0.1"
+                ))
+                .status_code,
+            202
+        );
+
+        let listed = service.handle_http_request(&collection_http(NARUON_CONSUMER_CODE, &[]));
+        assert_eq!(listed.status_code, 200);
+        let page = AnalysisRunCollection::from_json(&listed.body).expect("page");
+        assert_eq!(page.runs.len(), 5);
+        assert_eq!(page.next_cursor, None);
+        assert_eq!(page.runs[0].run_id, "tepp-run-1");
+        assert_eq!(page.runs[0].run_state, AnalysisRunStatusState::Accepted);
+        assert_eq!(page.runs[1].run_state, AnalysisRunStatusState::Running);
+        assert_eq!(page.runs[2].run_state, AnalysisRunStatusState::Cancelled);
+        assert_eq!(page.runs[3].run_state, AnalysisRunStatusState::Failed);
+        assert_eq!(page.runs[4].run_state, AnalysisRunStatusState::Succeeded);
+        assert!(!listed.body.contains("scientific_acceptance"));
+        assert!(!listed.body.contains("rmse"));
+        assert!(!listed.body.contains("terminal_result"));
+
+        let lineage =
+            service.handle_http_request(&collection_http(LINEAGEWEAVE_CONSUMER_CODE, &[]));
+        let lineage_page = AnalysisRunCollection::from_json(&lineage.body).expect("lineage");
+        assert_eq!(lineage_page.runs.len(), 1);
+        assert_eq!(lineage_page.runs[0].run_id, "tepp-run-6");
+
+        let first = service.handle_http_request(&collection_http(
+            NARUON_CONSUMER_CODE,
+            &[("tepp-page-limit", "2")],
+        ));
+        let first_page = AnalysisRunCollection::from_json(&first.body).expect("first");
+        assert_eq!(first_page.runs.len(), 2);
+        assert_eq!(first_page.next_cursor.as_deref(), Some("tepp-run-2"));
+        let second_page_http = service.handle_http_request(&collection_http(
+            NARUON_CONSUMER_CODE,
+            &[("tepp-page-cursor", "tepp-run-2"), ("tepp-page-limit", "2")],
+        ));
+        let second_page = AnalysisRunCollection::from_json(&second_page_http.body).expect("second");
+        assert_eq!(second_page.runs.len(), 2);
+        assert_eq!(second_page.runs[0].run_id, "tepp-run-3");
+        assert_eq!(second_page.next_cursor.as_deref(), Some("tepp-run-4"));
+        let last_page = AnalysisRunCollection::from_json(
+            &service
+                .handle_http_request(&collection_http(
+                    NARUON_CONSUMER_CODE,
+                    &[("tepp-page-cursor", "tepp-run-4"), ("tepp-page-limit", "2")],
+                ))
+                .body,
+        )
+        .expect("last");
+        assert_eq!(last_page.runs.len(), 1);
+        assert_eq!(last_page.runs[0].run_id, "tepp-run-5");
+        assert_eq!(last_page.next_cursor, None);
+
+        assert_eq!(
+            service
+                .handle_http_request(&collection_http(
+                    NARUON_CONSUMER_CODE,
+                    &[("tepp-page-cursor", "missing")],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&collection_http(
+                    NARUON_CONSUMER_CODE,
+                    &[("tepp-page-limit", "0")],
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&collection_http(
+                    NARUON_CONSUMER_CODE,
+                    &[("tepp-page-limit", "65")],
+                ))
+                .status_code,
+            413
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/tepp-run-1 HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}?cursor=tepp-run-1 HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\ncontent-length: 0\r\n\r\n"
                 ))
                 .status_code,
             400
