@@ -199,6 +199,14 @@
 //! unstandardised `τ` is defined for a zero residual and is not
 //! that map; `θ / θ = 1` is `MANIFESTVARstd` and is not that map
 //! even when `τ = √θ`; JSS PDF re-opened 2026-08-25T11:32Z),
+//! recovers the Driver p. 16 `TIPREDMEANSstd` as `μ_z / √v` after
+//! strictly positive `TIPREDVAR` (footnote 4 uses only the relevant
+//! predictor variance, not process-dynamics `asymDIFFUSION`;
+//! unstandardised `μ_z` is defined for a zero predictor variance
+//! and is not that map; `v / v = 1` is `TIPREDVARstd` and is not
+//! that map even when `μ_z = √v`; the 2017-era source forms
+//! `TIPREDVARstd` and does not form `TIPREDMEANSstd`; JSS PDF
+//! re-opened 2026-08-31T03:30Z),
 //! recovers the Driver p. 16 `T0MEANSstd` as `μ_0 / √p_0` after
 //! strictly positive free `T0VAR` (footnote 4 uses only the
 //! relevant first-occasion variance, not process-dynamics
@@ -417,6 +425,8 @@ pub use event_time::recover_standardised_manifest_mean;
 pub use event_time::recover_standardised_manifest_trait_variance;
 /// Exact scalar p. 16 `MANIFESTVARstd` `θ/...` after strictly positive `MANIFESTVAR`.
 pub use event_time::recover_standardised_manifest_variance;
+/// Exact scalar p. 16 `TIPREDMEANSstd` `μ_z / √v` after strictly positive `TIPREDVAR`.
+pub use event_time::recover_standardised_time_independent_predictor_mean;
 
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
@@ -641,6 +651,8 @@ pub use event_time::refuse_standardised_manifest_variance_as_standardised_manife
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
+/// Refuse treating p. 16 `TIPREDVARstd` as `TIPREDMEANSstd`.
+pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_time_independent_predictor_mean;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
 pub use event_time::refuse_standardised_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating p. 16 stationary `T0MEANS` as `asymCINT`.
@@ -743,11 +755,15 @@ pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest
 pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
+/// Refuse treating unstandardised `TIPREDMEANS` as `TIPREDMEANSstd`.
+pub use event_time::refuse_unstandardised_time_independent_predictor_mean_as_standardised_time_independent_predictor_mean;
 
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
 pub use event_time::refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean;
+/// Refuse treating `μ_z / √asymDIFFUSION` as `TIPREDMEANSstd`.
+pub use event_time::refuse_within_subject_scaled_time_independent_predictor_mean_as_standardised_time_independent_predictor_mean;
 /// Indicator coordinate kind.
 pub use indicator::IndicatorKind;
 /// Pearson correlation on valid coordinates.
