@@ -1,13 +1,14 @@
 FROM rust:1.98.0-bookworm@sha256:e70e2eec3d495fd5c8e0be74adda86507dfac7f51a724fbf9813ff59b2b247c7 AS build
 WORKDIR /src
 COPY . .
-RUN cargo build --locked --release -p analysis_engine --bin tepp-loopback
+RUN cargo build --locked --release -p analysis_engine --bin tepp-loopback --bin tepp-execute
 
 FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/target/release/tepp-loopback /usr/local/bin/tepp-loopback
+COPY --from=build /src/target/release/tepp-execute /usr/local/bin/tepp-execute
 USER 65532:65532
 HEALTHCHECK --interval=10s --timeout=3s --start-period=2s --retries=5 \
     CMD curl --fail --silent --show-error \

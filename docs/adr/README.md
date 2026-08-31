@@ -37,6 +37,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0033](0033-scientific-acceptance-loopback-binary.md) | Scientific-acceptance published loopback binary | Accepted | active-PR | `tepp-loopback` moves to `analysis_engine` and binds `ScientificAcceptanceLoopbackService` so `/execute` is reachable on the packaged listener. Persistence remains GAP-003B. |
 | [0034](0034-scientific-acceptance-execute-consumer-exchange.md) | Scientific-acceptance execute consumer exchange | Accepted | active-PR | Naruon and `LineageWeave` mint credential-free POST `/execute` through typed exchanges in `analysis_engine`. Persistence remains GAP-003B. |
 | [0037](0037-scientific-acceptance-execute-exchange-loopback-tcp.md) | Scientific-acceptance execute exchange on loopback TCP | Accepted | active-PR | Typed naruon/`LineageWeave` execute exchanges render onto the spawned `tepp-loopback` TCP listener. Persistence remains GAP-003B. |
+| [0041](0041-scientific-acceptance-execute-cli.md) | Scientific-acceptance execute loopback CLI | Accepted | active-PR | Published `tepp-execute` POSTs typed naruon/`LineageWeave` execute exchanges onto spawned `tepp-loopback` TCP. Persistence remains GAP-003B. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -149,6 +150,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **scientific-acceptance published loopback binary:** ADR 0033.
 - **scientific-acceptance execute consumer exchange:** ADR 0034.
 - **scientific-acceptance execute exchange on loopback TCP:** ADR 0037.
+- **scientific-acceptance execute loopback CLI:** ADR 0041.
 - **independent lineage criterion and posterior Project Journey:** ADR 0023.
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
 

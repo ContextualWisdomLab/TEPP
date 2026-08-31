@@ -118,7 +118,10 @@ binds that wrapper so operators reach `/execute` without embedding
 consumer contracts for that POST; they refuse LLM recovery, receipt metric
 keys, and non-`https` origins. `loopback_http1_from_execute_exchange` renders
 those exchanges onto the spawned `tepp-loopback` TCP listener; public bind
-hosts and `localhost` fail closed. Production TLS remains a later adapter.
+hosts and `localhost` fail closed. The published `tepp-execute` CLI POSTs those
+typed exchanges from stdin so operators do not write HTTP; public bind hosts,
+`localhost`, credential-shaped flags, empty stdin, LLM recovery, metric keys,
+and `http://` origins fail closed. Production TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
 path behind these DTOs. It consumes a bounded identity-free snapshot, excludes

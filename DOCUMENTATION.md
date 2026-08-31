@@ -63,6 +63,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Scientific-acceptance published loopback binary doctoring | [`docs/research/scientific-acceptance-loopback-binary.md`](docs/research/scientific-acceptance-loopback-binary.md) |
 | Scientific-acceptance execute consumer-exchange doctoring | [`docs/research/scientific-acceptance-execute-consumer-exchange.md`](docs/research/scientific-acceptance-execute-consumer-exchange.md) |
 | Scientific-acceptance execute-exchange loopback TCP doctoring | [`docs/research/scientific-acceptance-execute-exchange-loopback-tcp.md`](docs/research/scientific-acceptance-execute-exchange-loopback-tcp.md) |
+| Scientific-acceptance execute CLI doctoring | [`docs/research/scientific-acceptance-execute-cli.md`](docs/research/scientific-acceptance-execute-cli.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
 | Relation absence is not negative evidence | [`docs/research/relation-absence-not-negative.md`](docs/research/relation-absence-not-negative.md) |
@@ -157,6 +158,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Scientific-acceptance published loopback binary doctoring | [`docs/research/scientific-acceptance-loopback-binary.md`](docs/research/scientific-acceptance-loopback-binary.md) |
 | Scientific-acceptance execute consumer-exchange doctoring | [`docs/research/scientific-acceptance-execute-consumer-exchange.md`](docs/research/scientific-acceptance-execute-consumer-exchange.md) |
 | Scientific-acceptance execute-exchange loopback TCP doctoring | [`docs/research/scientific-acceptance-execute-exchange-loopback-tcp.md`](docs/research/scientific-acceptance-execute-exchange-loopback-tcp.md) |
+| Scientific-acceptance execute CLI doctoring | [`docs/research/scientific-acceptance-execute-cli.md`](docs/research/scientific-acceptance-execute-cli.md) |
 | Retention/deletion/legal-hold doctoring | [`docs/research/retention-deletion-legal-hold.md`](docs/research/retention-deletion-legal-hold.md) |
 | Stopword-deletion doctoring | [`docs/research/stopword-deletion.md`](docs/research/stopword-deletion.md) |
 | Provider-payload minimization doctoring | [`docs/research/provider-payload-minimization.md`](docs/research/provider-payload-minimization.md) |
