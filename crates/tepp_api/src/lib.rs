@@ -20,6 +20,7 @@ mod corpus_split_manifest;
 mod envelope;
 mod error;
 mod export;
+mod export_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
 mod lineageweave_http;
@@ -95,6 +96,16 @@ pub use export::GraphMlExport;
 pub use export::JsonLdExport;
 /// Reproducibility manifest.
 pub use export::ReproducibilityManifest;
+/// Export-retrieval contract version constant.
+pub use export_http::EXPORT_RETRIEVAL_CONTRACT_VERSION;
+/// Maximum export identity length on the retrieval path.
+pub use export_http::EXPORT_RETRIEVAL_ID_MAX_LEN;
+/// Metric-free export retrieval payload.
+pub use export_http::ExportRetrieval;
+/// Build a naruon export-retrieval GET exchange.
+pub use export_http::naruon_export_retrieval_exchange;
+/// Refuse scientific-metric keys on export-retrieval JSON.
+pub use export_http::refuse_metrics_on_export_retrieval_payload;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;

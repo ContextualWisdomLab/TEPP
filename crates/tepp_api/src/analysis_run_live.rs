@@ -2,28 +2,42 @@
 //!
 //! This module keeps the Naruon compatibility listener intact while providing
 //! the shared `/v1/analysis-runs` and cutoff-safe `/v1/temporal-context`
-//! boundaries needed by Naruon and `LineageWeave`. It accepts transport
-//! acknowledgements and temporal evidence context only; completed psychometric
-//! results remain outside this crate.
+//! boundaries needed by Naruon and `LineageWeave`. Naruon may also POST and
+//! GET `/v1/exports/{export_id}` for metric-free purpose-bound retrieval.
+//! It accepts transport acknowledgements, temporal evidence context, and
+//! export identities only; completed psychometric results remain outside this
+//! crate.
 
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
 
-use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};
+use crate::export_http::{export_retrieval_path_id, refuse_metrics_on_export_retrieval_payload};
+use crate::lineageweave_http::{
+    LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, consumer_is_supported,
+};
 use crate::live_http::{
     header_value, map_io_error, parse_headers, parse_request_line, read_http_request_with_limit,
     split_request_with_limit, validate_common_headers,
 };
-use crate::naruon_http::NARUON_ANALYSIS_RUN_PATH;
+use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
-    ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_PATH,
-    ProjectHistoryProjection, ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH, TemporalContextRequest,
+    AnalysisRunAccepted, AnalysisRunRequest, AnalyticalPurpose, ApiError,
+    DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope, ExportAuthorizationRequest, ExportRetrieval,
+    NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_PATH, ProjectHistoryProjection,
+    ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH, TemporalContextRequest, authorize_export,
     build_temporal_context, project_history_projection, requests_are_idempotent_matches,
+    require_export_allowed,
 };
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct StoredExport {
+    consumer: String,
+    request: ExportAuthorizationRequest,
+    retrieval: ExportRetrieval,
+}
 
 #[cfg(test)]
 use crate::live_http::{declared_content_length, host_implies_table_access, split_header_line};
@@ -39,8 +53,11 @@ pub struct AnalysisRunLiveService {
     bound_addr: Option<SocketAddr>,
     next_run_serial: u64,
     next_request_serial: u64,
+    next_export_serial: u64,
     accepted_runs: HashMap<String, (AnalysisRunRequest, AnalysisRunAccepted)>,
     accepted_project_histories: HashMap<String, (ProjectHistoryRequest, ProjectHistoryProjection)>,
+    authorized_exports: HashMap<String, StoredExport>,
+    exports_by_id: HashMap<String, String>,
 }
 
 impl Default for AnalysisRunLiveService {
@@ -58,8 +75,11 @@ impl AnalysisRunLiveService {
             bound_addr: None,
             next_run_serial: 1,
             next_request_serial: 1,
+            next_export_serial: 1,
             accepted_runs: HashMap::new(),
             accepted_project_histories: HashMap::new(),
+            authorized_exports: HashMap::new(),
+            exports_by_id: HashMap::new(),
         }
     }
 
@@ -143,14 +163,28 @@ impl AnalysisRunLiveService {
         let (header_block, body) = split_request_with_limit(request, MAX_LIVE_REQUEST_BODY_BYTES)?;
         let mut lines = header_block.split("\r\n");
         let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
-        if method != "POST"
-            || (path != NARUON_ANALYSIS_RUN_PATH
-                && path != TEMPORAL_CONTEXT_PATH
-                && path != PROJECT_HISTORY_PATH)
+        let headers = parse_headers(&mut lines)?;
+        if method == "GET" {
+            if matches!(
+                export_retrieval_path_id(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.read_export(path, &headers, body);
+            }
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if method != "POST" {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if path == NARUON_EXPORT_PATH {
+            return self.accept_export(&headers, body);
+        }
+        if path != NARUON_ANALYSIS_RUN_PATH
+            && path != TEMPORAL_CONTEXT_PATH
+            && path != PROJECT_HISTORY_PATH
         {
             return Err(ApiError::InvalidWirePayload);
         }
-        let headers = parse_headers(&mut lines)?;
         let consumer = require_headers(
             &headers,
             self.bound_addr,
@@ -232,6 +266,92 @@ impl AnalysisRunLiveService {
         let response_body = projection.to_json()?;
         self.accepted_project_histories
             .insert(replay_key, (request, projection));
+        Ok(json_response(200, "OK", response_body))
+    }
+
+    fn accept_export(
+        &mut self,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let consumer = require_headers(headers, self.bound_addr, true)?;
+        if consumer != NARUON_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let request: ExportAuthorizationRequest = crate::wire::from_json(body)?;
+        let idempotency_key = header_value(headers, "idempotency-key")?;
+        if idempotency_key == request.principal_id {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if request.purpose != AnalyticalPurpose::ModularServiceConsumer {
+            return Err(ApiError::AuthorizationDenied);
+        }
+        let decision = authorize_export(&request)?;
+        require_export_allowed(&decision)?;
+        let replay_key = consumer_tenant_idempotency_key(
+            consumer,
+            &request.tenant_workspace_id,
+            idempotency_key,
+        );
+        if let Some(stored) = self.authorized_exports.get(&replay_key) {
+            if stored.request == request {
+                refuse_metrics_on_export_retrieval_payload(&stored.retrieval.to_json()?)?;
+                return Ok(json_response(200, "OK", stored.retrieval.to_json()?));
+            }
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let export_id = format!("tepp-export-{}", self.next_export_serial);
+        self.next_export_serial += 1;
+        let retrieval = ExportRetrieval::new(
+            export_id.clone(),
+            request.artifact_id.clone(),
+            decision.decision_code().to_owned(),
+            request.purpose.wire_name(),
+            idempotency_key,
+        )?;
+        let response_body = retrieval.to_json()?;
+        refuse_metrics_on_export_retrieval_payload(&response_body)?;
+        self.exports_by_id.insert(export_id, replay_key.clone());
+        self.authorized_exports.insert(
+            replay_key,
+            StoredExport {
+                consumer: consumer.to_owned(),
+                request,
+                retrieval,
+            },
+        );
+        Ok(json_response(200, "OK", response_body))
+    }
+
+    fn read_export(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let export_id = export_retrieval_path_id(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != NARUON_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_export_retrieval_payload(body)?;
+        let replay_key = self
+            .exports_by_id
+            .get(&export_id)
+            .cloned()
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let stored = self
+            .authorized_exports
+            .get(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if stored.consumer != consumer {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let response_body = stored.retrieval.to_json()?;
+        refuse_metrics_on_export_retrieval_payload(&response_body)?;
         Ok(json_response(200, "OK", response_body))
     }
 
@@ -318,8 +438,9 @@ mod tests {
     use crate::{
         ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError,
         DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, LINEAGEWEAVE_CONSUMER_CODE,
-        NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
-        NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, TEMPORAL_CONTEXT_PATH,
+        NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_EXPORT_PATH,
+        NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT,
+        TEMPORAL_CONTEXT_PATH,
     };
 
     fn sample_run() -> AnalysisRunRequest {
@@ -936,6 +1057,172 @@ mod tests {
             envelope(&timeout_response.body).error_code(),
             "limit_exceeded"
         );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn handler_covers_metric_free_export_retrieval_get() {
+        use crate::{AnalyticalPurpose, ExportAuthorizationRequest, ExportRetrieval};
+
+        let request = ExportAuthorizationRequest {
+            tenant_workspace_id: "export-live-tenant".into(),
+            principal_id: "principal-analyst-1".into(),
+            purpose: AnalyticalPurpose::ModularServiceConsumer,
+            artifact_id: "artifact-live-1".into(),
+            includes_source_text: false,
+        };
+        let body = crate::wire::to_json(&request).expect("export json");
+        let mut service = AnalysisRunLiveService::new();
+        let posted = service.handle_http_request(&export_post_http(
+            &body,
+            NARUON_CONSUMER_CODE,
+            "export-idem-1",
+        ));
+        assert_eq!(posted.status_code, 200);
+        let retrieval = ExportRetrieval::from_json(&posted.body).expect("posted retrieval");
+        assert_eq!(retrieval.artifact_id, "artifact-live-1");
+        assert_eq!(retrieval.purpose, "modular_service_consumer");
+        assert_eq!(retrieval.decision_code, "purpose_bound_export_allowed");
+        assert_eq!(retrieval.idempotency_key, "export-idem-1");
+        assert!(!posted.body.contains("tenant_workspace_id"));
+        assert!(!posted.body.contains("principal_id"));
+        assert!(!posted.body.contains("includes_source_text"));
+        assert!(!posted.body.contains("scientific_acceptance"));
+        assert!(!posted.body.contains("rmse"));
+
+        let replay = service.handle_http_request(&export_post_http(
+            &body,
+            NARUON_CONSUMER_CODE,
+            "export-idem-1",
+        ));
+        assert_eq!(replay.status_code, 200);
+        assert_eq!(replay.body, posted.body);
+
+        let got = service
+            .handle_http_request(&export_get_http(&retrieval.export_id, NARUON_CONSUMER_CODE));
+        assert_eq!(got.status_code, 200);
+        assert_eq!(
+            ExportRetrieval::from_json(&got.body).expect("got"),
+            retrieval
+        );
+
+        assert_eq!(
+            service
+                .handle_http_request(&export_get_http(
+                    &retrieval.export_id,
+                    LINEAGEWEAVE_CONSUMER_CODE
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&export_post_http(
+                    &body,
+                    LINEAGEWEAVE_CONSUMER_CODE,
+                    "export-idem-2"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&export_get_http("missing-export", NARUON_CONSUMER_CODE))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_EXPORT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_EXPORT_PATH}/{}/extra HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
+                    retrieval.export_id
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_EXPORT_PATH}/{} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}",
+                    retrieval.export_id
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "POST {NARUON_EXPORT_PATH}/{} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: export-idem-1\r\ncontent-length: 0\r\n\r\n",
+                    retrieval.export_id
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {NARUON_ANALYSIS_RUN_PATH}/tepp-run-1 HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+
+        let mut denied = request.clone();
+        denied.purpose = AnalyticalPurpose::OperationalMonitoring;
+        denied.includes_source_text = true;
+        let denied_body = crate::wire::to_json(&denied).expect("denied json");
+        assert_eq!(
+            service
+                .handle_http_request(&export_post_http(
+                    &denied_body,
+                    NARUON_CONSUMER_CODE,
+                    "export-idem-denied",
+                ))
+                .status_code,
+            403
+        );
+
+        let mut conflict = request.clone();
+        conflict.artifact_id = "artifact-live-2".into();
+        let conflict_body = crate::wire::to_json(&conflict).expect("conflict json");
+        assert_eq!(
+            service
+                .handle_http_request(&export_post_http(
+                    &conflict_body,
+                    NARUON_CONSUMER_CODE,
+                    "export-idem-1",
+                ))
+                .status_code,
+            400
+        );
+
+        let principal_as_key = service.handle_http_request(&export_post_http(
+            &body,
+            NARUON_CONSUMER_CODE,
+            "principal-analyst-1",
+        ));
+        assert_eq!(principal_as_key.status_code, 400);
+    }
+
+    fn export_post_http(body: &str, consumer: &str, idempotency_key: &str) -> String {
+        format!(
+            "POST {NARUON_EXPORT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\nidempotency-key: {idempotency_key}\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    fn export_get_http(export_id: &str, consumer: &str) -> String {
+        format!(
+            "GET {NARUON_EXPORT_PATH}/{export_id} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        )
     }
 
     struct ScriptedRead {
