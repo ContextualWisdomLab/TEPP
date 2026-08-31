@@ -11,6 +11,7 @@
 //! contracts and preserves their artifact meaning.
 
 mod case_deletion_refit;
+mod copy_identity_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -41,6 +42,12 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Copy-identity artifact and execution contracts from this engine.
+pub use copy_identity_artifact::{
+    COPY_IDENTITY_ARTIFACT_BYTE_LIMIT, COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION,
+    COPY_IDENTITY_MODEL_CONTRACT_VERSION, COPY_IDENTITY_OUTPUT_PROFILE, CopyIdentityArtifact,
+    CopyIdentityDocument, CopyIdentityExecution, execute_copy_identity_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +255,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A copy-identity artifact violated its bounded schema or count invariants.
+    InvalidCopyIdentityArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +271,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidCopyIdentityArtifact => "invalid copy-identity artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +690,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidCopyIdentityArtifact,
+                "invalid copy-identity artifact",
             ),
         ];
         for (error, message) in messages {
