@@ -8,13 +8,16 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Longitudinal CWC composition
+//! is invoked through [`psychometric_core`] and is not a causal estimand.
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod longitudinal_cwc_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use psychometric_core::PsychometricError;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -45,6 +48,13 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Longitudinal CWC composition artifact and execution contracts.
+pub use longitudinal_cwc_artifact::{
+    LONGITUDINAL_CWC_ARTIFACT_BYTE_LIMIT, LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION,
+    LONGITUDINAL_CWC_MODEL_CONTRACT_VERSION, LONGITUDINAL_CWC_OUTPUT_PROFILE,
+    LongitudinalClusterScore, LongitudinalCwcArtifact, LongitudinalCwcExecution,
+    execute_longitudinal_cwc_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +258,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A psychometric recovery rejected the offered coordinates.
+    Psychometric(PsychometricError),
+    /// A longitudinal CWC artifact violated its bounded schema or count invariants.
+    InvalidLongitudinalCwcArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +276,8 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::Psychometric(error) => return error.fmt(formatter),
+            Self::InvalidLongitudinalCwcArtifact => "invalid longitudinal CWC artifact",
         };
         formatter.write_str(message)
     }
@@ -278,6 +294,12 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<PsychometricError> for AnalysisEngineError {
+    fn from(error: PsychometricError) -> Self {
+        Self::Psychometric(error)
     }
 }
 
@@ -413,7 +435,8 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
+        MAX_EVIDENCE_UNITS, PsychometricError, TopicMeasurementError, add_membership_count,
+        execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -681,6 +704,14 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::Psychometric(PsychometricError::CausalUnderidentified),
+                "temporal precedence is not causal identification",
+            ),
+            (
+                AnalysisEngineError::InvalidLongitudinalCwcArtifact,
+                "invalid longitudinal CWC artifact",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -689,6 +720,11 @@ mod tests {
         assert_eq!(converted.to_string(), "invalid API wire payload");
         let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
         assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        let from_psych: AnalysisEngineError = PsychometricError::CausalUnderidentified.into();
+        assert_eq!(
+            from_psych.to_string(),
+            "temporal precedence is not causal identification"
+        );
         assert_eq!(
             add_membership_count(u64::MAX, 1),
             Err(AnalysisEngineError::ArithmeticOverflow)
