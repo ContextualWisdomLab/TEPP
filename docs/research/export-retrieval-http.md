@@ -31,5 +31,6 @@ remain later work.
 
 GET-by-id status (#359), lifecycle POST, cancel, collection GET, retry,
 stored-request GET, retry-lineage GET, lookup GET, retry-parent GET, wait CLI,
-Leiden, Driver p.16 std-family restoration, Figma/export (GAP-010), and
-Compose persistence (GAP-003B).
+export-authorize CLI, Leiden, Driver p.16 std-family restoration, Figma/export
+(GAP-010), and Compose persistence (GAP-003B). The operator CLI for this GET
+is ADR 0055 on a stacked PR.

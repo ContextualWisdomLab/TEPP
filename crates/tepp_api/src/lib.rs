@@ -9,7 +9,9 @@
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
-//! causality, or completed psychometric model results.
+//! causality, or completed psychometric model results. The published
+//! `tepp-export-get` CLI mints typed naruon export-retrieval GET exchanges
+//! onto spawned `tepp-loopback` TCP. `LineageWeave` is refused on this adapter.
 
 mod analysis_result;
 mod analysis_run;
@@ -21,6 +23,7 @@ mod envelope;
 mod error;
 mod export;
 mod export_http;
+mod export_retrieval_cli;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
 mod lineageweave_http;
@@ -106,6 +109,22 @@ pub use export_http::ExportRetrieval;
 pub use export_http::naruon_export_retrieval_exchange;
 /// Refuse scientific-metric keys on export-retrieval JSON.
 pub use export_http::refuse_metrics_on_export_retrieval_payload;
+/// Loopback export-retrieval CLI invocation.
+pub use export_retrieval_cli::ExportRetrievalCliInvocation;
+/// Loopback export-retrieval CLI verb.
+pub use export_retrieval_cli::ExportRetrievalCliVerb;
+/// Compose HTTP/1.1 export-retrieval GET from a CLI invocation.
+pub use export_retrieval_cli::compose_export_retrieval_cli_http;
+/// Dispatch an export-retrieval CLI invocation against an in-process listener.
+pub use export_retrieval_cli::dispatch_export_retrieval_cli;
+/// Execute an export-retrieval CLI invocation over loopback TCP.
+pub use export_retrieval_cli::execute_export_retrieval_cli;
+/// Render a typed export-retrieval exchange onto a loopback HTTP/1.1 request.
+pub use export_retrieval_cli::loopback_http1_from_export_retrieval_exchange;
+/// Read export-retrieval CLI stdin; GET requires empty.
+pub use export_retrieval_cli::read_export_retrieval_cli_stdin;
+/// Filter export-retrieval CLI stdout so identity stays metric-free.
+pub use export_retrieval_cli::render_export_retrieval_cli_stdout;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;

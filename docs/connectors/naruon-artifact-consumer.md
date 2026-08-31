@@ -29,6 +29,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
 | Live loopback export retrieval | `tepp_api` `AnalysisRunLiveService` → `POST /v1/exports` then `GET /v1/exports/{export_id}` | naruon → TEPP |
+| Live loopback export retrieval CLI | `tepp_api` `tepp-export-get get` → typed `naruon_export_retrieval_exchange` on `tepp-loopback` | naruon → TEPP |
 
 Committed examples live under `examples/`. Schemas for analysis-run requests and corpus-split manifests live under `schemas/`.
 
