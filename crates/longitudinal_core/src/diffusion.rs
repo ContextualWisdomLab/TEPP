@@ -14,16 +14,20 @@ use crate::{EventTimeInterval, LongitudinalError, stationary::recover_stationary
 /// Recover the scalar research-candidate `DIFFUSIONstd = q / p` map.
 ///
 /// `q` is the continuous diffusion variance-rate input and `p` is the strictly
-/// positive stationary within-person variance `-q/(2a)`. The ratio is formed
-/// from those two quantities instead of returning a hard-coded `-2a`, which
-/// preserves the named composition and exercises the stationary-variance
-/// admission contract. Equal numeric values do not collapse this estimand into
-/// `asymDIFFUSIONstd` or another variance standardisation.
+/// positive stationary within-person variance `-q/(2a)`. The implementation
+/// first recovers `p` to enforce the named estimand's positive-stationarity
+/// admission contract. It then evaluates the algebraically identical scalar
+/// ratio as `-2a` instead of dividing by the rounded binary64 representation of
+/// `p`. That distinction matters for subnormal `q`/`p`: rounding `p` before
+/// `q/p` can destroy the cancellation and make the standardized result depend
+/// spuriously on diffusion scale. Equal numeric values still do not collapse
+/// this estimand into `asymDIFFUSIONstd` or another variance standardisation.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for non-finite
-/// inputs, negative diffusion, or a non-finite quotient. Returns
+/// inputs, negative diffusion, a non-representable stationary variance, or a
+/// non-representable final `-2a` ratio. Returns
 /// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
 /// Returns [`LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance`]
 /// when the stationary within-person variance is zero or underflows to zero.
@@ -35,8 +39,12 @@ pub fn recover_event_time_standardised_continuous_diffusion(
     if stationary <= 0.0 {
         return Err(LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance);
     }
-    let ratio = continuous_diffusion / stationary;
-    if !ratio.is_finite() {
+
+    // Algebraically q / (-q/(2a)) == -2a for every positive q. Evaluating
+    // q / rounded(p) is numerically wrong when q and p are subnormal because
+    // the rounded stationary variance no longer preserves that cancellation.
+    let ratio = -2.0 * log_rate;
+    if !ratio.is_finite() || ratio <= 0.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     Ok(ratio)
