@@ -70,6 +70,8 @@ POST   /v1/analysis-runs/{run_id}/cancel
 GET    /v1/model-artifacts/{artifact_id}
 GET    /v1/exports/{export_id}
 GET    /v1/project-histories
+GET    /v1/project-histories/{idempotency_key}
+GET    /v1/project-histories/{idempotency_key}/request
 ```
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.
@@ -103,6 +105,15 @@ cutoff-safe `ProjectHistoryProjection` on `tepp-loopback`. Consumer is
 `lineageweave` only. `inference_status` remains `temporal_association_only`.
 `tepp.scientific_acceptance.v1` and causal scores never appear. The retrieval
 does not infer causality.
+
+`GET /v1/project-histories/{idempotency_key}/request` returns the accepted
+LineageWeave create request on `tepp-loopback`. Consumer is `lineageweave`
+only. Stored projection `inference_status` remains `temporal_association_only`.
+`tepp.scientific_acceptance.v1` and causal scores never appear.
+
+`tepp-project-history-request get` is the operator-visible loopback client of
+that stored-request GET. Empty stdin is admitted. Naruon is refused. Process
+exit 0 is not an ADR 0014 claim.
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A

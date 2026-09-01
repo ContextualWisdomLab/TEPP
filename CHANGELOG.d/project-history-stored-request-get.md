@@ -1,0 +1,1 @@
+- `GET /v1/project-histories/{idempotency_key}/request` returns the accepted LineageWeave create request on `tepp-loopback` (ADR 0087). Metric-free; stored projection `inference_status` remains `temporal_association_only`. Does not infer causality. Naruon refused. `NaruonLiveService` stays POST-only. Does not re-open cancel lineages. Not GAP-010 Figma/export, not persistence.

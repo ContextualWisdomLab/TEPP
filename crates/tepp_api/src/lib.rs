@@ -9,7 +9,9 @@
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
-//! causality, or completed psychometric model results.
+//! causality, or completed psychometric model results. The published
+//! `tepp-project-history` CLI mints typed LineageWeave project-history POST
+//! exchanges onto spawned `tepp-loopback` TCP.
 
 mod analysis_result;
 mod analysis_run;
@@ -28,8 +30,11 @@ mod naruon_http;
 mod naruon_live;
 mod orchestration;
 mod project_history;
+mod project_history_cli;
 mod project_history_collection_http;
 mod project_history_retrieval_http;
+mod project_history_stored_request_cli;
+mod project_history_stored_request_http;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
@@ -232,6 +237,24 @@ pub use project_history::ProjectHistoryProjection;
 pub use project_history::ProjectHistoryRequest;
 /// Build a cutoff-safe project-history projection.
 pub use project_history::project_history_projection;
+/// Loopback project-history query CLI invocation.
+pub use project_history_cli::ProjectHistoryCliInvocation;
+/// Loopback project-history query CLI verb.
+pub use project_history_cli::ProjectHistoryCliVerb;
+/// Compose HTTP/1.1 project-history POST from a query CLI invocation.
+pub use project_history_cli::compose_project_history_cli_http;
+/// Dispatch a project-history query CLI invocation against an in-process listener.
+pub use project_history_cli::dispatch_project_history_cli;
+/// Execute a project-history query CLI invocation over loopback TCP.
+pub use project_history_cli::execute_project_history_cli;
+/// Render a typed project-history POST exchange as loopback HTTP/1.1.
+pub use project_history_cli::loopback_http1_from_project_history_exchange;
+/// Read bounded stdin for the project-history query CLI.
+pub use project_history_cli::read_project_history_cli_stdin;
+/// Refuse scientific metric or causal keys on project-history query CLI JSON.
+pub use project_history_cli::refuse_metrics_on_project_history_cli_payload;
+/// Render metric-free project-history query CLI stdout.
+pub use project_history_cli::render_project_history_cli_stdout;
 /// Maximum opaque cursor length on project-history collection GET.
 pub use project_history_collection_http::PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN;
 /// Default page size for project-history collection GET.
@@ -266,6 +289,30 @@ pub use project_history_retrieval_http::lineageweave_project_history_retrieval_e
 pub use project_history_retrieval_http::project_history_retrieval_path_id;
 /// Refuse scientific-metric and causal-score keys on retrieval JSON.
 pub use project_history_retrieval_http::refuse_metrics_on_project_history_retrieval_payload;
+/// Validated loopback CLI invocation for project-history stored-request GET.
+pub use project_history_stored_request_cli::ProjectHistoryStoredRequestCliInvocation;
+/// Loopback CLI verb for project-history stored-request GET.
+pub use project_history_stored_request_cli::ProjectHistoryStoredRequestCliVerb;
+/// Compose HTTP/1.1 from a stored-request CLI invocation.
+pub use project_history_stored_request_cli::compose_project_history_stored_request_cli_http;
+/// Dispatch a stored-request CLI invocation against an in-process listener.
+pub use project_history_stored_request_cli::dispatch_project_history_stored_request_cli;
+/// Execute a stored-request CLI invocation over loopback TCP.
+pub use project_history_stored_request_cli::execute_project_history_stored_request_cli;
+/// Render `tepp-loopback` HTTP/1.1 from a stored-request exchange.
+pub use project_history_stored_request_cli::loopback_http1_from_project_history_stored_request_exchange;
+/// Read leftover stdin for stored-request GET; empty is admitted.
+pub use project_history_stored_request_cli::read_project_history_stored_request_cli_stdin;
+/// Filter stored-request CLI stdout so scientific-acceptance never prints.
+pub use project_history_stored_request_cli::render_project_history_stored_request_cli_stdout;
+/// Whether a path is the project-history stored-request extra-segment.
+pub use project_history_stored_request_http::is_project_history_stored_request_path;
+/// `LineageWeave` GET exchange for one stored project-history create request.
+pub use project_history_stored_request_http::lineageweave_project_history_stored_request_exchange;
+/// Extract the opaque idempotency key from a stored-request GET path.
+pub use project_history_stored_request_http::project_history_stored_request_path_id;
+/// Refuse scientific-metric and causal-score keys on stored-request JSON.
+pub use project_history_stored_request_http::refuse_metrics_on_project_history_stored_request_payload;
 /// Maximum posterior Project Journey artifact size.
 pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
 /// Exact posterior Project Journey schema identity.
