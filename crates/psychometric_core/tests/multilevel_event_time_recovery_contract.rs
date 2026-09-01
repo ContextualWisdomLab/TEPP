@@ -36,17 +36,17 @@ use psychometric_core::{
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
-    recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
-    recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_discrete_continuous_intercept, recover_standardised_discrete_diffusion,
+    recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
+    recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
+    recover_standardised_manifest_variance, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -120,6 +120,7 @@ use psychometric_core::{
     refuse_observed_variance_as_standardised_manifest_variance,
     refuse_pooled_discrete_lag_across_unequal_intervals,
     refuse_process_noise_as_unconditional_variance,
+    refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
     refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
     refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
@@ -159,9 +160,11 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_total_variance_scaled_discrete_diffusion_as_standardised_discrete_diffusion,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
+    refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
@@ -6350,6 +6353,103 @@ fn standardised_discrete_continuous_intercept_refuses_non_event_clocks_and_does_
     )
     .expect("zero CINT");
     assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+}
+
+#[test]
+fn standardised_discrete_diffusion_recovers_driver_page_sixteen_ratio() {
+    let diffusion = 0.4_f64;
+    let log_rate = -0.25_f64;
+    let event_delta = 1.0_f64;
+    let recovered = recover_standardised_discrete_diffusion(
+        diffusion,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("discreteDIFFUSIONstd");
+    let identity = 1.0 - (2.0 * log_rate * event_delta).exp();
+    let recovered_error = (recovered - identity).abs();
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, p. 16 discreteDIFFUSIONstd): RMSE {recovered_error} for Q_Δt / p = 1 − exp(2 a Δt)"
+    );
+    let later =
+        recover_standardised_discrete_diffusion(diffusion, log_rate, 2.0, LagClock::EventTime)
+            .expect("later Δt");
+    assert!(
+        (later - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): a later event interval changes discreteDIFFUSIONstd"
+    );
+    let continuous_std = -2.0 * log_rate;
+    let continuous_error = (continuous_std - identity).abs();
+    assert!(
+        continuous_error > recovered_error,
+        "Driver et al. (2017, p. 16): DIFFUSIONstd RMSE {continuous_error} must exceed discreteDIFFUSIONstd RMSE {recovered_error}"
+    );
+    let process_noise =
+        recover_discrete_process_noise(diffusion, log_rate, event_delta, LagClock::EventTime)
+            .expect("discreteDIFFUSION");
+    let unstandardised_error = (process_noise - identity).abs();
+    assert!(
+        unstandardised_error > recovered_error,
+        "Driver et al. (2017, Eq. 3): unstandardised Q_Δt RMSE {unstandardised_error} must exceed discreteDIFFUSIONstd RMSE {recovered_error}"
+    );
+    let stationary =
+        recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime).expect("p");
+    let total = recover_trait_plus_state_latent_variance(0.5, stationary).expect("trait + p");
+    let total_scaled = process_noise / total;
+    let total_error = (total_scaled - identity).abs();
+    assert!(
+        total_error > recovered_error,
+        "Driver et al. (2017, footnote 4): total-scaled RMSE {total_error} must exceed discreteDIFFUSIONstd RMSE {recovered_error}"
+    );
+    assert_eq!(
+        refuse_unstandardised_discrete_diffusion_as_standardised_discrete_diffusion(
+            process_noise,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion)
+    );
+    assert_eq!(
+        refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion(
+            continuous_std,
+            recovered
+        ),
+        Err(PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion)
+    );
+    assert_eq!(
+        refuse_total_variance_scaled_discrete_diffusion_as_standardised_discrete_diffusion(
+            total_scaled,
+            recovered
+        ),
+        Err(
+            PsychometricError::TotalVarianceScaledDiscreteDiffusionIsNotStandardisedDiscreteDiffusion
+        )
+    );
+}
+
+#[test]
+fn standardised_discrete_diffusion_refuses_non_event_clocks_and_does_not_keep_zero_q() {
+    assert_eq!(
+        recover_standardised_discrete_diffusion(0.4, -0.25, 1.0, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_discrete_diffusion(0.4, -0.25, 1.0, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_discrete_diffusion(0.0, -0.25, 1.0, LagClock::EventTime),
+        Err(PsychometricError::StandardisedDiscreteDiffusionRequiresPositiveStationaryVariance)
+    );
+    assert_eq!(
+        recover_standardised_discrete_diffusion(0.4, 0.25, 1.0, LagClock::EventTime),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_standardised_discrete_diffusion(0.4, -0.25, 0.0, LagClock::EventTime),
+        Err(PsychometricError::NonPositiveInterval)
+    );
 }
 
 #[test]

@@ -650,6 +650,24 @@ pub enum PsychometricError {
     /// `discreteCINTstd`. The asymptotic map is the total change, not
     /// the finite-interval intercept.
     AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept,
+    /// Driver p. 16 `discreteDIFFUSIONstd` was requested without a
+    /// strictly positive `asymDIFFUSION`. Footnote 4 standardises
+    /// using only the relevant variance; zero `q` has no positive
+    /// process SD.
+    StandardisedDiscreteDiffusionRequiresPositiveStationaryVariance,
+    /// Unstandardised `discreteDIFFUSION` `Q_Δt` was treated as
+    /// `discreteDIFFUSIONstd`. Unstandardised process noise is
+    /// defined for growing `a ≥ 0` and for zero diffusion;
+    /// standardised discrete diffusion is not.
+    UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion,
+    /// Driver p. 16 `DIFFUSIONstd` `q / p = −2 a` was treated as
+    /// `discreteDIFFUSIONstd`. The continuous ratio does not depend
+    /// on the event interval.
+    StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion,
+    /// Driver §7.1 total `Q_Δt / (trait + p + added)` was treated as
+    /// p. 16 `discreteDIFFUSIONstd`. Footnote 4 uses only
+    /// within-subject `asymDIFFUSION`, not the total.
+    TotalVarianceScaledDiscreteDiffusionIsNotStandardisedDiscreteDiffusion,
     /// Driver p. 16 `asymCINTstd` was requested without a strictly
     /// positive `asymDIFFUSION`. Footnote 4 standardises using only
     /// the relevant variance; zero `q` has no positive process SD.
@@ -1197,6 +1215,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept => {
                 "asymptotic standardised continuous intercept is not standardised discrete continuous intercept"
+            }
+            Self::StandardisedDiscreteDiffusionRequiresPositiveStationaryVariance => {
+                "standardised discrete diffusion requires strictly positive stationary within-subject variance"
+            }
+            Self::UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion => {
+                "unstandardised discrete diffusion is not standardised discrete diffusion"
+            }
+            Self::StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion => {
+                "standardised continuous diffusion is not standardised discrete diffusion"
+            }
+            Self::TotalVarianceScaledDiscreteDiffusionIsNotStandardisedDiscreteDiffusion => {
+                "total-variance scaled discrete diffusion is not standardised discrete diffusion"
             }
             Self::StandardisedAsymptoticContinuousInterceptRequiresPositiveStationaryVariance => {
                 "standardised asymptotic continuous intercept requires strictly positive stationary within-subject variance"
@@ -2024,6 +2054,30 @@ mod tests {
             PsychometricError::AsymptoticStandardisedContinuousInterceptIsNotStandardisedDiscreteContinuousIntercept
                 .to_string(),
             "asymptotic standardised continuous intercept is not standardised discrete continuous intercept"
+        );
+    }
+
+    #[test]
+    fn standardised_discrete_diffusion_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedDiscreteDiffusionRequiresPositiveStationaryVariance
+                .to_string(),
+            "standardised discrete diffusion requires strictly positive stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDiscreteDiffusionIsNotStandardisedDiscreteDiffusion
+                .to_string(),
+            "unstandardised discrete diffusion is not standardised discrete diffusion"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousDiffusionIsNotStandardisedDiscreteDiffusion
+                .to_string(),
+            "standardised continuous diffusion is not standardised discrete diffusion"
+        );
+        assert_eq!(
+            PsychometricError::TotalVarianceScaledDiscreteDiffusionIsNotStandardisedDiscreteDiffusion
+                .to_string(),
+            "total-variance scaled discrete diffusion is not standardised discrete diffusion"
         );
     }
 
