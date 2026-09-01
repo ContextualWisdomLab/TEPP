@@ -26,14 +26,14 @@ pub fn recover_event_time_lagged_correlation(
         lagged_covariance,
         earlier_total_variance,
         later_total_variance,
-        event_interval.as_f64(),
+        event_interval,
     )
 }
 
 #[cfg(test)]
 mod tests {
     use super::recover_event_time_lagged_correlation;
-    use crate::EventTimeInterval;
+    use crate::{EventTimeInterval, LongitudinalError};
 
     #[test]
     fn public_boundary_requires_admitted_event_time() {
@@ -41,6 +41,18 @@ mod tests {
         assert_eq!(
             recover_event_time_lagged_correlation(2.0, 1.0, 4.0, interval),
             Ok(1.0)
+        );
+    }
+
+    #[test]
+    fn wrong_clock_shaped_numeric_values_fail_at_value_object_admission() {
+        assert_eq!(
+            EventTimeInterval::new(0.0),
+            Err(LongitudinalError::NonPositiveEventInterval)
+        );
+        assert_eq!(
+            EventTimeInterval::new(f64::NAN),
+            Err(LongitudinalError::NonPositiveEventInterval)
         );
     }
 }
