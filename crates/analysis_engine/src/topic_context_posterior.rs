@@ -7,12 +7,23 @@ use sha2::{Digest, Sha256};
 use temporal_core::KnowledgeCutoff;
 use uuid::Uuid;
 
-use crate::{AnalysisEngineError, format_digest, valid_identifier};
+use tepp_api::{
+    AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
+};
+
+use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
 
 /// Exact posterior artifact schema.
 pub const TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION: &str = "tepp.topic_context_posterior.v1";
 /// Maximum canonical JSON size.
 pub const TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT: usize = 16 * 1024 * 1024;
+/// Model contract required by the topic-context posterior analysis-run path.
+pub const TOPIC_CONTEXT_POSTERIOR_MODEL_CONTRACT_VERSION: &str = "topic_context_posterior_v1";
+/// Producer model contract accepted by the analysis-run profile.
+pub const TOPIC_CONTEXT_POSTERIOR_PRODUCER_CONTRACT_VERSION: &str = "trsl-tm-v1";
+/// Analysis-run output profile required for a topic-context posterior artifact.
+pub const TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE: &str = "topic_context_posterior_v1";
+const TOPIC_CONTEXT_POSTERIOR_INFERENCE_STATUS: &str = "posterior_topic_coordinates_not_importance";
 const ENTRY_LIMIT: usize = 1_000_000;
 const DIMENSIONS: [&str; 4] = ["business_unit", "process_unit", "team", "person"];
 type PosteriorDraws = BTreeMap<Uuid, BTreeSet<u64>>;
@@ -150,6 +161,21 @@ pub struct TopicContextPosteriorArtifact {
     pub inference_status: String,
 }
 
+/// Authoritative snapshot and cutoff-eligibility manifest for one artifact.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TopicContextPosteriorSnapshotManifest {
+    /// Immutable source snapshot identity.
+    pub snapshot_id: String,
+    /// Canonical digest of the resolved source snapshot bytes.
+    pub source_snapshot_sha256: String,
+    /// Historical cutoff applied while resolving eligibility.
+    pub knowledge_cutoff: String,
+    /// Canonical digest of the exact artifact admitted from this snapshot.
+    pub artifact_sha256: String,
+    /// Availability instant for every document represented by the artifact.
+    pub document_available_at: BTreeMap<String, String>,
+}
+
 fn digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -217,7 +243,7 @@ impl TopicContextPosteriorArtifact {
                 ],
                 entry_limit,
             )
-            && self.inference_status == "posterior_topic_coordinates_not_importance"
+            && self.inference_status == TOPIC_CONTEXT_POSTERIOR_INFERENCE_STATUS
     }
 
     /// Parse and validate one bounded posterior artifact.
@@ -634,6 +660,104 @@ impl TopicContextPosteriorArtifact {
         }
         Ok(())
     }
+}
+
+/// One completed topic-context posterior artifact and its terminal result.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TopicContextPosteriorExecution {
+    /// Digest-bound producer posterior artifact.
+    pub artifact: TopicContextPosteriorArtifact,
+    /// Terminal result carrying the artifact identity, digest, and schema.
+    pub terminal_result: AnalysisRunTerminalResult,
+}
+
+/// Execute posterior topic-context validation as one analysis-run profile.
+///
+/// The executor validates an already-constructed
+/// [`TopicContextPosteriorArtifact`] through its producer contract and does
+/// not reimplement TRSL-TM fitting, collapse missing draws, infer topic
+/// importance, or invent birth/split/merge events. Lineage events remain
+/// producer-supplied. This is not a Bayesian sampler and not GPU execution.
+///
+/// # Errors
+///
+/// Returns a request/receipt/snapshot/cutoff/profile error or a producer
+/// contract refusal.
+pub fn execute_topic_context_posterior_run(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+    manifest: &TopicContextPosteriorSnapshotManifest,
+    artifact: &TopicContextPosteriorArtifact,
+    completed_at: impl Into<String>,
+) -> Result<TopicContextPosteriorExecution, AnalysisEngineError> {
+    request.to_json()?;
+    accepted.to_json()?;
+    require_receipt_identity(request, accepted)?;
+    if request.snapshot_id != manifest.snapshot_id || artifact.snapshot_id != manifest.snapshot_id {
+        return Err(AnalysisEngineError::SnapshotMismatch);
+    }
+    let knowledge_cutoff =
+        canonical_time(&manifest.knowledge_cutoff).ok_or(AnalysisEngineError::InvalidEvidence)?;
+    if request.knowledge_cutoff != manifest.knowledge_cutoff
+        || artifact.knowledge_cutoff != manifest.knowledge_cutoff
+        || artifact.source_snapshot_sha256 != manifest.source_snapshot_sha256
+        || request.model_contract_version != TOPIC_CONTEXT_POSTERIOR_MODEL_CONTRACT_VERSION
+        || request.output_profile != TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE
+        || artifact.model_contract_version != TOPIC_CONTEXT_POSTERIOR_PRODUCER_CONTRACT_VERSION
+        || artifact.run_id != accepted.run_id
+        || artifact.inference_status != TOPIC_CONTEXT_POSTERIOR_INFERENCE_STATUS
+        || !digest(&manifest.source_snapshot_sha256)
+        || !digest(&manifest.artifact_sha256)
+    {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+
+    let digest = artifact.sha256()?;
+    if digest != manifest.artifact_sha256 {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    let mut document_ids = BTreeSet::new();
+    for value in &artifact.plausible_values {
+        document_ids.insert(value.document_id.clone());
+    }
+    if document_ids.len() != manifest.document_available_at.len()
+        || document_ids.iter().any(|document_id| {
+            manifest
+                .document_available_at
+                .get(document_id)
+                .and_then(|available_at| canonical_time(available_at))
+                .is_none_or(|available_at| available_at > knowledge_cutoff)
+        })
+    {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    // Artifact validation bounds the canonical payload to 16 MiB, so both
+    // counts are far below the public summary limit and fit in u64.
+    let document_count = document_ids.len() as u64;
+    let statistic_count = artifact
+        .plausible_values
+        .iter()
+        .map(|value| value.logistic_normal_coordinates.len() as u64)
+        .sum();
+    let summary = AnalysisResultSummary {
+        analysis_family: "topic_context_posterior".into(),
+        evidence_count: document_count,
+        statistic_count,
+        validation_status: TOPIC_CONTEXT_POSTERIOR_INFERENCE_STATUS.into(),
+    };
+    let terminal_result = AnalysisRunTerminalResult::succeeded(
+        request,
+        accepted,
+        format!("topic_context_posterior_artifact_{}", &digest[..16]),
+        digest,
+        TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
+        completed_at,
+        summary,
+    )?;
+    Ok(TopicContextPosteriorExecution {
+        artifact: artifact.clone(),
+        terminal_result,
+    })
 }
 
 #[cfg(test)]
