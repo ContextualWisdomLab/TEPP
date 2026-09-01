@@ -43,7 +43,7 @@ Rollback.
 
 
 class AdrIdentityUniquenessTests(unittest.TestCase):
-    """Reject branch-local reuse of a repository-wide ADR identifier."""
+    """Reject branch-local reuse or misdirection of an ADR identifier."""
 
     def _root(self, index_rows: str, files: dict[str, str]) -> Path:
         temporary = tempfile.TemporaryDirectory()
@@ -74,7 +74,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
                 docs.validate_adr_graph()
 
     def test_duplicate_numbered_files_fail(self) -> None:
-        """Two numbered ADR files may not share one repository-wide identity."""
+        """Two numbered root ADR files may not share one repository-wide identity."""
 
         root = self._root(
             "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n",
@@ -83,6 +83,41 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
         with mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "duplicate ADR file identity"):
                 docs.validate_adr_graph()
+
+    def test_mismatched_index_link_identity_fails(self) -> None:
+        """Displayed ADR identity must match the linked numbered filename."""
+
+        root = self._root(
+            "| [0001](0002-two.md) | One mislabeled | Accepted | partial | bad link |\n"
+            "| [0002](0001-one.md) | Two mislabeled | Accepted | partial | bad link |\n",
+            {"0001-one.md": "0001", "0002-two.md": "0002"},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "ADR index target identity mismatch"):
+                docs.validate_adr_graph()
+
+    def test_duplicate_index_targets_fail(self) -> None:
+        """Two index identities may not resolve to the same canonical ADR target."""
+
+        root = self._root(
+            "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n"
+            "| [0002](0001-one.md) | Two | Accepted | partial | duplicate target |\n",
+            {"0001-one.md": "0001", "0002-two.md": "0002"},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "duplicate ADR index target"):
+                docs.validate_adr_graph()
+
+    def test_canonical_index_targets_pass(self) -> None:
+        """Each displayed identity may link to its unique root ADR file."""
+
+        root = self._root(
+            "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n"
+            "| [0002](0002-two.md) | Two | Accepted | partial | canonical |\n",
+            {"0001-one.md": "0001", "0002-two.md": "0002"},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            docs.validate_adr_graph()
 
 
 if __name__ == "__main__":  # pragma: no cover
