@@ -6,16 +6,16 @@ This is a live-recovery record for delivery issue #175. GitHub state supersedes 
 
 - Protected default branch: `main`
 - Protected-main SHA observed: `1bc02f580cf48e1d39da239f0e818453437c31c3`
-- Snapshot stamp: `2026-09-01T10:19:29Z`
-- Open pull requests: **136**
-- Draft pull requests: **91**
-- Non-draft pull requests: **45**
+- Snapshot stamp: `2026-09-01T10:49:02Z`
+- Open pull requests: **139**
+- Draft pull requests: **90**
+- Non-draft pull requests: **49**
 - Open issues: **14**
 - Effective required-workflow ruleset: `18156473`, `CWL Central required workflows`
 - GitHub releases: **0**
 - `docs/product-technical-gap-baseline.md` is maintained on this recovery branch so it no longer presents a former zero-queue snapshot as current authority.
 
-The initial observation was 141/99. The queue later peaked at 149/100 while this recovery vehicle was open. The current 136/91/45 inventory is a net reduction after scientifically unsafe #356 closed without merge; it is not evidence that the queue is now a bounded landing set. A queued, skipped, cancelled, predecessor-head, or stale check is not passing evidence.
+The initial observation was 141/99. The queue later peaked at 149/100, fell to 136, and then rebounded to 139 while this recovery vehicle remained open. The rebound came from additional one-operation Analysis Run slices and is a WIP circuit-breaker regression, not buyer-visible progress. A queued, skipped, cancelled, predecessor-head, or stale check is not passing evidence.
 
 ## Queue authority classes
 
@@ -29,7 +29,7 @@ Every open PR must be classified before merge or closure as one of:
 - `research_lineage_only`: useful scientific provenance that is not intended to ship as a separate runtime boundary;
 - `blocked_external`: otherwise-valid work whose current blocker is external to TEPP and is recorded with an owning issue/PR.
 
-A PR title, ADR number, local green test, or separate crate does not establish an independent product boundary.
+A PR title, ADR number, local green test, or separate crate does not establish an independent product boundary. There is no `landing_vehicle_candidate` class; a vehicle is either selected as `landing_vehicle` or remains one of the declared non-authority classes until selection is justified.
 
 ## Landing order
 
@@ -49,37 +49,41 @@ New unrelated micro-PRs are release-excluded while this queue exceeds the active
 
 ### PR #441 — event-time lagged association repair
 
-Classification: `landing_vehicle_candidate` under Longitudinal Modeling; scientific root cause repaired on exact head `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5`, but not merge-ready until exact-head workflows succeed and independent non-author APPROVE exists.
+Classification: `landing_vehicle` under Longitudinal Modeling. The scientific root cause is repaired on exact head `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5`, but the vehicle is not merge-ready until exact-head workflows succeed and a qualifying independent non-author APPROVE exists.
 
 The predecessor head exposed `(trait + e^{aΔt} p + added) / (trait + p + added)` as `expected_autocorrelation`. Review showed that a one-sided covariance/earlier-variance ratio is not a correlation under nonstationary marginals and can exceed one. The repair removes that public claim and its `psychometric_core` changes from the final diff. The replacement belongs to `longitudinal_core` and standardizes a supplied lagged covariance only when both marginal variances are available:
 
 `Cov(Y_t,Y_t+Δ) / sqrt(Var(Y_t) * Var(Y_t+Δ))`.
 
-The invalid predecessor commit remains only as RED/scientific-failure lineage. Review threads tied to the removed implementation are resolved as outdated. Canonical `ARCHITECTURE.md` and `CHANGELOG.md` now record the event-time lagged-correlation standardizer; the one-shot self-modifying capability-record workflow was removed. Hosted exact-head Rust/documentation/security checks were still queued at this snapshot, so this PR is not yet a merge authority.
+The invalid predecessor commit remains only as RED/scientific-failure lineage. Review threads tied to the removed implementation are resolved. Canonical `ARCHITECTURE.md` and `CHANGELOG.md` record the event-time lagged-correlation standardizer; the one-shot self-modifying capability-record workflow was removed. Hosted exact-head Rust/documentation/security checks were still queued at this snapshot, so this PR is not yet a merge authority.
 
 ### PR #356 — validation-run scientific evidence
 
-Classification: **closed without merge**. Useful cutoff/run-binding/metric evidence is preserved in branch and review history for fold into the Validation landing work tracked by #166. Do not reopen this exact vehicle.
+Classification: **closed without merge**. Useful cutoff/run-binding/metric evidence is preserved in branch and review history for fold into the Scientific Validation landing work tracked by #166. Do not reopen this exact vehicle.
 
 The closed head `df33bfa3e61ae4de3dbfae16df0deac12d2f4003` bound cutoff-safe evidence to a validation run, but review found a scientific-authority defect: the acceptance rule compared RMSE with a standard error derived from the same residual vector using a caller-selected preregistered multiplier. That gate can accept arbitrarily large recovery error for pathological residual shapes. The closed observation also accepted caller-supplied truth/recovered vectors and an `authored_by_llm` boolean rather than an estimator-owned, digest-bound provenance artifact.
 
-DDD correction for the next Validation vehicle: the run should produce **Validation Evidence**. A distinct **Claim Promotion Decision** aggregate, governed by ADR 0014 and a method-specific preregistered evidence contract, decides whether a scientific claim is promotable. No generic standard-error multiplier, maximum-k, or other rule-of-thumb threshold may substitute for a research- or model-derived acceptance design.
+DDD correction for the next Scientific Validation vehicle: the run produces **Validation Evidence**. A distinct **Claim Promotion Decision** aggregate, governed by ADR 0014 and a method-specific preregistered evidence contract, decides whether a scientific claim is promotable. No generic standard-error multiplier, maximum-k, or other rule-of-thumb threshold may substitute for a research- or model-derived acceptance design.
 
-### PR #444 — export-collection CLI
+### PRs #443–#446 — Analysis Run export stack
 
-Classification: `fold_into_landing_vehicle` under Analysis Run/export, stacked on #443. Preserve CLI parsing, fail-closed origin/credential/consumer refusals, and metric-free receipt tests. Opening this slice while this recovery vehicle remains open is evidence that the WIP circuit breaker is not yet enforced.
+Classification: `fold_into_landing_vehicle` under one coherent Analysis Run/export vehicle.
+
+Preserve each slice's unique pagination, authorization, cancellation, CLI parsing, origin/credential/consumer refusal, and metric-free receipt tests. Do not retain one route or one binary as a separate product boundary or architecture authority merely because it has its own ADR or branch.
+
+### PR #447 — Analysis Run project-history cancel
+
+Classification: `fold_into_landing_vehicle` under the Analysis Run/project-history vehicle. Preserve its empty-body, path/credential refusal, cancellation-removal, and metric-free receipt evidence before folding.
 
 ### PRs #352 and #355 — same Driver/ctsem TIPREDEFFECT rewrite
 
-Classification: both `fold_into_landing_vehicle` candidates under Longitudinal Modeling; neither is selected as authority yet.
+Classification: both `fold_into_landing_vehicle` under Longitudinal Modeling; neither is selected as a separate authority.
 
 Both implement the scalar `-a * B` rewrite from the same current-main base. They differ in public naming, refusal guards, tests, doctoring, and documentation edits. Closing either solely because the title and core equation match would discard unique evidence. The consolidation vehicle must retain the stronger named-quantity refusal coverage and realistic published-example tests while avoiding unrelated architecture mega-row edits.
 
-### Analysis-run transport slices
+### Analysis Run transport slices
 
 PRs for one GET/POST/CLI/status/cancel/retry/export/project-history operation are not separate bounded contexts. Classify them under the Analysis Run application context and `tepp_api` adapter. Parent/child stacks remain documented until a current-main landing vehicle preserves their unique contract tests and consumer compatibility.
-
-PR #443 is a current example: it adds one export-collection GET on top of the existing export-retrieval stack. Its unique pagination/auth/refusal tests must be preserved, but the operation is a `fold_into_landing_vehicle` candidate rather than a new product boundary or architecture decision.
 
 ### Evidence/method refusal slices
 
@@ -100,4 +104,4 @@ Before merge:
 
 ## DDD delivery constraint
 
-Directory and crate moves are part of the owning product-vertical replay. Do not preserve a technical-layer or one-rule path as canonical if it obscures the domain responsibility. Conversely, do not rename all crates in one sweeping PR while 136 remote heads are active. The target bounded contexts are fixed in `docs/architecture/domain-context-map.md`; migration proceeds through safe, reviewable landing vehicles with explicit anti-corruption adapters and replacement mappings.
+Directory and crate moves are part of the owning product-vertical replay. Do not preserve a technical-layer or one-rule path as canonical if it obscures the domain responsibility. Conversely, do not rename all crates in one sweeping PR while 139 remote heads are active. The target bounded contexts are fixed in `docs/architecture/domain-context-map.md`; migration proceeds through safe, reviewable landing vehicles with explicit anti-corruption adapters and replacement mappings.
