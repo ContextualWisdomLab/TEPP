@@ -19,8 +19,9 @@ use crate::naruon_http::NARUON_ANALYSIS_RUN_PATH;
 use crate::{
     AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
     ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_PATH,
-    ProjectHistoryCollection, ProjectHistoryCollectionItem, ProjectHistoryProjection,
-    ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH, TemporalContextRequest, build_temporal_context,
+    PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER, ProjectHistoryCollection,
+    ProjectHistoryCollectionItem, ProjectHistoryProjection, ProjectHistoryRequest,
+    TEMPORAL_CONTEXT_PATH, TemporalContextRequest, build_temporal_context,
     is_project_history_collection_path, page_project_history_collection_items,
     parse_project_history_collection_page_cursor, parse_project_history_collection_page_limit,
     project_history_projection, project_history_retrieval_path_id,
@@ -150,7 +151,7 @@ impl AnalysisRunLiveService {
         let headers = parse_headers(&mut lines)?;
         if method == "GET" {
             if is_project_history_collection_path(path) {
-                return self.list_project_histories(path, &headers, body);
+                return self.list_project_histories(&headers, body);
             }
             if matches!(
                 project_history_retrieval_path_id(path),
@@ -253,13 +254,9 @@ impl AnalysisRunLiveService {
 
     fn list_project_histories(
         &self,
-        path: &str,
         headers: &HashMap<String, String>,
         body: &str,
     ) -> Result<NaruonLiveResponse, ApiError> {
-        if !is_project_history_collection_path(path) {
-            return Err(ApiError::InvalidWirePayload);
-        }
         if !body.is_empty() {
             return Err(ApiError::InvalidWirePayload);
         }
@@ -267,12 +264,10 @@ impl AnalysisRunLiveService {
         if consumer != LINEAGEWEAVE_CONSUMER_CODE {
             return Err(ApiError::InvalidWirePayload);
         }
-        let limit = parse_project_history_collection_page_limit(
-            headers.get("tepp-page-limit").map(String::as_str),
-        )?;
-        let cursor = parse_project_history_collection_page_cursor(
-            headers.get("tepp-page-cursor").map(String::as_str),
-        )?;
+        let page_limit = headers.get("tepp-page-limit").map(String::as_str);
+        let page_cursor = headers.get("tepp-page-cursor").map(String::as_str);
+        let limit = parse_project_history_collection_page_limit(page_limit)?;
+        let cursor = parse_project_history_collection_page_cursor(page_cursor)?;
         let items = self
             .accepted_project_histories
             .values()
@@ -297,7 +292,6 @@ impl AnalysisRunLiveService {
         headers: &HashMap<String, String>,
         body: &str,
     ) -> Result<NaruonLiveResponse, ApiError> {
-        let idempotency_key = project_history_retrieval_path_id(path)?;
         if !body.is_empty() {
             return Err(ApiError::InvalidWirePayload);
         }
@@ -309,18 +303,16 @@ impl AnalysisRunLiveService {
         if headers.contains_key("tepp-page-limit") || headers.contains_key("tepp-page-cursor") {
             return Err(ApiError::InvalidWirePayload);
         }
-        let matches: Vec<&ProjectHistoryProjection> = self
+        let tenant_workspace_id = header_value(headers, PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER)?;
+        crate::project_history::validate_project_history_registry_identity(tenant_workspace_id)?;
+        let idempotency_key = project_history_retrieval_path_id(path)?;
+        let replay_key =
+            consumer_tenant_idempotency_key(consumer, tenant_workspace_id, &idempotency_key);
+        let (_, projection) = self
             .accepted_project_histories
-            .values()
-            .filter(|(request, _)| request.idempotency_key == idempotency_key)
-            .map(|(_, projection)| projection)
-            .collect();
-        let projection = match matches.as_slice() {
-            [projection] => *projection,
-            _ => return Err(ApiError::InvalidWirePayload),
-        };
+            .get(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
         let response_body = projection.to_json()?;
-        refuse_metrics_on_project_history_retrieval_payload(&response_body)?;
         Ok(json_response(200, "OK", response_body))
     }
 
@@ -1101,6 +1093,13 @@ mod tests {
             ProjectHistoryCollection::from_json(&limited_got.body).expect("limited page");
         assert_eq!(limited_page.histories.len(), 1);
         assert_eq!(limited_page.next_cursor.as_deref(), Some("idem-a"));
+        let continued = format!(
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-page-limit: 1\r\ntepp-page-cursor: idem-a\r\ncontent-length: 0\r\n\r\n"
+        );
+        let continued_page =
+            ProjectHistoryCollection::from_json(&service.handle_http_request(&continued).body)
+                .expect("continued page");
+        assert_eq!(continued_page.histories[0].idempotency_key, "idem-b");
 
         let analysis_get = format!(
             "GET {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
@@ -1123,9 +1122,18 @@ mod tests {
         let posted = service.handle_http_request(&project_history_post(&first));
         assert_eq!(posted.status_code, 200);
         let stored = ProjectHistoryProjection::from_json(&posted.body).expect("stored");
+        let mut other_tenant = sample_project_history("idem-a", "project-b");
+        other_tenant.tenant_workspace_id = "other-tenant".into();
+        other_tenant.project_name = "Other project".into();
+        assert_eq!(
+            service
+                .handle_http_request(&project_history_post(&other_tenant))
+                .status_code,
+            200
+        );
 
         let got = service.handle_http_request(&format!(
-            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
         ));
         assert_eq!(got.status_code, 200);
         let retrieved = ProjectHistoryProjection::from_json(&got.body).expect("retrieved");
@@ -1135,26 +1143,50 @@ mod tests {
         assert!(!got.body.contains("tepp.scientific_acceptance.v1"));
         assert!(!got.body.contains("causal_score"));
 
+        let other = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: other-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        let other_projection =
+            ProjectHistoryProjection::from_json(&other.body).expect("other tenant projection");
+        assert_eq!(other_projection.project_key, "project-b");
+
+        let missing_tenant = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(missing_tenant.status_code, 400);
+        let foreign_tenant = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: foreign-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(foreign_tenant.status_code, 400);
+
         let unknown = service.handle_http_request(&format!(
-            "GET {PROJECT_HISTORY_PATH}/missing HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH}/missing HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
         ));
         assert_eq!(unknown.status_code, 400);
         let naruon = service.handle_http_request(&format!(
-            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
         ));
         assert_eq!(naruon.status_code, 400);
         let extra = service.handle_http_request(&format!(
-            "GET {PROJECT_HISTORY_PATH}/idem-a/extra HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH}/idem-a/extra HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
         ));
         assert_eq!(extra.status_code, 400);
         let paged = service.handle_http_request(&format!(
-            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-page-limit: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ntepp-page-limit: 1\r\ncontent-length: 0\r\n\r\n"
         ));
         assert_eq!(paged.status_code, 400);
+        let cursor = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ntepp-page-cursor: idem-a\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(cursor.status_code, 400);
         let nonempty = service.handle_http_request(&format!(
-            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}"
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 2\r\n\r\n{{}}"
         ));
         assert_eq!(nonempty.status_code, 400);
+        let wrong_method = service.handle_http_request(&format!(
+            "PUT {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(wrong_method.status_code, 400);
         let collection = service.handle_http_request(&format!(
             "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
         ));

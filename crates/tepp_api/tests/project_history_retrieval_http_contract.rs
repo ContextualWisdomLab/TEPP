@@ -7,9 +7,12 @@ use tepp_api::{
 
 #[test]
 fn project_history_retrieval_is_metric_free_get_without_credentials() {
-    let exchange =
-        lineageweave_project_history_retrieval_exchange("https://tepp.example.test", "idem-a")
-            .expect("exchange");
+    let exchange = lineageweave_project_history_retrieval_exchange(
+        "https://tepp.example.test",
+        "tenant-a",
+        "idem-a",
+    )
+    .expect("exchange");
     assert_eq!(exchange.method, "GET");
     assert!(
         exchange
@@ -17,6 +20,12 @@ fn project_history_retrieval_is_metric_free_get_without_credentials() {
             .ends_with("/v1/project-histories/idem-a")
     );
     assert!(exchange.body.is_empty());
+    assert!(
+        exchange
+            .headers
+            .iter()
+            .any(|(name, value)| { name == "tepp-tenant-workspace-id" && value == "tenant-a" })
+    );
     assert!(
         !exchange
             .headers
@@ -44,7 +53,11 @@ fn project_history_retrieval_refuses_metrics_naruon_origins_and_collection_path(
         Err(ApiError::InvalidWirePayload)
     );
     assert_eq!(
-        lineageweave_project_history_retrieval_exchange("http://insecure.example", "idem-a"),
+        lineageweave_project_history_retrieval_exchange(
+            "http://insecure.example",
+            "tenant-a",
+            "idem-a",
+        ),
         Err(ApiError::InvalidWirePayload)
     );
     assert_eq!(

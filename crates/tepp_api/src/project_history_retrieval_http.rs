@@ -11,11 +11,15 @@
 //! GAP-003B. `NaruonLiveService` stays POST-only.
 
 use crate::naruon_http::{NaruonHttpExchange, compose_https_target};
+use crate::project_history::validate_project_history_registry_identity;
 use crate::wire::require_nonempty;
 use crate::{ApiError, PROJECT_HISTORY_PATH};
 
 /// Maximum opaque idempotency-key length on the retrieval path.
-pub const PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN: usize = 128;
+pub const PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN: usize = 256;
+
+/// Header carrying the authorized project-history tenant on GET-by-id.
+pub const PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER: &str = "tepp-tenant-workspace-id";
 
 const FORBIDDEN_RETRIEVAL_KEYS: [&str; 12] = [
     "rmse",
@@ -120,12 +124,11 @@ fn refuse_metrics_on_json(value: &serde_json::Value) -> Result<(), ApiError> {
 /// [`PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN`] bytes.
 pub fn lineageweave_project_history_retrieval_exchange(
     origin: &str,
+    tenant_workspace_id: &str,
     idempotency_key: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
-    require_nonempty(idempotency_key)?;
-    if idempotency_key.len() > PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN {
-        return Err(ApiError::LimitExceeded);
-    }
+    validate_project_history_registry_identity(tenant_workspace_id)?;
+    validate_project_history_registry_identity(idempotency_key)?;
     let encoded_id = encode_path_segment(idempotency_key);
     let target_path = format!("{PROJECT_HISTORY_PATH}/{encoded_id}");
     let target_url = compose_https_target(origin, &target_path)?;
@@ -136,6 +139,10 @@ pub fn lineageweave_project_history_retrieval_exchange(
             ("content-type".into(), "application/json".into()),
             ("tepp-consumer".into(), "lineageweave".into()),
             ("tepp-contract-version".into(), "1".into()),
+            (
+                PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER.into(),
+                tenant_workspace_id.into(),
+            ),
         ],
         body: String::new(),
     })
@@ -182,7 +189,7 @@ fn decode_path_segment(value: &str) -> Result<String, ApiError> {
         }
     }
     let decoded = String::from_utf8(out).map_err(|_| ApiError::InvalidWirePayload)?;
-    if decoded.contains('/') || decoded.contains('\0') {
+    if decoded.chars().any(char::is_control) {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(decoded)
@@ -207,9 +214,12 @@ mod tests {
 
     #[test]
     fn retrieval_exchange_is_metric_free_get_without_credentials() {
-        let exchange =
-            lineageweave_project_history_retrieval_exchange("https://tepp.example.test", "idem-a")
-                .expect("exchange");
+        let exchange = lineageweave_project_history_retrieval_exchange(
+            "https://tepp.example.test",
+            "tenant-a",
+            "idem-a",
+        )
+        .expect("exchange");
         assert_eq!(exchange.method, "GET");
         assert!(
             exchange
@@ -229,13 +239,15 @@ mod tests {
         );
         let encoded = lineageweave_project_history_retrieval_exchange(
             "https://tepp.example.test",
+            "tenant-a",
             "idem/slash",
         )
         .expect("encoded");
         assert!(encoded.target_url.contains("idem%2Fslash"));
         assert_eq!(
-            project_history_retrieval_path_id("/v1/project-histories/idem%2Fslash"),
-            Err(ApiError::InvalidWirePayload)
+            project_history_retrieval_path_id("/v1/project-histories/idem%2Fslash")
+                .expect("decoded slash"),
+            "idem/slash"
         );
     }
 
@@ -265,11 +277,19 @@ mod tests {
             Err(ApiError::LimitExceeded)
         );
         assert_eq!(
-            lineageweave_project_history_retrieval_exchange("http://insecure.example", "idem-a"),
+            lineageweave_project_history_retrieval_exchange(
+                "http://insecure.example",
+                "tenant-a",
+                "idem-a",
+            ),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            lineageweave_project_history_retrieval_exchange("https://tepp.example.test", ""),
+            lineageweave_project_history_retrieval_exchange(
+                "https://tepp.example.test",
+                "tenant-a",
+                "",
+            ),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
@@ -299,8 +319,40 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            refuse_metrics_on_project_history_retrieval_payload(r#"{"nested":[1]}"#),
+            Ok(())
+        );
+        assert_eq!(
             project_history_retrieval_path_id("/v1/project-histories/%zz"),
             Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            lineageweave_project_history_retrieval_exchange(
+                "https://tepp.example.test",
+                "\ntenant",
+                "idem-a",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn retrieval_path_decoding_covers_hostile_and_encoded_bytes() {
+        for path in [
+            "/v1/project-histories/%",
+            "/v1/project-histories/idem!",
+            "/v1/project-histories/%00",
+            "/v1/project-histories/%FF",
+        ] {
+            assert_eq!(
+                project_history_retrieval_path_id(path),
+                Err(ApiError::InvalidWirePayload)
+            );
+        }
+        assert_eq!(
+            project_history_retrieval_path_id("/v1/project-histories/idem%2fslash")
+                .expect("lowercase hex"),
+            "idem/slash"
         );
     }
 }

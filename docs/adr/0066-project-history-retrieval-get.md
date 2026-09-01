@@ -13,11 +13,11 @@ ADR 0028 enumerates accepted project-history projections as metric-free identiti
 
 `tepp_api` publishes loopback-only `GET /v1/project-histories/{idempotency_key}` on `tepp-loopback`:
 
-- Consumer is `lineageweave` only. Empty body. The identity travels in the path.
+- Consumer is `lineageweave` only. Empty body. The idempotency identity travels in the path and the authorized tenant travels in `tepp-tenant-workspace-id`.
 - The response is the stored cutoff-safe `ProjectHistoryProjection`. `inference_status` remains `temporal_association_only`.
 - `tepp.scientific_acceptance.v1`, RMSE, bias, coverage, SE-gate, and `causal_score` never appear.
 - Collection GET (`GET /v1/project-histories` with no extra segment) is unchanged.
-- Pagination headers, naruon, nonempty bodies, extra path segments, and unknown keys fail closed.
+- Missing or mismatched tenant identity, pagination headers, naruon, nonempty bodies, extra path segments, and unknown keys fail closed.
 - The retrieval does not infer causality, mutate TEPP state, or return a completed psychometric result.
 - `NaruonLiveService` stays POST-only. This slice does not implement a retrieval CLI or persistence.
 
@@ -41,7 +41,7 @@ Non-`lineageweave` consumers, nonempty GET bodies, collection pagination headers
 ## Security, privacy, scientific-integrity, and governance impact
 
 - No credential headers cross the consumer boundary.
-- The retrieval remains loopback-only and size-bounded.
+- The retrieval remains loopback-only, size-bounded, and directly keyed by consumer, tenant, and idempotency identity.
 - Process 200 on GET-by-id is not measurement evidence and is not a causal claim.
 
 ## Compatibility and migration
@@ -53,7 +53,7 @@ Collection GET, POST `/v1/project-histories`, temporal-context, and analysis-run
 Falsifiable evidence:
 
 - GET of an accepted projection returns `temporal_association_only` without RMSE/bias/coverage/SE-gate/`tepp.scientific_acceptance.v1`/`causal_score` keys;
-- collection GET, naruon consumer, nonempty body, extra segments, and unknown keys fail closed;
+- cross-tenant GET, missing tenant, collection GET, naruon consumer, nonempty body, extra segments, and unknown keys fail closed;
 - Clippy `-D warnings`, `tepp_api` tests, rustdoc, and exact-head review remain required.
 
 ## Rollback and supersession

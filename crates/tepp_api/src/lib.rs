@@ -258,6 +258,8 @@ pub use project_history_collection_http::parse_project_history_collection_page_l
 pub use project_history_collection_http::refuse_metrics_on_project_history_collection_payload;
 /// Maximum opaque idempotency-key length on project-history GET-by-id.
 pub use project_history_retrieval_http::PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN;
+/// Header carrying the authorized tenant on project-history GET-by-id.
+pub use project_history_retrieval_http::PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER;
 /// `LineageWeave` GET exchange for one stored project-history projection.
 pub use project_history_retrieval_http::lineageweave_project_history_retrieval_exchange;
 /// Extract the opaque idempotency key from a project-history retrieval path.

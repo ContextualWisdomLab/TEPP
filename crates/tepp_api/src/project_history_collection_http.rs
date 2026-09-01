@@ -450,6 +450,13 @@ mod tests {
             ProjectHistoryCollection::new(vec![sample_item()], Some(String::new())),
             Err(ApiError::InvalidWirePayload)
         );
+        assert_eq!(
+            ProjectHistoryCollection::new(
+                vec![sample_item()],
+                Some("a".repeat(PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN + 1)),
+            ),
+            Err(ApiError::LimitExceeded)
+        );
         let oversized = vec![sample_item(); PROJECT_HISTORY_COLLECTION_MAX_LIMIT + 1];
         assert_eq!(
             ProjectHistoryCollection::new(oversized, None),
@@ -512,6 +519,12 @@ mod tests {
         assert_eq!(
             parse_project_history_collection_page_cursor(Some("")),
             Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_project_history_collection_page_cursor(Some(
+                &"a".repeat(PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN + 1)
+            )),
+            Err(ApiError::LimitExceeded)
         );
         assert!(is_project_history_collection_path("/v1/project-histories"));
         assert!(!is_project_history_collection_path("/v1/analysis-runs"));
