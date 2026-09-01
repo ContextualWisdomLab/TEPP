@@ -1,18 +1,15 @@
-//! Provider-owned export lookup stored-request GET contracts.
+//! Export idempotency-key stored-request lookup contracts.
 //!
-//! GAP-003A unique slice: `GET /v1/exports/by-idempotency/{idempotency_key}/request`
-//! returns the stored naruon export-authorization request of the unique
-//! accepted export that used that client key on `AnalysisRunLiveService` /
-//! `tepp-loopback`. Lookup GET returns identity only. Stored-request GET
-//! requires `export_id`. Operators who hold a 200 authorization receipt or
-//! log key still need two hops. `NaruonLiveService` stays POST-only.
-//! `LineageWeave` is refused on this naruon-owned adapter.
-//! `tepp.scientific_acceptance.v1` never appears. This module does not
-//! duplicate lookup GET/CLI (#465/#466), stored-request GET/CLI (#457/#459),
-//! GET-by-id (#411), retrieval CLI (#417), collection GET/CLI (#443/#444),
-//! export-authorize CLI (#410), analysis-run lookup (#380), or cancel
-//! lineages (closed). Persistence remains GAP-003B. GAP-010 Figma/export
-//! remains later work.
+//! `GET /v1/exports/by-idempotency/{idempotency_key}/request` was introduced as
+//! a convenience lookup for an accepted Naruon export authorization. Review of
+//! the first implementation showed that consumer-only lookup could search all
+//! Naruon tenant namespaces and return the original request, including tenant
+//! and principal identity. The route is therefore fail-closed until the
+//! Analysis Run boundary has an explicit tenant-and-principal authorization
+//! binding. The parser remains available so the live dispatcher can recognize
+//! and reject the reserved resource deterministically; the client exchange
+//! builder also refuses activation. `LineageWeave` remains outside this
+//! Naruon-owned adapter and `tepp.scientific_acceptance.v1` is never admitted.
 
 use crate::ApiError;
 use crate::export_idempotency_lookup_http::{
@@ -24,7 +21,9 @@ use crate::wire::require_nonempty;
 /// Extra-segment that names the stored export-authorization request.
 pub const EXPORT_IDEMPOTENCY_LOOKUP_STORED_REQUEST_SEGMENT: &str = "request";
 
-const FORBIDDEN_STORED_REQUEST_KEYS: [&str; 13] = [
+const FORBIDDEN_STORED_REQUEST_KEYS: [&str; 15] = [
+    "tenant_workspace_id",
+    "principal_id",
     "rmse",
     "rmse_standard_error",
     "mean_bias",
@@ -40,18 +39,18 @@ const FORBIDDEN_STORED_REQUEST_KEYS: [&str; 13] = [
     "terminal_result",
 ];
 
-/// Extract the opaque idempotency key from
-/// `GET /v1/exports/by-idempotency/{idempotency_key}/request`.
+/// Extract the opaque idempotency key from the reserved stored-request route.
 ///
-/// The route is segmented before percent decoding, so an encoded `/` remains
-/// data inside one opaque key rather than becoming an extra path segment.
+/// Raw and percent-decoded slashes are rejected. Keeping the key in one route
+/// segment avoids ambiguous normalization between proxies and the loopback
+/// dispatcher.
 ///
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] for collection, GET-by-id, lookup
 /// without `/request`, `{export_id}/request`, extra raw segments, a missing
-/// `by-idempotency` prefix, reserved prefix used as the key, NUL, empty key,
-/// or a hostile encoding, and [`ApiError::LimitExceeded`] when oversized.
+/// `by-idempotency` prefix, reserved prefix used as the key, slash, NUL, empty
+/// key, or hostile encoding, and [`ApiError::LimitExceeded`] when oversized.
 pub fn export_idempotency_lookup_stored_request_path_key(path: &str) -> Result<String, ApiError> {
     let remainder = path
         .strip_prefix(NARUON_EXPORT_PATH)
@@ -73,10 +72,7 @@ pub fn export_idempotency_lookup_stored_request_path_key(path: &str) -> Result<S
     }
     let key = decode_path_segment(encoded_key)?;
     require_nonempty(&key)?;
-    if key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX {
-        return Err(ApiError::InvalidWirePayload);
-    }
-    if key.contains('\0') {
+    if key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX || key.contains('/') || key.contains('\0') {
         return Err(ApiError::InvalidWirePayload);
     }
     if key.len() > EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN {
@@ -91,16 +87,18 @@ pub fn is_export_idempotency_lookup_stored_request_path(path: &str) -> bool {
     export_idempotency_lookup_stored_request_path_key(path).is_ok()
 }
 
-/// Refuse stored-request JSON that already carries scientific-metric keys.
+/// Refuse stored-request JSON that carries sensitive identity or scientific keys.
 ///
-/// Empty payloads are admitted for the GET request body. The original
-/// authorization request may carry `tenant_workspace_id`, `principal_id`, and
-/// `includes_source_text`; those keys are not scientific metrics.
+/// Empty payloads are admitted for the GET request body. A serialized
+/// [`crate::ExportAuthorizationRequest`] contains tenant and principal identity,
+/// so it is intentionally rejected while this route lacks caller scope binding.
+/// This gives the existing live dispatcher a fail-closed quarantine without
+/// weakening the separate metric-free export identity lookup.
 ///
 /// # Errors
 ///
-/// Returns [`ApiError::InvalidWirePayload`] when a forbidden metric key is
-/// present.
+/// Returns [`ApiError::InvalidWirePayload`] when a forbidden identity,
+/// scientific metric, report, or terminal-result key is present.
 pub fn refuse_metrics_on_export_lookup_stored_request_payload(
     payload: &str,
 ) -> Result<(), ApiError> {
@@ -146,22 +144,27 @@ fn refuse_metrics_on_json(value: &serde_json::Value) -> Result<(), ApiError> {
     }
 }
 
-/// Build a credential-free naruon lookup stored-request GET exchange.
+/// Validate a would-be Naruon lookup stored-request GET and fail closed.
 ///
-/// The builder refuses non-`https` origins and empty or oversized keys. It
-/// does not inject credentials. The GET body is empty. The opaque key is
-/// percent-encoded into exactly one path segment after `by-idempotency` and
-/// before `/request`.
+/// No exchange is emitted until the service can bind the lookup to both the
+/// authorized tenant/workspace and principal. Valid origin/key syntax is still
+/// checked so malformed callers receive the existing deterministic validation
+/// errors instead of using quarantine as an input-validation bypass.
 ///
 /// # Errors
 ///
-/// Returns a fail-closed origin or identity error.
+/// Returns a fail-closed origin/identity error for invalid inputs and
+/// [`ApiError::AuthorizationDenied`] for otherwise valid requests while the
+/// route is quarantined.
 pub fn naruon_export_idempotency_lookup_stored_request_exchange(
     origin: &str,
     idempotency_key: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
     require_nonempty(idempotency_key)?;
-    if idempotency_key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX || idempotency_key.contains('\0') {
+    if idempotency_key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX
+        || idempotency_key.contains('/')
+        || idempotency_key.contains('\0')
+    {
         return Err(ApiError::InvalidWirePayload);
     }
     if idempotency_key.len() > EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN {
@@ -171,17 +174,8 @@ pub fn naruon_export_idempotency_lookup_stored_request_exchange(
     let target_path = format!(
         "{NARUON_EXPORT_PATH}/{EXPORT_IDEMPOTENCY_LOOKUP_PREFIX}/{encoded_key}/{EXPORT_IDEMPOTENCY_LOOKUP_STORED_REQUEST_SEGMENT}"
     );
-    let target_url = compose_https_target(origin, &target_path)?;
-    Ok(NaruonHttpExchange {
-        method: "GET",
-        target_url,
-        headers: vec![
-            ("content-type".into(), "application/json".into()),
-            ("tepp-consumer".into(), "naruon".into()),
-            ("tepp-contract-version".into(), "1".into()),
-        ],
-        body: String::new(),
-    })
+    let _validated_target = compose_https_target(origin, &target_path)?;
+    Err(ApiError::AuthorizationDenied)
 }
 
 fn encode_path_segment(value: &str) -> String {
@@ -257,25 +251,13 @@ mod tests {
     };
 
     #[test]
-    fn lookup_stored_request_exchange_is_metric_free_get_without_credentials() {
-        let exchange = naruon_export_idempotency_lookup_stored_request_exchange(
-            "https://tepp.example.test",
-            "idem-9",
-        )
-        .expect("exchange");
-        assert_eq!(exchange.method, "GET");
+    fn lookup_stored_request_route_is_recognized_but_client_activation_is_quarantined() {
         assert_eq!(
-            exchange.target_url,
-            "https://tepp.example.test/v1/exports/by-idempotency/idem-9/request"
-        );
-        assert!(exchange.body.is_empty());
-        assert!(
-            !exchange
-                .headers
-                .iter()
-                .any(|(name, _)| name.contains("authorization")
-                    || name.contains("token")
-                    || name.contains("idempotency"))
+            naruon_export_idempotency_lookup_stored_request_exchange(
+                "https://tepp.example.test",
+                "idem-9",
+            ),
+            Err(ApiError::AuthorizationDenied)
         );
         assert!(is_export_idempotency_lookup_stored_request_path(
             "/v1/exports/by-idempotency/idem-9/request"
@@ -300,6 +282,12 @@ mod tests {
         assert_eq!(
             refuse_metrics_on_export_lookup_stored_request_payload(""),
             Ok(())
+        );
+        assert_eq!(
+            refuse_metrics_on_export_lookup_stored_request_payload(
+                r#"{"tenant_workspace_id":"tenant-a","principal_id":"principal-a","artifact_id":"artifact-a"}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
         );
     }
 
@@ -342,6 +330,12 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
+            export_idempotency_lookup_stored_request_path_key(
+                "/v1/exports/by-idempotency/idem%2F9/request"
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
             export_idempotency_lookup_stored_request_path_key(&format!(
                 "/v1/exports/by-idempotency/{}/request",
                 "a".repeat(EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN + 1)
@@ -366,6 +360,13 @@ mod tests {
             naruon_export_idempotency_lookup_stored_request_exchange(
                 "https://tepp.example.test",
                 "by-idempotency",
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            naruon_export_idempotency_lookup_stored_request_exchange(
+                "https://tepp.example.test",
+                "idem/9",
             ),
             Err(ApiError::InvalidWirePayload)
         );
