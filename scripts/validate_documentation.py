@@ -77,6 +77,8 @@ INVENTORY_ROW = re.compile(
     r"(?P<draft>true|false)\s*\|",
     re.MULTILINE,
 )
+PRIORITY_INVENTORY_HEADING = "## Current priority open pull-request evidence"
+LEVEL_TWO_HEADING = re.compile(r"^##\s+", re.MULTILINE)
 OPEN_PR_COUNT = re.compile(
     r"\|\s*Open pull requests\s*\|\s*\*\*(?P<count>\d+)\*\*"
 )
@@ -379,6 +381,18 @@ def _promotion_is_denied(text: str, claim: re.Match[str]) -> bool:
     return False
 
 
+def _priority_inventory_section(text: str) -> str:
+    """Return only the canonical priority-inventory section from the gap register."""
+
+    heading_start = text.find(PRIORITY_INVENTORY_HEADING)
+    if heading_start < 0:
+        return ""
+    section_start = heading_start + len(PRIORITY_INVENTORY_HEADING)
+    next_heading = LEVEL_TWO_HEADING.search(text, section_start)
+    section_end = next_heading.start() if next_heading is not None else len(text)
+    return text[section_start:section_end]
+
+
 def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     """Require a dated live gap register with an honest priority PR inventory."""
 
@@ -402,7 +416,8 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
         for match in QUEUED_CHECKS_AS_SHIPPED.finditer(text)
     ):
         failures.append("gap baseline treats queued Checks as implemented-main")
-    inventory = list(INVENTORY_ROW.finditer(text))
+    priority_inventory = _priority_inventory_section(text)
+    inventory = list(INVENTORY_ROW.finditer(priority_inventory))
     inventory_numbers = [match.group("number") for match in inventory]
     if not inventory:
         failures.append("gap baseline open-PR inventory has no exact-head rows")
