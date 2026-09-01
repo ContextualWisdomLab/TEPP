@@ -6,13 +6,14 @@ This is a live-recovery record for delivery issue #175. GitHub state supersedes 
 
 - Protected default branch: `main`
 - Protected-main SHA observed: `1bc02f580cf48e1d39da239f0e818453437c31c3`
-- Open pull requests: **141**
-- Draft pull requests: **99**
+- Open pull requests: **142**
+- Draft pull requests: **100**
 - Non-draft pull requests: **42**
+- Open issues: **13**
 - Effective required-workflow ruleset: `18156473`, `CWL Central required workflows`
-- `docs/product-technical-gap-baseline.md` is stale at this snapshot because it still records the previous queue-consolidation completion and older protected-main states.
+- `docs/product-technical-gap-baseline.md` was replaced on this recovery branch so it no longer presents the former zero-queue snapshot as current authority.
 
-These counts are delivery evidence, not a completion claim. A queued, skipped, cancelled, predecessor-head, or stale check is not passing evidence.
+The one-PR increase and one-draft increase from the initial 141/99 observation is this recovery PR itself. These counts are delivery evidence, not a completion claim. A queued, skipped, cancelled, predecessor-head, or stale check is not passing evidence.
 
 ## Queue authority classes
 
@@ -32,10 +33,10 @@ A PR title, ADR number, local green test, or separate crate does not establish a
 
 The active queue must be reduced in this order:
 
-1. **Delivery authority and DDD context ownership** — issue #175, this document, and `docs/architecture/domain-context-map.md`.
-2. **Analysis Run / scientific evidence vertical** — durable lifecycle, current-head validation evidence, persistence/recovery, terminal results, and operator retrieval. Scientific evidence production must be separated from claim-promotion authority.
-3. **Evidence & Semantic Measurement vertical** — span-grounded semantic/concept input, method/source distinctions, immutable source offsets, concept dictionary versioning.
-4. **Topic Measurement vertical** — real Rust CPU `f64` shared-latent estimator, uncertainty, true-parameter recovery, candidate-K fitting, topic lineage.
+1. **Delivery authority and DDD context ownership** — issue #175, this document, `docs/product-technical-gap-baseline.md`, and `docs/architecture/domain-context-map.md`.
+2. **Evidence & Semantic Measurement vertical** — span-grounded semantic/concept input, method/source distinctions, immutable source offsets, concept dictionary versioning.
+3. **Topic Measurement vertical** — real Rust CPU `f64` shared-latent estimator, uncertainty, true-parameter recovery, candidate-K fitting, topic lineage.
+4. **Analysis Run / scientific evidence vertical** — durable lifecycle, estimator-bound validation evidence, persistence/recovery, terminal results, and operator retrieval. Scientific evidence production is separated from claim-promotion authority.
 5. **Longitudinal Psychometrics vertical** — coherent ESEM/DSEM/multilevel measurement boundary rather than scalar-equation PR proliferation.
 6. **Event Intelligence vertical** — TDT/CHRONOS composition and event-time evidence under Temporal Event Knowledge.
 7. **Commercial runtime vertical** — tenancy, durable jobs, observability, backup/restore, release provenance, support.
@@ -50,9 +51,11 @@ Classification: `landing_vehicle_candidate`, pending correction before it may be
 
 Reason: it is direct from current protected main and binds cutoff-safe evidence to a validation run, but current review found a scientific-authority defect. The current acceptance rule compares RMSE with a standard error derived from the same residual vector using a caller-selected preregistered multiplier. This can accept arbitrarily large recovery error for pathological residual shapes. The current observation also accepts caller-supplied truth/recovered vectors and an `authored_by_llm` boolean rather than an estimator-owned, digest-bound provenance artifact. Graph recovery, invariance, convergence, and active-backend CPU/GPU parity applicability are not complete in the claimed scientific-acceptance artifact.
 
-DDD correction: the run should produce **Validation Evidence**. A distinct **Claim Promotion Decision** aggregate, governed by ADR 0014 and a method-specific preregistered evidence contract, decides whether a scientific claim is promotable. No generic “three-SE”, maximum-k, or other rule-of-thumb threshold may substitute for a research- or model-derived acceptance design.
+DDD correction: the run should produce **Validation Evidence**. A distinct **Claim Promotion Decision** aggregate, governed by ADR 0014 and a method-specific preregistered evidence contract, decides whether a scientific claim is promotable. No generic standard-error multiplier, maximum-k, or other rule-of-thumb threshold may substitute for a research- or model-derived acceptance design.
 
-Until corrected, #356 and downstream wire/HTTP slices must not be treated as a shippable scientific-acceptance vertical.
+Exact-head hosted evidence is also not green: the current Product workflow failed its coverage-diagnostic jobs. The branch remains non-draft in GitHub metadata because the connector's draft-conversion mutation is currently broken; that metadata must not be interpreted as merge readiness.
+
+Until the scientific and exact-head failures are corrected, #356 and downstream wire/HTTP slices must not be treated as a shippable scientific-acceptance vertical.
 
 ### PRs #352 and #355 — same Driver/ctsem TIPREDEFFECT rewrite
 
@@ -83,4 +86,4 @@ Before merge:
 
 ## DDD delivery constraint
 
-Directory and crate moves are part of the owning product-vertical replay. Do not preserve a technical-layer or one-rule path as canonical if it obscures the domain responsibility. Conversely, do not rename all 58 crates in one sweeping PR while 141 remote heads are active. The target bounded contexts are fixed in `docs/architecture/domain-context-map.md`; migration proceeds through safe, reviewable landing vehicles with explicit anti-corruption adapters and replacement mappings.
+Directory and crate moves are part of the owning product-vertical replay. Do not preserve a technical-layer or one-rule path as canonical if it obscures the domain responsibility. Conversely, do not rename all 58 crates in one sweeping PR while 142 remote heads are active. The target bounded contexts are fixed in `docs/architecture/domain-context-map.md`; migration proceeds through safe, reviewable landing vehicles with explicit anti-corruption adapters and replacement mappings.
