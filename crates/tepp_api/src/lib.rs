@@ -30,6 +30,7 @@ mod orchestration;
 mod project_history;
 mod project_history_collection_http;
 mod project_history_retrieval_http;
+mod project_history_stored_request_cli;
 mod project_history_stored_request_http;
 mod project_journey;
 mod provider_payload;
@@ -267,6 +268,22 @@ pub use project_history_retrieval_http::lineageweave_project_history_retrieval_e
 pub use project_history_retrieval_http::project_history_retrieval_path_id;
 /// Refuse scientific-metric and causal-score keys on retrieval JSON.
 pub use project_history_retrieval_http::refuse_metrics_on_project_history_retrieval_payload;
+/// Validated loopback CLI invocation for project-history stored-request GET.
+pub use project_history_stored_request_cli::ProjectHistoryStoredRequestCliInvocation;
+/// Loopback CLI verb for project-history stored-request GET.
+pub use project_history_stored_request_cli::ProjectHistoryStoredRequestCliVerb;
+/// Compose HTTP/1.1 from a stored-request CLI invocation.
+pub use project_history_stored_request_cli::compose_project_history_stored_request_cli_http;
+/// Dispatch a stored-request CLI invocation against an in-process listener.
+pub use project_history_stored_request_cli::dispatch_project_history_stored_request_cli;
+/// Execute a stored-request CLI invocation over loopback TCP.
+pub use project_history_stored_request_cli::execute_project_history_stored_request_cli;
+/// Render `tepp-loopback` HTTP/1.1 from a stored-request exchange.
+pub use project_history_stored_request_cli::loopback_http1_from_project_history_stored_request_exchange;
+/// Read leftover stdin for stored-request GET; empty is admitted.
+pub use project_history_stored_request_cli::read_project_history_stored_request_cli_stdin;
+/// Filter stored-request CLI stdout so scientific-acceptance never prints.
+pub use project_history_stored_request_cli::render_project_history_stored_request_cli_stdout;
 /// Whether a path is the project-history stored-request extra-segment.
 pub use project_history_stored_request_http::is_project_history_stored_request_path;
 /// `LineageWeave` GET exchange for one stored project-history create request.

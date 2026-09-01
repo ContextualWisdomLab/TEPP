@@ -106,6 +106,15 @@ cutoff-safe `ProjectHistoryProjection` on `tepp-loopback`. Consumer is
 `tepp.scientific_acceptance.v1` and causal scores never appear. The retrieval
 does not infer causality.
 
+`GET /v1/project-histories/{idempotency_key}/request` returns the accepted
+LineageWeave create request on `tepp-loopback`. Consumer is `lineageweave`
+only. Stored projection `inference_status` remains `temporal_association_only`.
+`tepp.scientific_acceptance.v1` and causal scores never appear.
+
+`tepp-project-history-request get` is the operator-visible loopback client of
+that stored-request GET. Empty stdin is admitted. Naruon is refused. Process
+exit 0 is not an ADR 0014 claim.
+
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
 terminal status contains exactly one request-bound
