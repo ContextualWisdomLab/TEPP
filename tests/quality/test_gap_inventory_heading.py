@@ -25,6 +25,7 @@ BASE = """# Product and Technical Gap Baseline
 | PR | Exact current head | Draft | Base | Title |
 |---:|---|:---:|---|---|
 | #441 | `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5` | false | main | repair |
+{extra_rows}
 
 ## Operator-gap register
 
@@ -35,15 +36,17 @@ BASE = """# Product and Technical Gap Baseline
 
 
 class PriorityInventoryHeadingTests(unittest.TestCase):
-    """Require the canonical level-two heading exactly, not a substring match."""
+    """Require the canonical level-two heading and every inventory row to be valid."""
 
-    def _write(self, heading: str) -> Path:
+    def _write(self, heading: str, extra_rows: str = "") -> Path:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
         path = root / docs.PRODUCT_TECHNICAL_GAP_BASELINE
         path.parent.mkdir(parents=True)
-        path.write_text(BASE.format(heading=heading), encoding="utf-8")
+        path.write_text(
+            BASE.format(heading=heading, extra_rows=extra_rows), encoding="utf-8"
+        )
         return root
 
     def test_exact_level_two_heading_passes(self) -> None:
@@ -64,6 +67,26 @@ class PriorityInventoryHeadingTests(unittest.TestCase):
 
         root = self._write("## Current priority open pull-request evidence (historical)")
         with self.assertRaisesRegex(AssertionError, "no exact-head rows"):
+            docs.validate_product_technical_gap_baseline(root)
+
+    def test_malformed_priority_row_fails_even_with_valid_sibling(self) -> None:
+        """A malformed data row cannot disappear from an otherwise valid inventory."""
+
+        root = self._write(
+            "## Current priority open pull-request evidence",
+            "| #442 | `deadbeef` | maybe | main | malformed |",
+        )
+        with self.assertRaisesRegex(AssertionError, "malformed priority inventory row"):
+            docs.validate_product_technical_gap_baseline(root)
+
+    def test_missing_priority_columns_fail_even_with_valid_sibling(self) -> None:
+        """Missing cells in one data row are an integrity failure, not an omission."""
+
+        root = self._write(
+            "## Current priority open pull-request evidence",
+            "| #442 | `0123456789012345678901234567890123456789` | true |",
+        )
+        with self.assertRaisesRegex(AssertionError, "malformed priority inventory row"):
             docs.validate_product_technical_gap_baseline(root)
 
 
