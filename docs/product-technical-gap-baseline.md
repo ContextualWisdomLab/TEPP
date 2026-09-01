@@ -15,8 +15,8 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | Signal | Current evidence | Delivery implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
-| Open pull requests | **133** | WIP remains release-blocking, but the queue has been reduced from the observed peak of 149 and from the 136-PR regression repaired in this slice. |
-| Draft pull requests | **132** | Non-landable work is explicitly parked while consolidated, repaired, or supplied with missing evidence. |
+| Open pull requests | **132** | WIP remains release-blocking, but the queue has been reduced from the observed peak of 149 and from the 136-PR regression repaired in this slice. |
+| Draft pull requests | **131** | Non-landable work is explicitly parked while consolidated, repaired, or supplied with missing evidence. |
 | Non-draft pull requests | **1** | #310 is the only current non-Draft landing vehicle. |
 | Open issues | **15** | Includes #437 for repository-wide ADR identity normalization and #472 for cutoff-safe inferred-status Analysis Run projection. |
 | GitHub releases | **0** | No open head is a released TEPP contract. |
@@ -24,11 +24,11 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 
 Classic branch protection is not the sole policy source; organization rulesets are effective merge authority where applicable. Any increase in open PR count while #435 remains open is a WIP regression unless the new PR is a demonstrably independent root-cause repair that cannot safely belong to an existing landing vehicle.
 
-The queue regressed to 136 when #476 (`DIFFUSIONstd`) and #477 (`discreteDIFFUSIONstd`) appeared as one-map Drafts under the wrong technical owner `psychometric_core`. Their distinct scientific evidence was verified as folded into #310 under Longitudinal Modeling before both predecessors were closed. A second ownership repair retired dirty #272 only after its IEEE-754 exact-unit finding moved to the fast-mlsirm owner lane. Concurrent upstream owner work then converged again: fast-mlsirm #1723 was closed unmerged only after its scalar evidence was preserved in the broader surviving #1722 covariance-standardisation contract. TEPP #315 remains Draft adapter lineage and may not land duplicate local arithmetic. The live TEPP queue is 133.
+The queue regressed to 136 when #476 (`DIFFUSIONstd`) and #477 (`discreteDIFFUSIONstd`) appeared as one-map Drafts under the wrong technical owner `psychometric_core`. Their distinct scientific evidence was verified as folded into #310 under Longitudinal Modeling before both predecessors were closed. A second ownership repair retired dirty #272 only after its IEEE-754 exact-unit finding moved to the fast-mlsirm owner lane. Concurrent upstream owner work then converged again: fast-mlsirm #1723 was closed unmerged only after its scalar evidence was preserved in the broader surviving #1722 covariance-standardisation contract. TEPP #315 remains Draft adapter lineage and may not land duplicate local arithmetic. #420 is now closed only after its project-history query CLI source, integration tests, changelog fragment and doctoring were folded into the surviving #456 Analysis Run adapter at exact head `5e327b8c6238aa1f3777bac4390be32d58adcfac`. The live TEPP queue is 132.
 
 ## Current priority open pull-request evidence
 
-This is a priority subset, not a row-for-row copy of the 133-PR queue. #435 intentionally omits its own SHA because embedding the branch head in a file changed by that same branch would make the evidence self-stale.
+This is a priority subset, not a row-for-row copy of the 132-PR queue. #435 intentionally omits its own SHA because embedding the branch head in a file changed by that same branch would make the evidence self-stale.
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
@@ -36,7 +36,7 @@ This is a priority subset, not a row-for-row copy of the 133-PR queue. #435 inte
 | #466 | `71f34b890bbd096eee152947c5e22d9778d323e8` | true | export-retrieval ancestry | Analysis Run / naruon export idempotency lookup + quarantine-parity landing vehicle. |
 | #464 | `1b3a477242336634be2c7867b29d39979e9a6dca` | true | temporal-context retrieval ancestry | Analysis Run / LineageWeave temporal-context stored-request GET+CLI landing vehicle; re-read before mutation. |
 | #462 | `c1b7d627167dd7636d2975cc41cec050a5e477ba` | true | main | Bounded source-name compatibility repair; v1 serialized key remains `id`. |
-| #420 | `0dc8b48f66b367a90847fcfebd2c6453ff275a1d` | true | main | Project-history query CLI; `fold_into_landing_vehicle` until unique source/tests are composed into the surviving Analysis Run vehicle. |
+| #456 | `5e327b8c6238aa1f3777bac4390be32d58adcfac` | true | project-history retrieval ancestry | Analysis Run / LineageWeave project-history landing vehicle; stored-request GET/CLI plus folded #420 query CLI source/tests. |
 | #417 | `1e468f62ec47f3476a7b4d18ed2980451dc425cf` | true | main | Analysis Run / naruon export retrieval GET+CLI landing vehicle; re-read before mutation. |
 | #315 | `538f9bd1c76422bc894836b65083c62544330c7c` | true | main | TEPP `TIPREDVARstd` adapter lineage only; blocked on a released fast-mlsirm #1722/successor contract and must remove duplicate arithmetic before landing. |
 | #310 | `4e7435f6dd232ae8e1e019f1393e7285e32c6527` | false | main | Longitudinal Modeling landing vehicle; contains closed #441 lineage and verified #476/#477 diffusion folds. |
@@ -85,6 +85,8 @@ Supported temporal estimators require realistic known-truth recovery for every c
 
 **#272/#315 — static-standardisation ownership repair.** #272 is closed after its exact-unit binary64 finding moved to fast-mlsirm. The narrower upstream #1723 was subsequently closed unmerged because its unique scalar evidence was preserved in surviving fast-mlsirm #1722, whose current candidate contract is `fast_mlsirm.covariance_standardization@1.0.0`. #315 remains Draft only to preserve the TEPP-specific `TIPREDVARstd` naming/event-time/refusal contract. It must not merge with duplicate arithmetic. After #1722 or its successor is merged and released/versioned, #315 must consume that immutable contract through an ACL, prove parity, retain TEPP temporal/model admission, and delete wrong-owner production arithmetic before folding into a Measurement/Longitudinal Modeling landing vehicle.
 
+**#420/#456 — project-history adapter consolidation.** #420 is closed as `superseded_by_fold` only after #456 exact head `5e327b8c6238aa1f3777bac4390be32d58adcfac` was verified to contain the original query-CLI implementation blob `4b3dd9950d2328cbb7ed4d32aeb5ee2c19590435`, original integration-test blob `6740078cc42cefbf5d906603d6b55657eb8241d1`, binary registration, changelog evidence and doctoring. #456 must reacquire its own exact-head hosted checks/review; no #420 check evidence transfers.
+
 **Dependency-review support.** Where Security Scan fails before Dependency Review because GitHub dependency-graph comparison is unavailable to the workflow token, keep the gate fail-closed. OSV, Trivy, and Scorecard are sibling evidence, not substitutes. Do not weaken TEPP source to manufacture missing control-plane evidence.
 
 **Analysis Run adapter/profile proliferation.** Export, interpretation, project-history, inferred-status, and temporal-context HTTP/CLI mechanics are adapters inside supporting contexts. Strict ancestry may be folded without force after exact comparison; diverged siblings require an actual source/test fold. One refusal/profile/route/CLI verb does not create architecture authority.
@@ -101,7 +103,7 @@ fast-mlsirm PR #1722 is the surviving canonical-owner candidate for domain-neutr
 
 | ID | Gap | Maturity | Closure evidence |
 | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 133 open PRs | `release-blocking` | coherent landing vehicles, unique evidence preservation, protected-main reduction |
+| GAP-001 | PR authority fragmented across 132 open PRs | `release-blocking` | coherent landing vehicles, unique evidence preservation, protected-main reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission | `partial` | immutable offsets/layout, language profiles, concept dictionary, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator | `partial` | Rust CPU f64 likelihood/uncertainty, relation/time/membership effects, true recovery, fitted candidate-K |
 | GAP-004 | durable end-to-end Analysis Run | `partial` | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation/promotion separation, Compose E2E |
