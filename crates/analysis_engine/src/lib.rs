@@ -11,6 +11,7 @@
 //! contracts and preserves their artifact meaning.
 
 mod case_deletion_refit;
+mod inferred_status_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -41,6 +42,12 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Inferred-status artifact and execution contracts from this engine.
+pub use inferred_status_artifact::{
+    INFERRED_STATUS_ARTIFACT_BYTE_LIMIT, INFERRED_STATUS_ARTIFACT_SCHEMA_VERSION,
+    INFERRED_STATUS_MODEL_CONTRACT_VERSION, INFERRED_STATUS_OUTPUT_PROFILE, InferredStatusArtifact,
+    InferredStatusEvidence, InferredStatusExecution, execute_inferred_status_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +255,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// An inferred-status artifact violated its bounded schema or count invariants.
+    InvalidInferredStatusArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +271,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidInferredStatusArtifact => "invalid inferred-status artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +690,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidInferredStatusArtifact,
+                "invalid inferred-status artifact",
             ),
         ];
         for (error, message) in messages {
