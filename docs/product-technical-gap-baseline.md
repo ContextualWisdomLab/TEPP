@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-01T12:31:35Z  
+**Snapshot:** 2026-09-01T12:58:29Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`  
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
@@ -19,29 +19,31 @@ Passing or queued Checks on an open PR never promote that PR to implemented-main
 | Signal | Current evidence | Delivery implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
-| Open pull requests | **135** | Release-blocking WIP remains high despite falling from the observed peak of 149. |
+| Open pull requests | **137** | Release-blocking WIP remains high despite falling from the observed peak of 149. |
 | Draft pull requests | **89** | Draft status is workflow metadata, not scientific or domain classification. |
-| Non-draft pull requests | **46** | Ready metadata is not merge readiness without exact-head evidence. |
+| Non-draft pull requests | **48** | Ready metadata is not merge readiness without exact-head evidence. |
 | Open issues | **14** | Includes #437 for repository-wide ADR identity normalization. |
 | GitHub releases | **0** | No open PR head or local branch is a released TEPP product contract. |
 | Effective organization ruleset | `18156473` | Current ruleset, exact-head workflows, resolved conversations and qualifying review govern merge. |
 
 The classic branch-protection payload is not the sole policy source. Organization rulesets are the effective merge authority where applicable.
 
-The queue fell from 149 to 134, then returned to 135 when #454 appeared. New one-operation Analysis Run slices therefore still count as WIP regression while queue recovery is active even though overall predecessor closure is reducing the queue.
+The queue fell from the observed peak of 149 to 134, then rose to 135 when #454 appeared and to 137 with #455/#456. New one-operation Analysis Run slices therefore still count as WIP regression while queue recovery is active even though overall predecessor closure is reducing the queue.
 
 ## Current priority open pull-request evidence
 
-This table is an exact-head **priority subset**, not a row-for-row copy of the 135-PR queue. PR #435 itself is omitted because writing its own exact head into a commit on that branch would immediately make the embedded head stale.
+This table is an exact-head **priority subset**, not a row-for-row copy of the 137-PR queue. PR #435 itself is omitted because writing its own exact head into a commit on that branch would immediately make the embedded head stale.
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
+| #456 | `ade6e27d46f477d8332bce13ccee080f0b55bfa9` | false | #455 head | Analysis Run/LineageWeave project-history stored-request CLI; `fold_into_landing_vehicle` |
+| #455 | `c7e02968f147157aedbe805a8ffac823bdb716bf` | false | #429 head | Analysis Run/LineageWeave project-history stored-request GET; `fold_into_landing_vehicle` |
 | #454 | `c911fbcd6e13046358cc7f3692775ed4b008dadd` | false | #453 head | Analysis Run/contextual-orchestrator stored-request CLI; `fold_into_landing_vehicle` |
 | #453 | `baee8854e99dc416b2b907a22101c53a6eca9eca` | false | #438 head | Analysis Run/contextual-orchestrator stored-request GET; `fold_into_landing_vehicle` |
 | #452 | `cb97aad9f87283df4d94abe8c6df61a0a476c893` | false | #451 head | Analysis Run/LineageWeave temporal-context retrieval CLI; `fold_into_landing_vehicle` candidate |
 | #451 | `7b117e8f69cd74e28eceaf1748c6a9210f5dffbc` | false | main | Analysis Run/LineageWeave temporal-context GET-by-id; `fold_into_landing_vehicle` candidate |
 | #443 | `504793d88c6b754f5181f48dc7abde073ff9146a` | false | #411 head | Analysis Run/export collection adapter; `fold_into_landing_vehicle` |
-| #441 | `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5` | false | main | Longitudinal Modeling lagged-correlation root-cause repair; auto-merge enabled, exact-head hosted gates still pending |
+| #441 | `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5` | false | main | Longitudinal Modeling lagged-correlation root-cause repair; exact-head hosted gates still pending |
 
 ## Strategic Domain-Driven Design baseline
 
@@ -124,9 +126,11 @@ A generic arithmetic standardizer is not itself a DSEM/ctsem estimator and must 
 
 ## Current classifications
 
-**#441 — Longitudinal Modeling landing vehicle.** The invalid predecessor that divided lagged covariance by only the earlier marginal variance has been retired. `longitudinal_core::recover_event_time_lagged_correlation` now requires lagged covariance plus both occasion-specific marginal variances and a positive event-time lag. Exact binary64 covariance-bound checking avoids rounded-product acceptance/rejection errors and stable division order avoids avoidable overflow/underflow. All currently visible review threads are resolved. Auto-merge is enabled. Exact-head Documentation Quality, Rust Foundation CI, Security Scan and SAST Semgrep are still queued and no qualifying independent non-author APPROVE has been observed, so queued checks never constitute implemented-main evidence.
+**#441 — Longitudinal Modeling landing vehicle.** The invalid predecessor that divided lagged covariance by only the earlier marginal variance has been retired. `longitudinal_core::recover_event_time_lagged_correlation` now requires lagged covariance plus both occasion-specific marginal variances and a positive event-time lag. Exact binary64 covariance-bound checking avoids rounded-product acceptance/rejection errors and stable division order avoids avoidable overflow/underflow. All currently visible review threads are resolved. Exact-head Documentation Quality, Rust Foundation CI, Security Scan and SAST Semgrep remain queued, so queued checks never constitute implemented-main evidence.
 
-**#453/#454 — Analysis Run interpretation adapter fold candidates.** Their PR descriptions now explicitly classify them `fold_into_landing_vehicle`. Preserve stored-request path/CLI parsing, hostile-input, origin/credential/consumer refusal, metric-free result and `scientific_authority=false` tests. ADR 0085/0086 are implementation evidence pending #437 normalization, not branch-local architecture authority.
+**#455/#456 — Analysis Run project-history adapter fold candidates.** Their own PR descriptions classify them `fold_into_landing_vehicle` and prohibit independent merge while queue recovery is active. Preserve stored-request path/CLI parsing, hostile-input/origin/credential/consumer refusals, `inference_status=temporal_association_only`, metric-free responses and focused contract tests, then fold with #429/#431/#424/#428/#420. ADR 0087/0088 are implementation evidence pending #437 normalization, not branch-local architecture authority.
+
+**#453/#454 — Analysis Run interpretation adapter fold candidates.** Their PR descriptions explicitly classify them `fold_into_landing_vehicle`. Preserve stored-request path/CLI parsing, hostile-input, origin/credential/consumer refusal, metric-free result and `scientific_authority=false` tests. ADR 0085/0086 are implementation evidence pending #437 normalization, not branch-local architecture authority.
 
 **#451/#452 — Analysis Run temporal-context adapter fold candidates.** Preserve LineageWeave-only identity/refusal/metric-free tests, then fold with the coherent temporal-context adapter vehicle instead of creating a bounded context per GET/CLI operation.
 
@@ -140,7 +144,7 @@ A generic arithmetic standardizer is not itself a DSEM/ctsem estimator and must 
 
 | ID | Gap | Maturity | Authority | Closure evidence |
 | --- | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 135 open PRs | `release-blocking` | #175 / #435 | classified queue, coherent bounded-context landing vehicles, unique evidence preserved, safe reduction |
+| GAP-001 | PR authority fragmented across 137 open PRs | `release-blocking` | #175 / #435 | classified queue, coherent bounded-context landing vehicles, unique evidence preserved, safe reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission incomplete | `partial` | Evidence & Semantic Measurement | immutable offsets/layout, language profiles, concept dictionary, unknown review, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator incomplete | `partial` | #167 | Rust CPU `f64` likelihood/estimands/uncertainty, relation/time/membership effects, multi-seed recovery, real candidate-K fits |
 | GAP-004 | durable end-to-end Analysis Run incomplete | `partial` | #166 | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation evidence, claim-promotion separation, Compose E2E |
