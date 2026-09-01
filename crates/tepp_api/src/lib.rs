@@ -28,6 +28,7 @@ mod naruon_http;
 mod naruon_live;
 mod orchestration;
 mod project_history;
+mod project_history_cancel_http;
 mod project_history_collection_http;
 mod project_history_retrieval_http;
 mod project_journey;
@@ -266,6 +267,14 @@ pub use project_history_retrieval_http::lineageweave_project_history_retrieval_e
 pub use project_history_retrieval_http::project_history_retrieval_path_id;
 /// Refuse scientific-metric and causal-score keys on retrieval JSON.
 pub use project_history_retrieval_http::refuse_metrics_on_project_history_retrieval_payload;
+/// Metric-free cancelled project-history identity.
+pub use project_history_cancel_http::ProjectHistoryCancelled;
+/// Maximum opaque idempotency-key length on the cancel path.
+pub use project_history_cancel_http::PROJECT_HISTORY_CANCEL_ID_MAX_LEN;
+/// Extract the opaque idempotency key from `POST /v1/project-histories/{key}/cancel`.
+pub use project_history_cancel_http::project_history_cancel_path_id;
+/// Build a credential-free `LineageWeave` cancel POST exchange.
+pub use project_history_cancel_http::lineageweave_project_history_cancel_exchange;
 /// Maximum posterior Project Journey artifact size.
 pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
 /// Exact posterior Project Journey schema identity.

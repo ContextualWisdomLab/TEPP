@@ -24,8 +24,10 @@ use crate::{
     TEMPORAL_CONTEXT_PATH, TemporalContextRequest, build_temporal_context,
     is_project_history_collection_path, page_project_history_collection_items,
     parse_project_history_collection_page_cursor, parse_project_history_collection_page_limit,
-    project_history_projection, project_history_retrieval_path_id,
+    project_history_cancel_path_id, project_history_projection, project_history_retrieval_path_id,
+    refuse_metrics_on_project_history_collection_payload,
     refuse_metrics_on_project_history_retrieval_payload, requests_are_idempotent_matches,
+    ProjectHistoryCancelled,
 };
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
@@ -161,10 +163,18 @@ impl AnalysisRunLiveService {
             }
             return Err(ApiError::InvalidWirePayload);
         }
-        if method != "POST"
-            || (path != NARUON_ANALYSIS_RUN_PATH
-                && path != TEMPORAL_CONTEXT_PATH
-                && path != PROJECT_HISTORY_PATH)
+        if method != "POST" {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if matches!(
+            project_history_cancel_path_id(path),
+            Ok(_) | Err(ApiError::LimitExceeded)
+        ) {
+            return self.cancel_project_history(path, &headers, body);
+        }
+        if path != NARUON_ANALYSIS_RUN_PATH
+            && path != TEMPORAL_CONTEXT_PATH
+            && path != PROJECT_HISTORY_PATH
         {
             return Err(ApiError::InvalidWirePayload);
         }
@@ -318,6 +328,40 @@ impl AnalysisRunLiveService {
             .get(&replay_key)
             .ok_or(ApiError::InvalidWirePayload)?;
         let response_body = projection.to_json()?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
+    fn cancel_project_history(
+        &mut self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_project_history_collection_payload(body)?;
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != LINEAGEWEAVE_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if headers.contains_key("idempotency-key")
+            || headers.contains_key("tepp-page-limit")
+            || headers.contains_key("tepp-page-cursor")
+        {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let tenant_workspace_id = header_value(headers, PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER)?;
+        crate::project_history::validate_project_history_registry_identity(tenant_workspace_id)?;
+        let idempotency_key = project_history_cancel_path_id(path)?;
+        let replay_key =
+            consumer_tenant_idempotency_key(consumer, tenant_workspace_id, &idempotency_key);
+        let (request, projection) = self
+            .accepted_project_histories
+            .remove(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let cancelled = ProjectHistoryCancelled::from_stored(&request, &projection)?;
+        let response_body = cancelled.to_json()?;
         Ok(json_response(200, "OK", response_body))
     }
 
@@ -1235,6 +1279,53 @@ mod tests {
         ));
         assert_eq!(collection.status_code, 200);
         assert!(!collection.body.contains("evidence_text"));
+    }
+
+    #[test]
+    fn project_history_cancel_removes_identity_and_fails_closed() {
+        let mut service = AnalysisRunLiveService::new();
+        let first = sample_project_history("idem-a", "project-a");
+        let posted = service.handle_http_request(&project_history_post(&first));
+        assert_eq!(posted.status_code, 200);
+        let cancelled = service.handle_http_request(&format!(
+            "POST {PROJECT_HISTORY_PATH}/idem-a/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(cancelled.status_code, 200, "{}", cancelled.body);
+        let parsed =
+            crate::ProjectHistoryCancelled::from_json(&cancelled.body).expect("cancelled");
+        assert!(parsed.cancelled);
+        assert_eq!(parsed.project_key, "project-a");
+        assert_eq!(parsed.idempotency_key, "idem-a");
+        assert_eq!(parsed.inference_status, "temporal_association_only");
+        assert!(!cancelled.body.contains("evidence_text"));
+        assert!(!cancelled.body.contains("findings"));
+        assert!(!cancelled.body.contains("rmse"));
+        assert!(!cancelled.body.contains("tepp.scientific_acceptance.v1"));
+        let missing = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(missing.status_code, 400);
+        let listed = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(listed.status_code, 200);
+        assert!(!listed.body.contains("idem-a"));
+        let replay = service.handle_http_request(&format!(
+            "POST {PROJECT_HISTORY_PATH}/idem-a/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(replay.status_code, 400);
+        let naruon = service.handle_http_request(&format!(
+            "POST {PROJECT_HISTORY_PATH}/idem-a/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(naruon.status_code, 400);
+        let with_key = service.handle_http_request(&format!(
+            "POST {PROJECT_HISTORY_PATH}/idem-a/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: idem-a\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(with_key.status_code, 400);
+        let nonempty = service.handle_http_request(&format!(
+            "POST {PROJECT_HISTORY_PATH}/idem-a/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 2\r\n\r\n{{}}"
+        ));
+        assert_eq!(nonempty.status_code, 400);
     }
 
     struct ScriptedRead {

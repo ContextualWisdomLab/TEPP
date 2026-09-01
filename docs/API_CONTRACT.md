@@ -104,6 +104,11 @@ cutoff-safe `ProjectHistoryProjection` on `tepp-loopback`. Consumer is
 `tepp.scientific_acceptance.v1` and causal scores never appear. The retrieval
 does not infer causality.
 
+`POST /v1/project-histories/{idempotency_key}/cancel` removes one accepted
+identity (ADR 0079). Receipts stay metric-free with `cancelled=true` and
+`inference_status=temporal_association_only`. Naruon is refused.
+`NaruonLiveService` stays POST-only.
+
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
 terminal status contains exactly one request-bound
