@@ -55,7 +55,7 @@ recovery_evidence_reference
 primary_citation_references
 ```
 
-The ACL rejects missing structural identity, unknown contract versions, digest mismatch, and a request that silently substitutes a local-independent candidate for a dependence-aware request.
+The ACL rejects missing structural identity, unknown contract versions, digest mismatch, and a request that silently substitutes a local-independent candidate for a dependence-aware request. Identity-bearing fields and error responses expose only opaque identifiers or digests; this restriction does not remove schema-authorized model, event, posterior, relation, uncertainty, or statistical payload fields from the versioned ACL contract.
 
 TEPP does not duplicate the upstream `ResponseKernel`, `GeneralizedMixedStructure`, LSIRM, MLSIRM, or DLSJM implementation. When reusable static arithmetic currently exists locally in TEPP, its migration path is parity and recovery against the fast-mlsirm owner, followed by replacement with a released versioned adapter and removal of the duplicate production source.
 
