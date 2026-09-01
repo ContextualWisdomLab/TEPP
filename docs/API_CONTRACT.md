@@ -92,9 +92,11 @@ them by event time and opaque event ID, and emits adjacent forward temporal
 associations plus `candidate_not_causal` transition gaps. It does not infer
 causality, mutate TEPP state, or return a completed psychometric result.
 `GET /v1/temporal-context/{idempotency_key}` returns one metric-free identity
-minted when that POST carries an `idempotency-key` header (ADR 0083). Event
-labels, actor lists, and `tepp.scientific_acceptance.v1` never appear. Naruon
-is refused. `NaruonLiveService` stays POST-only. Collection GET stays closed.
+minted when that POST carries an `idempotency-key` header (ADR 0083). Published
+`tepp-temporal-context-get get` mints that retrieval GET onto spawned
+`tepp-loopback` TCP (ADR 0084). Event labels, actor lists, and
+`tepp.scientific_acceptance.v1` never appear. Naruon is refused.
+`NaruonLiveService` stays POST-only. Collection GET stays closed.
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
