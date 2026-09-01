@@ -20,6 +20,7 @@ mod corpus_split_manifest;
 mod envelope;
 mod error;
 mod export;
+mod export_cancel_http;
 mod export_collection_http;
 mod export_http;
 mod lineage_criterion_anchor;
@@ -123,6 +124,14 @@ pub use export_collection_http::EXPORT_COLLECTION_CURSOR_MAX_LEN;
 pub use export_collection_http::EXPORT_COLLECTION_DEFAULT_LIMIT;
 /// Maximum page size for export collection GET.
 pub use export_collection_http::EXPORT_COLLECTION_MAX_LIMIT;
+/// Metric-free cancelled export identity.
+pub use export_cancel_http::ExportCancelled;
+/// Maximum opaque export identity length on the cancel path.
+pub use export_cancel_http::EXPORT_CANCEL_ID_MAX_LEN;
+/// Extract the opaque export identity from `POST /v1/exports/{export_id}/cancel`.
+pub use export_cancel_http::export_cancel_path_id;
+/// Build a credential-free naruon cancel POST exchange.
+pub use export_cancel_http::naruon_export_cancel_exchange;
 /// Refuse scientific-metric keys on export-retrieval JSON.
 pub use export_http::refuse_metrics_on_export_retrieval_payload;
 

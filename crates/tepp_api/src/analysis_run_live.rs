@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
 
+use crate::export_cancel_http::{export_cancel_path_id, ExportCancelled};
 use crate::export_collection_http::{
     is_export_collection_path, page_export_collection_items, parse_export_collection_page_cursor,
     parse_export_collection_page_limit, ExportCollection,
@@ -183,6 +184,12 @@ impl AnalysisRunLiveService {
         }
         if path == NARUON_EXPORT_PATH {
             return self.accept_export(&headers, body);
+        }
+        if matches!(
+            export_cancel_path_id(path),
+            Ok(_) | Err(ApiError::LimitExceeded)
+        ) {
+            return self.cancel_export(path, &headers, body);
         }
         if path != NARUON_ANALYSIS_RUN_PATH
             && path != TEMPORAL_CONTEXT_PATH
@@ -379,6 +386,38 @@ impl AnalysisRunLiveService {
         let (page, next_cursor) = page_export_collection_items(items, cursor.as_deref(), limit);
         let collection = ExportCollection::new(page, next_cursor)?;
         Ok(json_response(200, "OK", collection.to_json()?))
+    }
+
+    fn cancel_export(
+        &mut self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let export_id = export_cancel_path_id(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_export_retrieval_payload(body)?;
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != NARUON_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if headers.contains_key("idempotency-key") {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let replay_key = self
+            .exports_by_id
+            .remove(&export_id)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let stored = self
+            .authorized_exports
+            .remove(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        let cancelled = ExportCancelled::from_retrieval(stored.retrieval)?;
+        let response_body = cancelled.to_json()?;
+        refuse_metrics_on_export_retrieval_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
     }
 
     fn response_from_error(&mut self, error: ApiError) -> NaruonLiveResponse {
@@ -1258,6 +1297,91 @@ mod tests {
         );
     }
 
+    #[test]
+    fn handler_covers_metric_free_export_cancel() {
+        use crate::{
+            AnalyticalPurpose, ExportAuthorizationRequest, ExportCancelled, ExportCollection,
+            ExportRetrieval,
+        };
+
+        let request = ExportAuthorizationRequest {
+            tenant_workspace_id: "export-cancel-tenant".into(),
+            principal_id: "principal-analyst-1".into(),
+            purpose: AnalyticalPurpose::ModularServiceConsumer,
+            artifact_id: "artifact-cancel-1".into(),
+            includes_source_text: false,
+        };
+        let body = crate::wire::to_json(&request).expect("export json");
+        let mut service = AnalysisRunLiveService::new();
+        let posted = service.handle_http_request(&export_post_http(
+            &body,
+            NARUON_CONSUMER_CODE,
+            "export-cancel-idem-1",
+        ));
+        assert_eq!(posted.status_code, 200);
+        let retrieval = ExportRetrieval::from_json(&posted.body).expect("posted retrieval");
+        let cancelled = service.handle_http_request(&export_cancel_http(
+            &retrieval.export_id,
+            NARUON_CONSUMER_CODE,
+        ));
+        assert_eq!(cancelled.status_code, 200, "{}", cancelled.body);
+        let parsed = ExportCancelled::from_json(&cancelled.body).expect("cancelled");
+        assert_eq!(parsed.export_id, retrieval.export_id);
+        assert_eq!(parsed.artifact_id, "artifact-cancel-1");
+        assert!(parsed.cancelled);
+        assert!(!cancelled.body.contains("tenant_workspace_id"));
+        assert!(!cancelled.body.contains("rmse"));
+        assert!(!cancelled.body.contains("scientific_acceptance"));
+        assert_eq!(
+            service
+                .handle_http_request(&export_get_http(&retrieval.export_id, NARUON_CONSUMER_CODE))
+                .status_code,
+            400
+        );
+        let listed = service.handle_http_request(&format!(
+            "GET {NARUON_EXPORT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(listed.status_code, 200);
+        let page: ExportCollection = serde_json::from_str(&listed.body).expect("page");
+        assert!(page.items.is_empty());
+        assert_eq!(
+            service
+                .handle_http_request(&export_cancel_http(
+                    &retrieval.export_id,
+                    NARUON_CONSUMER_CODE
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&export_cancel_http(
+                    &retrieval.export_id,
+                    LINEAGEWEAVE_CONSUMER_CODE
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "POST {NARUON_EXPORT_PATH}/{}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\nidempotency-key: export-cancel-idem-1\r\ncontent-length: 0\r\n\r\n",
+                    retrieval.export_id
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "POST {NARUON_EXPORT_PATH}/{}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}",
+                    retrieval.export_id
+                ))
+                .status_code,
+            400
+        );
+    }
+
     fn export_post_http(body: &str, consumer: &str, idempotency_key: &str) -> String {
         format!(
             "POST {NARUON_EXPORT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\nidempotency-key: {idempotency_key}\r\ncontent-length: {}\r\n\r\n{body}",
@@ -1268,6 +1392,12 @@ mod tests {
     fn export_get_http(export_id: &str, consumer: &str) -> String {
         format!(
             "GET {NARUON_EXPORT_PATH}/{export_id} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        )
+    }
+
+    fn export_cancel_http(export_id: &str, consumer: &str) -> String {
+        format!(
+            "POST {NARUON_EXPORT_PATH}/{export_id}/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
         )
     }
 
