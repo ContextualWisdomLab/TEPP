@@ -3,7 +3,8 @@
 use analysis_engine::{
     AnalysisEngineError, EPISODE_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
     EPISODE_MEMBERSHIP_MODEL_CONTRACT_VERSION, EPISODE_MEMBERSHIP_OUTPUT_PROFILE,
-    EpisodeMembershipAssignment, MAX_EVIDENCE_UNITS, execute_episode_membership_run,
+    EpisodeMembershipArtifact, EpisodeMembershipAssignment, MAX_EVIDENCE_UNITS,
+    execute_episode_membership_run,
 };
 use episode_membership::EventWindow;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -110,6 +111,32 @@ fn mixed_windows_emit_digest_bound_refusals_without_recovery_metric() {
     assert_eq!(
         execution.terminal_result.result_schema_version.as_deref(),
         Some(EPISODE_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION)
+    );
+}
+
+#[test]
+fn compact_oversized_artifact_counts_fail_closed() {
+    let assignment_count = MAX_EVIDENCE_UNITS as u64 + 1;
+    let escaped_count = assignment_count - 1;
+    let artifact = EpisodeMembershipArtifact {
+        schema_version: EPISODE_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION.into(),
+        run_id: "run-compact-oversize".into(),
+        snapshot_id: "snapshot-compact-oversize".into(),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        assignment_count,
+        contained_count: 1,
+        escaped_count,
+        refused_as_escape_count: escaped_count,
+        inference_status: "membership_window_cannot_escape_episode_interval".into(),
+    };
+    let raw_payload = serde_json::to_string(&artifact).expect("raw json");
+    assert_eq!(
+        artifact.to_json(),
+        Err(AnalysisEngineError::InvalidEpisodeMembershipArtifact)
+    );
+    assert_eq!(
+        EpisodeMembershipArtifact::from_json(&raw_payload),
+        Err(AnalysisEngineError::InvalidEpisodeMembershipArtifact)
     );
 }
 
