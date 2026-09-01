@@ -150,6 +150,7 @@ impl RelationAbsenceArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.pair_count < 3
+            || self.pair_count > MAX_EVIDENCE_UNITS as u64
             || self.observed_count == 0
             || self.inferred_count == 0
             || self.unobserved_count == 0
