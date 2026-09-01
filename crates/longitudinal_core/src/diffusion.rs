@@ -1,0 +1,180 @@
+//! Scalar diffusion standardisation on substantive event time.
+//!
+//! These functions preserve the scientific evidence from TEPP PRs #476 and
+//! #477 while moving temporal/state composition out of `psychometric_core`.
+//! Driver, Oud, and Voelkle (2017) print the underlying continuous/discrete
+//! diffusion transformations and describe relevant-variance standardisation,
+//! but the 2017 ctsem summary source does not emit named `DIFFUSIONstd` or
+//! `discreteDIFFUSIONstd` matrices. The scalar maps below are therefore
+//! research-candidate extensions, not canonical ctsem output and not a DSEM or
+//! ctsem estimator.
+
+use crate::{EventTimeInterval, LongitudinalError, stationary::recover_stationary_within_variance};
+
+/// Recover the scalar research-candidate `DIFFUSIONstd = q / p` map.
+///
+/// `q` is the continuous diffusion variance-rate input and `p` is the strictly
+/// positive stationary within-person variance `-q/(2a)`. The ratio is formed
+/// from those two quantities instead of returning a hard-coded `-2a`, which
+/// preserves the named composition and exercises the stationary-variance
+/// admission contract. Equal numeric values do not collapse this estimand into
+/// `asymDIFFUSIONstd` or another variance standardisation.
+///
+/// # Errors
+///
+/// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for non-finite
+/// inputs, negative diffusion, or a non-finite quotient. Returns
+/// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
+/// Returns [`LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance`]
+/// when the stationary within-person variance is zero or underflows to zero.
+pub fn recover_event_time_standardised_continuous_diffusion(
+    continuous_diffusion: f64,
+    log_rate: f64,
+) -> Result<f64, LongitudinalError> {
+    let stationary = recover_stationary_within_variance(continuous_diffusion, log_rate)?;
+    if stationary <= 0.0 {
+        return Err(LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance);
+    }
+    let ratio = continuous_diffusion / stationary;
+    if !ratio.is_finite() {
+        return Err(LongitudinalError::InvalidTemporalTransformInput);
+    }
+    Ok(ratio)
+}
+
+/// Recover the scalar research-candidate `discreteDIFFUSIONstd = Q_delta / p` map.
+///
+/// For a stable scalar continuous-time process, dividing discrete process noise
+/// over an event interval by stationary within-person variance yields
+/// `1 - exp(2 a delta)`. The implementation evaluates this ratio directly with
+/// `exp_m1` after independently proving that positive stationary variance
+/// exists. This avoids multiplying by `p` only to divide by `p` again, which can
+/// overflow even when the final standardized ratio is representable. The
+/// [`EventTimeInterval`] value object prevents measurement occasion, document,
+/// assertion, system, or availability durations from being passed as event time
+/// accidentally.
+///
+/// # Errors
+///
+/// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for invalid
+/// diffusion/drift, an event-time product that underflows to signed zero, or a
+/// non-representable final ratio. Returns
+/// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
+/// Returns [`LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance`]
+/// when the stationary within-person variance is zero or underflows to zero.
+pub fn recover_event_time_standardised_discrete_diffusion(
+    continuous_diffusion: f64,
+    log_rate: f64,
+    event_interval: EventTimeInterval,
+) -> Result<f64, LongitudinalError> {
+    let stationary = recover_stationary_within_variance(continuous_diffusion, log_rate)?;
+    if stationary <= 0.0 {
+        return Err(LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance);
+    }
+
+    let half_exponent = log_rate * event_interval.as_f64();
+    if half_exponent == 0.0 {
+        return Err(LongitudinalError::InvalidTemporalTransformInput);
+    }
+    if half_exponent == f64::NEG_INFINITY {
+        return Ok(1.0);
+    }
+    if !half_exponent.is_finite() {
+        return Err(LongitudinalError::InvalidTemporalTransformInput);
+    }
+
+    let exponent = half_exponent * 2.0;
+    let ratio = if exponent == f64::NEG_INFINITY {
+        1.0
+    } else {
+        -exponent.exp_m1()
+    };
+    if !ratio.is_finite() || ratio <= 0.0 || ratio > 1.0 {
+        return Err(LongitudinalError::InvalidTemporalTransformInput);
+    }
+    Ok(ratio)
+}
+
+/// Refuse treating a continuous standardised diffusion ratio as a discrete one.
+///
+/// `q/p` is interval-independent while `Q_delta/p` is an event-interval
+/// quantity. Numerical equality at a particular parameter value does not make
+/// the named estimands interchangeable.
+///
+/// # Errors
+///
+/// Always returns [`LongitudinalError::ContinuousDiffusionIsNotDiscreteDiffusion`].
+pub fn refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion(
+    continuous_standardised_diffusion: f64,
+    discrete_standardised_diffusion: f64,
+) -> Result<f64, LongitudinalError> {
+    let _ = (
+        continuous_standardised_diffusion,
+        discrete_standardised_diffusion,
+    );
+    Err(LongitudinalError::ContinuousDiffusionIsNotDiscreteDiffusion)
+}
+
+/// Refuse treating an unstandardised diffusion quantity as a standardised one.
+///
+/// # Errors
+///
+/// Always returns [`LongitudinalError::UnstandardisedDiffusionIsNotStandardisedDiffusion`].
+pub fn refuse_unstandardised_diffusion_as_standardised_diffusion(
+    unstandardised_diffusion: f64,
+    standardised_diffusion: f64,
+) -> Result<f64, LongitudinalError> {
+    let _ = (unstandardised_diffusion, standardised_diffusion);
+    Err(LongitudinalError::UnstandardisedDiffusionIsNotStandardisedDiffusion)
+}
+
+/// Refuse scaling diffusion by total trait-plus-state variance as standardisation.
+///
+/// Driver et al.'s relevant-variance rule for these scalar research candidates
+/// uses within-person stationary variance, not a total that also contains
+/// between-unit trait or added time-independent-predictor variance.
+///
+/// # Errors
+///
+/// Always returns [`LongitudinalError::TotalVarianceScaledDiffusionIsNotStandardisedDiffusion`].
+pub fn refuse_total_variance_scaled_diffusion_as_standardised_diffusion(
+    total_variance_scaled_diffusion: f64,
+    standardised_diffusion: f64,
+) -> Result<f64, LongitudinalError> {
+    let _ = (total_variance_scaled_diffusion, standardised_diffusion);
+    Err(LongitudinalError::TotalVarianceScaledDiffusionIsNotStandardisedDiffusion)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        recover_event_time_standardised_continuous_diffusion,
+        recover_event_time_standardised_discrete_diffusion,
+    };
+    use crate::{EventTimeInterval, LongitudinalError};
+
+    #[test]
+    fn discrete_candidate_fails_closed_on_signed_zero_event_product() {
+        let tiny = EventTimeInterval::new(f64::from_bits(1)).expect("minimum subnormal interval");
+        assert_eq!(
+            recover_event_time_standardised_discrete_diffusion(1.0, -0.5, tiny),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+    }
+
+    #[test]
+    fn very_large_stable_event_product_has_representable_unit_limit() {
+        let interval = EventTimeInterval::new(f64::MAX).expect("finite positive interval");
+        let recovered = recover_event_time_standardised_discrete_diffusion(1.0, -1.0, interval)
+            .expect("the final standardized noise fraction tends to one");
+        assert_eq!(recovered, 1.0);
+    }
+
+    #[test]
+    fn continuous_candidate_rejects_nonrepresentable_ratio() {
+        assert_eq!(
+            recover_event_time_standardised_continuous_diffusion(f64::MAX, -f64::MAX),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+    }
+}
