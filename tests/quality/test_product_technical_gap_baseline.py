@@ -128,18 +128,40 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "smaller than priority inventory"):
                 docs.validate_product_technical_gap_baseline(root)
 
-    def test_duplicate_priority_inventory_row_fails(self) -> None:
-        """A priority PR may appear at most once in the exact-head inventory."""
+    def test_same_pr_in_unrelated_exact_head_table_is_allowed(self) -> None:
+        """Only duplicates inside the priority inventory are classification errors."""
 
-        duplicate_row = f"| #164 | `{VALID_HEAD}` | false | main | docs duplicate |\n"
+        supporting_row = (
+            "\n## Historical evidence\n\n"
+            "| PR | Exact current head | Draft | Base | Note |\n"
+            "|---:|---|:---:|---|---|\n"
+            f"| #164 | `{VALID_HEAD}` | false | main | historical |\n"
+        )
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             path = root / BASELINE_PATH
             path.parent.mkdir(parents=True)
             path.write_text(
-                valid_baseline(count=94, extra=f"\n{duplicate_row}"),
+                valid_baseline(count=94, extra=supporting_row),
                 encoding="utf-8",
             )
+            docs.validate_product_technical_gap_baseline(root)
+
+    def test_duplicate_priority_inventory_row_fails(self) -> None:
+        """A priority PR may appear at most once inside the priority inventory."""
+
+        duplicate_row = f"| #164 | `{VALID_HEAD}` | false | main | docs duplicate |\n"
+        marker = "\n## Operator-gap register\n"
+        fixture = valid_baseline(count=94).replace(
+            marker,
+            f"{duplicate_row}{marker}",
+            1,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(fixture, encoding="utf-8")
             with self.assertRaisesRegex(AssertionError, "duplicate PR rows"):
                 docs.validate_product_technical_gap_baseline(root)
 
