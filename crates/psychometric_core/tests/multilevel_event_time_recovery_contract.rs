@@ -2,10 +2,8 @@
 #![allow(clippy::cast_precision_loss)]
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
-    LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
-    ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
-    recover_asymptotic_time_independent_predictor_effect,
+    map_discrete_lag_across_event_intervals, ordinary_least_squares_slope,
+    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
@@ -45,8 +43,8 @@ use psychometric_core::{
     recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
     recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
     recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_trait_plus_state_expected_autocorrelation, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -159,12 +157,16 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_trait_plus_state_expected_autocorrelation_as_discrete_drift,
+    refuse_trait_plus_state_expected_autocorrelation_as_standardised_discrete_drift,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
-    refuse_unstandardised_trait_variance_as_standardised_trait_variance,
+    refuse_unstandardised_trait_variance_as_standardised_trait_variance, ClusteredEventScore,
+    ClusteredScore, EventOccasion, IndicatorKind, LagClock, LaggedWithinResidual,
+    PsychometricError,
 };
 
 fn rmse(truth: &[f64], recovered: &[f64]) -> f64 {
@@ -928,6 +930,121 @@ fn trait_plus_state_recovers_driver_section_four_point_three() {
     );
     assert_eq!(
         recover_trait_plus_state_lagged_covariance(0.4, 0.4, -0.5, 1.0, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn trait_plus_state_expected_autocorrelation_recovers_driver_section_seven_point_one() {
+    let trait_variance = 0.8_f64;
+    let state_variance = 0.4_f64;
+    let added = 0.2_f64;
+    let drift = -0.5_f64;
+    let delta = 1.0_f64;
+    let recovered = recover_trait_plus_state_expected_autocorrelation(
+        trait_variance,
+        state_variance,
+        added,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("ρ");
+    let lagged = recover_trait_plus_state_lagged_covariance(
+        trait_variance,
+        state_variance,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("lagged");
+    let contemporaneous =
+        recover_trait_plus_state_latent_variance(trait_variance, state_variance).expect("total");
+    let expected = (lagged + added) / (contemporaneous + added);
+    let error = rmse(&[expected], &[recovered]);
+    assert!(
+        error < 1e-15,
+        "Driver §7.1 trait-plus-state expected autocorrelation RMSE {error}"
+    );
+    let discrete_drift =
+        recover_discrete_lag_from_log_rate(drift, delta, LagClock::EventTime).expect("φ");
+    let collapsed = rmse(&[expected], &[discrete_drift]);
+    assert!(
+        collapsed > error,
+        "treating e^{{a Δt}} as the §7.1 autocorrelation is not that map: collapsed RMSE {collapsed} must exceed {error}"
+    );
+    assert!((discrete_drift - recovered).abs() > 0.28);
+    assert_eq!(
+        recover_trait_plus_state_expected_autocorrelation(
+            0.0,
+            state_variance,
+            0.0,
+            drift,
+            delta,
+            LagClock::EventTime,
+        ),
+        Ok(discrete_drift)
+    );
+    assert_eq!(
+        recover_trait_plus_state_expected_autocorrelation(
+            trait_variance,
+            0.0,
+            added,
+            drift,
+            delta,
+            LagClock::EventTime,
+        ),
+        Ok(1.0)
+    );
+    let far = recover_trait_plus_state_expected_autocorrelation(
+        trait_variance,
+        state_variance,
+        added,
+        drift,
+        700.0,
+        LagClock::EventTime,
+    )
+    .expect("Δt→∞");
+    let asymptotic = (trait_variance + added) / (trait_variance + state_variance + added);
+    let far_error = rmse(&[asymptotic], &[far]);
+    assert!(
+        far_error < 1e-15,
+        "as Δt → ∞ the state term vanishes: RMSE {far_error}"
+    );
+    assert_eq!(
+        refuse_trait_plus_state_expected_autocorrelation_as_discrete_drift(
+            recovered,
+            discrete_drift
+        ),
+        Err(PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotDiscreteDrift)
+    );
+    assert_eq!(
+        refuse_trait_plus_state_expected_autocorrelation_as_standardised_discrete_drift(
+            recovered,
+            discrete_drift
+        ),
+        Err(PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotStandardisedDiscreteDrift)
+    );
+    assert_eq!(
+        recover_trait_plus_state_expected_autocorrelation(
+            0.0,
+            0.0,
+            0.0,
+            drift,
+            delta,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::TraitPlusStateExpectedAutocorrelationRequiresPositiveTotalVariance)
+    );
+    assert_eq!(
+        recover_trait_plus_state_expected_autocorrelation(
+            trait_variance,
+            state_variance,
+            added,
+            drift,
+            delta,
+            LagClock::SystemTime,
+        ),
         Err(PsychometricError::EventTimeRequired)
     );
 }
@@ -2239,8 +2356,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_is_not_impulse
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry()
- {
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_process_impulse_and_carry(
+) {
     let loading = 2.0_f64;
     let drift = -0.5_f64;
     let delta = 2.0_f64;
@@ -2394,8 +2511,8 @@ fn discrete_observed_mean_with_initial_time_independent_predictor_zero_loading_i
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks()
- {
+fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_overflow_and_non_event_clocks(
+) {
     assert_eq!(
         recover_discrete_observed_mean_with_initial_time_independent_predictor(
             1e308,
@@ -3326,8 +3443,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_is_not_impulse_o
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_process_impulse_and_carry()
- {
+fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_process_impulse_and_carry(
+) {
     let loading = 2.0_f64;
     let drift = -0.5_f64;
     let delta = 2.0_f64;
@@ -3500,8 +3617,8 @@ fn discrete_observed_mean_with_initial_time_dependent_predictor_zero_loading_is_
 }
 
 #[test]
-fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks()
- {
+fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_overflow_and_non_event_clocks(
+) {
     assert_eq!(
         recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             1e308,

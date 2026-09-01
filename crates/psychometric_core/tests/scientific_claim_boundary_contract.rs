@@ -1,7 +1,6 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -40,8 +39,8 @@ use psychometric_core::{
     recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
     recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
     recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_trait_plus_state_expected_autocorrelation, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -167,6 +166,8 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_trait_plus_state_expected_autocorrelation_as_discrete_drift,
+    refuse_trait_plus_state_expected_autocorrelation_as_standardised_discrete_drift,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
@@ -181,6 +182,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -3780,5 +3782,97 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
         )
+    );
+}
+
+#[test]
+fn trait_plus_state_expected_autocorrelation_is_not_discrete_drift_or_discrete_drift_std() {
+    let trait_variance = 0.8_f64;
+    let state_variance = 0.4_f64;
+    let added = 0.2_f64;
+    let drift = -0.5_f64;
+    let delta = 1.0_f64;
+    let recovered = recover_trait_plus_state_expected_autocorrelation(
+        trait_variance,
+        state_variance,
+        added,
+        drift,
+        delta,
+        LagClock::EventTime,
+    )
+    .expect("ρ");
+    assert!(
+        (recovered - 0.887_580_188_5).abs() < 1e-9,
+        "Driver et al. (2017, §7.1): (trait + e^{{a Δt}} p + added) / (trait + p + added)"
+    );
+    let discrete_drift = drift.exp();
+    assert!(
+        (discrete_drift - recovered).abs() > 0.28,
+        "Driver et al. (2017, Eq. 3 / §7.1): e^{{a Δt}} is not the trait-plus-state autocorrelation"
+    );
+    assert_eq!(
+        recover_trait_plus_state_expected_autocorrelation(
+            0.0,
+            state_variance,
+            0.0,
+            drift,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("zero trait+added"),
+        discrete_drift
+    );
+    assert_eq!(
+        refuse_trait_plus_state_expected_autocorrelation_as_discrete_drift(
+            recovered,
+            discrete_drift
+        ),
+        Err(
+            psychometric_core::PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotDiscreteDrift
+        )
+    );
+    assert_eq!(
+        refuse_trait_plus_state_expected_autocorrelation_as_standardised_discrete_drift(
+            recovered,
+            discrete_drift
+        ),
+        Err(
+            psychometric_core::PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotStandardisedDiscreteDrift
+        )
+    );
+    assert_eq!(
+        recover_trait_plus_state_expected_autocorrelation(
+            0.0,
+            0.0,
+            0.0,
+            drift,
+            delta,
+            LagClock::EventTime,
+        ),
+        Err(
+            psychometric_core::PsychometricError::TraitPlusStateExpectedAutocorrelationRequiresPositiveTotalVariance
+        )
+    );
+    assert_eq!(
+        recover_trait_plus_state_expected_autocorrelation(
+            trait_variance,
+            0.0,
+            added,
+            drift,
+            delta,
+            LagClock::EventTime,
+        ),
+        Ok(1.0)
+    );
+    assert_eq!(
+        recover_trait_plus_state_expected_autocorrelation(
+            trait_variance,
+            state_variance,
+            added,
+            drift,
+            delta,
+            LagClock::DocumentTime,
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
     );
 }

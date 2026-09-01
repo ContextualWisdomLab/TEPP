@@ -261,6 +261,16 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver §7.1 trait-plus-state expected autocorrelation
+//! `(trait + e^{a Δt} p + added) / (trait + p + added)` (form the
+//! lagged covariance first, then the contemporaneous total, then
+//! add `addedTIPREDVAR`, then the ratio; zero trait and zero added
+//! recovers `e^{a Δt}` numerically and remains a distinct named
+//! quantity; zero state with positive trait or extra is exactly 1;
+//! zero total variance fails closed; `a > 0` is a growing covariance
+//! ratio and is kept; unstandardised `e^{a Δt}` is not this map;
+//! `discreteDRIFTstd` is not this map; JSS PDF re-opened
+//! 2026-09-01T06:30Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -442,6 +452,8 @@ pub use event_time::recover_stationary_later_observed_variance;
 pub use event_time::recover_time_dependent_predictor_impulse;
 /// Exact scalar within-interval `TDPREDEFFECT` carry `e^{A(t−u)} M x`.
 pub use event_time::recover_time_dependent_predictor_impulse_carry;
+/// Exact scalar §7.1 trait-plus-state expected autocorrelation `(trait + e^{a Δt} p + added) / (trait + p + added)`.
+pub use event_time::recover_trait_plus_state_expected_autocorrelation;
 /// Exact scalar trait-plus-state lagged covariance.
 pub use event_time::recover_trait_plus_state_lagged_covariance;
 /// Exact scalar trait-plus-state latent variance.
@@ -715,6 +727,10 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating §7.1 trait-plus-state expected autocorrelation as unstandardised `discreteDRIFT`.
+pub use event_time::refuse_trait_plus_state_expected_autocorrelation_as_discrete_drift;
+/// Refuse treating §7.1 trait-plus-state expected autocorrelation as p. 16 `discreteDRIFTstd`.
+pub use event_time::refuse_trait_plus_state_expected_autocorrelation_as_standardised_discrete_drift;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
