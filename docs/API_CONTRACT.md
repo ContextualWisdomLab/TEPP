@@ -92,8 +92,10 @@ them by event time and opaque event ID, and emits adjacent forward temporal
 associations plus `candidate_not_causal` transition gaps. It does not infer
 causality, mutate TEPP state, or return a completed psychometric result.
 `GET /v1/temporal-context` enumerates accepted metric-free identities minted
-when that POST carries an `idempotency-key` header (ADR 0081). Collection rows
-stay `inference_status=temporal_association_only`. Event labels, actor lists,
+when that POST carries an `idempotency-key` header (ADR 0081). Published
+`tepp-temporal-contexts list` mints that collection GET onto spawned
+`tepp-loopback` TCP (ADR 0082). Collection rows stay
+`inference_status=temporal_association_only`. Event labels, actor lists,
 and `tepp.scientific_acceptance.v1` never appear. Naruon is refused.
 `NaruonLiveService` stays POST-only.
 

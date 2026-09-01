@@ -31,6 +31,7 @@ mod project_history;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
+mod temporal_context_collection_cli;
 mod temporal_context_collection_http;
 mod wire;
 
@@ -309,3 +310,19 @@ pub use temporal_context_collection_http::parse_temporal_context_collection_page
 pub use temporal_context_collection_http::parse_temporal_context_collection_page_limit;
 /// Refuse collection JSON that already carries scientific-metric or evidence keys.
 pub use temporal_context_collection_http::refuse_metrics_on_temporal_context_collection_payload;
+/// Supported operator verbs for the loopback temporal-context collection CLI.
+pub use temporal_context_collection_cli::TemporalContextCollectionCliVerb;
+/// One operator CLI invocation against a loopback collection GET listener.
+pub use temporal_context_collection_cli::TemporalContextCollectionCliInvocation;
+/// Compose one HTTP/1.1 collection GET from the typed `LineageWeave` exchange.
+pub use temporal_context_collection_cli::compose_temporal_context_collection_cli_http;
+/// Dispatch one collection CLI invocation against an in-process listener.
+pub use temporal_context_collection_cli::dispatch_temporal_context_collection_cli;
+/// Execute one collection CLI invocation over loopback TCP.
+pub use temporal_context_collection_cli::execute_temporal_context_collection_cli;
+/// Render a typed collection GET exchange as HTTP/1.1 for a loopback listener.
+pub use temporal_context_collection_cli::loopback_http1_from_temporal_context_collection_exchange;
+/// Read stdin leftover bytes on a non-terminal; collection GET admits empty.
+pub use temporal_context_collection_cli::read_temporal_context_collection_cli_stdin;
+/// Filter CLI stdout so collection pages never print scientific acceptance.
+pub use temporal_context_collection_cli::render_temporal_context_collection_cli_stdout;
