@@ -17,7 +17,8 @@ LLM/provider settings are execution policy only. Deterministic scientific gates 
 `orchestrator_live::OrchestratorLiveService` binds loopback TCP and serves
 `POST /v1/interpretation-runs` plus `GET /v1/interpretation-runs`. Accepted
 output is always hypothetical and never scientific authority. Collection GET
-returns metric-free identities only. Non-loopback binds, table-access hosts, and
+returns metric-free identities only. `tepp-interpretation-runs list` mints that
+collection GET onto spawned loopback TCP. Non-loopback binds, table-access hosts, and
 review/Copilot/GitHub credential headers fail closed. The listener does not
 call a model provider.
 

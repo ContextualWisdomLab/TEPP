@@ -41,6 +41,7 @@ or claim promotion.
 - `crates/orchestrator_live/tests/interpretation_run_collection_http_contract.rs`
   — fail-closed collection proofs
 - `crates/orchestrator_live/tests/live_http_contract.rs` — loopback GET proofs
+- `docs/adr/0070-interpretation-run-collection-cli.md` — collection CLI
 
 ## Verification
 
