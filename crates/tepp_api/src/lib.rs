@@ -31,6 +31,7 @@ mod project_history;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
+mod temporal_context_collection_http;
 mod wire;
 
 /// Terminal analysis-result contract version constant.
@@ -282,3 +283,29 @@ pub use temporal_context::TemporalContextTimelineEvent;
 pub use temporal_context::TemporalTransitionGapCandidate;
 /// Build a cutoff-safe, non-causal temporal context.
 pub use temporal_context::build_temporal_context;
+/// Supported temporal-context collection contract version.
+pub use temporal_context_collection_http::TEMPORAL_CONTEXT_COLLECTION_CONTRACT_VERSION;
+/// Default page size for loopback temporal-context collection GET.
+pub use temporal_context_collection_http::TEMPORAL_CONTEXT_COLLECTION_DEFAULT_LIMIT;
+/// Maximum opaque cursor / idempotency-key length on the collection path.
+pub use temporal_context_collection_http::TEMPORAL_CONTEXT_COLLECTION_CURSOR_MAX_LEN;
+/// Fixed non-causal claim boundary echoed on every collection row.
+pub use temporal_context_collection_http::TEMPORAL_CONTEXT_COLLECTION_INFERENCE_STATUS;
+/// Maximum page size accepted on loopback temporal-context collection GET.
+pub use temporal_context_collection_http::TEMPORAL_CONTEXT_COLLECTION_MAX_LIMIT;
+/// Versioned metric-free temporal-context collection page.
+pub use temporal_context_collection_http::TemporalContextCollection;
+/// One metric-free collection row for an accepted temporal-context identity.
+pub use temporal_context_collection_http::TemporalContextCollectionItem;
+/// Return whether `path` is exactly the temporal-context collection resource.
+pub use temporal_context_collection_http::is_temporal_context_collection_path;
+/// Build a provider-owned `GET` temporal-context collection exchange.
+pub use temporal_context_collection_http::lineageweave_temporal_context_collection_exchange;
+/// Page stored rows after an exclusive cursor, sorted by idempotency key.
+pub use temporal_context_collection_http::page_temporal_context_collection_items;
+/// Parse the optional exclusive `tepp-page-cursor` header.
+pub use temporal_context_collection_http::parse_temporal_context_collection_page_cursor;
+/// Parse the optional `tepp-page-limit` header.
+pub use temporal_context_collection_http::parse_temporal_context_collection_page_limit;
+/// Refuse collection JSON that already carries scientific-metric or evidence keys.
+pub use temporal_context_collection_http::refuse_metrics_on_temporal_context_collection_payload;
