@@ -21,6 +21,7 @@ mod envelope;
 mod error;
 mod export;
 mod export_http;
+mod export_idempotency_lookup_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
 mod lineageweave_http;
@@ -106,6 +107,18 @@ pub use export_http::ExportRetrieval;
 pub use export_http::naruon_export_retrieval_exchange;
 /// Refuse scientific-metric keys on export-retrieval JSON.
 pub use export_http::refuse_metrics_on_export_retrieval_payload;
+/// Export idempotency-lookup contract version constant.
+pub use export_idempotency_lookup_http::EXPORT_IDEMPOTENCY_LOOKUP_CONTRACT_VERSION;
+/// Maximum export idempotency-key length on the lookup path.
+pub use export_idempotency_lookup_http::EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN;
+/// Reserved lookup path prefix.
+pub use export_idempotency_lookup_http::EXPORT_IDEMPOTENCY_LOOKUP_PREFIX;
+/// Metric-free export identity found by idempotency key.
+pub use export_idempotency_lookup_http::ExportIdempotencyLookup;
+/// Build a naruon export idempotency-lookup GET exchange.
+pub use export_idempotency_lookup_http::naruon_export_idempotency_lookup_exchange;
+/// Refuse scientific-metric keys on export lookup JSON.
+pub use export_idempotency_lookup_http::refuse_metrics_on_export_idempotency_lookup_payload;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;

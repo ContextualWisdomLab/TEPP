@@ -216,6 +216,9 @@ pub(crate) fn export_retrieval_path_id(path: &str) -> Result<String, ApiError> {
         return Err(ApiError::InvalidWirePayload);
     }
     let export_id = decode_path_segment(encoded)?;
+    if export_id == "by-idempotency" {
+        return Err(ApiError::InvalidWirePayload);
+    }
     if export_id.len() > EXPORT_RETRIEVAL_ID_MAX_LEN {
         return Err(ApiError::LimitExceeded);
     }
@@ -454,6 +457,10 @@ mod tests {
         );
         assert_eq!(
             export_retrieval_path_id("/v1/exports/a/b"),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            export_retrieval_path_id("/v1/exports/by-idempotency"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
