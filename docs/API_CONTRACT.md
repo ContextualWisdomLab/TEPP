@@ -66,6 +66,7 @@ POST   /v1/interpretation-runs
 POST   /v1/analysis-runs
 POST   /v1/temporal-context
 GET    /v1/temporal-context/{idempotency_key}
+GET    /v1/temporal-context/{idempotency_key}/request
 GET    /v1/analysis-runs/{run_id}
 POST   /v1/analysis-runs/{run_id}/cancel
 GET    /v1/model-artifacts/{artifact_id}
@@ -95,6 +96,8 @@ causality, mutate TEPP state, or return a completed psychometric result.
 minted when that POST carries an `idempotency-key` header (ADR 0083). Event
 labels, actor lists, and `tepp.scientific_acceptance.v1` never appear. Naruon
 is refused. `NaruonLiveService` stays POST-only. Collection GET stays closed.
+`GET /v1/temporal-context/{idempotency_key}/request` returns the stored create
+request (ADR 0091) so operators who hold the identity do not replay POST.
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A

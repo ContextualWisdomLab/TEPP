@@ -32,6 +32,7 @@ mod project_journey;
 mod provider_payload;
 mod temporal_context;
 mod temporal_context_retrieval_http;
+mod temporal_context_stored_request_http;
 mod wire;
 
 /// Terminal analysis-result contract version constant.
@@ -299,3 +300,11 @@ pub use temporal_context_retrieval_http::refuse_metrics_on_temporal_context_retr
 pub use temporal_context_retrieval_http::temporal_context_retrieval_path_id;
 /// Refuse an empty, oversized, slash, NUL, or control-bearing identity.
 pub use temporal_context_retrieval_http::validate_temporal_context_registry_identity;
+/// Whether `path` is the stored-request extra-segment resource.
+pub use temporal_context_stored_request_http::is_temporal_context_stored_request_path;
+/// Build a credential-free `LineageWeave` stored-request GET exchange.
+pub use temporal_context_stored_request_http::lineageweave_temporal_context_stored_request_exchange;
+/// Extract the opaque idempotency key from `GET /v1/temporal-context/{key}/request`.
+pub use temporal_context_stored_request_http::temporal_context_stored_request_path_id;
+/// Refuse stored-request JSON that already carries scientific-metric keys.
+pub use temporal_context_stored_request_http::refuse_metrics_on_temporal_context_stored_request_payload;
