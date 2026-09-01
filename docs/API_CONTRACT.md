@@ -65,6 +65,7 @@ GET    /v1/evidence-imports/{import_id}
 POST   /v1/interpretation-runs
 GET    /v1/interpretation-runs
 GET    /v1/interpretation-runs/{idempotency_key}
+GET    /v1/interpretation-runs/{idempotency_key}/request
 POST   /v1/analysis-runs
 POST   /v1/temporal-context
 GET    /v1/analysis-runs/{run_id}

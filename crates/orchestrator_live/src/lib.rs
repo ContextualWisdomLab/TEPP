@@ -7,6 +7,8 @@
 //! hypothetical and never scientific authority. Collection GET enumerates
 //! metric-free identities so operators do not guess idempotency keys.
 //! GET-by-id returns one of those identities without POST replay.
+//! `GET /v1/interpretation-runs/{idempotency_key}/request` returns the stored
+//! create request without POST replay.
 //! Table-access hosts, review/Copilot/GitHub credentials, and
 //! `COPILOT_GITHUB_TOKEN` fail closed. This crate does not implement TLS
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
@@ -19,6 +21,7 @@ mod http;
 mod interpretation_run_cli;
 mod interpretation_run_collection_http;
 mod interpretation_run_retrieval_http;
+mod interpretation_run_stored_request_http;
 mod mode;
 mod request;
 mod service;
@@ -89,6 +92,16 @@ pub use interpretation_run_retrieval_http::interpretation_run_retrieval_path_id;
 pub use interpretation_run_retrieval_http::InterpretationRunRetrievalHttpExchange;
 /// Maximum opaque idempotency-key length on interpretation-run GET-by-id.
 pub use interpretation_run_retrieval_http::INTERPRETATION_RUN_RETRIEVAL_ID_MAX_LEN;
+/// Build a credential-free contextual-orchestrator stored-request GET exchange.
+pub use interpretation_run_stored_request_http::contextual_orchestrator_interpretation_run_stored_request_exchange;
+/// Extract the opaque idempotency key from a stored-request GET path.
+pub use interpretation_run_stored_request_http::interpretation_run_stored_request_path_id;
+/// Whether a path is the stored-request extra-segment resource.
+pub use interpretation_run_stored_request_http::is_interpretation_run_stored_request_path;
+/// Refuse metric keys on stored-request JSON.
+pub use interpretation_run_stored_request_http::refuse_metrics_on_interpretation_run_stored_request_payload;
+/// Typed GET exchange for interpretation-run stored-request retrieval.
+pub use interpretation_run_stored_request_http::InterpretationRunStoredRequestHttpExchange;
 /// Closed ADR 0010 orchestration-mode vocabulary.
 pub use mode::OrchestrationMode;
 /// Accepted hypothetical interpretation-run response.

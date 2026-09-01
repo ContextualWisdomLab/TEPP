@@ -1,4 +1,6 @@
 //! Loopback-only live HTTP/1.1 listener for interpretation POSTs (ADR 0010/0011).
+//! `GET /v1/interpretation-runs/{idempotency_key}/request` returns the stored
+//! create request without POST replay.
 
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -18,6 +20,10 @@ use crate::interpretation_run_collection_http::{
 use crate::interpretation_run_retrieval_http::{
     interpretation_run_retrieval_item_json, interpretation_run_retrieval_path_id,
 };
+use crate::interpretation_run_stored_request_http::{
+    interpretation_run_stored_request_path_id, is_interpretation_run_stored_request_path,
+    refuse_metrics_on_interpretation_run_stored_request_payload,
+};
 use crate::request::{
     to_json, InterpretationRunAccepted, InterpretationRunRequest, INTERPRETATION_RUN_PATH,
 };
@@ -30,6 +36,8 @@ use crate::request::{
 /// `GET /v1/interpretation-runs` enumerates accepted hypothetical runs as
 /// metric-free identities. `GET /v1/interpretation-runs/{idempotency_key}`
 /// returns one of those identities without POST replay.
+/// `GET /v1/interpretation-runs/{idempotency_key}/request` returns the stored
+/// create request without POST replay.
 #[derive(Debug)]
 pub struct OrchestratorLiveService {
     listener: Option<TcpListener>,
@@ -180,6 +188,9 @@ impl OrchestratorLiveService {
             if is_interpretation_run_collection_path(path) {
                 return self.list_interpretation_runs(path, &headers, body);
             }
+            if is_interpretation_run_stored_request_path(path) {
+                return self.get_interpretation_run_stored_request(path, &headers, body);
+            }
             return self.get_interpretation_run(path, &headers, body);
         }
         if method != "POST" || path != INTERPRETATION_RUN_PATH {
@@ -259,6 +270,27 @@ impl OrchestratorLiveService {
             "OK",
             interpretation_run_retrieval_item_json(&item)?,
         ))
+    }
+
+    fn get_interpretation_run_stored_request(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<OrchestratorLiveResponse, OrchestratorLiveError> {
+        let idempotency_key = interpretation_run_stored_request_path_id(path)?;
+        if !body.is_empty() {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
+        refuse_retrieval_get_headers(headers)?;
+        let stored = self
+            .accepted_runs
+            .get(&idempotency_key)
+            .map(|(request, _)| request)
+            .ok_or(OrchestratorLiveError::InvalidWirePayload)?;
+        let payload = stored.to_json()?;
+        refuse_metrics_on_interpretation_run_stored_request_payload(&payload)?;
+        Ok(OrchestratorLiveResponse::json(200, "OK", payload))
     }
 
     fn accept_interpretation_run(
