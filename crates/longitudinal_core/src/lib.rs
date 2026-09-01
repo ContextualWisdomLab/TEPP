@@ -16,10 +16,8 @@ mod discrete_drift;
 mod error;
 mod event_time;
 mod level;
+mod temporal_association;
 
-/// Recover a valid event-time lagged correlation from covariance and both
-/// marginal variances.
-pub use association::recover_event_time_lagged_correlation;
 /// One unit-specific within or between component.
 pub use component::ComponentValue;
 /// RMSE of recovered components against known truth.
@@ -44,3 +42,6 @@ pub use event_time::EventTimeInterval;
 pub use level::ComponentLevel;
 /// Refuse to treat a between-unit component as within-unit change.
 pub use level::refuse_between_as_within_change;
+/// Recover a valid event-time lagged correlation from covariance and both
+/// marginal variances through the typed event-time boundary.
+pub use temporal_association::recover_event_time_lagged_correlation;
