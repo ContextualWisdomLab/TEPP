@@ -2,111 +2,54 @@
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/TEPP)
 
-TEPP is the **Temporal Event Psychometrics Platform**: a multilingual, temporal,
-relational measurement system whose statistical and psychometric arithmetic is
-implemented in Rust.
+**Temporal Event Psychometrics Platform for multilingual, relational, time-aware measurement.**
 
-## Current implementation state
+TEPP measures documentary and event evidence as fallible observations of latent semantic, temporal, relational, and psychological structure. It preserves exact source evidence, multiple clocks, multilevel membership, measurement uncertainty, and relation history instead of flattening documents into independent rows or treating model output as scientific authority.
 
-This branch preserves the protected-main Rust workspace and quality-gate
-foundation. The workspace crates expose tested contracts only: immutable
-evidence identities and exact spans, six-clock temporal values with Allen
-algebra and cutoff eligibility, event mentions/instances with
-evidence-layer intelligence gates, a forward-only relation graph,
-cross-classified membership, bitemporal persistence, leakage-safe corpus
-splits, simulation manifests, claim-promotion validation, API DTOs, the
-purpose-bound privacy envelope, and longitudinal within/between
-decomposition. It adds the independently usable `analysis_engine` vertical
-slice: bounded cutoff-safe readiness work that emits a digest-bound terminal
-artifact or a redacted no-eligible-evidence result. That slice is active-PR
-evidence, not a psychometric estimator or a release claim.
-The current workspace contains 50 independently documented Rust crates. Each
-crate exposes a bounded, tested contract for evidence, temporal semantics,
-event and relation reasoning, membership, persistence, simulation, validation,
-API exchange, compute planning, or evidence-grounded interpretation. Numerical
-and psychometric authority remains on the CPU `f64` reference path; streamed
-accelerator plans must preserve the full observation set and fail closed to the
-reference path when resources or validation are insufficient.
-The repository currently implements 54 independently documented crates rather
-than a full commercial release. The implemented crates include topic
-measurement, the analysis engine, and psychometric input/recovery gates; they
-do not claim a complete commercial estimator,
-operator workspace, or supported release.
+Production mathematical and psychometric arithmetic belongs in Rust. Statistical claims remain gated by explicit evidence and validation contracts; LLMs may assist interpretation or proposal generation but do not become numerical estimators or claim-promotion authority.
 
-- `topic_measurement`: the first production topic-measurement crate. It
-  estimates topic proportions from observed counts, maps those proportions into
-  additive log-ratio coordinates, and keeps posterior uncertainty attached so
-  later psychometric models do not treat raw topic proportions as ordinary
-  Euclidean indicators.
-- `analysis_engine`: the first production analysis-run crate. It assembles one
-  cutoff-safe run from a validated design, documented evidence graph, and
-  estimator contract; persists the run with the six TEPP clocks; and emits a
-  typed terminal result. The crate does not claim buyer-visible product
-  completeness.
-- `psychometric_core`: validated statistical-recovery APIs on already-mapped
-  coordinates. It does not implement a full ESEM/DSEM estimator.
+## Why TEPP
 
-```text
-crates/analysis_engine
-crates/assertion_clock
-crates/available_clock
-crates/checkpoint_authority
-crates/citation_edge
-crates/compute_backend
-crates/copied_text
-crates/copy_identity
-crates/corpus_background
-crates/corpus_split
-crates/cutoff_clock
-crates/derived_sensitivity
-crates/document_clocks
-crates/encrypted_mapping
-crates/episode_membership
-crates/event_clock
-crates/event_core
-crates/evidence_core
-crates/inferred_status
-crates/intake_authorization
-crates/interpretation_gateway
-crates/location_membership
-crates/longitudinal_core
-crates/membership_core
-crates/membership_target
-crates/modality_source
-crates/model_selection
-crates/network_analysis
-crates/operational_log
-crates/outcome_order
-crates/payload_bound
-crates/persistence_postgres
-crates/prediction_contradiction
-crates/prompt_source
-crates/provider_receipt
-crates/psychometric_core
-crates/psychometric_fit
-crates/relation_absence
-crates/relation_graph
-crates/retrospective_edge
-crates/revision_order
-crates/role_contradiction
-crates/semantic_core
-crates/service_tls
-crates/stopword_deletion
-crates/style_source
-crates/subevent_containment
-crates/summarizes_edge
-crates/support_edge
-crates/system_clock
-crates/temporal_core
-crates/tepp_api
-crates/tepp_simulation
-crates/topic_lineage
-crates/topic_measurement
-crates/validation_core
+Many analytical systems lose the context needed to decide whether an apparent change is real: when evidence became available, which revision was observed, which language or template expressed it, which people or organizations belonged to which groups at the time, and whether a result is measurement drift rather than substantive change.
 
-```
+TEPP keeps those distinctions explicit.
 
-## Local verification
+| Need | What TEPP is designed to preserve |
+| --- | --- |
+| Multilingual measurement | Shared concepts with language-specific expression and evidence-bound alignment |
+| Time-aware analysis | Event, assertion, document, system, availability, and knowledge-cutoff clocks |
+| Relational evidence | Documents, spans, events, entities, revisions, translations, citations, memberships, and provenance |
+| Multilevel structure | Cross-classified and multiple membership without collapsing observations to one group |
+| Measurement uncertainty | Posterior-aware and invariance-aware contracts instead of treating latent estimates as error-free scores |
+| Scientific governance | Separate validation evidence, interpretation, and scientific claim promotion |
+| Reproducibility | Immutable evidence identities, deterministic contracts, versioned decisions, and explicit failure boundaries |
+
+## Product boundary
+
+TEPP owns **temporal/event measurement composition**: evidence/time semantics, longitudinal and relational measurement context, analysis-run contracts, scientific validation boundaries, and the event-aware structures required to measure change responsibly.
+
+It does not absorb every adjacent capability:
+
+- [`fast-mlsirm`](https://github.com/ContextualWisdomLab/fast-mlsirm) owns reusable psychometric/static numerical kernels and model-family arithmetic that should not be duplicated here.
+- [`contextual-orchestrator`](https://github.com/ContextualWisdomLab/contextual-orchestrator) owns model-provider execution, routing, credentials, and LLM orchestration.
+- [`LineageWeave`](https://github.com/ContextualWisdomLab/LineageWeave) can preserve and render accepted lineage/evidence but is not TEPP's numerical authority.
+- Consumer products such as Naruon own their workflow and decision semantics rather than becoming TEPP subdomains.
+
+Cross-product integrations must use released, versioned contracts. An open upstream branch or model response is never treated as production truth.
+
+## Current maturity
+
+TEPP is an active technical platform under development, not a completed commercial release. Protected source contains a broad Rust-first contract foundation for evidence, temporal semantics, relations, membership, persistence, simulation, validation, API exchange, and selected analytical/recovery primitives. The approved PRD describes a larger target platform than the capabilities currently integrated and released.
+
+In particular, do not infer from the architecture that TEPP already ships a complete ESEM/DSEM/continuous-time estimator suite, production operator workspace, supported GPU backend, or generally available service. Candidate behavior in open pull requests remains candidate evidence until it reaches protected source through normal governance and, where applicable, a versioned release.
+
+The current product/technical gap and ownership evidence is maintained in [`docs/product-technical-gap-baseline.md`](docs/product-technical-gap-baseline.md).
+
+## Start here
+
+TEPP is currently consumed and developed from source; there is no generally available installation package or production endpoint advertised by this README.
+
+For a source checkout, verify the repository contract before relying on a branch:
 
 ```bash
 python3 scripts/check_workspace_contract.py
@@ -123,32 +66,94 @@ cargo doc --workspace --all-features --no-deps
 cargo deny check
 ```
 
-Stable Rust line coverage is measured with `cargo-llvm-cov`. Branch coverage is
-measured in a separately pinned nightly lane because Rust branch coverage remains
-an unstable compiler capability. A zero denominator is reported explicitly for
-any crate whose lane still ships no executable behavior; it must never conceal
-uncovered production behavior.
+Stable Rust line coverage is measured with `cargo-llvm-cov`. Branch coverage uses a separately pinned nightly lane because Rust branch coverage remains an unstable compiler capability. A zero denominator is reported explicitly for a crate with no executable behavior; it must never hide uncovered production code.
 
-## Normative documents
+If you are evaluating TEPP as an integrator rather than developing the workspace, start with the product boundary and released-contract evidence rather than individual crate names.
 
-- `AGENTS.md`
-- `ARCHITECTURE.md`
-- `docs/product/prd-v0.4-approved.md`
-- `docs/superpowers/plans/2026-08-05-temporal-event-foundation.md`
-- `docs/research/standards-and-literature.md`
+## Core concepts
 
-No release, production-readiness, GPU, database, or statistical-recovery claim is
-made by this foundation slice.
+### Evidence before interpretation
 
-The active stacked analysis-engine slice adds a bounded executable readiness path
-from an accepted run to a digest-bound terminal artifact. It is not yet
-implemented-main and does not replace scientific estimator contracts.
-Validated statistical-recovery APIs exist only inside `psychometric_core`: OLS
-loading recovery on already-mapped coordinates, posterior-draw point estimates,
-the Rubin total-variance identity `T = U_bar + (1 + 1/m) B`, CWC/event-time/
-contextual recovery maps, and two-group OLS latent-mean comparison gated behind
-typed strong/strict invariance evidence (`LatentMeanComparisonEvidence`; metric,
-weak, or configural status cannot reduce to a passing flag). No release,
-production-readiness, GPU, or database claim is made by this foundation slice,
-and no crate yet implements a full ESEM/DSEM estimator (the two-group OLS
-invariance gate is not MGCFA).
+Source bytes, exact spans, identifiers, versions, provenance, and availability are first-class evidence. Derived fields and model outputs do not overwrite the observations that support them.
+
+### Six-clock temporal semantics
+
+TEPP distinguishes event/valid time, assertion time, document time, system time, availability time, and the analysis knowledge cutoff. Historical analyses exclude evidence that was not actually available by the declared cutoff.
+
+### Relational and multilevel measurement
+
+Documents and events can participate in revision, translation, citation, membership, project, organization, author, episode, and other time-varying relations. Membership can be cross-classified and multiple rather than forced into one hierarchy.
+
+### Measurement is not labeling
+
+A discovered topic, cluster, relation, or LLM explanation is not automatically a validated construct. Measurement invariance, uncertainty, known-truth recovery, model diagnostics, and external validity remain separate requirements appropriate to the claim being made.
+
+### Temporal precedence is not causality
+
+TEPP can preserve ordered events and analyze temporal association, but causal language requires an identified experimental, quasi-experimental, or defensible observational design. A successful API call, fit routine, or temporal ordering does not promote a causal claim.
+
+## Architecture at a glance
+
+```text
+Documentary / event evidence
+           |
+           v
++-------------------------------+
+| Evidence & temporal semantics |
+| exact spans / provenance      |
+| six clocks / cutoff rules     |
++---------------+---------------+
+                |
+                v
++-------------------------------+
+| Relational measurement layer  |
+| events / membership / lineage |
+| multilingual measurement      |
++---------------+---------------+
+                |
+                v
++-------------------------------+
+| Analysis & validation         |
+| Rust numerical boundaries     |
+| recovery / invariance gates   |
++---------------+---------------+
+                |
+                v
++-------------------------------+
+| Evidence-grounded outputs     |
+| interpretation / audit        |
+| explicit claim authority      |
++-------------------------------+
+```
+
+Implementation crates are modular units inside these product responsibilities; crate count is not a customer capability metric and is intentionally not used as a maturity signal in this README.
+
+## Scientific and security guardrails
+
+TEPP is designed to fail closed when evidence, temporal identity, provenance, authorization, numerical validity, or claim-promotion requirements are absent or contradictory. The architecture deliberately separates statistical recovery from scientific acceptance and evidence-grounded interpretation from authoritative estimation.
+
+Production mathematical and psychometric arithmetic is Rust-owned. Python can support repository validation, interoperability, and independent-oracle testing, but does not become the production numerical core.
+
+Security, privacy, and access boundaries are part of the data contract: sensitive evidence is purpose-bound, consumer boundaries are explicit, and adjacent systems do not receive authority merely because they can call an API.
+
+## Documentation map
+
+Use the canonical documentation graph rather than treating this README as a complete technical specification:
+
+- [`DOCUMENTATION.md`](DOCUMENTATION.md) — documentation authority and navigation.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system and bounded-context architecture.
+- [`docs/product/prd-v0.4-approved.md`](docs/product/prd-v0.4-approved.md) — approved product requirements baseline.
+- [`docs/architecture/domain-context-map.md`](docs/architecture/domain-context-map.md) — DDD ownership and dependency direction.
+- [`docs/product-technical-gap-baseline.md`](docs/product-technical-gap-baseline.md) — current gaps, maturity, owners, and evidence limits.
+- [`docs/adr/README.md`](docs/adr/README.md) — architecture decisions.
+- [`docs/research/standards-and-literature.md`](docs/research/standards-and-literature.md) — standards and research basis.
+
+## Contributing and support
+
+Before changing product behavior, numerical authority, or cross-repository ownership, read [`AGENTS.md`](AGENTS.md), the architecture, applicable ADRs, and the product/technical gap baseline. Keep new behavior inside the bounded context that owns it, add executable evidence before promoting a claim, and update source, tests, documentation, and traceability together.
+
+Use repository issues for reproducible product defects, standards gaps, scientific-contract gaps, and integration problems. An open PR is not support evidence for a capability until it is integrated and released under the repository's normal governance.
+
+## License
+
+TEPP source and documentation are licensed under the [MIT License](LICENSE). Third-party dependencies and external services retain their own licenses and terms; commercially incompatible inbound software must not be treated as acceptable merely because TEPP itself is MIT-licensed.
