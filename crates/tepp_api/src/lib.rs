@@ -9,7 +9,9 @@
 //! may also request a cutoff-safe project-history projection from explicit
 //! source evidence. Naruon owns the current purpose-bound export adapter.
 //! Loopback listeners prove the HTTP boundary without claiming production TLS,
-//! causality, or completed psychometric model results.
+//! causality, or completed psychometric model results. The published
+//! `tepp-project-history` CLI mints typed LineageWeave project-history POST
+//! exchanges onto spawned `tepp-loopback` TCP.
 
 mod analysis_result;
 mod analysis_run;
@@ -28,6 +30,7 @@ mod naruon_http;
 mod naruon_live;
 mod orchestration;
 mod project_history;
+mod project_history_cli;
 mod project_history_collection_http;
 mod project_history_retrieval_http;
 mod project_history_stored_request_cli;
@@ -234,6 +237,24 @@ pub use project_history::ProjectHistoryProjection;
 pub use project_history::ProjectHistoryRequest;
 /// Build a cutoff-safe project-history projection.
 pub use project_history::project_history_projection;
+/// Loopback project-history query CLI invocation.
+pub use project_history_cli::ProjectHistoryCliInvocation;
+/// Loopback project-history query CLI verb.
+pub use project_history_cli::ProjectHistoryCliVerb;
+/// Compose HTTP/1.1 project-history POST from a query CLI invocation.
+pub use project_history_cli::compose_project_history_cli_http;
+/// Dispatch a project-history query CLI invocation against an in-process listener.
+pub use project_history_cli::dispatch_project_history_cli;
+/// Execute a project-history query CLI invocation over loopback TCP.
+pub use project_history_cli::execute_project_history_cli;
+/// Render a typed project-history POST exchange as loopback HTTP/1.1.
+pub use project_history_cli::loopback_http1_from_project_history_exchange;
+/// Read bounded stdin for the project-history query CLI.
+pub use project_history_cli::read_project_history_cli_stdin;
+/// Refuse scientific metric or causal keys on project-history query CLI JSON.
+pub use project_history_cli::refuse_metrics_on_project_history_cli_payload;
+/// Render metric-free project-history query CLI stdout.
+pub use project_history_cli::render_project_history_cli_stdout;
 /// Maximum opaque cursor length on project-history collection GET.
 pub use project_history_collection_http::PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN;
 /// Default page size for project-history collection GET.

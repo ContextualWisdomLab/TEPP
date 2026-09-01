@@ -1,0 +1,2 @@
+- `tepp_api` loopback `tepp-project-history query` mints a typed LineageWeave `POST /v1/project-histories` onto spawned `tepp-loopback` TCP (ADR 0061). Metric-free `temporal_association_only` JSON only. `tepp.scientific_acceptance.v1` never appears. Does not infer causality. Naruon is refused. Not temporal-context CLI, not export CLI, not persistence.
+- Fail closed on HTTP field injection, duplicate or transfer-encoded framing, non-2xx stdout, and stdin/response payloads above the existing project-history wire limits.
