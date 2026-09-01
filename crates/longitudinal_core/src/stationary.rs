@@ -48,6 +48,17 @@ mod tests {
     }
 
     #[test]
+    fn preserves_minimum_subnormal_stationary_variance_after_drift_overflow() {
+        // Exact q / (-2a) lies above the half-ulp threshold for the minimum
+        // positive subnormal. Dividing by |a| first rounds to one subnormal;
+        // halving that rounded intermediate incorrectly erases the result.
+        let diffusion = 1.332_267_629_550_187_7e-15_f64;
+        let stationary = recover_stationary_within_variance(diffusion, -f64::MAX)
+            .expect("positive subnormal stationary variance is representable");
+        assert_eq!(stationary.to_bits(), 1);
+    }
+
+    #[test]
     fn stationary_variance_admission_is_fail_closed() {
         assert_eq!(recover_stationary_within_variance(0.0, -0.5), Ok(0.0));
         assert_eq!(
