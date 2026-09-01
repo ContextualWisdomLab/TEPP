@@ -26,7 +26,7 @@ def valid_baseline(*, count: int = 1, extra: str = "") -> str:
         "| Signal | Snapshot evidence | Delivery implication |\n"
         "|---|---:|---|\n"
         f"| Open pull requests | **{count}** | Queue only. |\n\n"
-        "## Current open pull-request evidence\n\n"
+        "## Current priority open pull-request evidence\n\n"
         "| PR | Exact current head | Draft | Base | Title |\n"
         "|---:|---|:---:|---|---|\n"
         f"| #164 | `{VALID_HEAD}` | false | main | docs |\n\n"
@@ -52,7 +52,7 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
         self.assertIn(f"]({BASELINE_PATH})", documentation)
 
     def test_live_repository_baseline_is_structurally_valid(self) -> None:
-        """The committed register carries a dated SHA-bound inventory."""
+        """The committed register carries a dated SHA-bound priority inventory."""
 
         docs.validate_required_files(REPOSITORY_ROOT)
         docs.validate_documentation_map(REPOSITORY_ROOT)
@@ -81,7 +81,7 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
                 docs.validate_documentation_map(root)
 
     def test_valid_fixture_passes_structure_validator(self) -> None:
-        """A dated exact-head register with matching count is accepted."""
+        """A dated exact-head register with a priority inventory is accepted."""
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -107,15 +107,40 @@ class ProductTechnicalGapBaselineTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "exact-head"):
                 docs.validate_product_technical_gap_baseline(root)
 
-    def test_inventory_count_mismatch_fails(self) -> None:
-        """Declared open-PR count must match exact-head inventory rows."""
+    def test_queue_total_may_exceed_priority_inventory(self) -> None:
+        """A large live queue need not be duplicated row-for-row in the operator register."""
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             path = root / BASELINE_PATH
             path.parent.mkdir(parents=True)
             path.write_text(valid_baseline(count=94), encoding="utf-8")
-            with self.assertRaisesRegex(AssertionError, "does not match inventory"):
+            docs.validate_product_technical_gap_baseline(root)
+
+    def test_queue_total_smaller_than_priority_inventory_fails(self) -> None:
+        """The declared live queue cannot be smaller than its exact-head subset."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(valid_baseline(count=0), encoding="utf-8")
+            with self.assertRaisesRegex(AssertionError, "smaller than priority inventory"):
+                docs.validate_product_technical_gap_baseline(root)
+
+    def test_duplicate_priority_inventory_row_fails(self) -> None:
+        """A priority PR may appear at most once in the exact-head inventory."""
+
+        duplicate_row = f"| #164 | `{VALID_HEAD}` | false | main | docs duplicate |\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / BASELINE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                valid_baseline(count=94, extra=f"\n{duplicate_row}"),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "duplicate PR rows"):
                 docs.validate_product_technical_gap_baseline(root)
 
     def test_queued_checks_as_implemented_main_fails(self) -> None:
