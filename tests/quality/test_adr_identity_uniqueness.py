@@ -108,6 +108,18 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "duplicate ADR index target"):
                 docs.validate_adr_graph()
 
+    def test_titled_duplicate_index_rows_fail(self) -> None:
+        """Markdown link titles may not hide a duplicate ADR identity."""
+
+        root = self._root(
+            '| [0001](0001-one.md "canonical") | One | Accepted | partial | first |\n'
+            '| [0001](0001-one.md "duplicate") | One again | Accepted | partial | duplicate |\n',
+            {"0001-one.md": "0001"},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "duplicate ADR index identity"):
+                docs.validate_adr_graph()
+
     def test_canonical_index_targets_pass(self) -> None:
         """Each displayed identity may link to its unique root ADR file."""
 
