@@ -31,9 +31,10 @@ The repository-level classic branch-protection payload is not the sole policy so
 
 This table is an exact-head **priority subset**, not a row-for-row copy of the 143-PR queue. The live total and this operator inventory are deliberately different concepts.
 
+PR #435 itself is deliberately omitted from the exact-head table. A commit that rewrites this document necessarily advances #435's head, so embedding that same branch's “exact current head” inside the commit would be self-invalidating. The delivery-authority line links #435, while its live head is re-read from GitHub immediately before any readiness or merge decision.
+
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
-| #435 | `c8c0ca232fb27b0a828caab159c2b0af2c8bebb7` | true | main | queue/DDD recovery landing vehicle; this branch |
 | #436 | `460503b6e787362b702509faa955c4730f6d8680` | false | #433 head | Analysis Run/contextual-orchestrator CLI stack; `stacked_dependency` |
 | #434 | `c0fbaabd8c95e69407c3b9e50f8d1846bd949598` | false | main | membership-target refusal profile; `fold_into_landing_vehicle` candidate |
 | #432 | `3e09ff29cc89ef97a859f3ae50e1297846dd2eeb` | false | main | Topic Measurement profile binding; preserve unique contract tests |
