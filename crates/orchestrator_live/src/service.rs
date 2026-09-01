@@ -19,7 +19,8 @@ use crate::interpretation_run_collection_http::{
     parse_interpretation_run_collection_page_limit,
 };
 use crate::interpretation_run_lookup_http::{
-    interpretation_run_lookup_path_id, is_interpretation_run_lookup_path,
+    INTERPRETATION_RUN_LOOKUP_PREFIX, interpretation_run_lookup_path_id,
+    is_interpretation_run_lookup_path,
 };
 use crate::interpretation_run_lookup_stored_request_http::{
     interpretation_run_lookup_stored_request_path_id,
@@ -374,6 +375,9 @@ impl OrchestratorLiveService {
         body: &str,
     ) -> Result<OrchestratorLiveResponse, OrchestratorLiveError> {
         let request = InterpretationRunRequest::from_json(body)?;
+        if request.idempotency_key() == INTERPRETATION_RUN_LOOKUP_PREFIX {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
         let idempotency_key = header_value(headers, "idempotency-key")?;
         if idempotency_key != request.idempotency_key() {
             return Err(OrchestratorLiveError::InvalidWirePayload);
