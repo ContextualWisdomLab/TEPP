@@ -1,9 +1,9 @@
 //! End-to-end contract for cutoff-safe membership-target refusals.
 
 use analysis_engine::{
-    execute_membership_target_run, AnalysisEngineError, MembershipTargetDocument,
-    MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION, MEMBERSHIP_TARGET_MODEL_CONTRACT_VERSION,
-    MEMBERSHIP_TARGET_OUTPUT_PROFILE,
+    execute_membership_target_run, AnalysisEngineError, MembershipTargetArtifact,
+    MembershipTargetDocument, MAX_EVIDENCE_UNITS, MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION,
+    MEMBERSHIP_TARGET_MODEL_CONTRACT_VERSION, MEMBERSHIP_TARGET_OUTPUT_PROFILE,
 };
 use membership_target::MembershipTargetKind;
 use temporal_core::KnowledgeCutoff;
@@ -102,6 +102,38 @@ fn mixed_target_kinds_emit_digest_bound_refusals_without_recovery_metric() {
 }
 
 #[test]
+fn compact_oversized_artifact_counts_fail_closed() {
+    let document_count = MAX_EVIDENCE_UNITS as u64 + 1;
+    let language_count = document_count - 2;
+    let artifact = MembershipTargetArtifact {
+        schema_version: MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION.into(),
+        run_id: "run-compact-oversize".into(),
+        snapshot_id: "snapshot-compact-oversize".into(),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        document_count,
+        language_count,
+        episode_count: 0,
+        template_count: 0,
+        department_count: 0,
+        opportunity_pool_count: 0,
+        entity_count: 1,
+        project_count: 1,
+        refused_as_entity_count: language_count,
+        refused_as_project_count: language_count,
+        inference_status: "language_episode_template_department_opportunity_pool_are_not_entities".into(),
+    };
+    let raw_payload = serde_json::to_string(&artifact).expect("raw json");
+    assert_eq!(
+        artifact.to_json(),
+        Err(AnalysisEngineError::InvalidMembershipTargetArtifact)
+    );
+    assert_eq!(
+        MembershipTargetArtifact::from_json(&raw_payload),
+        Err(AnalysisEngineError::InvalidMembershipTargetArtifact)
+    );
+}
+
+#[test]
 fn empty_single_class_and_duplicate_identities_fail_closed() {
     let request = request();
     assert_eq!(
@@ -163,7 +195,7 @@ fn empty_single_class_and_duplicate_identities_fail_closed() {
 }
 
 #[test]
-fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
+fn execution_refuses_snapshot_profile_cutoff_mismatch_and_oversize() {
     let request = request();
     let documents = mixed_documents();
     assert_eq!(
@@ -225,4 +257,18 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+    let oversized: Vec<MembershipTargetDocument> = (0..=MAX_EVIDENCE_UNITS)
+        .map(|index| {
+            let kind = if index == MAX_EVIDENCE_UNITS {
+                MembershipTargetKind::Entity
+            } else {
+                MembershipTargetKind::Language
+            };
+            MembershipTargetDocument::new(format!("document-{index}"), kind).expect("document")
+        })
+        .collect();
+    assert_eq!(
+        execute(&request, &oversized),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
 }
