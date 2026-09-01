@@ -154,8 +154,6 @@ mod tests {
 
     #[test]
     fn nonstationary_marginals_do_not_use_the_earlier_variance_twice() {
-        // The retired one-sided ratio would be 1.5 and therefore impossible as
-        // an autocorrelation. Supplying the later marginal gives 0.75.
         let recovered = recover_event_time_lagged_correlation(1.5, 1.0, 4.0, 1.0)
             .expect("valid nonstationary covariance should standardize");
         assert!((recovered - 0.75).abs() < f64::EPSILON * 4.0);
@@ -197,7 +195,6 @@ mod tests {
             recover_event_time_lagged_correlation(-f64::MAX, f64::MAX, f64::MAX, 1.0),
             Ok(-1.0)
         );
-
         let minimum_subnormal = f64::from_bits(1);
         assert_eq!(
             recover_event_time_lagged_correlation(
@@ -231,6 +228,19 @@ mod tests {
             ),
             Err(LongitudinalError::CovarianceBoundViolation)
         );
+    }
+
+    #[test]
+    fn unequal_scales_do_not_underflow_a_representable_correlation() {
+        let recovered = recover_event_time_lagged_correlation(
+            f64::MIN_POSITIVE,
+            f64::MIN_POSITIVE,
+            f64::MAX,
+            1.0,
+        )
+        .expect("valid unequal-scale covariance should remain representable");
+        assert!(recovered > 0.0);
+        assert!(recovered.is_finite());
     }
 
     #[test]
