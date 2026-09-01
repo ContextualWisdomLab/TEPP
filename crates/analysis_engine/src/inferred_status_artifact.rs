@@ -150,6 +150,7 @@ impl InferredStatusArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.evidence_count < 2
+            || self.evidence_count > MAX_EVIDENCE_UNITS as u64
             || self.observed_count == 0
             || self.inferred_count == 0
             || status_sum != Some(self.evidence_count)
@@ -327,7 +328,7 @@ mod tests {
         INFERRED_STATUS_ARTIFACT_BYTE_LIMIT, INFERRED_STATUS_ARTIFACT_SCHEMA_VERSION,
         INFERRED_STATUS_INFERENCE_STATUS, InferredStatusArtifact,
     };
-    use crate::AnalysisEngineError;
+    use crate::{AnalysisEngineError, MAX_EVIDENCE_UNITS};
 
     fn artifact() -> InferredStatusArtifact {
         InferredStatusArtifact {
@@ -367,6 +368,26 @@ mod tests {
         assert_eq!(
             InferredStatusArtifact::from_json(&"x".repeat(INFERRED_STATUS_ARTIFACT_BYTE_LIMIT + 1)),
             Err(AnalysisEngineError::LimitExceeded)
+        );
+    }
+
+    #[test]
+    fn artifact_claimed_count_above_execution_limit_fails_parse_and_serialize() {
+        let mut oversized = artifact();
+        oversized.evidence_count = MAX_EVIDENCE_UNITS as u64 + 1;
+        oversized.observed_count = 1;
+        oversized.inferred_count = MAX_EVIDENCE_UNITS as u64;
+        oversized.refused_as_observed_count = MAX_EVIDENCE_UNITS as u64;
+        oversized.refused_as_transition_count = MAX_EVIDENCE_UNITS as u64;
+
+        assert_eq!(
+            oversized.to_json(),
+            Err(AnalysisEngineError::InvalidInferredStatusArtifact)
+        );
+        let unchecked_payload = serde_json::to_string(&oversized).expect("unchecked fixture json");
+        assert_eq!(
+            InferredStatusArtifact::from_json(&unchecked_payload),
+            Err(AnalysisEngineError::InvalidInferredStatusArtifact)
         );
     }
 
