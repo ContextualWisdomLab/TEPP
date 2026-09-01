@@ -197,13 +197,17 @@ fn contains_forbidden_export_key(value: &serde_json::Value) -> bool {
     }
 }
 
+fn export_retrieval_id_is_reserved(export_id: &str) -> bool {
+    export_id == "by-idempotency"
+}
+
 /// Extract the opaque export identity from `GET /v1/exports/{export_id}`.
 ///
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] for the collection path, extra
-/// segments, a hostile encoding, or an empty identity, and
-/// [`ApiError::LimitExceeded`] when the decoded identity exceeds
+/// segments, a reserved route identity, a hostile encoding, or an empty
+/// identity, and [`ApiError::LimitExceeded`] when the decoded identity exceeds
 /// [`EXPORT_RETRIEVAL_ID_MAX_LEN`].
 pub(crate) fn export_retrieval_path_id(path: &str) -> Result<String, ApiError> {
     let remainder = path
@@ -216,7 +220,7 @@ pub(crate) fn export_retrieval_path_id(path: &str) -> Result<String, ApiError> {
         return Err(ApiError::InvalidWirePayload);
     }
     let export_id = decode_path_segment(encoded)?;
-    if export_id == "by-idempotency" {
+    if export_retrieval_id_is_reserved(&export_id) {
         return Err(ApiError::InvalidWirePayload);
     }
     if export_id.len() > EXPORT_RETRIEVAL_ID_MAX_LEN {
@@ -227,21 +231,24 @@ pub(crate) fn export_retrieval_path_id(path: &str) -> Result<String, ApiError> {
 
 /// Build a provider-owned `GET` export-retrieval exchange.
 ///
-/// The builder refuses non-`https` origins and empty or oversized identities.
-/// It does not inject credentials. The GET body is empty. The identity
-/// travels in the path; the builder does not send an `idempotency-key`
-/// header.
+/// The builder refuses non-`https` origins, empty or oversized identities, and
+/// identities reserved for collection sub-routes. It does not inject
+/// credentials. The GET body is empty. The identity travels in the path; the
+/// builder does not send an `idempotency-key` header.
 ///
 /// # Errors
 ///
-/// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin or empty
-/// identity, and [`ApiError::LimitExceeded`] when the identity exceeds
-/// [`EXPORT_RETRIEVAL_ID_MAX_LEN`] bytes.
+/// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin, empty
+/// identity, or reserved route identity, and [`ApiError::LimitExceeded`] when
+/// the identity exceeds [`EXPORT_RETRIEVAL_ID_MAX_LEN`] bytes.
 pub fn naruon_export_retrieval_exchange(
     origin: &str,
     export_id: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
     require_nonempty(export_id)?;
+    if export_retrieval_id_is_reserved(export_id) {
+        return Err(ApiError::InvalidWirePayload);
+    }
     if export_id.len() > EXPORT_RETRIEVAL_ID_MAX_LEN {
         return Err(ApiError::LimitExceeded);
     }
@@ -520,6 +527,10 @@ mod tests {
         );
         assert_eq!(
             naruon_export_retrieval_exchange("https://tepp.example.test", ""),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            naruon_export_retrieval_exchange("https://tepp.example.test", "by-idempotency"),
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
