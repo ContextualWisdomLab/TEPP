@@ -20,6 +20,7 @@ mod corpus_split_manifest;
 mod envelope;
 mod error;
 mod export;
+mod export_collection_http;
 mod export_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
@@ -104,6 +105,24 @@ pub use export_http::EXPORT_RETRIEVAL_ID_MAX_LEN;
 pub use export_http::ExportRetrieval;
 /// Build a naruon export-retrieval GET exchange.
 pub use export_http::naruon_export_retrieval_exchange;
+/// Build a credential-free naruon export collection GET exchange.
+pub use export_collection_http::naruon_export_collection_exchange;
+/// Whether a path is the export collection resource.
+pub use export_collection_http::is_export_collection_path;
+/// Page stored export collection rows with an exclusive export-id cursor.
+pub use export_collection_http::page_export_collection_items;
+/// Parse the optional exclusive `tepp-page-cursor` header.
+pub use export_collection_http::parse_export_collection_page_cursor;
+/// Parse the optional `tepp-page-limit` header.
+pub use export_collection_http::parse_export_collection_page_limit;
+/// Metric-free export collection page.
+pub use export_collection_http::ExportCollection;
+/// Maximum opaque cursor length on export collection GET.
+pub use export_collection_http::EXPORT_COLLECTION_CURSOR_MAX_LEN;
+/// Default page size for export collection GET.
+pub use export_collection_http::EXPORT_COLLECTION_DEFAULT_LIMIT;
+/// Maximum page size for export collection GET.
+pub use export_collection_http::EXPORT_COLLECTION_MAX_LIMIT;
 /// Refuse scientific-metric keys on export-retrieval JSON.
 pub use export_http::refuse_metrics_on_export_retrieval_payload;
 
