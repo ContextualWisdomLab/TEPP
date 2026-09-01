@@ -23,6 +23,7 @@ mod export;
 mod export_http;
 mod export_idempotency_lookup_cli;
 mod export_idempotency_lookup_http;
+mod export_idempotency_lookup_stored_request_cli;
 mod export_idempotency_lookup_stored_request_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
@@ -147,6 +148,22 @@ pub use export_idempotency_lookup_stored_request_http::is_export_idempotency_loo
 pub use export_idempotency_lookup_stored_request_http::naruon_export_idempotency_lookup_stored_request_exchange;
 /// Refuse scientific-metric keys on lookup stored-request JSON.
 pub use export_idempotency_lookup_stored_request_http::refuse_metrics_on_export_lookup_stored_request_payload;
+/// One operator CLI invocation against lookup stored-request GET.
+pub use export_idempotency_lookup_stored_request_cli::ExportIdempotencyLookupStoredRequestCliInvocation;
+/// Supported lookup stored-request CLI verbs.
+pub use export_idempotency_lookup_stored_request_cli::ExportIdempotencyLookupStoredRequestCliVerb;
+/// Compose HTTP/1.1 lookup stored-request GET from a typed CLI invocation.
+pub use export_idempotency_lookup_stored_request_cli::compose_export_idempotency_lookup_stored_request_cli_http;
+/// Dispatch lookup stored-request CLI against an in-process listener.
+pub use export_idempotency_lookup_stored_request_cli::dispatch_export_idempotency_lookup_stored_request_cli;
+/// Execute lookup stored-request CLI over loopback TCP.
+pub use export_idempotency_lookup_stored_request_cli::execute_export_idempotency_lookup_stored_request_cli;
+/// Render a typed lookup stored-request GET as HTTP/1.1 for a loopback host.
+pub use export_idempotency_lookup_stored_request_cli::loopback_http1_from_export_idempotency_lookup_stored_request_exchange;
+/// Read leftover stdin for lookup stored-request GET (empty admitted).
+pub use export_idempotency_lookup_stored_request_cli::read_export_idempotency_lookup_stored_request_cli_stdin;
+/// Filter lookup stored-request CLI stdout so scientific acceptance never appears.
+pub use export_idempotency_lookup_stored_request_cli::render_export_idempotency_lookup_stored_request_cli_stdout;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;
