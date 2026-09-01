@@ -8,6 +8,12 @@ artifacts through `TopicContextPosteriorArtifact`. This slice binds that
 producer contract to a cutoff-safe analysis-run profile so an operator can
 request a digest-bound terminal result.
 
+Execution requires one authoritative snapshot manifest. It binds the source
+snapshot digest and exact artifact digest, provides an availability instant for
+every represented document, rejects evidence available after the historical
+cutoff, and admits only the `trsl-tm-v1` producer contract. The terminal summary
+counts the logistic-normal coordinates actually validated.
+
 The executor does not infer topic importance, does not collapse missing
 draws, and does not invent birth/split/merge events. Lineage events remain
 producer-supplied. It is not a Bayesian sampler and not GPU execution.

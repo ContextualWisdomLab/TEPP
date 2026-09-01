@@ -1,17 +1,15 @@
 //! End-to-end contract for cutoff-safe posterior topic-context analysis-run.
 
+use std::collections::BTreeMap;
+
 use analysis_engine::{
     AnalysisEngineError, TOPIC_CONTEXT_POSTERIOR_MODEL_CONTRACT_VERSION,
     TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
     TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
-    TopicDocumentRelation, TopicPostPlausibleValue, execute_topic_context_posterior_run,
+    TopicContextPosteriorSnapshotManifest, TopicDocumentRelation, TopicPostPlausibleValue,
+    execute_topic_context_posterior_run,
 };
-use temporal_core::KnowledgeCutoff;
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
-
-fn cutoff() -> KnowledgeCutoff {
-    KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
-}
 
 fn artifact() -> TopicContextPosteriorArtifact {
     let documents = [
@@ -99,6 +97,25 @@ fn request() -> AnalysisRunRequest {
     }
 }
 
+fn manifest(artifact: &TopicContextPosteriorArtifact) -> TopicContextPosteriorSnapshotManifest {
+    TopicContextPosteriorSnapshotManifest {
+        snapshot_id: artifact.snapshot_id.clone(),
+        source_snapshot_sha256: artifact.source_snapshot_sha256.clone(),
+        knowledge_cutoff: artifact.knowledge_cutoff.clone(),
+        artifact_sha256: artifact.sha256().expect("artifact digest"),
+        document_available_at: BTreeMap::from([
+            (
+                "018f3f7a-7b7c-7d00-8000-000000000001".into(),
+                "2026-07-20T00:00:00Z".into(),
+            ),
+            (
+                "018f3f7a-7b7c-7d00-8000-000000000002".into(),
+                "2026-08-01T00:00:00Z".into(),
+            ),
+        ]),
+    }
+}
+
 fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
     AnalysisRunAccepted::new(
         "run-topic-context-posterior",
@@ -111,12 +128,12 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
 fn execute(
     request: &AnalysisRunRequest,
 ) -> Result<analysis_engine::TopicContextPosteriorExecution, AnalysisEngineError> {
+    let artifact = artifact();
     execute_topic_context_posterior_run(
         request,
         &accepted(request),
-        "snapshot-topic-context-posterior",
-        cutoff(),
-        &artifact(),
+        &manifest(&artifact),
+        &artifact,
         "2026-08-02T00:00:00Z",
     )
 }
@@ -147,6 +164,15 @@ fn validated_posterior_emits_digest_without_claiming_importance() {
         execution.terminal_result.result_schema_version.as_deref(),
         Some(TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION)
     );
+    assert_eq!(
+        execution
+            .terminal_result
+            .summary
+            .as_ref()
+            .expect("summary")
+            .statistic_count,
+        4
+    );
 }
 
 #[test]
@@ -154,25 +180,39 @@ fn producer_contract_refusal_and_run_identity_mismatch_fail_closed() {
     let request = request();
     let mut invalid = artifact();
     invalid.plausible_values.pop();
+    let invalid_manifest = manifest(&artifact());
     assert_eq!(
         execute_topic_context_posterior_run(
             &request,
             &accepted(&request),
-            "snapshot-topic-context-posterior",
-            cutoff(),
+            &invalid_manifest,
             &invalid,
             "2026-08-02T00:00:00Z",
         ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
-    let mut mismatched_run = artifact();
-    mismatched_run.run_id = "other-run".into();
+
+    let original_artifact = artifact();
+    let mut artifact_snapshot_mismatch = original_artifact.clone();
+    artifact_snapshot_mismatch.snapshot_id = "other-snapshot".into();
     assert_eq!(
         execute_topic_context_posterior_run(
             &request,
             &accepted(&request),
-            "snapshot-topic-context-posterior",
-            cutoff(),
+            &manifest(&original_artifact),
+            &artifact_snapshot_mismatch,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::SnapshotMismatch)
+    );
+    let mut mismatched_run = artifact();
+    mismatched_run.run_id = "other-run".into();
+    let mismatched_manifest = manifest(&mismatched_run);
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &mismatched_manifest,
             &mismatched_run,
             "2026-08-02T00:00:00Z",
         ),
@@ -183,13 +223,15 @@ fn producer_contract_refusal_and_run_identity_mismatch_fail_closed() {
 #[test]
 fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
     let request = request();
+    let artifact = artifact();
+    let mut mismatched_manifest = manifest(&artifact);
+    mismatched_manifest.snapshot_id = "other-snapshot".into();
     assert_eq!(
         execute_topic_context_posterior_run(
             &request,
             &accepted(&request),
-            "other-snapshot",
-            cutoff(),
-            &artifact(),
+            &mismatched_manifest,
+            &artifact,
             "2026-08-02T00:00:00Z",
         ),
         Err(AnalysisEngineError::SnapshotMismatch)
@@ -241,4 +283,200 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+}
+
+#[test]
+fn execution_binds_snapshot_digest_availability_and_producer_contract() {
+    let request = request();
+    let artifact = artifact();
+
+    let mut wrong_snapshot_digest = manifest(&artifact);
+    wrong_snapshot_digest.source_snapshot_sha256 = "1".repeat(64);
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &wrong_snapshot_digest,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut future_evidence = manifest(&artifact);
+    future_evidence.document_available_at.insert(
+        "018f3f7a-7b7c-7d00-8000-000000000001".into(),
+        "2026-08-01T00:00:01Z".into(),
+    );
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &future_evidence,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut foreign_producer = artifact.clone();
+    foreign_producer.model_contract_version = "unapproved-producer-v1".into();
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &manifest(&foreign_producer),
+            &foreign_producer,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    for invalid_artifact in [
+        {
+            let mut value = artifact.clone();
+            value.knowledge_cutoff = "2026-07-31T23:59:59Z".into();
+            value
+        },
+        {
+            let mut value = artifact.clone();
+            value.inference_status = "topic_importance".into();
+            value
+        },
+    ] {
+        assert_eq!(
+            execute_topic_context_posterior_run(
+                &request,
+                &accepted(&request),
+                &manifest(&artifact),
+                &invalid_artifact,
+                "2026-08-02T00:00:00Z",
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+    }
+}
+
+#[test]
+fn execution_rejects_unbound_artifact_and_availability_manifests() {
+    let request = request();
+    let artifact = artifact();
+
+    let mut wrong_artifact_digest = manifest(&artifact);
+    wrong_artifact_digest.artifact_sha256 = "1".repeat(64);
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &wrong_artifact_digest,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut incomplete_availability = manifest(&artifact);
+    incomplete_availability.document_available_at.pop_first();
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &incomplete_availability,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut malformed_availability = manifest(&artifact);
+    *malformed_availability
+        .document_available_at
+        .first_entry()
+        .expect("document")
+        .get_mut() = "not-a-time".into();
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &malformed_availability,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut malformed_manifest_digest = manifest(&artifact);
+    malformed_manifest_digest.artifact_sha256 = "not-a-digest".into();
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &malformed_manifest_digest,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut malformed_source_digest = manifest(&artifact);
+    malformed_source_digest.source_snapshot_sha256 = "not-a-digest".into();
+    let mut matching_malformed_source = artifact.clone();
+    matching_malformed_source.source_snapshot_sha256 = "not-a-digest".into();
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &malformed_source_digest,
+            &matching_malformed_source,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut substituted_availability = manifest(&artifact);
+    substituted_availability.document_available_at.pop_first();
+    substituted_availability.document_available_at.insert(
+        "018f3f7a-7b7c-7d00-8000-000000000099".into(),
+        "2026-07-20T00:00:00Z".into(),
+    );
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &substituted_availability,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn execution_rejects_malformed_manifest_and_completion_times() {
+    let request = request();
+    let artifact = artifact();
+
+    let mut malformed_cutoff = manifest(&artifact);
+    malformed_cutoff.knowledge_cutoff = "not-a-time".into();
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &malformed_cutoff,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    assert!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &manifest(&artifact),
+            &artifact,
+            "not-a-time",
+        )
+        .is_err()
+    );
 }

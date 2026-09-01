@@ -38,7 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
-- **Posterior topic-context analysis-run profile**: cutoff-safe `topic_context_posterior_v1` binds `TopicContextPosteriorArtifact` and refuses importance, collapsed draws, and invented birth/split/merge (`analysis_engine`). Not a Bayesian sampler and not implemented-main.
+- **Posterior topic-context analysis-run profile**: cutoff-safe `topic_context_posterior_v1` binds `TopicContextPosteriorArtifact` to an authoritative source/artifact digest manifest, rejects missing or post-cutoff document availability and unapproved producer contracts, derives the validated coordinate count, and refuses importance, collapsed draws, and invented birth/split/merge (`analysis_engine`). Not a Bayesian sampler and not implemented-main.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 

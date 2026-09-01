@@ -51,9 +51,10 @@ pub use lineage_criterion::{
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
     TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_MODEL_CONTRACT_VERSION,
-    TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
-    TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
-    TopicContextPosteriorExecution, TopicDocumentRelation, TopicLineageEvent,
+    TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE, TOPIC_CONTEXT_POSTERIOR_PRODUCER_CONTRACT_VERSION,
+    TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION, TopicActivityInterval, TopicContextMembership,
+    TopicContextPosteriorArtifact, TopicContextPosteriorExecution,
+    TopicContextPosteriorSnapshotManifest, TopicDocumentRelation, TopicLineageEvent,
     TopicPostPlausibleValue, execute_topic_context_posterior_run,
 };
 /// Topic-lineage artifact and execution contracts from this engine.

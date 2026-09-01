@@ -29,13 +29,17 @@ Add the `topic_context_posterior_v1` analysis-run output profile to
 `analysis_engine`. The executor:
 
 - consumes an already-constructed `TopicContextPosteriorArtifact`;
-- requires the request snapshot, knowledge cutoff, and accepted run
-  identity to match the offered artifact;
+- requires an authoritative snapshot manifest to bind the request and artifact
+  snapshot identity, source digest, cutoff, exact artifact digest, and every
+  represented document's availability time;
+- rejects missing, extra, malformed, or post-cutoff document availability and
+  artifacts not emitted under the approved `trsl-tm-v1` producer contract;
 - invokes the existing producer `sha256`/validate path without
   reimplementing TRSL-TM fitting;
 - emits a digest-bound terminal result under
   `tepp.topic_context_posterior.v1` with inference status
-  `posterior_topic_coordinates_not_importance`;
+  `posterior_topic_coordinates_not_importance` and counts the coordinates
+  actually present rather than a fixed statistic count;
 - refuses reuse of `lineage_criterion_v1`, `case_deletion_refit_v1`,
   `composed_fitted_lineage_v1`, `fitted_candidate_k_v1`,
   `trsl_topic_lineage_v1`, and `method_effects_v1` as this profile;
@@ -61,15 +65,15 @@ This is posterior topic coordinates, not importance and not a sampler.
 Operators can request cutoff-safe posterior topic-context validation as a
 digest-bound terminal result. The artifact does not claim topic
 importance, Bayesian sampling, GPU parity, or invented birth/split/merge.
-Snapshot/profile/cutoff mismatch and producer-contract refusal fail
-closed.
+Snapshot/profile/cutoff/digest mismatch, incomplete cutoff eligibility, and
+producer-contract refusal fail closed.
 
 ## Verification
 
 The PR includes Rust integration tests for successful digest-bound
 coordinates, incomplete draw refusal, run-identity mismatch,
-snapshot/profile/cutoff mismatch including reuse of live sibling
-profiles. Run:
+snapshot/profile/cutoff/source/artifact-digest mismatch, future evidence,
+producer-contract mismatch, and reuse of live sibling profiles. Run:
 
 ```text
 cargo fmt --all -- --check
