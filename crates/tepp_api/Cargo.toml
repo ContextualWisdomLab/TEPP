@@ -29,5 +29,11 @@ path = "src/bin/tepp_loopback.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "tepp-export-get"
+path = "src/bin/tepp_export_get.rs"
+test = false
+bench = false
+
 [lints]
 workspace = true

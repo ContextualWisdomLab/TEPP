@@ -18,7 +18,7 @@ pub const NARUON_TEPP_INFERENCE_METHOD: &str = "tepp_topic_measurement";
 /// One fail-closed HTTP exchange naruon may send to a TEPP origin.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NaruonHttpExchange {
-    /// HTTP method (`POST` for both create and export-authorize).
+    /// HTTP method (`POST` for create and export-authorize; `GET` for export retrieval).
     pub method: &'static str,
     /// Absolute `https` URL on the versioned TEPP path.
     pub target_url: String,
