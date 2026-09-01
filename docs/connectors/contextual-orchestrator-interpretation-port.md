@@ -18,7 +18,7 @@ LLM/provider settings are execution policy only. Deterministic scientific gates 
 `POST /v1/interpretation-runs` plus `GET /v1/interpretation-runs`. Accepted
 output is always hypothetical and never scientific authority. Collection GET
 returns metric-free identities only. GET-by-id returns one of those identities
-without POST replay. Cancel drops one in-memory identity. Non-loopback binds, table-access hosts, and
+without POST replay. Cancel drops one in-memory identity. `tepp-interpretation-run-cancel cancel` mints that POST onto spawned loopback TCP. Non-loopback binds, table-access hosts, and
 review/Copilot/GitHub credential headers fail closed. The listener does not
 call a model provider.
 

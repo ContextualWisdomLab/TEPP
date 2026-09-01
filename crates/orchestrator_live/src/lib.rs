@@ -9,6 +9,7 @@
 //! GET-by-id returns one of those identities without POST replay.
 //! `POST /v1/interpretation-runs/{idempotency_key}/cancel` removes one
 //! accepted identity from the in-memory registry.
+//! `tepp-interpretation-run-cancel` mints that POST onto spawned loopback TCP.
 //! Table-access hosts, review/Copilot/GitHub credentials, and
 //! `COPILOT_GITHUB_TOKEN` fail closed. This crate does not implement TLS
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
@@ -18,6 +19,7 @@
 
 mod error;
 mod http;
+mod interpretation_run_cancel_cli;
 mod interpretation_run_cancel_http;
 mod interpretation_run_cli;
 mod interpretation_run_collection_http;
@@ -34,6 +36,22 @@ pub use http::OrchestratorLiveResponse;
 pub use http::LIVE_HEADER_BYTE_LIMIT;
 /// Maximum live HTTP header count.
 pub use http::LIVE_HEADER_COUNT_LIMIT;
+/// Compose one HTTP/1.1 cancel POST from the typed consumer exchange.
+pub use interpretation_run_cancel_cli::compose_interpretation_run_cancel_cli_http;
+/// Dispatch one cancel CLI invocation against an in-process listener.
+pub use interpretation_run_cancel_cli::dispatch_interpretation_run_cancel_cli;
+/// Execute one cancel CLI invocation over loopback TCP.
+pub use interpretation_run_cancel_cli::execute_interpretation_run_cancel_cli;
+/// Render a typed cancel POST exchange as HTTP/1.1 for a loopback listener.
+pub use interpretation_run_cancel_cli::loopback_http1_from_interpretation_run_cancel_exchange;
+/// Read stdin leftover bytes; cancel POST admits empty.
+pub use interpretation_run_cancel_cli::read_interpretation_run_cancel_cli_stdin;
+/// Filter CLI stdout so cancel never prints scientific acceptance.
+pub use interpretation_run_cancel_cli::render_interpretation_run_cancel_cli_stdout;
+/// One operator CLI invocation against a loopback cancel listener.
+pub use interpretation_run_cancel_cli::InterpretationRunCancelCliInvocation;
+/// Supported operator verbs for the loopback interpretation-run cancel CLI.
+pub use interpretation_run_cancel_cli::InterpretationRunCancelCliVerb;
 /// Build a credential-free contextual-orchestrator cancel exchange.
 pub use interpretation_run_cancel_http::contextual_orchestrator_interpretation_run_cancel_exchange;
 /// Extract the opaque idempotency key from a cancel path.
