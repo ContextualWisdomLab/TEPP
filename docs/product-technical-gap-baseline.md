@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-01T16:43:00Z  
+**Snapshot:** 2026-09-01T17:14:00Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`  
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
@@ -15,9 +15,9 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | Signal | Current evidence | Delivery implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
-| Open pull requests | **134** | WIP remains release-blocking, though verified consolidation reduced the observed peak of 149. |
-| Draft pull requests | **133** | Non-landable work is now explicitly parked while it is consolidated, repaired or supplied with missing evidence. |
-| Non-draft pull requests | **1** | #310 is the sole Ready PR and is not independently mergeable under the current DDD disposition. |
+| Open pull requests | **133** | WIP remains release-blocking, though verified consolidation reduced the observed peak of 149. |
+| Draft pull requests | **132** | Non-landable work is explicitly parked while it is consolidated, repaired or supplied with missing evidence. |
+| Non-draft pull requests | **1** | #310 is the sole Ready landing vehicle; it still requires fresh exact-head gates and qualifying review. |
 | Open issues | **14** | Includes #437 for repository-wide ADR identity normalization. |
 | GitHub releases | **0** | No open head is a released TEPP contract. |
 | Effective organization ruleset | `18156473` | One qualifying approval, resolved conversations, exact-head required workflows and an allowed merge method are required. |
@@ -26,17 +26,16 @@ Classic branch-protection status is not the sole policy source; organization rul
 
 ## Priority exact-head inventory
 
-This is a priority subset, not a row-for-row copy of the 134-PR queue. #435 omits its own SHA because embedding it in the same branch would make the value stale on commit.
+This is a priority subset, not a row-for-row copy of the 133-PR queue. #435 omits its own SHA because embedding it in the same branch would make the value stale on commit.
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
 | #466 | `0c5efc3c9075115d0670b8438342c72069043dcd` | true | export-retrieval ancestor | Analysis Run / naruon export idempotency GET+CLI landing vehicle. |
 | #464 | `1b3a477242336634be2c7867b29d39979e9a6dca` | true | temporal-context retrieval ancestor | Analysis Run / LineageWeave temporal-context stored-request GET+CLI landing vehicle. |
 | #462 | `c1b7d627167dd7636d2975cc41cec050a5e477ba` | true | main | Bounded source-name compatibility repair; v1 serialized key remains `id`. |
-| #441 | `23959d1199f84554f4a5090cea2b9e9d70b55dd8` | true | main | Longitudinal Modeling two-marginal lagged-correlation repair; source findings resolved, dependency-review support blocked externally. |
 | #420 | `0dc8b48f66b367a90847fcfebd2c6453ff275a1d` | true | main | Project-history query CLI; `fold_into_landing_vehicle`. |
 | #417 | `1e468f62ec47f3476a7b4d18ed2980451dc425cf` | true | main | Analysis Run / naruon export retrieval GET+CLI landing vehicle. |
-| #310 | `cc7fad4d0bdffe7b524636737581227663f930f4` | false | main | Sole Ready PR; temporal `discreteDRIFTstd` evidence must migrate from `psychometric_core` into Longitudinal Modeling before landing. |
+| #310 | `2d44b89ed4cd63181cdc738ff6222ede002a4f3f` | false | main | Longitudinal Modeling landing vehicle; strictly contains closed predecessor #441 and adds typed event-time admission, p.16 `discreteDRIFTstd`, overflow repair and governance amendments. |
 
 ## Domain ownership
 
@@ -75,9 +74,9 @@ Supported temporal estimators require realistic known-truth recovery: RMSE, bias
 
 ## Current repairs and blockers
 
-**#441 — Longitudinal Modeling.** The invalid one-sided covariance/earlier-variance ratio is retired. `longitudinal_core::recover_event_time_lagged_correlation` requires lagged covariance, both marginal variances and a positive event-time interval. Exact binary64 covariance-bound checking and scale-ordered division cover extreme finite inputs. All visible review threads are resolved; Semgrep is GREEN. The central Security Scan fails before dependency review because the exact dependency-graph compare endpoint returns HTTP 403 for this public repository even with `contents: read`; OSV and Trivy are separately GREEN. Treat this as `blocked_external` repository dependency-graph/security support, not as a TEPP vulnerability. Never weaken the fail-closed central workflow.
+**#310 — Longitudinal Modeling landing vehicle.** Strict ancestry proves closed predecessor #441 is contained by #310. The invalid one-sided covariance/earlier-variance ratio remains retired; public lagged correlation requires lagged covariance and both marginal variances. Public event-time operations now admit `EventTimeInterval`, preventing an arbitrary positive duration from silently crossing the event-time boundary. RED `c52c436c6b075e3982c8195b7862ea07063930b2` reproduces the finite extreme stable-rate case where `-2a` overflowed despite a representable p.16 `discreteDRIFTstd`; the repaired implementation avoids that intermediate overflow. ADR 0005 is clarified without a new numeric identity and PRD v0.4 has a longitudinal-time ownership amendment. All previously visible #310 review findings have been answered/resolved; exact-current-head hosted checks and independent review must regenerate.
 
-**#310 — wrong-owner temporal mapping.** Its scalar Driver/Oud/Voelkle p.16 `discreteDRIFTstd` mapping is event-interval composition but currently lives in `psychometric_core::event_time`. Preserve its scientific distinction from unstandardised `discreteDRIFT`, trait-plus-state association and DSEM/ctsem estimation, but move the temporal transform/refusals/tests into Longitudinal Modeling before landing. Reusable static psychometric/dependence arithmetic remains fast-mlsirm-owned.
+**Dependency-review support.** The central Security Scan has failed before dependency review because the exact dependency-graph compare endpoint returns HTTP 403 for this public repository with the workflow's read-only token; OSV, Trivy and Scorecard independently terminate GREEN. Treat this as `blocked_external` dependency-graph/security support or GitHub control-plane behavior, not as a TEPP vulnerability and not as permission to weaken the fail-closed central workflow. Retry only after the underlying support/configuration condition changes.
 
 **Analysis Run adapter/profile proliferation.** Export, interpretation, project-history and temporal-context HTTP/CLI mechanics are adapters inside one supporting context. Strict predecessor/child stacks may be folded only after exact ancestry is proven; diverged siblings require an actual source/test fold. One refusal/profile does not create architecture authority. Preserve unique routes, refusals, tests and review evidence before predecessor closure.
 
@@ -95,7 +94,7 @@ TEPP never copies fast-mlsirm numerical kernels or contextual-orchestrator provi
 
 | ID | Gap | Maturity | Closure evidence |
 | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 134 open PRs | `release-blocking` | coherent landing vehicles, unique evidence preservation, protected-main reduction |
+| GAP-001 | PR authority fragmented across 133 open PRs | `release-blocking` | coherent landing vehicles, unique evidence preservation, protected-main reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission | `partial` | immutable offsets/layout, language profiles, concept dictionary, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator | `partial` | Rust CPU f64 likelihood/uncertainty, relation/time/membership effects, true recovery, fitted candidate-K |
 | GAP-004 | durable end-to-end Analysis Run | `partial` | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation/promotion separation, Compose E2E |
