@@ -21,16 +21,14 @@ use crate::live_http::map_io_error;
 use crate::naruon_http::header_is_credential;
 use crate::wire::require_nonempty;
 use crate::{
-    AnalysisRunLiveService, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
+    AnalysisRunLiveService, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope,
     LINEAGEWEAVE_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT,
     NARUON_LIVE_IO_TIMEOUT, NaruonHttpExchange, NaruonLiveResponse,
-    PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN, ProjectHistoryProjection,
+    PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER, ProjectHistoryRetrievalReceipt,
     lineageweave_project_history_retrieval_exchange, project_history_retrieval_path_id,
     refuse_metrics_on_project_history_retrieval_payload,
 };
 
-const SCIENTIFIC_ACCEPTANCE_SCHEMA: &str = "tepp.scientific_acceptance.v1";
-const TEMPORAL_ASSOCIATION_ONLY: &str = "temporal_association_only";
 const MAXIMUM_HTTP_RESPONSE_BYTES: usize =
     NARUON_LIVE_HEADER_BYTE_LIMIT + 4 + DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
 
@@ -76,6 +74,8 @@ pub struct ProjectHistoryRetrievalCliInvocation {
     pub consumer: String,
     /// Opaque idempotency key that minted the stored projection.
     pub idempotency_key: String,
+    /// Tenant workspace that owns the stored projection.
+    pub tenant_workspace_id: String,
     /// JSON body. Retrieval GET requires empty.
     pub body: String,
 }
@@ -121,17 +121,13 @@ impl ProjectHistoryRetrievalCliInvocation {
         if self.consumer != LINEAGEWEAVE_CONSUMER_CODE {
             return Err(ApiError::InvalidWirePayload);
         }
-        require_nonempty(&self.idempotency_key)?;
-        if self.idempotency_key.contains('/') || self.idempotency_key.contains('\0') {
-            return Err(ApiError::InvalidWirePayload);
-        }
-        if self.idempotency_key.len() > PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN {
-            return Err(ApiError::LimitExceeded);
-        }
+        crate::project_history::validate_project_history_registry_identity(&self.idempotency_key)?;
+        crate::project_history::validate_project_history_registry_identity(
+            &self.tenant_workspace_id,
+        )?;
         if !self.body.is_empty() {
             return Err(ApiError::InvalidWirePayload);
         }
-        refuse_scientific_acceptance(&self.body)?;
         refuse_metrics_on_project_history_retrieval_payload(&self.body)?;
         Ok(())
     }
@@ -142,6 +138,7 @@ struct ParsedFlags {
     origin: Option<String>,
     consumer: Option<String>,
     idempotency_key: Option<String>,
+    tenant_workspace_id: Option<String>,
 }
 
 fn parse_flags(rest: &[String]) -> Result<ParsedFlags, ApiError> {
@@ -150,6 +147,7 @@ fn parse_flags(rest: &[String]) -> Result<ParsedFlags, ApiError> {
         origin: None,
         consumer: None,
         idempotency_key: None,
+        tenant_workspace_id: None,
     };
     let mut index = 0;
     while index < rest.len() {
@@ -166,6 +164,7 @@ fn parse_flags(rest: &[String]) -> Result<ParsedFlags, ApiError> {
             "origin" => &mut flags.origin,
             "consumer" => &mut flags.consumer,
             "idempotency-key" => &mut flags.idempotency_key,
+            "tenant-workspace-id" => &mut flags.tenant_workspace_id,
             _ => return Err(ApiError::InvalidWirePayload),
         };
         if slot.is_some() || index + 1 >= rest.len() {
@@ -192,6 +191,9 @@ fn assemble_invocation(
             .consumer
             .unwrap_or_else(|| LINEAGEWEAVE_CONSUMER_CODE.to_owned()),
         idempotency_key: flags.idempotency_key.ok_or(ApiError::InvalidWirePayload)?,
+        tenant_workspace_id: flags
+            .tenant_workspace_id
+            .ok_or(ApiError::InvalidWirePayload)?,
         body,
     };
     invocation.validate()?;
@@ -244,6 +246,7 @@ pub fn loopback_http1_from_project_history_retrieval_exchange(
     let mut has_content_type = false;
     let mut has_consumer = false;
     let mut has_contract = false;
+    let mut has_tenant = false;
     for (name, value) in &exchange.headers {
         if header_is_credential(name) {
             return Err(ApiError::AuthorizationDenied);
@@ -267,13 +270,18 @@ pub fn loopback_http1_from_project_history_retrieval_exchange(
                 has_contract = true;
                 value == "1"
             }
+            PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER => {
+                has_tenant = true;
+                crate::project_history::validate_project_history_registry_identity(value)?;
+                true
+            }
             _ => false,
         };
         if !valid {
             return Err(ApiError::InvalidWirePayload);
         }
     }
-    if !has_content_type || !has_consumer || !has_contract {
+    if !has_content_type || !has_consumer || !has_contract || !has_tenant {
         return Err(ApiError::InvalidWirePayload);
     }
     let mut request = String::new();
@@ -302,6 +310,7 @@ pub fn compose_project_history_retrieval_cli_http(
     invocation.validate()?;
     let exchange = lineageweave_project_history_retrieval_exchange(
         &invocation.origin,
+        &invocation.tenant_workspace_id,
         &invocation.idempotency_key,
     )?;
     loopback_http1_from_project_history_retrieval_exchange(&exchange, &invocation.host)
@@ -363,27 +372,32 @@ pub fn render_project_history_retrieval_cli_stdout(
     if response.body.is_empty() {
         return Err(ApiError::InvalidWirePayload);
     }
-    refuse_scientific_acceptance(&response.body)?;
     refuse_metrics_on_project_history_retrieval_payload(&response.body)?;
     if !(200..300).contains(&response.status_code) {
-        return Ok(response.body.clone());
+        let expected_code = match response.status_code {
+            400 => "invalid_wire_payload",
+            403 => "authorization_denied",
+            413 => "limit_exceeded",
+            422 => "unsupported_contract_version",
+            _ => return Err(ApiError::InvalidWirePayload),
+        };
+        let envelope: ErrorEnvelope =
+            serde_json::from_str(&response.body).map_err(|_| ApiError::InvalidWirePayload)?;
+        if envelope.error_code() != expected_code {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        return envelope.to_json();
     }
     if response.status_code != 200 {
         return Err(ApiError::InvalidWirePayload);
     }
-    let projection = ProjectHistoryProjection::from_json(&response.body)?;
-    if projection.inference_status != TEMPORAL_ASSOCIATION_ONLY {
+    let receipt = ProjectHistoryRetrievalReceipt::from_json(&response.body)?;
+    if receipt.tenant_workspace_id != invocation.tenant_workspace_id
+        || receipt.idempotency_key != invocation.idempotency_key
+    {
         return Err(ApiError::InvalidWirePayload);
     }
-    projection.to_json()
-}
-
-fn refuse_scientific_acceptance(body: &str) -> Result<(), ApiError> {
-    if body.contains(SCIENTIFIC_ACCEPTANCE_SCHEMA) {
-        Err(ApiError::InvalidWirePayload)
-    } else {
-        Ok(())
-    }
+    receipt.projection.to_json()
 }
 
 fn parse_http_response(bytes: &[u8]) -> Result<NaruonLiveResponse, ApiError> {
@@ -514,4 +528,168 @@ fn valid_http_field_name(name: &str) -> bool {
                         | b'~'
                 )
         })
+}
+
+#[cfg(test)]
+mod branch_coverage_tests {
+    use std::io::{self, Cursor, Read};
+
+    use super::{
+        ProjectHistoryRetrievalCliInvocation, ProjectHistoryRetrievalCliVerb,
+        loopback_http1_from_project_history_retrieval_exchange, parse_http_response,
+        read_project_history_retrieval_cli_stdin, valid_http_field_name,
+    };
+    use crate::{
+        ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, LINEAGEWEAVE_CONSUMER_CODE,
+        lineageweave_project_history_retrieval_exchange,
+    };
+
+    fn invocation() -> ProjectHistoryRetrievalCliInvocation {
+        ProjectHistoryRetrievalCliInvocation {
+            verb: ProjectHistoryRetrievalCliVerb::Get,
+            host: "127.0.0.1:18081".into(),
+            origin: "https://tepp.example.test".into(),
+            consumer: LINEAGEWEAVE_CONSUMER_CODE.into(),
+            idempotency_key: "idem-a".into(),
+            tenant_workspace_id: "tenant-a".into(),
+            body: String::new(),
+        }
+    }
+
+    #[test]
+    fn invocation_and_flag_error_arms_are_covered() {
+        let mut value = invocation();
+        value.origin = "http://tepp.example.test".into();
+        assert_eq!(value.validate(), Err(ApiError::InvalidWirePayload));
+        value = invocation();
+        value.consumer = "naruon".into();
+        assert_eq!(value.validate(), Err(ApiError::InvalidWirePayload));
+        value = invocation();
+        value.body = "{}".into();
+        assert_eq!(value.validate(), Err(ApiError::InvalidWirePayload));
+        value = invocation();
+        value.tenant_workspace_id = "tenant\nother".into();
+        assert_eq!(value.validate(), Err(ApiError::InvalidWirePayload));
+        value = invocation();
+        value.origin = "https://bad/path".into();
+        assert!(super::compose_project_history_retrieval_cli_http(&value).is_err());
+
+        for args in [
+            vec!["get", "host"],
+            vec!["get", "--host"],
+            vec!["get", "--host", "a", "--host", "b"],
+            vec!["get", "--host", ""],
+        ] {
+            assert!(ProjectHistoryRetrievalCliInvocation::from_args(args, "").is_err());
+        }
+    }
+
+    #[test]
+    fn exchange_header_and_target_error_arms_are_covered() {
+        let origin = "https://tepp.example.test";
+        let base = lineageweave_project_history_retrieval_exchange(origin, "tenant-a", "idem-a")
+            .expect("exchange");
+        let mut cases = Vec::new();
+        let mut value = base.clone();
+        value.body = "{}".into();
+        cases.push(value);
+        let mut value = base.clone();
+        value.target_url = "http://tepp.example.test/v1/project-histories/idem-a".into();
+        cases.push(value);
+        let mut value = base.clone();
+        value.target_url = "https://tepp.example.test".into();
+        cases.push(value);
+        for (name, header_value) in [("bad name", "x"), ("x-good", "bad\nvalue")] {
+            let mut value = base.clone();
+            value.headers.push((name.into(), header_value.into()));
+            cases.push(value);
+        }
+        let mut value = base.clone();
+        value
+            .headers
+            .push(("content-type".into(), "application/json".into()));
+        cases.push(value);
+        for index in 0..base.headers.len() {
+            let mut value = base.clone();
+            value.headers.remove(index);
+            cases.push(value);
+        }
+        for value in cases {
+            assert!(
+                loopback_http1_from_project_history_retrieval_exchange(&value, "127.0.0.1:18081",)
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn response_parser_and_reader_error_arms_are_covered() {
+        use std::fmt::Write as _;
+
+        let oversized_header = "x".repeat(crate::NARUON_LIVE_HEADER_BYTE_LIMIT + 1);
+        let mut many_headers = String::new();
+        for index in 0..=crate::NARUON_LIVE_HEADER_COUNT_LIMIT {
+            write!(many_headers, "x-{index}: b\r\n").expect("string write");
+        }
+        let cases = [
+            vec![0xff],
+            b"HTTP/1.1 200 OK".to_vec(),
+            format!("{oversized_header}\r\n\r\n").into_bytes(),
+            b"HTTP/1.0 200 OK\r\ncontent-length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 nope\r\ncontent-length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 999 Unknown\r\ncontent-length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 Bad\r\ncontent-length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\nbad\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\nbad name: x\r\ncontent-length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\nx-good: bad\x01value\r\ncontent-length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\nx-good: a\r\nx-good: b\r\ncontent-length: 0\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\ncontent-length: x\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\n\r\n".to_vec(),
+            b"HTTP/1.1 200 OK\r\ncontent-length: 1\r\n\r\n".to_vec(),
+            format!(
+                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n",
+                DEFAULT_PROJECT_HISTORY_BYTE_LIMIT + 1
+            )
+            .into_bytes(),
+            format!("HTTP/1.1 200 OK\r\n{many_headers}content-length: 0\r\n\r\n").into_bytes(),
+        ];
+        for bytes in cases {
+            assert!(parse_http_response(&bytes).is_err());
+        }
+        for (code, reason) in [
+            (202, "Accepted"),
+            (400, "Bad Request"),
+            (403, "Forbidden"),
+            (413, "Payload Too Large"),
+            (422, "Unprocessable Entity"),
+        ] {
+            let response = format!("HTTP/1.1 {code} {reason}\r\ncontent-length: 0\r\n\r\n");
+            assert_eq!(
+                parse_http_response(response.as_bytes())
+                    .expect("response")
+                    .status_code,
+                code
+            );
+        }
+        assert!(read_project_history_retrieval_cli_stdin(false, Cursor::new([0xff])).is_err());
+        assert!(
+            read_project_history_retrieval_cli_stdin(
+                false,
+                Cursor::new(vec![b'a'; DEFAULT_PROJECT_HISTORY_BYTE_LIMIT + 1]),
+            )
+            .is_err()
+        );
+        assert!(read_project_history_retrieval_cli_stdin(false, FailingReader).is_err());
+        assert!(!valid_http_field_name(""));
+        assert!(!valid_http_field_name("bad name"));
+    }
+
+    struct FailingReader;
+
+    impl Read for FailingReader {
+        fn read(&mut self, _buffer: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::other("redacted"))
+        }
+    }
 }

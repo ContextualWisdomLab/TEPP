@@ -40,6 +40,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Fixed
 
+- `tepp-project-history-get` now requires and forwards the tenant workspace, accepts the same bounded identities as POST/GET, validates identity-bound success receipts and status-matched redacted error envelopes, and prints redacted failures to stderr.
+
 - Project-history collection and GET-by-id now require the tenant workspace identity, use the consumer/tenant/idempotency registry boundary, and accept the POST contract's full 256-byte key range, preventing cross-tenant disclosure, duplicate-key pagination loss, and unretrievable accepted histories; structured schema validation no longer rejects harmless evidence-text mentions.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.

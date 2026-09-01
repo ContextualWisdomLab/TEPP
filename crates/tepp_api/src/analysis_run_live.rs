@@ -21,11 +21,12 @@ use crate::{
     ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_PATH,
     PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER, ProjectHistoryCollection,
     ProjectHistoryCollectionItem, ProjectHistoryProjection, ProjectHistoryRequest,
-    TEMPORAL_CONTEXT_PATH, TemporalContextRequest, build_temporal_context,
-    is_project_history_collection_path, page_project_history_collection_items,
-    parse_project_history_collection_page_cursor, parse_project_history_collection_page_limit,
-    project_history_projection, project_history_retrieval_path_id,
-    refuse_metrics_on_project_history_retrieval_payload, requests_are_idempotent_matches,
+    ProjectHistoryRetrievalReceipt, TEMPORAL_CONTEXT_PATH, TemporalContextRequest,
+    build_temporal_context, is_project_history_collection_path,
+    page_project_history_collection_items, parse_project_history_collection_page_cursor,
+    parse_project_history_collection_page_limit, project_history_projection,
+    project_history_retrieval_path_id, refuse_metrics_on_project_history_retrieval_payload,
+    requests_are_idempotent_matches,
 };
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
@@ -317,7 +318,12 @@ impl AnalysisRunLiveService {
             .accepted_project_histories
             .get(&replay_key)
             .ok_or(ApiError::InvalidWirePayload)?;
-        let response_body = projection.to_json()?;
+        let receipt = project_history_retrieval_receipt(
+            tenant_workspace_id,
+            idempotency_key,
+            projection.clone(),
+        )?;
+        let response_body = receipt.to_json()?;
         Ok(json_response(200, "OK", response_body))
     }
 
@@ -355,6 +361,14 @@ fn consumer_tenant_idempotency_key(
     idempotency_key: &str,
 ) -> String {
     format!("{consumer}\u{1f}{tenant_workspace_id}\u{1f}{idempotency_key}")
+}
+
+fn project_history_retrieval_receipt(
+    tenant_workspace_id: &str,
+    idempotency_key: String,
+    projection: ProjectHistoryProjection,
+) -> Result<ProjectHistoryRetrievalReceipt, ApiError> {
+    ProjectHistoryRetrievalReceipt::new(tenant_workspace_id, idempotency_key, projection)
 }
 
 fn status_for(error: ApiError) -> (u16, &'static str) {
@@ -398,7 +412,7 @@ mod tests {
     use super::{
         AnalysisRunLiveService, consumer_tenant_idempotency_key, declared_content_length,
         error_envelope_json, host_implies_table_access, map_io_error, parse_headers,
-        require_headers, split_header_line, status_for,
+        project_history_retrieval_receipt, require_headers, split_header_line, status_for,
     };
     use crate::live_http::{host_is_loopback, read_http_request, split_request};
     use crate::{
@@ -407,7 +421,8 @@ mod tests {
         NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
         NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, PROJECT_HISTORY_CONTRACT_VERSION,
         PROJECT_HISTORY_PATH, ProjectHistoryCollection, ProjectHistoryEvent,
-        ProjectHistoryProjection, ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH,
+        ProjectHistoryProjection, ProjectHistoryRequest, ProjectHistoryRetrievalReceipt,
+        TEMPORAL_CONTEXT_PATH,
     };
 
     fn sample_run() -> AnalysisRunRequest {
@@ -1165,6 +1180,21 @@ mod tests {
         let posted = service.handle_http_request(&project_history_post(&first));
         assert_eq!(posted.status_code, 200);
         let stored = ProjectHistoryProjection::from_json(&posted.body).expect("stored");
+        assert!(
+            project_history_retrieval_receipt("tenant\nother", "idem-a".into(), stored.clone(),)
+                .is_err()
+        );
+        let mut corrupted_service = AnalysisRunLiveService::new();
+        let mut corrupted_projection = stored.clone();
+        corrupted_projection.inference_status = "causal".into();
+        corrupted_service.accepted_project_histories.insert(
+            consumer_tenant_idempotency_key(LINEAGEWEAVE_CONSUMER_CODE, "history-tenant", "idem-a"),
+            (first.clone(), corrupted_projection),
+        );
+        let corrupted = corrupted_service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(corrupted.status_code, 400);
         let mut other_tenant = sample_project_history("idem-a", "project-b");
         other_tenant.tenant_workspace_id = "other-tenant".into();
         other_tenant.project_name = "Other project".into();
@@ -1179,9 +1209,14 @@ mod tests {
             "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
         ));
         assert_eq!(got.status_code, 200);
-        let retrieved = ProjectHistoryProjection::from_json(&got.body).expect("retrieved");
-        assert_eq!(retrieved, stored);
-        assert_eq!(retrieved.inference_status, "temporal_association_only");
+        let retrieved = ProjectHistoryRetrievalReceipt::from_json(&got.body).expect("retrieved");
+        assert_eq!(retrieved.tenant_workspace_id, "history-tenant");
+        assert_eq!(retrieved.idempotency_key, "idem-a");
+        assert_eq!(retrieved.projection, stored);
+        assert_eq!(
+            retrieved.projection.inference_status,
+            "temporal_association_only"
+        );
         assert!(!got.body.contains("rmse"));
         assert!(!got.body.contains("tepp.scientific_acceptance.v1"));
         assert!(!got.body.contains("causal_score"));
@@ -1189,9 +1224,10 @@ mod tests {
         let other = service.handle_http_request(&format!(
             "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: other-tenant\r\ncontent-length: 0\r\n\r\n"
         ));
-        let other_projection =
-            ProjectHistoryProjection::from_json(&other.body).expect("other tenant projection");
-        assert_eq!(other_projection.project_key, "project-b");
+        let other_receipt =
+            ProjectHistoryRetrievalReceipt::from_json(&other.body).expect("other tenant receipt");
+        assert_eq!(other_receipt.tenant_workspace_id, "other-tenant");
+        assert_eq!(other_receipt.projection.project_key, "project-b");
 
         let missing_tenant = service.handle_http_request(&format!(
             "GET {PROJECT_HISTORY_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"

@@ -5,9 +5,9 @@ use tepp_api::{
     NaruonHttpExchange, NaruonLiveResponse, NaruonLiveService, PROJECT_HISTORY_CONTRACT_VERSION,
     PROJECT_HISTORY_PATH, PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN, ProjectHistoryEvent,
     ProjectHistoryProjection, ProjectHistoryRequest, ProjectHistoryRetrievalCliInvocation,
-    ProjectHistoryRetrievalCliVerb, compose_project_history_retrieval_cli_http,
-    dispatch_project_history_retrieval_cli, execute_project_history_retrieval_cli,
-    lineageweave_project_history_retrieval_exchange,
+    ProjectHistoryRetrievalCliVerb, ProjectHistoryRetrievalReceipt,
+    compose_project_history_retrieval_cli_http, dispatch_project_history_retrieval_cli,
+    execute_project_history_retrieval_cli, lineageweave_project_history_retrieval_exchange,
     loopback_http1_from_project_history_retrieval_exchange,
     read_project_history_retrieval_cli_stdin, render_project_history_retrieval_cli_stdout,
 };
@@ -46,7 +46,7 @@ fn project_history_post(request: &ProjectHistoryRequest) -> String {
     )
 }
 
-fn get_args<'a>(host: &'a str, idempotency_key: &'a str, consumer: &'a str) -> [&'a str; 9] {
+fn get_args<'a>(host: &'a str, idempotency_key: &'a str, consumer: &'a str) -> [&'a str; 11] {
     [
         "get",
         "--host",
@@ -57,6 +57,8 @@ fn get_args<'a>(host: &'a str, idempotency_key: &'a str, consumer: &'a str) -> [
         consumer,
         "--idempotency-key",
         idempotency_key,
+        "--tenant-workspace-id",
+        "history-tenant",
     ]
 }
 
@@ -140,7 +142,7 @@ fn verbs_and_from_args_fail_closed() {
 }
 
 #[test]
-fn from_args_refuses_naruon_body_slash_size_and_pagination_flags() {
+fn from_args_accepts_slash_and_refuses_naruon_body_size_tenant_and_pagination() {
     assert_eq!(
         ProjectHistoryRetrievalCliInvocation::from_args(
             get_args("127.0.0.1:18081", "idem-a", NARUON_CONSUMER_CODE),
@@ -165,13 +167,12 @@ fn from_args_refuses_naruon_body_slash_size_and_pagination_flags() {
         .unwrap_err(),
         ApiError::InvalidWirePayload
     );
-    assert_eq!(
+    assert!(
         ProjectHistoryRetrievalCliInvocation::from_args(
             get_args("127.0.0.1:18081", "idem/slash", LINEAGEWEAVE_CONSUMER_CODE),
             "",
         )
-        .unwrap_err(),
-        ApiError::InvalidWirePayload
+        .is_ok()
     );
     assert_eq!(
         ProjectHistoryRetrievalCliInvocation::from_args(
@@ -203,6 +204,28 @@ fn from_args_refuses_naruon_body_slash_size_and_pagination_flags() {
         .unwrap_err(),
         ApiError::InvalidWirePayload
     );
+    assert_eq!(
+        ProjectHistoryRetrievalCliInvocation::from_args(
+            [
+                "get",
+                "--host",
+                "127.0.0.1:18081",
+                "--origin",
+                ORIGIN,
+                "--idempotency-key",
+                "idem-a",
+            ],
+            "",
+        )
+        .unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
+    let mut hostile_tenant = get_args("127.0.0.1:18081", "idem-a", LINEAGEWEAVE_CONSUMER_CODE);
+    hostile_tenant[10] = "tenant\nother";
+    assert_eq!(
+        ProjectHistoryRetrievalCliInvocation::from_args(hostile_tenant, "").unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
 }
 
 #[test]
@@ -215,6 +238,7 @@ fn compose_is_typed_https_get_without_credentials() {
     let http = compose_project_history_retrieval_cli_http(&invocation).expect("http");
     assert!(http.starts_with("GET /v1/project-histories/idem-a HTTP/1.1"));
     assert!(http.contains("tepp-consumer: lineageweave"));
+    assert!(http.contains("tepp-tenant-workspace-id: history-tenant"));
     assert!(http.contains("content-length: 0"));
     assert!(!http.to_ascii_lowercase().contains("authorization"));
     assert!(!http.contains("idempotency-key:"));
@@ -247,6 +271,35 @@ fn lineageweave_cli_retrieves_stored_projection_and_naruon_live_stays_post_only(
     assert!(!stdout.contains("rmse"));
     assert!(!stdout.contains(SCHEMA));
     assert!(!stdout.contains("causal_score"));
+
+    let mut mismatched = ProjectHistoryRetrievalReceipt::from_json(&got.body).expect("receipt");
+    mismatched.tenant_workspace_id = "other-tenant".into();
+    assert_eq!(
+        render_project_history_retrieval_cli_stdout(
+            &invocation,
+            &NaruonLiveResponse {
+                status_code: 200,
+                reason_phrase: "OK",
+                body: mismatched.to_json().expect("mismatched receipt"),
+            },
+        ),
+        Err(ApiError::InvalidWirePayload)
+    );
+    let mut mismatched = ProjectHistoryRetrievalReceipt::from_json(&got.body).expect("receipt");
+    mismatched.idempotency_key = "other-id".into();
+    for status_code in [200, 202] {
+        assert_eq!(
+            render_project_history_retrieval_cli_stdout(
+                &invocation,
+                &NaruonLiveResponse {
+                    status_code,
+                    reason_phrase: "OK",
+                    body: mismatched.to_json().expect("mismatched receipt"),
+                },
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+    }
 
     let missing = ProjectHistoryRetrievalCliInvocation::from_args(
         get_args("127.0.0.1:18081", "missing", LINEAGEWEAVE_CONSUMER_CODE),
@@ -308,12 +361,47 @@ fn render_refuses_metrics_schema_and_empty_success() {
         .unwrap_err(),
         ApiError::InvalidWirePayload
     );
+    for (status_code, error_code) in [(500, "invalid_wire_payload"), (400, "limit_exceeded")] {
+        assert_eq!(
+            render_project_history_retrieval_cli_stdout(
+                &invocation,
+                &NaruonLiveResponse {
+                    status_code,
+                    reason_phrase: "Error",
+                    body: format!(
+                        r#"{{"error_code":"{error_code}","message":"redacted","request_id":"req-1","retryable":false}}"#
+                    ),
+                },
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+    }
+    for (status_code, error_code) in [
+        (403, "authorization_denied"),
+        (413, "limit_exceeded"),
+        (422, "unsupported_contract_version"),
+    ] {
+        let rendered = render_project_history_retrieval_cli_stdout(
+            &invocation,
+            &NaruonLiveResponse {
+                status_code,
+                reason_phrase: "Error",
+                body: format!(
+                    r#"{{"error_code":"{error_code}","message":"redacted","request_id":"req-1","retryable":false}}"#
+                ),
+            },
+        )
+        .expect("status-matched envelope");
+        assert!(rendered.contains(error_code));
+    }
 }
 
 #[test]
 fn loopback_http1_refuses_non_get_collection_extra_and_credentials() {
     let host = "127.0.0.1:18081";
-    let exchange = lineageweave_project_history_retrieval_exchange(ORIGIN, "idem-a").expect("ex");
+    let exchange =
+        lineageweave_project_history_retrieval_exchange(ORIGIN, "history-tenant", "idem-a")
+            .expect("ex");
     let ok = loopback_http1_from_project_history_retrieval_exchange(&exchange, host).expect("ok");
     assert!(ok.starts_with("GET /v1/project-histories/idem-a HTTP/1.1"));
     let mut posted = exchange.clone();
@@ -384,4 +472,37 @@ fn execute_over_tcp_and_stdin_reader() {
     let piped =
         read_project_history_retrieval_cli_stdin(false, std::io::Cursor::new(b"")).expect("pipe");
     assert!(piped.is_empty());
+}
+
+#[test]
+fn binary_reports_redacted_success_and_failure_statuses() {
+    let mut service = AnalysisRunLiveService::bind_loopback().expect("bind");
+    let addr = service.local_addr().expect("addr").to_string();
+    let request = sample_request("idem-bin", "project-bin");
+    assert_eq!(
+        service
+            .handle_http_request(&project_history_post(&request))
+            .status_code,
+        200
+    );
+    let handle = std::thread::spawn(move || {
+        service.serve_one().expect("success request");
+        service.serve_one().expect("missing request");
+    });
+    let binary = env!("CARGO_BIN_EXE_tepp-project-history-get");
+    let run = |idempotency_key: &str| {
+        std::process::Command::new(binary)
+            .args(get_args(&addr, idempotency_key, LINEAGEWEAVE_CONSUMER_CODE))
+            .output()
+            .expect("binary")
+    };
+    let success = run("idem-bin");
+    assert!(success.status.success());
+    assert!(String::from_utf8_lossy(&success.stdout).contains("project-bin"));
+    assert!(success.stderr.is_empty());
+    let failure = run("missing");
+    assert!(!failure.status.success());
+    assert!(String::from_utf8_lossy(&failure.stderr).contains("invalid API wire payload"));
+    assert!(!String::from_utf8_lossy(&failure.stderr).contains("history-tenant"));
+    handle.join().expect("server");
 }

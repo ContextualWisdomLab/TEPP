@@ -14,7 +14,7 @@ ADR 0028 enumerates accepted project-history projections as metric-free identiti
 `tepp_api` publishes loopback-only `GET /v1/project-histories/{idempotency_key}` on `tepp-loopback`:
 
 - Consumer is `lineageweave` only. Empty body. The idempotency identity travels in the path and the authorized tenant travels in `tepp-tenant-workspace-id`.
-- The response is the stored cutoff-safe `ProjectHistoryProjection`. `inference_status` remains `temporal_association_only`.
+- The response is an identity-bound receipt carrying the authorized tenant, decoded idempotency key, and stored cutoff-safe `ProjectHistoryProjection`. `inference_status` remains `temporal_association_only`.
 - `tepp.scientific_acceptance.v1`, RMSE, bias, coverage, SE-gate, and `causal_score` never appear.
 - Collection GET (`GET /v1/project-histories` with no extra segment) is unchanged.
 - Missing or mismatched tenant identity, pagination headers, naruon, nonempty bodies, extra path segments, and unknown keys fail closed.

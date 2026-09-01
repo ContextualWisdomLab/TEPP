@@ -277,6 +277,8 @@ pub use project_history_retrieval_cli::render_project_history_retrieval_cli_stdo
 pub use project_history_retrieval_http::PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN;
 /// Header carrying the authorized tenant on project-history GET-by-id.
 pub use project_history_retrieval_http::PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER;
+/// Identity-bound project-history GET-by-id receipt.
+pub use project_history_retrieval_http::ProjectHistoryRetrievalReceipt;
 /// `LineageWeave` GET exchange for one stored project-history projection.
 pub use project_history_retrieval_http::lineageweave_project_history_retrieval_exchange;
 /// Extract the opaque idempotency key from a project-history retrieval path.

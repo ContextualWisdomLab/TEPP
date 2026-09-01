@@ -25,7 +25,8 @@ on this adapter; `NaruonLiveService` stays POST-only.
   spawned `tepp-loopback` TCP. `--origin` stays the published HTTPS origin;
   only `--host` is the loopback bind address.
 - Empty stdin is admitted. Consumer is `lineageweave` only.
-- `--idempotency-key` is the path identity. Pagination flags fail closed.
+- `--idempotency-key` is the path identity and required `--tenant-workspace-id` selects its authorized tenant registry. Pagination flags fail closed.
+- A successful GET returns an identity-bound receipt; the CLI compares both tenant and idempotency key before printing only the validated projection.
 - Stdout is the stored `ProjectHistoryProjection`. `inference_status` remains
   `temporal_association_only`. Evidence text and findings belong to the stored
   projection.
@@ -34,8 +35,9 @@ on this adapter; `NaruonLiveService` stays POST-only.
 - The CLI does not infer causality, mutate TEPP state, or return a completed
   psychometric result.
 - Non-loopback hosts, `localhost`, credential-shaped flags, unknown verbs,
-  nonempty stdin, unpublished consumers, naruon, non-`https` origins, decoded
-  `/` or NUL identities, and pagination headers fail closed.
+  nonempty stdin, unpublished consumers, naruon, non-`https` origins, control
+  identities, and pagination headers fail closed. Percent-encoded `/` keys
+  round-trip because the POST contract admits them.
 - Persistence, Compose recovery, and psychometric execution remain GAP-003B.
 
 ## Alternatives considered

@@ -12,14 +12,79 @@
 
 use crate::naruon_http::{NaruonHttpExchange, compose_https_target};
 use crate::project_history::validate_project_history_registry_identity;
-use crate::wire::require_nonempty;
-use crate::{ApiError, PROJECT_HISTORY_PATH};
+use crate::wire::{from_json, require_byte_limit, require_nonempty, to_json_with_limit};
+use crate::{
+    ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, PROJECT_HISTORY_PATH, ProjectHistoryProjection,
+};
+use serde::{Deserialize, Serialize};
 
 /// Maximum opaque idempotency-key length on the retrieval path.
 pub const PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN: usize = 256;
 
 /// Header carrying the authorized project-history tenant on GET-by-id.
 pub const PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER: &str = "tepp-tenant-workspace-id";
+
+/// Identity-bound receipt returned by project-history GET-by-id.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectHistoryRetrievalReceipt {
+    /// Tenant workspace authorized by the retrieval request.
+    pub tenant_workspace_id: String,
+    /// Idempotency key decoded from the retrieval path.
+    pub idempotency_key: String,
+    /// Stored cutoff-safe project-history projection.
+    pub projection: ProjectHistoryProjection,
+}
+
+impl ProjectHistoryRetrievalReceipt {
+    /// Construct and validate an identity-bound retrieval receipt.
+    ///
+    /// # Errors
+    ///
+    /// Returns a registry-identity or projection validation error.
+    pub fn new(
+        tenant_workspace_id: impl Into<String>,
+        idempotency_key: impl Into<String>,
+        projection: ProjectHistoryProjection,
+    ) -> Result<Self, ApiError> {
+        let receipt = Self {
+            tenant_workspace_id: tenant_workspace_id.into(),
+            idempotency_key: idempotency_key.into(),
+            projection,
+        };
+        receipt.validate()?;
+        Ok(receipt)
+    }
+
+    /// Parse and validate a bounded retrieval receipt.
+    ///
+    /// # Errors
+    ///
+    /// Returns a size, JSON, identity, or projection validation error.
+    pub fn from_json(payload: &str) -> Result<Self, ApiError> {
+        require_byte_limit(payload, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)?;
+        let receipt: Self = from_json(payload)?;
+        receipt.validate()?;
+        Ok(receipt)
+    }
+
+    /// Serialize a fully validated retrieval receipt.
+    ///
+    /// # Errors
+    ///
+    /// Returns an identity, projection, or size validation error.
+    pub fn to_json(&self) -> Result<String, ApiError> {
+        self.validate()?;
+        to_json_with_limit(self, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT)
+    }
+
+    fn validate(&self) -> Result<(), ApiError> {
+        validate_project_history_registry_identity(&self.tenant_workspace_id)?;
+        validate_project_history_registry_identity(&self.idempotency_key)?;
+        self.projection.to_json()?;
+        Ok(())
+    }
+}
 
 const FORBIDDEN_RETRIEVAL_KEYS: [&str; 12] = [
     "rmse",
