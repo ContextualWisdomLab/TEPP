@@ -1,11 +1,13 @@
 //! Operator loopback CLI for naruon export lookup stored-request GET.
 //!
-//! Operators run `tepp-export-lookup-request get` to mint
-//! `naruon_export_idempotency_lookup_stored_request_exchange` onto spawned
-//! `tepp-loopback` TCP. Stdout is the stored export-authorization request.
-//! Reserved `by-idempotency` as a key, slash, and NUL fail closed to match
-//! lookup stored-request GET. `tepp.scientific_acceptance.v1` never
-//! appears. `LineageWeave` is refused and `NaruonLiveService` stays POST-only.
+//! Operators run `tepp-export-lookup-request get` as quarantine-parity of
+//! ADR 0099. `naruon_export_idempotency_lookup_stored_request_exchange`
+//! returns [`ApiError::AuthorizationDenied`] after origin/key validation.
+//! Compose never mints HTTP onto `tepp-loopback`. Stdout never contains a
+//! stored export-authorization request, `tenant_workspace_id`, or
+//! `principal_id`. Reserved `by-idempotency` as a key, slash, and NUL fail
+//! closed. `tepp.scientific_acceptance.v1` never appears. `LineageWeave` is
+//! refused and `NaruonLiveService` stays POST-only.
 
 use std::collections::HashSet;
 use std::fmt::Write as _;
@@ -286,12 +288,18 @@ pub fn loopback_http1_from_export_idempotency_lookup_stored_request_exchange(
     Ok(request)
 }
 
-/// Compose one HTTP/1.1 lookup GET from the typed naruon exchange.
+/// Compose one HTTP/1.1 lookup stored-request GET from the typed exchange.
+///
+/// While ADR 0099 is in force the typed exchange returns
+/// [`ApiError::AuthorizationDenied`] after origin/key validation, so this
+/// function never emits a wire request and never discloses a stored create.
 ///
 /// # Errors
 ///
-/// Returns the same fail-closed errors as
-/// [`ExportIdempotencyLookupStoredRequestCliInvocation::validate`].
+/// Returns fail-closed validation errors from
+/// [`ExportIdempotencyLookupStoredRequestCliInvocation::validate`], then
+/// [`ApiError::AuthorizationDenied`] for an otherwise valid quarantined
+/// invocation.
 pub fn compose_export_idempotency_lookup_stored_request_cli_http(
     invocation: &ExportIdempotencyLookupStoredRequestCliInvocation,
 ) -> Result<String, ApiError> {
@@ -344,17 +352,17 @@ pub fn execute_export_idempotency_lookup_stored_request_cli(
     parse_http_response(&bytes)
 }
 
-/// Filter CLI stdout so lookup GET never prints scientific acceptance.
+/// Filter CLI stdout so the quarantined lookup never prints a stored create.
 ///
-/// RMSE, bias, coverage, SE-gate, tenant, principal, source-text, and
-/// causal-score keys fail closed. Success stdout is only the metric-free
-/// identity projection.
+/// Tenant, principal, RMSE, bias, coverage, SE-gate, source-text, and
+/// causal-score keys fail closed. A 200 stored-create body is unreachable
+/// while ADR 0099 remains in force; compose fails first.
 ///
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when a body carries metric keys,
-/// `tepp.scientific_acceptance.v1`, or a success body that is not an
-/// `ExportIdempotencyLookup`.
+/// `tepp.scientific_acceptance.v1`, tenant/principal fields, or a success
+/// body that is not a metric-free stored create.
 pub fn render_export_idempotency_lookup_stored_request_cli_stdout(
     invocation: &ExportIdempotencyLookupStoredRequestCliInvocation,
     response: &NaruonLiveResponse,

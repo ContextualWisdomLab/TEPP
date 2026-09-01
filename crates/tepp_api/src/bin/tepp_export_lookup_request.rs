@@ -1,4 +1,7 @@
-//! Operator CLI for loopback naruon export lookup stored-request GET.
+//! Operator CLI for quarantined naruon export lookup stored-request GET.
+//!
+//! Compose returns `authorization_denied` after origin/key validation (ADR
+//! 0099). This binary never prints a stored export-authorization request.
 
 use std::io::{self, IsTerminal};
 use std::process::ExitCode;
