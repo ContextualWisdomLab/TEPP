@@ -31,6 +31,8 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 
 Committed examples live under `examples/`. Schemas for analysis-run requests and corpus-split manifests live under `schemas/`.
 
+For the `JsonLdExport` v1 boundary, Rust source code uses the semantic field name `node_id`; Serde deliberately preserves the existing serialized key `id`. Consumers must treat the versioned wire contract—not an internal Rust field spelling—as the interoperability boundary. A future change from the v1 `id` term to another JSON-LD representation such as `@id` requires an explicit versioned contract decision rather than an implicit source rename.
+
 ## Purpose-bound disclosure
 
 When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServiceConsumer`. Free-text source bodies remain optional and purpose-gated; opaque analytical identifiers and membership/relation structure must not be blanket-masked when required for multilevel measurement (ADR 0009).
@@ -59,3 +61,5 @@ Klyne, G., & Newman, C. (2002). *Date and time on the Internet: Timestamps* (RFC
 ISO/IEC. (2019). *ISO/IEC 27701:2019 Security techniques — Extension to ISO/IEC 27001 and ISO/IEC 27002 for privacy information management — Requirements and guidelines*. International Organization for Standardization.
 
 National Institute of Standards and Technology. (2020). *NIST Privacy Framework: A tool for improving privacy through enterprise risk management* (Version 1.0). U.S. Department of Commerce. https://doi.org/10.6028/NIST.CSWP.01162020
+
+World Wide Web Consortium. (2020, July 16). *JSON-LD 1.1: A JSON-based serialization for linked data* (W3C Recommendation). https://www.w3.org/TR/json-ld11/
