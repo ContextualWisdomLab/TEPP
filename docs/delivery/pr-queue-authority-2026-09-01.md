@@ -6,14 +6,15 @@ This is a live-recovery record for delivery issue #175. GitHub state supersedes 
 
 - Protected default branch: `main`
 - Protected-main SHA observed: `1bc02f580cf48e1d39da239f0e818453437c31c3`
-- Open pull requests: **142**
+- Open pull requests: **149**
 - Draft pull requests: **100**
-- Non-draft pull requests: **42**
-- Open issues: **13**
+- Non-draft pull requests: **49**
+- Open issues: **14**
 - Effective required-workflow ruleset: `18156473`, `CWL Central required workflows`
-- `docs/product-technical-gap-baseline.md` was replaced on this recovery branch so it no longer presents the former zero-queue snapshot as current authority.
+- GitHub releases: **0**
+- `docs/product-technical-gap-baseline.md` is maintained on this recovery branch so it no longer presents a former zero-queue snapshot as current authority.
 
-The one-PR increase and one-draft increase from the initial 141/99 observation is this recovery PR itself. These counts are delivery evidence, not a completion claim. A queued, skipped, cancelled, predecessor-head, or stale check is not passing evidence.
+The queue has grown from the initial 141/99 observation to 149/100 while this recovery vehicle remains open. That is a delivery regression, not evidence of product progress. A queued, skipped, cancelled, predecessor-head, or stale check is not passing evidence.
 
 ## Queue authority classes
 
@@ -37,13 +38,23 @@ The active queue must be reduced in this order:
 2. **Evidence & Semantic Measurement vertical** — span-grounded semantic/concept input, method/source distinctions, immutable source offsets, concept dictionary versioning.
 3. **Topic Measurement vertical** — real Rust CPU `f64` shared-latent estimator, uncertainty, true-parameter recovery, candidate-K fitting, topic lineage.
 4. **Analysis Run / scientific evidence vertical** — durable lifecycle, estimator-bound validation evidence, persistence/recovery, terminal results, and operator retrieval. Scientific evidence production is separated from claim-promotion authority.
-5. **Longitudinal Psychometrics vertical** — coherent ESEM/DSEM/multilevel measurement boundary rather than scalar-equation PR proliferation.
+5. **Longitudinal Modeling vertical** — coherent ESEM/DSEM/multilevel measurement and event-time composition rather than scalar-equation PR proliferation.
 6. **Event Intelligence vertical** — TDT/CHRONOS composition and event-time evidence under Temporal Event Knowledge.
 7. **Commercial runtime vertical** — tenancy, durable jobs, observability, backup/restore, release provenance, support.
 
 New unrelated micro-PRs are release-excluded while this queue exceeds the active-queue target in issue #175.
 
 ## First classification findings
+
+### PR #441 — event-time lagged association repair
+
+Classification: `landing_vehicle_candidate` under Longitudinal Modeling; scientific root cause repaired on exact head `c1aeed3bc2ca5f801f3baa748a4a3dde9f948338`, but not merge-ready until exact-head workflows and fresh review complete.
+
+The predecessor head exposed `(trait + e^{aΔt} p + added) / (trait + p + added)` as `expected_autocorrelation`. Review showed that a one-sided covariance/earlier-variance ratio is not a correlation under nonstationary marginals and can exceed one. The repair removes that public claim and its `psychometric_core` changes from the final diff. The replacement belongs to `longitudinal_core` and standardizes a supplied lagged covariance only when both marginal variances are available:
+
+`Cov(Y_t,Y_t+Δ) / sqrt(Var(Y_t) * Var(Y_t+Δ))`.
+
+The invalid predecessor commit remains only as RED/scientific-failure lineage. Review threads tied to the removed implementation are resolved as outdated. Hosted exact-head Rust/documentation/security checks were queued at the latest observation, so this PR is not yet a merge authority.
 
 ### PR #356 — validation-run scientific evidence
 
@@ -53,19 +64,21 @@ Reason: it is direct from current protected main and binds cutoff-safe evidence 
 
 DDD correction: the run should produce **Validation Evidence**. A distinct **Claim Promotion Decision** aggregate, governed by ADR 0014 and a method-specific preregistered evidence contract, decides whether a scientific claim is promotable. No generic standard-error multiplier, maximum-k, or other rule-of-thumb threshold may substitute for a research- or model-derived acceptance design.
 
-Exact-head hosted evidence is also not green: the current Product workflow failed its coverage-diagnostic jobs. The branch remains non-draft in GitHub metadata because the connector's draft-conversion mutation is currently broken; that metadata must not be interpreted as merge readiness.
+Exact-head hosted evidence is also not green: the latest observed Product workflow failed its coverage-diagnostic jobs. The branch remains non-draft in GitHub metadata because the connector's draft-conversion mutation is currently broken; that metadata must not be interpreted as merge readiness.
 
 Until the scientific and exact-head failures are corrected, #356 and downstream wire/HTTP slices must not be treated as a shippable scientific-acceptance vertical.
 
 ### PRs #352 and #355 — same Driver/ctsem TIPREDEFFECT rewrite
 
-Classification: both `fold_into_landing_vehicle` candidates under Longitudinal Psychometrics; neither is selected as authority yet.
+Classification: both `fold_into_landing_vehicle` candidates under Longitudinal Modeling; neither is selected as authority yet.
 
 Both implement the scalar `-a * B` rewrite from the same current-main base. They differ in public naming, refusal guards, tests, doctoring, and documentation edits. Closing either solely because the title and core equation match would discard unique evidence. The consolidation vehicle must retain the stronger named-quantity refusal coverage and realistic published-example tests while avoiding unrelated architecture mega-row edits.
 
 ### Analysis-run transport slices
 
 PRs for one GET/POST/CLI/status/cancel/retry/export/project-history operation are not separate bounded contexts. Classify them under the Analysis Run application context and `tepp_api` adapter. Parent/child stacks remain documented until a current-main landing vehicle preserves their unique contract tests and consumer compatibility.
+
+PR #443 is a current example: it adds one export-collection GET on top of the existing export-retrieval stack. Its unique pagination/auth/refusal tests must be preserved, but the operation is a `fold_into_landing_vehicle` candidate rather than a new product boundary or architecture decision.
 
 ### Evidence/method refusal slices
 
@@ -86,4 +99,4 @@ Before merge:
 
 ## DDD delivery constraint
 
-Directory and crate moves are part of the owning product-vertical replay. Do not preserve a technical-layer or one-rule path as canonical if it obscures the domain responsibility. Conversely, do not rename all 58 crates in one sweeping PR while 142 remote heads are active. The target bounded contexts are fixed in `docs/architecture/domain-context-map.md`; migration proceeds through safe, reviewable landing vehicles with explicit anti-corruption adapters and replacement mappings.
+Directory and crate moves are part of the owning product-vertical replay. Do not preserve a technical-layer or one-rule path as canonical if it obscures the domain responsibility. Conversely, do not rename all crates in one sweeping PR while 149 remote heads are active. The target bounded contexts are fixed in `docs/architecture/domain-context-map.md`; migration proceeds through safe, reviewable landing vehicles with explicit anti-corruption adapters and replacement mappings.
