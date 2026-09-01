@@ -9,6 +9,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PRODUCT_TECHNICAL_GAP_BASELINE = "docs/product-technical-gap-baseline.md"
+DOMAIN_CONTEXT_MAP = "docs/architecture/domain-context-map.md"
+TEMPORAL_DEPENDENCE_COMPOSITION = "docs/architecture/temporal-dependence-composition.md"
+TEMPORAL_DEPENDENCE_RESEARCH = "docs/research/temporal-dependence-models.md"
 
 REQUIRED_FILES = (
     "DOCUMENTATION.md",
@@ -49,9 +52,12 @@ REQUIRED_FILES = (
     "docs/adr/0022-deterministic-analysis-run-execution.md",
     "docs/product/prd-v0.4-approved.md",
     PRODUCT_TECHNICAL_GAP_BASELINE,
+    DOMAIN_CONTEXT_MAP,
+    TEMPORAL_DEPENDENCE_COMPOSITION,
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
     "docs/superpowers/plans/2026-08-05-temporal-event-foundation.md",
     "docs/research/standards-and-literature.md",
+    TEMPORAL_DEPENDENCE_RESEARCH,
 )
 
 PLACEHOLDER_PATTERNS = (
@@ -159,6 +165,8 @@ CANONICAL_LINKS = (
     "docs/DOCUMENTATION_ASSESSMENT.md",
     "docs/TRD.md",
     "ARCHITECTURE.md",
+    DOMAIN_CONTEXT_MAP,
+    TEMPORAL_DEPENDENCE_COMPOSITION,
     "docs/API_CONTRACT.md",
     "docs/UML.md",
     "docs/ERD.md",
@@ -175,6 +183,7 @@ CANONICAL_LINKS = (
     "docs/roadmaps/2026-08-05-tepp-delivery-roadmap.md",
     "docs/superpowers/plans/2026-08-05-temporal-event-foundation.md",
     "docs/research/standards-and-literature.md",
+    TEMPORAL_DEPENDENCE_RESEARCH,
     "GOVERNANCE.md",
     "AGENTS.md",
     "CLAUDE.md",
