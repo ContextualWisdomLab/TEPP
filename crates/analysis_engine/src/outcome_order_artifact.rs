@@ -169,6 +169,7 @@ impl OutcomeOrderArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.edge_count < 3
+            || self.edge_count > MAX_EVIDENCE_UNITS as u64
             || self.input_to_count == 0
             || self.process_to_count == 0
             || self.outcome_of_count == 0
