@@ -102,7 +102,10 @@ QUEUED_CHECKS_ADVERSATIVE = re.compile(
     r"\b(?:but|however|yet|although|though)\b", re.IGNORECASE
 )
 QUEUED_CHECKS_SENTENCE_BREAK = re.compile(r"[.;!?\n]")
-ADR_TABLE_ROW = re.compile(r"^\|\s*\[(?P<number>\d{4})\]", re.MULTILINE)
+ADR_TABLE_ROW = re.compile(
+    r"^\|\s*\[(?P<number>\d{4})\]\((?P<target>[^)\s]+)\)\s*\|",
+    re.MULTILINE,
+)
 ADR_FILE_NAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
 ADR_DECISION_STATUS = re.compile(
     r"^\*\*Decision status:\*\*\s*(Accepted|Proposed|Superseded|Rejected)\b",
@@ -450,13 +453,12 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
 
 
 def validate_adr_graph() -> None:
-    """Require every numbered ADR to have one repository-wide identity."""
+    """Require every numbered ADR to have one repository-wide identity and target."""
 
     adr_root = ROOT / "docs" / "adr"
     adr_index = (adr_root / "README.md").read_text(encoding="utf-8")
-    indexed_number_list = [
-        match.group("number") for match in ADR_TABLE_ROW.finditer(adr_index)
-    ]
+    index_rows = list(ADR_TABLE_ROW.finditer(adr_index))
+    indexed_number_list = [match.group("number") for match in index_rows]
     duplicate_index_numbers = sorted(
         number
         for number in set(indexed_number_list)
@@ -466,8 +468,15 @@ def validate_adr_graph() -> None:
         raise AssertionError(
             f"duplicate ADR index identity: {duplicate_index_numbers}"
         )
-    indexed_numbers = set(indexed_number_list)
 
+    indexed_targets = [match.group("target") for match in index_rows]
+    duplicate_targets = sorted(
+        target for target in set(indexed_targets) if indexed_targets.count(target) > 1
+    )
+    if duplicate_targets:
+        raise AssertionError(f"duplicate ADR index target: {duplicate_targets}")
+
+    indexed_numbers = set(indexed_number_list)
     adr_paths_by_number: dict[str, list[Path]] = {}
     for path in sorted(adr_root.glob("[0-9][0-9][0-9][0-9]-*.md")):
         match = ADR_FILE_NAME.fullmatch(path.name)
@@ -491,6 +500,27 @@ def validate_adr_graph() -> None:
             f"index_only={sorted(indexed_numbers - file_numbers)}, "
             f"file_only={sorted(file_numbers - indexed_numbers)}"
         )
+
+    for row in index_rows:
+        number = row.group("number")
+        target = row.group("target")
+        target_name = Path(target).name
+        target_match = ADR_FILE_NAME.fullmatch(target_name)
+        if (
+            "/" in target
+            or "\\" in target
+            or target_match is None
+            or target_match.group("number") != number
+        ):
+            raise AssertionError(
+                f"ADR index target identity mismatch: {number} -> {target!r}"
+            )
+        canonical_target = adr_files[number].name
+        if target != canonical_target:
+            raise AssertionError(
+                f"ADR index target mismatch: {number} -> {target!r}; "
+                f"expected {canonical_target!r}"
+            )
 
     failures: list[str] = []
     for number, path in adr_files.items():
