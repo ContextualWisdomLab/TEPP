@@ -1,11 +1,11 @@
 # Product and Technical Gap Baseline
 
-**Status:** Active delivery recovery  
-**Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-01T10:49:02Z  
-**Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
-**Workspace version:** `0.2.0`  
-**Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
+**Status:** Active delivery recovery
+**Product:** Temporal Event Psychometrics Platform (TEPP)
+**Snapshot:** 2026-09-01T10:49:02Z
+**Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
+**Workspace version:** `0.2.0`
+**Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)
 **DDD authority:** [`docs/architecture/domain-context-map.md`](architecture/domain-context-map.md) and [`docs/architecture/temporal-dependence-composition.md`](architecture/temporal-dependence-composition.md)
 
 ## Purpose
@@ -69,8 +69,8 @@ Cargo crates are implementation units, not bounded contexts. Current product res
 
 ### Canonical owner boundaries
 
-- **fast-mlsirm** owns reusable static/generalized-mixed/dependence-aware psychometric model specification and numerical kernels, including LSIRM/MLSIRM/DLSJM.
-- **TEPP** owns temporal/event composition: six-clock semantics, cutoff safety, irregular time, time-varying covariates/random effects/memberships, longitudinal invariance/drift, state evolution, event ontology/graph, temporal alignment and temporal recovery.
+- **fast-mlsirm** owns reusable static/generalized-mixed/dependence-aware psychometric model specification and numerical kernels, including LSIRM/MLSIRM/DLSJM, under ADR 0011's cross-service boundary.
+- **TEPP** owns temporal/event composition: the six-clock contract, cutoff safety, irregular time, time-varying covariates/random effects/memberships, longitudinal invariance/drift, state evolution, event ontology/graph, temporal alignment and temporal recovery.
 - **contextual-orchestrator** owns every LLM provider call, routing/fallback, credential, verifier/adjudicator execution, and model-call provenance.
 - **LineageWeave or the consuming product** owns source/item-generation lineage; lineage is evidence, not numerical authority.
 
@@ -92,6 +92,8 @@ TEPP composes time over the **full upstream candidate identity**, not over hard-
 Every TEPP temporal candidate records the upstream contract version/digest, exact base formulation, generalized-mixed structure, dependence structure, clock roles, event/occasion semantics, state equation, temporal identification/alignment rules, time-varying membership/covariates, estimator owner, recovery contract, citations, and one status: `supported`, `research_candidate`, or `unsupported`.
 
 Auto-expansion is not auto-activation. Unknown or novel couplings remain `research_candidate`; incoherent couplings are `unsupported`. TEPP never silently simplifies a dependence-aware temporal request to a static or local-independent model.
+
+The canonical dependence-family research authority is [`docs/research/temporal-dependence-models.md`](research/temporal-dependence-models.md).
 
 ### LSIRM / MLSIRM
 
@@ -115,7 +117,7 @@ Multiple-membership weights are explicit, auditable and time-valid. They are obs
 | GAP-002 | multilingual span-grounded semantic/concept admission incomplete | `partial` | Evidence & Semantic Measurement | immutable offsets/layout, language profiles, concept dictionary, unknown review, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator incomplete | `partial` | #167 | Rust CPU `f64` likelihood/estimands/uncertainty, time/relation/membership effects, multi-seed recovery, real candidate-K fits |
 | GAP-004 | durable end-to-end Analysis Run incomplete | `partial` | #166 | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, complete validation evidence, separate claim promotion, Compose E2E |
-| GAP-005 | temporal psychometric composition fragmented and partly duplicated | `partial` | #169 + fast-mlsirm owner boundary | versioned upstream model/dependence contract, TEPP temporal ACL, invariance/alignment, irregular time, temporal recovery, duplicate static kernels removed after parity |
+| GAP-005 | temporal psychometric composition fragmented and partly duplicated | `partial` | #169 + ADR 0011 / fast-mlsirm owner boundary | released upstream model/dependence contract, TEPP temporal ACL, invariance/alignment, irregular time, temporal recovery, duplicate static kernels removed after parity |
 | GAP-006 | TDT/CHRONOS event workflow incomplete | `partial` | #170 | calibrated event evidence/detection/tracking/schema/interval consistency with recovery and durable artifacts |
 | GAP-007 | real accelerator/memory evidence incomplete | `accepted-target` | #171 | real hardware execution, CPU f64 parity, bounded memory/OOM/fallback evidence |
 | GAP-008 | posterior network/cluster buyer workflow incomplete | `partial` | #172 | known-truth network recovery, uncertainty/stability, repeated Leiden consensus, exact-value exports |
@@ -131,7 +133,7 @@ Multiple-membership weights are explicit, auditable and time-valid. They are obs
 2. Consolidate Evidence & Semantic Measurement.
 3. Complete the Rust CPU `f64` shared-latent topic estimator (#167).
 4. Complete durable end-to-end Analysis Run and evidence/promotion separation (#166).
-5. Compose temporal psychometrics through fast-mlsirm contracts (#169) and complete Event Intelligence (#170) instead of producing one-equation product slices.
+5. Compose temporal psychometrics through released fast-mlsirm contracts (#169) and complete Event Intelligence (#170) instead of producing one-equation product slices.
 6. Add real accelerator parity after CPU scientific authority is established (#171).
 7. Complete network/cluster, interpretation and buyer visual workflows (#172/#176/#173).
 8. Productionize tenancy, durability, observability, recovery, release and support (#174).
@@ -195,7 +197,8 @@ Do not run a repository-wide rename across more than one hundred live heads. The
 ## Scientific and data invariants
 
 - Production mathematical/statistical/psychometric/vector/matrix arithmetic is Rust-owned; deterministic CPU `f64` is the scientific numerical reference.
-- Event, valid, assertion, document, system, available and knowledge-cutoff semantics stay distinct; historical evidence requires availability at or before cutoff.
+- The six clock roles are event **or** valid time, assertion time, document time, system time, available time, and knowledge cutoff. Event instants and validity intervals represent the first role; they are not independent seventh and eighth clocks.
+- Historical evidence requires availability at or before cutoff.
 - Measurement occasion as a rater/method facet is distinct from substantive event time.
 - Process/transition edges are forward-only. Citation, support, summary, revision and retrospective report do not become transitions.
 - Cross-classification and weighted multiple membership are preserved rather than forced into one parent hierarchy.
@@ -203,7 +206,7 @@ Do not run a repository-wide rename across more than one hundred live heads. The
 - Residual person-item interaction may motivate LSIRM/MLSIRM; joint local-item plus local-person dependence may motivate DLSJM only when its relational formulation matches the question.
 - Exploratory factors/loadings and dependence geometry remain hypotheses until confirmatory/invariance/recovery evidence permits production use.
 - Every temporal dependence candidate generates model-appropriate known-truth recovery for states/trajectories, fixed/random effects, covariance, membership, factors/loadings, response-family-specific parameters, dependence geometry, dynamics and uncertainty.
-- Temporal recovery uses event-time/available-time separation, rolling-origin evaluation, irregular gaps, delayed/retrospective records, missing occasions, changing membership and language/source drift.
+- Temporal recovery uses event-or-valid-time/available-time separation, rolling-origin evaluation, irregular gaps, delayed/retrospective records, missing occasions, changing membership and language/source drift.
 - Monte Carlo uncertainty is reported; arbitrary pass percentages or rule-of-thumb thresholds are not scientific promotion criteria.
 - LLMs never replace estimation/validation and are called only through contextual-orchestrator.
 - Database authority is normalized, tenant/time/provenance aware, uses descriptive multiword `snake_case`, explicit idempotency/UPSERT and measured hot-partition evidence.
@@ -233,8 +236,4 @@ Before a landing vehicle merges:
 
 ## Research traceability for dependence ownership
 
-- Jin, I. H., & Jeon, M. (2019). A doubly latent space joint model for local item and person dependence in the analysis of item response data. *Psychometrika, 84*(1), 236–260. https://doi.org/10.1007/s11336-018-9630-0
-- Jeon, M., Jin, I. H., Schweinberger, M., & Baugh, S. (2021). Mapping unobserved item–respondent interactions: A latent space item response model with interaction map. *Psychometrika, 86*(2), 378–403. https://doi.org/10.1007/s11336-021-09762-5
-- Kang, I., & Jeon, M. (2025). Multidimensional latent space item response models: A note on the relativity of conditional dependence. *Psychometrika, 90*(2), 799–826. https://doi.org/10.1017/psy.2025.5
-
-The cited dependence families do not establish every novel base-family × generalized-mixed × dependence × temporal coupling. Novel compositions stay `research_candidate` until the exact combined model, identification, estimator and recovery are demonstrated.
+The canonical primary-research discussion is [`docs/research/temporal-dependence-models.md`](research/temporal-dependence-models.md). Novel base-family × generalized-mixed × dependence × temporal couplings stay `research_candidate` until the exact combined model, identification, estimator and recovery are demonstrated.
