@@ -118,7 +118,7 @@ fn verbs_and_from_args_fail_closed() {
 }
 
 #[test]
-fn from_args_refuses_lineageweave_slash_body_size_and_pagination() {
+fn from_args_refuses_lineageweave_body_size_and_pagination_but_keeps_opaque_keys() {
     assert_eq!(
         ExportIdempotencyLookupCliInvocation::from_args(
             lookup_args("127.0.0.1:18081", "idem-1", LINEAGEWEAVE_CONSUMER_CODE),
@@ -143,21 +143,19 @@ fn from_args_refuses_lineageweave_slash_body_size_and_pagination() {
         .unwrap_err(),
         ApiError::InvalidWirePayload
     );
-    assert_eq!(
+    assert!(
         ExportIdempotencyLookupCliInvocation::from_args(
             lookup_args("127.0.0.1:18081", "idem/slash", NARUON_CONSUMER_CODE),
             ""
         )
-        .unwrap_err(),
-        ApiError::InvalidWirePayload
+        .is_ok()
     );
-    assert_eq!(
+    assert!(
         ExportIdempotencyLookupCliInvocation::from_args(
             lookup_args("127.0.0.1:18081", "by-idempotency", NARUON_CONSUMER_CODE),
             ""
         )
-        .unwrap_err(),
-        ApiError::InvalidWirePayload
+        .is_ok()
     );
     assert_eq!(
         ExportIdempotencyLookupCliInvocation::from_args(
