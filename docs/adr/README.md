@@ -31,17 +31,17 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | Owns independent criterion-anchor contract; estimator execution remains separately evidence-gated. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Owns the topic-context producer DTO/schema; fast-mlsirm owns reusable case-deletion influence arithmetic. |
 | [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Owns native Metal execution/parity receipt boundary; Linux must not claim Metal execution. |
-| [0026](0026-lineage-pair-criterion-and-project-journey-posterior.md) | Independent lineage-pair criterion and posterior Project Journey | Proposed | active-PR | Renumbered from a colliding pre-normalization 0024 identity; preserves posterior temporal/relation evidence without total-order or causal claims. |
+| [0026](0026-lineage-pair-criterion-and-project-journey-posterior.md) | Independent lineage-pair criterion and posterior Project Journey | Proposed | active-PR | Proposed successor identity for the pre-normalization colliding 0024 decision; it is not architecture authority unless and until accepted. |
 
 ## Pre-normalization lineage
 
 The historical file [`archive/pre-normalization-0021-deterministic-analysis-run-execution.md`](archive/pre-normalization-0021-deterministic-analysis-run-execution.md) preserves the earlier branch-era ADR 0021 text byte-for-byte after that number was found to collide with the LineageWeave project-history decision. The canonical analysis-run execution decision is ADR 0022. Historical branch references to the colliding identity remain provenance, not current architecture authority.
 
-The former lineage-pair/Project-Journey ADR 0024 collision is represented canonically by ADR 0026; ADR 0024 remains the independent topic-importance anchor. No historical collision authorizes reuse of a retired number for a new decision.
+The former lineage-pair/Project-Journey ADR 0024 collision is represented by proposed ADR 0026; accepted ADR 0024 remains the Posterior topic-context producer contract. No historical collision authorizes reuse of a retired number for a new decision, and a proposed successor does not become architecture authority merely because implementation work exists.
 
 ## Decision ownership summary
 
-Use the narrowest owning ADR when decisions overlap:
+Use the narrowest owning **Accepted** ADR when decisions overlap. Proposed ADRs are recorded separately and are not architecture authority until accepted:
 
 - numerical implementation/reference backend: ADR 0001;
 - clock/time eligibility: ADR 0002;
@@ -65,9 +65,9 @@ Use the narrowest owning ADR when decisions overlap:
 - LineageWeave project-history boundary: ADR 0021;
 - deterministic analysis-run execution: ADR 0022;
 - Event Lineage criterion anchor: ADR 0023;
-- independent topic-importance anchor: ADR 0024;
+- Posterior topic-context producer contract: ADR 0024;
 - macOS-native Rust-owned MLX/Metal boundary: ADR 0025;
-- independent lineage-pair criterion and posterior Project Journey: ADR 0026.
+- proposed independent lineage-pair criterion and posterior Project Journey: ADR 0026 (`Proposed`; not current architecture authority).
 
 ## Change and supersession rule
 
