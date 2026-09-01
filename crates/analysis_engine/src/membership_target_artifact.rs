@@ -8,7 +8,10 @@ use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 
-use crate::{format_digest, require_receipt_identity, valid_identifier, AnalysisEngineError};
+use crate::{
+    format_digest, require_receipt_identity, valid_identifier, AnalysisEngineError,
+    MAX_EVIDENCE_UNITS,
+};
 
 /// Versioned schema for a completed membership-target artifact.
 pub const MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION: &str = "tepp.membership_target.v1";
@@ -152,6 +155,7 @@ impl MembershipTargetArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.document_count < 2
+            || self.document_count > MAX_EVIDENCE_UNITS as u64
             || typed_sum == Some(0)
             || persistence_sum == Some(0)
             || kind_sum != Some(self.document_count)
@@ -185,7 +189,8 @@ pub struct MembershipTargetExecution {
 /// # Errors
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, empty or
-/// single-class corpus, duplicate document identity, or invalid artifact error.
+/// single-class corpus, duplicate document identity, an oversized corpus, or
+/// an invalid artifact error.
 #[allow(clippy::too_many_lines)]
 pub fn execute_membership_target_run(
     request: &AnalysisRunRequest,
@@ -206,6 +211,9 @@ pub fn execute_membership_target_run(
         || request.output_profile != MEMBERSHIP_TARGET_OUTPUT_PROFILE
     {
         return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    if documents.len() > MAX_EVIDENCE_UNITS {
+        return Err(AnalysisEngineError::LimitExceeded);
     }
 
     let mut seen = std::collections::BTreeSet::new();
