@@ -6,15 +6,16 @@ This is a live-recovery record for delivery issue #175. GitHub state supersedes 
 
 - Protected default branch: `main`
 - Protected-main SHA observed: `1bc02f580cf48e1d39da239f0e818453437c31c3`
-- Open pull requests: **149**
-- Draft pull requests: **100**
-- Non-draft pull requests: **49**
+- Snapshot stamp: `2026-09-01T10:19:29Z`
+- Open pull requests: **136**
+- Draft pull requests: **91**
+- Non-draft pull requests: **45**
 - Open issues: **14**
 - Effective required-workflow ruleset: `18156473`, `CWL Central required workflows`
 - GitHub releases: **0**
 - `docs/product-technical-gap-baseline.md` is maintained on this recovery branch so it no longer presents a former zero-queue snapshot as current authority.
 
-The queue has grown from the initial 141/99 observation to 149/100 while this recovery vehicle remains open. That is a delivery regression, not evidence of product progress. A queued, skipped, cancelled, predecessor-head, or stale check is not passing evidence.
+The initial observation was 141/99. The queue later peaked at 149/100 while this recovery vehicle was open. The current 136/91/45 inventory is a net reduction after scientifically unsafe #356 closed without merge; it is not evidence that the queue is now a bounded landing set. A queued, skipped, cancelled, predecessor-head, or stale check is not passing evidence.
 
 ## Queue authority classes
 
@@ -48,25 +49,25 @@ New unrelated micro-PRs are release-excluded while this queue exceeds the active
 
 ### PR #441 — event-time lagged association repair
 
-Classification: `landing_vehicle_candidate` under Longitudinal Modeling; scientific root cause repaired on exact head `c1aeed3bc2ca5f801f3baa748a4a3dde9f948338`, but not merge-ready until exact-head workflows and fresh review complete.
+Classification: `landing_vehicle_candidate` under Longitudinal Modeling; scientific root cause repaired on exact head `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5`, but not merge-ready until exact-head workflows succeed and independent non-author APPROVE exists.
 
 The predecessor head exposed `(trait + e^{aΔt} p + added) / (trait + p + added)` as `expected_autocorrelation`. Review showed that a one-sided covariance/earlier-variance ratio is not a correlation under nonstationary marginals and can exceed one. The repair removes that public claim and its `psychometric_core` changes from the final diff. The replacement belongs to `longitudinal_core` and standardizes a supplied lagged covariance only when both marginal variances are available:
 
 `Cov(Y_t,Y_t+Δ) / sqrt(Var(Y_t) * Var(Y_t+Δ))`.
 
-The invalid predecessor commit remains only as RED/scientific-failure lineage. Review threads tied to the removed implementation are resolved as outdated. Hosted exact-head Rust/documentation/security checks were queued at the latest observation, so this PR is not yet a merge authority.
+The invalid predecessor commit remains only as RED/scientific-failure lineage. Review threads tied to the removed implementation are resolved as outdated. Canonical `ARCHITECTURE.md` and `CHANGELOG.md` now record the event-time lagged-correlation standardizer; the one-shot self-modifying capability-record workflow was removed. Hosted exact-head Rust/documentation/security checks were still queued at this snapshot, so this PR is not yet a merge authority.
 
 ### PR #356 — validation-run scientific evidence
 
-Classification: `landing_vehicle_candidate`, pending correction before it may become `landing_vehicle`.
+Classification: **closed without merge**. Useful cutoff/run-binding/metric evidence is preserved in branch and review history for fold into the Validation landing work tracked by #166. Do not reopen this exact vehicle.
 
-Reason: it is direct from current protected main and binds cutoff-safe evidence to a validation run, but current review found a scientific-authority defect. The current acceptance rule compares RMSE with a standard error derived from the same residual vector using a caller-selected preregistered multiplier. This can accept arbitrarily large recovery error for pathological residual shapes. The current observation also accepts caller-supplied truth/recovered vectors and an `authored_by_llm` boolean rather than an estimator-owned, digest-bound provenance artifact. Graph recovery, invariance, convergence, and active-backend CPU/GPU parity applicability are not complete in the claimed scientific-acceptance artifact.
+The closed head `df33bfa3e61ae4de3dbfae16df0deac12d2f4003` bound cutoff-safe evidence to a validation run, but review found a scientific-authority defect: the acceptance rule compared RMSE with a standard error derived from the same residual vector using a caller-selected preregistered multiplier. That gate can accept arbitrarily large recovery error for pathological residual shapes. The closed observation also accepted caller-supplied truth/recovered vectors and an `authored_by_llm` boolean rather than an estimator-owned, digest-bound provenance artifact.
 
-DDD correction: the run should produce **Validation Evidence**. A distinct **Claim Promotion Decision** aggregate, governed by ADR 0014 and a method-specific preregistered evidence contract, decides whether a scientific claim is promotable. No generic standard-error multiplier, maximum-k, or other rule-of-thumb threshold may substitute for a research- or model-derived acceptance design.
+DDD correction for the next Validation vehicle: the run should produce **Validation Evidence**. A distinct **Claim Promotion Decision** aggregate, governed by ADR 0014 and a method-specific preregistered evidence contract, decides whether a scientific claim is promotable. No generic standard-error multiplier, maximum-k, or other rule-of-thumb threshold may substitute for a research- or model-derived acceptance design.
 
-Exact-head hosted evidence is also not green: the latest observed Product workflow failed its coverage-diagnostic jobs. The branch remains non-draft in GitHub metadata because the connector's draft-conversion mutation is currently broken; that metadata must not be interpreted as merge readiness.
+### PR #444 — export-collection CLI
 
-Until the scientific and exact-head failures are corrected, #356 and downstream wire/HTTP slices must not be treated as a shippable scientific-acceptance vertical.
+Classification: `fold_into_landing_vehicle` under Analysis Run/export, stacked on #443. Preserve CLI parsing, fail-closed origin/credential/consumer refusals, and metric-free receipt tests. Opening this slice while this recovery vehicle remains open is evidence that the WIP circuit breaker is not yet enforced.
 
 ### PRs #352 and #355 — same Driver/ctsem TIPREDEFFECT rewrite
 
@@ -99,4 +100,4 @@ Before merge:
 
 ## DDD delivery constraint
 
-Directory and crate moves are part of the owning product-vertical replay. Do not preserve a technical-layer or one-rule path as canonical if it obscures the domain responsibility. Conversely, do not rename all crates in one sweeping PR while 149 remote heads are active. The target bounded contexts are fixed in `docs/architecture/domain-context-map.md`; migration proceeds through safe, reviewable landing vehicles with explicit anti-corruption adapters and replacement mappings.
+Directory and crate moves are part of the owning product-vertical replay. Do not preserve a technical-layer or one-rule path as canonical if it obscures the domain responsibility. Conversely, do not rename all crates in one sweeping PR while 136 remote heads are active. The target bounded contexts are fixed in `docs/architecture/domain-context-map.md`; migration proceeds through safe, reviewable landing vehicles with explicit anti-corruption adapters and replacement mappings.
