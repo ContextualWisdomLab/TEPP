@@ -1,34 +1,11 @@
-# Export idempotency-key lookup HTTP (doctoring)
+# Export idempotency-key lookup HTTP doctoring
 
-## Scope
+`GET /v1/exports/by-idempotency/{idempotency_key}` resolves a purpose-bound export authorization key to the metric-free server-assigned export identity on `AnalysisRunLiveService`. HTTP method/path/framing semantics follow RFC 9110 (Fielding, Nottingham, & Reschke, 2022); the product-specific authorization, privacy and scientific-authority rules are TEPP contracts.
 
-Operators who receive a 200 purpose-bound export authorization still cannot
-jump from the request idempotency key to that export. `GET /v1/exports/{export_id}`
-requires the server-assigned capability. `GET /v1/exports/by-idempotency/{key}`
-on `AnalysisRunLiveService` is the first executable lookup route. HTTP method,
-path, `Host`, and `Transfer-Encoding` semantics follow current HTTP semantics
-(Fielding, Nottingham, & Reschke, 2022). Fail-closed refusal of table-access
-URLs, review/Copilot/NIM/proxy credential headers, metric keys, LineageWeave
-on this naruon-owned adapter, ambiguous multi-tenant matches, and non-loopback
-binds is repository contract authority, not an RFC inference rule.
+The important compatibility invariant is that lookup does not narrow the idempotency-key domain already admitted by export authorization. Keys are opaque request identity. A key containing `/` is percent-encoded into one route segment, with segmentation performed before percent decoding. A key whose literal value is `by-idempotency` remains data at `/v1/exports/by-idempotency/by-idempotency`. Raw extra path segments, NUL and oversized values still fail closed. This avoids accepting an export and later making its receipt impossible to resolve.
 
-The live listener is loopback HTTP/1.1 with an installed read/write deadline.
-It is not a production TLS/`$PORT` service. Persistence remains GAP-003B.
-JSON-LD/GraphML envelopes, Figma views, and GAP-010 visual export workflows
-remain later work. `NaruonLiveService` stays POST-only.
+The returned `ExportIdempotencyLookup` contains only `export_id`, `decision_code` and the exact decoded `idempotency_key`. Tenant/workspace, principal, source-text and scientific metric/acceptance fields are refused recursively. Zero and ambiguous matches fail closed rather than becoming a tenant-count oracle. LineageWeave is outside this Naruon-owned adapter and `NaruonLiveService` stays POST-only.
 
-## Internal contract evidence
+The related stored-request-by-idempotency route is a different disclosure boundary. ADR 0099 quarantines that convenience path because the first version had no authenticated tenant/principal binding. Successful metric-free identity lookup is therefore not authorization to retrieve the original request.
 
-- ADR 0093 owns this lookup GET.
-- ADR 0054 owns retrieval GET-by-id.
-- ADR 0009 owns purpose-bound disclosure without blanket masking.
-- ADR 0011 owns the standalone/CWL MSA boundary.
-- `docs/API_CONTRACT.md` names `GET /v1/exports/by-idempotency/{idempotency_key}`
-  as the target lookup shape.
-
-## Non-goals
-
-GET-by-id (#411), retrieval CLI (#417), collection GET/CLI (#443/#444),
-stored-request GET/CLI (#457/#459), export-authorize CLI (#410), analysis-run
-lookup GET (#380), cancel lineages (closed), Leiden, Driver p.16 std-family
-restoration, Figma/export (GAP-010), and Compose persistence (GAP-003B).
+The listener remains loopback HTTP/1.1 with bounded framing and deadlines; it is not a production public TLS service. Persistence remains GAP-003B. Exact-head tests cover slash and route-prefix-looking keys through POST→lookup round trips as well as fail-closed privacy and framing cases.
