@@ -2,8 +2,8 @@
 
 use analysis_engine::{
     AnalysisEngineError, MAX_EVIDENCE_UNITS, OUTCOME_ORDER_ARTIFACT_SCHEMA_VERSION,
-    OUTCOME_ORDER_MODEL_CONTRACT_VERSION, OUTCOME_ORDER_OUTPUT_PROFILE, OutcomeOrderEdge,
-    execute_outcome_order_run,
+    OUTCOME_ORDER_MODEL_CONTRACT_VERSION, OUTCOME_ORDER_OUTPUT_PROFILE, OutcomeOrderArtifact,
+    OutcomeOrderEdge, execute_outcome_order_run,
 };
 use outcome_order::OutcomeKind;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -115,6 +115,33 @@ fn mixed_ipo_kinds_emit_digest_bound_refusals_without_recovery_metric() {
     assert_eq!(
         execution.terminal_result.result_schema_version.as_deref(),
         Some(OUTCOME_ORDER_ARTIFACT_SCHEMA_VERSION)
+    );
+}
+
+#[test]
+fn compact_oversized_artifact_counts_fail_closed() {
+    let edge_count = MAX_EVIDENCE_UNITS as u64 + 1;
+    let outcome_of_count = edge_count - 2;
+    let artifact = OutcomeOrderArtifact {
+        schema_version: OUTCOME_ORDER_ARTIFACT_SCHEMA_VERSION.into(),
+        run_id: "run-compact-oversize".into(),
+        snapshot_id: "snapshot-compact-oversize".into(),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        edge_count,
+        input_to_count: 1,
+        process_to_count: 1,
+        outcome_of_count,
+        refused_as_transition_count: outcome_of_count,
+        inference_status: "input_process_forward_outcome_of_is_not_transition".into(),
+    };
+    let raw_payload = serde_json::to_string(&artifact).expect("raw json");
+    assert_eq!(
+        artifact.to_json(),
+        Err(AnalysisEngineError::InvalidOutcomeOrderArtifact)
+    );
+    assert_eq!(
+        OutcomeOrderArtifact::from_json(&raw_payload),
+        Err(AnalysisEngineError::InvalidOutcomeOrderArtifact)
     );
 }
 
