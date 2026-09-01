@@ -69,9 +69,12 @@ fn export_idempotency_lookup_contract_refuses_table_access_and_metric_keys() {
         ),
         Err(ApiError::LimitExceeded)
     );
+    let reserved_looking =
+        naruon_export_idempotency_lookup_exchange("https://tepp.example.test", "by-idempotency")
+            .expect("route prefix remains opaque client-key data after the prefix segment");
     assert_eq!(
-        naruon_export_idempotency_lookup_exchange("https://tepp.example.test", "by-idempotency"),
-        Err(ApiError::InvalidWirePayload)
+        reserved_looking.target_url,
+        "https://tepp.example.test/v1/exports/by-idempotency/by-idempotency"
     );
     assert_eq!(
         refuse_metrics_on_export_idempotency_lookup_payload(r#"{"rmse":1.0}"#),
