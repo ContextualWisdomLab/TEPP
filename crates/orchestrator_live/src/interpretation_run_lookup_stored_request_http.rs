@@ -16,15 +16,24 @@
 //! (closed). Persistence remains GAP-003B. Naruon and `LineageWeave` are
 //! refused. `NaruonLiveService` stays POST-only.
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::OrchestratorLiveError;
 use crate::interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
 use crate::interpretation_run_lookup_http::{
     INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN, INTERPRETATION_RUN_LOOKUP_PREFIX,
 };
-use crate::request::{INTERPRETATION_RUN_PATH, host_implies_table_access, require_nonempty};
+use crate::request::{
+    DEFAULT_INTERPRETATION_BYTE_LIMIT, INTERPRETATION_RUN_PATH, InterpretationRunRequest,
+    from_json, host_implies_table_access, require_byte_limit, require_nonempty, to_json,
+};
 
 /// Extra-segment that names the stored create request.
 pub const INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_SEGMENT: &str = "request";
+
+/// Maximum JSON bytes for the run-bound stored-request response envelope.
+pub const INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_RESPONSE_BYTE_LIMIT: usize =
+    DEFAULT_INTERPRETATION_BYTE_LIMIT + INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN + 128;
 
 /// Typed GET exchange for stored-request lookup by server-assigned id.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -38,6 +47,79 @@ pub struct InterpretationRunLookupStoredRequestHttpExchange {
     pub headers: Vec<(String, String)>,
     /// GET body, always empty.
     pub body: String,
+}
+
+/// Run-bound response envelope for stored-request lookup by server-assigned id.
+///
+/// Carrying the requested run identity in the response prevents a valid stored
+/// request for a different run from being accepted as the result of this lookup.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct InterpretationRunLookupStoredRequestPayload {
+    interpretation_run_id: String,
+    request: InterpretationRunRequest,
+}
+
+impl InterpretationRunLookupStoredRequestPayload {
+    /// Bind one validated stored request to its server-assigned run identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed identity or request validation error.
+    pub fn new(
+        interpretation_run_id: impl Into<String>,
+        request: InterpretationRunRequest,
+    ) -> Result<Self, OrchestratorLiveError> {
+        let payload = Self {
+            interpretation_run_id: interpretation_run_id.into(),
+            request,
+        };
+        payload.validate()?;
+        Ok(payload)
+    }
+
+    /// Parse and validate a run-bound stored-request response.
+    ///
+    /// # Errors
+    ///
+    /// Returns a limit, wire, identity, or nested-request validation error.
+    pub fn from_json(payload: &str) -> Result<Self, OrchestratorLiveError> {
+        require_byte_limit(
+            payload,
+            INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_RESPONSE_BYTE_LIMIT,
+        )?;
+        let payload: Self = from_json(payload)?;
+        payload.validate()?;
+        Ok(payload)
+    }
+
+    /// Serialize the validated response envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation or serialization error.
+    pub fn to_json(&self) -> Result<String, OrchestratorLiveError> {
+        self.validate()?;
+        to_json(self)
+    }
+
+    /// Server-assigned run identity that owns the returned stored request.
+    #[must_use]
+    pub fn interpretation_run_id(&self) -> &str {
+        &self.interpretation_run_id
+    }
+
+    /// Stored create request bound to [`Self::interpretation_run_id`].
+    #[must_use]
+    pub const fn request(&self) -> &InterpretationRunRequest {
+        &self.request
+    }
+
+    fn validate(&self) -> Result<(), OrchestratorLiveError> {
+        validate_lookup_identity(&self.interpretation_run_id)?;
+        self.request.to_json()?;
+        Ok(())
+    }
 }
 
 /// Extract the opaque `interpretation_run_id` from
@@ -75,16 +157,7 @@ pub fn interpretation_run_lookup_stored_request_path_id(
         return Err(OrchestratorLiveError::InvalidWirePayload);
     }
     let interpretation_run_id = decode_path_segment(encoded_id)?;
-    require_nonempty(&interpretation_run_id)?;
-    if interpretation_run_id == INTERPRETATION_RUN_LOOKUP_PREFIX {
-        return Err(OrchestratorLiveError::InvalidWirePayload);
-    }
-    if interpretation_run_id.contains('/') || interpretation_run_id.contains('\0') {
-        return Err(OrchestratorLiveError::InvalidWirePayload);
-    }
-    if interpretation_run_id.len() > INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN {
-        return Err(OrchestratorLiveError::LimitExceeded);
-    }
+    validate_lookup_identity(&interpretation_run_id)?;
     Ok(interpretation_run_id)
 }
 
@@ -129,16 +202,7 @@ pub fn contextual_orchestrator_interpretation_run_lookup_stored_request_exchange
     if host_implies_table_access(rest) {
         return Err(OrchestratorLiveError::InvalidWirePayload);
     }
-    require_nonempty(interpretation_run_id)?;
-    if interpretation_run_id == INTERPRETATION_RUN_LOOKUP_PREFIX {
-        return Err(OrchestratorLiveError::InvalidWirePayload);
-    }
-    if interpretation_run_id.contains('/') || interpretation_run_id.contains('\0') {
-        return Err(OrchestratorLiveError::InvalidWirePayload);
-    }
-    if interpretation_run_id.len() > INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN {
-        return Err(OrchestratorLiveError::LimitExceeded);
-    }
+    validate_lookup_identity(interpretation_run_id)?;
     let encoded_id = encode_path_segment(interpretation_run_id);
     Ok(InterpretationRunLookupStoredRequestHttpExchange {
         method: "GET",
@@ -155,6 +219,20 @@ pub fn contextual_orchestrator_interpretation_run_lookup_stored_request_exchange
         ],
         body: String::new(),
     })
+}
+
+fn validate_lookup_identity(interpretation_run_id: &str) -> Result<(), OrchestratorLiveError> {
+    require_nonempty(interpretation_run_id)?;
+    if interpretation_run_id == INTERPRETATION_RUN_LOOKUP_PREFIX {
+        return Err(OrchestratorLiveError::InvalidWirePayload);
+    }
+    if interpretation_run_id.contains('/') || interpretation_run_id.contains('\0') {
+        return Err(OrchestratorLiveError::InvalidWirePayload);
+    }
+    if interpretation_run_id.len() > INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN {
+        return Err(OrchestratorLiveError::LimitExceeded);
+    }
+    Ok(())
 }
 
 fn encode_path_segment(value: &str) -> String {
@@ -217,6 +295,7 @@ fn from_hex(byte: u8) -> Result<u8, OrchestratorLiveError> {
 mod tests {
     use super::{
         INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_SEGMENT,
+        InterpretationRunLookupStoredRequestPayload,
         contextual_orchestrator_interpretation_run_lookup_stored_request_exchange,
         interpretation_run_lookup_stored_request_path_id,
         is_interpretation_run_lookup_stored_request_path,
@@ -227,6 +306,23 @@ mod tests {
         is_interpretation_run_lookup_path,
     };
     use crate::interpretation_run_stored_request_http::is_interpretation_run_stored_request_path;
+    use crate::mode::OrchestrationMode;
+    use crate::request::{INTERPRETATION_RUN_CONTRACT_VERSION, InterpretationRunRequest};
+
+    fn sample_request() -> InterpretationRunRequest {
+        InterpretationRunRequest::new(
+            INTERPRETATION_RUN_CONTRACT_VERSION,
+            "idem-a",
+            "tenant-a",
+            "snapshot-a",
+            "2026-09-01T00:00:00Z",
+            OrchestrationMode::Direct,
+            128,
+            vec!["span-a".into()],
+            false,
+        )
+        .expect("request")
+    }
 
     #[test]
     fn lookup_stored_request_exchange_is_metric_free_get_without_credentials() {
@@ -267,6 +363,17 @@ mod tests {
         );
         assert_eq!(INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_SEGMENT, "request");
         assert_eq!(INTERPRETATION_RUN_LOOKUP_PREFIX, "by-run-id");
+    }
+
+    #[test]
+    fn lookup_stored_request_payload_binds_run_to_request() {
+        let payload =
+            InterpretationRunLookupStoredRequestPayload::new("orch-run-1", sample_request())
+                .expect("payload");
+        let json = payload.to_json().expect("json");
+        let parsed = InterpretationRunLookupStoredRequestPayload::from_json(&json).expect("parse");
+        assert_eq!(parsed.interpretation_run_id(), "orch-run-1");
+        assert_eq!(parsed.request().idempotency_key(), "idem-a");
     }
 
     #[test]
