@@ -1,17 +1,13 @@
 //! Provider-owned export idempotency-key lookup GET contracts.
 //!
-//! GAP-003A unique slice: `GET /v1/exports/by-idempotency/{idempotency_key}`
-//! returns the metric-free identity of the unique naruon export that used that
-//! idempotency key on `AnalysisRunLiveService` / `tepp-loopback`. Retrieval GET
-//! requires an `export_id`. Collection GET is a different stack. Operators who
-//! hold a 200 authorization receipt or log key cannot jump to that export
-//! without scanning identities. `NaruonLiveService` stays POST-only.
-//! `LineageWeave` is refused on this naruon-owned adapter.
-//! `tepp.scientific_acceptance.v1` never appears. This module does not
-//! duplicate GET-by-id (#411), retrieval CLI (#417), collection GET/CLI
-//! (#443/#444), stored-request GET/CLI (#457/#459), export-authorize CLI
-//! (#410), analysis-run lookup GET (#380), or cancel lineages (closed).
-//! Persistence remains GAP-003B. GAP-010 Figma/export remains later work.
+//! GAP-003A: `GET /v1/exports/by-idempotency/{idempotency_key}` returns the
+//! metric-free identity of the unique naruon export that used that idempotency
+//! key on `AnalysisRunLiveService` / `tepp-loopback`. Retrieval GET requires an
+//! `export_id`. Idempotency keys are opaque accepted request data: values that
+//! contain `/` are encoded into one path segment and the literal value
+//! `by-idempotency` remains addressable after the route prefix.
+//! `NaruonLiveService` stays POST-only. `LineageWeave` is refused on this
+//! naruon-owned adapter. `tepp.scientific_acceptance.v1` never appears.
 
 use crate::export_http::{EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE, EXPORT_RETRIEVAL_ID_MAX_LEN};
 use crate::naruon_http::{NARUON_EXPORT_PATH, NaruonHttpExchange, compose_https_target};
@@ -27,7 +23,7 @@ pub const EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN: usize = EXPORT_RETRIEVAL_ID_MAX
 /// Supported export idempotency-lookup contract version.
 pub const EXPORT_IDEMPOTENCY_LOOKUP_CONTRACT_VERSION: u16 = 1;
 
-/// Reserved collection-relative prefix that names the lookup resource.
+/// Collection-relative prefix that names the lookup resource.
 pub const EXPORT_IDEMPOTENCY_LOOKUP_PREFIX: &str = "by-idempotency";
 
 const FORBIDDEN_EXPORT_LOOKUP_KEYS: [&str; 16] = [
@@ -142,9 +138,9 @@ impl ExportIdempotencyLookup {
         {
             return Err(ApiError::InvalidWirePayload);
         }
-        if self.export_id == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX
-            || self.idempotency_key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX
-        {
+        // The route prefix is reserved only in the server-assigned export-id
+        // position. Client idempotency keys are opaque data and may equal it.
+        if self.export_id == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX {
             return Err(ApiError::InvalidWirePayload);
         }
         if self.export_id.len() > EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN
@@ -195,15 +191,17 @@ fn contains_forbidden_export_lookup_key(value: &serde_json::Value) -> bool {
 /// `GET /v1/exports/by-idempotency/{key}`.
 ///
 /// The route is segmented before percent decoding, so an encoded `/` remains
-/// data inside one opaque key rather than becoming an extra path segment.
+/// data inside one opaque key rather than becoming an extra path segment. The
+/// key value may itself equal `by-idempotency`; after the route prefix that
+/// token is data, not another control segment.
 ///
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] for a collection path, GET-by-id,
 /// extra raw segments, a missing `by-idempotency` prefix, stored-request
-/// `/request` suffix, a reserved prefix used as the key, a NUL byte, or a
-/// hostile encoding, and [`ApiError::LimitExceeded`] when the decoded key
-/// exceeds [`EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`].
+/// `/request` suffix, a NUL byte, or hostile encoding, and
+/// [`ApiError::LimitExceeded`] when the decoded key exceeds
+/// [`EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`].
 pub(crate) fn export_idempotency_lookup_path_key(path: &str) -> Result<String, ApiError> {
     let remainder = path
         .strip_prefix(NARUON_EXPORT_PATH)
@@ -222,9 +220,6 @@ pub(crate) fn export_idempotency_lookup_path_key(path: &str) -> Result<String, A
     }
     let key = decode_path_segment(encoded)?;
     require_nonempty(&key)?;
-    if key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX {
-        return Err(ApiError::InvalidWirePayload);
-    }
     if key.len() > EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN {
         return Err(ApiError::LimitExceeded);
     }
@@ -241,15 +236,14 @@ pub(crate) fn export_idempotency_lookup_path_key(path: &str) -> Result<String, A
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin, empty
-/// key, NUL-containing key, or the reserved lookup prefix, and
-/// [`ApiError::LimitExceeded`] when the key exceeds
-/// [`EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`] bytes.
+/// key, or NUL-containing key, and [`ApiError::LimitExceeded`] when the key
+/// exceeds [`EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`] bytes.
 pub fn naruon_export_idempotency_lookup_exchange(
     origin: &str,
     idempotency_key: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
     require_nonempty(idempotency_key)?;
-    if idempotency_key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX || idempotency_key.contains('\0') {
+    if idempotency_key.contains('\0') {
         return Err(ApiError::InvalidWirePayload);
     }
     if idempotency_key.len() > EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN {
@@ -369,6 +363,14 @@ mod tests {
                 "export-1",
                 EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
                 "scope/key"
+            )
+            .is_ok()
+        );
+        assert!(
+            ExportIdempotencyLookup::new(
+                "export-1",
+                EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
+                EXPORT_IDEMPOTENCY_LOOKUP_PREFIX
             )
             .is_ok()
         );
@@ -535,8 +537,11 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            export_idempotency_lookup_path_key("/v1/exports/by-idempotency/by-idempotency"),
-            Err(ApiError::InvalidWirePayload)
+            export_idempotency_lookup_path_key(
+                "/v1/exports/by-idempotency/by-idempotency"
+            )
+            .expect("route prefix is opaque data after the route segment"),
+            "by-idempotency"
         );
         let oversized = format!(
             "/v1/exports/by-idempotency/{}",
