@@ -393,10 +393,14 @@ def _promotion_is_denied(text: str, claim: re.Match[str]) -> bool:
 def _priority_inventory_section(text: str) -> str:
     """Return only the canonical priority-inventory section from the gap register."""
 
-    heading_start = text.find(PRIORITY_INVENTORY_HEADING)
-    if heading_start < 0:
+    heading = re.search(
+        rf"^{re.escape(PRIORITY_INVENTORY_HEADING)}[ \t]*$",
+        text,
+        re.MULTILINE,
+    )
+    if heading is None:
         return ""
-    section_start = heading_start + len(PRIORITY_INVENTORY_HEADING)
+    section_start = heading.end()
     next_heading = LEVEL_TWO_HEADING.search(text, section_start)
     section_end = next_heading.start() if next_heading is not None else len(text)
     return text[section_start:section_end]
