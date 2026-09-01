@@ -12,6 +12,7 @@
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod outcome_order_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -45,6 +46,12 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Outcome-order artifact and execution contracts from this engine.
+pub use outcome_order_artifact::{
+    OUTCOME_ORDER_ARTIFACT_BYTE_LIMIT, OUTCOME_ORDER_ARTIFACT_SCHEMA_VERSION,
+    OUTCOME_ORDER_MODEL_CONTRACT_VERSION, OUTCOME_ORDER_OUTPUT_PROFILE, OutcomeOrderArtifact,
+    OutcomeOrderEdge, OutcomeOrderExecution, execute_outcome_order_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +255,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// An outcome-order artifact violated its bounded schema or count invariants.
+    InvalidOutcomeOrderArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +271,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidOutcomeOrderArtifact => "invalid outcome-order artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +690,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidOutcomeOrderArtifact,
+                "invalid outcome-order artifact",
             ),
         ];
         for (error, message) in messages {
