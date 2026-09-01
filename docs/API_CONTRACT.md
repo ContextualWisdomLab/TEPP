@@ -104,6 +104,10 @@ cutoff-safe `ProjectHistoryProjection` on `tepp-loopback`. Consumer is
 `tepp.scientific_acceptance.v1` and causal scores never appear. The retrieval
 does not infer causality.
 
+`tepp-project-history-get get` is the operator-visible loopback client of that
+GET-by-id. Empty stdin is admitted. Naruon is refused. Process exit 0 is not
+an ADR 0014 claim.
+
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
 terminal status contains exactly one request-bound
