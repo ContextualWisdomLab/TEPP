@@ -380,7 +380,7 @@ def _promotion_is_denied(text: str, claim: re.Match[str]) -> bool:
 
 
 def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
-    """Require a dated live gap register that does not promote queued Checks."""
+    """Require a dated live gap register with an honest priority PR inventory."""
 
     path = root / PRODUCT_TECHNICAL_GAP_BASELINE
     if not path.is_file():
@@ -403,15 +403,18 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     ):
         failures.append("gap baseline treats queued Checks as implemented-main")
     inventory = list(INVENTORY_ROW.finditer(text))
+    inventory_numbers = [match.group("number") for match in inventory]
     if not inventory:
         failures.append("gap baseline open-PR inventory has no exact-head rows")
+    elif len(inventory_numbers) != len(set(inventory_numbers)):
+        failures.append("gap baseline priority inventory contains duplicate PR rows")
     count_match = OPEN_PR_COUNT.search(text)
     if count_match is None:
         failures.append("gap baseline lacks an open pull-request count")
-    elif count_match.group("count") != str(len(inventory)):
+    elif int(count_match.group("count")) < len(inventory):
         failures.append(
             "gap baseline open-PR count "
-            f"{count_match.group('count')} does not match inventory "
+            f"{count_match.group('count')} is smaller than priority inventory "
             f"{len(inventory)}"
         )
     if failures:
