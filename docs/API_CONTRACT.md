@@ -70,6 +70,8 @@ POST   /v1/analysis-runs/{run_id}/cancel
 GET    /v1/model-artifacts/{artifact_id}
 GET    /v1/exports/{export_id}
 GET    /v1/project-histories
+GET    /v1/project-histories/{idempotency_key}
+GET    /v1/project-histories/{idempotency_key}/request
 ```
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.

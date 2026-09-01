@@ -30,6 +30,7 @@ mod orchestration;
 mod project_history;
 mod project_history_collection_http;
 mod project_history_retrieval_http;
+mod project_history_stored_request_http;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
@@ -266,6 +267,14 @@ pub use project_history_retrieval_http::lineageweave_project_history_retrieval_e
 pub use project_history_retrieval_http::project_history_retrieval_path_id;
 /// Refuse scientific-metric and causal-score keys on retrieval JSON.
 pub use project_history_retrieval_http::refuse_metrics_on_project_history_retrieval_payload;
+/// Whether a path is the project-history stored-request extra-segment.
+pub use project_history_stored_request_http::is_project_history_stored_request_path;
+/// `LineageWeave` GET exchange for one stored project-history create request.
+pub use project_history_stored_request_http::lineageweave_project_history_stored_request_exchange;
+/// Extract the opaque idempotency key from a stored-request GET path.
+pub use project_history_stored_request_http::project_history_stored_request_path_id;
+/// Refuse scientific-metric and causal-score keys on stored-request JSON.
+pub use project_history_stored_request_http::refuse_metrics_on_project_history_stored_request_payload;
 /// Maximum posterior Project Journey artifact size.
 pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
 /// Exact posterior Project Journey schema identity.

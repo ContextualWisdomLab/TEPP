@@ -25,7 +25,8 @@ use crate::{
     is_project_history_collection_path, page_project_history_collection_items,
     parse_project_history_collection_page_cursor, parse_project_history_collection_page_limit,
     project_history_projection, project_history_retrieval_path_id,
-    refuse_metrics_on_project_history_retrieval_payload, requests_are_idempotent_matches,
+    project_history_stored_request_path_id, refuse_metrics_on_project_history_retrieval_payload,
+    refuse_metrics_on_project_history_stored_request_payload, requests_are_idempotent_matches,
 };
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
@@ -152,6 +153,12 @@ impl AnalysisRunLiveService {
         if method == "GET" {
             if is_project_history_collection_path(path) {
                 return self.list_project_histories(&headers, body);
+            }
+            if matches!(
+                project_history_stored_request_path_id(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.get_project_history_stored_request(path, &headers, body);
             }
             if matches!(
                 project_history_retrieval_path_id(path),
@@ -318,6 +325,40 @@ impl AnalysisRunLiveService {
             .get(&replay_key)
             .ok_or(ApiError::InvalidWirePayload)?;
         let response_body = projection.to_json()?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
+    fn get_project_history_stored_request(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if !body.is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_project_history_stored_request_payload(body)?;
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != LINEAGEWEAVE_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if headers.contains_key("tepp-page-limit") || headers.contains_key("tepp-page-cursor") {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let tenant_workspace_id = header_value(headers, PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER)?;
+        crate::project_history::validate_project_history_registry_identity(tenant_workspace_id)?;
+        let idempotency_key = project_history_stored_request_path_id(path)?;
+        let replay_key =
+            consumer_tenant_idempotency_key(consumer, tenant_workspace_id, &idempotency_key);
+        let (stored_request, projection) = self
+            .accepted_project_histories
+            .get(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        if projection.inference_status != "temporal_association_only" {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let response_body = stored_request.to_json()?;
+        refuse_metrics_on_project_history_stored_request_payload(&response_body)?;
         Ok(json_response(200, "OK", response_body))
     }
 
@@ -1235,6 +1276,51 @@ mod tests {
         ));
         assert_eq!(collection.status_code, 200);
         assert!(!collection.body.contains("evidence_text"));
+    }
+
+    #[test]
+    fn project_history_stored_request_get_returns_create_request_and_fails_closed() {
+        let mut service = AnalysisRunLiveService::new();
+        let first = sample_project_history("idem-a", "project-a");
+        assert_eq!(
+            service
+                .handle_http_request(&project_history_post(&first))
+                .status_code,
+            200
+        );
+        let got = service.handle_http_request(&format!(
+            "GET {PROJECT_HISTORY_PATH}/idem-a/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        ));
+        assert_eq!(got.status_code, 200, "{}", got.body);
+        let stored = ProjectHistoryRequest::from_json(&got.body).expect("stored");
+        assert_eq!(stored, first);
+        assert!(!got.body.contains("rmse"));
+        assert!(!got.body.contains("tepp.scientific_acceptance.v1"));
+        assert!(!got.body.contains("causal_score"));
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {PROJECT_HISTORY_PATH}/idem-a/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {PROJECT_HISTORY_PATH}/idem-a/cancel HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&format!(
+                    "GET {PROJECT_HISTORY_PATH}/missing/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+                ))
+                .status_code,
+            400
+        );
     }
 
     struct ScriptedRead {
