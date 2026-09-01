@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-01T12:58:29Z  
+**Snapshot:** 2026-09-01T13:07:05Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`  
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
@@ -19,23 +19,24 @@ Passing or queued Checks on an open PR never promote that PR to implemented-main
 | Signal | Current evidence | Delivery implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
-| Open pull requests | **137** | Release-blocking WIP remains high despite falling from the observed peak of 149. |
+| Open pull requests | **138** | Release-blocking WIP remains high despite falling from the observed peak of 149. |
 | Draft pull requests | **89** | Draft status is workflow metadata, not scientific or domain classification. |
-| Non-draft pull requests | **48** | Ready metadata is not merge readiness without exact-head evidence. |
+| Non-draft pull requests | **49** | Ready metadata is not merge readiness without exact-head evidence. |
 | Open issues | **14** | Includes #437 for repository-wide ADR identity normalization. |
 | GitHub releases | **0** | No open PR head or local branch is a released TEPP product contract. |
 | Effective organization ruleset | `18156473` | Current ruleset, exact-head workflows, resolved conversations and qualifying review govern merge. |
 
 The classic branch-protection payload is not the sole policy source. Organization rulesets are the effective merge authority where applicable.
 
-The queue fell from the observed peak of 149 to 134, then rose to 135 when #454 appeared and to 137 with #455/#456. New one-operation Analysis Run slices therefore still count as WIP regression while queue recovery is active even though overall predecessor closure is reducing the queue.
+The queue fell from the observed peak of 149 to 134, then rose to 135 when #454 appeared, to 137 with #455/#456, and to 138 with #457. New one-operation Analysis Run slices therefore still count as WIP regression while queue recovery is active even though predecessor closure has reduced the peak queue.
 
 ## Current priority open pull-request evidence
 
-This table is an exact-head **priority subset**, not a row-for-row copy of the 137-PR queue. PR #435 itself is omitted because writing its own exact head into a commit on that branch would immediately make the embedded head stale.
+This table is an exact-head **priority subset**, not a row-for-row copy of the 138-PR queue. PR #435 itself is omitted because writing its own exact head into a commit on that branch would immediately make the embedded head stale.
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
+| #457 | `f259497ff2e45536352fa399504f56b736ad4f83` | false | #411 head | Analysis Run/naruon export stored-request GET; `fold_into_landing_vehicle` |
 | #456 | `ade6e27d46f477d8332bce13ccee080f0b55bfa9` | false | #455 head | Analysis Run/LineageWeave project-history stored-request CLI; `fold_into_landing_vehicle` |
 | #455 | `c7e02968f147157aedbe805a8ffac823bdb716bf` | false | #429 head | Analysis Run/LineageWeave project-history stored-request GET; `fold_into_landing_vehicle` |
 | #454 | `c911fbcd6e13046358cc7f3692775ed4b008dadd` | false | #453 head | Analysis Run/contextual-orchestrator stored-request CLI; `fold_into_landing_vehicle` |
@@ -128,6 +129,8 @@ A generic arithmetic standardizer is not itself a DSEM/ctsem estimator and must 
 
 **#441 — Longitudinal Modeling landing vehicle.** The invalid predecessor that divided lagged covariance by only the earlier marginal variance has been retired. `longitudinal_core::recover_event_time_lagged_correlation` now requires lagged covariance plus both occasion-specific marginal variances and a positive event-time lag. Exact binary64 covariance-bound checking avoids rounded-product acceptance/rejection errors and stable division order avoids avoidable overflow/underflow. All currently visible review threads are resolved. Exact-head Documentation Quality, Rust Foundation CI, Security Scan and SAST Semgrep remain queued, so queued checks never constitute implemented-main evidence.
 
+**#457 — Analysis Run export adapter fold candidate.** The extra-segment `GET /v1/exports/{export_id}/request` slice is stacked on #411 and its own PR description already classifies it `fold_into_landing_vehicle`. Preserve stored-request path parsing, LineageWeave/hostile-identity/credential refusals, metric-free response, focused tests and cancel-route refusal, then fold it with #411/#417/#443/#444/#410. ADR 0089 is implementation evidence pending #437 normalization, not branch-local architecture authority.
+
 **#455/#456 — Analysis Run project-history adapter fold candidates.** Their own PR descriptions classify them `fold_into_landing_vehicle` and prohibit independent merge while queue recovery is active. Preserve stored-request path/CLI parsing, hostile-input/origin/credential/consumer refusals, `inference_status=temporal_association_only`, metric-free responses and focused contract tests, then fold with #429/#431/#424/#428/#420. ADR 0087/0088 are implementation evidence pending #437 normalization, not branch-local architecture authority.
 
 **#453/#454 — Analysis Run interpretation adapter fold candidates.** Their PR descriptions explicitly classify them `fold_into_landing_vehicle`. Preserve stored-request path/CLI parsing, hostile-input, origin/credential/consumer refusal, metric-free result and `scientific_authority=false` tests. ADR 0085/0086 are implementation evidence pending #437 normalization, not branch-local architecture authority.
@@ -140,11 +143,15 @@ A generic arithmetic standardizer is not itself a DSEM/ctsem estimator and must 
 
 **#437 — ADR identity repair.** Repository-wide ADR IDs are immutable and unique. Duplicate numeric files/index rows must fail deterministic fitness tests. Implementation maturity does not create branch-local architecture authority.
 
+## Dependency pin status
+
+`contextual-orchestrator` protected `main` is currently ahead of TEPP's checksum-pinned hourly gateway dependency and includes a correction to Bytez provider-declared zero-price ranking used by `select_top_n_cheapest_discovered_agents`. TEPP's hourly gateway currently remains pinned to `e226e1197bdfc890c9d8e5b9b648c78857d7e465` with a committed archive SHA-256. Do not remove or weaken that checksum merely to follow upstream. Advance the pin only after the exact replacement source archive digest is reproducibly acquired and reviewed; until then this is dependency drift rather than permission to duplicate upstream ranking logic in TEPP. The hourly single-flight gate is currently non-dispatchable anyway because open PRs/issues are non-zero.
+
 ## Operator-gap register
 
 | ID | Gap | Maturity | Authority | Closure evidence |
 | --- | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 137 open PRs | `release-blocking` | #175 / #435 | classified queue, coherent bounded-context landing vehicles, unique evidence preserved, safe reduction |
+| GAP-001 | PR authority fragmented across 138 open PRs | `release-blocking` | #175 / #435 | classified queue, coherent bounded-context landing vehicles, unique evidence preserved, safe reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission incomplete | `partial` | Evidence & Semantic Measurement | immutable offsets/layout, language profiles, concept dictionary, unknown review, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator incomplete | `partial` | #167 | Rust CPU `f64` likelihood/estimands/uncertainty, relation/time/membership effects, multi-seed recovery, real candidate-K fits |
 | GAP-004 | durable end-to-end Analysis Run incomplete | `partial` | #166 | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation evidence, claim-promotion separation, Compose E2E |
