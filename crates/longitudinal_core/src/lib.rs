@@ -14,6 +14,7 @@ mod component;
 mod decompose;
 mod discrete_drift;
 mod error;
+mod event_time;
 mod level;
 
 /// Recover a valid event-time lagged correlation from covariance and both
@@ -37,6 +38,8 @@ pub use discrete_drift::refuse_trait_variance_as_standardisation_variance;
 pub use discrete_drift::refuse_unstandardised_discrete_drift_as_standardised_discrete_drift;
 /// Fail-closed longitudinal-modeling errors.
 pub use error::LongitudinalError;
+/// A finite, strictly positive interval admitted on substantive event time.
+pub use event_time::EventTimeInterval;
 /// Established longitudinal component level.
 pub use level::ComponentLevel;
 /// Refuse to treat a between-unit component as within-unit change.
