@@ -156,6 +156,7 @@ impl EpisodeMembershipArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.assignment_count < 2
+            || self.assignment_count > MAX_EVIDENCE_UNITS as u64
             || self.contained_count == 0
             || self.escaped_count == 0
             || status_sum != Some(self.assignment_count)
