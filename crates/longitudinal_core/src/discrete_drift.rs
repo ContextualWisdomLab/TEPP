@@ -22,11 +22,11 @@ use crate::{EventTimeInterval, LongitudinalError};
 ///
 /// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for non-finite
 /// diffusion/drift inputs, negative diffusion, non-representable stationary
-/// variance, non-representable `a * delta_t`, or an exponential that underflows
-/// to zero. Returns [`LongitudinalError::StationaryVarianceRequiresStableDrift`]
-/// unless `a < 0`. Returns
-/// [`LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance`] when
-/// the stationary within-person variance is zero or underflows to zero.
+/// variance, an `a * delta_t` product that overflows or underflows to signed
+/// zero, or an exponential that underflows to zero. Returns
+/// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
+/// Returns [`LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance`]
+/// when the stationary within-person variance is zero or underflows to zero.
 pub fn recover_event_time_standardised_discrete_drift(
     continuous_diffusion: f64,
     log_rate: f64,
@@ -64,7 +64,11 @@ pub fn recover_event_time_standardised_discrete_drift(
     }
 
     let exponent = log_rate * event_interval.as_f64();
-    if !exponent.is_finite() {
+    // `log_rate` is strictly negative and EventTimeInterval is strictly
+    // positive, so an exact product cannot be zero. A signed zero therefore
+    // proves binary64 multiplication underflow and must fail closed instead of
+    // silently becoming exp(-0.0) == 1.0.
+    if !exponent.is_finite() || exponent == 0.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     let discrete_drift = exponent.exp();
