@@ -29,5 +29,11 @@ path = "src/bin/tepp_loopback.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "tepp-temporal-context-request"
+path = "src/bin/tepp_temporal_context_request.rs"
+test = false
+bench = false
+
 [lints]
 workspace = true
