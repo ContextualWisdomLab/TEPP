@@ -173,8 +173,9 @@ pub fn center_within_unit_event_lags(
 /// used so near-equal large residuals do not collapse to zero. Overflowed or
 /// underflowed ratios fall back to `ln|later| − ln|earlier|`. Opposite-sign
 /// and zero residuals have no real logarithm and are skipped. The pairwise
-/// mean is incremental so two finite rates whose raw sum overflows stay
-/// representable. An empty admissible set fails closed. This is not Newton LS
+/// mean uses scale-normalized Neumaier compensation so finite rates can cancel
+/// without forming an overflowing raw sum or discarding a much smaller finite
+/// contribution. An empty admissible set fails closed. This is not Newton LS
 /// and does not recover raw-process drift from CWC of a raw AR path (Curran
 /// & Bauer, 2011, pp. 583–619; Eq. 36).
 ///
@@ -209,8 +210,7 @@ pub fn recover_centered_irregular_residual_log_rate(
     if pairs.is_empty() {
         return Err(LongitudinalError::InvalidObservationPayload);
     }
-    let mut mean = 0.0_f64;
-    let mut count = 0.0_f64;
+    let mut rates = Vec::with_capacity(pairs.len());
     for pair in pairs {
         if !pair.earlier_residual().is_finite() || !pair.later_residual().is_finite() {
             return Err(LongitudinalError::InvalidObservationPayload);
@@ -222,10 +222,11 @@ pub fn recover_centered_irregular_residual_log_rate(
         if !ratio.is_finite() || ratio <= 0.0 {
             return Err(LongitudinalError::InvalidTemporalTransformInput);
         }
-        let rate = require_finite(ratio.ln() / pair.event_interval().as_f64())?;
-        (mean, count) = overflow_safe_running_mean(mean, count, rate);
+        rates.push(require_finite(
+            ratio.ln() / pair.event_interval().as_f64(),
+        )?);
     }
-    require_finite(mean)
+    scaled_compensated_mean(&rates)
 }
 
 /// Refuse treating a CWC residual log-rate as raw-process AR drift.
@@ -249,38 +250,55 @@ pub fn refuse_cwc_residual_log_rate_as_raw_process_drift(
 }
 
 fn pairwise_same_sign_log_rate(lagged: &[LaggedWithinResidual]) -> Result<f64, LongitudinalError> {
-    let mut mean = 0.0_f64;
-    let mut count = 0.0_f64;
+    let mut rates = Vec::with_capacity(lagged.len());
     for pair in lagged {
         if !same_sign_nonzero(pair.earlier_residual(), pair.later_residual()) {
             continue;
         }
-        let rate = driver_same_sign_log_rate(
+        rates.push(driver_same_sign_log_rate(
             pair.earlier_residual(),
             pair.later_residual(),
             pair.event_interval(),
-        )?;
-        (mean, count) = overflow_safe_running_mean(mean, count, rate);
+        )?);
     }
-    if count <= 0.0 {
-        return Err(LongitudinalError::InvalidTemporalTransformInput);
-    }
-    require_finite(mean)
+    scaled_compensated_mean(&rates)
 }
 
-/// Incremental mean that stays finite when the raw sum of finite values overflows.
+/// Scale-normalized Neumaier mean for finite values with extreme dynamic range.
 ///
-/// Form `mean * (n − 1) / n + value / n` so two rates near `1.45e308` keep a
-/// representable pairwise mean. Mixed signs scale each term by `1 / n` before
-/// adding, so `MAX + (−MAX)` is not formed. Caller supplies finite values.
-pub(crate) fn overflow_safe_running_mean(mean: f64, count: f64, value: f64) -> (f64, f64) {
-    let next_count = count + 1.0;
-    if count <= 0.0 {
-        (value, next_count)
-    } else {
-        let inv = 1.0 / next_count;
-        (mean.mul_add(1.0 - inv, value * inv), next_count)
+/// Normalizing by the largest magnitude keeps the raw accumulation bounded by
+/// the number of values. Neumaier compensation retains low-order terms when
+/// large opposite-signed rates cancel. Division by the count happens before
+/// scaling back, so a representable mean is not lost to an overflowing sum.
+fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
+    if values.is_empty() {
+        return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
+    let mut scale = 0.0_f64;
+    for &value in values {
+        if !value.is_finite() {
+            return Err(LongitudinalError::InvalidTemporalTransformInput);
+        }
+        scale = scale.max(value.abs());
+    }
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+
+    let mut sum = 0.0_f64;
+    let mut compensation = 0.0_f64;
+    for &value in values {
+        let scaled = value / scale;
+        let next = sum + scaled;
+        if sum.abs() >= scaled.abs() {
+            compensation += (sum - next) + scaled;
+        } else {
+            compensation += (scaled - next) + sum;
+        }
+        sum = next;
+    }
+    let normalized_mean = (sum + compensation) / values.len() as f64;
+    require_finite(normalized_mean * scale)
 }
 
 /// Nonzero residuals of equal sign admit a real Driver Eq. 3 logarithm.
@@ -320,10 +338,10 @@ fn require_finite(value: f64) -> Result<f64, LongitudinalError> {
 mod tests {
     use super::{
         EventTimedObservation, LaggedWithinResidual, center_within_unit_event_lags,
-        driver_same_sign_log_rate, overflow_safe_running_mean,
-        recover_centered_irregular_residual_log_rate,
+        driver_same_sign_log_rate, recover_centered_irregular_residual_log_rate,
         recover_within_unit_irregular_residual_log_rate,
         refuse_cwc_residual_log_rate_as_raw_process_drift, same_sign_nonzero,
+        scaled_compensated_mean,
     };
     use crate::{EventTimeInterval, LongitudinalError};
 
@@ -465,19 +483,27 @@ mod tests {
     }
 
     #[test]
-    fn overflow_safe_running_mean_keeps_finite_pairwise_mean() {
+    fn scaled_compensated_mean_keeps_extreme_cancellation_and_overflow_safe_mean() {
         let large = 1.45e308_f64;
         assert!(!(large + large).is_finite());
-        let (first, n1) = overflow_safe_running_mean(0.0, 0.0, large);
-        assert_eq!(first.to_bits(), large.to_bits());
-        assert_eq!(n1.to_bits(), 1.0_f64.to_bits());
-        let (same_sign, n2) = overflow_safe_running_mean(first, n1, large);
+        let same_sign = scaled_compensated_mean(&[large, large]).expect("same-sign mean");
         assert!(same_sign.is_finite());
         assert!((same_sign - large).abs() < 1.0);
-        assert_eq!(n2.to_bits(), 2.0_f64.to_bits());
-        let (mixed, n_mixed) = overflow_safe_running_mean(first, n1, -large);
+        let mixed = scaled_compensated_mean(&[large, -large]).expect("mixed mean");
         assert!(mixed.abs() < 1.0);
-        assert_eq!(n_mixed.to_bits(), 2.0_f64.to_bits());
+
+        let recovered = scaled_compensated_mean(&[1.0e100, 1.0, -1.0e100])
+            .expect("small signal survives cancellation");
+        assert!((recovered - (1.0 / 3.0)).abs() <= 1.0e-12);
+        assert_eq!(
+            scaled_compensated_mean(&[]),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+        assert_eq!(scaled_compensated_mean(&[0.0, 0.0]), Ok(0.0));
+        assert_eq!(
+            scaled_compensated_mean(&[f64::INFINITY]),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
     }
 
     fn overflowing_cwc_rate_rows(unit: u32, growing: bool) -> [EventTimedObservation; 3] {
@@ -495,11 +521,11 @@ mod tests {
     }
 
     #[test]
-    fn cwc_pairwise_keeps_overflowed_rate_sum_via_incremental_mean() {
+    fn cwc_pairwise_keeps_overflowed_rate_sum_via_compensated_mean() {
         let mut rows = overflowing_cwc_rate_rows(1, true).to_vec();
         rows.extend(overflowing_cwc_rate_rows(2, true));
         let recovered =
-            recover_within_unit_irregular_residual_log_rate(&rows).expect("incremental");
+            recover_within_unit_irregular_residual_log_rate(&rows).expect("compensated");
         assert!(recovered.is_finite());
         let extracted = center_within_unit_event_lags(&rows).expect("extract");
         let mut rates = Vec::new();
@@ -518,12 +544,7 @@ mod tests {
         }
         assert_eq!(rates.len(), 2);
         assert!(!(rates[0] + rates[1]).is_finite());
-        let expected = overflow_safe_running_mean(
-            overflow_safe_running_mean(0.0, 0.0, rates[0]).0,
-            1.0,
-            rates[1],
-        )
-        .0;
+        let expected = scaled_compensated_mean(&rates).expect("reference compensated mean");
         assert!((recovered - expected).abs() <= expected.abs() * 1e-15);
         let mut mixed = overflowing_cwc_rate_rows(1, true).to_vec();
         mixed.extend(overflowing_cwc_rate_rows(2, false));
