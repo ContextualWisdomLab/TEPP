@@ -12,6 +12,7 @@
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod relation_absence_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -45,6 +46,13 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Relation-absence artifact and execution contracts from this engine.
+pub use relation_absence_artifact::{
+    RELATION_ABSENCE_ARTIFACT_BYTE_LIMIT, RELATION_ABSENCE_ARTIFACT_SCHEMA_VERSION,
+    RELATION_ABSENCE_MODEL_CONTRACT_VERSION, RELATION_ABSENCE_OUTPUT_PROFILE,
+    RelationAbsenceArtifact, RelationAbsenceExecution, RelationAbsencePair,
+    execute_relation_absence_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +256,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A relation-absence artifact violated its bounded schema or count invariants.
+    InvalidRelationAbsenceArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +272,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidRelationAbsenceArtifact => "invalid relation-absence artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +691,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidRelationAbsenceArtifact,
+                "invalid relation-absence artifact",
             ),
         ];
         for (error, message) in messages {
