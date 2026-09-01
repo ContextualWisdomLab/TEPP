@@ -66,7 +66,10 @@ Figma/export would collide with live PRs. Naruon is refused on this adapter;
 Non-loopback hosts return authorization denied. Unknown verbs, metric keys,
 nonempty bodies, unknown cursors, zero or non-integer limits, unpublished
 consumers, naruon, and credential flags fail closed. The in-memory registry
-is not durable.
+is not durable. Non-200 bodies never reach stdout; failures emit only the
+stable redacted API error on stderr. Successful pages must remain strictly
+ordered, respect the requested exclusive cursor and limit, and bind any next
+cursor to the page's last row.
 
 ## Security, privacy, scientific-integrity, and governance impact
 

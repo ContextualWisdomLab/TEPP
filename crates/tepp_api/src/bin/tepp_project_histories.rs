@@ -11,7 +11,10 @@ use tepp_api::{
 fn main() -> ExitCode {
     match run() {
         Ok(()) => ExitCode::SUCCESS,
-        Err(_) => ExitCode::FAILURE,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -22,9 +25,5 @@ fn run() -> Result<(), ApiError> {
     let response = execute_project_history_collection_cli(&invocation)?;
     let stdout = render_project_history_collection_cli_stdout(&invocation, &response)?;
     println!("{stdout}");
-    if (200..300).contains(&response.status_code) {
-        Ok(())
-    } else {
-        Err(ApiError::InvalidWirePayload)
-    }
+    Ok(())
 }

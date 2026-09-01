@@ -257,12 +257,14 @@ impl AnalysisRunLiveService {
         if consumer != LINEAGEWEAVE_CONSUMER_CODE {
             return Err(ApiError::InvalidWirePayload);
         }
-        let limit = parse_project_history_collection_page_limit(
-            headers.get("tepp-page-limit").map(String::as_str),
-        )?;
-        let cursor = parse_project_history_collection_page_cursor(
-            headers.get("tepp-page-cursor").map(String::as_str),
-        )?;
+        let limit = match headers.get("tepp-page-limit") {
+            Some(value) => parse_project_history_collection_page_limit(Some(value.as_str()))?,
+            None => parse_project_history_collection_page_limit(None)?,
+        };
+        let cursor = match headers.get("tepp-page-cursor") {
+            Some(value) => parse_project_history_collection_page_cursor(Some(value.as_str()))?,
+            None => parse_project_history_collection_page_cursor(None)?,
+        };
         let items = self
             .accepted_project_histories
             .values()

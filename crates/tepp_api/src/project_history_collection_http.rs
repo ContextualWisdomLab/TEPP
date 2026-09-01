@@ -14,7 +14,10 @@ use crate::naruon_http::{NaruonHttpExchange, compose_https_target};
 use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
-use crate::{ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, PROJECT_HISTORY_PATH};
+use crate::{
+    ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, PROJECT_HISTORY_IDEMPOTENCY_KEY_MAX_LEN,
+    PROJECT_HISTORY_PATH,
+};
 use serde::{Deserialize, Serialize};
 
 /// Supported project-history collection contract version.
@@ -27,7 +30,8 @@ pub const PROJECT_HISTORY_COLLECTION_DEFAULT_LIMIT: usize = 32;
 pub const PROJECT_HISTORY_COLLECTION_MAX_LIMIT: usize = 64;
 
 /// Maximum opaque cursor / idempotency-key length on the collection path.
-pub const PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN: usize = 128;
+pub const PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN: usize =
+    PROJECT_HISTORY_IDEMPOTENCY_KEY_MAX_LEN;
 
 /// Fixed non-causal claim boundary echoed on every collection row.
 pub const PROJECT_HISTORY_COLLECTION_INFERENCE_STATUS: &str = "temporal_association_only";

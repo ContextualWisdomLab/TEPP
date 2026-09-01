@@ -218,6 +218,8 @@ pub use project_history::DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
 pub use project_history::DEFAULT_PROJECT_HISTORY_EVENT_LIMIT;
 /// Supported project-history contract version.
 pub use project_history::PROJECT_HISTORY_CONTRACT_VERSION;
+/// Maximum opaque idempotency-key size shared by project-history APIs.
+pub use project_history::PROJECT_HISTORY_IDEMPOTENCY_KEY_MAX_LEN;
 /// Versioned project-history path.
 pub use project_history::PROJECT_HISTORY_PATH;
 /// Explicit source-grounded project event.

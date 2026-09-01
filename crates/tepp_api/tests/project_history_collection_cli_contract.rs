@@ -1,5 +1,9 @@
 //! Contract tests for the `LineageWeave` project-history collection loopback CLI.
 
+use std::io::{Read as _, Write as _};
+use std::net::TcpListener;
+use std::process::Command;
+use std::thread;
 use tepp_api::{
     ApiError, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, PROJECT_HISTORY_PATH,
     ProjectHistoryCollection, ProjectHistoryCollectionCliInvocation,
@@ -52,6 +56,58 @@ fn collection_cli_list_is_metric_free_get_without_credentials() {
 
 #[test]
 fn collection_cli_refuses_naruon_non_loopback_unknown_verbs_and_metric_bodies() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
+    let host = listener.local_addr().expect("loopback address").to_string();
+    let body = ProjectHistoryCollection::new(Vec::new(), None)
+        .expect("empty collection")
+        .to_json()
+        .expect("collection JSON");
+    let expected = serde_json::from_str::<serde_json::Value>(&body).expect("expected JSON");
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept CLI");
+        let mut request = [0_u8; 4096];
+        let read = stream.read(&mut request).expect("read request");
+        assert!(request[..read].ends_with(b"\r\n\r\n"));
+        write!(
+            stream,
+            "HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        )
+        .expect("write response");
+    });
+    let accepted = Command::new(env!("CARGO_BIN_EXE_tepp-project-histories"))
+        .args([
+            "list",
+            "--host",
+            &host,
+            "--origin",
+            ORIGIN,
+            "--page-limit",
+            "1",
+            "--page-cursor",
+            "before",
+        ])
+        .output()
+        .expect("run successful binary");
+    server.join().expect("join loopback server");
+    assert!(
+        accepted.status.success(),
+        "{}",
+        String::from_utf8_lossy(&accepted.stderr)
+    );
+    assert!(accepted.stderr.is_empty());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&accepted.stdout).expect("stdout JSON"),
+        expected
+    );
+
+    let rejected = Command::new(env!("CARGO_BIN_EXE_tepp-project-histories"))
+        .arg("unknown")
+        .output()
+        .expect("run binary");
+    assert!(!rejected.status.success());
+    assert!(rejected.stdout.is_empty());
+    assert!(!rejected.stderr.is_empty());
     assert_eq!(
         ProjectHistoryCollectionCliInvocation::from_args(
             ["list", "--host", "8.8.8.8:80", "--origin", ORIGIN],
