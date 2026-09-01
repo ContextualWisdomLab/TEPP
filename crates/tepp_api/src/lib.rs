@@ -23,6 +23,7 @@ mod export;
 mod export_http;
 mod export_idempotency_lookup_cli;
 mod export_idempotency_lookup_http;
+mod export_idempotency_lookup_stored_request_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
 mod lineageweave_http;
@@ -136,6 +137,16 @@ pub use export_idempotency_lookup_cli::loopback_http1_from_export_idempotency_lo
 pub use export_idempotency_lookup_cli::read_export_idempotency_lookup_cli_stdin;
 /// Filter lookup CLI stdout so scientific acceptance never appears.
 pub use export_idempotency_lookup_cli::render_export_idempotency_lookup_cli_stdout;
+/// Extra-segment that names the stored create on lookup stored-request GET.
+pub use export_idempotency_lookup_stored_request_http::EXPORT_IDEMPOTENCY_LOOKUP_STORED_REQUEST_SEGMENT;
+/// Extract the opaque idempotency key from a lookup stored-request path.
+pub use export_idempotency_lookup_stored_request_http::export_idempotency_lookup_stored_request_path_key;
+/// Whether a path is the lookup stored-request extra-segment resource.
+pub use export_idempotency_lookup_stored_request_http::is_export_idempotency_lookup_stored_request_path;
+/// Build a naruon lookup stored-request GET exchange.
+pub use export_idempotency_lookup_stored_request_http::naruon_export_idempotency_lookup_stored_request_exchange;
+/// Refuse scientific-metric keys on lookup stored-request JSON.
+pub use export_idempotency_lookup_stored_request_http::refuse_metrics_on_export_lookup_stored_request_payload;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;
