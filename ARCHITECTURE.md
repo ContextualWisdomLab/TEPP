@@ -102,7 +102,7 @@ boundaries above remain the target modular MSA architecture.
 | `operational_log` | operational logs; `try_record` is the only recording API; source text and source identity are not loggable; `persistence_postgres` `audit_event` inserts call the same gate |
 | `service_tls` | production TLS bind gates and rustls server config |
 | `derived_sensitivity` | derived topic/factor/relation outputs inherit source sensitivity |
-| `longitudinal_core` | active-PR: within/between decomposition; refuse between-as-within; component RMSE |
+| `longitudinal_core` | within/between decomposition; refuse between-as-within; component RMSE; event-time lagged-correlation standardization from lagged covariance plus both occasion-specific marginal variances with exact binary64 covariance-bound validation; arithmetic boundary only, not a DSEM/ctsem/state-transition estimator |
 | `topic_lineage` | global topic identity across active/dormant/reactivated states |
 | `network_analysis` | compositional cluster-pair gates; raw simplex is not Euclidean |
 | `interpretation_gateway` | evidence-bounded LLM interpretations; not estimators or observed facts |
