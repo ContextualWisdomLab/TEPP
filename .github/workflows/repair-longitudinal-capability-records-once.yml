@@ -1,0 +1,68 @@
+name: One-shot longitudinal capability record repair
+
+on:
+  push:
+    branches:
+      - agent/psychometric-trait-plus-state-expected-autocorrelation
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Repair canonical capability records
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          architecture = Path("ARCHITECTURE.md")
+          text = architecture.read_text(encoding="utf-8")
+          old = "| `longitudinal_core` | active-PR: within/between decomposition; refuse between-as-within; component RMSE |"
+          new = "| `longitudinal_core` | within/between decomposition; refuse between-as-within; component RMSE; event-time lagged-correlation standardization from lagged covariance plus both occasion-specific marginal variances with exact binary64 covariance-bound validation; arithmetic boundary only, not a DSEM/ctsem/state-transition estimator |"
+          if text.count(old) != 1:
+              raise SystemExit("expected longitudinal_core capability row exactly once")
+          architecture.write_text(text.replace(old, new), encoding="utf-8")
+
+          changelog = Path("CHANGELOG.md")
+          text = changelog.read_text(encoding="utf-8")
+          marker = "## [Unreleased]\n"
+          entry = (
+              "\n- `longitudinal_core` adds event-time lagged-correlation standardization that requires lagged covariance plus both occasion-specific marginal variances, enforces the exact binary64 covariance bound, and uses bounded division order to avoid representable overflow/underflow. The invalid one-sided covariance/earlier-variance `expected_autocorrelation` API is removed; this arithmetic boundary does not claim a DSEM/ctsem/state-transition estimator.\n"
+          )
+          if text.count(marker) != 1:
+              raise SystemExit("expected one Unreleased changelog section")
+          if "event-time lagged-correlation standardization" not in text:
+              text = text.replace(marker, marker + entry, 1)
+          changelog.write_text(text, encoding="utf-8")
+          PY
+      - name: Verify documentation contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_documentation.py
+          python3 scripts/check_docstrings.py
+          grep -F 'event-time lagged-correlation standardization' ARCHITECTURE.md
+          grep -F 'event-time lagged-correlation standardization' CHANGELOG.md
+      - name: Commit repair and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/repair-longitudinal-capability-records-once.yml
+          git add ARCHITECTURE.md CHANGELOG.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --cached --quiet; then
+            echo "No repair delta to commit" >&2
+            exit 1
+          fi
+          git commit -m "docs(longitudinal): record lagged-correlation capability"
+          git push origin HEAD:agent/psychometric-trait-plus-state-expected-autocorrelation
