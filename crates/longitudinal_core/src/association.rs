@@ -141,13 +141,11 @@ pub fn recover_event_time_lagged_correlation(
         (later_scale, earlier_scale)
     };
     let correlation = (lagged_covariance / first_scale) / second_scale;
-    if !correlation.is_finite() {
-        return Err(LongitudinalError::InvalidTemporalAssociationInput);
-    }
 
-    // The exact binary-input bound has already been checked above. Clamping
-    // only absorbs the final square-root/division rounding at a valid ±1
-    // boundary; it cannot admit an over-bound covariance.
+    // Finite positive marginals plus the exact covariance-bound gate guarantee
+    // that both divisions stay finite. Clamping only absorbs final
+    // square-root/division rounding at a valid ±1 boundary; it cannot admit an
+    // over-bound covariance.
     Ok(correlation.clamp(-1.0, 1.0))
 }
 
@@ -248,6 +246,13 @@ mod tests {
     }
 
     #[test]
+    fn scale_order_is_symmetric_when_the_earlier_marginal_is_larger() {
+        let recovered = recover_event_time_lagged_correlation(1.5, 4.0, 1.0, 1.0)
+            .expect("reversing marginal scale order should still standardize");
+        assert!((recovered - 0.75).abs() < f64::EPSILON * 4.0);
+    }
+
+    #[test]
     fn zero_covariance_is_valid() {
         assert_eq!(
             recover_event_time_lagged_correlation(0.0, 1.0, 4.0, 1.0),
@@ -290,15 +295,39 @@ mod tests {
     }
 
     #[test]
-    fn invalid_inputs_fail_closed() {
+    fn every_non_finite_input_position_fails_closed() {
         assert_eq!(
             recover_event_time_lagged_correlation(f64::NAN, 1.0, 1.0, 1.0),
             Err(LongitudinalError::InvalidTemporalAssociationInput)
         );
         assert_eq!(
+            recover_event_time_lagged_correlation(0.0, f64::INFINITY, 1.0, 1.0),
+            Err(LongitudinalError::InvalidTemporalAssociationInput)
+        );
+        assert_eq!(
+            recover_event_time_lagged_correlation(0.0, 1.0, f64::INFINITY, 1.0),
+            Err(LongitudinalError::InvalidTemporalAssociationInput)
+        );
+        assert_eq!(
+            recover_event_time_lagged_correlation(0.0, 1.0, 1.0, f64::INFINITY),
+            Err(LongitudinalError::InvalidTemporalAssociationInput)
+        );
+    }
+
+    #[test]
+    fn either_non_positive_marginal_fails_closed() {
+        assert_eq!(
             recover_event_time_lagged_correlation(0.0, 0.0, 1.0, 1.0),
             Err(LongitudinalError::NonPositiveMarginalVariance)
         );
+        assert_eq!(
+            recover_event_time_lagged_correlation(0.0, 1.0, 0.0, 1.0),
+            Err(LongitudinalError::NonPositiveMarginalVariance)
+        );
+    }
+
+    #[test]
+    fn non_positive_event_interval_fails_closed() {
         assert_eq!(
             recover_event_time_lagged_correlation(0.0, 1.0, 1.0, 0.0),
             Err(LongitudinalError::NonPositiveEventInterval)
