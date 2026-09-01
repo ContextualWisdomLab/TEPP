@@ -18,7 +18,7 @@ fn driver_page_sixteen_scalar_standardised_drift_recovers_on_event_time() {
     let longer = recover_event_time_standardised_discrete_drift(0.4, -0.5, event_time(2.5))
         .expect("irregular positive event interval");
     assert!((longer - (-1.25_f64).exp()).abs() < 1e-15);
-    assert!((longer - recovered).abs() > 1e-9);
+    assert!(longer < recovered);
 }
 
 #[test]
@@ -52,6 +52,18 @@ fn extreme_stable_rate_preserves_representable_stationary_result() {
     .expect("doubling the drift must not create an avoidable overflow");
     let truth = (-f64::MAX * delta).exp();
     assert!((recovered - truth).abs() <= f64::EPSILON);
+}
+
+#[test]
+fn event_time_exponent_underflow_fails_closed_instead_of_becoming_one() {
+    assert_eq!(
+        recover_event_time_standardised_discrete_drift(
+            f64::MIN_POSITIVE,
+            -f64::MIN_POSITIVE,
+            event_time(f64::MIN_POSITIVE),
+        ),
+        Err(LongitudinalError::InvalidTemporalTransformInput)
+    );
 }
 
 #[test]
