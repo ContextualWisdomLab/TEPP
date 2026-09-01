@@ -70,6 +70,7 @@ GET    /v1/interpretation-runs/by-run-id/{interpretation_run_id}
 GET    /v1/interpretation-runs/by-run-id/{interpretation_run_id}/request
 Loopback `tepp-interpretation-run-request get` mints that stored-request GET onto spawned `tepp-orchestrator-loopback` TCP.
 Loopback `tepp-interpretation-run-lookup lookup` mints that lookup GET onto spawned `tepp-orchestrator-loopback` TCP.
+Loopback `tepp-interpretation-run-lookup-request get` mints that lookup stored-request GET onto spawned `tepp-orchestrator-loopback` TCP.
 POST   /v1/analysis-runs
 POST   /v1/temporal-context
 GET    /v1/analysis-runs/{run_id}

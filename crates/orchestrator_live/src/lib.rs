@@ -16,6 +16,8 @@
 //! `tepp-orchestrator-loopback` TCP.
 //! `GET /v1/interpretation-runs/by-run-id/{interpretation_run_id}/request`
 //! returns the stored create request of that unique accepted run.
+//! Published `tepp-interpretation-run-lookup-request` mints that GET onto
+//! spawned `tepp-orchestrator-loopback` TCP.
 //! Table-access hosts, review/Copilot/GitHub credentials, and
 //! `COPILOT_GITHUB_TOKEN` fail closed. This crate does not implement TLS
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
@@ -29,6 +31,7 @@ mod interpretation_run_cli;
 mod interpretation_run_collection_http;
 mod interpretation_run_lookup_cli;
 mod interpretation_run_lookup_http;
+mod interpretation_run_lookup_stored_request_cli;
 mod interpretation_run_lookup_stored_request_http;
 mod interpretation_run_retrieval_http;
 mod interpretation_run_stored_request_cli;
@@ -115,6 +118,22 @@ pub use interpretation_run_lookup_stored_request_http::contextual_orchestrator_i
 pub use interpretation_run_lookup_stored_request_http::interpretation_run_lookup_stored_request_path_id;
 /// Whether a path is the lookup stored-request extra-segment resource.
 pub use interpretation_run_lookup_stored_request_http::is_interpretation_run_lookup_stored_request_path;
+/// Loopback lookup stored-request CLI invocation.
+pub use interpretation_run_lookup_stored_request_cli::InterpretationRunLookupStoredRequestCliInvocation;
+/// Loopback lookup stored-request CLI verb.
+pub use interpretation_run_lookup_stored_request_cli::InterpretationRunLookupStoredRequestCliVerb;
+/// Compose HTTP/1.1 lookup stored-request GET from a CLI invocation.
+pub use interpretation_run_lookup_stored_request_cli::compose_interpretation_run_lookup_stored_request_cli_http;
+/// Dispatch a lookup stored-request CLI invocation against an in-process listener.
+pub use interpretation_run_lookup_stored_request_cli::dispatch_interpretation_run_lookup_stored_request_cli;
+/// Execute a lookup stored-request CLI invocation over loopback TCP.
+pub use interpretation_run_lookup_stored_request_cli::execute_interpretation_run_lookup_stored_request_cli;
+/// Render a typed lookup stored-request exchange onto a loopback HTTP/1.1 request.
+pub use interpretation_run_lookup_stored_request_cli::loopback_http1_from_interpretation_run_lookup_stored_request_exchange;
+/// Read leftover stdin for the lookup stored-request CLI.
+pub use interpretation_run_lookup_stored_request_cli::read_interpretation_run_lookup_stored_request_cli_stdin;
+/// Filter lookup stored-request CLI stdout so the stored create stays hypothetical.
+pub use interpretation_run_lookup_stored_request_cli::render_interpretation_run_lookup_stored_request_cli_stdout;
 /// Loopback lookup CLI invocation.
 pub use interpretation_run_lookup_cli::InterpretationRunLookupCliInvocation;
 /// Loopback lookup CLI verb.
