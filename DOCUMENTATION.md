@@ -15,6 +15,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Orchestrator live HTTP doctoring | [`docs/research/orchestrator-live-http.md`](docs/research/orchestrator-live-http.md) |
 | Export collection GET doctoring | [`docs/research/export-collection-http.md`](docs/research/export-collection-http.md) |
 | Export cancel HTTP doctoring | [`docs/research/export-cancel-http.md`](docs/research/export-cancel-http.md) |
+| Export cancel CLI doctoring | [`docs/research/export-cancel-cli.md`](docs/research/export-cancel-cli.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
 | Logical/physical ERD | [`docs/ERD.md`](docs/ERD.md) |
 | Security policy | [`SECURITY.md`](SECURITY.md) |

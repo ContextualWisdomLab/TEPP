@@ -20,6 +20,7 @@ mod corpus_split_manifest;
 mod envelope;
 mod error;
 mod export;
+mod export_cancel_cli;
 mod export_cancel_http;
 mod export_collection_http;
 mod export_http;
@@ -132,6 +133,22 @@ pub use export_cancel_http::EXPORT_CANCEL_ID_MAX_LEN;
 pub use export_cancel_http::export_cancel_path_id;
 /// Build a credential-free naruon cancel POST exchange.
 pub use export_cancel_http::naruon_export_cancel_exchange;
+/// Supported operator verbs for the loopback export-cancel CLI.
+pub use export_cancel_cli::ExportCancelCliVerb;
+/// One operator CLI invocation against a loopback export-cancel POST listener.
+pub use export_cancel_cli::ExportCancelCliInvocation;
+/// Compose one HTTP/1.1 cancel POST from the typed naruon exchange.
+pub use export_cancel_cli::compose_export_cancel_cli_http;
+/// Dispatch one cancel CLI invocation against an in-process listener.
+pub use export_cancel_cli::dispatch_export_cancel_cli;
+/// Execute one cancel CLI invocation over loopback TCP.
+pub use export_cancel_cli::execute_export_cancel_cli;
+/// Render a typed export-cancel exchange as HTTP/1.1 for a loopback listener.
+pub use export_cancel_cli::loopback_http1_from_export_cancel_exchange;
+/// Read stdin leftover bytes on a non-terminal; cancel POST admits empty.
+pub use export_cancel_cli::read_export_cancel_cli_stdin;
+/// Filter CLI stdout so cancel never prints scientific acceptance.
+pub use export_cancel_cli::render_export_cancel_cli_stdout;
 /// Refuse scientific-metric keys on export-retrieval JSON.
 pub use export_http::refuse_metrics_on_export_retrieval_payload;
 
