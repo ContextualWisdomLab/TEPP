@@ -138,7 +138,6 @@ impl ExportIdempotencyLookup {
         }
         if self.export_id.contains('/')
             || self.export_id.contains('\0')
-            || self.idempotency_key.contains('/')
             || self.idempotency_key.contains('\0')
         {
             return Err(ApiError::InvalidWirePayload);
@@ -165,35 +164,46 @@ impl ExportIdempotencyLookup {
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when a forbidden metric key is
-/// present or the payload is a non-empty non-object.
+/// present at any nesting depth or the payload is a non-empty non-object.
 pub fn refuse_metrics_on_export_idempotency_lookup_payload(payload: &str) -> Result<(), ApiError> {
     if payload.trim().is_empty() {
         return Ok(());
     }
     let value: serde_json::Value =
         serde_json::from_str(payload).map_err(|_| ApiError::InvalidWirePayload)?;
-    let Some(object) = value.as_object() else {
+    if !value.is_object() {
         return Err(ApiError::InvalidWirePayload);
-    };
-    if FORBIDDEN_EXPORT_LOOKUP_KEYS
-        .iter()
-        .any(|key| object.contains_key(*key))
-    {
+    }
+    if contains_forbidden_export_lookup_key(&value) {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(())
 }
 
+fn contains_forbidden_export_lookup_key(value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::Object(object) => object.iter().any(|(key, value)| {
+            FORBIDDEN_EXPORT_LOOKUP_KEYS.contains(&key.as_str())
+                || contains_forbidden_export_lookup_key(value)
+        }),
+        serde_json::Value::Array(values) => values.iter().any(contains_forbidden_export_lookup_key),
+        _ => false,
+    }
+}
+
 /// Extract the opaque idempotency key from
 /// `GET /v1/exports/by-idempotency/{key}`.
+///
+/// The route is segmented before percent decoding, so an encoded `/` remains
+/// data inside one opaque key rather than becoming an extra path segment.
 ///
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] for a collection path, GET-by-id,
-/// extra segments, a missing `by-idempotency` prefix, stored-request `/request`
-/// suffix, a reserved prefix used as the key, or a hostile encoding, and
-/// [`ApiError::LimitExceeded`] when the decoded key exceeds
-/// [`EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`].
+/// extra raw segments, a missing `by-idempotency` prefix, stored-request
+/// `/request` suffix, a reserved prefix used as the key, a NUL byte, or a
+/// hostile encoding, and [`ApiError::LimitExceeded`] when the decoded key
+/// exceeds [`EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`].
 pub(crate) fn export_idempotency_lookup_path_key(path: &str) -> Result<String, ApiError> {
     let remainder = path
         .strip_prefix(NARUON_EXPORT_PATH)
@@ -224,20 +234,22 @@ pub(crate) fn export_idempotency_lookup_path_key(path: &str) -> Result<String, A
 /// Build a provider-owned `GET` export idempotency-lookup exchange.
 ///
 /// The builder refuses non-`https` origins and empty or oversized keys. It
-/// does not inject credentials. The GET body is empty. The key travels in
-/// the path; the builder does not send an `idempotency-key` header.
+/// does not inject credentials. The GET body is empty. The opaque key is
+/// percent-encoded into exactly one path segment; the builder does not send an
+/// `idempotency-key` header.
 ///
 /// # Errors
 ///
-/// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin or empty
-/// key, and [`ApiError::LimitExceeded`] when the key exceeds
+/// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin, empty
+/// key, NUL-containing key, or the reserved lookup prefix, and
+/// [`ApiError::LimitExceeded`] when the key exceeds
 /// [`EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN`] bytes.
 pub fn naruon_export_idempotency_lookup_exchange(
     origin: &str,
     idempotency_key: &str,
 ) -> Result<NaruonHttpExchange, ApiError> {
     require_nonempty(idempotency_key)?;
-    if idempotency_key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX {
+    if idempotency_key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX || idempotency_key.contains('\0') {
         return Err(ApiError::InvalidWirePayload);
     }
     if idempotency_key.len() > EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN {
@@ -300,7 +312,7 @@ fn decode_path_segment(value: &str) -> Result<String, ApiError> {
         }
     }
     let decoded = String::from_utf8(out).map_err(|_| ApiError::InvalidWirePayload)?;
-    if decoded.is_empty() || decoded.contains('/') || decoded.contains('\0') {
+    if decoded.is_empty() || decoded.contains('\0') {
         return Err(ApiError::InvalidWirePayload);
     }
     Ok(decoded)
@@ -351,6 +363,14 @@ mod tests {
         assert_eq!(
             ExportIdempotencyLookup::new("export-1", "denied", "idem-1"),
             Err(ApiError::AuthorizationDenied)
+        );
+        assert!(
+            ExportIdempotencyLookup::new(
+                "export-1",
+                EXPORT_RETRIEVAL_ALLOWED_DECISION_CODE,
+                "scope/key"
+            )
+            .is_ok()
         );
         assert_eq!(
             ExportIdempotencyLookup::new(
@@ -428,6 +448,22 @@ mod tests {
             );
         }
         assert_eq!(
+            refuse_metrics_on_export_idempotency_lookup_payload(
+                r#"{"safe":{"nested":{"rmse":1.0}}}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            refuse_metrics_on_export_idempotency_lookup_payload(
+                r#"{"safe":[{"nested":{"scientific_acceptance":{}}}]}"#
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            refuse_metrics_on_export_idempotency_lookup_payload(r#"{"safe":[{"value":1}]}"#),
+            Ok(())
+        );
+        assert_eq!(
             refuse_metrics_on_export_idempotency_lookup_payload("[true]"),
             Err(ApiError::InvalidWirePayload)
         );
@@ -452,6 +488,11 @@ mod tests {
             export_idempotency_lookup_path_key("/v1/exports/by-idempotency/key%2Dabc")
                 .expect("upper"),
             "key-abc"
+        );
+        assert_eq!(
+            export_idempotency_lookup_path_key("/v1/exports/by-idempotency/scope%2Fkey")
+                .expect("encoded slash remains opaque key data"),
+            "scope/key"
         );
         assert_eq!(
             export_idempotency_lookup_path_key("/v1/exports"),
@@ -486,8 +527,8 @@ mod tests {
             Err(ApiError::InvalidWirePayload)
         );
         assert_eq!(
-            export_idempotency_lookup_path_key("/v1/exports/by-idempotency/%2F"),
-            Err(ApiError::InvalidWirePayload)
+            export_idempotency_lookup_path_key("/v1/exports/by-idempotency/%2F").expect("slash"),
+            "/"
         );
         assert_eq!(
             export_idempotency_lookup_path_key("/v1/exports/by-idempotency/%00"),
