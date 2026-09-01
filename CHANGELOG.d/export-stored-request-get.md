@@ -1,0 +1,1 @@
+- `GET /v1/exports/{export_id}/request` returns the accepted naruon export-authorization request on `tepp-loopback` (ADR 0089). Metric-free. LineageWeave refused. `NaruonLiveService` stays POST-only. Does not re-open cancel lineages. Not GAP-010 Figma/export, not persistence.

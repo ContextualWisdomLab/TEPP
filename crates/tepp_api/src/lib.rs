@@ -21,6 +21,7 @@ mod envelope;
 mod error;
 mod export;
 mod export_http;
+mod export_stored_request_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
 mod lineageweave_http;
@@ -106,6 +107,14 @@ pub use export_http::ExportRetrieval;
 pub use export_http::naruon_export_retrieval_exchange;
 /// Refuse scientific-metric keys on export-retrieval JSON.
 pub use export_http::refuse_metrics_on_export_retrieval_payload;
+/// Extract the opaque export identity from a stored-request path.
+pub use export_stored_request_http::export_stored_request_path_id;
+/// Whether a path is the export stored-request extra-segment resource.
+pub use export_stored_request_http::is_export_stored_request_path;
+/// Build a naruon export stored-request GET exchange.
+pub use export_stored_request_http::naruon_export_stored_request_exchange;
+/// Refuse scientific-metric keys on export stored-request JSON.
+pub use export_stored_request_http::refuse_metrics_on_export_stored_request_payload;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;
