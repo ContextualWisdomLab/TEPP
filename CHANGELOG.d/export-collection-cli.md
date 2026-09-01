@@ -1,0 +1,1 @@
+- `tepp-export-list list` mints naruon `GET /v1/exports` onto spawned `tepp-loopback` TCP (ADR 0076). Metric-free receipts only. `tepp.scientific_acceptance.v1` never appears. Does not infer causality. LineageWeave refused. `NaruonLiveService` stays POST-only. Not export-retrieval CLI, not GAP-010 Figma/export, not persistence.
