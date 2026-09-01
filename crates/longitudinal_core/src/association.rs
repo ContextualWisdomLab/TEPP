@@ -5,7 +5,7 @@
 //! available. A one-sided covariance/initial-variance ratio is deliberately
 //! not exposed as an autocorrelation.
 
-use crate::LongitudinalError;
+use crate::{EventTimeInterval, LongitudinalError};
 
 /// Decompose a positive finite binary64 value into an exact integer
 /// significand and a power-of-two exponent.
@@ -89,37 +89,32 @@ fn covariance_within_binary_bound(
 /// they do not justify replacing the second marginal variance with the first
 /// when the process is nonstationary.
 ///
-/// `event_interval` is semantically required to be strictly positive so a
-/// measurement-occasion or method facet cannot be passed as an untyped lag.
-/// This function does not infer either marginal variance and does not estimate
-/// a state process.
+/// [`EventTimeInterval`] makes substantive event-time ownership explicit. This
+/// function does not infer either marginal variance and does not estimate a
+/// state process.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalAssociationInput`] for
-/// non-finite inputs, [`LongitudinalError::NonPositiveMarginalVariance`] when
-/// either marginal variance is not strictly positive,
-/// [`LongitudinalError::NonPositiveEventInterval`] for a non-positive event
-/// interval, and [`LongitudinalError::CovarianceBoundViolation`] when the
-/// supplied covariance is incompatible with the two marginal variances.
-pub fn recover_event_time_lagged_correlation(
+/// non-finite covariance or marginal inputs,
+/// [`LongitudinalError::NonPositiveMarginalVariance`] when either marginal
+/// variance is not strictly positive, and
+/// [`LongitudinalError::CovarianceBoundViolation`] when the supplied covariance
+/// is incompatible with the two marginal variances.
+pub(crate) fn recover_event_time_lagged_correlation(
     lagged_covariance: f64,
     earlier_total_variance: f64,
     later_total_variance: f64,
-    event_interval: f64,
+    _event_interval: EventTimeInterval,
 ) -> Result<f64, LongitudinalError> {
     if !lagged_covariance.is_finite()
         || !earlier_total_variance.is_finite()
         || !later_total_variance.is_finite()
-        || !event_interval.is_finite()
     {
         return Err(LongitudinalError::InvalidTemporalAssociationInput);
     }
     if earlier_total_variance <= 0.0 || later_total_variance <= 0.0 {
         return Err(LongitudinalError::NonPositiveMarginalVariance);
-    }
-    if event_interval <= 0.0 {
-        return Err(LongitudinalError::NonPositiveEventInterval);
     }
     if !covariance_within_binary_bound(
         lagged_covariance,
@@ -152,11 +147,15 @@ pub fn recover_event_time_lagged_correlation(
 #[cfg(test)]
 mod tests {
     use super::{recover_event_time_lagged_correlation, scaled_integer_leq};
-    use crate::LongitudinalError;
+    use crate::{EventTimeInterval, LongitudinalError};
+
+    fn event_time(value: f64) -> EventTimeInterval {
+        EventTimeInterval::new(value).expect("test interval must be valid event time")
+    }
 
     #[test]
     fn nonstationary_marginals_do_not_use_the_earlier_variance_twice() {
-        let recovered = recover_event_time_lagged_correlation(1.5, 1.0, 4.0, 1.0)
+        let recovered = recover_event_time_lagged_correlation(1.5, 1.0, 4.0, event_time(1.0))
             .expect("valid nonstationary covariance should standardize");
         assert!((recovered - 0.75).abs() < f64::EPSILON * 4.0);
     }
@@ -164,11 +163,11 @@ mod tests {
     #[test]
     fn covariance_bound_is_fail_closed() {
         assert_eq!(
-            recover_event_time_lagged_correlation(2.000_000_000_1, 1.0, 4.0, 1.0),
+            recover_event_time_lagged_correlation(2.000_000_000_1, 1.0, 4.0, event_time(1.0)),
             Err(LongitudinalError::CovarianceBoundViolation)
         );
         assert_eq!(
-            recover_event_time_lagged_correlation(-2.000_000_000_1, 1.0, 4.0, 1.0),
+            recover_event_time_lagged_correlation(-2.000_000_000_1, 1.0, 4.0, event_time(1.0)),
             Err(LongitudinalError::CovarianceBoundViolation)
         );
     }
@@ -178,11 +177,21 @@ mod tests {
         let variance = 2.0_f64;
         let one_ulp_above = f64::from_bits(variance.to_bits() + 1);
         assert_eq!(
-            recover_event_time_lagged_correlation(one_ulp_above, variance, variance, 1.0),
+            recover_event_time_lagged_correlation(
+                one_ulp_above,
+                variance,
+                variance,
+                event_time(1.0),
+            ),
             Err(LongitudinalError::CovarianceBoundViolation)
         );
         assert_eq!(
-            recover_event_time_lagged_correlation(-one_ulp_above, variance, variance, 1.0),
+            recover_event_time_lagged_correlation(
+                -one_ulp_above,
+                variance,
+                variance,
+                event_time(1.0),
+            ),
             Err(LongitudinalError::CovarianceBoundViolation)
         );
     }
@@ -190,11 +199,21 @@ mod tests {
     #[test]
     fn exact_binary_bound_accepts_extreme_and_subnormal_boundaries() {
         assert_eq!(
-            recover_event_time_lagged_correlation(f64::MAX, f64::MAX, f64::MAX, 1.0),
+            recover_event_time_lagged_correlation(
+                f64::MAX,
+                f64::MAX,
+                f64::MAX,
+                event_time(1.0),
+            ),
             Ok(1.0)
         );
         assert_eq!(
-            recover_event_time_lagged_correlation(-f64::MAX, f64::MAX, f64::MAX, 1.0),
+            recover_event_time_lagged_correlation(
+                -f64::MAX,
+                f64::MAX,
+                f64::MAX,
+                event_time(1.0),
+            ),
             Ok(-1.0)
         );
         let minimum_subnormal = f64::from_bits(1);
@@ -203,7 +222,7 @@ mod tests {
                 minimum_subnormal,
                 minimum_subnormal,
                 minimum_subnormal,
-                1.0,
+                event_time(1.0),
             ),
             Ok(1.0)
         );
@@ -212,7 +231,7 @@ mod tests {
                 -minimum_subnormal,
                 minimum_subnormal,
                 minimum_subnormal,
-                1.0,
+                event_time(1.0),
             ),
             Ok(-1.0)
         );
@@ -226,7 +245,7 @@ mod tests {
                 1.0,
                 minimum_subnormal,
                 minimum_subnormal,
-                1.0,
+                event_time(1.0),
             ),
             Err(LongitudinalError::CovarianceBoundViolation)
         );
@@ -238,7 +257,7 @@ mod tests {
             f64::MIN_POSITIVE,
             f64::MIN_POSITIVE,
             f64::MAX,
-            1.0,
+            event_time(1.0),
         )
         .expect("valid unequal-scale covariance should remain representable");
         assert!(recovered > 0.0);
@@ -247,7 +266,7 @@ mod tests {
 
     #[test]
     fn scale_order_is_symmetric_when_the_earlier_marginal_is_larger() {
-        let recovered = recover_event_time_lagged_correlation(1.5, 4.0, 1.0, 1.0)
+        let recovered = recover_event_time_lagged_correlation(1.5, 4.0, 1.0, event_time(1.0))
             .expect("reversing marginal scale order should still standardize");
         assert!((recovered - 0.75).abs() < f64::EPSILON * 4.0);
     }
@@ -255,7 +274,7 @@ mod tests {
     #[test]
     fn zero_covariance_is_valid() {
         assert_eq!(
-            recover_event_time_lagged_correlation(0.0, 1.0, 4.0, 1.0),
+            recover_event_time_lagged_correlation(0.0, 1.0, 4.0, event_time(1.0)),
             Ok(0.0)
         );
     }
@@ -272,11 +291,11 @@ mod tests {
     #[test]
     fn exact_boundary_correlations_are_allowed() {
         assert_eq!(
-            recover_event_time_lagged_correlation(2.0, 1.0, 4.0, 1.0),
+            recover_event_time_lagged_correlation(2.0, 1.0, 4.0, event_time(1.0)),
             Ok(1.0)
         );
         assert_eq!(
-            recover_event_time_lagged_correlation(-2.0, 1.0, 4.0, 1.0),
+            recover_event_time_lagged_correlation(-2.0, 1.0, 4.0, event_time(1.0)),
             Ok(-1.0)
         );
     }
@@ -288,7 +307,7 @@ mod tests {
             variance / 2.0,
             variance,
             variance,
-            1.0,
+            event_time(1.0),
         )
         .expect("representable standardized covariance should remain representable");
         assert!((recovered - 0.5).abs() < 1.0e-15);
@@ -297,19 +316,15 @@ mod tests {
     #[test]
     fn every_non_finite_input_position_fails_closed() {
         assert_eq!(
-            recover_event_time_lagged_correlation(f64::NAN, 1.0, 1.0, 1.0),
+            recover_event_time_lagged_correlation(f64::NAN, 1.0, 1.0, event_time(1.0)),
             Err(LongitudinalError::InvalidTemporalAssociationInput)
         );
         assert_eq!(
-            recover_event_time_lagged_correlation(0.0, f64::INFINITY, 1.0, 1.0),
+            recover_event_time_lagged_correlation(0.0, f64::INFINITY, 1.0, event_time(1.0)),
             Err(LongitudinalError::InvalidTemporalAssociationInput)
         );
         assert_eq!(
-            recover_event_time_lagged_correlation(0.0, 1.0, f64::INFINITY, 1.0),
-            Err(LongitudinalError::InvalidTemporalAssociationInput)
-        );
-        assert_eq!(
-            recover_event_time_lagged_correlation(0.0, 1.0, 1.0, f64::INFINITY),
+            recover_event_time_lagged_correlation(0.0, 1.0, f64::INFINITY, event_time(1.0)),
             Err(LongitudinalError::InvalidTemporalAssociationInput)
         );
     }
@@ -317,20 +332,12 @@ mod tests {
     #[test]
     fn either_non_positive_marginal_fails_closed() {
         assert_eq!(
-            recover_event_time_lagged_correlation(0.0, 0.0, 1.0, 1.0),
+            recover_event_time_lagged_correlation(0.0, 0.0, 1.0, event_time(1.0)),
             Err(LongitudinalError::NonPositiveMarginalVariance)
         );
         assert_eq!(
-            recover_event_time_lagged_correlation(0.0, 1.0, 0.0, 1.0),
+            recover_event_time_lagged_correlation(0.0, 1.0, 0.0, event_time(1.0)),
             Err(LongitudinalError::NonPositiveMarginalVariance)
-        );
-    }
-
-    #[test]
-    fn non_positive_event_interval_fails_closed() {
-        assert_eq!(
-            recover_event_time_lagged_correlation(0.0, 1.0, 1.0, 0.0),
-            Err(LongitudinalError::NonPositiveEventInterval)
         );
     }
 }
