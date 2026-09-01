@@ -12,6 +12,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Modular/API integration contract | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) |
 | naruon modular consumer contract | [`docs/connectors/naruon-artifact-consumer.md`](docs/connectors/naruon-artifact-consumer.md) |
 | Export stored-request GET doctoring | [`docs/research/export-stored-request-get.md`](docs/research/export-stored-request-get.md) |
+| Export stored-request CLI doctoring | [`docs/research/export-stored-request-cli.md`](docs/research/export-stored-request-cli.md) |
 | contextual-orchestrator interpretation port | [`docs/connectors/contextual-orchestrator-interpretation-port.md`](docs/connectors/contextual-orchestrator-interpretation-port.md) |
 | Orchestrator live HTTP doctoring | [`docs/research/orchestrator-live-http.md`](docs/research/orchestrator-live-http.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
@@ -111,6 +112,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Modular/API integration contract | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) |
 | naruon modular consumer contract | [`docs/connectors/naruon-artifact-consumer.md`](docs/connectors/naruon-artifact-consumer.md) |
 | Export stored-request GET doctoring | [`docs/research/export-stored-request-get.md`](docs/research/export-stored-request-get.md) |
+| Export stored-request CLI doctoring | [`docs/research/export-stored-request-cli.md`](docs/research/export-stored-request-cli.md) |
 | contextual-orchestrator interpretation port | [`docs/connectors/contextual-orchestrator-interpretation-port.md`](docs/connectors/contextual-orchestrator-interpretation-port.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
 | Logical/physical ERD | [`docs/ERD.md`](docs/ERD.md) |
