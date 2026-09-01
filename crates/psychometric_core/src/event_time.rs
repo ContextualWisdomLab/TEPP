@@ -917,122 +917,6 @@ pub fn recover_trait_plus_state_lagged_covariance(
     require_finite(trait_variance + state_lagged)
 }
 
-/// Exact scalar §7.1 trait-plus-state expected autocorrelation.
-///
-/// Driver, Oud, and Voelkle (2017, §7.1, pp. 18–19; Eq. 3–4, pp. 4–5;
-/// §4.3, p. 9; §7.2 `addedTIPREDVAR`; JSS PDF re-opened
-/// 2026-09-01T06:30Z from
-/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
-/// name traits the stable between-subject differences (unit-level
-/// unobserved heterogeneity). Omitting `TRAITVAR` mixes between- and
-/// within-person information (Balestra & Nerlove, 1966; Oud & Jansen,
-/// 2000, unread; Halaby, 2004). Figure 4 shows auto-effects
-/// (persistence) reduced after traits are modelled. The paper does
-/// not print this ratio; it is the covariance ratio of the already
-/// recovered §4.3 maps. Form the lagged covariance
-/// `trait + e^{a Δt} p` first, then the contemporaneous total
-/// `trait + p`, then include `addedTIPREDVAR`, then the ratio
-/// `(trait + e^{a Δt} p + added) / (trait + p + added)`. A zero
-/// trait and a zero TI extra recovers `e^{a Δt}` numerically and
-/// remains a distinct named quantity. A zero state with a positive
-/// trait or extra is exactly 1. A zero total variance has no
-/// autocorrelation and fails closed. Growing `a > 0` is a covariance
-/// ratio of those named maps and is kept; it is not a stationary
-/// correlation and is not `discreteDRIFTstd` (which requires stable
-/// `a < 0` and strictly positive `asymDIFFUSION`). Unstandardised
-/// `discreteDRIFT` `e^{a Δt}` is the state auto-effect, not this
-/// total-variance ratio. Page 16 `discreteDRIFTstd` standardises
-/// `DRIFT` using only within-subject `asymDIFFUSION` (footnote 4),
-/// not the total. `TRAITVAR` is not the standardisation variance.
-/// The interval must be event time and strictly positive. This is
-/// not a Kalman filter, not a matrix `expm`, not RI-CLPM, not DSEM,
-/// and not ctsem estimation.
-///
-/// # Errors
-///
-/// Propagates [`recover_trait_plus_state_lagged_covariance`] and
-/// [`recover_trait_plus_state_latent_variance`]. Returns
-/// [`PsychometricError::InvalidNumericInput`] when the TI extra
-/// variance is negative or non-finite or a sum or ratio overflows,
-/// and
-/// [`PsychometricError::TraitPlusStateExpectedAutocorrelationRequiresPositiveTotalVariance`]
-/// when `trait + p + added` is zero.
-pub fn recover_trait_plus_state_expected_autocorrelation(
-    trait_variance: f64,
-    state_variance: f64,
-    added_time_independent_variance: f64,
-    log_rate: f64,
-    event_delta: f64,
-    clock: LagClock,
-) -> Result<f64, PsychometricError> {
-    if !added_time_independent_variance.is_finite() || added_time_independent_variance < 0.0 {
-        return Err(PsychometricError::InvalidNumericInput);
-    }
-    let lagged = recover_trait_plus_state_lagged_covariance(
-        trait_variance,
-        state_variance,
-        log_rate,
-        event_delta,
-        clock,
-    )?;
-    let contemporaneous = recover_trait_plus_state_latent_variance(trait_variance, state_variance)?;
-    let numerator = if added_time_independent_variance == 0.0 {
-        lagged
-    } else {
-        require_finite(lagged + added_time_independent_variance)?
-    };
-    let denominator = if added_time_independent_variance == 0.0 {
-        contemporaneous
-    } else {
-        require_finite(contemporaneous + added_time_independent_variance)?
-    };
-    if denominator == 0.0 {
-        return Err(
-            PsychometricError::TraitPlusStateExpectedAutocorrelationRequiresPositiveTotalVariance,
-        );
-    }
-    require_finite(numerator / denominator)
-}
-
-/// Refuse treating §7.1 trait-plus-state expected autocorrelation as
-/// unstandardised `discreteDRIFT`.
-///
-/// `(trait + e^{a Δt} p + added) / (trait + p + added)` is the
-/// total-variance ratio. `e^{a Δt}` is the state auto-effect.
-/// Equal numbers when trait and added vanish remain distinct named
-/// quantities.
-///
-/// # Errors
-///
-/// Always returns
-/// [`PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotDiscreteDrift`].
-pub fn refuse_trait_plus_state_expected_autocorrelation_as_discrete_drift(
-    expected_autocorrelation: f64,
-    discrete_drift: f64,
-) -> Result<f64, PsychometricError> {
-    let _ = (expected_autocorrelation, discrete_drift);
-    Err(PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotDiscreteDrift)
-}
-
-/// Refuse treating §7.1 trait-plus-state expected autocorrelation as
-/// p. 16 `discreteDRIFTstd`.
-///
-/// Footnote 4 standardises `DRIFT` using only within-subject
-/// `asymDIFFUSION`, not the total. The autocorrelation uses
-/// `TRAITVAR` and is not that map.
-///
-/// # Errors
-///
-/// Always returns
-/// [`PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotStandardisedDiscreteDrift`].
-pub fn refuse_trait_plus_state_expected_autocorrelation_as_standardised_discrete_drift(
-    expected_autocorrelation: f64,
-    standardised_discrete_drift: f64,
-) -> Result<f64, PsychometricError> {
-    let _ = (expected_autocorrelation, standardised_discrete_drift);
-    Err(PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotStandardisedDiscreteDrift)
-}
-
 /// Refuse treating Driver §4.3 trait variance as process noise.
 ///
 /// A stable trait has `DIFFUSION` fixed to zero. The ctsem
@@ -6969,8 +6853,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
-        recover_asymptotic_continuous_intercept,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
+        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -7013,7 +6897,6 @@ mod tests {
         recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
         recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
         recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_expected_autocorrelation,
         recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
         recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
@@ -7143,8 +7026,6 @@ mod tests {
         refuse_time_independent_effect_as_time_varying_discrete_effect,
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
-        refuse_trait_plus_state_expected_autocorrelation_as_discrete_drift,
-        refuse_trait_plus_state_expected_autocorrelation_as_standardised_discrete_drift,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
         refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
@@ -7159,7 +7040,6 @@ mod tests {
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
     };
     use crate::error::PsychometricError;
 
@@ -8051,205 +7931,6 @@ mod tests {
         );
         assert_eq!(
             recover_trait_plus_state_lagged_covariance(1e308, 1e308, 0.0, 1.0, LagClock::EventTime),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-    }
-
-    #[test]
-    fn trait_plus_state_expected_autocorrelation_recovers_driver_section_seven_point_one() {
-        let trait_variance = 0.8_f64;
-        let state_variance = 0.4_f64;
-        let added = 0.2_f64;
-        let drift = -0.5_f64;
-        let delta = 1.0_f64;
-        let recovered = recover_trait_plus_state_expected_autocorrelation(
-            trait_variance,
-            state_variance,
-            added,
-            drift,
-            delta,
-            LagClock::EventTime,
-        )
-        .expect("ρ");
-        let discrete_drift =
-            recover_discrete_lag_from_log_rate(drift, delta, LagClock::EventTime).expect("φ");
-        let lagged = recover_trait_plus_state_lagged_covariance(
-            trait_variance,
-            state_variance,
-            drift,
-            delta,
-            LagClock::EventTime,
-        )
-        .expect("lagged");
-        let contemporaneous =
-            recover_trait_plus_state_latent_variance(trait_variance, state_variance)
-                .expect("total");
-        let expected = (lagged + added) / (contemporaneous + added);
-        assert!((recovered - expected).abs() < 1e-15);
-        assert!((recovered - 0.887_580_188_5).abs() < 1e-9);
-        assert!((discrete_drift - recovered).abs() > 0.28);
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                0.0,
-                state_variance,
-                0.0,
-                drift,
-                delta,
-                LagClock::EventTime,
-            ),
-            Ok(discrete_drift)
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                trait_variance,
-                0.0,
-                added,
-                drift,
-                delta,
-                LagClock::EventTime,
-            ),
-            Ok(1.0)
-        );
-        let far = recover_trait_plus_state_expected_autocorrelation(
-            trait_variance,
-            state_variance,
-            added,
-            drift,
-            700.0,
-            LagClock::EventTime,
-        )
-        .expect("Δt→∞");
-        let asymptotic = (trait_variance + added) / (trait_variance + state_variance + added);
-        assert!((far - asymptotic).abs() < 1e-15);
-        let growing = recover_trait_plus_state_expected_autocorrelation(
-            trait_variance,
-            state_variance,
-            added,
-            0.5,
-            delta,
-            LagClock::EventTime,
-        )
-        .expect("a>0");
-        assert!(growing > 1.0);
-        assert_eq!(
-            refuse_trait_plus_state_expected_autocorrelation_as_discrete_drift(
-                recovered,
-                discrete_drift
-            ),
-            Err(PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotDiscreteDrift)
-        );
-        assert_eq!(
-            refuse_trait_plus_state_expected_autocorrelation_as_standardised_discrete_drift(
-                recovered,
-                discrete_drift
-            ),
-            Err(
-                PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotStandardisedDiscreteDrift
-            )
-        );
-    }
-
-    #[test]
-    fn trait_plus_state_expected_autocorrelation_invalid_inputs_fail_closed() {
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                0.0,
-                0.0,
-                0.0,
-                -0.5,
-                1.0,
-                LagClock::EventTime,
-            ),
-            Err(
-                PsychometricError::TraitPlusStateExpectedAutocorrelationRequiresPositiveTotalVariance
-            )
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                0.8,
-                0.4,
-                -0.1,
-                -0.5,
-                1.0,
-                LagClock::EventTime,
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                0.8,
-                0.4,
-                f64::NAN,
-                -0.5,
-                1.0,
-                LagClock::EventTime,
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                0.8,
-                0.4,
-                f64::INFINITY,
-                -0.5,
-                1.0,
-                LagClock::EventTime,
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                0.8,
-                0.4,
-                0.2,
-                -0.5,
-                1.0,
-                LagClock::SystemTime,
-            ),
-            Err(PsychometricError::EventTimeRequired)
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                0.8,
-                0.4,
-                0.2,
-                -0.5,
-                0.0,
-                LagClock::EventTime,
-            ),
-            Err(PsychometricError::NonPositiveInterval)
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                -0.1,
-                0.4,
-                0.2,
-                -0.5,
-                1.0,
-                LagClock::EventTime,
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                1e308,
-                0.0,
-                1e308,
-                0.0,
-                1.0,
-                LagClock::EventTime,
-            ),
-            Err(PsychometricError::InvalidNumericInput)
-        );
-        assert_eq!(
-            recover_trait_plus_state_expected_autocorrelation(
-                0.0,
-                1e308,
-                1e308,
-                -800.0,
-                1.0,
-                LagClock::EventTime,
-            ),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
@@ -11466,8 +11147,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -12042,8 +11723,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
         // λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ.
@@ -12619,8 +12300,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
-    ) {
+    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
+     {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of stationary T0VAR is
         // λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ.
@@ -14774,8 +14455,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
-    ) {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
+     {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -14925,8 +14606,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
-    ) {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
+     {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -15544,8 +15225,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
-    ) {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
+     {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,

@@ -710,23 +710,6 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
-    /// Driver §7.1 trait-plus-state expected autocorrelation was
-    /// requested with a zero total variance. The covariance ratio
-    /// `(trait + e^{a Δt} p + added) / (trait + p + added)` is
-    /// undefined at a zero denominator.
-    TraitPlusStateExpectedAutocorrelationRequiresPositiveTotalVariance,
-    /// Driver §7.1 trait-plus-state expected autocorrelation was
-    /// treated as unstandardised `discreteDRIFT`. The total-variance
-    /// ratio is not `e^{a Δt}` when `TRAITVAR` or `addedTIPREDVAR`
-    /// is nonzero. Equal numbers when both vanish remain distinct
-    /// named quantities.
-    TraitPlusStateExpectedAutocorrelationIsNotDiscreteDrift,
-    /// Driver §7.1 trait-plus-state expected autocorrelation was
-    /// treated as p. 16 `discreteDRIFTstd`. Footnote 4 standardises
-    /// `DRIFT` using only within-subject `asymDIFFUSION`, not the
-    /// total. The autocorrelation uses `TRAITVAR` and is not that
-    /// map.
-    TraitPlusStateExpectedAutocorrelationIsNotStandardisedDiscreteDrift,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1251,15 +1234,6 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
-            }
-            Self::TraitPlusStateExpectedAutocorrelationRequiresPositiveTotalVariance => {
-                "trait-plus-state expected autocorrelation requires a strictly positive total variance"
-            }
-            Self::TraitPlusStateExpectedAutocorrelationIsNotDiscreteDrift => {
-                "trait-plus-state expected autocorrelation is not discrete drift"
-            }
-            Self::TraitPlusStateExpectedAutocorrelationIsNotStandardisedDiscreteDrift => {
-                "trait-plus-state expected autocorrelation is not standardised discrete drift"
             }
         };
         formatter.write_str(message)
@@ -2097,24 +2071,6 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
-        );
-    }
-
-    #[test]
-    fn trait_plus_state_expected_autocorrelation_boundary_messages_are_stable() {
-        assert_eq!(
-            PsychometricError::TraitPlusStateExpectedAutocorrelationRequiresPositiveTotalVariance
-                .to_string(),
-            "trait-plus-state expected autocorrelation requires a strictly positive total variance"
-        );
-        assert_eq!(
-            PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotDiscreteDrift.to_string(),
-            "trait-plus-state expected autocorrelation is not discrete drift"
-        );
-        assert_eq!(
-            PsychometricError::TraitPlusStateExpectedAutocorrelationIsNotStandardisedDiscreteDrift
-                .to_string(),
-            "trait-plus-state expected autocorrelation is not standardised discrete drift"
         );
     }
 }
