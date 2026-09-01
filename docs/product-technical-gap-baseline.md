@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-01T18:14:00Z  
+**Snapshot:** 2026-09-01T18:29:00Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`  
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
@@ -30,7 +30,7 @@ This is a priority subset, not a row-for-row copy of the 133-PR queue. #435 omit
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
-| #469 | `6a68f98971986f3ea9562fd7a73c5974e5a4af6e` | false* | interpretation-run retrieval ancestor | Analysis Run / contextual-orchestrator stored-request + server-id lookup GET/CLI landing vehicle; *metadata non-Draft after connector Draft-conversion failure, operationally review-not-ready. |
+| #469 | `5b46d78aef81902ab12b8ad691fd83be68d616cc` | false* | interpretation-run retrieval ancestor | Analysis Run / contextual-orchestrator stored-request + server-id lookup GET/CLI landing vehicle, now also containing folded #470 lookup-request CLI; *metadata non-Draft after connector Draft-conversion failure, operationally review-not-ready. |
 | #466 | `0c5efc3c9075115d0670b8438342c72069043dcd` | true | export-retrieval ancestor | Analysis Run / naruon export idempotency GET+CLI landing vehicle. |
 | #464 | `1b3a477242336634be2c7867b29d39979e9a6dca` | true | temporal-context retrieval ancestor | Analysis Run / LineageWeave temporal-context stored-request GET+CLI landing vehicle. |
 | #462 | `c1b7d627167dd7636d2975cc41cec050a5e477ba` | true | main | Bounded source-name compatibility repair; v1 serialized key remains `id`. |
@@ -77,13 +77,13 @@ Supported temporal estimators require realistic known-truth recovery: RMSE, bias
 
 **#310 — Longitudinal Modeling landing vehicle.** Closed predecessor #441 is contained by #310. The invalid one-sided covariance/earlier-variance ratio remains retired; public lagged correlation requires lagged covariance and both marginal variances. `EventTimeInterval` is now preserved through the public wrapper into the internal association primitive instead of being erased to a bare `f64`. RED `c52c436c6b075e3982c8195b7862ea07063930b2` reproduces the finite extreme stable-rate case where `-2a` overflowed despite a representable p.16 `discreteDRIFTstd`; the implementation avoids that intermediate overflow. RED `b6d7594208f1c469382e7d540a5507280de6a196` additionally reproduces finite negative drift × positive event-interval multiplication underflow to signed zero; GREEN `1347bfb7726fd1cb3196f6cad306aa00fe41d112` fails closed instead of silently returning `exp(-0.0) == 1.0`. The known-truth test now asserts the correct temporal ordering (`longer interval < shorter interval` for stable negative drift). Research doctoring at `58c1ba7f085260ee8efa90e2089828cc469581ba` grounds the covariance bound in Bouniakowsky's 1859 primary inequality while retaining later correlation literature as supplementary context. Current Semgrep is GREEN; Rust and Documentation are queued. Security is fail-closed only at dependency-review support preflight while OSV/Trivy/Scorecard pass. Independent current-head review is still required.
 
-**Dependency-review support.** The central Security Scan has failed before dependency review because the exact dependency-graph compare support probe is not admitted for this repository/workflow token; OSV, Trivy and Scorecard independently terminate GREEN. Treat this as `blocked_external` dependency-graph/security support or GitHub control-plane behavior, not as a TEPP vulnerability and not as permission to weaken the fail-closed central workflow. Retry only after the underlying support/configuration condition changes.
+**Dependency-review support.** The central Security Scan fails closed before Dependency Review because GitHub's exact dependency-graph comparison is unavailable to the workflow token. Central governance issue `ContextualWisdomLab/.github#810` confirms the current public non-fork incident: repeated canaries return HTTP 403 with curl exit 0, while the central workflow correctly requires transport success plus HTTP 200 before the pinned Dependency Review action may execute. OSV, Trivy and Scorecard remain independent sibling evidence and are not substitutes. There is no TEPP-local source change that can convert this missing GitHub control-plane evidence into an authoritative dependency review; do not weaken the gate.
 
-**Analysis Run adapter/profile proliferation.** Export, interpretation, project-history and temporal-context HTTP/CLI mechanics are adapters inside one supporting context. This run collapsed strict interpretation-run ancestry repeatedly: #454 was folded into #467, #467 into #468, and #468 into surviving #469, with each predecessor proven as the merge base and each child exactly one commit ahead/zero behind before retarget-and-close. This preserves source/tests/review evidence while preventing GET/CLI/request variants from remaining independent product WIP. Diverged siblings still require an actual source/test fold. One refusal/profile does not create architecture authority.
+**Analysis Run adapter/profile proliferation.** Export, interpretation, project-history and temporal-context HTTP/CLI mechanics are adapters inside one supporting context. Strict interpretation-run ancestry has been collapsed repeatedly: #454→#467→#468→#469, followed by #470→#469 after proving #470 was based exactly on #469's prior head and fast-forwarding the surviving branch without force. #469 now preserves stored-request GET/CLI, server-assigned run-id lookup GET/CLI, server-id stored-request GET, and the corresponding lookup-request CLI on one Analysis Run vehicle. Predecessor discussions remain immutable evidence. Diverged siblings still require an actual source/test fold. One refusal/profile does not create architecture authority.
 
 **#462 — bounded naming repair.** Rust source uses `node_id` while the v1 serialized key remains `id`; this is not a JSON-LD `@id` semantic change or a new bounded context.
 
-**#437 — ADR identity.** The #435 branch rejects duplicate index IDs, duplicate index targets and duplicate numbered ADR files. The normalized index preserves pre-normalization collision lineage under `docs/adr/archive/`. Operation-specific ADR 0095/0096/0097 created on active adapter branches remain implementation lineage pending normalization; route/CLI proliferation must not become architecture authority. Closure waits for protected-main integration.
+**#437 — ADR identity.** The #435 branch rejects duplicate index IDs, duplicate index targets and duplicate numbered ADR files. The normalized index preserves pre-normalization collision lineage under `docs/adr/archive/`. Operation-specific ADR 0095/0096/0097/0098 created on active adapter branches remain implementation lineage pending normalization; route/CLI proliferation must not become architecture authority. Closure waits for protected-main integration.
 
 ## Dependency and Context Fabric status
 
@@ -108,7 +108,7 @@ TEPP never copies fast-mlsirm numerical kernels or contextual-orchestrator provi
 | GAP-011 | operable multi-tenant release | `accepted-target` | OIDC/RLS/purpose controls, durable queue/storage, OTel/SLO, restore/load/migration, signed SBOM/provenance |
 | GAP-012 | paths obscure domain ownership | `active-refactor` | staged moves, ACLs, no cycles/cross-context persistence/shared-kernel creep |
 | GAP-013 | ADR identity collisions | `release-integrity` | unique repository-wide identity, deterministic duplicate detection, supersession lineage |
-| GAP-014 | dependency-review evidence unavailable | `blocked_external` | repair/enable dependency-graph support, exact-head Security Scan GREEN, no fail-open bypass |
+| GAP-014 | dependency-review evidence unavailable | `blocked_external` | authorized GitHub/dependency-graph availability repair, unchanged-head compare HTTP 200, pinned Dependency Review execution, exact-head Security Scan GREEN, no fail-open bypass |
 
 ## Delivery and release order
 
