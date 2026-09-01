@@ -1,4 +1,4 @@
-//! RED contract for scalar standardised diffusion maps in Longitudinal Modeling.
+//! RED/GREEN contract for scalar standardised diffusion maps in Longitudinal Modeling.
 //!
 //! Driver, Oud, and Voelkle (2017) print the underlying continuous/discrete
 //! diffusion transformations and describe relevant-variance standardisation,
@@ -28,6 +28,20 @@ fn continuous_diffusion_candidate_recovers_relevant_variance_ratio() {
     let max_path = recover_event_time_standardised_continuous_diffusion(f64::MAX, -0.75)
         .expect("representable q/p must not fail on an avoidable intermediate overflow");
     assert!((max_path - 1.5).abs() < 1e-15);
+}
+
+#[test]
+fn continuous_diffusion_candidate_does_not_lose_cancellation_to_subnormal_rounding() {
+    let minimum_subnormal = f64::from_bits(1);
+    let recovered = recover_event_time_standardised_continuous_diffusion(minimum_subnormal, -0.75)
+        .expect("positive rounded stationary variance remains admissible");
+    assert_eq!(recovered, 1.5);
+
+    let slightly_larger_subnormal = f64::from_bits(3);
+    let recovered_larger =
+        recover_event_time_standardised_continuous_diffusion(slightly_larger_subnormal, -0.75)
+            .expect("scale must not alter the standardized scalar identity");
+    assert_eq!(recovered_larger, 1.5);
 }
 
 #[test]
