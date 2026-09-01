@@ -106,7 +106,9 @@ does not infer causality.
 
 `POST /v1/project-histories/{idempotency_key}/cancel` removes one accepted
 identity (ADR 0079). Receipts stay metric-free with `cancelled=true` and
-`inference_status=temporal_association_only`. Naruon is refused.
+`inference_status=temporal_association_only`. Published
+`tepp-project-history-cancel cancel` mints that cancel POST onto spawned
+`tepp-loopback` TCP (ADR 0080). Naruon is refused.
 `NaruonLiveService` stays POST-only.
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or

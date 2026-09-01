@@ -28,6 +28,7 @@ mod naruon_http;
 mod naruon_live;
 mod orchestration;
 mod project_history;
+mod project_history_cancel_cli;
 mod project_history_cancel_http;
 mod project_history_collection_http;
 mod project_history_retrieval_http;
@@ -275,6 +276,22 @@ pub use project_history_cancel_http::PROJECT_HISTORY_CANCEL_ID_MAX_LEN;
 pub use project_history_cancel_http::project_history_cancel_path_id;
 /// Build a credential-free `LineageWeave` cancel POST exchange.
 pub use project_history_cancel_http::lineageweave_project_history_cancel_exchange;
+/// Supported operator verbs for the loopback project-history cancel CLI.
+pub use project_history_cancel_cli::ProjectHistoryCancelCliVerb;
+/// One operator CLI invocation against a loopback project-history cancel POST.
+pub use project_history_cancel_cli::ProjectHistoryCancelCliInvocation;
+/// Compose one HTTP/1.1 cancel POST from the typed `LineageWeave` exchange.
+pub use project_history_cancel_cli::compose_project_history_cancel_cli_http;
+/// Dispatch one cancel CLI invocation against an in-process listener.
+pub use project_history_cancel_cli::dispatch_project_history_cancel_cli;
+/// Execute one cancel CLI invocation over loopback TCP.
+pub use project_history_cancel_cli::execute_project_history_cancel_cli;
+/// Render a typed project-history cancel exchange as HTTP/1.1 for loopback.
+pub use project_history_cancel_cli::loopback_http1_from_project_history_cancel_exchange;
+/// Read stdin leftover bytes on a non-terminal; cancel POST admits empty.
+pub use project_history_cancel_cli::read_project_history_cancel_cli_stdin;
+/// Filter CLI stdout so cancel never prints scientific acceptance.
+pub use project_history_cancel_cli::render_project_history_cancel_cli_stdout;
 /// Maximum posterior Project Journey artifact size.
 pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
 /// Exact posterior Project Journey schema identity.
