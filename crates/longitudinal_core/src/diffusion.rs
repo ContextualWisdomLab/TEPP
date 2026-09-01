@@ -43,8 +43,10 @@ pub fn recover_event_time_standardised_continuous_diffusion(
     // Algebraically q / (-q/(2a)) == -2a for every positive q. Evaluating
     // q / rounded(p) is numerically wrong when q and p are subnormal because
     // the rounded stationary variance no longer preserves that cancellation.
+    // The admission gate has already established finite log_rate < 0, so the
+    // only possible invalid result here is overflow to +infinity.
     let ratio = -2.0 * log_rate;
-    if !ratio.is_finite() || ratio <= 0.0 {
+    if !ratio.is_finite() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     Ok(ratio)
