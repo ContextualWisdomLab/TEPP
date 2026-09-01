@@ -133,6 +133,7 @@ pub fn center_within_unit_event_lags(
         if occasions.len() < 2 {
             continue;
         }
+        occasions.sort_by(|left, right| left.event_time().total_cmp(&right.event_time()));
         let count = occasions.len() as f64;
         let mut total = 0.0_f64;
         for row in occasions.iter() {
@@ -142,7 +143,6 @@ pub fn center_within_unit_event_lags(
         if !mean.is_finite() {
             return Err(LongitudinalError::InvalidObservationPayload);
         }
-        occasions.sort_by(|left, right| left.event_time().total_cmp(&right.event_time()));
         for window in occasions.windows(2) {
             let earlier_residual = window[0].score() - mean;
             let later_residual = window[1].score() - mean;
