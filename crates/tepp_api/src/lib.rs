@@ -21,6 +21,7 @@ mod envelope;
 mod error;
 mod export;
 mod export_http;
+mod export_idempotency_lookup_cli;
 mod export_idempotency_lookup_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
@@ -119,6 +120,22 @@ pub use export_idempotency_lookup_http::ExportIdempotencyLookup;
 pub use export_idempotency_lookup_http::naruon_export_idempotency_lookup_exchange;
 /// Refuse scientific-metric keys on export lookup JSON.
 pub use export_idempotency_lookup_http::refuse_metrics_on_export_idempotency_lookup_payload;
+/// One operator CLI invocation against export idempotency-lookup GET.
+pub use export_idempotency_lookup_cli::ExportIdempotencyLookupCliInvocation;
+/// Supported export idempotency-lookup CLI verbs.
+pub use export_idempotency_lookup_cli::ExportIdempotencyLookupCliVerb;
+/// Compose HTTP/1.1 lookup GET from a typed CLI invocation.
+pub use export_idempotency_lookup_cli::compose_export_idempotency_lookup_cli_http;
+/// Dispatch lookup CLI against an in-process listener.
+pub use export_idempotency_lookup_cli::dispatch_export_idempotency_lookup_cli;
+/// Execute lookup CLI over loopback TCP.
+pub use export_idempotency_lookup_cli::execute_export_idempotency_lookup_cli;
+/// Render a typed lookup GET as HTTP/1.1 for a loopback host.
+pub use export_idempotency_lookup_cli::loopback_http1_from_export_idempotency_lookup_exchange;
+/// Read leftover stdin for lookup GET (empty admitted).
+pub use export_idempotency_lookup_cli::read_export_idempotency_lookup_cli_stdin;
+/// Filter lookup CLI stdout so scientific acceptance never appears.
+pub use export_idempotency_lookup_cli::render_export_idempotency_lookup_cli_stdout;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;
