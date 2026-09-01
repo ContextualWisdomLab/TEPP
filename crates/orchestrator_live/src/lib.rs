@@ -12,12 +12,14 @@
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
 //! `tepp-interpretation-runs` CLI mints typed contextual-orchestrator
 //! interpretation-run POST exchanges onto spawned `tepp-orchestrator-loopback`
-//! TCP.
+//! TCP. `tepp-interpretation-run-get` retrieves one accepted identity without
+//! POST replay.
 
 mod error;
 mod http;
 mod interpretation_run_cli;
 mod interpretation_run_collection_http;
+mod interpretation_run_retrieval_cli;
 mod interpretation_run_retrieval_http;
 mod mode;
 mod request;
@@ -79,6 +81,22 @@ pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_CURSOR
 pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_DEFAULT_LIMIT;
 /// Maximum page size for interpretation-run collection GET.
 pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_MAX_LIMIT;
+/// Compose one HTTP/1.1 retrieval GET from the typed consumer exchange.
+pub use interpretation_run_retrieval_cli::compose_interpretation_run_retrieval_cli_http;
+/// Dispatch one retrieval CLI invocation against an in-process listener.
+pub use interpretation_run_retrieval_cli::dispatch_interpretation_run_retrieval_cli;
+/// Execute one retrieval CLI invocation over loopback TCP.
+pub use interpretation_run_retrieval_cli::execute_interpretation_run_retrieval_cli;
+/// Render a typed retrieval GET exchange as HTTP/1.1 for a loopback listener.
+pub use interpretation_run_retrieval_cli::loopback_http1_from_interpretation_run_retrieval_exchange;
+/// Read stdin leftover bytes; retrieval GET admits empty.
+pub use interpretation_run_retrieval_cli::read_interpretation_run_retrieval_cli_stdin;
+/// Filter CLI stdout so retrieval never prints scientific acceptance.
+pub use interpretation_run_retrieval_cli::render_interpretation_run_retrieval_cli_stdout;
+/// One operator CLI invocation against a loopback GET-by-id listener.
+pub use interpretation_run_retrieval_cli::InterpretationRunRetrievalCliInvocation;
+/// Supported operator verbs for the loopback interpretation-run retrieval CLI.
+pub use interpretation_run_retrieval_cli::InterpretationRunRetrievalCliVerb;
 /// Build a credential-free contextual-orchestrator GET-by-id exchange.
 pub use interpretation_run_retrieval_http::contextual_orchestrator_interpretation_run_retrieval_exchange;
 /// Serialize one metric-free GET-by-id identity.
