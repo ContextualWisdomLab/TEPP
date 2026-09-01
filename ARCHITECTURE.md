@@ -177,4 +177,4 @@ Documents, external metadata, serialized payloads, model artifacts, and LLM outp
 - longitudinal/ctsem equation evidence: [`docs/research/multilevel-event-time-recovery.md`](docs/research/multilevel-event-time-recovery.md)
 - scientific promotion: ADR 0014 and [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md)
 
-Detailed equation-by-equation recovery evidence belongs in research/doctoring documents and executable tests, not duplicated into architecture responsibility tables.
+Detailed equation-by-equation recovery evidence belongs in `docs/research/` and executable tests, not duplicated into architecture responsibility tables.
