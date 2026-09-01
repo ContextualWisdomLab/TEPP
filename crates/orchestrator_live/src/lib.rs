@@ -8,7 +8,8 @@
 //! metric-free identities so operators do not guess idempotency keys.
 //! GET-by-id returns one of those identities without POST replay.
 //! `GET /v1/interpretation-runs/{idempotency_key}/request` returns the stored
-//! create request without POST replay.
+//! create request without POST replay. Published `tepp-interpretation-run-request`
+//! mints that GET onto spawned `tepp-orchestrator-loopback` TCP.
 //! Table-access hosts, review/Copilot/GitHub credentials, and
 //! `COPILOT_GITHUB_TOKEN` fail closed. This crate does not implement TLS
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
@@ -21,6 +22,7 @@ mod http;
 mod interpretation_run_cli;
 mod interpretation_run_collection_http;
 mod interpretation_run_retrieval_http;
+mod interpretation_run_stored_request_cli;
 mod interpretation_run_stored_request_http;
 mod mode;
 mod request;
@@ -102,6 +104,22 @@ pub use interpretation_run_stored_request_http::is_interpretation_run_stored_req
 pub use interpretation_run_stored_request_http::refuse_metrics_on_interpretation_run_stored_request_payload;
 /// Typed GET exchange for interpretation-run stored-request retrieval.
 pub use interpretation_run_stored_request_http::InterpretationRunStoredRequestHttpExchange;
+/// Compose HTTP/1.1 stored-request GET from a CLI invocation.
+pub use interpretation_run_stored_request_cli::compose_interpretation_run_stored_request_cli_http;
+/// Dispatch a stored-request CLI invocation against an in-process listener.
+pub use interpretation_run_stored_request_cli::dispatch_interpretation_run_stored_request_cli;
+/// Execute a stored-request CLI invocation over loopback TCP.
+pub use interpretation_run_stored_request_cli::execute_interpretation_run_stored_request_cli;
+/// Render a typed stored-request exchange onto a loopback HTTP/1.1 request.
+pub use interpretation_run_stored_request_cli::loopback_http1_from_interpretation_run_stored_request_exchange;
+/// Read leftover stdin for the stored-request CLI.
+pub use interpretation_run_stored_request_cli::read_interpretation_run_stored_request_cli_stdin;
+/// Filter stored-request CLI stdout so `scientific_authority` stays false.
+pub use interpretation_run_stored_request_cli::render_interpretation_run_stored_request_cli_stdout;
+/// Loopback stored-request CLI invocation.
+pub use interpretation_run_stored_request_cli::InterpretationRunStoredRequestCliInvocation;
+/// Loopback stored-request CLI verb.
+pub use interpretation_run_stored_request_cli::InterpretationRunStoredRequestCliVerb;
 /// Closed ADR 0010 orchestration-mode vocabulary.
 pub use mode::OrchestrationMode;
 /// Accepted hypothetical interpretation-run response.

@@ -66,6 +66,7 @@ POST   /v1/interpretation-runs
 GET    /v1/interpretation-runs
 GET    /v1/interpretation-runs/{idempotency_key}
 GET    /v1/interpretation-runs/{idempotency_key}/request
+Loopback `tepp-interpretation-run-request get` mints that stored-request GET onto spawned `tepp-orchestrator-loopback` TCP.
 POST   /v1/analysis-runs
 POST   /v1/temporal-context
 GET    /v1/analysis-runs/{run_id}

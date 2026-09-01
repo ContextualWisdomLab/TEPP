@@ -29,5 +29,11 @@ path = "src/bin/tepp_interpretation_runs.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "tepp-interpretation-run-request"
+path = "src/bin/tepp_interpretation_run_request.rs"
+test = false
+bench = false
+
 [lints]
 workspace = true
