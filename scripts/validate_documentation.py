@@ -103,7 +103,7 @@ QUEUED_CHECKS_ADVERSATIVE = re.compile(
 )
 QUEUED_CHECKS_SENTENCE_BREAK = re.compile(r"[.;!?\n]")
 ADR_TABLE_ROW = re.compile(
-    r"^\|\s*\[(?P<number>\d{4})\]\((?P<target>[^)\s]+)\)\s*\|",
+    r'^\|\s*\[(?P<number>\d{4})\]\((?P<target>[^)\s]+)(?:\s+"[^"]*")?\)\s*\|',
     re.MULTILINE,
 )
 ADR_FILE_NAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
