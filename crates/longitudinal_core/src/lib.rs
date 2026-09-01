@@ -6,16 +6,19 @@
 //! Stable between-unit components cannot be scored as within-unit change.
 //! Event-time lagged associations require both marginal variances before a
 //! covariance can be standardized as a correlation. Event-interval response
-//! transforms live here rather than in a generic psychometric kernel. Recovery
-//! reports computed component RMSE against known truth (ADR 0005).
+//! transforms and scalar diffusion standardisation candidates live here rather
+//! than in a generic psychometric kernel. Recovery reports computed component
+//! RMSE against known truth (ADR 0005).
 
 mod association;
 mod component;
 mod decompose;
+mod diffusion;
 mod discrete_drift;
 mod error;
 mod event_time;
 mod level;
+mod stationary;
 mod temporal_association;
 
 /// One unit-specific within or between component.
@@ -26,6 +29,16 @@ pub use component::component_root_mean_square_error;
 pub use decompose::OccasionObservation;
 /// Decompose occasion scores into unit means and within residuals.
 pub use decompose::decompose_within_between;
+/// Recover the scalar research-candidate continuous diffusion standardisation on event time.
+pub use diffusion::recover_event_time_standardised_continuous_diffusion;
+/// Recover the scalar research-candidate discrete diffusion standardisation on event time.
+pub use diffusion::recover_event_time_standardised_discrete_diffusion;
+/// Refuse continuous standardised diffusion as discrete standardised diffusion.
+pub use diffusion::refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion;
+/// Refuse total-variance scaling as relevant-variance diffusion standardisation.
+pub use diffusion::refuse_total_variance_scaled_diffusion_as_standardised_diffusion;
+/// Refuse unstandardised diffusion as standardised diffusion.
+pub use diffusion::refuse_unstandardised_diffusion_as_standardised_diffusion;
 /// Recover scalar Driver p.16 `discreteDRIFTstd` on substantive event time.
 pub use discrete_drift::recover_event_time_standardised_discrete_drift;
 /// Refuse trait-plus-state association as `discreteDRIFTstd`.
