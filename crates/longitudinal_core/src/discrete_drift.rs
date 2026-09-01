@@ -1,6 +1,8 @@
 //! Event-time standardisation for scalar continuous-time drift.
 
-use crate::{EventTimeInterval, LongitudinalError};
+use crate::{
+    EventTimeInterval, LongitudinalError, stationary::recover_stationary_within_variance,
+};
 
 /// Recover the scalar p. 16 `discreteDRIFTstd` on event time.
 ///
@@ -32,33 +34,8 @@ pub fn recover_event_time_standardised_discrete_drift(
     log_rate: f64,
     event_interval: EventTimeInterval,
 ) -> Result<f64, LongitudinalError> {
-    if !continuous_diffusion.is_finite() || continuous_diffusion < 0.0 {
-        return Err(LongitudinalError::InvalidTemporalTransformInput);
-    }
-    if !log_rate.is_finite() {
-        return Err(LongitudinalError::InvalidTemporalTransformInput);
-    }
-    if log_rate >= 0.0 {
-        return Err(LongitudinalError::StationaryVarianceRequiresStableDrift);
-    }
-    if continuous_diffusion == 0.0 {
-        return Err(LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance);
-    }
-
-    // Prefer the direct scalar stationary-variance expression when doubling the
-    // stable rate remains representable. If only that intermediate overflows,
-    // divide by the finite original rate first and apply the factor 1/2 after
-    // the division. This preserves valid extreme-rate cases such as
-    // q = f64::MAX, a = -f64::MAX without changing the mathematical estimand.
-    let twice_rate = log_rate * 2.0;
-    let within_person_variance = if twice_rate.is_finite() {
-        continuous_diffusion / -twice_rate
-    } else {
-        (continuous_diffusion / -log_rate) * 0.5
-    };
-    if !within_person_variance.is_finite() {
-        return Err(LongitudinalError::InvalidTemporalTransformInput);
-    }
+    let within_person_variance =
+        recover_stationary_within_variance(continuous_diffusion, log_rate)?;
     if within_person_variance <= 0.0 {
         return Err(LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance);
     }
