@@ -21,6 +21,10 @@ use crate::interpretation_run_collection_http::{
 use crate::interpretation_run_lookup_http::{
     interpretation_run_lookup_path_id, is_interpretation_run_lookup_path,
 };
+use crate::interpretation_run_lookup_stored_request_http::{
+    interpretation_run_lookup_stored_request_path_id,
+    is_interpretation_run_lookup_stored_request_path,
+};
 use crate::interpretation_run_retrieval_http::{
     interpretation_run_retrieval_item_json, interpretation_run_retrieval_path_id,
 };
@@ -197,6 +201,9 @@ impl OrchestratorLiveService {
             if is_interpretation_run_stored_request_path(path) {
                 return self.get_interpretation_run_stored_request(path, &headers, body);
             }
+            if is_interpretation_run_lookup_stored_request_path(path) {
+                return self.get_interpretation_run_lookup_stored_request(path, &headers, body);
+            }
             if is_interpretation_run_lookup_path(path) {
                 return self.lookup_interpretation_run_by_run_id(path, &headers, body);
             }
@@ -297,6 +304,31 @@ impl OrchestratorLiveService {
             .get(&idempotency_key)
             .map(|(request, _)| request)
             .ok_or(OrchestratorLiveError::InvalidWirePayload)?;
+        let payload = stored.to_json()?;
+        refuse_metrics_on_interpretation_run_stored_request_payload(&payload)?;
+        Ok(OrchestratorLiveResponse::json(200, "OK", payload))
+    }
+
+    fn get_interpretation_run_lookup_stored_request(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<OrchestratorLiveResponse, OrchestratorLiveError> {
+        let interpretation_run_id = interpretation_run_lookup_stored_request_path_id(path)?;
+        if !body.is_empty() {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
+        refuse_retrieval_get_headers(headers)?;
+        let mut matches = self.accepted_runs.values().filter_map(|(request, accepted)| {
+            (accepted.interpretation_run_id() == interpretation_run_id).then_some(request)
+        });
+        let stored = matches
+            .next()
+            .ok_or(OrchestratorLiveError::InvalidWirePayload)?;
+        if matches.next().is_some() {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
         let payload = stored.to_json()?;
         refuse_metrics_on_interpretation_run_stored_request_payload(&payload)?;
         Ok(OrchestratorLiveResponse::json(200, "OK", payload))

@@ -14,6 +14,8 @@
 //! metric-free identity of the unique accepted run without POST replay.
 //! Published `tepp-interpretation-run-lookup` mints that GET onto spawned
 //! `tepp-orchestrator-loopback` TCP.
+//! `GET /v1/interpretation-runs/by-run-id/{interpretation_run_id}/request`
+//! returns the stored create request of that unique accepted run.
 //! Table-access hosts, review/Copilot/GitHub credentials, and
 //! `COPILOT_GITHUB_TOKEN` fail closed. This crate does not implement TLS
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
@@ -27,6 +29,7 @@ mod interpretation_run_cli;
 mod interpretation_run_collection_http;
 mod interpretation_run_lookup_cli;
 mod interpretation_run_lookup_http;
+mod interpretation_run_lookup_stored_request_http;
 mod interpretation_run_retrieval_http;
 mod interpretation_run_stored_request_cli;
 mod interpretation_run_stored_request_http;
@@ -102,6 +105,16 @@ pub use interpretation_run_lookup_http::contextual_orchestrator_interpretation_r
 pub use interpretation_run_lookup_http::interpretation_run_lookup_path_id;
 /// Whether a path is the lookup-by-run-id resource.
 pub use interpretation_run_lookup_http::is_interpretation_run_lookup_path;
+/// Extra-segment that names the stored create on lookup stored-request GET.
+pub use interpretation_run_lookup_stored_request_http::INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_SEGMENT;
+/// Typed GET exchange for stored-request lookup by server-assigned id.
+pub use interpretation_run_lookup_stored_request_http::InterpretationRunLookupStoredRequestHttpExchange;
+/// Build a credential-free contextual-orchestrator lookup stored-request GET.
+pub use interpretation_run_lookup_stored_request_http::contextual_orchestrator_interpretation_run_lookup_stored_request_exchange;
+/// Extract the opaque `interpretation_run_id` from a lookup stored-request path.
+pub use interpretation_run_lookup_stored_request_http::interpretation_run_lookup_stored_request_path_id;
+/// Whether a path is the lookup stored-request extra-segment resource.
+pub use interpretation_run_lookup_stored_request_http::is_interpretation_run_lookup_stored_request_path;
 /// Loopback lookup CLI invocation.
 pub use interpretation_run_lookup_cli::InterpretationRunLookupCliInvocation;
 /// Loopback lookup CLI verb.

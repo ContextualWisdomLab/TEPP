@@ -13,6 +13,7 @@
 
 use crate::error::OrchestratorLiveError;
 use crate::interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
+use crate::interpretation_run_lookup_http::INTERPRETATION_RUN_LOOKUP_PREFIX;
 use crate::interpretation_run_retrieval_http::INTERPRETATION_RUN_RETRIEVAL_ID_MAX_LEN;
 use crate::request::{host_implies_table_access, require_nonempty, INTERPRETATION_RUN_PATH};
 
@@ -69,6 +70,9 @@ pub fn interpretation_run_stored_request_path_id(
     }
     let idempotency_key = decode_path_segment(encoded_id)?;
     require_nonempty(&idempotency_key)?;
+    if idempotency_key == INTERPRETATION_RUN_LOOKUP_PREFIX {
+        return Err(OrchestratorLiveError::InvalidWirePayload);
+    }
     if idempotency_key.contains('/') || idempotency_key.contains('\0') {
         return Err(OrchestratorLiveError::InvalidWirePayload);
     }
@@ -107,6 +111,9 @@ pub fn contextual_orchestrator_interpretation_run_stored_request_exchange(
         return Err(OrchestratorLiveError::InvalidWirePayload);
     }
     require_nonempty(idempotency_key)?;
+    if idempotency_key == INTERPRETATION_RUN_LOOKUP_PREFIX {
+        return Err(OrchestratorLiveError::InvalidWirePayload);
+    }
     if idempotency_key.contains('/') || idempotency_key.contains('\0') {
         return Err(OrchestratorLiveError::InvalidWirePayload);
     }
@@ -271,6 +278,16 @@ mod tests {
         );
         assert_eq!(
             interpretation_run_stored_request_path_id("/v1/interpretation-runs/idem-a/cancel"),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        assert_eq!(
+            interpretation_run_stored_request_path_id("/v1/interpretation-runs/by-run-id/request"),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        assert_eq!(
+            interpretation_run_stored_request_path_id(
+                "/v1/interpretation-runs/by-run-id/orch-run-1/request"
+            ),
             Err(OrchestratorLiveError::InvalidWirePayload)
         );
         assert_eq!(
