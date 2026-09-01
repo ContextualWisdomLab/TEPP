@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 
 use crate::error::OrchestratorLiveError;
 use crate::request::{
-    DEFAULT_INTERPRETATION_BYTE_LIMIT, host_implies_table_access, require_nonempty,
+    host_implies_table_access, require_nonempty, DEFAULT_INTERPRETATION_BYTE_LIMIT,
 };
 
 /// Maximum request-line plus header bytes accepted before the body.
@@ -211,6 +211,17 @@ pub(crate) fn refuse_collection_get_headers(
     Ok(())
 }
 
+/// GET-by-id admits empty bodies and refuses pagination plus `idempotency-key`.
+pub(crate) fn refuse_retrieval_get_headers(
+    headers: &HashMap<String, String>,
+) -> Result<(), OrchestratorLiveError> {
+    refuse_collection_get_headers(headers)?;
+    if headers.contains_key("tepp-page-limit") || headers.contains_key("tepp-page-cursor") {
+        return Err(OrchestratorLiveError::InvalidWirePayload);
+    }
+    Ok(())
+}
+
 fn refuse_common_live_headers(
     headers: &HashMap<String, String>,
 ) -> Result<(), OrchestratorLiveError> {
@@ -280,8 +291,8 @@ pub(crate) fn status_for(error: OrchestratorLiveError) -> (u16, &'static str) {
 mod tests {
     use super::{
         declared_content_length, header_is_credential, map_io_error, parse_headers,
-        parse_request_line, refuse_collection_get_headers, refuse_live_headers, split_header_line,
-        split_request, status_for,
+        parse_request_line, refuse_collection_get_headers, refuse_live_headers,
+        refuse_retrieval_get_headers, split_header_line, split_request, status_for,
     };
     use crate::error::OrchestratorLiveError;
     use std::collections::HashMap;
@@ -457,6 +468,13 @@ mod tests {
         );
         headers.remove("idempotency-key");
         refuse_collection_get_headers(&headers).expect("collection headers");
+        refuse_retrieval_get_headers(&headers).expect("retrieval headers");
+        headers.insert("tepp-page-limit".into(), "1".into());
+        assert_eq!(
+            refuse_retrieval_get_headers(&headers),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        headers.remove("tepp-page-limit");
         headers.insert("tepp-consumer".into(), "naruon".into());
         assert_eq!(
             refuse_collection_get_headers(&headers),
