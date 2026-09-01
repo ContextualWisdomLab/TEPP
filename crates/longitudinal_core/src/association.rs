@@ -131,7 +131,11 @@ pub fn recover_event_time_lagged_correlation(
 
     let earlier_scale = earlier_total_variance.sqrt();
     let later_scale = later_total_variance.sqrt();
-    let (first_scale, second_scale) = if earlier_scale >= later_scale {
+    // Divide by the smaller scale first. The exact covariance-bound gate above
+    // guarantees the intermediate magnitude cannot exceed the remaining
+    // marginal scale, while this order avoids underflow when the marginals are
+    // separated by hundreds of binary exponents.
+    let (first_scale, second_scale) = if earlier_scale <= later_scale {
         (earlier_scale, later_scale)
     } else {
         (later_scale, earlier_scale)
