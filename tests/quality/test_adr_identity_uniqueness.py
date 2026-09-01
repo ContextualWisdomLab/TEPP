@@ -1,4 +1,4 @@
-"""Regression tests for repository-wide ADR identity uniqueness."""
+"""Regression tests for repository-wide ADR identity and authority consistency."""
 
 from __future__ import annotations
 
@@ -43,9 +43,14 @@ Rollback.
 
 
 class AdrIdentityUniquenessTests(unittest.TestCase):
-    """Reject branch-local reuse or misdirection of an ADR identifier."""
+    """Reject branch-local reuse, misdirection, or split ADR authority metadata."""
 
-    def _root(self, index_rows: str, files: dict[str, str]) -> Path:
+    def _root(
+        self,
+        index_rows: str,
+        files: dict[str, str],
+        bodies: dict[str, str] | None = None,
+    ) -> Path:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name)
@@ -58,7 +63,8 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             encoding="utf-8",
         )
         for name, number in files.items():
-            (adr_root / name).write_text(ADR_BODY.format(number=number), encoding="utf-8")
+            body = (bodies or {}).get(name, ADR_BODY.format(number=number))
+            (adr_root / name).write_text(body, encoding="utf-8")
         return root
 
     def test_duplicate_index_rows_fail(self) -> None:
@@ -118,6 +124,60 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
         )
         with mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "duplicate ADR index identity"):
+                docs.validate_adr_graph()
+
+    def test_index_maturity_must_match_canonical_adr(self) -> None:
+        """The index cannot advertise a different implementation maturity."""
+
+        root = self._root(
+            "| [0001](0001-one.md) | One | Accepted | active-PR | drift |\n",
+            {"0001-one.md": "0001"},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "ADR index maturity mismatch"):
+                docs.validate_adr_graph()
+
+    def test_index_decision_status_must_match_canonical_adr(self) -> None:
+        """Accepted/proposed authority may not diverge between file and index."""
+
+        root = self._root(
+            "| [0001](0001-one.md) | One | Proposed | partial | drift |\n",
+            {"0001-one.md": "0001"},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "ADR index decision-status mismatch"):
+                docs.validate_adr_graph()
+
+    def test_duplicate_maturity_metadata_fails(self) -> None:
+        """An ADR has exactly one canonical implementation-maturity declaration."""
+
+        body = ADR_BODY.format(number="0001").replace(
+            "**Implementation maturity:** partial",
+            "**Implementation maturity:** partial\n**Implementation maturity:** active-PR",
+        )
+        root = self._root(
+            "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n",
+            {"0001-one.md": "0001"},
+            {"0001-one.md": body},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "multiple Implementation maturity"):
+                docs.validate_adr_graph()
+
+    def test_duplicate_decision_status_metadata_fails(self) -> None:
+        """An ADR has exactly one canonical decision-status declaration."""
+
+        body = ADR_BODY.format(number="0001").replace(
+            "**Decision status:** Accepted",
+            "**Decision status:** Accepted\n**Decision status:** Proposed",
+        )
+        root = self._root(
+            "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n",
+            {"0001-one.md": "0001"},
+            {"0001-one.md": body},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "multiple Decision status"):
                 docs.validate_adr_graph()
 
     def test_canonical_index_targets_pass(self) -> None:
