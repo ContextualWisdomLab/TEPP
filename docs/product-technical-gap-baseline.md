@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-01T13:07:05Z  
+**Snapshot:** 2026-09-01T14:02:31Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`  
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
@@ -19,30 +19,32 @@ Passing or queued Checks on an open PR never promote that PR to implemented-main
 | Signal | Current evidence | Delivery implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
-| Open pull requests | **138** | Release-blocking WIP remains high despite falling from the observed peak of 149. |
+| Open pull requests | **145** | Release-blocking WIP remains high and rose again after reaching 138. |
 | Draft pull requests | **89** | Draft status is workflow metadata, not scientific or domain classification. |
-| Non-draft pull requests | **49** | Ready metadata is not merge readiness without exact-head evidence. |
+| Non-draft pull requests | **56** | Ready metadata is not merge readiness without exact-head evidence. |
 | Open issues | **14** | Includes #437 for repository-wide ADR identity normalization. |
 | GitHub releases | **0** | No open PR head or local branch is a released TEPP product contract. |
-| Effective organization ruleset | `18156473` | Current ruleset, exact-head workflows, resolved conversations and qualifying review govern merge. |
+| Effective organization ruleset | `18156473` | Current ruleset requires one qualifying approval, resolved review threads, exact-head required workflows, and an allowed merge method. |
 
 The classic branch-protection payload is not the sole policy source. Organization rulesets are the effective merge authority where applicable.
 
-The queue fell from the observed peak of 149 to 134, then rose to 135 when #454 appeared, to 137 with #455/#456, and to 138 with #457. New one-operation Analysis Run slices therefore still count as WIP regression while queue recovery is active even though predecessor closure has reduced the peak queue.
+The queue fell from the observed peak of 149 to 134, then rose to 135 with #454, 137 with #455/#456, 138 with #457, and **145 with #458-#464**. That latest increase is a WIP regression. #459, #463 and #464 are additional one-operation Analysis Run adapter slices; #458, #460 and #461 are one-refusal analysis-profile slices. #462 is a bounded naming/compatibility repair and is evaluated separately rather than used to justify the surrounding micro-PR growth.
 
 ## Current priority open pull-request evidence
 
-This table is an exact-head **priority subset**, not a row-for-row copy of the 138-PR queue. PR #435 itself is omitted because writing its own exact head into a commit on that branch would immediately make the embedded head stale.
+This table is an exact-head **priority subset**, not a row-for-row copy of the 145-PR queue. PR #435 itself is omitted because writing its own exact head into a commit on that branch would immediately make the embedded head stale.
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
+| #464 | `0a16134ab6e4d8d4a30012dc5d5234d6ff59b235` | false | #463 head | Analysis Run/LineageWeave temporal-context stored-request CLI; `fold_into_landing_vehicle` |
+| #463 | `b476b9de1bbd949e7b089727bfac2256a5cbb886` | false | #451 head | Analysis Run/LineageWeave temporal-context stored-request GET; `fold_into_landing_vehicle` |
 | #457 | `f259497ff2e45536352fa399504f56b736ad4f83` | false | #411 head | Analysis Run/naruon export stored-request GET; `fold_into_landing_vehicle` |
 | #456 | `ade6e27d46f477d8332bce13ccee080f0b55bfa9` | false | #455 head | Analysis Run/LineageWeave project-history stored-request CLI; `fold_into_landing_vehicle` |
 | #455 | `c7e02968f147157aedbe805a8ffac823bdb716bf` | false | #429 head | Analysis Run/LineageWeave project-history stored-request GET; `fold_into_landing_vehicle` |
 | #454 | `c911fbcd6e13046358cc7f3692775ed4b008dadd` | false | #453 head | Analysis Run/contextual-orchestrator stored-request CLI; `fold_into_landing_vehicle` |
 | #453 | `baee8854e99dc416b2b907a22101c53a6eca9eca` | false | #438 head | Analysis Run/contextual-orchestrator stored-request GET; `fold_into_landing_vehicle` |
-| #452 | `cb97aad9f87283df4d94abe8c6df61a0a476c893` | false | #451 head | Analysis Run/LineageWeave temporal-context retrieval CLI; `fold_into_landing_vehicle` candidate |
-| #451 | `7b117e8f69cd74e28eceaf1748c6a9210f5dffbc` | false | main | Analysis Run/LineageWeave temporal-context GET-by-id; `fold_into_landing_vehicle` candidate |
+| #452 | `cb97aad9f87283df4d94abe8c6df61a0a476c893` | false | #451 head | Analysis Run/LineageWeave temporal-context retrieval CLI; `fold_into_landing_vehicle` |
+| #451 | `7b117e8f69cd74e28eceaf1748c6a9210f5dffbc` | false | main | Analysis Run/LineageWeave temporal-context GET-by-id; `fold_into_landing_vehicle` |
 | #443 | `504793d88c6b754f5181f48dc7abde073ff9146a` | false | #411 head | Analysis Run/export collection adapter; `fold_into_landing_vehicle` |
 | #441 | `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5` | false | main | Longitudinal Modeling lagged-correlation root-cause repair; exact-head hosted gates still pending |
 
@@ -129,19 +131,23 @@ A generic arithmetic standardizer is not itself a DSEM/ctsem estimator and must 
 
 **#441 — Longitudinal Modeling landing vehicle.** The invalid predecessor that divided lagged covariance by only the earlier marginal variance has been retired. `longitudinal_core::recover_event_time_lagged_correlation` now requires lagged covariance plus both occasion-specific marginal variances and a positive event-time lag. Exact binary64 covariance-bound checking avoids rounded-product acceptance/rejection errors and stable division order avoids avoidable overflow/underflow. All currently visible review threads are resolved. Exact-head Documentation Quality, Rust Foundation CI, Security Scan and SAST Semgrep remain queued, so queued checks never constitute implemented-main evidence.
 
-**#457 — Analysis Run export adapter fold candidate.** The extra-segment `GET /v1/exports/{export_id}/request` slice is stacked on #411 and its own PR description already classifies it `fold_into_landing_vehicle`. Preserve stored-request path parsing, LineageWeave/hostile-identity/credential refusals, metric-free response, focused tests and cancel-route refusal, then fold it with #411/#417/#443/#444/#410. ADR 0089 is implementation evidence pending #437 normalization, not branch-local architecture authority.
+**#463/#464 together with #451/#452 — Analysis Run temporal-context adapter fold candidates.** #463 and #464 were created after the queue had already begun recovery and are additional GET/CLI slices over the same LineageWeave temporal-context application boundary. Preserve extra-segment/path and CLI parsing, hostile identity/body/stdin/origin/credential/consumer refusals, metric-free stored-request behavior, `temporal_association_only` semantics and focused contract tests. Fold them with #451/#452/#414 into one coherent temporal-context application-adapter landing vehicle. ADR 0091/0092 are implementation evidence pending #437 normalization, not new architecture authority.
+
+**#457/#459 — Analysis Run export adapter fold candidates.** The stored-request GET and dedicated CLI are additional naruon-facing export adapters stacked on the existing export family. Preserve stored-request path/CLI parsing, LineageWeave/hostile-identity/credential refusals, metric-free responses, focused tests and cancel-route refusal, then fold with #411/#417/#443/#444/#410. ADR 0089/0090 are implementation evidence pending #437 normalization, not branch-local architecture authority.
 
 **#455/#456 — Analysis Run project-history adapter fold candidates.** Their own PR descriptions classify them `fold_into_landing_vehicle` and prohibit independent merge while queue recovery is active. Preserve stored-request path/CLI parsing, hostile-input/origin/credential/consumer refusals, `inference_status=temporal_association_only`, metric-free responses and focused contract tests, then fold with #429/#431/#424/#428/#420. ADR 0087/0088 are implementation evidence pending #437 normalization, not branch-local architecture authority.
 
 **#453/#454 — Analysis Run interpretation adapter fold candidates.** Their PR descriptions explicitly classify them `fold_into_landing_vehicle`. Preserve stored-request path/CLI parsing, hostile-input, origin/credential/consumer refusal, metric-free result and `scientific_authority=false` tests. ADR 0085/0086 are implementation evidence pending #437 normalization, not branch-local architecture authority.
 
-**#451/#452 — Analysis Run temporal-context adapter fold candidates.** Preserve LineageWeave-only identity/refusal/metric-free tests, then fold with the coherent temporal-context adapter vehicle instead of creating a bounded context per GET/CLI operation.
+**#458/#460/#461 — Validation / Analysis Run profile fold candidates.** These bind one already-existing refusal rule at a time (`outcome_order`, `relation_absence`, `episode_membership`) into separate analysis-run profiles. The rules and their cutoff-safe tests are evidence worth preserving, but one refusal profile is not one bounded context. Fold compatible profile registration, cutoff/digest/census mechanics, limit handling and inspect-payload refusal tests into the coherent Validation/Analysis Run vehicle instead of extending per-rule PR/ADR proliferation.
+
+**#462 — bounded source-identifier repair.** Renaming the Rust source field to `node_id` while preserving the serialized v1 `id` wire key is a compatibility-scoped root-cause repair rather than a new domain slice. It may remain independently landable if current exact-head compatibility, documentation, coverage, review and security gates are satisfied; it does not justify new Analysis Run micro-PRs.
 
 **#443/#444 and related export slices — Analysis Run export fold candidates.** Preserve pagination/auth/refusal/metric-free tests and fold into one export application-adapter landing vehicle.
 
 **#356 — closed, not merged.** Its self-referential RMSE-SE acceptance gate, caller-declared recovery provenance and Validation/Claim-Promotion conflation remain prohibited. Useful cutoff/run-binding/metric evidence belongs in the coherent Validation/Analysis Run vehicle.
 
-**#437 — ADR identity repair.** Repository-wide ADR IDs are immutable and unique. Duplicate numeric files/index rows must fail deterministic fitness tests. Implementation maturity does not create branch-local architecture authority.
+**#437 — ADR identity repair.** Repository-wide ADR IDs are immutable and unique. Duplicate numeric files/index rows must fail deterministic fitness tests. The queue-authority branch now contains duplicate-index, duplicate-target and duplicate-numbered-file checks; normalization must still land coherently rather than renumbering every live micro-branch independently. Implementation maturity does not create branch-local architecture authority.
 
 ## Dependency pin status
 
@@ -151,7 +157,7 @@ A generic arithmetic standardizer is not itself a DSEM/ctsem estimator and must 
 
 | ID | Gap | Maturity | Authority | Closure evidence |
 | --- | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 138 open PRs | `release-blocking` | #175 / #435 | classified queue, coherent bounded-context landing vehicles, unique evidence preserved, safe reduction |
+| GAP-001 | PR authority fragmented across 145 open PRs | `release-blocking` | #175 / #435 | classified queue, coherent bounded-context landing vehicles, unique evidence preserved, safe reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission incomplete | `partial` | Evidence & Semantic Measurement | immutable offsets/layout, language profiles, concept dictionary, unknown review, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator incomplete | `partial` | #167 | Rust CPU `f64` likelihood/estimands/uncertainty, relation/time/membership effects, multi-seed recovery, real candidate-K fits |
 | GAP-004 | durable end-to-end Analysis Run incomplete | `partial` | #166 | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation evidence, claim-promotion separation, Compose E2E |
