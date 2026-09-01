@@ -1,8 +1,8 @@
 # ADR 0005 ownership addendum — Longitudinal Modeling
 
-**Parent decision:** ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation  
-**Decision identity:** ADR 0005; this addendum does not mint a new ADR number  
-**Status:** Accepted clarification  
+**Parent decision:** ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
+**Decision identity:** ADR 0005; this addendum does not mint a new ADR number
+**Status:** Accepted clarification
 **Recorded:** 2026-09-01
 
 ## Decision clarification
@@ -15,7 +15,7 @@ For the scalar Driver, Oud, and Voelkle (2017) p. 16 `discreteDRIFTstd` special 
 
 The lagged-correlation boundary similarly requires both occasion-specific marginal variances and an `EventTimeInterval`; a covariance divided only by the earlier variance is not exposed as an autocorrelation.
 
-CWC-then-irregular residual log-rate is also Longitudinal Modeling composition. Person-mean centering of a time-related series is not raw-process drift (Curran & Bauer, 2011, pp. 583–619; PMC3059070 XML opened 2026-09-02; Eq. 36). The unique pairwise-mean-after-CWC evidence from Draft #327 is folded here with typed `EventTimeInterval` rather than grown on `psychometric_core`. Already-centered irregular pairs recover the Driver et al. (2017, Eq. 3) inverse; CWC of a raw AR path does not.
+CWC-then-irregular residual log-rate is also Longitudinal Modeling composition. Person-mean centering of a time-related series is not raw-process drift (Curran & Bauer, 2011, pp. 583–619; PMC3059070 XML opened 2026-09-02; Eq. 36). The unique pairwise-mean-after-CWC evidence from Draft #327 is folded here with typed `EventTimeInterval` rather than grown on `psychometric_core`. Already-centered irregular pairs `(1, 0.5)` recover `ln(0.5)` only for `Δt = 1`; for a general admitted interval the exact map is `ln(0.5) / Δt`. CWC of a raw AR path does not recover raw-process drift.
 
 ## DDD consequences
 
@@ -26,6 +26,6 @@ CWC-then-irregular residual log-rate is also Longitudinal Modeling composition. 
 
 ## Verification
 
-PR #310 is the current landing vehicle for this clarification. Its RED lineage includes an extreme stable-drift case that failed because `-2a` overflowed despite a representable stationary variance, and a typed event-time contract that could not compile before the value object existed. The repaired source avoids the unnecessary doubling overflow and moves public event-time admission behind `EventTimeInterval`. The #327 fold adds CWC-then-pairwise-mean residual log-rate with Curran refusal and known-truth already-centered recovery of `ln(0.5)`.
+PR #310 is the current landing vehicle for this clarification. Its RED lineage includes an extreme stable-drift case that failed because `-2a` overflowed despite a representable stationary variance, and a typed event-time contract that could not compile before the value object existed. The repaired source avoids the unnecessary doubling overflow and moves public event-time admission behind `EventTimeInterval`. The #327 fold adds CWC-then-pairwise-mean residual log-rate with Curran refusal and known-truth already-centered recovery of `ln(0.5)` at `Δt = 1`; arbitrary admitted intervals recover the exact `ln(0.5) / Δt` map.
 
 Protected-main maturity is not claimed until the exact landing head passes the live ruleset and is merged.
