@@ -29,6 +29,8 @@ mod naruon_live;
 mod orchestration;
 mod project_history;
 mod project_history_collection_http;
+mod project_history_retrieval_cli;
+mod project_history_retrieval_http;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
@@ -255,6 +257,34 @@ pub use project_history_collection_http::parse_project_history_collection_page_c
 pub use project_history_collection_http::parse_project_history_collection_page_limit;
 /// Refuse metric, evidence, and causal-score keys on collection JSON.
 pub use project_history_collection_http::refuse_metrics_on_project_history_collection_payload;
+/// Loopback project-history retrieval CLI invocation.
+pub use project_history_retrieval_cli::ProjectHistoryRetrievalCliInvocation;
+/// Loopback project-history retrieval CLI verb.
+pub use project_history_retrieval_cli::ProjectHistoryRetrievalCliVerb;
+/// Compose HTTP/1.1 retrieval GET from a CLI invocation.
+pub use project_history_retrieval_cli::compose_project_history_retrieval_cli_http;
+/// Dispatch a retrieval CLI invocation against an in-process listener.
+pub use project_history_retrieval_cli::dispatch_project_history_retrieval_cli;
+/// Execute a retrieval CLI invocation over loopback TCP.
+pub use project_history_retrieval_cli::execute_project_history_retrieval_cli;
+/// Render a typed retrieval GET exchange as loopback HTTP/1.1.
+pub use project_history_retrieval_cli::loopback_http1_from_project_history_retrieval_exchange;
+/// Read leftover stdin for the project-history retrieval CLI.
+pub use project_history_retrieval_cli::read_project_history_retrieval_cli_stdin;
+/// Filter retrieval CLI stdout so scientific-acceptance never appears.
+pub use project_history_retrieval_cli::render_project_history_retrieval_cli_stdout;
+/// Maximum opaque idempotency-key length on project-history GET-by-id.
+pub use project_history_retrieval_http::PROJECT_HISTORY_RETRIEVAL_ID_MAX_LEN;
+/// Header carrying the authorized tenant on project-history GET-by-id.
+pub use project_history_retrieval_http::PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER;
+/// Identity-bound project-history GET-by-id receipt.
+pub use project_history_retrieval_http::ProjectHistoryRetrievalReceipt;
+/// `LineageWeave` GET exchange for one stored project-history projection.
+pub use project_history_retrieval_http::lineageweave_project_history_retrieval_exchange;
+/// Extract the opaque idempotency key from a project-history retrieval path.
+pub use project_history_retrieval_http::project_history_retrieval_path_id;
+/// Refuse scientific-metric and causal-score keys on retrieval JSON.
+pub use project_history_retrieval_http::refuse_metrics_on_project_history_retrieval_payload;
 /// Maximum posterior Project Journey artifact size.
 pub use project_journey::DEFAULT_PROJECT_JOURNEY_BYTE_LIMIT;
 /// Exact posterior Project Journey schema identity.

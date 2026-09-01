@@ -162,8 +162,8 @@ impl ProjectHistoryRequest {
 
     fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(self.contract_version, PROJECT_HISTORY_CONTRACT_VERSION)?;
-        validate_bounded_text(&self.idempotency_key, 256)?;
-        validate_bounded_text(&self.tenant_workspace_id, 256)?;
+        validate_project_history_registry_identity(&self.idempotency_key)?;
+        validate_project_history_registry_identity(&self.tenant_workspace_id)?;
         validate_bounded_text(&self.project_key, 256)?;
         validate_bounded_text(&self.project_name, 512)?;
         validate_bounded_text(&self.focus_event_id, 256)?;
@@ -388,6 +388,14 @@ fn validate_bounded_text(value: &str, maximum_bytes: usize) -> Result<(), ApiErr
     if value.len() > maximum_bytes {
         return Err(ApiError::LimitExceeded);
     }
+    Ok(())
+}
+
+pub(crate) fn validate_project_history_registry_identity(value: &str) -> Result<(), ApiError> {
+    if value.chars().any(char::is_control) {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    validate_bounded_text(value, 256)?;
     Ok(())
 }
 
@@ -686,6 +694,13 @@ mod tests {
 
     #[test]
     fn request_refuses_missing_focus_bad_codes_and_excess_events() {
+        let mut control_identity = request_with_single_event();
+        control_identity.tenant_workspace_id = "\ntenant".into();
+        assert_eq!(
+            project_history_projection(&control_identity),
+            Err(ApiError::InvalidWirePayload)
+        );
+
         let mut missing_focus = request_with_single_event();
         missing_focus.focus_event_id = "missing".into();
         assert_eq!(

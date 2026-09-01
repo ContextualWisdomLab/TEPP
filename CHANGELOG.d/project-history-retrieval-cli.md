@@ -1,0 +1,1 @@
+- `tepp_api` publishes `tepp-project-history-get` for loopback `GET /v1/project-histories/{idempotency_key}` (ADR 0067). Stdout is one stored `temporal_association_only` projection. `tepp.scientific_acceptance.v1` never appears. Does not infer causality. Not collection CLI, not GET-by-id HTTP, not persistence.

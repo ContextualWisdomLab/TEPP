@@ -22,9 +22,13 @@ fn project_history_collection_is_metric_free_get_without_credentials() {
     assert!(!json.contains("tepp.scientific_acceptance.v1"));
     assert!(!json.contains("evidence_text"));
     assert!(!json.contains("findings"));
-    let exchange =
-        lineageweave_project_history_collection_exchange("https://tepp.example.test", None, None)
-            .expect("exchange");
+    let exchange = lineageweave_project_history_collection_exchange(
+        "https://tepp.example.test",
+        "tenant-a",
+        None,
+        None,
+    )
+    .expect("exchange");
     assert_eq!(exchange.method, "GET");
     assert!(exchange.target_url.ends_with("/v1/project-histories"));
     assert!(
@@ -46,7 +50,12 @@ fn project_history_collection_refuses_metrics_evidence_and_insecure_origins() {
         Err(ApiError::InvalidWirePayload)
     );
     assert_eq!(
-        lineageweave_project_history_collection_exchange("http://insecure.example", None, None),
+        lineageweave_project_history_collection_exchange(
+            "http://insecure.example",
+            "tenant-a",
+            None,
+            None,
+        ),
         Err(ApiError::InvalidWirePayload)
     );
     assert!(!is_project_history_collection_path("/v1/analysis-runs"));

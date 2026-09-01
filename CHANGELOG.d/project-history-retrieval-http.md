@@ -1,0 +1,1 @@
+- `tepp_api` loopback `GET /v1/project-histories/{idempotency_key}` retrieves one accepted LineageWeave project-history projection on `tepp-loopback` (ADR 0066). `inference_status` remains `temporal_association_only`. `tepp.scientific_acceptance.v1` never appears. Does not infer causality. Not collection GET, not collection CLI, not persistence.
