@@ -27,7 +27,10 @@ pub(crate) fn recover_stationary_within_variance(
     let stationary = if twice_rate.is_finite() {
         continuous_diffusion / -twice_rate
     } else {
-        (continuous_diffusion / -log_rate) * 0.5
+        // Scale the overflowing denominator down before division and compensate
+        // afterward. This keeps a representable minimum-subnormal result from
+        // being rounded to one subnormal and then erased by a final halving.
+        (continuous_diffusion / (-log_rate * 0.5)) * 0.25
     };
     if !stationary.is_finite() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
