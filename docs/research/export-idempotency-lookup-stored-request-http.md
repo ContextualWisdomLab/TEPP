@@ -1,16 +1,27 @@
-# Export idempotency-key lookup stored-request GET (doctoring)
+# Export idempotency-key stored-request lookup security doctoring
 
-`GET /v1/exports/by-idempotency/{idempotency_key}/request` returns the stored
-naruon export-authorization request on `tepp-loopback`. HTTP semantics follow
-RFC 9110 (Fielding, Nottingham, & Reschke, 2022). Fail-closed unpublished
-consumers, extra segments, slash/NUL, reserved prefix, zero or ambiguous
-matches, credential flags, cancel extra-segment, and scientific-authority
-promotion are repository contract (ADR 0099; ADR 0014).
+The first `GET /v1/exports/by-idempotency/{idempotency_key}/request`
+implementation searched the whole Naruon consumer namespace and returned the
+stored export-authorization request. The registry itself is tenant-aware, but
+the GET carried no authenticated tenant/workspace or principal scope. Knowledge
+of a unique idempotency key could therefore disclose another tenant's
+`tenant_workspace_id`, `principal_id`, and artifact request metadata.
 
-`tepp.scientific_acceptance.v1` never appears. HTTP 200 is not a scientific
-claim. `NaruonLiveService` stays POST-only. LineageWeave is refused.
+ADR 0099 now quarantines the route. A syntactically valid client exchange is
+denied until a versioned tenant-and-principal authorization context exists, and
+the live response guard rejects serialized tenant/principal identity. Raw and
+percent-decoded slash are both refused so intermediaries cannot normalize one
+opaque key into a different path interpretation. The metric-free identity lookup
+from ADR 0093 remains separate and does not gain stored-request authority.
 
-Does not re-open cancel lineages, GAP-010 Figma/export, persistence, Leiden,
-or an ADR 0014 claim-promotion package. Dual identity of stored-request GET
-(`export_id`) versus this lookup (`idempotency_key`). Not a duplicate of
-lookup GET (#466) or of `{export_id}/request` (#459).
+The security rule is deliberately stronger than key opacity: an idempotency key
+identifies a replay domain; it is not a bearer authorization credential. A
+future reactivation must prove cross-tenant and cross-principal isolation with
+same-key regression cases and exact-head coverage/security evidence. Merely
+adding caller-controlled scope headers without an authenticated authority would
+not repair the boundary.
+
+HTTP semantics remain aligned with RFC 9110 (Fielding, Nottingham, & Reschke,
+2022). `tepp.scientific_acceptance.v1` is unrelated to this transport repair and
+never appears. `NaruonLiveService` remains POST-only and LineageWeave remains
+outside this Naruon-owned adapter.
