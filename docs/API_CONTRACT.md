@@ -8,7 +8,7 @@
 
 TEPP must work both as a standalone product and as a modular CWL component. Integrations with `naruon`, `contextual-orchestrator`, `.github`, or other repositories use explicit versioned API/artifact contracts. Cross-service direct table access is prohibited.
 
-Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships. Loopback `tepp-interpretation-runs create` is the operator-visible client for `POST /v1/interpretation-runs` on `tepp-orchestrator-loopback` (ADR 0064); stdout stays metric-free with `claim_status` `hypothetical` and `scientific_authority` false.
+Current protected main exposes Rust library/domain contracts. The active stack adds a loopback HTTP/1.1 listener for naruon analysis-run, LineageWeave temporal-context, and export POSTs, including `POST /v1/project-histories` on the `AnalysisRunLiveService` contract boundary. `tepp-loopback` runs the shared consumer listener on `127.0.0.1:18081` by default; a caller may pass another loopback socket address and an optional maximum request count as its two arguments. The container is intended for a trusted same-host or shared-network-namespace sidecar, checks readiness through a synthetic bounded temporal-context request, and deliberately cannot bind a public or bridge address. It is not a production TLS/`$PORT` service. Endpoint examples below that are not covered by `NaruonLiveService` or `AnalysisRunLiveService` remain target interface shapes; export retrieval stays a target shape until an executable export route ships. Loopback `tepp-interpretation-runs create` is the operator-visible client for `POST /v1/interpretation-runs` on `tepp-orchestrator-loopback` (ADR 0064); stdout stays metric-free with `claim_status` `hypothetical` and `scientific_authority` false. Loopback `GET /v1/interpretation-runs` enumerates those accepted hypothetical runs as metric-free identities (ADR 0069); naruon and LineageWeave stay refused.
 
 ## 2. Contract families
 
@@ -20,7 +20,7 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | topic-context posterior plausible values | `analysis_engine` `tepp.topic_context_posterior.v1` | fast-mlsirm, LineageWeave | contract-only active-PR |
-| LLM interpretation provider port | `orchestrator_live` loopback `POST /v1/interpretation-runs` | contextual-orchestrator | partial |
+| LLM interpretation provider port | `orchestrator_live` loopback `POST`/`GET /v1/interpretation-runs` | contextual-orchestrator | partial |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
 | analysis-run request/accepted/status/terminal-result contracts | `tepp_api` v1 wire DTOs | naruon, orchestrator, UI | active product branch |
@@ -63,6 +63,7 @@ When the service layer is introduced, use resources such as:
 POST   /v1/evidence-imports
 GET    /v1/evidence-imports/{import_id}
 POST   /v1/interpretation-runs
+GET    /v1/interpretation-runs
 POST   /v1/analysis-runs
 POST   /v1/temporal-context
 GET    /v1/analysis-runs/{run_id}
@@ -204,7 +205,7 @@ Before any naruon, contextual-orchestrator, or NVIDIA NIM submission, callers mu
 
 ### contextual-orchestrator
 
-TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. The standalone `orchestrator_live::OrchestratorLiveService` also serves a loopback-only `POST /v1/interpretation-runs` proof listener; the listener is not TLS termination. A production live port must pass `service_tls::authorize_orchestrator_live_port` (valid rustls PEM on an `https` bind); loopback plaintext is refused and loopback `https` with valid PEM is authorized as production TLS. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
+TEPP may call a provider-neutral interpretation/orchestration port for semantic unitization, blinded model review, and evidence-bounded interpretation. Callers first obtain a plan from `tepp_api::route_orchestration` and may bind it with `tepp_api::bind_contextual_orchestrator` using an evidence-manifest digest. The standalone `orchestrator_live::OrchestratorLiveService` also serves a loopback-only `POST /v1/interpretation-runs` proof listener and `GET /v1/interpretation-runs` collection of accepted hypothetical identities; the listener is not TLS termination. A production live port must pass `service_tls::authorize_orchestrator_live_port` (valid rustls PEM on an `https` bind); loopback plaintext is refused and loopback `https` with valid PEM is authorized as production TLS. The orchestrator does not own TEPP's statistical truth, source evidence, model registry, merge/release authority, or scientific acceptance. Detailed port boundary and credential separation are recorded in [`docs/connectors/contextual-orchestrator-interpretation-port.md`](connectors/contextual-orchestrator-interpretation-port.md).
 
 ### organization `.github`
 

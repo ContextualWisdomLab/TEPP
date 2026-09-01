@@ -15,8 +15,9 @@ TEPP may call a provider-neutral interpretation/orchestration port for semantic 
 LLM/provider settings are execution policy only. Deterministic scientific gates remain authoritative (AGENTS.md §11). A production live bind uses `service_tls::authorize_orchestrator_live_port` and cannot be loopback plaintext. This document does not claim a deployed TLS listener.
 
 `orchestrator_live::OrchestratorLiveService` binds loopback TCP and serves
-`POST /v1/interpretation-runs`. Accepted output is always hypothetical and
-never scientific authority. Non-loopback binds, table-access hosts, and
+`POST /v1/interpretation-runs` plus `GET /v1/interpretation-runs`. Accepted
+output is always hypothetical and never scientific authority. Collection GET
+returns metric-free identities only. Non-loopback binds, table-access hosts, and
 review/Copilot/GitHub credential headers fail closed. The listener does not
 call a model provider.
 
