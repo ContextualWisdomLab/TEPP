@@ -31,16 +31,19 @@ Add the `location_membership_v1` analysis-run output profile to
 `analysis_engine`. The executor:
 
 - consumes already-validated `LocationMembershipDocument` rows with
-  closed `LocationKind` values;
+  closed `LocationKind` values and explicit availability clocks;
 - requires the request snapshot and knowledge cutoff to match the offered
   input construction;
+- rejects post-cutoff documents and inputs above the shared 100,000-document
+  in-memory execution bound before aggregation;
 - invokes `refuse_location_as_entity_identity` and
   `refuse_location_as_language_channel` without reimplementing the
   location/entity/language vocabulary;
 - requires at least one location membership and at least one
   non-location treatment so the census is mixed;
 - emits a canonical SHA-256-digested `tepp.location_membership.v1`
-  artifact with per-kind counts, matching refusal counts, and inference
+  artifact with five reported census statistics (three per-kind counts and
+  two matching refusal counts), and inference
   status `location_is_not_entity_identity_not_language_channel`;
 - does not emit `identity_recovery_rate`, invent MCMC, select GPU
   backends, or emit topic birth/split/merge events.
@@ -65,14 +68,15 @@ Operators can request cutoff-safe location-membership refusals as a
 digest-bound terminal result. The artifact does not claim MCMC, GPU
 parity, membership-posterior ICC, copied-text, citation-edge,
 corpus-background, method-effect estimation, or topic birth/split/merge.
-Snapshot/profile/cutoff mismatch, empty or single-kind corpora, and
-duplicate document identities fail closed.
+Snapshot/profile/cutoff mismatch, future evidence, oversized input, empty or
+single-kind corpora, and duplicate document identities fail closed.
 
 ## Verification
 
 The PR includes Rust unit and integration tests for mixed
 location/entity/language corpora, empty/single-kind/duplicate refusal,
-snapshot / profile / cutoff mismatch, and artifact tampering. Run:
+availability immediately at/after cutoff, oversized input, snapshot / profile /
+cutoff mismatch, and artifact tampering. Run:
 
 ```text
 cargo fmt --all -- --check

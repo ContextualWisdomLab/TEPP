@@ -38,7 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
-- **Location-membership analysis-run profile**: `analysis_engine` binds existing `location_membership::refuse_location_as_entity_identity` and `refuse_location_as_language_channel` to cutoff-safe `location_membership_v1` (`tepp.location_membership.v1`) with inference status `location_is_not_entity_identity_not_language_channel`. `identity_recovery_rate` stays library-side. Not membership-posterior ICC, not copied-text, not citation-edge, not corpus-background, not GPU, not MCMC, and not topic birth/split/merge.
+- **Location-membership analysis-run profile**: `analysis_engine` binds existing `location_membership::refuse_location_as_entity_identity` and `refuse_location_as_language_channel` to cutoff-safe `location_membership_v1` (`tepp.location_membership.v1`) with explicit document availability, a shared 100,000-document execution bound, five accurately reported census statistics, and inference status `location_is_not_entity_identity_not_language_channel`. `identity_recovery_rate` stays library-side. Not membership-posterior ICC, not copied-text, not citation-edge, not corpus-background, not GPU, not MCMC, and not topic birth/split/merge.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 

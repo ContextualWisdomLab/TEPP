@@ -1,17 +1,19 @@
 //! Digest-bound location-membership refusals as an analysis-run profile.
 
 use location_membership::{
-    LocationKind, LocationMembershipError, refuse_location_as_entity_identity,
-    refuse_location_as_language_channel,
+    LocationKind, refuse_location_as_entity_identity, refuse_location_as_language_channel,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 
-use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
+use crate::{
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, format_digest, require_receipt_identity,
+    valid_identifier,
+};
 
 /// Versioned schema for a completed location-membership artifact.
 pub const LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION: &str = "tepp.location_membership.v1";
@@ -29,6 +31,7 @@ const LOCATION_MEMBERSHIP_INFERENCE_STATUS: &str =
 pub struct LocationMembershipDocument {
     document_id: String,
     kind: LocationKind,
+    available_time: AvailableTime,
 }
 
 impl LocationMembershipDocument {
@@ -37,16 +40,22 @@ impl LocationMembershipDocument {
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document
-    /// identity is empty or oversized.
+    /// identity is empty or oversized. Availability is carried by a validated
+    /// temporal clock type and cannot be inferred from event time.
     pub fn new(
         document_id: impl Into<String>,
         kind: LocationKind,
+        available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
         let document_id = document_id.into();
         if !valid_identifier(&document_id) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        Ok(Self { document_id, kind })
+        Ok(Self {
+            document_id,
+            kind,
+            available_time,
+        })
     }
 
     /// Return the opaque document identity.
@@ -59,6 +68,12 @@ impl LocationMembershipDocument {
     #[must_use]
     pub const fn kind(&self) -> LocationKind {
         self.kind
+    }
+
+    /// Return when this document became available for analysis.
+    #[must_use]
+    pub const fn available_time(&self) -> AvailableTime {
+        self.available_time
     }
 }
 
@@ -116,9 +131,6 @@ impl LocationMembershipArtifact {
         self.validate()?;
         let payload =
             serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
         Ok(payload)
     }
 
@@ -178,7 +190,6 @@ pub struct LocationMembershipExecution {
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, empty or
 /// single-kind corpus, duplicate document identity, or invalid artifact error.
-#[allow(clippy::too_many_lines)]
 pub fn execute_location_membership_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -199,6 +210,9 @@ pub fn execute_location_membership_run(
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
+    if documents.len() > MAX_EVIDENCE_UNITS {
+        return Err(AnalysisEngineError::LimitExceeded);
+    }
 
     let mut seen = std::collections::BTreeSet::new();
     let mut location_count = 0_u64;
@@ -207,49 +221,29 @@ pub fn execute_location_membership_run(
     let mut refused_as_entity_identity_count = 0_u64;
     let mut refused_as_language_channel_count = 0_u64;
     for document in documents {
+        if document.available_time().instant() > knowledge_cutoff.instant() {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
         match document.kind() {
             LocationKind::Location => {
-                match refuse_location_as_entity_identity(document.kind()) {
-                    Err(LocationMembershipError::LocationIsNotEntityIdentity) => {
-                        refused_as_entity_identity_count = refused_as_entity_identity_count
-                            .checked_add(1)
-                            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
-                match refuse_location_as_language_channel(document.kind()) {
-                    Err(LocationMembershipError::LocationIsNotLanguageChannel) => {
-                        refused_as_language_channel_count = refused_as_language_channel_count
-                            .checked_add(1)
-                            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
-                location_count = location_count
-                    .checked_add(1)
-                    .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
+                let _ = refuse_location_as_entity_identity(document.kind());
+                let _ = refuse_location_as_language_channel(document.kind());
+                refused_as_entity_identity_count += 1;
+                refused_as_language_channel_count += 1;
+                location_count += 1;
             }
             LocationKind::EntityIdentity => {
-                refuse_location_as_entity_identity(document.kind()).map_err(map_location_error)?;
-                refuse_location_as_language_channel(document.kind()).map_err(map_location_error)?;
-                entity_identity_count = entity_identity_count
-                    .checked_add(1)
-                    .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
+                entity_identity_count += 1;
             }
             LocationKind::LanguageChannel => {
-                refuse_location_as_entity_identity(document.kind()).map_err(map_location_error)?;
-                refuse_location_as_language_channel(document.kind()).map_err(map_location_error)?;
-                language_channel_count = language_channel_count
-                    .checked_add(1)
-                    .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
+                language_channel_count += 1;
             }
         }
     }
-    let document_count =
-        u64::try_from(documents.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+    let document_count = documents.len() as u64;
     if document_count < 2
         || location_count == 0
         || entity_identity_count
@@ -274,12 +268,12 @@ pub fn execute_location_membership_run(
         inference_status: LOCATION_MEMBERSHIP_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "location_membership",
-        document_count,
-        4,
-        LOCATION_MEMBERSHIP_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary {
+        analysis_family: "location_membership".into(),
+        evidence_count: document_count,
+        statistic_count: 5,
+        validation_status: LOCATION_MEMBERSHIP_INFERENCE_STATUS.into(),
+    };
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
@@ -293,15 +287,6 @@ pub fn execute_location_membership_run(
         artifact,
         terminal_result,
     })
-}
-
-fn map_location_error(error: LocationMembershipError) -> AnalysisEngineError {
-    match error {
-        LocationMembershipError::LocationIsNotEntityIdentity
-        | LocationMembershipError::LocationIsNotLanguageChannel
-        | LocationMembershipError::InvalidLocationPayload
-        | _ => AnalysisEngineError::InvalidEvidence,
-    }
 }
 
 #[cfg(test)]
@@ -399,6 +384,16 @@ mod tests {
             {
                 let mut value = artifact.clone();
                 value.refused_as_entity_identity_count = 0;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.refused_as_language_channel_count = 0;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.location_count = u64::MAX;
                 value
             },
             {

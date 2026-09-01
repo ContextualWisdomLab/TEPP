@@ -6,11 +6,19 @@ use analysis_engine::{
     LocationMembershipDocument, execute_location_membership_run,
 };
 use location_membership::LocationKind;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+}
+
+fn available(value: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(value).expect("availability")
+}
+
+fn document(id: &str, kind: LocationKind) -> LocationMembershipDocument {
+    LocationMembershipDocument::new(id, kind, available("2026-07-31T23:59:59Z")).expect("document")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -36,9 +44,9 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
 
 fn mixed_documents() -> Vec<LocationMembershipDocument> {
     vec![
-        LocationMembershipDocument::new("loc-a", LocationKind::Location).expect("location"),
-        LocationMembershipDocument::new("ent-b", LocationKind::EntityIdentity).expect("entity"),
-        LocationMembershipDocument::new("lang-c", LocationKind::LanguageChannel).expect("language"),
+        document("loc-a", LocationKind::Location),
+        document("ent-b", LocationKind::EntityIdentity),
+        document("lang-c", LocationKind::LanguageChannel),
     ]
 }
 
@@ -89,6 +97,15 @@ fn mixed_location_kinds_emit_digest_bound_refusals_without_recovery_metric() {
         execution.terminal_result.result_schema_version.as_deref(),
         Some(LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION)
     );
+    assert_eq!(
+        execution
+            .terminal_result
+            .summary
+            .as_ref()
+            .expect("summary")
+            .statistic_count,
+        5
+    );
 }
 
 #[test]
@@ -99,48 +116,84 @@ fn empty_single_kind_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let location_only = vec![
-        LocationMembershipDocument::new("loc-a", LocationKind::Location).expect("location"),
-        LocationMembershipDocument::new("loc-b", LocationKind::Location).expect("location"),
+        document("loc-a", LocationKind::Location),
+        document("loc-b", LocationKind::Location),
     ];
     assert_eq!(
         execute(&request, &location_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let entity_only = vec![
-        LocationMembershipDocument::new("ent-a", LocationKind::EntityIdentity).expect("entity"),
-        LocationMembershipDocument::new("ent-b", LocationKind::EntityIdentity).expect("entity"),
+        document("ent-a", LocationKind::EntityIdentity),
+        document("ent-b", LocationKind::EntityIdentity),
     ];
     assert_eq!(
         execute(&request, &entity_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let language_only = vec![
-        LocationMembershipDocument::new("lang-a", LocationKind::LanguageChannel).expect("language"),
-        LocationMembershipDocument::new("lang-b", LocationKind::LanguageChannel).expect("language"),
+        document("lang-a", LocationKind::LanguageChannel),
+        document("lang-b", LocationKind::LanguageChannel),
     ];
     assert_eq!(
         execute(&request, &language_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let no_location = vec![
-        LocationMembershipDocument::new("ent-a", LocationKind::EntityIdentity).expect("entity"),
-        LocationMembershipDocument::new("lang-b", LocationKind::LanguageChannel).expect("language"),
+        document("ent-a", LocationKind::EntityIdentity),
+        document("lang-b", LocationKind::LanguageChannel),
     ];
     assert_eq!(
         execute(&request, &no_location),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
-        LocationMembershipDocument::new("same", LocationKind::Location).expect("location"),
-        LocationMembershipDocument::new("same", LocationKind::EntityIdentity).expect("entity"),
+        document("same", LocationKind::Location),
+        document("same", LocationKind::EntityIdentity),
     ];
     assert_eq!(
         execute(&request, &duplicates),
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        LocationMembershipDocument::new("", LocationKind::Location),
+        LocationMembershipDocument::new(
+            "",
+            LocationKind::Location,
+            available("2026-07-31T23:59:59Z"),
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn availability_cutoff_and_document_limit_fail_closed() {
+    let request = request();
+    let mut documents = mixed_documents();
+    documents[0] = LocationMembershipDocument::new(
+        "loc-a",
+        LocationKind::Location,
+        available("2026-08-01T00:00:00Z"),
+    )
+    .expect("at cutoff");
+    execute(&request, &documents).expect("availability at cutoff");
+
+    documents[0] = LocationMembershipDocument::new(
+        "loc-a",
+        LocationKind::Location,
+        available("2026-08-01T00:00:00.000000001Z"),
+    )
+    .expect("after cutoff");
+    assert_eq!(
+        execute(&request, &documents),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let oversized = (0..=analysis_engine::MAX_EVIDENCE_UNITS)
+        .map(|index| document(&format!("document-{index}"), LocationKind::Location))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        execute(&request, &oversized),
+        Err(AnalysisEngineError::LimitExceeded)
     );
 }
 
@@ -165,6 +218,19 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
         execute_location_membership_run(
             &mismatched,
             &accepted(&mismatched),
+            "snapshot-location-membership",
+            cutoff(),
+            &documents,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    let mut mismatched_model = request.clone();
+    mismatched_model.model_contract_version = "other-model".into();
+    assert_eq!(
+        execute_location_membership_run(
+            &mismatched_model,
+            &accepted(&mismatched_model),
             "snapshot-location-membership",
             cutoff(),
             &documents,
@@ -204,4 +270,15 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+    assert!(
+        execute_location_membership_run(
+            &request,
+            &accepted(&request),
+            "snapshot-location-membership",
+            cutoff(),
+            &documents,
+            "not-a-time",
+        )
+        .is_err()
+    );
 }

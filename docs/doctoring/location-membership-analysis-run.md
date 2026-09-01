@@ -6,7 +6,10 @@
 `location_membership` already refuses to treat location membership as
 permanent entity identity or as a language channel. This slice binds
 those refusals to a cutoff-safe analysis-run profile so operators can
-request a digest-bound identity artifact.
+request a digest-bound location-membership refusal artifact. Every input
+document carries a validated availability clock; post-cutoff evidence and
+corpora above the shared 100,000-document execution bound fail closed before
+counting. The terminal summary reports the artifact's five census statistics.
 
 The artifact inference status is
 `location_is_not_entity_identity_not_language_channel`.
