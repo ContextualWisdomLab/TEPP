@@ -44,6 +44,9 @@ Add the `inferred_status_v1` analysis-run output profile to
   `observed` / `inferred` vocabulary;
 - requires a mixed census of at least one `observed` and one `inferred`
   after cutoff exclusion;
+- caps both executable evidence input and serialized/deserialized artifact
+  claims at `MAX_EVIDENCE_UNITS`, so a compact payload cannot claim a census
+  no valid run can produce;
 - emits a canonical SHA-256-digested `tepp.inferred_status.v1` artifact
   with per-status counts, matching inferred refusal counts, and
   inference status `inferred_is_not_observed_and_not_transition`;
@@ -76,14 +79,14 @@ membership-target, location-membership, membership-posterior ICC,
 copied-text, copy-identity, citation-edge, subevent containment,
 method-effect estimation, or topic birth/split/merge. Snapshot /
 profile / cutoff mismatch, empty or single-class corpora, duplicate
-evidence identities, and oversized corpora fail closed.
+evidence identities, and oversized corpora or artifact claims fail closed.
 
 ## Verification
 
 The PR includes Rust unit and integration tests for mixed
 `observed` / `inferred` corpora, cutoff exclusion,
 empty/single-class/duplicate refusal, snapshot / profile / cutoff
-mismatch, oversize, and artifact tampering. Run:
+mismatch, executable and compact-artifact oversize, and artifact tampering. Run:
 
 ```text
 cargo fmt --all -- --check
@@ -91,6 +94,14 @@ cargo test -p analysis_engine
 cargo clippy -p analysis_engine --all-targets -- -D warnings
 python3 scripts/validate_documentation.py
 ```
+
+Then follow the repository-wide exact-head procedure in
+[`AGENTS.md`](../../AGENTS.md#pull-request-and-autonomous-execution-loop): the
+required hosted CI, documentation, security/supply-chain workflows and
+qualifying review must apply to the PR's current exact SHA. Queued, stale or
+predecessor-head results are not passing evidence. Because this profile is
+`fold_into_landing_vehicle`, its final landing evidence belongs to the coherent
+Validation / Analysis Run successor head rather than this micro-profile alone.
 
 ## Rollback and supersession
 
