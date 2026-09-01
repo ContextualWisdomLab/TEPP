@@ -450,21 +450,40 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
 
 
 def validate_adr_graph() -> None:
-    """Require every numbered ADR to be indexed and carry unambiguous authority metadata."""
+    """Require every numbered ADR to have one repository-wide identity."""
 
     adr_root = ROOT / "docs" / "adr"
     adr_index = (adr_root / "README.md").read_text(encoding="utf-8")
-    indexed_numbers = {
+    indexed_number_list = [
         match.group("number") for match in ADR_TABLE_ROW.finditer(adr_index)
-    }
+    ]
+    duplicate_index_numbers = sorted(
+        number
+        for number in set(indexed_number_list)
+        if indexed_number_list.count(number) > 1
+    )
+    if duplicate_index_numbers:
+        raise AssertionError(
+            f"duplicate ADR index identity: {duplicate_index_numbers}"
+        )
+    indexed_numbers = set(indexed_number_list)
 
-    adr_files: dict[str, Path] = {}
+    adr_paths_by_number: dict[str, list[Path]] = {}
     for path in sorted(adr_root.glob("[0-9][0-9][0-9][0-9]-*.md")):
         match = ADR_FILE_NAME.fullmatch(path.name)
         if not match:
             raise AssertionError(f"invalid ADR filename: {path.relative_to(ROOT)}")
-        adr_files[match.group("number")] = path
+        adr_paths_by_number.setdefault(match.group("number"), []).append(path)
 
+    duplicate_file_numbers = sorted(
+        number for number, paths in adr_paths_by_number.items() if len(paths) > 1
+    )
+    if duplicate_file_numbers:
+        raise AssertionError(
+            f"duplicate ADR file identity: {duplicate_file_numbers}"
+        )
+
+    adr_files = {number: paths[0] for number, paths in adr_paths_by_number.items()}
     file_numbers = set(adr_files)
     if indexed_numbers != file_numbers:
         raise AssertionError(
