@@ -131,6 +131,9 @@ impl LocationMembershipArtifact {
         self.validate()?;
         let payload =
             serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
+        if payload.len() > LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT {
+            return Err(AnalysisEngineError::LimitExceeded);
+        }
         Ok(payload)
     }
 
@@ -157,6 +160,7 @@ impl LocationMembershipArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.document_count < 2
+            || self.document_count > MAX_EVIDENCE_UNITS as u64
             || self.location_count == 0
             || non_location == Some(0)
             || kind_sum != Some(self.document_count)
