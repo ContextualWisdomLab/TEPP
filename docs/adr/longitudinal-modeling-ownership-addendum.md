@@ -1,8 +1,11 @@
 # ADR 0005 ownership addendum — Longitudinal Modeling
 
 **Parent decision:** ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation
+
 **Decision identity:** ADR 0005; this addendum does not mint a new ADR number
+
 **Status:** Accepted clarification
+
 **Recorded:** 2026-09-01
 
 ## Decision clarification
