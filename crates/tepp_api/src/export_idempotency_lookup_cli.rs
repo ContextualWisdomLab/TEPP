@@ -1,16 +1,12 @@
 //! Operator loopback CLI for naruon export idempotency-key lookup GET.
 //!
-//! GAP-003A unique slice: operators run `tepp-export-lookup lookup` to mint
+//! Operators run `tepp-export-lookup lookup` to mint
 //! `naruon_export_idempotency_lookup_exchange` onto spawned `tepp-loopback`
-//! TCP. Stdout is the metric-free `ExportIdempotencyLookup`.
-//! `tepp.scientific_acceptance.v1` never appears. The CLI does not infer
-//! causality. `LineageWeave` is refused on this naruon-owned adapter.
-//! `NaruonLiveService` stays POST-only. This module does not duplicate
-//! lookup GET (#465), GET-by-id HTTP (#411), retrieval CLI (#417),
-//! collection GET/CLI (#443/#444), stored-request GET/CLI (#457/#459),
-//! export-authorize CLI (#410), analysis-run lookup CLI (#401), cancel
-//! lineages (closed), Leiden, or GAP-010 Figma/export. Persistence remains
-//! GAP-003B.
+//! TCP. Stdout is the metric-free `ExportIdempotencyLookup`. Accepted
+//! idempotency keys remain opaque data: slash-containing keys are percent-
+//! encoded by the HTTP contract and the literal `by-idempotency` value remains
+//! addressable after the route prefix. `tepp.scientific_acceptance.v1` never
+//! appears. `LineageWeave` is refused and `NaruonLiveService` stays POST-only.
 
 use std::collections::HashSet;
 use std::fmt::Write as _;
@@ -25,8 +21,8 @@ use crate::{
     naruon_export_idempotency_lookup_exchange, refuse_metrics_on_export_idempotency_lookup_payload,
     AnalysisRunLiveService, ApiError, ErrorEnvelope, ExportIdempotencyLookup, NaruonHttpExchange,
     NaruonLiveResponse, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN,
-    EXPORT_IDEMPOTENCY_LOOKUP_PREFIX, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
-    NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT,
+    NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT,
+    NARUON_LIVE_IO_TIMEOUT,
 };
 
 const MAXIMUM_HTTP_RESPONSE_BYTES: usize =
@@ -85,7 +81,7 @@ impl ExportIdempotencyLookupCliInvocation {
     ///
     /// Returns a fail-closed error for unknown verbs, missing required flags, a
     /// non-loopback host, a non-`https` origin, an unpublished or `LineageWeave`
-    /// consumer, credential-shaped flags, a hostile key, or a nonempty body.
+    /// consumer, credential-shaped flags, an invalid key, or a nonempty body.
     pub fn from_args<I, S>(args: I, body: impl Into<String>) -> Result<Self, ApiError>
     where
         I: IntoIterator<Item = S>,
@@ -107,7 +103,8 @@ impl ExportIdempotencyLookupCliInvocation {
     ///
     /// Returns [`ApiError::AuthorizationDenied`] for a non-loopback host and
     /// [`ApiError::InvalidWirePayload`] or [`ApiError::LimitExceeded`] for
-    /// empty, unpublished, `LineageWeave`, nonempty-body, or oversized fields.
+    /// empty, unpublished, `LineageWeave`, nonempty-body, NUL-containing, or
+    /// oversized fields.
     pub fn validate(&self) -> Result<(), ApiError> {
         require_loopback_host(&self.host)?;
         require_nonempty(&self.origin)?;
@@ -119,10 +116,7 @@ impl ExportIdempotencyLookupCliInvocation {
             return Err(ApiError::InvalidWirePayload);
         }
         require_nonempty(&self.idempotency_key)?;
-        if self.idempotency_key.contains('/')
-            || self.idempotency_key.contains('\0')
-            || self.idempotency_key == EXPORT_IDEMPOTENCY_LOOKUP_PREFIX
-        {
+        if self.idempotency_key.contains('\0') {
             return Err(ApiError::InvalidWirePayload);
         }
         if self.idempotency_key.len() > EXPORT_IDEMPOTENCY_LOOKUP_KEY_MAX_LEN {
