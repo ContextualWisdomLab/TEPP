@@ -48,11 +48,15 @@ For an LSIRM/MLSIRM/DLSJM **temporal** candidate to be classified `supported`, T
 - implemented estimator owned by the canonical repository;
 - leakage-safe recovery that separates event-or-valid time from available time and enforces the analysis knowledge cutoff;
 - model-appropriate known-truth recovery with RMSE, bias, interval/credible-interval coverage, convergence, and uncertainty reporting for the parameters actually claimed;
+- known-truth recovery of any claimed temporal ordering, transition ordering, dependency graph, branch graph, or cluster-transition structure; a candidate cannot be `supported` for a structural claim whose structure is not recoverable in simulation;
+- longitudinal measurement-invariance evidence sufficient for every cross-time measurement or comparison claim actually made; invariance is not limited to multilingual or source-drift claims;
 - irregular-gap, delayed/retrospective-record, missing-occasion, and changing-membership cases when the temporal formulation permits them;
 - language/source drift tests when multilingual/source invariance is part of the claim;
 - CPU `f64` reference evidence and CPU/GPU parity only when an accelerator implementation is claimed; a skipped or unexecuted GPU path is not evidence;
 - Monte Carlo uncertainty for simulation summaries rather than an arbitrary replication pass percentage;
 - primary-source traceability for established model components and explicit `research_candidate` labeling for novel couplings.
+
+Structural acceptance is claim-scoped: if a candidate claims only parameter recovery it is not automatically authorized to claim recovered temporal order, dependency topology, branching, clustering, or longitudinal invariance. Conversely, any such structural claim makes its corresponding known-truth recovery evidence mandatory before promotion.
 
 These items are acceptance evidence for a TEPP claim. They should not be cited as findings of Jeon et al. (2021), Jin and Jeon (2019), or Kang and Jeon (2025) unless a specific item is explicitly supported by the relevant paper. Auto-expansion only materializes a candidate contract; it does not satisfy TEPP's promotion conditions.
 
