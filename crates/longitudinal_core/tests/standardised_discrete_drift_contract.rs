@@ -18,9 +18,32 @@ fn driver_page_sixteen_scalar_standardised_drift_recovers_on_event_time() {
 }
 
 #[test]
+fn known_truth_grid_has_machine_precision_rmse() {
+    let cases = [
+        (0.1_f64, -0.15_f64, 0.25_f64),
+        (0.4, -0.5, 1.0),
+        (1.2, -1.25, 0.8),
+        (3.0, -0.05, 7.0),
+    ];
+    let mut squared_error_sum = 0.0;
+    for (diffusion, rate, delta) in cases {
+        let recovered = recover_event_time_standardised_discrete_drift(diffusion, rate, delta)
+            .expect("known-truth case");
+        let truth = (rate * delta).exp();
+        squared_error_sum += (recovered - truth).powi(2);
+    }
+    let rmse = (squared_error_sum / cases.len() as f64).sqrt();
+    assert!(rmse <= f64::EPSILON);
+}
+
+#[test]
 fn standardised_drift_fails_closed_without_positive_stationary_within_variance() {
     assert_eq!(
         recover_event_time_standardised_discrete_drift(0.0, -0.5, 1.0),
+        Err(LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance)
+    );
+    assert_eq!(
+        recover_event_time_standardised_discrete_drift(f64::from_bits(1), -1.0e307, 1.0e-307),
         Err(LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance)
     );
     assert_eq!(
@@ -42,20 +65,31 @@ fn standardised_drift_fails_closed_without_positive_stationary_within_variance()
 }
 
 #[test]
-fn standardised_drift_rejects_nonfinite_or_unrepresentable_inputs() {
-    for (diffusion, rate, delta) in [
-        (f64::NAN, -0.5, 1.0),
-        (f64::INFINITY, -0.5, 1.0),
-        (-0.1, -0.5, 1.0),
-        (0.4, f64::NAN, 1.0),
-        (0.4, f64::NEG_INFINITY, 1.0),
-    ] {
+fn standardised_drift_rejects_nonfinite_negative_or_unrepresentable_inputs() {
+    for diffusion in [f64::NAN, f64::INFINITY, -0.1] {
         assert_eq!(
-            recover_event_time_standardised_discrete_drift(diffusion, rate, delta),
+            recover_event_time_standardised_discrete_drift(diffusion, -0.5, 1.0),
             Err(LongitudinalError::InvalidTemporalTransformInput)
         );
     }
-
+    for rate in [f64::NAN, f64::NEG_INFINITY] {
+        assert_eq!(
+            recover_event_time_standardised_discrete_drift(0.4, rate, 1.0),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+    }
+    assert_eq!(
+        recover_event_time_standardised_discrete_drift(0.4, -f64::MAX, 1.0),
+        Err(LongitudinalError::InvalidTemporalTransformInput)
+    );
+    assert_eq!(
+        recover_event_time_standardised_discrete_drift(f64::MAX, -f64::MIN_POSITIVE, 1.0),
+        Err(LongitudinalError::InvalidTemporalTransformInput)
+    );
+    assert_eq!(
+        recover_event_time_standardised_discrete_drift(0.4, -2.0, f64::MAX),
+        Err(LongitudinalError::InvalidTemporalTransformInput)
+    );
     assert_eq!(
         recover_event_time_standardised_discrete_drift(0.4, -800.0, 1.0),
         Err(LongitudinalError::InvalidTemporalTransformInput)

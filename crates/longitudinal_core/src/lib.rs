@@ -5,12 +5,14 @@
 //!
 //! Stable between-unit components cannot be scored as within-unit change.
 //! Event-time lagged associations require both marginal variances before a
-//! covariance can be standardized as a correlation. Recovery reports computed
-//! component RMSE against known truth (ADR 0005).
+//! covariance can be standardized as a correlation. Event-interval response
+//! transforms live here rather than in a generic psychometric kernel. Recovery
+//! reports computed component RMSE against known truth (ADR 0005).
 
 mod association;
 mod component;
 mod decompose;
+mod discrete_drift;
 mod error;
 mod level;
 
@@ -25,6 +27,14 @@ pub use component::component_root_mean_square_error;
 pub use decompose::OccasionObservation;
 /// Decompose occasion scores into unit means and within residuals.
 pub use decompose::decompose_within_between;
+/// Recover scalar Driver p.16 `discreteDRIFTstd` on substantive event time.
+pub use discrete_drift::recover_event_time_standardised_discrete_drift;
+/// Refuse trait-plus-state association as `discreteDRIFTstd`.
+pub use discrete_drift::refuse_trait_plus_state_association_as_standardised_discrete_drift;
+/// Refuse trait variance as the drift standardisation variance.
+pub use discrete_drift::refuse_trait_variance_as_standardisation_variance;
+/// Refuse unstandardised `discreteDRIFT` as `discreteDRIFTstd`.
+pub use discrete_drift::refuse_unstandardised_discrete_drift_as_standardised_discrete_drift;
 /// Fail-closed longitudinal-modeling errors.
 pub use error::LongitudinalError;
 /// Established longitudinal component level.
