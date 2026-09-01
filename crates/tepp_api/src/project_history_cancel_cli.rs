@@ -332,8 +332,8 @@ pub fn execute_project_history_cancel_cli(
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when a receipt carries metric keys,
-/// `tepp.scientific_acceptance.v1`, or a success body that is not a metric-free
-/// cancelled identity.
+/// `tepp.scientific_acceptance.v1`, or a success body that is not the requested
+/// metric-free cancelled identity.
 pub fn render_project_history_cancel_cli_stdout(
     invocation: &ProjectHistoryCancelCliInvocation,
     response: &NaruonLiveResponse,
@@ -348,7 +348,7 @@ pub fn render_project_history_cancel_cli_stdout(
         return Err(ApiError::InvalidWirePayload);
     }
     let parsed = ProjectHistoryCancelled::from_json(&response.body)?;
-    if !parsed.cancelled {
+    if !parsed.cancelled || parsed.idempotency_key != invocation.idempotency_key {
         return Err(ApiError::InvalidWirePayload);
     }
     parsed.to_json()
@@ -437,11 +437,14 @@ pub fn read_project_history_cancel_cli_stdin(
 mod tests {
     use super::{
         compose_project_history_cancel_cli_http, loopback_http1_from_project_history_cancel_exchange,
-        read_project_history_cancel_cli_stdin, ProjectHistoryCancelCliInvocation,
-        ProjectHistoryCancelCliVerb,
+        read_project_history_cancel_cli_stdin, render_project_history_cancel_cli_stdout,
+        ProjectHistoryCancelCliInvocation, ProjectHistoryCancelCliVerb,
     };
     use crate::lineageweave_http::LINEAGEWEAVE_CONSUMER_CODE;
-    use crate::{lineageweave_project_history_cancel_exchange, ApiError, NaruonHttpExchange};
+    use crate::{
+        lineageweave_project_history_cancel_exchange, ApiError, NaruonHttpExchange,
+        NaruonLiveResponse,
+    };
 
     const ORIGIN: &str = "https://tepp.example.test";
 
@@ -623,6 +626,22 @@ mod tests {
         assert_eq!(
             loopback_http1_from_project_history_cancel_exchange(&gotten, "127.0.0.1:18081")
                 .unwrap_err(),
+            ApiError::InvalidWirePayload
+        );
+    }
+
+    #[test]
+    fn render_refuses_mismatched_cancel_receipt() {
+        let invocation =
+            ProjectHistoryCancelCliInvocation::from_args(cancel_args(), "").expect("cancel");
+        let response = NaruonLiveResponse {
+            status_code: 200,
+            reason_phrase: "OK",
+            body: r#"{"project_key":"project-a","idempotency_key":"other","knowledge_cutoff":"2026-01-01T00:00:00Z","inference_status":"temporal_association_only","cancelled":true}"#
+                .to_owned(),
+        };
+        assert_eq!(
+            render_project_history_cancel_cli_stdout(&invocation, &response).unwrap_err(),
             ApiError::InvalidWirePayload
         );
     }
