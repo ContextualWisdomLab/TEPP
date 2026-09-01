@@ -98,6 +98,8 @@ labels, actor lists, and `tepp.scientific_acceptance.v1` never appear. Naruon
 is refused. `NaruonLiveService` stays POST-only. Collection GET stays closed.
 `GET /v1/temporal-context/{idempotency_key}/request` returns the stored create
 request (ADR 0091) so operators who hold the identity do not replay POST.
+`tepp-temporal-context-request get` mints that stored-request GET onto spawned
+`tepp-loopback` TCP (ADR 0092).
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A

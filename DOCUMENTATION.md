@@ -15,6 +15,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Orchestrator live HTTP doctoring | [`docs/research/orchestrator-live-http.md`](docs/research/orchestrator-live-http.md) |
 | Temporal-context GET-by-id doctoring | [`docs/research/temporal-context-retrieval-get.md`](docs/research/temporal-context-retrieval-get.md) |
 | Temporal-context stored-request GET doctoring | [`docs/research/temporal-context-stored-request-get.md`](docs/research/temporal-context-stored-request-get.md) |
+| Temporal-context stored-request CLI doctoring | [`docs/research/temporal-context-stored-request-cli.md`](docs/research/temporal-context-stored-request-cli.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
 | Logical/physical ERD | [`docs/ERD.md`](docs/ERD.md) |
 | Security policy | [`SECURITY.md`](SECURITY.md) |

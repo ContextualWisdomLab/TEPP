@@ -33,6 +33,7 @@ mod provider_payload;
 mod temporal_context;
 mod temporal_context_retrieval_http;
 mod temporal_context_stored_request_http;
+mod temporal_context_stored_request_cli;
 mod wire;
 
 /// Terminal analysis-result contract version constant.
@@ -308,3 +309,19 @@ pub use temporal_context_stored_request_http::lineageweave_temporal_context_stor
 pub use temporal_context_stored_request_http::temporal_context_stored_request_path_id;
 /// Refuse stored-request JSON that already carries scientific-metric keys.
 pub use temporal_context_stored_request_http::refuse_metrics_on_temporal_context_stored_request_payload;
+/// Supported operator verbs for the loopback temporal-context stored-request CLI.
+pub use temporal_context_stored_request_cli::TemporalContextStoredRequestCliVerb;
+/// One operator CLI invocation against a loopback stored-request listener.
+pub use temporal_context_stored_request_cli::TemporalContextStoredRequestCliInvocation;
+/// Render a typed stored-request GET exchange as HTTP/1.1 for a loopback listener.
+pub use temporal_context_stored_request_cli::loopback_http1_from_temporal_context_stored_request_exchange;
+/// Compose one HTTP/1.1 stored-request GET from the typed `LineageWeave` exchange.
+pub use temporal_context_stored_request_cli::compose_temporal_context_stored_request_cli_http;
+/// Dispatch one stored-request CLI invocation against an in-process listener.
+pub use temporal_context_stored_request_cli::dispatch_temporal_context_stored_request_cli;
+/// Execute one stored-request CLI invocation over loopback TCP.
+pub use temporal_context_stored_request_cli::execute_temporal_context_stored_request_cli;
+/// Filter CLI stdout so stored-request GET never prints scientific acceptance.
+pub use temporal_context_stored_request_cli::render_temporal_context_stored_request_cli_stdout;
+/// Read stdin leftover bytes on a non-terminal; stored-request GET admits empty.
+pub use temporal_context_stored_request_cli::read_temporal_context_stored_request_cli_stdin;
