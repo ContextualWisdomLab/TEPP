@@ -1,8 +1,9 @@
-//! Contract tests for export lookup stored-request GET.
+//! Contract tests for the quarantined export lookup stored-request GET.
 
 use tepp_api::{
     AnalysisRunLiveService, AnalyticalPurpose, ApiError, ExportAuthorizationRequest,
-    NaruonLiveService, naruon_export_idempotency_lookup_stored_request_exchange,
+    NaruonLiveService, export_idempotency_lookup_stored_request_path_key,
+    naruon_export_idempotency_lookup_stored_request_exchange,
     refuse_metrics_on_export_lookup_stored_request_payload,
 };
 
@@ -24,48 +25,42 @@ fn export_post_http(body: &str) -> String {
 }
 
 #[test]
-fn lookup_stored_request_exchange_is_https_get_without_credentials() {
-    let exchange = naruon_export_idempotency_lookup_stored_request_exchange(
-        "https://tepp.example.test",
-        "export-idem-1",
-    )
-    .expect("exchange");
-    assert_eq!(exchange.method, "GET");
+fn lookup_stored_request_exchange_is_quarantined_without_tenant_principal_binding() {
     assert_eq!(
-        exchange.target_url,
-        "https://tepp.example.test/v1/exports/by-idempotency/export-idem-1/request"
+        naruon_export_idempotency_lookup_stored_request_exchange(
+            "https://tepp.example.test",
+            "export-idem-1",
+        ),
+        Err(ApiError::AuthorizationDenied)
     );
-    assert!(exchange.body.is_empty());
-    assert!(
-        exchange
-            .headers
-            .iter()
-            .any(|(name, value)| name == "tepp-consumer" && value == "naruon")
+    assert_eq!(
+        export_idempotency_lookup_stored_request_path_key(
+            "/v1/exports/by-idempotency/export%2Fidem/request"
+        ),
+        Err(ApiError::InvalidWirePayload)
     );
 }
 
 #[test]
-fn live_get_returns_stored_authorization_request() {
+fn live_get_without_tenant_principal_scope_fails_closed() {
     let request = sample_request();
     let body = serde_json::to_string(&request).expect("json");
     let mut service = AnalysisRunLiveService::new();
     let posted = service.handle_http_request(&export_post_http(&body));
     assert_eq!(posted.status_code, 200, "{}", posted.body);
+
     let got = service.handle_http_request(
         "GET /v1/exports/by-idempotency/export-idem-1/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
     );
-    assert_eq!(got.status_code, 200, "{}", got.body);
+    assert_eq!(got.status_code, 400, "{}", got.body);
+    assert!(!got.body.contains("export-live-tenant"));
+    assert!(!got.body.contains("principal-analyst-1"));
+    assert!(!got.body.contains("artifact-live-1"));
     assert_eq!(
-        refuse_metrics_on_export_lookup_stored_request_payload(&got.body),
-        Ok(())
+        refuse_metrics_on_export_lookup_stored_request_payload(&body),
+        Err(ApiError::InvalidWirePayload)
     );
-    assert!(!got.body.contains("tepp.scientific_acceptance.v1"));
-    assert!(!got.body.contains("rmse"));
-    assert!(got.body.contains("\"artifact_id\":\"artifact-live-1\""));
-    assert!(
-        got.body
-            .contains("\"tenant_workspace_id\":\"export-live-tenant\"")
-    );
+
     assert_eq!(
         service
             .handle_http_request(
