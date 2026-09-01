@@ -19,8 +19,10 @@ use crate::naruon_http::NARUON_ANALYSIS_RUN_PATH;
 use crate::{
     AnalysisRunAccepted, AnalysisRunRequest, ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT,
     ErrorEnvelope, NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_PATH,
-    ProjectHistoryProjection, ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH, TemporalContextRequest,
+    ProjectHistoryProjection, ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH,
+    TEMPORAL_CONTEXT_RETRIEVAL_INFERENCE_STATUS, TemporalContextRequest, TemporalContextRetrieved,
     build_temporal_context, project_history_projection, requests_are_idempotent_matches,
+    temporal_context_retrieval_path_id,
 };
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
@@ -41,6 +43,7 @@ pub struct AnalysisRunLiveService {
     next_request_serial: u64,
     accepted_runs: HashMap<String, (AnalysisRunRequest, AnalysisRunAccepted)>,
     accepted_project_histories: HashMap<String, (ProjectHistoryRequest, ProjectHistoryProjection)>,
+    accepted_temporal_contexts: HashMap<String, TemporalContextRetrieved>,
 }
 
 impl Default for AnalysisRunLiveService {
@@ -60,6 +63,7 @@ impl AnalysisRunLiveService {
             next_request_serial: 1,
             accepted_runs: HashMap::new(),
             accepted_project_histories: HashMap::new(),
+            accepted_temporal_contexts: HashMap::new(),
         }
     }
 
@@ -143,6 +147,10 @@ impl AnalysisRunLiveService {
         let (header_block, body) = split_request_with_limit(request, MAX_LIVE_REQUEST_BODY_BYTES)?;
         let mut lines = header_block.split("\r\n");
         let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
+        let headers = parse_headers(&mut lines)?;
+        if method == "GET" {
+            return self.get_temporal_context(path, &headers, body);
+        }
         if method != "POST"
             || (path != NARUON_ANALYSIS_RUN_PATH
                 && path != TEMPORAL_CONTEXT_PATH
@@ -150,24 +158,72 @@ impl AnalysisRunLiveService {
         {
             return Err(ApiError::InvalidWirePayload);
         }
-        let headers = parse_headers(&mut lines)?;
         let consumer = require_headers(
             &headers,
             self.bound_addr,
             path == NARUON_ANALYSIS_RUN_PATH || path == PROJECT_HISTORY_PATH,
         )?;
         if path == TEMPORAL_CONTEXT_PATH {
-            if consumer != LINEAGEWEAVE_CONSUMER_CODE {
-                return Err(ApiError::InvalidWirePayload);
-            }
-            let context_request = TemporalContextRequest::from_json(body)?;
-            let response = build_temporal_context(&context_request)?;
-            return Ok(json_response(200, "OK", response.to_json()?));
+            return self.accept_temporal_context(consumer, &headers, body);
         }
         if path == PROJECT_HISTORY_PATH {
             return self.accept_project_history(consumer, &headers, body);
         }
         self.accept_analysis_run(consumer, &headers, body)
+    }
+
+    fn accept_temporal_context(
+        &mut self,
+        consumer: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if consumer != LINEAGEWEAVE_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let context_request = TemporalContextRequest::from_json(body)?;
+        if let Some(idempotency_key) = headers.get("idempotency-key") {
+            let item = TemporalContextRetrieved::new(
+                idempotency_key.clone(),
+                context_request.knowledge_cutoff.clone(),
+                TEMPORAL_CONTEXT_RETRIEVAL_INFERENCE_STATUS,
+            )?;
+            let replay_key = format!("{consumer}\u{1f}{idempotency_key}");
+            if let Some(stored) = self.accepted_temporal_contexts.get(&replay_key) {
+                if stored.knowledge_cutoff != item.knowledge_cutoff {
+                    return Err(ApiError::InvalidWirePayload);
+                }
+            } else {
+                self.accepted_temporal_contexts.insert(replay_key, item);
+            }
+        }
+        let response = build_temporal_context(&context_request)?;
+        Ok(json_response(200, "OK", response.to_json()?))
+    }
+
+    fn get_temporal_context(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if !body.is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if headers.contains_key("idempotency-key") {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let idempotency_key = temporal_context_retrieval_path_id(path)?;
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != LINEAGEWEAVE_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let replay_key = format!("{consumer}\u{1f}{idempotency_key}");
+        let stored = self
+            .accepted_temporal_contexts
+            .get(&replay_key)
+            .ok_or(ApiError::InvalidWirePayload)?;
+        Ok(json_response(200, "OK", stored.to_json()?))
     }
 
     fn accept_analysis_run(
@@ -320,6 +376,7 @@ mod tests {
         DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, LINEAGEWEAVE_CONSUMER_CODE,
         NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_LIVE_HEADER_BYTE_LIMIT,
         NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, TEMPORAL_CONTEXT_PATH,
+        TemporalContextRetrieved,
     };
 
     fn sample_run() -> AnalysisRunRequest {
@@ -732,6 +789,58 @@ mod tests {
             .accept_analysis_run(NARUON_CONSUMER_CODE, &headers, &body)
             .expect("replay");
         assert_eq!(replay.body, accepted.body);
+    }
+
+    #[test]
+    fn temporal_context_get_by_id_is_metric_free_and_fail_closed() {
+        let temporal_body = r#"{"contract_version":1,"consumer_code":"lineageweave","knowledge_cutoff":"2026-08-20T00:00:00Z","subject_post_id":null,"events":[{"event_id":"event-1","source_post_id":"post-1","event_type_code":"order_awarded","event_label":"Order awarded","event_time":"2026-08-01T09:00:00Z","available_time":"2026-08-01T10:00:00Z","project_reference":null,"actor_references":["actor-1"]}]}"#;
+        let mut service = AnalysisRunLiveService::new();
+        let posted = format!(
+            "POST {TEMPORAL_CONTEXT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\nidempotency-key: idem-a\r\ncontent-length: {}\r\n\r\n{temporal_body}",
+            temporal_body.len()
+        );
+        assert_eq!(service.handle_http_request(&posted).status_code, 200);
+        let got = service.handle_http_request(
+            &format!(
+                "GET {TEMPORAL_CONTEXT_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+            ),
+        );
+        assert_eq!(got.status_code, 200, "{}", got.body);
+        assert!(!got.body.contains("event_label"));
+        assert!(!got.body.contains("rmse"));
+        let row = TemporalContextRetrieved::from_json(&got.body).expect("row");
+        assert_eq!(row.idempotency_key, "idem-a");
+        assert_eq!(row.inference_status, "temporal_association_only");
+        assert_eq!(
+            service
+                .handle_http_request(
+                    &format!(
+                        "GET {TEMPORAL_CONTEXT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                    )
+                )
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(
+                    &format!(
+                        "GET {TEMPORAL_CONTEXT_PATH}/idem-a HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                    )
+                )
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(
+                    &format!(
+                        "GET {TEMPORAL_CONTEXT_PATH}/missing HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+                    )
+                )
+                .status_code,
+            400
+        );
     }
 
     #[test]

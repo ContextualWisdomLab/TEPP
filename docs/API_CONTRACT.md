@@ -65,6 +65,7 @@ GET    /v1/evidence-imports/{import_id}
 POST   /v1/interpretation-runs
 POST   /v1/analysis-runs
 POST   /v1/temporal-context
+GET    /v1/temporal-context/{idempotency_key}
 GET    /v1/analysis-runs/{run_id}
 POST   /v1/analysis-runs/{run_id}/cancel
 GET    /v1/model-artifacts/{artifact_id}
@@ -90,6 +91,10 @@ only events whose availability time is at or before `knowledge_cutoff`, orders
 them by event time and opaque event ID, and emits adjacent forward temporal
 associations plus `candidate_not_causal` transition gaps. It does not infer
 causality, mutate TEPP state, or return a completed psychometric result.
+`GET /v1/temporal-context/{idempotency_key}` returns one metric-free identity
+minted when that POST carries an `idempotency-key` header (ADR 0083). Event
+labels, actor lists, and `tepp.scientific_acceptance.v1` never appear. Naruon
+is refused. `NaruonLiveService` stays POST-only. Collection GET stays closed.
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
