@@ -7,6 +7,75 @@
 
 use crate::LongitudinalError;
 
+/// Decompose a positive finite binary64 value into an exact integer
+/// significand and a power-of-two exponent.
+fn positive_binary_components(value: f64) -> (u64, i32) {
+    let bits = value.to_bits();
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & ((1_u64 << 52) - 1);
+    if exponent_bits == 0 {
+        (fraction, -1074)
+    } else {
+        ((1_u64 << 52) | fraction, exponent_bits - 1023 - 52)
+    }
+}
+
+/// Compare two positive `u128 * 2^exponent` values without overflowing the
+/// integer significands.
+fn scaled_integer_leq(
+    left_significand: u128,
+    left_exponent: i32,
+    right_significand: u128,
+    right_exponent: i32,
+) -> bool {
+    let left_bits = (u128::BITS - left_significand.leading_zeros()) as i32;
+    let right_bits = (u128::BITS - right_significand.leading_zeros()) as i32;
+    let left_order = left_exponent + left_bits;
+    let right_order = right_exponent + right_bits;
+    if left_order != right_order {
+        return left_order < right_order;
+    }
+    if left_exponent == right_exponent {
+        return left_significand <= right_significand;
+    }
+    if left_exponent > right_exponent {
+        let shift = (left_exponent - right_exponent) as u32;
+        return (left_significand << shift) <= right_significand;
+    }
+    let shift = (right_exponent - left_exponent) as u32;
+    left_significand <= (right_significand << shift)
+}
+
+/// Test the Cauchy–Schwarz covariance bound exactly for the supplied binary64
+/// inputs rather than using a rounded floating-point square-root product.
+fn covariance_within_binary_bound(
+    lagged_covariance: f64,
+    earlier_total_variance: f64,
+    later_total_variance: f64,
+) -> bool {
+    let covariance_magnitude = lagged_covariance.abs();
+    if covariance_magnitude == 0.0 {
+        return true;
+    }
+    let (covariance_significand, covariance_exponent) =
+        positive_binary_components(covariance_magnitude);
+    let (earlier_significand, earlier_exponent) =
+        positive_binary_components(earlier_total_variance);
+    let (later_significand, later_exponent) =
+        positive_binary_components(later_total_variance);
+
+    let covariance_square =
+        u128::from(covariance_significand) * u128::from(covariance_significand);
+    let variance_product =
+        u128::from(earlier_significand) * u128::from(later_significand);
+    scaled_integer_leq(
+        covariance_square,
+        covariance_exponent * 2,
+        variance_product,
+        earlier_exponent + later_exponent,
+    )
+}
+
 /// Recover a Pearson correlation for an event-time lag from its covariance and
 /// both marginal variances.
 ///
@@ -52,25 +121,35 @@ pub fn recover_event_time_lagged_correlation(
     if event_interval <= 0.0 {
         return Err(LongitudinalError::NonPositiveEventInterval);
     }
-
-    // sqrt(v1) * sqrt(v2) avoids the avoidable overflow of sqrt(v1 * v2).
-    let denominator = earlier_total_variance.sqrt() * later_total_variance.sqrt();
-    if !denominator.is_finite() || denominator <= 0.0 {
-        return Err(LongitudinalError::InvalidTemporalAssociationInput);
+    if !covariance_within_binary_bound(
+        lagged_covariance,
+        earlier_total_variance,
+        later_total_variance,
+    ) {
+        return Err(LongitudinalError::CovarianceBoundViolation);
     }
-    let correlation = lagged_covariance / denominator;
+
+    let earlier_scale = earlier_total_variance.sqrt();
+    let later_scale = later_total_variance.sqrt();
+    let (first_scale, second_scale) = if earlier_scale >= later_scale {
+        (earlier_scale, later_scale)
+    } else {
+        (later_scale, earlier_scale)
+    };
+    let correlation = (lagged_covariance / first_scale) / second_scale;
     if !correlation.is_finite() {
         return Err(LongitudinalError::InvalidTemporalAssociationInput);
     }
-    if correlation.abs() > 1.0 {
-        return Err(LongitudinalError::CovarianceBoundViolation);
-    }
-    Ok(correlation)
+
+    // The exact binary-input bound has already been checked above. Clamping
+    // only absorbs the final square-root/division rounding at a valid ±1
+    // boundary; it cannot admit an over-bound covariance.
+    Ok(correlation.clamp(-1.0, 1.0))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::recover_event_time_lagged_correlation;
+    use super::{recover_event_time_lagged_correlation, scaled_integer_leq};
     use crate::LongitudinalError;
 
     #[test]
@@ -152,6 +231,23 @@ mod tests {
             ),
             Err(LongitudinalError::CovarianceBoundViolation)
         );
+    }
+
+    #[test]
+    fn zero_covariance_is_valid() {
+        assert_eq!(
+            recover_event_time_lagged_correlation(0.0, 1.0, 4.0, 1.0),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn scaled_integer_comparison_covers_alignment_directions() {
+        assert!(scaled_integer_leq(1, 2, 4, 0));
+        assert!(!scaled_integer_leq(5, 0, 1, 2));
+        assert!(scaled_integer_leq(3, 0, 6, -1));
+        assert!(scaled_integer_leq(6, -1, 3, 0));
+        assert!(!scaled_integer_leq(7, -1, 3, 0));
     }
 
     #[test]
