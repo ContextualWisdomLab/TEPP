@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-01T17:14:00Z  
+**Snapshot:** 2026-09-01T18:14:00Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`  
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
@@ -16,8 +16,8 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
 | Open pull requests | **133** | WIP remains release-blocking, though verified consolidation reduced the observed peak of 149. |
-| Draft pull requests | **132** | Non-landable work is explicitly parked while it is consolidated, repaired or supplied with missing evidence. |
-| Non-draft pull requests | **1** | #310 is the sole Ready landing vehicle; it still requires fresh exact-head gates and qualifying review. |
+| Draft pull requests | **131** | Non-landable work is explicitly parked while it is consolidated, repaired or supplied with missing evidence. |
+| Non-draft pull requests | **2** | #310 is the scientific landing vehicle; #469 remains non-Draft only because the connector's Draft-conversion GraphQL mutation failed after retargeting and must be treated as review-not-ready until fresh exact-head gates/review exist. |
 | Open issues | **14** | Includes #437 for repository-wide ADR identity normalization. |
 | GitHub releases | **0** | No open head is a released TEPP contract. |
 | Effective organization ruleset | `18156473` | One qualifying approval, resolved conversations, exact-head required workflows and an allowed merge method are required. |
@@ -30,12 +30,13 @@ This is a priority subset, not a row-for-row copy of the 133-PR queue. #435 omit
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
+| #469 | `6a68f98971986f3ea9562fd7a73c5974e5a4af6e` | false* | interpretation-run retrieval ancestor | Analysis Run / contextual-orchestrator stored-request + server-id lookup GET/CLI landing vehicle; *metadata non-Draft after connector Draft-conversion failure, operationally review-not-ready. |
 | #466 | `0c5efc3c9075115d0670b8438342c72069043dcd` | true | export-retrieval ancestor | Analysis Run / naruon export idempotency GET+CLI landing vehicle. |
 | #464 | `1b3a477242336634be2c7867b29d39979e9a6dca` | true | temporal-context retrieval ancestor | Analysis Run / LineageWeave temporal-context stored-request GET+CLI landing vehicle. |
 | #462 | `c1b7d627167dd7636d2975cc41cec050a5e477ba` | true | main | Bounded source-name compatibility repair; v1 serialized key remains `id`. |
 | #420 | `0dc8b48f66b367a90847fcfebd2c6453ff275a1d` | true | main | Project-history query CLI; `fold_into_landing_vehicle`. |
 | #417 | `1e468f62ec47f3476a7b4d18ed2980451dc425cf` | true | main | Analysis Run / naruon export retrieval GET+CLI landing vehicle. |
-| #310 | `2d44b89ed4cd63181cdc738ff6222ede002a4f3f` | false | main | Longitudinal Modeling landing vehicle; strictly contains closed predecessor #441 and adds typed event-time admission, p.16 `discreteDRIFTstd`, overflow repair and governance amendments. |
+| #310 | `58c1ba7f085260ee8efa90e2089828cc469581ba` | false | main | Longitudinal Modeling landing vehicle; contains closed #441 lineage, typed event-time lag association, p.16 `discreteDRIFTstd`, extreme-overflow and signed-zero-underflow repairs, temporal-ordering regression and primary-source doctoring. |
 
 ## Domain ownership
 
@@ -74,15 +75,15 @@ Supported temporal estimators require realistic known-truth recovery: RMSE, bias
 
 ## Current repairs and blockers
 
-**#310 — Longitudinal Modeling landing vehicle.** Strict ancestry proves closed predecessor #441 is contained by #310. The invalid one-sided covariance/earlier-variance ratio remains retired; public lagged correlation requires lagged covariance and both marginal variances. Public event-time operations now admit `EventTimeInterval`, preventing an arbitrary positive duration from silently crossing the event-time boundary. RED `c52c436c6b075e3982c8195b7862ea07063930b2` reproduces the finite extreme stable-rate case where `-2a` overflowed despite a representable p.16 `discreteDRIFTstd`; the repaired implementation avoids that intermediate overflow. ADR 0005 is clarified without a new numeric identity and PRD v0.4 has a longitudinal-time ownership amendment. All previously visible #310 review findings have been answered/resolved; exact-current-head hosted checks and independent review must regenerate.
+**#310 — Longitudinal Modeling landing vehicle.** Closed predecessor #441 is contained by #310. The invalid one-sided covariance/earlier-variance ratio remains retired; public lagged correlation requires lagged covariance and both marginal variances. `EventTimeInterval` is now preserved through the public wrapper into the internal association primitive instead of being erased to a bare `f64`. RED `c52c436c6b075e3982c8195b7862ea07063930b2` reproduces the finite extreme stable-rate case where `-2a` overflowed despite a representable p.16 `discreteDRIFTstd`; the implementation avoids that intermediate overflow. RED `b6d7594208f1c469382e7d540a5507280de6a196` additionally reproduces finite negative drift × positive event-interval multiplication underflow to signed zero; GREEN `1347bfb7726fd1cb3196f6cad306aa00fe41d112` fails closed instead of silently returning `exp(-0.0) == 1.0`. The known-truth test now asserts the correct temporal ordering (`longer interval < shorter interval` for stable negative drift). Research doctoring at `58c1ba7f085260ee8efa90e2089828cc469581ba` grounds the covariance bound in Bouniakowsky's 1859 primary inequality while retaining later correlation literature as supplementary context. Current Semgrep is GREEN; Rust and Documentation are queued. Security is fail-closed only at dependency-review support preflight while OSV/Trivy/Scorecard pass. Independent current-head review is still required.
 
-**Dependency-review support.** The central Security Scan has failed before dependency review because the exact dependency-graph compare endpoint returns HTTP 403 for this public repository with the workflow's read-only token; OSV, Trivy and Scorecard independently terminate GREEN. Treat this as `blocked_external` dependency-graph/security support or GitHub control-plane behavior, not as a TEPP vulnerability and not as permission to weaken the fail-closed central workflow. Retry only after the underlying support/configuration condition changes.
+**Dependency-review support.** The central Security Scan has failed before dependency review because the exact dependency-graph compare support probe is not admitted for this repository/workflow token; OSV, Trivy and Scorecard independently terminate GREEN. Treat this as `blocked_external` dependency-graph/security support or GitHub control-plane behavior, not as a TEPP vulnerability and not as permission to weaken the fail-closed central workflow. Retry only after the underlying support/configuration condition changes.
 
-**Analysis Run adapter/profile proliferation.** Export, interpretation, project-history and temporal-context HTTP/CLI mechanics are adapters inside one supporting context. Strict predecessor/child stacks may be folded only after exact ancestry is proven; diverged siblings require an actual source/test fold. One refusal/profile does not create architecture authority. Preserve unique routes, refusals, tests and review evidence before predecessor closure.
+**Analysis Run adapter/profile proliferation.** Export, interpretation, project-history and temporal-context HTTP/CLI mechanics are adapters inside one supporting context. This run collapsed strict interpretation-run ancestry repeatedly: #454 was folded into #467, #467 into #468, and #468 into surviving #469, with each predecessor proven as the merge base and each child exactly one commit ahead/zero behind before retarget-and-close. This preserves source/tests/review evidence while preventing GET/CLI/request variants from remaining independent product WIP. Diverged siblings still require an actual source/test fold. One refusal/profile does not create architecture authority.
 
 **#462 — bounded naming repair.** Rust source uses `node_id` while the v1 serialized key remains `id`; this is not a JSON-LD `@id` semantic change or a new bounded context.
 
-**#437 — ADR identity.** The #435 branch rejects duplicate index IDs, duplicate index targets and duplicate numbered ADR files. The normalized index preserves pre-normalization collision lineage under `docs/adr/archive/`. Closure waits for protected-main integration.
+**#437 — ADR identity.** The #435 branch rejects duplicate index IDs, duplicate index targets and duplicate numbered ADR files. The normalized index preserves pre-normalization collision lineage under `docs/adr/archive/`. Operation-specific ADR 0095/0096/0097 created on active adapter branches remain implementation lineage pending normalization; route/CLI proliferation must not become architecture authority. Closure waits for protected-main integration.
 
 ## Dependency and Context Fabric status
 
