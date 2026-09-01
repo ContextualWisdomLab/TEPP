@@ -1,16 +1,18 @@
 # Temporal dependence composition boundary
 
-**Status:** Accepted target; the upstream Published Language is not yet implemented on protected `main`.
+**Status:** Accepted target; the upstream Published Language is not yet a released production dependency.
+**Architecture authority:** ADR 0011.
+**Research authority:** [`docs/research/temporal-dependence-models.md`](../research/temporal-dependence-models.md).
 
 This document defines the anti-corruption boundary between reusable static psychometric model specification in `ContextualWisdomLab/fast-mlsirm` and TEPP-owned temporal/event composition. It does not add a numerical estimator and does not make an upstream research candidate a supported TEPP model.
 
 ## Ownership
 
-`fast-mlsirm` owns reusable response-family, dimensional, generalized-mixed, and dependence-aware psychometric specification and numerical kernels. Its Published Language is a versioned immutable candidate manifest whose structural identity covers the exact base response formulation, parameter blocks, dimensional structure, generalized-mixed structure, and dependence structure.
+`fast-mlsirm` owns reusable response-family, dimensional, generalized-mixed, and dependence-aware psychometric specification and numerical kernels. Its Published Language must be a released, versioned, immutable candidate manifest whose structural identity covers the exact base response formulation, parameter blocks, dimensional structure, generalized-mixed structure, and dependence structure.
 
 TEPP owns only the temporal/event composition placed around that published candidate:
 
-- event time, valid time, assertion time, document time, system time, available time, and knowledge cutoff;
+- event or valid time, assertion time, document time, system time, available time, and knowledge cutoff;
 - leakage-safe historical eligibility;
 - measurement occasion as a method/rater facet distinct from substantive event time;
 - irregular observation intervals;
@@ -21,11 +23,13 @@ TEPP owns only the temporal/event composition placed around that published candi
 - event ontology and temporal graph constraints;
 - temporal known-truth recovery and rolling-origin validation.
 
+The first clock role is **event or valid time**, matching the approved six-clock contract. A state may be represented by an event instant or a validity interval, but TEPP does not mint a seventh independent clock by storing `event_time` and `valid_time` as unrelated analysis-time authorities.
+
 `contextual-orchestrator` owns every LLM provider call, routing decision, verifier/adjudicator workflow, credential, and model-call provenance. TEPP never calls a model provider directly.
 
 ## Published-language intake
 
-The TEPP ACL consumes a versioned upstream candidate contract rather than branching on model-family names. At minimum the contract must carry:
+The TEPP ACL consumes a released/versioned upstream candidate contract rather than branching on model-family names. At minimum the contract must carry:
 
 ```text
 candidate_id
@@ -53,7 +57,7 @@ primary_citation_references
 
 The ACL rejects missing structural identity, unknown contract versions, digest mismatch, and a request that silently substitutes a local-independent candidate for a dependence-aware request.
 
-TEPP does not duplicate the upstream `ResponseKernel`, `GeneralizedMixedStructure`, LSIRM, MLSIRM, or DLSJM implementation. When reusable static arithmetic currently exists locally in TEPP, its migration path is parity and recovery against the fast-mlsirm owner, followed by replacement with a versioned adapter and removal of the duplicate production source.
+TEPP does not duplicate the upstream `ResponseKernel`, `GeneralizedMixedStructure`, LSIRM, MLSIRM, or DLSJM implementation. When reusable static arithmetic currently exists locally in TEPP, its migration path is parity and recovery against the fast-mlsirm owner, followed by replacement with a released versioned adapter and removal of the duplicate production source.
 
 ## Generic temporal compiler
 
@@ -70,7 +74,7 @@ upstream_contract_version
 upstream_contract_digest
 temporal_formulation_id
 clock_role_contract
-event_time_semantics
+event_or_valid_time_semantics
 occasion_facet_semantics
 state_equation_id
 temporal_identification_rules
@@ -109,6 +113,8 @@ MLSIRM is the multidimensional-main-effect latent-space extension described by K
 
 A temporal LSIRM/MLSIRM candidate must define how interaction geometry evolves and how successive maps are identified. Raw coordinates from two occasions cannot be compared before the declared translation/rotation/reflection alignment. If scale or orientation is not identified across time, the candidate remains `research_candidate` regardless of apparently smooth trajectories.
 
+The canonical primary-research scope and extension limits are maintained in [`docs/research/temporal-dependence-models.md`](../research/temporal-dependence-models.md).
+
 ## DLSJM temporal composition
 
 DLSJM follows Jin and Jeon (2019) as the baseline formulation for joint local item dependence and local person dependence. It is not an LSIRM alias.
@@ -129,7 +135,7 @@ Generalized-mixed structure composes orthogonally with dependence and time when 
 
 One observation may belong simultaneously to multiple organizations, projects, teams, sources, languages, item families, judges, raters, templates, or event episodes. Cross-classification is not multiple membership; both remain explicit in the candidate identity.
 
-Multiple-membership weights are auditable and time-valid. They are either observed/normalized under the declared design or estimated by an explicit model. TEPP does not invent equal weights as a fallback. Membership changes are state input with valid/event/available-time provenance; future membership cannot enter a historical cutoff.
+Multiple-membership weights are auditable and time-valid. They are either observed/normalized under the declared design or estimated by an explicit model. TEPP does not invent equal weights as a fallback. Membership changes are state input with event-or-valid/available-time provenance; future membership cannot enter a historical cutoff.
 
 ## Explanatory and exploratory candidates
 
@@ -163,7 +169,7 @@ Every expanded temporal dependence candidate receives a generated recovery speci
 - temporal transition/dynamic parameters;
 - posterior/interval uncertainty and coverage.
 
-Known-truth simulation separates event time from available time. The suite includes irregular gaps, delayed reports, retrospective documents, missing occasions, changing memberships, and language/source drift. Evaluation uses leakage-safe rolling origins. Monte Carlo uncertainty is reported for simulation summaries; arbitrary pass percentages or rule-of-thumb thresholds are not scientific promotion criteria.
+Known-truth simulation separates event-or-valid time from available time. The suite includes irregular gaps, delayed reports, retrospective documents, missing occasions, changing memberships, and language/source drift. Evaluation uses leakage-safe rolling origins. Monte Carlo uncertainty is reported for simulation summaries; arbitrary pass percentages or rule-of-thumb thresholds are not scientific promotion criteria.
 
 A recovery artifact is evidence. A separate Scientific Claim Promotion Decision applies the preregistered method-specific acceptance contract from ADR 0014. A transport success, mergeable PR, LLM judgment, or generic RMSE threshold cannot promote a candidate.
 
@@ -171,7 +177,7 @@ A recovery artifact is evidence. A separate Scientific Claim Promotion Decision 
 
 ```text
 fast-mlsirm Model Specification / Numerical Core
-        Published Language: versioned candidate manifest
+        Published Language: released versioned candidate manifest
                          |
                          v
               TEPP anti-corruption layer
@@ -189,18 +195,14 @@ contextual-orchestrator --ACL--> Interpretation only
 LineageWeave ------------ACL--> Evidence/lineage input only
 ```
 
-Dependency direction is one-way. TEPP may depend on a versioned fast-mlsirm contract. fast-mlsirm must not import TEPP temporal ontology. Neither repository accesses the other repository's database.
+Dependency direction is one-way. TEPP may depend on a released versioned fast-mlsirm contract. fast-mlsirm must not import TEPP temporal ontology. Neither repository accesses the other repository's database.
 
 ## Current implementation status
 
-As of the snapshot that introduced this document, `fast-mlsirm` PR #1714 publishes the proposed non-numerical generalized-mixed/dependence candidate compiler, but it is not yet merged into fast-mlsirm protected `main`. Therefore TEPP has no right to claim this Published Language as available production dependency yet.
+The upstream generalized-mixed/dependence candidate compiler is a contract-in-progress until it reaches the canonical fast-mlsirm protected branch and is released/versioned. TEPP must re-read its live identity each execution rather than treating a remembered PR number or SHA as authority.
 
-Until that contract lands and is versioned, TEPP should develop only the ACL schema/tests and temporal composition semantics that do not duplicate the upstream compiler or numerical kernel. Any local reusable static psychometric implementation discovered during that work is a migration candidate, not a second canonical source.
+Until that contract is released, TEPP develops only ACL schema/tests and temporal composition semantics that do not duplicate the upstream compiler or numerical kernel. Any local reusable static psychometric implementation discovered during that work is a migration candidate, not a second canonical source.
 
 ## Research basis
 
-Jin, I. H., & Jeon, M. (2019). A doubly latent space joint model for local item and person dependence in the analysis of item response data. *Psychometrika, 84*(1), 236–260. https://doi.org/10.1007/s11336-018-9630-0
-
-Jeon, M., Jin, I. H., Schweinberger, M., & Baugh, S. (2021). Mapping unobserved item–respondent interactions: A latent space item response model with interaction map. *Psychometrika, 86*(2), 378–403. https://doi.org/10.1007/s11336-021-09762-5
-
-Kang, I., & Jeon, M. (2025). Multidimensional latent space item response models: A note on the relativity of conditional dependence. *Psychometrika, 90*(2), 799–826. https://doi.org/10.1017/psy.2025.5
+The canonical research discussion and APA 7 references for LSIRM, MLSIRM, and DLSJM are in [`docs/research/temporal-dependence-models.md`](../research/temporal-dependence-models.md). This architecture document intentionally does not maintain a second independent citation authority.
