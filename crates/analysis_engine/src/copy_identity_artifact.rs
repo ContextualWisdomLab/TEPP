@@ -11,7 +11,10 @@ use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 
-use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
+use crate::{
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, format_digest, require_receipt_identity,
+    valid_identifier,
+};
 
 /// Versioned schema for a completed copy-identity artifact.
 pub const COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION: &str = "tepp.copy_identity.v1";
@@ -125,6 +128,9 @@ impl CopyIdentityArtifact {
         self.validate()?;
         let payload =
             serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
+        if payload.len() > COPY_IDENTITY_ARTIFACT_BYTE_LIMIT {
+            return Err(AnalysisEngineError::LimitExceeded);
+        }
         Ok(payload)
     }
 
@@ -147,6 +153,7 @@ impl CopyIdentityArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.document_count < 2
+            || self.document_count > MAX_EVIDENCE_UNITS as u64
             || self.source_document_count == 0
             || self.template_copy_count == 0
             || kind_sum != Some(self.document_count)
@@ -179,7 +186,8 @@ pub struct CopyIdentityExecution {
 /// # Errors
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, empty or
-/// single-kind corpus, duplicate document identity, or invalid artifact error.
+/// single-kind corpus, duplicate document identity, oversized corpus, or
+/// invalid artifact error.
 pub fn execute_copy_identity_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -199,6 +207,9 @@ pub fn execute_copy_identity_run(
         || request.output_profile != COPY_IDENTITY_OUTPUT_PROFILE
     {
         return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    if documents.len() > MAX_EVIDENCE_UNITS {
+        return Err(AnalysisEngineError::LimitExceeded);
     }
 
     let mut seen = std::collections::BTreeSet::new();
