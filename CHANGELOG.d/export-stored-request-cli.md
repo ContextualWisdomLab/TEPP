@@ -1,0 +1,1 @@
+- `tepp-export-request get` mints naruon stored-request GET onto spawned `tepp-loopback` TCP (ADR 0090). Metric-free. LineageWeave refused. `NaruonLiveService` stays POST-only. Does not re-open cancel lineages. Not GAP-010 Figma/export, not persistence.
