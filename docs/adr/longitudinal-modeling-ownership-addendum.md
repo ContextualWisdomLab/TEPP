@@ -1,0 +1,29 @@
+# ADR 0005 ownership addendum — Longitudinal Modeling
+
+**Parent decision:** ADR 0005 — Posterior-aware ESEM/DSEM and structural interpretation  
+**Decision identity:** ADR 0005; this addendum does not mint a new ADR number  
+**Status:** Accepted clarification  
+**Recorded:** 2026-09-01
+
+## Decision clarification
+
+Temporal/event composition of longitudinal psychometric quantities belongs to the TEPP Longitudinal Modeling bounded context. Public operations whose meaning depends on substantive event time must therefore expose an event-time domain type at the context boundary rather than accepting an unqualified numeric duration.
+
+`longitudinal_core` owns this TEPP temporal composition. `fast-mlsirm` remains the canonical owner of reusable static/generalized-mixed/dependence-aware psychometric kernels. A numerically reusable primitive must migrate through the fast-mlsirm Published Language/ACL boundary rather than turning `longitudinal_core` into a second static psychometric kernel.
+
+For the scalar Driver, Oud, and Voelkle (2017) p. 16 `discreteDRIFTstd` special case, TEPP owns only the event-time composition and admissibility policy. The function requires stable negative drift, positive stationary within-person variance, and an admitted `EventTimeInterval`. It does not estimate ctsem/DSEM parameters, state trajectories, process noise, or uncertainty.
+
+The lagged-correlation boundary similarly requires both occasion-specific marginal variances and an `EventTimeInterval`; a covariance divided only by the earlier variance is not exposed as an autocorrelation.
+
+## DDD consequences
+
+- `psychometric_core` is not the authority for temporal transforms merely because an earlier branch placed them there.
+- `EventTimeInterval` is a value object of Longitudinal Modeling. Assertion-, document-, system-, availability-, and method-occasion intervals require explicit owning-context conversion before they can be admitted as substantive event time.
+- One transform, route, clock, or refusal does not create a bounded context or a new ADR identity.
+- Compatibility adapters may preserve public callers during a landed migration, but domain ownership and dependency direction must remain explicit.
+
+## Verification
+
+PR #310 is the current landing vehicle for this clarification. Its RED lineage includes an extreme stable-drift case that failed because `-2a` overflowed despite a representable stationary variance, and a typed event-time contract that could not compile before the value object existed. The repaired source avoids the unnecessary doubling overflow and moves public event-time admission behind `EventTimeInterval`.
+
+Protected-main maturity is not claimed until the exact landing head passes the live ruleset and is merged.
