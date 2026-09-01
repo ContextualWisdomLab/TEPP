@@ -95,6 +95,66 @@ mod tests {
     }
 
     #[test]
+    fn exact_binary_bound_rejects_one_ulp_excess_for_both_signs() {
+        let variance = 2.0_f64;
+        let one_ulp_above = f64::from_bits(variance.to_bits() + 1);
+        assert_eq!(
+            recover_event_time_lagged_correlation(one_ulp_above, variance, variance, 1.0),
+            Err(LongitudinalError::CovarianceBoundViolation)
+        );
+        assert_eq!(
+            recover_event_time_lagged_correlation(-one_ulp_above, variance, variance, 1.0),
+            Err(LongitudinalError::CovarianceBoundViolation)
+        );
+    }
+
+    #[test]
+    fn exact_binary_bound_accepts_extreme_and_subnormal_boundaries() {
+        assert_eq!(
+            recover_event_time_lagged_correlation(f64::MAX, f64::MAX, f64::MAX, 1.0),
+            Ok(1.0)
+        );
+        assert_eq!(
+            recover_event_time_lagged_correlation(-f64::MAX, f64::MAX, f64::MAX, 1.0),
+            Ok(-1.0)
+        );
+
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(
+            recover_event_time_lagged_correlation(
+                minimum_subnormal,
+                minimum_subnormal,
+                minimum_subnormal,
+                1.0,
+            ),
+            Ok(1.0)
+        );
+        assert_eq!(
+            recover_event_time_lagged_correlation(
+                -minimum_subnormal,
+                minimum_subnormal,
+                minimum_subnormal,
+                1.0,
+            ),
+            Ok(-1.0)
+        );
+    }
+
+    #[test]
+    fn gross_subnormal_bound_violation_is_classified_before_division() {
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(
+            recover_event_time_lagged_correlation(
+                1.0,
+                minimum_subnormal,
+                minimum_subnormal,
+                1.0,
+            ),
+            Err(LongitudinalError::CovarianceBoundViolation)
+        );
+    }
+
+    #[test]
     fn exact_boundary_correlations_are_allowed() {
         assert_eq!(
             recover_event_time_lagged_correlation(2.0, 1.0, 4.0, 1.0),
