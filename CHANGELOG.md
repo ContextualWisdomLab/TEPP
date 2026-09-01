@@ -40,7 +40,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Fixed
 
-- Project-history GET-by-id now requires the tenant workspace identity and performs a direct consumer/tenant/idempotency lookup, preventing cross-tenant projection disclosure and ambiguous duplicate-key retrieval.
+- Project-history collection and GET-by-id now require the tenant workspace identity, use the consumer/tenant/idempotency registry boundary, and accept the POST contract's full 256-byte key range, preventing cross-tenant disclosure, duplicate-key pagination loss, and unretrievable accepted histories; structured schema validation no longer rejects harmless evidence-text mentions.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 

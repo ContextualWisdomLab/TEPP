@@ -11,10 +11,14 @@
 //! Figma/export. Persistence remains GAP-003B.
 
 use crate::naruon_http::{NaruonHttpExchange, compose_https_target};
+use crate::project_history::validate_project_history_registry_identity;
 use crate::wire::{
     from_json, require_byte_limit, require_contract_version, require_nonempty, to_json,
 };
-use crate::{ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, PROJECT_HISTORY_PATH};
+use crate::{
+    ApiError, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, PROJECT_HISTORY_PATH,
+    PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER,
+};
 use serde::{Deserialize, Serialize};
 
 /// Supported project-history collection contract version.
@@ -27,7 +31,7 @@ pub const PROJECT_HISTORY_COLLECTION_DEFAULT_LIMIT: usize = 32;
 pub const PROJECT_HISTORY_COLLECTION_MAX_LIMIT: usize = 64;
 
 /// Maximum opaque cursor / idempotency-key length on the collection path.
-pub const PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN: usize = 128;
+pub const PROJECT_HISTORY_COLLECTION_CURSOR_MAX_LEN: usize = 256;
 
 /// Fixed non-causal claim boundary echoed on every collection row.
 pub const PROJECT_HISTORY_COLLECTION_INFERENCE_STATUS: &str = "temporal_association_only";
@@ -318,14 +322,16 @@ pub fn page_project_history_collection_items(
 ///
 /// # Errors
 ///
-/// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin or an
-/// empty cursor, and [`ApiError::LimitExceeded`] when limit or cursor bounds
-/// are exceeded.
+/// Returns [`ApiError::InvalidWirePayload`] for a non-`https` origin, invalid
+/// tenant identity, or empty cursor, and [`ApiError::LimitExceeded`] when
+/// tenant, limit, or cursor bounds are exceeded.
 pub fn lineageweave_project_history_collection_exchange(
     origin: &str,
+    tenant_workspace_id: &str,
     cursor: Option<&str>,
     limit: Option<&str>,
 ) -> Result<NaruonHttpExchange, ApiError> {
+    validate_project_history_registry_identity(tenant_workspace_id)?;
     let _ = parse_project_history_collection_page_limit(limit)?;
     let _ = parse_project_history_collection_page_cursor(cursor)?;
     let target_url = compose_https_target(origin, PROJECT_HISTORY_PATH)?;
@@ -333,6 +339,10 @@ pub fn lineageweave_project_history_collection_exchange(
         ("content-type".into(), "application/json".into()),
         ("tepp-consumer".into(), "lineageweave".into()),
         ("tepp-contract-version".into(), "1".into()),
+        (
+            PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER.into(),
+            tenant_workspace_id.to_owned(),
+        ),
     ];
     if let Some(cursor) = cursor {
         headers.push(("tepp-page-cursor".into(), cursor.to_owned()));
@@ -549,12 +559,17 @@ mod tests {
 
         let exchange = lineageweave_project_history_collection_exchange(
             "https://tepp.example.test",
+            "tenant-a",
             Some("idem-1"),
             Some("8"),
         )
         .expect("exchange");
         assert_eq!(exchange.method, "GET");
         assert!(exchange.target_url.ends_with("/v1/project-histories"));
+        assert!(exchange.headers.contains(&(
+            crate::PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER.into(),
+            "tenant-a".into(),
+        )));
         assert!(
             !exchange
                 .headers
@@ -563,7 +578,21 @@ mod tests {
         );
         assert!(exchange.body.is_empty());
         assert_eq!(
-            lineageweave_project_history_collection_exchange("http://insecure.example", None, None),
+            lineageweave_project_history_collection_exchange(
+                "http://insecure.example",
+                "tenant-a",
+                None,
+                None,
+            ),
+            Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            lineageweave_project_history_collection_exchange(
+                "https://tepp.example.test",
+                "",
+                None,
+                None,
+            ),
             Err(ApiError::InvalidWirePayload)
         );
     }

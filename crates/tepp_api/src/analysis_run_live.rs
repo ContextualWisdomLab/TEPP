@@ -268,9 +268,14 @@ impl AnalysisRunLiveService {
         let page_cursor = headers.get("tepp-page-cursor").map(String::as_str);
         let limit = parse_project_history_collection_page_limit(page_limit)?;
         let cursor = parse_project_history_collection_page_cursor(page_cursor)?;
+        let tenant_workspace_id = header_value(headers, PROJECT_HISTORY_RETRIEVAL_TENANT_HEADER)?;
+        crate::project_history::validate_project_history_registry_identity(tenant_workspace_id)?;
+        let tenant_prefix = format!("{consumer}\u{1f}{tenant_workspace_id}\u{1f}");
         let items = self
             .accepted_project_histories
-            .values()
+            .iter()
+            .filter(|(registry_identity, _)| registry_identity.starts_with(&tenant_prefix))
+            .map(|(_, stored)| stored)
             .map(|(request, projection)| {
                 ProjectHistoryCollectionItem::new(
                     request.project_key.clone(),
@@ -1071,7 +1076,7 @@ mod tests {
         );
 
         let list = format!(
-            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
         );
         let got = service.handle_http_request(&list);
         assert_eq!(got.status_code, 200);
@@ -1086,7 +1091,7 @@ mod tests {
         assert!(!got.body.contains("causal_score"));
 
         let limited = format!(
-            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-page-limit: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ntepp-page-limit: 1\r\ncontent-length: 0\r\n\r\n"
         );
         let limited_got = service.handle_http_request(&limited);
         let limited_page =
@@ -1094,25 +1099,63 @@ mod tests {
         assert_eq!(limited_page.histories.len(), 1);
         assert_eq!(limited_page.next_cursor.as_deref(), Some("idem-a"));
         let continued = format!(
-            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-page-limit: 1\r\ntepp-page-cursor: idem-a\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ntepp-page-limit: 1\r\ntepp-page-cursor: idem-a\r\ncontent-length: 0\r\n\r\n"
         );
         let continued_page =
             ProjectHistoryCollection::from_json(&service.handle_http_request(&continued).body)
                 .expect("continued page");
         assert_eq!(continued_page.histories[0].idempotency_key, "idem-b");
 
+        let missing_tenant = format!(
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        );
+        assert_eq!(
+            service.handle_http_request(&missing_tenant).status_code,
+            400
+        );
+
         let analysis_get = format!(
             "GET {NARUON_ANALYSIS_RUN_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
         );
         assert_eq!(service.handle_http_request(&analysis_get).status_code, 400);
         let naruon_list = format!(
-            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {NARUON_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
         );
         assert_eq!(service.handle_http_request(&naruon_list).status_code, 400);
         let nonempty = format!(
-            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 2\r\n\r\n{{}}"
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 2\r\n\r\n{{}}"
         );
         assert_eq!(service.handle_http_request(&nonempty).status_code, 400);
+    }
+
+    #[test]
+    fn project_history_collection_scopes_duplicate_and_maximum_keys_by_tenant() {
+        let mut service = AnalysisRunLiveService::new();
+        let maximum_key = "k".repeat(256);
+        let first = sample_project_history(&maximum_key, "project-a");
+        let mut other_tenant = sample_project_history(&maximum_key, "project-b");
+        other_tenant.tenant_workspace_id = "other-tenant".into();
+        assert_eq!(
+            service
+                .handle_http_request(&project_history_post(&first))
+                .status_code,
+            200
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&project_history_post(&other_tenant))
+                .status_code,
+            200
+        );
+
+        let list = format!(
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
+        );
+        let page = ProjectHistoryCollection::from_json(&service.handle_http_request(&list).body)
+            .expect("tenant page");
+        assert_eq!(page.histories.len(), 1);
+        assert_eq!(page.histories[0].idempotency_key, maximum_key);
+        assert_eq!(page.histories[0].project_key, "project-a");
     }
 
     #[test]
@@ -1188,7 +1231,7 @@ mod tests {
         ));
         assert_eq!(wrong_method.status_code, 400);
         let collection = service.handle_http_request(&format!(
-            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+            "GET {PROJECT_HISTORY_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {LINEAGEWEAVE_CONSUMER_CODE}\r\ntepp-contract-version: 1\r\ntepp-tenant-workspace-id: history-tenant\r\ncontent-length: 0\r\n\r\n"
         ));
         assert_eq!(collection.status_code, 200);
         assert!(!collection.body.contains("evidence_text"));

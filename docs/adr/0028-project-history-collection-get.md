@@ -13,7 +13,7 @@ Protected main already stores accepted project-history projections on `AnalysisR
 
 `tepp_api` publishes loopback-only `GET /v1/project-histories` on `tepp-loopback`:
 
-- Consumer is `lineageweave` only. Empty body. Pagination uses `tepp-page-limit` and exclusive `tepp-page-cursor` headers because the request-line parser fails closed on query strings.
+- Consumer is `lineageweave` only. The required `tepp-tenant-workspace-id` scopes every page to one validated tenant. Empty body. Pagination uses `tepp-page-limit` and exclusive `tepp-page-cursor` headers because the request-line parser fails closed on query strings.
 - Collection rows are metric-free identities: `project_key`, `idempotency_key`, `knowledge_cutoff`, `inference_status=temporal_association_only`.
 - `tepp.scientific_acceptance.v1`, RMSE, bias, coverage, SE-gate, `evidence_text`, `findings`, and `causal_score` never appear.
 - The collection does not infer causality, mutate TEPP state, or return a completed psychometric result.

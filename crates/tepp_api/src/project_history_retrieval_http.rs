@@ -70,14 +70,11 @@ pub fn project_history_retrieval_path_id(path: &str) -> Result<String, ApiError>
 /// # Errors
 ///
 /// Returns [`ApiError::InvalidWirePayload`] when a forbidden metric or causal
-/// key is present, `tepp.scientific_acceptance.v1` appears, or nonempty JSON
-/// is not an object.
+/// key is present, the scientific-acceptance schema is claimed, or nonempty
+/// JSON is not an object.
 pub fn refuse_metrics_on_project_history_retrieval_payload(payload: &str) -> Result<(), ApiError> {
     if payload.trim().is_empty() {
         return Ok(());
-    }
-    if payload.contains("tepp.scientific_acceptance.v1") {
-        return Err(ApiError::InvalidWirePayload);
     }
     let value: serde_json::Value =
         serde_json::from_str(payload).map_err(|_| ApiError::InvalidWirePayload)?;
@@ -90,6 +87,13 @@ pub fn refuse_metrics_on_project_history_retrieval_payload(payload: &str) -> Res
 fn refuse_metrics_on_json(value: &serde_json::Value) -> Result<(), ApiError> {
     match value {
         serde_json::Value::Object(object) => {
+            if object
+                .get("schema_version")
+                .and_then(serde_json::Value::as_str)
+                == Some("tepp.scientific_acceptance.v1")
+            {
+                return Err(ApiError::InvalidWirePayload);
+            }
             if FORBIDDEN_RETRIEVAL_KEYS
                 .iter()
                 .any(|key| object.contains_key(*key))
@@ -313,6 +317,12 @@ mod tests {
                 r#"{"schema_version":"tepp.scientific_acceptance.v1"}"#
             ),
             Err(ApiError::InvalidWirePayload)
+        );
+        assert_eq!(
+            refuse_metrics_on_project_history_retrieval_payload(
+                r#"{"evidence_text":"mentions tepp.scientific_acceptance.v1 as untrusted text"}"#
+            ),
+            Ok(())
         );
         assert_eq!(
             refuse_metrics_on_project_history_retrieval_payload("[]"),
