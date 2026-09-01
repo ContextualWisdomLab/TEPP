@@ -7,6 +7,8 @@
 //! hypothetical and never scientific authority. Collection GET enumerates
 //! metric-free identities so operators do not guess idempotency keys.
 //! GET-by-id returns one of those identities without POST replay.
+//! `POST /v1/interpretation-runs/{idempotency_key}/cancel` removes one
+//! accepted identity from the in-memory registry.
 //! Table-access hosts, review/Copilot/GitHub credentials, and
 //! `COPILOT_GITHUB_TOKEN` fail closed. This crate does not implement TLS
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
@@ -16,6 +18,7 @@
 
 mod error;
 mod http;
+mod interpretation_run_cancel_http;
 mod interpretation_run_cli;
 mod interpretation_run_collection_http;
 mod interpretation_run_retrieval_http;
@@ -31,6 +34,18 @@ pub use http::OrchestratorLiveResponse;
 pub use http::LIVE_HEADER_BYTE_LIMIT;
 /// Maximum live HTTP header count.
 pub use http::LIVE_HEADER_COUNT_LIMIT;
+/// Build a credential-free contextual-orchestrator cancel exchange.
+pub use interpretation_run_cancel_http::contextual_orchestrator_interpretation_run_cancel_exchange;
+/// Extract the opaque idempotency key from a cancel path.
+pub use interpretation_run_cancel_http::interpretation_run_cancel_path_id;
+/// Refuse metric, evidence, and causal-score keys on cancel JSON.
+pub use interpretation_run_cancel_http::refuse_metrics_on_interpretation_run_cancel_payload;
+/// Typed POST exchange for interpretation-run cancel.
+pub use interpretation_run_cancel_http::InterpretationRunCancelHttpExchange;
+/// Metric-free cancelled interpretation-run identity.
+pub use interpretation_run_cancel_http::InterpretationRunCancelled;
+/// Maximum opaque idempotency-key length on interpretation-run cancel.
+pub use interpretation_run_cancel_http::INTERPRETATION_RUN_CANCEL_ID_MAX_LEN;
 /// Compose HTTP/1.1 interpretation-run POST from a CLI invocation.
 pub use interpretation_run_cli::compose_interpretation_run_cli_http;
 /// Build a credential-free contextual-orchestrator interpretation-run exchange.

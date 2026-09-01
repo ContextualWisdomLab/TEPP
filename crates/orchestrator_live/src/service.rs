@@ -9,6 +9,10 @@ use crate::http::{
     refuse_collection_get_headers, refuse_live_headers, refuse_retrieval_get_headers,
     split_request, status_for, write_response, OrchestratorLiveResponse,
 };
+use crate::interpretation_run_cancel_http::{
+    interpretation_run_cancel_path_id, refuse_metrics_on_interpretation_run_cancel_payload,
+    InterpretationRunCancelled,
+};
 use crate::interpretation_run_collection_http::{
     is_interpretation_run_collection_path, page_interpretation_run_collection_items,
     parse_interpretation_run_collection_page_cursor,
@@ -30,6 +34,8 @@ use crate::request::{
 /// `GET /v1/interpretation-runs` enumerates accepted hypothetical runs as
 /// metric-free identities. `GET /v1/interpretation-runs/{idempotency_key}`
 /// returns one of those identities without POST replay.
+/// `POST /v1/interpretation-runs/{idempotency_key}/cancel` removes one
+/// accepted identity from the in-memory registry.
 #[derive(Debug)]
 pub struct OrchestratorLiveService {
     listener: Option<TcpListener>,
@@ -182,11 +188,17 @@ impl OrchestratorLiveService {
             }
             return self.get_interpretation_run(path, &headers, body);
         }
-        if method != "POST" || path != INTERPRETATION_RUN_PATH {
-            return Err(OrchestratorLiveError::InvalidWirePayload);
+        if method == "POST" {
+            if interpretation_run_cancel_path_id(path).is_ok() {
+                return self.cancel_interpretation_run(path, &headers, body);
+            }
+            if path != INTERPRETATION_RUN_PATH {
+                return Err(OrchestratorLiveError::InvalidWirePayload);
+            }
+            refuse_live_headers(&headers)?;
+            return self.accept_interpretation_run(&headers, body);
         }
-        refuse_live_headers(&headers)?;
-        self.accept_interpretation_run(&headers, body)
+        Err(OrchestratorLiveError::InvalidWirePayload)
     }
 
     fn list_interpretation_runs(
@@ -258,6 +270,36 @@ impl OrchestratorLiveService {
             200,
             "OK",
             interpretation_run_retrieval_item_json(&item)?,
+        ))
+    }
+
+    fn cancel_interpretation_run(
+        &mut self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<OrchestratorLiveResponse, OrchestratorLiveError> {
+        let idempotency_key = interpretation_run_cancel_path_id(path)?;
+        if !body.is_empty() {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
+        refuse_metrics_on_interpretation_run_cancel_payload(body)?;
+        refuse_retrieval_get_headers(headers)?;
+        let (_, accepted) = self
+            .accepted_runs
+            .remove(&idempotency_key)
+            .ok_or(OrchestratorLiveError::InvalidWirePayload)?;
+        let cancelled = InterpretationRunCancelled::new(
+            accepted.interpretation_run_id(),
+            accepted.idempotency_key(),
+            accepted.orchestration_mode(),
+            accepted.claim_status(),
+            accepted.scientific_authority(),
+        )?;
+        Ok(OrchestratorLiveResponse::json(
+            200,
+            "OK",
+            cancelled.to_json()?,
         ))
     }
 

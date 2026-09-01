@@ -460,6 +460,77 @@ fn handle_http_retrieves_one_interpretation_run_on_get_by_id() {
 }
 
 #[test]
+fn handle_http_cancels_one_interpretation_run_and_drops_the_identity() {
+    let mut service = OrchestratorLiveService::new();
+    let first = sample_request();
+    assert_eq!(
+        service
+            .handle_http_request(&interpretation_http(&first))
+            .status_code,
+        202
+    );
+    let mut naruon = collection_headers();
+    naruon[2] = ("tepp-consumer".into(), "naruon".into());
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "POST",
+                "/v1/interpretation-runs/orch-live-idem-001/cancel",
+                &naruon,
+                "",
+            ))
+            .status_code,
+        400
+    );
+    let cancelled = service.handle_http_request(&http_request(
+        "POST",
+        "/v1/interpretation-runs/orch-live-idem-001/cancel",
+        &collection_headers(),
+        "",
+    ));
+    assert_eq!(cancelled.status_code, 200, "{}", cancelled.body);
+    assert!(cancelled.body.contains("\"cancelled\":true"));
+    assert!(cancelled.body.contains("\"claim_status\":\"hypothetical\""));
+    assert!(cancelled.body.contains("\"scientific_authority\":false"));
+    assert!(!cancelled.body.contains("rmse"));
+    assert!(!cancelled.body.contains("evidence_span_ids"));
+    assert!(!cancelled.body.contains("tepp.scientific_acceptance.v1"));
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "GET",
+                "/v1/interpretation-runs/orch-live-idem-001",
+                &collection_headers(),
+                "",
+            ))
+            .status_code,
+        400
+    );
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "POST",
+                "/v1/interpretation-runs/orch-live-idem-001/cancel",
+                &collection_headers(),
+                "",
+            ))
+            .status_code,
+        400
+    );
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "POST",
+                "/v1/interpretation-runs/orch-live-idem-001/cancel",
+                &collection_headers(),
+                "{}",
+            ))
+            .status_code,
+        400
+    );
+}
+
+#[test]
 fn handle_http_collection_get_refuses_foreign_consumers_and_hostile_headers() {
     let mut service = OrchestratorLiveService::new();
     assert_eq!(
