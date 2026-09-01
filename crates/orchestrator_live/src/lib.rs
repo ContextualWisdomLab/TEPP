@@ -12,6 +12,8 @@
 //! mints that GET onto spawned `tepp-orchestrator-loopback` TCP.
 //! `GET /v1/interpretation-runs/by-run-id/{interpretation_run_id}` returns the
 //! metric-free identity of the unique accepted run without POST replay.
+//! Published `tepp-interpretation-run-lookup` mints that GET onto spawned
+//! `tepp-orchestrator-loopback` TCP.
 //! Table-access hosts, review/Copilot/GitHub credentials, and
 //! `COPILOT_GITHUB_TOKEN` fail closed. This crate does not implement TLS
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
@@ -23,6 +25,7 @@ mod error;
 mod http;
 mod interpretation_run_cli;
 mod interpretation_run_collection_http;
+mod interpretation_run_lookup_cli;
 mod interpretation_run_lookup_http;
 mod interpretation_run_retrieval_http;
 mod interpretation_run_stored_request_cli;
@@ -99,6 +102,22 @@ pub use interpretation_run_lookup_http::contextual_orchestrator_interpretation_r
 pub use interpretation_run_lookup_http::interpretation_run_lookup_path_id;
 /// Whether a path is the lookup-by-run-id resource.
 pub use interpretation_run_lookup_http::is_interpretation_run_lookup_path;
+/// Loopback lookup CLI invocation.
+pub use interpretation_run_lookup_cli::InterpretationRunLookupCliInvocation;
+/// Loopback lookup CLI verb.
+pub use interpretation_run_lookup_cli::InterpretationRunLookupCliVerb;
+/// Compose HTTP/1.1 lookup GET from a CLI invocation.
+pub use interpretation_run_lookup_cli::compose_interpretation_run_lookup_cli_http;
+/// Dispatch a lookup CLI invocation against an in-process listener.
+pub use interpretation_run_lookup_cli::dispatch_interpretation_run_lookup_cli;
+/// Execute a lookup CLI invocation over loopback TCP.
+pub use interpretation_run_lookup_cli::execute_interpretation_run_lookup_cli;
+/// Render a typed lookup exchange onto a loopback HTTP/1.1 request.
+pub use interpretation_run_lookup_cli::loopback_http1_from_interpretation_run_lookup_exchange;
+/// Read leftover stdin for the lookup CLI.
+pub use interpretation_run_lookup_cli::read_interpretation_run_lookup_cli_stdin;
+/// Filter lookup CLI stdout so the identity stays hypothetical.
+pub use interpretation_run_lookup_cli::render_interpretation_run_lookup_cli_stdout;
 /// Maximum opaque idempotency-key length on interpretation-run GET-by-id.
 pub use interpretation_run_retrieval_http::INTERPRETATION_RUN_RETRIEVAL_ID_MAX_LEN;
 /// Typed GET exchange for interpretation-run GET-by-id.

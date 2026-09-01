@@ -19,6 +19,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Interpretation-run stored-request GET doctoring | [`docs/research/interpretation-run-stored-request-get.md`](docs/research/interpretation-run-stored-request-get.md) |
 | Interpretation-run stored-request CLI doctoring | [`docs/research/interpretation-run-stored-request-cli.md`](docs/research/interpretation-run-stored-request-cli.md) |
 | Interpretation-run lookup GET doctoring | [`docs/research/interpretation-run-lookup-http.md`](docs/research/interpretation-run-lookup-http.md) |
+| Interpretation-run lookup CLI doctoring | [`docs/research/interpretation-run-lookup-cli.md`](docs/research/interpretation-run-lookup-cli.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |
 | Logical/physical ERD | [`docs/ERD.md`](docs/ERD.md) |
 | Security policy | [`SECURITY.md`](SECURITY.md) |
