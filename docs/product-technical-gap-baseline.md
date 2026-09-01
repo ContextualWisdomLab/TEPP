@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-01T05:53:35Z  
+**Snapshot:** 2026-09-01T09:14:20Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`  
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
@@ -19,27 +19,30 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | Signal | Current evidence | Delivery implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
-| Open pull requests | **143** | The queue is release-blocking and still growing while consolidation is active. |
+| Open pull requests | **149** | The queue is release-blocking and grew from the initial 141 while consolidation remained open. |
 | Draft pull requests | **100** | Draft state is not classification or ownership. |
-| Non-draft pull requests | **43** | Ready metadata is not merge readiness without exact-head evidence. |
+| Non-draft pull requests | **49** | Ready metadata is not merge readiness without exact-head evidence. |
 | Open issues | **14** | Includes #437 for repository-wide ADR identity normalization. |
+| GitHub releases | **0** | No open PR head or local branch is a released product contract. |
 | Effective ruleset | `18156473` | Current ruleset, exact-head workflows, resolved conversations, and qualifying review are the merge authority. |
 
 The repository-level classic branch-protection payload is not the sole policy source. Do not infer that protection is absent from an empty classic required-check list and do not bypass the organization ruleset.
 
 ## Current priority open pull-request evidence
 
-This table is an exact-head **priority subset**, not a row-for-row copy of the 143-PR queue. The live total and this operator inventory are deliberately different concepts.
+This table is an exact-head **priority subset**, not a row-for-row copy of the 149-PR queue. The live total and this operator inventory are deliberately different concepts.
 
 PR #435 itself is deliberately omitted from the exact-head table. A commit that rewrites this document necessarily advances #435's head, so embedding that same branch's “exact current head” inside the commit would be self-invalidating. The delivery-authority line links #435, while its live head is re-read from GitHub immediately before any readiness or merge decision.
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
+| #443 | `504793d88c6b754f5181f48dc7abde073ff9146a` | false | #411/export stack | Analysis Run export collection adapter; `fold_into_landing_vehicle` candidate |
+| #441 | `c1aeed3bc2ca5f801f3baa748a4a3dde9f948338` | false | main | Longitudinal Modeling lagged-correlation repair; original invalid ratio removed; exact-head checks pending |
 | #436 | `460503b6e787362b702509faa955c4730f6d8680` | false | #433 head | Analysis Run/contextual-orchestrator CLI stack; `stacked_dependency` |
 | #434 | `c0fbaabd8c95e69407c3b9e50f8d1846bd949598` | false | main | membership-target refusal profile; `fold_into_landing_vehicle` candidate |
 | #432 | `3e09ff29cc89ef97a859f3ae50e1297846dd2eeb` | false | main | Topic Measurement profile binding; preserve unique contract tests |
 | #425 | `c11558313dd1b95d7528eb5fcb89ad296cf879c0` | false | main | Analysis Run/contextual-orchestrator create CLI stack root candidate |
-| #389 | `035bfb087d47543fd7dd87cfdbc4edd778f4a6aa` | false | main | irregular event-time composition; Longitudinal Psychometrics fold candidate |
+| #389 | `035bfb087d47543fd7dd87cfdbc4edd778f4a6aa` | false | main | irregular event-time composition; Longitudinal Modeling fold candidate |
 | #356 | `df33bfa3e61ae4de3dbfae16df0deac12d2f4003` | false | main | Validation Evidence candidate; scientifically blocked from global claim promotion |
 
 Passing or queued Checks on an open PR never promote that PR to implemented-main.
@@ -53,7 +56,7 @@ Cargo crates are implementation units, not bounded contexts. Current product res
 | Core | Evidence & Semantic Measurement | `EvidenceCorpus`, `SemanticUnitSet`, `ConceptDictionaryRevision` | `evidence_core`, `semantic_core` |
 | Core | Temporal Event Knowledge | `EventEpisode`, `TemporalRelationSet`, `MembershipAssignmentSet` | `temporal_core`, `event_core`, `relation_graph`, `membership_core` |
 | Core | Topic Measurement | `TopicModelRun`, `TopicLineage` | `topic_measurement`, `topic_lineage`, `model_selection`, `network_analysis` |
-| Core | Temporal Psychometric Composition | `TemporalModelSpecification`, `TemporalModelRun` | TEPP temporal composition around versioned fast-mlsirm contracts |
+| Core | Longitudinal Modeling / Temporal Psychometric Composition | `TemporalModelSpecification`, `TemporalModelRun` | `longitudinal_core` plus TEPP temporal composition around versioned fast-mlsirm contracts |
 | Core | Analysis Run | `AnalysisRun` | `analysis_engine` application services; transport remains adapter-owned |
 | Core | Scientific Validation & Claim Promotion | `ValidationStudy`, `ClaimPromotionDecision` | `validation_core`, `tepp_simulation`; claim promotion is distinct from evidence generation |
 | Supporting | Interpretation | evidence-grounded interpretation workflow | contextual-orchestrator ACL only |
@@ -68,7 +71,7 @@ Cargo crates are implementation units, not bounded contexts. Current product res
 - **contextual-orchestrator** owns every LLM provider call, routing/fallback, credential, verifier/adjudicator execution, and model-call provenance.
 - **LineageWeave or the consuming product** owns source/item-generation lineage; lineage is evidence, not numerical authority.
 
-At this snapshot, fast-mlsirm PR #1714 at `362a50e104e532684824a35e16f881c7ddb1ebc9` proposes a non-numerical candidate compiler that preserves exact response/dimensional/generalized-mixed identity and materializes typed LSIRM/MLSIRM/DLSJM candidates. It is not yet merged into fast-mlsirm protected main, so TEPP treats it as an upstream contract dependency in progress and does not copy its implementation.
+At this snapshot, fast-mlsirm PR #1714 at `cf538931199c4433a2c018c970d3609e17939505` proposes the non-numerical candidate compiler. It preserves full candidate identity and formulation-scoped evidence but remains an unreleased upstream dependency. A TEPP consumer-boundary review also requires an explicit published-manifest schema/version/digest and typed generalized-mixed membership/weight semantics before this can serve as TEPP's versioned Published Language. TEPP does not copy its implementation or bind deployable behavior to the open head.
 
 ### Dependency invariants
 
@@ -105,7 +108,7 @@ Multiple-membership weights are explicit, auditable and time-valid. They are obs
 
 | ID | Gap | Maturity | Authority | Closure evidence |
 | --- | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 143 heads | `release-blocking` | #175 / #435 | exact-head classification, bounded-context landing vehicles, unique evidence preserved, safe queue reduction |
+| GAP-001 | PR authority fragmented across 149 heads | `release-blocking` | #175 / #435 | exact-head classification, bounded-context landing vehicles, unique evidence preserved, safe queue reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission incomplete | `partial` | Evidence & Semantic Measurement | immutable offsets/layout, language profiles, concept dictionary, unknown review, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator incomplete | `partial` | #167 | Rust CPU `f64` likelihood/estimands/uncertainty, time/relation/membership effects, multi-seed recovery, real candidate-K fits |
 | GAP-004 | durable end-to-end Analysis Run incomplete | `partial` | #166 | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, complete validation evidence, separate claim promotion, Compose E2E |
@@ -150,9 +153,13 @@ One-rule crates, one-clock crates and one-operation API/CLI PRs are not independ
 
 ### Current classifications
 
+**#441 — Longitudinal Modeling lagged-correlation repair.** The invalid predecessor API that divided lagged covariance by only the earlier marginal variance was removed from the final diff after review showed it could produce impossible autocorrelations under nonstationary marginals. Exact repair head `c1aeed3bc2ca5f801f3baa748a4a3dde9f948338` instead places event-time association standardization in `longitudinal_core`, requires both marginal variances, enforces the covariance bound, and avoids the avoidable variance-product overflow. The predecessor commit remains RED/scientific-failure lineage. The branch is not merge-ready until exact-head hosted checks and fresh review complete.
+
+**#443 — Analysis Run export adapter fold candidate.** The export-collection GET is useful operator behavior, but one route is not an independent bounded context. Preserve its pagination, authorization and refusal tests while folding the operation into a coherent Analysis Run/export landing vehicle.
+
 **#356 — Validation Evidence candidate.** Keep useful run binding, but do not make it global scientific-acceptance authority. Its generic `RMSE <= k * SE(RMSE)` rule does not bound absolute recovery error when RMSE and its SE arise from the same residual vector; caller-provided truth/recovered vectors and an `authored_by_llm` boolean also do not establish estimator-owned provenance. Graph recovery, invariance, convergence and applicable CPU/GPU parity remain incomplete. Scientific Claim Promotion is a separate aggregate governed by ADR 0014.
 
-**#352/#355 — Longitudinal Psychometrics fold candidates.** They share a Driver/ctsem scalar rewrite but retain different public names, refusal guards, tests and research documentation. Preserve the strongest evidence before closing either.
+**#352/#355 — Longitudinal Modeling fold candidates.** They share a Driver/ctsem scalar rewrite but retain different public names, refusal guards, tests and research documentation. Preserve the strongest evidence before closing either.
 
 **#425/#433/#436 and similar route/CLI stacks — Analysis Run adapter dependencies.** They are transport/application behavior, not bounded contexts and not grounds for branch-local ADR identity.
 
@@ -167,6 +174,7 @@ One-rule crates, one-clock crates and one-operation API/CLI PRs are not independ
 | `location_membership`, `episode_membership`, `membership_target` | Temporal Event Knowledge |
 | `prompt_source`, `style_source`, `modality_source`, `copied_text`, `copy_identity`, `corpus_background`, `stopword_deletion`, `payload_bound`, `derived_sensitivity` | Evidence & Semantic Measurement |
 | reusable static/generalized-mixed/dependence psychometric arithmetic in TEPP | migrate to fast-mlsirm after parity/recovery; retain only TEPP temporal/event ACL and policy |
+| event-time association standardization | `longitudinal_core`; require both marginals and keep model-specific covariance construction outside this generic standardizer |
 | flat `analysis_engine` one-profile files | fold by owning domain/application module through landing vehicles |
 
 Do not run a repository-wide rename across more than one hundred live heads. The target DDD architecture is mandatory, but path migration is staged through landing vehicles so concurrent-agent intent and review evidence survive.
@@ -206,7 +214,7 @@ Before a landing vehicle merges:
 | GAP-001 | Queue reaches a bounded, classified set of coherent landing vehicles and all superseded/duplicate closures retain replacement mapping. |
 | GAP-003 | Real CPU `f64` estimator passes preregistered known-truth recovery and is invoked by the product workflow. |
 | GAP-004 | One durable evidence-to-terminal-result run survives restart/restore and separates Validation Evidence from Claim Promotion. |
-| GAP-005 | TEPP consumes a versioned fast-mlsirm candidate contract; temporal auto-expansion/recovery is generic; duplicated static kernels are removed after parity. |
+| GAP-005 | TEPP consumes a released/versioned fast-mlsirm candidate contract; temporal auto-expansion/recovery is generic; duplicated static kernels are removed after parity. |
 | GAP-012 | Architecture fitness tests and landing vehicles demonstrate correct bounded-context paths/dependency direction. |
 | GAP-013 | #437 closes with unique repository-wide ADR identities and duplicate-ID validation. |
 
