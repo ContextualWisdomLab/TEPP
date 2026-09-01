@@ -22,14 +22,13 @@ use crate::http::{header_is_credential, map_io_error};
 use crate::interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
 use crate::interpretation_run_lookup_http::INTERPRETATION_RUN_LOOKUP_PREFIX;
 use crate::interpretation_run_lookup_stored_request_http::{
-    InterpretationRunLookupStoredRequestHttpExchange,
+    INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_RESPONSE_BYTE_LIMIT,
+    InterpretationRunLookupStoredRequestHttpExchange, InterpretationRunLookupStoredRequestPayload,
     contextual_orchestrator_interpretation_run_lookup_stored_request_exchange,
     interpretation_run_lookup_stored_request_path_id,
 };
 use crate::interpretation_run_stored_request_http::refuse_metrics_on_interpretation_run_stored_request_payload;
-use crate::request::{
-    DEFAULT_INTERPRETATION_BYTE_LIMIT, InterpretationRunRequest, require_nonempty,
-};
+use crate::request::{DEFAULT_INTERPRETATION_BYTE_LIMIT, require_nonempty};
 use crate::{
     LIVE_HEADER_BYTE_LIMIT, LIVE_HEADER_COUNT_LIMIT, OrchestratorLiveError,
     OrchestratorLiveResponse, OrchestratorLiveService,
@@ -38,7 +37,7 @@ use crate::{
 const SCIENTIFIC_ACCEPTANCE_SCHEMA: &str = "tepp.scientific_acceptance.v1";
 const CLI_IO_TIMEOUT: Duration = Duration::from_secs(2);
 const MAXIMUM_HTTP_RESPONSE_BYTES: usize =
-    LIVE_HEADER_BYTE_LIMIT + 4 + DEFAULT_INTERPRETATION_BYTE_LIMIT;
+    LIVE_HEADER_BYTE_LIMIT + 4 + INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_RESPONSE_BYTE_LIMIT;
 
 /// Supported operator verbs for lookup stored-request GET.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -345,10 +344,14 @@ pub fn execute_interpretation_run_lookup_stored_request_cli(
 
 /// Filter CLI stdout so lookup stored-request GET never prints scientific acceptance.
 ///
+/// The run-bound response envelope must identify exactly the run requested by
+/// the invocation. Stdout strips that transport binding and prints only the
+/// validated stored create request.
+///
 /// # Errors
 ///
-/// Returns [`OrchestratorLiveError::InvalidWirePayload`] when a receipt carries
-/// metric keys, evidence, causal scores, or
+/// Returns [`OrchestratorLiveError::InvalidWirePayload`] when a response is
+/// bound to a different run, carries metric/evidence/causal keys, or includes
 /// `tepp.scientific_acceptance.v1`.
 pub fn render_interpretation_run_lookup_stored_request_cli_stdout(
     invocation: &InterpretationRunLookupStoredRequestCliInvocation,
@@ -363,8 +366,11 @@ pub fn render_interpretation_run_lookup_stored_request_cli_stdout(
     if response.status_code != 200 {
         return Err(OrchestratorLiveError::InvalidWirePayload);
     }
-    let stored = InterpretationRunRequest::from_json(&response.body)?;
-    stored.to_json()
+    let payload = InterpretationRunLookupStoredRequestPayload::from_json(&response.body)?;
+    if payload.interpretation_run_id() != invocation.interpretation_run_id {
+        return Err(OrchestratorLiveError::InvalidWirePayload);
+    }
+    payload.request().to_json()
 }
 
 fn refuse_scientific_acceptance(body: &str) -> Result<(), OrchestratorLiveError> {
@@ -418,7 +424,7 @@ fn parse_http_response(bytes: &[u8]) -> Result<OrchestratorLiveResponse, Orchest
         }
     }
     let declared = content_length.ok_or(OrchestratorLiveError::InvalidWirePayload)?;
-    if declared > DEFAULT_INTERPRETATION_BYTE_LIMIT {
+    if declared > INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_RESPONSE_BYTE_LIMIT {
         return Err(OrchestratorLiveError::LimitExceeded);
     }
     if declared != body.len() {
