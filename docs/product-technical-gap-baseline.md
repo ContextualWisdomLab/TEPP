@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-09-01T10:49:02Z
+**Snapshot:** 2026-09-01T11:27:07Z
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 **Workspace version:** `0.2.0`
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)
@@ -19,9 +19,9 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | Signal | Current evidence | Delivery implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
-| Open pull requests | **139** | The queue remains release-blocking. It fell from the 149-head peak to 136, then rebounded to 139 after new one-operation Analysis Run slices #445–#447 were opened while recovery remained active. |
+| Open pull requests | **140** | The queue remains release-blocking. It fell from the 149-head peak to 136, then rebounded to 140 as one-operation Analysis Run slices #445–#448 were opened while recovery remained active. |
 | Draft pull requests | **90** | Draft state is not classification or ownership. |
-| Non-draft pull requests | **49** | Ready metadata is not merge readiness without exact-head evidence. |
+| Non-draft pull requests | **50** | Ready metadata is not merge readiness without exact-head evidence. |
 | Open issues | **14** | Includes #437 for repository-wide ADR identity normalization. |
 | GitHub releases | **0** | No open PR head or local branch is a released product contract. |
 | Effective ruleset | `18156473` | Current ruleset, exact-head workflows, resolved conversations, and qualifying review are the merge authority. |
@@ -30,18 +30,19 @@ The repository-level classic branch-protection payload is not the sole policy so
 
 ## Current priority open pull-request evidence
 
-This table is an exact-head **priority subset**, not a row-for-row copy of the 139-PR queue. The live total and this operator inventory are deliberately different concepts.
+This table is an exact-head **priority subset**, not a row-for-row copy of the 140-PR queue. The live total and this operator inventory are deliberately different concepts.
 
 PR #435 itself is deliberately omitted from the exact-head table. A commit that rewrites this document necessarily advances #435's head, so embedding that same branch's “exact current head” inside the commit would be self-invalidating. The delivery-authority line links #435, while its live head is re-read from GitHub immediately before any readiness or merge decision.
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
+| #448 | `05130b348cc75a51604188063324e74656df1c48` | false | #447/project-history stack | Analysis Run project-history cancel CLI; `fold_into_landing_vehicle` candidate |
 | #447 | `325590cc1664f89bf6de5f43a1b8092560dac6bc` | false | #429/project-history stack | Analysis Run project-history cancel HTTP; `fold_into_landing_vehicle` candidate |
 | #446 | `86a2202852595f372013d1f8ee4c604ceadbd616` | false | #445/export stack | Analysis Run export cancel CLI; `fold_into_landing_vehicle` candidate |
 | #445 | `e38a1c1d0bd91a97c1b6427ad2617d1837b36360` | false | #443/export stack | Analysis Run export cancel HTTP; `fold_into_landing_vehicle` candidate |
 | #444 | `95ab519fdb39c66a574d1452e969b0b80b9e4ba9` | false | #443/export stack | Analysis Run export collection CLI; `fold_into_landing_vehicle` candidate |
 | #443 | `504793d88c6b754f5181f48dc7abde073ff9146a` | false | #411/export stack | Analysis Run export collection adapter; `fold_into_landing_vehicle` candidate |
-| #441 | `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5` | false | main | Longitudinal Modeling lagged-correlation repair; invalid ratio retired; review threads resolved; exact-head required workflows still queued |
+| #441 | `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5` | false | main | Longitudinal Modeling lagged-correlation repair; invalid ratio retired; all visible review threads resolved; exact-head required workflows queued |
 | #436 | `460503b6e787362b702509faa955c4730f6d8680` | false | #433 head | Analysis Run/contextual-orchestrator CLI stack; `stacked_dependency` |
 | #434 | `c0fbaabd8c95e69407c3b9e50f8d1846bd949598` | false | main | membership-target refusal profile; `fold_into_landing_vehicle` candidate |
 | #432 | `3e09ff29cc89ef97a859f3ae50e1297846dd2eeb` | false | main | Topic Measurement profile binding; preserve unique contract tests |
@@ -113,7 +114,7 @@ Multiple-membership weights are explicit, auditable and time-valid. They are obs
 
 | ID | Gap | Maturity | Authority | Closure evidence |
 | --- | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 139 heads | `release-blocking` | #175 / #435 | exact-head classification, bounded-context landing vehicles, unique evidence preserved, safe queue reduction |
+| GAP-001 | PR authority fragmented across 140 heads | `release-blocking` | #175 / #435 | exact-head classification, bounded-context landing vehicles, unique evidence preserved, safe queue reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission incomplete | `partial` | Evidence & Semantic Measurement | immutable offsets/layout, language profiles, concept dictionary, unknown review, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator incomplete | `partial` | #167 | Rust CPU `f64` likelihood/estimands/uncertainty, time/relation/membership effects, multi-seed recovery, real candidate-K fits |
 | GAP-004 | durable end-to-end Analysis Run incomplete | `partial` | #166 | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, complete validation evidence, separate claim promotion, Compose E2E |
@@ -160,6 +161,8 @@ One-rule crates, one-clock crates and one-operation API/CLI PRs are not independ
 
 **#441 — Longitudinal Modeling lagged-correlation repair.** The invalid predecessor API that divided lagged covariance by only the earlier marginal variance was removed from the final diff after review showed it could produce impossible autocorrelations under nonstationary marginals. Exact repair head `6f483224b3a03e8237c6f4f098a8b0e85e0a91f5` places event-time association standardization in `longitudinal_core`, requires both marginal variances, enforces the covariance bound without a rounded product, and records the capability on `ARCHITECTURE.md` and `CHANGELOG.md`. All currently visible review threads are resolved. The predecessor commit remains RED/scientific-failure lineage. The one-shot self-deleting workflow is gone. The branch is not merge-ready while exact-head hosted workflows remain queued and no qualifying independent non-author APPROVE exists. Queued or predecessor-head checks are not passing evidence.
 
+**#448 — Analysis Run project-history cancel CLI fold candidate.** This dedicated binary is stacked on #447 and is another one-operation adapter slice. Preserve its CLI parsing, fail-closed origin/credential/consumer behavior, cancellation receipt and LineageWeave-only contract, then fold it with #447 into the coherent Analysis Run/project-history landing vehicle rather than treating ADR 0080 as a new bounded-context authority.
+
 **#447 — Analysis Run project-history cancel HTTP fold candidate.** This is another one-operation adapter slice stacked on #429. Preserve its empty-body, path/credential refusal, cancellation-removal and metric-free receipt tests, then fold it into the coherent Analysis Run/project-history vehicle rather than treating ADR 0079 as a new bounded-context authority.
 
 **#446 — Analysis Run export cancel CLI fold candidate.** This one-binary slice is stacked on #445. Preserve its CLI parsing, fail-closed origin/credential/consumer and metric-free receipt evidence, then fold it with the export landing vehicle.
@@ -170,7 +173,7 @@ One-rule crates, one-clock crates and one-operation API/CLI PRs are not independ
 
 **#443 — Analysis Run export adapter fold candidate.** The export-collection GET is useful operator behavior, but one route is not an independent bounded context. Preserve its pagination, authorization and refusal tests while folding the operation into a coherent Analysis Run/export landing vehicle.
 
-The rebound from 136 to 139 open PRs while #435 remains active is direct evidence that the WIP circuit breaker is not yet enforced by the delivery system. New one-operation slices should be folded into the existing Analysis Run landing vehicles rather than extending the branch-local ADR sequence.
+The rebound from 136 to 140 open PRs while #435 remains active is direct evidence that the WIP circuit breaker is not yet enforced by the delivery system. New one-operation slices should be folded into the existing Analysis Run landing vehicles rather than extending the branch-local ADR sequence.
 
 **#356 — closed without merge.** Useful cutoff/run-binding/metric evidence is preserved in branch and review history for fold into #166. The generic `RMSE <= k * SE(RMSE)` rule, caller-declared recovery provenance, and Validation/Claim-Promotion conflation must not be revived. Scientific Claim Promotion remains a separate aggregate governed by ADR 0014.
 
