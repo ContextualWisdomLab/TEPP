@@ -560,11 +560,11 @@ def validate_adr_graph() -> None:
         maturity_matches = list(ADR_IMPLEMENTATION_STATUS.finditer(text))
         if not decision_matches:
             failures.append(f"ADR {number} lacks a valid Decision status")
-        elif len({match.group(1) for match in decision_matches}) > 1:
+        elif len(decision_matches) > 1:
             failures.append(f"ADR {number} has multiple Decision status authorities")
         if not maturity_matches:
             failures.append(f"ADR {number} lacks a valid Implementation maturity")
-        elif len({match.group(1) for match in maturity_matches}) > 1:
+        elif len(maturity_matches) > 1:
             failures.append(f"ADR {number} has multiple Implementation maturity authorities")
 
         index_row = index_by_number[number]
