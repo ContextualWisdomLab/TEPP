@@ -3,7 +3,10 @@
 //! This module keeps the Naruon compatibility listener intact while providing
 //! the shared `/v1/analysis-runs` and cutoff-safe `/v1/temporal-context`
 //! boundaries needed by Naruon and `LineageWeave`. Naruon may also POST and
-//! GET `/v1/exports/{export_id}` for metric-free purpose-bound retrieval.
+//! GET `/v1/exports/{export_id}` for metric-free purpose-bound retrieval
+//! and `GET /v1/exports/by-idempotency/{idempotency_key}` for key lookup.
+//! `GET /v1/exports/by-idempotency/{idempotency_key}/request` returns the stored
+//! export-authorization request of that unique accepted export.
 //! It accepts transport acknowledgements, temporal evidence context, and
 //! export identities only; completed psychometric results remain outside this
 //! crate.
@@ -13,6 +16,14 @@ use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
 
 use crate::export_http::{export_retrieval_path_id, refuse_metrics_on_export_retrieval_payload};
+use crate::export_idempotency_lookup_http::{
+    ExportIdempotencyLookup, export_idempotency_lookup_path_key,
+    refuse_metrics_on_export_idempotency_lookup_payload,
+};
+use crate::export_idempotency_lookup_stored_request_http::{
+    export_idempotency_lookup_stored_request_path_key,
+    refuse_metrics_on_export_lookup_stored_request_payload,
+};
 use crate::lineageweave_http::{
     LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, consumer_is_supported,
 };
@@ -162,6 +173,18 @@ impl AnalysisRunLiveService {
         let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
         let headers = parse_headers(&mut lines)?;
         if method == "GET" {
+            if matches!(
+                export_idempotency_lookup_stored_request_path_key(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.lookup_export_stored_request_by_idempotency(path, &headers, body);
+            }
+            if matches!(
+                export_idempotency_lookup_path_key(path),
+                Ok(_) | Err(ApiError::LimitExceeded)
+            ) {
+                return self.lookup_export_by_idempotency(path, &headers, body);
+            }
             if matches!(
                 export_retrieval_path_id(path),
                 Ok(_) | Err(ApiError::LimitExceeded)
@@ -339,6 +362,79 @@ impl AnalysisRunLiveService {
             .ok_or(ApiError::InvalidWirePayload)?;
         let response_body = stored.retrieval.to_json()?;
         refuse_metrics_on_export_retrieval_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
+    fn lookup_export_by_idempotency(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let idempotency_key = export_idempotency_lookup_path_key(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != NARUON_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_export_idempotency_lookup_payload(body)?;
+        let prefix = format!("{consumer}\u{1f}");
+        let mut matches: Vec<&StoredExport> = self
+            .authorized_exports
+            .iter()
+            .filter(|(replay_key, stored)| {
+                replay_key.starts_with(&prefix)
+                    && stored.retrieval.idempotency_key == idempotency_key
+            })
+            .map(|(_, stored)| stored)
+            .collect();
+        if matches.len() != 1 {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let stored = matches.remove(0);
+        let payload = ExportIdempotencyLookup::new(
+            stored.retrieval.export_id.clone(),
+            stored.retrieval.decision_code.clone(),
+            stored.retrieval.idempotency_key.clone(),
+        )?;
+        let response_body = payload.to_json()?;
+        refuse_metrics_on_export_idempotency_lookup_payload(&response_body)?;
+        Ok(json_response(200, "OK", response_body))
+    }
+
+    fn lookup_export_stored_request_by_idempotency(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        let idempotency_key = export_idempotency_lookup_stored_request_path_key(path)?;
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != NARUON_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_export_lookup_stored_request_payload(body)?;
+        let prefix = format!("{consumer}\u{1f}");
+        let mut matches: Vec<&StoredExport> = self
+            .authorized_exports
+            .iter()
+            .filter(|(replay_key, stored)| {
+                replay_key.starts_with(&prefix)
+                    && stored.retrieval.idempotency_key == idempotency_key
+            })
+            .map(|(_, stored)| stored)
+            .collect();
+        if matches.len() != 1 {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let stored = matches.remove(0);
+        let response_body = crate::wire::to_json(&stored.request)?;
+        refuse_metrics_on_export_lookup_stored_request_payload(&response_body)?;
         Ok(json_response(200, "OK", response_body))
     }
 
@@ -1202,6 +1298,77 @@ mod tests {
             400
         );
 
+        let looked_up = service.handle_http_request(&export_lookup_http(
+            "export-idem-1",
+            NARUON_CONSUMER_CODE,
+        ));
+        assert_eq!(looked_up.status_code, 200);
+        let lookup = crate::ExportIdempotencyLookup::from_json(&looked_up.body).expect("lookup");
+        assert_eq!(lookup.export_id, retrieval.export_id);
+        assert_eq!(lookup.idempotency_key, "export-idem-1");
+        assert_eq!(lookup.decision_code, "purpose_bound_export_allowed");
+        assert!(!looked_up.body.contains("tenant_workspace_id"));
+        assert!(!looked_up.body.contains("principal_id"));
+        assert!(!looked_up.body.contains("includes_source_text"));
+        assert!(!looked_up.body.contains("scientific_acceptance"));
+        assert!(!looked_up.body.contains("rmse"));
+        assert_eq!(
+            service
+                .handle_http_request(&export_lookup_http(
+                    "export-idem-1",
+                    LINEAGEWEAVE_CONSUMER_CODE
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&export_lookup_http("missing-key", NARUON_CONSUMER_CODE))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&export_lookup_body_http(
+                    "export-idem-1",
+                    NARUON_CONSUMER_CODE,
+                    "{}",
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&export_lookup_post_http(
+                    "export-idem-1",
+                    NARUON_CONSUMER_CODE,
+                ))
+                .status_code,
+            400
+        );
+        assert_eq!(
+            service
+                .handle_http_request(&export_get_http("by-idempotency", NARUON_CONSUMER_CODE))
+                .status_code,
+            400
+        );
+
+        let mut other_tenant = request.clone();
+        other_tenant.tenant_workspace_id = "export-live-tenant-b".into();
+        let other_body = crate::wire::to_json(&other_tenant).expect("other json");
+        let other_posted = service.handle_http_request(&export_post_http(
+            &other_body,
+            NARUON_CONSUMER_CODE,
+            "export-idem-1",
+        ));
+        assert_eq!(other_posted.status_code, 200);
+        assert_eq!(
+            service
+                .handle_http_request(&export_lookup_http("export-idem-1", NARUON_CONSUMER_CODE))
+                .status_code,
+            400
+        );
+
         let principal_as_key = service.handle_http_request(&export_post_http(
             &body,
             NARUON_CONSUMER_CODE,
@@ -1230,6 +1397,23 @@ mod tests {
     fn export_get_http(export_id: &str, consumer: &str) -> String {
         format!(
             "GET {NARUON_EXPORT_PATH}/{export_id} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
+        )
+    }
+
+    fn export_lookup_http(idempotency_key: &str, consumer: &str) -> String {
+        export_lookup_body_http(idempotency_key, consumer, "")
+    }
+
+    fn export_lookup_body_http(idempotency_key: &str, consumer: &str, body: &str) -> String {
+        format!(
+            "GET {NARUON_EXPORT_PATH}/by-idempotency/{idempotency_key} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        )
+    }
+
+    fn export_lookup_post_http(idempotency_key: &str, consumer: &str) -> String {
+        format!(
+            "POST {NARUON_EXPORT_PATH}/by-idempotency/{idempotency_key} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: {consumer}\r\ntepp-contract-version: 1\r\nidempotency-key: {idempotency_key}\r\ncontent-length: 0\r\n\r\n"
         )
     }
 
