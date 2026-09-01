@@ -22,6 +22,28 @@ fn already_centered_unit_interval_recovers_ln_half() {
 }
 
 #[test]
+fn cwc_mean_is_deterministic_under_input_row_permutation() {
+    let canonical = [
+        timed(1, 0.0, 1.0e16),
+        timed(1, 1.0, -1.0e16),
+        timed(1, 2.0, 1.0),
+        timed(2, 0.0, 2.0),
+        timed(2, 1.0, 1.0),
+    ];
+    let shuffled = [
+        timed(1, 0.0, 1.0e16),
+        timed(1, 2.0, 1.0),
+        timed(1, 1.0, -1.0e16),
+        timed(2, 1.0, 1.0),
+        timed(2, 0.0, 2.0),
+    ];
+
+    let expected = center_within_unit_event_lags(&canonical).expect("canonical ordering");
+    let reordered = center_within_unit_event_lags(&shuffled).expect("shuffled ordering");
+    assert_eq!(reordered, expected, "CWC output must not depend on input row order");
+}
+
+#[test]
 fn cwc_of_raw_autoregressive_path_is_not_process_drift() {
     let drift = (0.5_f64).ln();
     let rows = [
