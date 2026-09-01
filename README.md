@@ -1,5 +1,7 @@
 # TEPP
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ContextualWisdomLab/TEPP)
+
 TEPP is the **Temporal Event Psychometrics Platform**: a multilingual, temporal,
 relational measurement system whose statistical and psychometric arithmetic is
 implemented in Rust.
