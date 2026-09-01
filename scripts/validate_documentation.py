@@ -80,11 +80,13 @@ SNAPSHOT_STAMP = re.compile(
 )
 INVENTORY_ROW = re.compile(
     r"^\|\s*#(?P<number>\d+)\s*\|\s*`(?P<sha>[0-9a-f]{40})`\s*\|\s*"
-    r"(?P<draft>true|false)\s*\|",
-    re.MULTILINE,
+    r"(?P<draft>true|false)\s*\|\s*(?P<base>[^|]+?)\s*\|\s*"
+    r"(?P<disposition>[^|]+?)\s*\|\s*$"
 )
 PRIORITY_INVENTORY_HEADING = "## Current priority open pull-request evidence"
 LEVEL_TWO_HEADING = re.compile(r"^##\s+", re.MULTILINE)
+PRIORITY_HEADER_ROW = re.compile(r"^\|\s*PR\s*\|", re.IGNORECASE)
+PRIORITY_SEPARATOR_ROW = re.compile(r"^\|(?:\s*:?-+:?\s*\|)+\s*$")
 OPEN_PR_COUNT = re.compile(
     r"\|\s*Open pull requests\s*\|\s*\*\*(?P<count>\d+)\*\*"
 )
@@ -102,18 +104,23 @@ QUEUED_CHECKS_ADVERSATIVE = re.compile(
     r"\b(?:but|however|yet|although|though)\b", re.IGNORECASE
 )
 QUEUED_CHECKS_SENTENCE_BREAK = re.compile(r"[.;!?\n]")
+ADR_STATUS_VALUES = "Accepted|Proposed|Superseded|Rejected"
+ADR_MATURITY_VALUES = (
+    "implemented-main|active-PR|partial|accepted-target|research-only|out-of-scope"
+)
 ADR_TABLE_ROW = re.compile(
-    r'^\|\s*\[(?P<number>\d{4})\]\((?P<target>[^)\s]+)(?:\s+"[^"]*")?\)\s*\|',
+    rf'^\|\s*\[(?P<number>\d{{4}})\]\((?P<target>[^)\s]+)(?:\s+"[^"]*")?\)\s*\|'
+    rf"\s*[^|]+\|\s*(?P<decision>{ADR_STATUS_VALUES})\s*\|"
+    rf"\s*(?P<maturity>{ADR_MATURITY_VALUES})\s*\|",
     re.MULTILINE,
 )
 ADR_FILE_NAME = re.compile(r"^(?P<number>\d{4})-[a-z0-9-]+\.md$")
 ADR_DECISION_STATUS = re.compile(
-    r"^\*\*Decision status:\*\*\s*(Accepted|Proposed|Superseded|Rejected)\b",
+    rf"^\*\*Decision status:\*\*\s*({ADR_STATUS_VALUES})\b",
     re.MULTILINE,
 )
 ADR_IMPLEMENTATION_STATUS = re.compile(
-    r"^\*\*Implementation maturity:\*\*\s*"
-    r"(implemented-main|active-PR|partial|accepted-target|research-only|out-of-scope)\b",
+    rf"^\*\*Implementation maturity:\*\*\s*({ADR_MATURITY_VALUES})\b",
     re.MULTILINE,
 )
 ADR_REQUIRED_HEADINGS = (
@@ -409,6 +416,25 @@ def _priority_inventory_section(text: str) -> str:
     return text[section_start:section_end]
 
 
+def _priority_inventory_rows(section: str) -> tuple[list[re.Match[str]], list[str]]:
+    """Parse every Markdown table data row in the priority inventory fail-closed."""
+
+    inventory: list[re.Match[str]] = []
+    malformed: list[str] = []
+    for raw_line in section.splitlines():
+        line = raw_line.strip()
+        if not line.startswith("|"):
+            continue
+        if PRIORITY_HEADER_ROW.match(line) or PRIORITY_SEPARATOR_ROW.fullmatch(line):
+            continue
+        match = INVENTORY_ROW.fullmatch(line)
+        if match is None:
+            malformed.append(line)
+        else:
+            inventory.append(match)
+    return inventory, malformed
+
+
 def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     """Require a dated live gap register with an honest priority PR inventory."""
 
@@ -433,7 +459,11 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
     ):
         failures.append("gap baseline treats queued Checks as implemented-main")
     priority_inventory = _priority_inventory_section(text)
-    inventory = list(INVENTORY_ROW.finditer(priority_inventory))
+    inventory, malformed_rows = _priority_inventory_rows(priority_inventory)
+    if malformed_rows:
+        failures.extend(
+            f"malformed priority inventory row: {row}" for row in malformed_rows
+        )
     inventory_numbers = [match.group("number") for match in inventory]
     if not inventory:
         failures.append("gap baseline open-PR inventory has no exact-head rows")
@@ -453,7 +483,7 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
 
 
 def validate_adr_graph() -> None:
-    """Require every numbered ADR to have one repository-wide identity and target."""
+    """Require every numbered ADR to have one repository-wide identity and authority."""
 
     adr_root = ROOT / "docs" / "adr"
     adr_index = (adr_root / "README.md").read_text(encoding="utf-8")
@@ -477,6 +507,7 @@ def validate_adr_graph() -> None:
         raise AssertionError(f"duplicate ADR index target: {duplicate_targets}")
 
     indexed_numbers = set(indexed_number_list)
+    index_by_number = {match.group("number"): match for match in index_rows}
     adr_paths_by_number: dict[str, list[Path]] = {}
     for path in sorted(adr_root.glob("[0-9][0-9][0-9][0-9]-*.md")):
         match = ADR_FILE_NAME.fullmatch(path.name)
@@ -525,10 +556,33 @@ def validate_adr_graph() -> None:
     failures: list[str] = []
     for number, path in adr_files.items():
         text = path.read_text(encoding="utf-8")
-        if ADR_DECISION_STATUS.search(text) is None:
+        decision_matches = list(ADR_DECISION_STATUS.finditer(text))
+        maturity_matches = list(ADR_IMPLEMENTATION_STATUS.finditer(text))
+        if not decision_matches:
             failures.append(f"ADR {number} lacks a valid Decision status")
-        if ADR_IMPLEMENTATION_STATUS.search(text) is None:
+        elif len({match.group(1) for match in decision_matches}) > 1:
+            failures.append(f"ADR {number} has multiple Decision status authorities")
+        if not maturity_matches:
             failures.append(f"ADR {number} lacks a valid Implementation maturity")
+        elif len({match.group(1) for match in maturity_matches}) > 1:
+            failures.append(f"ADR {number} has multiple Implementation maturity authorities")
+
+        index_row = index_by_number[number]
+        if decision_matches:
+            canonical_decision = decision_matches[0].group(1)
+            if index_row.group("decision") != canonical_decision:
+                failures.append(
+                    f"ADR index decision-status mismatch for {number}: "
+                    f"index={index_row.group('decision')} file={canonical_decision}"
+                )
+        if maturity_matches:
+            canonical_maturity = maturity_matches[0].group(1)
+            if index_row.group("maturity") != canonical_maturity:
+                failures.append(
+                    f"ADR index maturity mismatch for {number}: "
+                    f"index={index_row.group('maturity')} file={canonical_maturity}"
+                )
+
         if "**Supersedes:**" not in text and "**Supersession:**" not in text:
             failures.append(f"ADR {number} lacks explicit supersession metadata")
         for heading in ADR_REQUIRED_HEADINGS:
