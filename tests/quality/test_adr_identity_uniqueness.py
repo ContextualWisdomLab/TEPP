@@ -164,12 +164,44 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "multiple Implementation maturity"):
                 docs.validate_adr_graph()
 
+    def test_identical_duplicate_maturity_metadata_fails(self) -> None:
+        """Repeating the same maturity is still competing canonical authority."""
+
+        body = ADR_BODY.format(number="0001").replace(
+            "**Implementation maturity:** partial",
+            "**Implementation maturity:** partial\n**Implementation maturity:** partial",
+        )
+        root = self._root(
+            "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n",
+            {"0001-one.md": "0001"},
+            {"0001-one.md": body},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "multiple Implementation maturity"):
+                docs.validate_adr_graph()
+
     def test_duplicate_decision_status_metadata_fails(self) -> None:
         """An ADR has exactly one canonical decision-status declaration."""
 
         body = ADR_BODY.format(number="0001").replace(
             "**Decision status:** Accepted",
             "**Decision status:** Accepted\n**Decision status:** Proposed",
+        )
+        root = self._root(
+            "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n",
+            {"0001-one.md": "0001"},
+            {"0001-one.md": body},
+        )
+        with mock.patch.object(docs, "ROOT", root):
+            with self.assertRaisesRegex(AssertionError, "multiple Decision status"):
+                docs.validate_adr_graph()
+
+    def test_identical_duplicate_decision_status_metadata_fails(self) -> None:
+        """Repeating the same Decision status is still competing authority."""
+
+        body = ADR_BODY.format(number="0001").replace(
+            "**Decision status:** Accepted",
+            "**Decision status:** Accepted\n**Decision status:** Accepted",
         )
         root = self._root(
             "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n",
