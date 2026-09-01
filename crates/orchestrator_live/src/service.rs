@@ -23,7 +23,7 @@ use crate::interpretation_run_lookup_http::{
     is_interpretation_run_lookup_path,
 };
 use crate::interpretation_run_lookup_stored_request_http::{
-    interpretation_run_lookup_stored_request_path_id,
+    InterpretationRunLookupStoredRequestPayload, interpretation_run_lookup_stored_request_path_id,
     is_interpretation_run_lookup_stored_request_path,
 };
 use crate::interpretation_run_retrieval_http::{
@@ -322,15 +322,20 @@ impl OrchestratorLiveService {
         }
         refuse_retrieval_get_headers(headers)?;
         let mut matches = self.accepted_runs.values().filter_map(|(request, accepted)| {
-            (accepted.interpretation_run_id() == interpretation_run_id).then_some(request)
+            (accepted.interpretation_run_id() == interpretation_run_id)
+                .then_some((request, accepted))
         });
-        let stored = matches
+        let (stored, accepted) = matches
             .next()
             .ok_or(OrchestratorLiveError::InvalidWirePayload)?;
         if matches.next().is_some() {
             return Err(OrchestratorLiveError::InvalidWirePayload);
         }
-        let payload = stored.to_json()?;
+        let payload = InterpretationRunLookupStoredRequestPayload::new(
+            accepted.interpretation_run_id(),
+            stored.clone(),
+        )?
+        .to_json()?;
         refuse_metrics_on_interpretation_run_stored_request_payload(&payload)?;
         Ok(OrchestratorLiveResponse::json(200, "OK", payload))
     }
