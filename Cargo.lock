@@ -74,6 +74,7 @@ dependencies = [
  "corpus_split",
  "event_core",
  "membership_core",
+ "membership_target",
  "relation_graph",
  "serde",
  "serde_json",
