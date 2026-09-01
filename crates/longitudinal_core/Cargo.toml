@@ -1,6 +1,6 @@
 [package]
 name = "longitudinal_core"
-description = "Longitudinal modeling gates, within/between decomposition, temporal association standardization, and recovery metrics."
+description = "Longitudinal modeling gates, within/between decomposition, CWC-then-irregular residual log-rate, temporal association standardization, and recovery metrics."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

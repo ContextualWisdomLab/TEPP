@@ -11,6 +11,8 @@ TEPP Longitudinal Modeling owns temporal/event composition for longitudinal psyc
 
 For event-time lagged association, the product contract requires lagged covariance, both occasion-specific marginal variances, and an admitted positive finite event-time interval. Nonstationary correlation must not replace the later marginal variance with the earlier one.
 
+CWC-then-irregular residual log-rate is Longitudinal Modeling composition, not a generic psychometric kernel. Consecutive unit-mean-centered pairs keep typed event-time intervals. The pairwise mean of the Driver, Oud, and Voelkle (2017, Eq. 3) scalar inverse on nonzero same-sign residuals is not raw-process drift (Curran & Bauer, 2011, Eq. 36). Already-centered irregular pairs may recover that inverse, including `ln(0.5)`. This is not DSEM and not Newton least-squares.
+
 For the scalar stationary Driver, Oud, and Voelkle (2017) p. 16 `discreteDRIFTstd` mapping, TEPP may expose a deterministic event-time transform only when stable drift and positive stationary within-person variance are established. Numerical equality with `exp(a Δt)` in that scalar stationary special case does not make unstandardised `discreteDRIFT` and `discreteDRIFTstd` the same estimand.
 
 Reusable static/generalized-mixed/dependence-aware psychometric arithmetic remains owned by `ContextualWisdomLab/fast-mlsirm`; TEPP consumes versioned contracts through an anti-corruption layer and does not retain duplicate production kernels. LLM execution remains `contextual-orchestrator`-owned and cannot substitute for numerical estimation or scientific acceptance.

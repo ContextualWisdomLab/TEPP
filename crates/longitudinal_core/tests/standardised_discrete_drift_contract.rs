@@ -1,3 +1,5 @@
+//! Scalar Driver p.16 `discreteDRIFTstd` contract on event time.
+
 use longitudinal_core::{
     EventTimeInterval, LongitudinalError, recover_event_time_standardised_discrete_drift,
     refuse_trait_plus_state_association_as_standardised_discrete_drift,
@@ -44,12 +46,9 @@ fn known_truth_grid_has_machine_precision_rmse() {
 #[test]
 fn extreme_stable_rate_preserves_representable_stationary_result() {
     let delta = 1.0 / f64::MAX;
-    let recovered = recover_event_time_standardised_discrete_drift(
-        f64::MAX,
-        -f64::MAX,
-        event_time(delta),
-    )
-    .expect("doubling the drift must not create an avoidable overflow");
+    let recovered =
+        recover_event_time_standardised_discrete_drift(f64::MAX, -f64::MAX, event_time(delta))
+            .expect("doubling the drift must not create an avoidable overflow");
     let truth = (-f64::MAX * delta).exp();
     assert!((recovered - truth).abs() <= f64::EPSILON);
 }

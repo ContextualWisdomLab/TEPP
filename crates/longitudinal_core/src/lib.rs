@@ -7,8 +7,9 @@
 //! Event-time lagged associations require both marginal variances before a
 //! covariance can be standardized as a correlation. Event-interval response
 //! transforms and scalar diffusion standardisation candidates live here rather
-//! than in a generic psychometric kernel. Recovery reports computed component
-//! RMSE against known truth (ADR 0005).
+//! than in a generic psychometric kernel. Person-mean centering of a time-related
+//! series is not raw-process drift (Curran & Bauer, 2011). Recovery reports
+//! computed component RMSE against known truth (ADR 0005).
 
 mod association;
 mod component;
@@ -17,6 +18,7 @@ mod diffusion;
 mod discrete_drift;
 mod error;
 mod event_time;
+mod irregular_residual;
 mod level;
 mod stationary;
 mod temporal_association;
@@ -51,6 +53,18 @@ pub use discrete_drift::refuse_unstandardised_discrete_drift_as_standardised_dis
 pub use error::LongitudinalError;
 /// A finite, strictly positive interval admitted on substantive event time.
 pub use event_time::EventTimeInterval;
+/// One unit's score at one event-time occasion.
+pub use irregular_residual::EventTimedObservation;
+/// One already-formed lagged within residual pair on event time.
+pub use irregular_residual::LaggedWithinResidual;
+/// Cluster-mean-center consecutive event-time lags inside each unit.
+pub use irregular_residual::center_within_unit_event_lags;
+/// Mean exact scalar log-rate on already-centered residuals.
+pub use irregular_residual::recover_centered_irregular_residual_log_rate;
+/// Pairwise-mean exact log-rate after CWC on irregular event intervals.
+pub use irregular_residual::recover_within_unit_irregular_residual_log_rate;
+/// Refuse treating a CWC residual log-rate as raw-process AR drift.
+pub use irregular_residual::refuse_cwc_residual_log_rate_as_raw_process_drift;
 /// Established longitudinal component level.
 pub use level::ComponentLevel;
 /// Refuse to treat a between-unit component as within-unit change.

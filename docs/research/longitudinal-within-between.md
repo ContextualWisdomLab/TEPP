@@ -8,7 +8,9 @@ as within-unit change. Recovered components are scored with computed RMSE
 against known truth.
 
 This slice does not fit DSEM, claim lagged or causal paths, or treat
-irregular intervals as equally spaced.
+irregular intervals as equally spaced. CWC-then-irregular residual
+log-rate lives in the same crate; see
+`docs/research/cwc-irregular-residual-log-rate.md`.
 
 ## Authority
 

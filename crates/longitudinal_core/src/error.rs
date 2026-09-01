@@ -42,6 +42,8 @@ pub enum LongitudinalError {
     UnstandardisedDiffusionIsNotStandardisedDiffusion,
     /// Diffusion was scaled by total variance instead of relevant within variance.
     TotalVarianceScaledDiffusionIsNotStandardisedDiffusion,
+    /// Cluster-mean-centered residual log-rate was treated as raw-process AR drift.
+    CwcResidualLogRateIsNotRawProcessDrift,
 }
 
 impl fmt::Display for LongitudinalError {
@@ -88,6 +90,9 @@ impl fmt::Display for LongitudinalError {
             }
             Self::TotalVarianceScaledDiffusionIsNotStandardisedDiffusion => {
                 "total-variance-scaled diffusion is not relevant-variance-standardised diffusion"
+            }
+            Self::CwcResidualLogRateIsNotRawProcessDrift => {
+                "cluster-mean-centered residual log-rate is not the raw-process autoregressive drift"
             }
         };
         formatter.write_str(message)
@@ -174,6 +179,10 @@ mod tests {
             (
                 LongitudinalError::TotalVarianceScaledDiffusionIsNotStandardisedDiffusion,
                 "total-variance-scaled diffusion is not relevant-variance-standardised diffusion",
+            ),
+            (
+                LongitudinalError::CwcResidualLogRateIsNotRawProcessDrift,
+                "cluster-mean-centered residual log-rate is not the raw-process autoregressive drift",
             ),
         ] {
             assert_eq!(error.to_string(), message);
