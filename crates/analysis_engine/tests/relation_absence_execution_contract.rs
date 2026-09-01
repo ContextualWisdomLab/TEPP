@@ -2,8 +2,8 @@
 
 use analysis_engine::{
     AnalysisEngineError, MAX_EVIDENCE_UNITS, RELATION_ABSENCE_ARTIFACT_SCHEMA_VERSION,
-    RELATION_ABSENCE_MODEL_CONTRACT_VERSION, RELATION_ABSENCE_OUTPUT_PROFILE, RelationAbsencePair,
-    execute_relation_absence_run,
+    RELATION_ABSENCE_MODEL_CONTRACT_VERSION, RELATION_ABSENCE_OUTPUT_PROFILE,
+    RelationAbsenceArtifact, RelationAbsencePair, execute_relation_absence_run,
 };
 use relation_absence::ObservationStatus;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -104,6 +104,33 @@ fn mixed_statuses_emit_digest_bound_refusals_without_recovery_metric() {
     assert_eq!(
         execution.terminal_result.result_schema_version.as_deref(),
         Some(RELATION_ABSENCE_ARTIFACT_SCHEMA_VERSION)
+    );
+}
+
+#[test]
+fn compact_oversized_artifact_counts_fail_closed() {
+    let pair_count = MAX_EVIDENCE_UNITS as u64 + 1;
+    let unobserved_count = pair_count - 2;
+    let artifact = RelationAbsenceArtifact {
+        schema_version: RELATION_ABSENCE_ARTIFACT_SCHEMA_VERSION.into(),
+        run_id: "run-compact-oversize".into(),
+        snapshot_id: "snapshot-compact-oversize".into(),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        pair_count,
+        observed_count: 1,
+        inferred_count: 1,
+        unobserved_count,
+        refused_as_negative_count: unobserved_count,
+        inference_status: "unobserved_is_not_negative_observed_inferred_are_presence".into(),
+    };
+    let raw_payload = serde_json::to_string(&artifact).expect("raw json");
+    assert_eq!(
+        artifact.to_json(),
+        Err(AnalysisEngineError::InvalidRelationAbsenceArtifact)
+    );
+    assert_eq!(
+        RelationAbsenceArtifact::from_json(&raw_payload),
+        Err(AnalysisEngineError::InvalidRelationAbsenceArtifact)
     );
 }
 
