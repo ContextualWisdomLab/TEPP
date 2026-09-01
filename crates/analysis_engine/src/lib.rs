@@ -8,7 +8,9 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Posterior topic-context
+//! artifacts are validated through [`TopicContextPosteriorArtifact`] and do
+//! not claim topic importance.
 
 mod case_deletion_refit;
 mod lineage_criterion;
@@ -48,9 +50,11 @@ pub use lineage_criterion::{
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
-    TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
+    TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT, TOPIC_CONTEXT_POSTERIOR_MODEL_CONTRACT_VERSION,
+    TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE, TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
     TopicActivityInterval, TopicContextMembership, TopicContextPosteriorArtifact,
-    TopicDocumentRelation, TopicLineageEvent, TopicPostPlausibleValue,
+    TopicContextPosteriorExecution, TopicDocumentRelation, TopicLineageEvent,
+    TopicPostPlausibleValue, execute_topic_context_posterior_run,
 };
 /// Topic-lineage artifact and execution contracts from this engine.
 pub use topic_lineage_artifact::{

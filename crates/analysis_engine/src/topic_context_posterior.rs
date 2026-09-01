@@ -7,12 +7,21 @@ use sha2::{Digest, Sha256};
 use temporal_core::KnowledgeCutoff;
 use uuid::Uuid;
 
-use crate::{AnalysisEngineError, format_digest, valid_identifier};
+use tepp_api::{
+    AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
+};
+
+use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
 
 /// Exact posterior artifact schema.
 pub const TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION: &str = "tepp.topic_context_posterior.v1";
 /// Maximum canonical JSON size.
 pub const TOPIC_CONTEXT_POSTERIOR_BYTE_LIMIT: usize = 16 * 1024 * 1024;
+/// Model contract required by the topic-context posterior analysis-run path.
+pub const TOPIC_CONTEXT_POSTERIOR_MODEL_CONTRACT_VERSION: &str = "topic_context_posterior_v1";
+/// Analysis-run output profile required for a topic-context posterior artifact.
+pub const TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE: &str = "topic_context_posterior_v1";
+const TOPIC_CONTEXT_POSTERIOR_INFERENCE_STATUS: &str = "posterior_topic_coordinates_not_importance";
 const ENTRY_LIMIT: usize = 1_000_000;
 const DIMENSIONS: [&str; 4] = ["business_unit", "process_unit", "team", "person"];
 type PosteriorDraws = BTreeMap<Uuid, BTreeSet<u64>>;
@@ -217,7 +226,7 @@ impl TopicContextPosteriorArtifact {
                 ],
                 entry_limit,
             )
-            && self.inference_status == "posterior_topic_coordinates_not_importance"
+            && self.inference_status == TOPIC_CONTEXT_POSTERIOR_INFERENCE_STATUS
     }
 
     /// Parse and validate one bounded posterior artifact.
@@ -634,6 +643,79 @@ impl TopicContextPosteriorArtifact {
         }
         Ok(())
     }
+}
+
+/// One completed topic-context posterior artifact and its terminal result.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TopicContextPosteriorExecution {
+    /// Digest-bound producer posterior artifact.
+    pub artifact: TopicContextPosteriorArtifact,
+    /// Terminal result carrying the artifact identity, digest, and schema.
+    pub terminal_result: AnalysisRunTerminalResult,
+}
+
+/// Execute posterior topic-context validation as one analysis-run profile.
+///
+/// The executor validates an already-constructed
+/// [`TopicContextPosteriorArtifact`] through its producer contract and does
+/// not reimplement TRSL-TM fitting, collapse missing draws, infer topic
+/// importance, or invent birth/split/merge events. Lineage events remain
+/// producer-supplied. This is not a Bayesian sampler and not GPU execution.
+///
+/// # Errors
+///
+/// Returns a request/receipt/snapshot/cutoff/profile error or a producer
+/// contract refusal.
+pub fn execute_topic_context_posterior_run(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+    snapshot_id: &str,
+    knowledge_cutoff: KnowledgeCutoff,
+    artifact: &TopicContextPosteriorArtifact,
+    completed_at: impl Into<String>,
+) -> Result<TopicContextPosteriorExecution, AnalysisEngineError> {
+    request.to_json()?;
+    accepted.to_json()?;
+    require_receipt_identity(request, accepted)?;
+    if request.snapshot_id != snapshot_id || artifact.snapshot_id != snapshot_id {
+        return Err(AnalysisEngineError::SnapshotMismatch);
+    }
+    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+        || artifact.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+        || request.model_contract_version != TOPIC_CONTEXT_POSTERIOR_MODEL_CONTRACT_VERSION
+        || request.output_profile != TOPIC_CONTEXT_POSTERIOR_OUTPUT_PROFILE
+        || artifact.run_id != accepted.run_id
+        || artifact.inference_status != TOPIC_CONTEXT_POSTERIOR_INFERENCE_STATUS
+    {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+
+    let digest = artifact.sha256()?;
+    let mut document_ids = BTreeSet::new();
+    for value in &artifact.plausible_values {
+        document_ids.insert(value.document_id.as_str());
+    }
+    let document_count =
+        u64::try_from(document_ids.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+    let summary = AnalysisResultSummary::new(
+        "topic_context_posterior",
+        document_count,
+        3,
+        TOPIC_CONTEXT_POSTERIOR_INFERENCE_STATUS,
+    )?;
+    let terminal_result = AnalysisRunTerminalResult::succeeded(
+        request,
+        accepted,
+        format!("topic_context_posterior_artifact_{}", &digest[..16]),
+        digest,
+        TOPIC_CONTEXT_POSTERIOR_SCHEMA_VERSION,
+        completed_at,
+        summary,
+    )?;
+    Ok(TopicContextPosteriorExecution {
+        artifact: artifact.clone(),
+        terminal_result,
+    })
 }
 
 #[cfg(test)]
