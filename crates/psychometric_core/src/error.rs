@@ -605,6 +605,23 @@ pub enum PsychometricError {
     /// `asymDIFFUSIONstd`. The continuous-diffusion ratio is not
     /// the correlation form of `asymDIFFUSION`.
     StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion,
+    /// Driver p. 16 `DIFFUSIONstd` was requested without a strictly
+    /// positive `asymDIFFUSION`. Footnote 4 standardises using only
+    /// the relevant variance; zero `q` has no positive process SD.
+    StandardisedContinuousDiffusionRequiresPositiveStationaryVariance,
+    /// Driver Table 2 unstandardised `DIFFUSION` `q` was treated as
+    /// `DIFFUSIONstd`. Unstandardised diffusion is defined for
+    /// growing `a ≥ 0` and for zero diffusion; standardised
+    /// `DIFFUSION` is not.
+    UnstandardisedContinuousDiffusionIsNotStandardisedContinuousDiffusion,
+    /// Driver p. 16 `discreteDIFFUSIONstd` `Q_Δt / p` was treated
+    /// as `DIFFUSIONstd`. The discrete map depends on the event
+    /// interval; the continuous ratio does not.
+    DiscreteStandardisedDiffusionIsNotStandardisedContinuousDiffusion,
+    /// Driver §7.1 total `q / (trait + p + added)` was treated as
+    /// p. 16 `DIFFUSIONstd`. Footnote 4 uses only within-subject
+    /// `asymDIFFUSION`, not the total.
+    TotalVarianceScaledDiffusionIsNotStandardisedContinuousDiffusion,
     /// Driver p. 16 `TIPREDVARstd` was treated as p. 16
     /// `asymDIFFUSIONstd`. Equal numbers of 1 after a strictly
     /// positive relevant variance are still distinct named
@@ -1167,6 +1184,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::StandardisedContinuousDiffusionIsNotStandardisedAsymptoticDiffusion => {
                 "standardised continuous diffusion is not standardised asymptotic diffusion"
+            }
+            Self::StandardisedContinuousDiffusionRequiresPositiveStationaryVariance => {
+                "standardised continuous diffusion requires strictly positive stationary within-subject variance"
+            }
+            Self::UnstandardisedContinuousDiffusionIsNotStandardisedContinuousDiffusion => {
+                "unstandardised continuous diffusion is not standardised continuous diffusion"
+            }
+            Self::DiscreteStandardisedDiffusionIsNotStandardisedContinuousDiffusion => {
+                "discrete standardised diffusion is not standardised continuous diffusion"
+            }
+            Self::TotalVarianceScaledDiffusionIsNotStandardisedContinuousDiffusion => {
+                "total-variance scaled diffusion is not standardised continuous diffusion"
             }
             Self::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion => {
                 "standardised time-independent predictor variance is not standardised asymptotic diffusion"
@@ -1976,6 +2005,30 @@ mod tests {
             PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedAsymptoticDiffusion
                 .to_string(),
             "standardised time-independent predictor variance is not standardised asymptotic diffusion"
+        );
+    }
+
+    #[test]
+    fn standardised_continuous_diffusion_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedContinuousDiffusionRequiresPositiveStationaryVariance
+                .to_string(),
+            "standardised continuous diffusion requires strictly positive stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousDiffusionIsNotStandardisedContinuousDiffusion
+                .to_string(),
+            "unstandardised continuous diffusion is not standardised continuous diffusion"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteStandardisedDiffusionIsNotStandardisedContinuousDiffusion
+                .to_string(),
+            "discrete standardised diffusion is not standardised continuous diffusion"
+        );
+        assert_eq!(
+            PsychometricError::TotalVarianceScaledDiffusionIsNotStandardisedContinuousDiffusion
+                .to_string(),
+            "total-variance scaled diffusion is not standardised continuous diffusion"
         );
     }
 

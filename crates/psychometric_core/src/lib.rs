@@ -246,6 +246,17 @@
 //! is `TIPREDVARstd` and is not that map even when both equal 1;
 //! zero `q` fails closed; a non-event clock fails closed; `a ≥ 0`
 //! fails closed; JSS PDF re-opened 2026-08-26T17:20Z),
+//! recovers the Driver p. 16 `DIFFUSIONstd` as `q / p = −2 a` after
+//! strictly positive `asymDIFFUSION` `p = −q / (2 a)` (footnote 4
+//! uses only the relevant within-subject variance; 2017-era
+//! `summary.ctsemFit.R` forms unstandardised `DIFFUSION` and
+//! `asymDIFFUSIONstd` and does not form a `DIFFUSIONstd` matrix;
+//! unstandardised `q` is defined for growing `a ≥ 0` and for a zero
+//! process and is not that map; `Q_Δt / p` is
+//! `discreteDIFFUSIONstd` and is not that continuous ratio;
+//! `q / (trait + p + added)` uses the total and is not that map;
+//! zero `q` fails closed; a non-event clock fails closed; `a ≥ 0`
+//! fails closed; JSS PDF re-opened 2026-09-01T19:20Z),
 //! recovers the Driver p. 16 `MANIFESTTRAITVARstd` as `ψ / ψ = 1`
 //! after strictly positive `MANIFESTTRAITVAR` (Table 2 names
 //! `MANIFESTTRAITVAR` `Ψ_τ`; §7.1 names manifest traits stable
@@ -403,6 +414,8 @@ pub use event_time::recover_manifest_trait_plus_state_observed_variance;
 pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 /// Exact scalar p. 16 `asymDIFFUSIONstd` `p / p = 1` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_asymptotic_diffusion;
+/// Exact scalar p. 16 `DIFFUSIONstd` `q / p = −2 a` after strictly positive `asymDIFFUSION`.
+pub use event_time::recover_standardised_continuous_diffusion;
 /// Exact scalar p. 16 `CINTstd` `κ / √p`.
 pub use event_time::recover_standardised_continuous_intercept;
 /// Exact scalar p. 16 `discreteCINTstd` `A^{-1}[e^{A Δt} − I] κ / √p`.
@@ -492,6 +505,8 @@ pub use event_time::refuse_difference_quotient_as_local_rate;
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating p. 16 `discreteDIFFUSIONstd` as `DIFFUSIONstd`.
+pub use event_time::refuse_discrete_standardised_diffusion_as_standardised_continuous_diffusion;
 /// Refuse treating evolved `τ + λ μ_t` as the after-t0 extra-process observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the extra-process observed mean.
@@ -636,6 +651,10 @@ pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_
 pub use event_time::refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
+/// Refuse treating total-variance scaled `q / (trait + p + added)` as `DIFFUSIONstd`.
+pub use event_time::refuse_total_variance_scaled_diffusion_as_standardised_continuous_diffusion;
+/// Refuse treating unstandardised `DIFFUSION` as p. 16 `DIFFUSIONstd`.
+pub use event_time::refuse_unstandardised_continuous_diffusion_as_standardised_continuous_diffusion;
 
 /// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
