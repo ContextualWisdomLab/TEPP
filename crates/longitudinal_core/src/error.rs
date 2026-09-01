@@ -26,6 +26,8 @@ pub enum LongitudinalError {
     CovarianceBoundViolation,
     /// A stationary within-person variance was requested without stable negative drift.
     StationaryVarianceRequiresStableDrift,
+    /// A standardised diffusion candidate was requested without positive within variance.
+    StandardisedDiffusionRequiresPositiveWithinVariance,
     /// `discreteDRIFTstd` was requested without positive stationary within-person variance.
     StandardisedDriftRequiresPositiveWithinVariance,
     /// Unstandardised `discreteDRIFT` was substituted for `discreteDRIFTstd`.
@@ -34,6 +36,12 @@ pub enum LongitudinalError {
     TraitStateAssociationIsNotStandardisedDrift,
     /// Between-unit trait variance was used as the drift standardisation variance.
     TraitVarianceIsNotDriftStandardisationVariance,
+    /// A continuous diffusion ratio was substituted for a discrete diffusion ratio.
+    ContinuousDiffusionIsNotDiscreteDiffusion,
+    /// An unstandardised diffusion quantity was substituted for a standardised one.
+    UnstandardisedDiffusionIsNotStandardisedDiffusion,
+    /// Diffusion was scaled by total variance instead of relevant within variance.
+    TotalVarianceScaledDiffusionIsNotStandardisedDiffusion,
 }
 
 impl fmt::Display for LongitudinalError {
@@ -57,6 +65,9 @@ impl fmt::Display for LongitudinalError {
             Self::StationaryVarianceRequiresStableDrift => {
                 "stationary within-person variance requires strictly negative drift"
             }
+            Self::StandardisedDiffusionRequiresPositiveWithinVariance => {
+                "standardised diffusion requires positive stationary within-person variance"
+            }
             Self::StandardisedDriftRequiresPositiveWithinVariance => {
                 "standardised discrete drift requires positive stationary within-person variance"
             }
@@ -68,6 +79,15 @@ impl fmt::Display for LongitudinalError {
             }
             Self::TraitVarianceIsNotDriftStandardisationVariance => {
                 "trait variance is not the drift standardisation variance"
+            }
+            Self::ContinuousDiffusionIsNotDiscreteDiffusion => {
+                "continuous standardised diffusion is not discrete standardised diffusion"
+            }
+            Self::UnstandardisedDiffusionIsNotStandardisedDiffusion => {
+                "unstandardised diffusion is not standardised diffusion"
+            }
+            Self::TotalVarianceScaledDiffusionIsNotStandardisedDiffusion => {
+                "total-variance-scaled diffusion is not relevant-variance-standardised diffusion"
             }
         };
         formatter.write_str(message)
@@ -124,6 +144,10 @@ mod tests {
                 "stationary within-person variance requires strictly negative drift",
             ),
             (
+                LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance,
+                "standardised diffusion requires positive stationary within-person variance",
+            ),
+            (
                 LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance,
                 "standardised discrete drift requires positive stationary within-person variance",
             ),
@@ -138,6 +162,18 @@ mod tests {
             (
                 LongitudinalError::TraitVarianceIsNotDriftStandardisationVariance,
                 "trait variance is not the drift standardisation variance",
+            ),
+            (
+                LongitudinalError::ContinuousDiffusionIsNotDiscreteDiffusion,
+                "continuous standardised diffusion is not discrete standardised diffusion",
+            ),
+            (
+                LongitudinalError::UnstandardisedDiffusionIsNotStandardisedDiffusion,
+                "unstandardised diffusion is not standardised diffusion",
+            ),
+            (
+                LongitudinalError::TotalVarianceScaledDiffusionIsNotStandardisedDiffusion,
+                "total-variance-scaled diffusion is not relevant-variance-standardised diffusion",
             ),
         ] {
             assert_eq!(error.to_string(), message);
