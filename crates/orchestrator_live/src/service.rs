@@ -1,21 +1,25 @@
 //! Loopback-only live HTTP/1.1 listener for interpretation POSTs (ADR 0010/0011).
 //! `GET /v1/interpretation-runs/{idempotency_key}/request` returns the stored
-//! create request without POST replay.
+//! create request without POST replay. `GET /v1/interpretation-runs/by-run-id/{interpretation_run_id}`
+//! returns the metric-free identity of the unique accepted run.
 
 use std::collections::HashMap;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use crate::error::OrchestratorLiveError;
 use crate::http::{
-    header_value, map_io_error, parse_headers, parse_request_line, read_http_request,
-    refuse_collection_get_headers, refuse_live_headers, refuse_retrieval_get_headers,
-    split_request, status_for, write_response, OrchestratorLiveResponse,
+    OrchestratorLiveResponse, header_value, map_io_error, parse_headers, parse_request_line,
+    read_http_request, refuse_collection_get_headers, refuse_live_headers,
+    refuse_retrieval_get_headers, split_request, status_for, write_response,
 };
 use crate::interpretation_run_collection_http::{
+    InterpretationRunCollection, InterpretationRunCollectionItem,
     is_interpretation_run_collection_path, page_interpretation_run_collection_items,
     parse_interpretation_run_collection_page_cursor,
-    parse_interpretation_run_collection_page_limit, InterpretationRunCollection,
-    InterpretationRunCollectionItem,
+    parse_interpretation_run_collection_page_limit,
+};
+use crate::interpretation_run_lookup_http::{
+    interpretation_run_lookup_path_id, is_interpretation_run_lookup_path,
 };
 use crate::interpretation_run_retrieval_http::{
     interpretation_run_retrieval_item_json, interpretation_run_retrieval_path_id,
@@ -25,7 +29,7 @@ use crate::interpretation_run_stored_request_http::{
     refuse_metrics_on_interpretation_run_stored_request_payload,
 };
 use crate::request::{
-    to_json, InterpretationRunAccepted, InterpretationRunRequest, INTERPRETATION_RUN_PATH,
+    INTERPRETATION_RUN_PATH, InterpretationRunAccepted, InterpretationRunRequest, to_json,
 };
 
 /// Loopback live HTTP/1.1 service for contextual-orchestrator interpretation POSTs.
@@ -38,6 +42,8 @@ use crate::request::{
 /// returns one of those identities without POST replay.
 /// `GET /v1/interpretation-runs/{idempotency_key}/request` returns the stored
 /// create request without POST replay.
+/// `GET /v1/interpretation-runs/by-run-id/{interpretation_run_id}` returns one
+/// of those identities from the server-assigned run id without POST replay.
 #[derive(Debug)]
 pub struct OrchestratorLiveService {
     listener: Option<TcpListener>,
@@ -191,6 +197,9 @@ impl OrchestratorLiveService {
             if is_interpretation_run_stored_request_path(path) {
                 return self.get_interpretation_run_stored_request(path, &headers, body);
             }
+            if is_interpretation_run_lookup_path(path) {
+                return self.lookup_interpretation_run_by_run_id(path, &headers, body);
+            }
             return self.get_interpretation_run(path, &headers, body);
         }
         if method != "POST" || path != INTERPRETATION_RUN_PATH {
@@ -293,6 +302,40 @@ impl OrchestratorLiveService {
         Ok(OrchestratorLiveResponse::json(200, "OK", payload))
     }
 
+    fn lookup_interpretation_run_by_run_id(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<OrchestratorLiveResponse, OrchestratorLiveError> {
+        let interpretation_run_id = interpretation_run_lookup_path_id(path)?;
+        if !body.is_empty() {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
+        refuse_retrieval_get_headers(headers)?;
+        let mut matches = self.accepted_runs.values().filter_map(|(_, accepted)| {
+            (accepted.interpretation_run_id() == interpretation_run_id).then_some(accepted)
+        });
+        let accepted = matches
+            .next()
+            .ok_or(OrchestratorLiveError::InvalidWirePayload)?;
+        if matches.next().is_some() {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
+        let item = InterpretationRunCollectionItem::new(
+            accepted.interpretation_run_id(),
+            accepted.idempotency_key(),
+            accepted.orchestration_mode(),
+            accepted.claim_status(),
+            accepted.scientific_authority(),
+        )?;
+        Ok(OrchestratorLiveResponse::json(
+            200,
+            "OK",
+            interpretation_run_retrieval_item_json(&item)?,
+        ))
+    }
+
     fn accept_interpretation_run(
         &mut self,
         headers: &HashMap<String, String>,
@@ -364,7 +407,7 @@ struct ErrorWire {
 
 #[cfg(test)]
 mod tests {
-    use super::{envelope_json, fallback_envelope_json, OrchestratorLiveService};
+    use super::{OrchestratorLiveService, envelope_json, fallback_envelope_json};
     use crate::error::OrchestratorLiveError;
 
     #[test]
@@ -378,11 +421,13 @@ mod tests {
             envelope_json(OrchestratorLiveError::LimitExceeded, "req-1".into())
                 .contains("limit_exceeded")
         );
-        assert!(envelope_json(
-            OrchestratorLiveError::ScientificAuthorityRefused,
-            "req-2".into()
-        )
-        .contains("scientific_authority_refused"));
+        assert!(
+            envelope_json(
+                OrchestratorLiveError::ScientificAuthorityRefused,
+                "req-2".into()
+            )
+            .contains("scientific_authority_refused")
+        );
         assert_eq!(
             OrchestratorLiveService::new()
                 .serve_accepted(Err(std::io::Error::other("accept")))
