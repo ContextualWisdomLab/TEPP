@@ -88,10 +88,18 @@ pub fn interpretation_run_lookup_stored_request_path_id(
     Ok(interpretation_run_id)
 }
 
-/// Whether `path` is the lookup stored-request extra-segment resource.
+/// Whether `path` structurally targets the lookup stored-request resource.
+///
+/// Oversized identities still belong to this route so the handler can preserve
+/// [`OrchestratorLiveError::LimitExceeded`] and map it to HTTP 413 instead of
+/// falling through to an unrelated 400 route. Other invalid shapes remain
+/// non-matches.
 #[must_use]
 pub fn is_interpretation_run_lookup_stored_request_path(path: &str) -> bool {
-    interpretation_run_lookup_stored_request_path_id(path).is_ok()
+    matches!(
+        interpretation_run_lookup_stored_request_path_id(path),
+        Ok(_) | Err(OrchestratorLiveError::LimitExceeded)
+    )
 }
 
 /// Build a credential-free contextual-orchestrator lookup stored-request GET.
@@ -311,13 +319,17 @@ mod tests {
             ),
             Err(OrchestratorLiveError::InvalidWirePayload)
         );
+        let oversized_path = format!(
+            "/v1/interpretation-runs/by-run-id/{}/request",
+            "a".repeat(INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN + 1)
+        );
         assert_eq!(
-            interpretation_run_lookup_stored_request_path_id(&format!(
-                "/v1/interpretation-runs/by-run-id/{}/request",
-                "a".repeat(INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN + 1)
-            )),
+            interpretation_run_lookup_stored_request_path_id(&oversized_path),
             Err(OrchestratorLiveError::LimitExceeded)
         );
+        assert!(is_interpretation_run_lookup_stored_request_path(
+            &oversized_path
+        ));
         assert_eq!(
             contextual_orchestrator_interpretation_run_lookup_stored_request_exchange(
                 "http://insecure.example",
