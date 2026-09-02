@@ -22,6 +22,24 @@ fn already_centered_unit_interval_recovers_ln_half() {
 }
 
 #[test]
+fn centered_log_rate_survives_nonrepresentable_intermediate_ratios() {
+    let interval = longitudinal_core::EventTimeInterval::new(1.0).expect("event time");
+    let overflow_pair = LaggedWithinResidual::new(f64::MIN_POSITIVE, f64::MAX, interval);
+    assert!(!(f64::MAX / f64::MIN_POSITIVE).is_finite());
+    let overflow_expected = f64::MAX.ln() - f64::MIN_POSITIVE.ln();
+    let overflow_recovered = recover_centered_irregular_residual_log_rate(&[overflow_pair])
+        .expect("finite log-domain rate despite overflowing direct ratio");
+    assert_eq!(overflow_recovered.to_bits(), overflow_expected.to_bits());
+
+    let underflow_pair = LaggedWithinResidual::new(f64::MAX, f64::MIN_POSITIVE, interval);
+    assert_eq!(f64::MIN_POSITIVE / f64::MAX, 0.0);
+    let underflow_expected = f64::MIN_POSITIVE.ln() - f64::MAX.ln();
+    let underflow_recovered = recover_centered_irregular_residual_log_rate(&[underflow_pair])
+        .expect("finite log-domain rate despite underflowing direct ratio");
+    assert_eq!(underflow_recovered.to_bits(), underflow_expected.to_bits());
+}
+
+#[test]
 fn cwc_mean_is_deterministic_under_input_row_permutation() {
     let canonical = [
         timed(1, 0.0, 1.0e16),
