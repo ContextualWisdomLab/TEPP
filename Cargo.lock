@@ -73,7 +73,9 @@ version = "0.2.0"
 dependencies = [
  "copy_identity",
  "corpus_split",
+ "episode_membership",
  "event_core",
+ "inferred_status",
  "location_membership",
  "membership_core",
  "relation_graph",

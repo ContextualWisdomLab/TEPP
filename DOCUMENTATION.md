@@ -73,6 +73,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Analysis engine gap-closure doctoring | [`docs/doctoring/analysis-engine-gap-closure.md`](docs/doctoring/analysis-engine-gap-closure.md) |
 | Copy-identity analysis-run doctoring | [`docs/doctoring/copy-identity-analysis-run.md`](docs/doctoring/copy-identity-analysis-run.md) |
 | Location-membership analysis-run doctoring | [`docs/doctoring/location-membership-analysis-run.md`](docs/doctoring/location-membership-analysis-run.md) |
+| Episode-membership analysis-run doctoring | [`docs/doctoring/episode-membership-analysis-run.md`](docs/doctoring/episode-membership-analysis-run.md) |
 | Corpus-split leakage-audit wire doctoring | [`docs/research/corpus-split-manifest-wire.md`](docs/research/corpus-split-manifest-wire.md) |
 | Unicode canonical-identity doctoring | [`docs/research/unicode-canonical-identity.md`](docs/research/unicode-canonical-identity.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
