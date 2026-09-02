@@ -272,11 +272,11 @@ fn census_admitted_assignments(
     let mut refused_as_source_identity_count = 0_u64;
     let mut compatible_source_count = 0_u64;
     for assignment in assignments {
-        if !seen.insert(assignment.assignment_id()) {
-            return Err(AnalysisEngineError::DuplicateEvidence);
-        }
         if assignment.available_time().instant() > knowledge_cutoff.instant() {
             continue;
+        }
+        if !seen.insert(assignment.assignment_id()) {
+            return Err(AnalysisEngineError::DuplicateEvidence);
         }
         classify_assignment(
             assignment.kind(),

@@ -151,6 +151,23 @@ fn future_available_assignments_are_excluded() {
 }
 
 #[test]
+fn future_duplicate_identity_cannot_change_a_historical_cutoff_result() {
+    let request = request();
+    let mut with_future_duplicate = mixed_assignments();
+    with_future_duplicate.push(assignment(
+        "summary-a",
+        SummarizesKind::SourceDocument,
+        "2026-08-02T00:00:00Z",
+    ));
+
+    let execution = execute(&request, &with_future_duplicate)
+        .expect("future-unavailable evidence must not affect the historical run");
+    assert_eq!(execution.artifact.assignment_count, 3);
+    assert_eq!(execution.artifact.summary_count, 2);
+    assert_eq!(execution.artifact.source_document_count, 1);
+}
+
+#[test]
 fn empty_or_single_kind_and_duplicate_fail_closed() {
     let request = request();
     let stamp = "2026-07-01T00:00:00Z";
