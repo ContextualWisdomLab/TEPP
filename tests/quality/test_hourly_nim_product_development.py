@@ -48,6 +48,8 @@ class HourlyOrchestratorProductDevelopmentContractTests(unittest.TestCase):
             "base_branch_advanced",
             "open_pull_request_after_generation",
             "open_issue_after_generation",
+            "--proto '=https'",
+            '[[ "$CONTEXTUAL_ORCHESTRATOR_BASE_URL" == https://* ]]',
         ):
             self.assertIn(token, text)
 
@@ -63,6 +65,7 @@ class HourlyOrchestratorProductDevelopmentContractTests(unittest.TestCase):
             "select_top_n_cheapest_discovered_agents",
             "OPENCODE_RUN_TIMEOUT_SECONDS",
             "timeout --kill-after",
+            "http://127.0.0.1",
             "COPILOT_GITHUB_TOKEN",
         ):
             self.assertNotIn(forbidden, text)
@@ -146,6 +149,14 @@ class HourlyOrchestratorProductDevelopmentContractTests(unittest.TestCase):
         ):
             self.assertIn(token, text)
         self.assertEqual(text.count("artifact-ids:"), 2)
+
+    def test_publisher_revalidates_the_exact_proposal_base(self) -> None:
+        """Reject a default-branch advance without an unbound shell variable."""
+
+        text = _text(WORKFLOW)
+        publisher = text.split("publish_product_increment:", 1)[1]
+        self.assertIn('[ "$live_base" = "$EXPECTED_BASE" ]', publisher)
+        self.assertNotIn('$expected_base', publisher)
 
     def test_prompt_and_verifier_keep_scientific_and_commercial_gates(self) -> None:
         """Require one buyer gap, released orchestration, and full verification."""
