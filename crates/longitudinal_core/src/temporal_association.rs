@@ -12,10 +12,11 @@ use crate::{EventTimeInterval, LongitudinalError, association};
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalAssociationInput`] for invalid
-/// covariance or marginal inputs, [`LongitudinalError::NonPositiveMarginalVariance`]
-/// when either marginal variance is non-positive, and
-/// [`LongitudinalError::CovarianceBoundViolation`] when the covariance exceeds
-/// the exact binary64 Cauchy–Schwarz bound.
+/// covariance or marginal inputs, or when a nonzero exact correlation is too
+/// small to be represented as binary64,
+/// [`LongitudinalError::NonPositiveMarginalVariance`] when either marginal
+/// variance is non-positive, and [`LongitudinalError::CovarianceBoundViolation`]
+/// when the covariance exceeds the exact binary64 Cauchy–Schwarz bound.
 pub fn recover_event_time_lagged_correlation(
     lagged_covariance: f64,
     earlier_total_variance: f64,
@@ -41,6 +42,20 @@ mod tests {
         assert_eq!(
             recover_event_time_lagged_correlation(2.0, 1.0, 4.0, interval),
             Ok(1.0)
+        );
+    }
+
+    #[test]
+    fn public_boundary_does_not_report_underflowed_nonzero_correlation_as_zero() {
+        let interval = EventTimeInterval::new(1.0).expect("valid event time");
+        assert_eq!(
+            recover_event_time_lagged_correlation(
+                f64::from_bits(1),
+                f64::MAX,
+                f64::MAX,
+                interval,
+            ),
+            Err(LongitudinalError::InvalidTemporalAssociationInput)
         );
     }
 
