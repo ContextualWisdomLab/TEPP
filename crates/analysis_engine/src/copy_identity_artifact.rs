@@ -271,7 +271,7 @@ pub fn execute_copy_identity_run(
     };
     let digest = artifact.sha256()?;
     #[rustfmt::skip]
-    let summary = AnalysisResultSummary::new("copy_identity", document_count, 4, COPY_IDENTITY_INFERENCE_STATUS)?;
+    let summary = AnalysisResultSummary::new("copy_identity", document_count, 4, "validated")?;
     #[rustfmt::skip]
     let terminal_result = AnalysisRunTerminalResult::succeeded(request, accepted, format!("copy_identity_artifact_{}", &digest[..16]), digest, COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION, completed_at, summary)?;
     Ok(CopyIdentityExecution {
