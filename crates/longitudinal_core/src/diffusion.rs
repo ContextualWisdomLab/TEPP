@@ -189,11 +189,18 @@ mod tests {
     }
 
     #[test]
-    fn very_large_stable_event_product_has_representable_unit_limit() {
-        let interval = EventTimeInterval::new(f64::MAX).expect("finite positive interval");
-        let recovered = recover_event_time_standardised_discrete_diffusion(1.0, -1.0, interval)
-            .expect("the final standardized noise fraction tends to one");
-        assert_eq!(recovered, 1.0);
+    fn finite_event_interval_must_not_collapse_to_false_unit_diffusion() {
+        let huge = EventTimeInterval::new(f64::MAX).expect("finite positive interval");
+        assert_eq!(
+            recover_event_time_standardised_discrete_diffusion(1.0, -1.0, huge),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+
+        let finite_saturating = EventTimeInterval::new(50.0).expect("finite event interval");
+        assert_eq!(
+            recover_event_time_standardised_discrete_diffusion(1.0, -1.0, finite_saturating),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
     }
 
     #[test]
