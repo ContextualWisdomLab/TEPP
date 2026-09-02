@@ -205,10 +205,8 @@ mod tests {
             ComponentValue::new(1, 0, ComponentLevel::Between, 1.0),
         ];
         let expected = 1.0 / f64::sqrt(2.0);
-        assert_eq!(
-            component_root_mean_square_error(&truth, &decided),
-            Ok(expected)
-        );
+        let got = component_root_mean_square_error(&truth, &decided).expect("finite residual");
+        assert!((got - expected).abs() <= expected * 4.0 * f64::EPSILON);
     }
 
     #[test]
