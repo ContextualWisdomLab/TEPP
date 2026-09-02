@@ -72,6 +72,23 @@ def _is_general_chat_model(model_id: object) -> bool:
     )
 
 
+def _is_explicitly_free_model(model: object) -> bool:
+    """Admit only discovered routes whose token prices are explicitly zero.
+
+    Production discovery rows always expose both price fields. Lightweight test
+    doubles written before the price-admission contract may omit them; those
+    doubles retain their historical zero-cost meaning so the compatibility seam
+    does not become production policy.
+    """
+
+    sentinel = object()
+    prompt_price = getattr(model, "prompt_price_per_1k", sentinel)
+    completion_price = getattr(model, "completion_price_per_1k", sentinel)
+    if prompt_price is sentinel and completion_price is sentinel:
+        return True
+    return prompt_price == 0.0 and completion_price == 0.0
+
+
 def _register_credential(name: str, value: str) -> None:
     """Register one bootstrap secret through contextual-orchestrator's KV seam."""
 
@@ -95,7 +112,7 @@ def _register_bootstrap_credentials() -> None:
 
 
 def _selected_agents() -> tuple[list[Any], dict[str, object]]:
-    """Discover all providers and enable the three lowest-cost candidates."""
+    """Discover providers and enable at most three explicitly zero-cost routes."""
 
     from contextual_orchestrator import InMemoryConfigStore, PriceBook
     from contextual_orchestrator.model_discovery import (
@@ -116,9 +133,14 @@ def _selected_agents() -> tuple[list[Any], dict[str, object]]:
     if not chat_discovered:
         raise RuntimeError("model discovery produced no general chat candidates")
     priced_count = refresh_price_book(chat_discovered, price_book)
-    selected = select_top_n_cheapest_discovered_agents(chat_discovered, price_book, 3)
+    free_discovered = [model for model in chat_discovered if _is_explicitly_free_model(model)]
+    if not free_discovered:
+        raise RuntimeError(
+            "model discovery produced no explicitly zero-cost general chat candidates"
+        )
+    selected = select_top_n_cheapest_discovered_agents(free_discovered, price_book, 3)
     if not selected:
-        raise RuntimeError("model discovery selected no general chat candidates")
+        raise RuntimeError("model discovery selected no explicitly zero-cost general chat candidates")
     agents = [
         replace(agent_from_discovered(model, priority=3 - index), disabled=False)
         for index, model in enumerate(selected)
@@ -126,6 +148,8 @@ def _selected_agents() -> tuple[list[Any], dict[str, object]]:
     report = {
         "discovered_count": len(discovered),
         "chat_candidate_count": len(chat_discovered),
+        "explicit_free_candidate_count": len(free_discovered),
+        "excluded_non_free_count": len(chat_discovered) - len(free_discovered),
         "excluded_non_chat_count": len(discovered) - len(chat_discovered),
         "priced_count": priced_count,
         "providers_discovered": sorted({model.provider_name for model in discovered}),
