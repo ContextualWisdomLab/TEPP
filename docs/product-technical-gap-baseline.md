@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-09-01T23:11:53Z
+**Snapshot:** 2026-09-02T00:05Z
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 **Workspace version:** `0.2.0`
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)
@@ -18,13 +18,13 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | Open pull requests | **131** | WIP remains release-blocking, but the queue is down from the observed peak of 149. |
 | Draft pull requests | **130** | Non-landable work is explicitly parked while consolidated, repaired, or supplied with missing evidence. |
 | Non-draft pull requests | **1** | #310 is the only current non-Draft landing vehicle. |
-| Open issues | **15** | Includes #437 for repository-wide ADR identity normalization and the active Analysis Run/product gaps. |
+| Open issues | **15** | Includes #437 for repository-wide ADR identity normalization and active Analysis Run/product gaps. |
 | GitHub releases | **0** | No open head is a released TEPP contract. |
 | Effective organization ruleset | `18156473` | Current-head required workflows, resolved conversations, qualifying review, and an allowed merge method remain landing authority. |
 
 Classic branch protection is not the sole policy source; organization rulesets are effective merge authority where applicable. Any increase in open PR count while #435 remains open is a WIP regression unless the new PR is a demonstrably independent root-cause repair that cannot safely belong to an existing landing vehicle.
 
-The queue previously regressed when one-map and one-route Drafts appeared as independently shippable work. Recovery now preserves unique RED/GREEN, review, research and contract evidence on coherent bounded-context landing vehicles before strict ancestors or superseded siblings are closed. The live TEPP queue is **131**.
+The queue previously regressed when one-map and one-route Drafts appeared as independently shippable work. Recovery preserves unique RED/GREEN, review, research, and contract evidence on coherent bounded-context landing vehicles before strict ancestors or superseded siblings are closed. The live TEPP queue is **131**.
 
 ## Current priority open pull-request evidence
 
@@ -33,15 +33,15 @@ This is a priority subset, not a row-for-row copy of the 131-PR queue. #435 inte
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
 | #473 | `9ae0488e44bc0775b2289c71d83d88c57e660b0d` | true | profile ancestry | Validation / Analysis Run inferred-status refusal profile; `fold_into_landing_vehicle`, not independent architecture authority. |
-| #469 | `72a7755bcc91b1107560c980ce817eca153126e4` | true | interpretation-run retrieval ancestry | Analysis Run / contextual-orchestrator interpretation-run retrieval, lookup and stored-request adapter landing vehicle. |
+| #469 | `72a7755bcc91b1107560c980ce817eca153126e4` | true | interpretation-run retrieval ancestry | Analysis Run / contextual-orchestrator interpretation-run retrieval, lookup, and stored-request adapter landing vehicle. |
 | #466 | `71f34b890bbd096eee152947c5e22d9778d323e8` | true | export-retrieval ancestry | Analysis Run / naruon export idempotency lookup and quarantine-parity landing vehicle. |
 | #464 | `1b3a477242336634be2c7867b29d39979e9a6dca` | true | temporal-context retrieval ancestry | Analysis Run / LineageWeave temporal-context stored-request GET+CLI landing vehicle. |
 | #462 | `c1b7d627167dd7636d2975cc41cec050a5e477ba` | true | main | Bounded source-name compatibility repair; Rust `node_id`, v1 serialized key remains `id`. |
 | #456 | `f02436236a73824c87c6043fc5d1e0b08cb0d448` | true | project-history retrieval ancestry | Analysis Run / LineageWeave project-history landing vehicle; includes folded query CLI evidence. |
 | #417 | `1e468f62ec47f3476a7b4d18ed2980451dc425cf` | true | main | Analysis Run / naruon export retrieval GET+CLI landing vehicle. |
-| #416 | `d5c9811f3d0547fab811252d27c202d011759048` | true | main | Provisional Validation / Analysis Run simple-refusal landing vehicle; shared admission/artifact invariants plus profile-specific adapters. |
+| #416 | `a6ba5d79c8d9acc1e7b4a53b3be5ef3d70ab19e7` | true | main | Provisional Validation / Analysis Run simple-refusal landing vehicle; shared admission/artifact invariants plus profile-specific adapters. |
 | #315 | `538f9bd1c76422bc894836b65083c62544330c7c` | true | main | TEPP `TIPREDVARstd` adapter lineage only; blocked on a released fast-mlsirm covariance-standardisation contract and removal of duplicate local arithmetic. |
-| #310 | `623fb253ba9de67dc3f18743c7c223bad97c0954` | false | main | Longitudinal Modeling landing vehicle; contains repaired lagged correlation, diffusion research candidates, and current CWC deterministic-arithmetic repair. |
+| #310 | `af767e1bb9ab27c71023e0c3f4be1bb0918dd20f` | false | main | Longitudinal Modeling landing vehicle; repaired lagged correlation, diffusion research candidates, and full-range stable CWC mean arithmetic. |
 
 Exact current-head evidence is authoritative only for the named PR and becomes stale after any source mutation.
 
@@ -81,17 +81,21 @@ Supported temporal estimators require realistic known-truth recovery for every c
 
 ## Current repairs and blockers
 
-**#310 — Longitudinal Modeling landing vehicle.** Closed predecessor #441 is contained by #310. The invalid one-sided covariance/earlier-variance ratio remains retired; public lagged correlation requires lagged covariance and both marginal variances. `EventTimeInterval` is preserved end-to-end. This run found a new deterministic-arithmetic defect in CWC processing: unit scores were accumulated before event-time sorting, so input-row permutation could alter low-order floating centering results. RED `fb784f103ddb6fc69b7ffbf13df0e8f62bf007cb` proves the permutation failure. GREEN `e9e6a409acf6eac0b1e0ba24a73c8f7325fae391` sorts per-unit observations before mean accumulation and then forms chronological lag pairs. ADR/source-hygiene follow-up `623fb253ba9de67dc3f18743c7c223bad97c0954` preserves readable ADR metadata without trailing-space hard breaks and qualifies the already-centered `(1, 0.5)` mapping as `ln(0.5)` only at `Δt = 1`.
+**#310 — Longitudinal Modeling landing vehicle.** Closed predecessor #441 is contained by #310. The invalid one-sided covariance/earlier-variance ratio remains retired; public lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. `EventTimeInterval` is preserved end-to-end. Earlier RED/GREEN slices already repaired event-order-sensitive CWC accumulation and the `ln(0.5) / Δt` documentation boundary.
 
-#310 is not mergeable yet. The exact head `623fb253ba9de67dc3f18743c7c223bad97c0954` has fresh Rust Foundation CI, Documentation Quality, Security Scan, and SAST Semgrep runs queued. One CodeRabbit documentation conversation also remains valid: `docs/research/multilevel-event-time-recovery.md` and `CLAUDE.md` must state that `(1, 0.5)` maps to `ln(0.5) / Δt` generally and equals `ln(0.5)` only for unit event time. The local source-access date `2026-09-02` is retained as truthful local evidence rather than rewritten to satisfy a reviewer generated on the prior UTC date. Current-head qualifying independent approval is also required.
+The current run found a further numerical-stability defect in pairwise irregular-residual mean recovery. Largest-magnitude normalization could erase a representable low-order contribution before cancellation when very large positive and negative finite rates coexist with a much smaller finite rate. RED `0057b85a8467b9c904aaa20ffe79462aa3339786` reproduces the full binary64 exponent-range loss. GREEN `af767e1bb9ab27c71023e0c3f4be1bb0918dd20f` replaces the largest-magnitude scaling path. Mixed-sign means use an exact power-of-two divisor sized to the larger sign population plus Neumaier compensation, while same-sign finite inputs use a convex running mean whose intermediate remains inside the observed finite range. The branch-local contract includes `[f64::MAX, 1e-16, -f64::MAX]` with bit-for-bit `1e-16/3` recovery, negative same-sign coverage, and empty/non-finite fail-closed behavior. The corresponding substantive review thread is resolved on the current head.
+
+#310 is still not landable. Exact head `af767e1bb9ab27c71023e0c3f4be1bb0918dd20f` has fresh Rust Foundation CI and SAST Semgrep queued, Documentation Quality pending, and Security Scan queued. Queued/pending evidence is non-passing. There is no qualifying current-head independent `APPROVED` review. The exact-head verification conversation remains intentionally unresolved until the required workflows terminate successfully and review policy is satisfied.
 
 The surviving branch also contains source/test evidence folded from #476/#477 under `longitudinal_core`: continuous and discrete scalar diffusion-standardisation candidates, positive stationary-within admission, subnormal-cancellation repair, scale-invariance tests, signed-zero event-product refusal, interval ordering, and named-estimand refusals. Those maps remain `research_candidate` because the 2017 ctsem summary source does not emit named `DIFFUSIONstd` / `discreteDIFFUSIONstd` matrices.
 
-**#416 and sibling simple-refusal profiles.** #416 is the provisional Validation / Analysis Run landing vehicle. Compatible style/prompt/modality/background/citation/copied-text/location/membership-target/outcome-order/relation-absence/episode-membership/inferred-status profiles must preserve unique refusal vocabulary, cutoff behavior, tests and evidence while sharing execution/artifact-count/output-size invariants. #473 is explicitly `fold_into_landing_vehicle`; it is not independently shippable.
+**#416 and sibling simple-refusal profiles.** #416 is the provisional Validation / Analysis Run landing vehicle. Its current head `a6ba5d79c8d9acc1e7b4a53b3be5ef3d70ab19e7` keeps the already-repaired `MAX_EVIDENCE_UNITS` execution/artifact bound before identity-set growth and adds a fresh temporal-admission repair. RED `b7312eed81e25aba586323be058077dabc38a2df` proves that equivalent RFC 3339 spellings such as `2026-08-01T09:00:00+09:00` and `2026-08-01T00:00:00Z` were incorrectly rejected when request cutoff text was compared directly. GREEN `a6ba5d79c8d9acc1e7b4a53b3be5ef3d70ab19e7` parses the request cutoff into `KnowledgeCutoff` and compares `instant()` values, retaining genuine cutoff/profile/model mismatch refusal. The stale oversize-census thread and the equivalent-offset thread are resolved after current-source verification. Fresh exact-head Rust, Documentation, Security, and SAST workflows are queued, so #416 remains Draft and must not independently land ahead of consolidation.
+
+Compatible style/prompt/modality/background/citation/copied-text/location/membership-target/outcome-order/relation-absence/episode-membership/inferred-status profiles must preserve unique refusal vocabulary, cutoff behavior, tests, and evidence while sharing execution/artifact-count/output-size invariants. #473 is explicitly `fold_into_landing_vehicle`; it is not independently shippable.
 
 **#315 — static-standardisation ownership repair.** #315 remains Draft only to preserve TEPP-specific `TIPREDVARstd` naming/event-time/refusal semantics. It must not merge with duplicate reusable arithmetic. After fast-mlsirm #1722 or its live successor is merged and released/versioned, #315 must consume that immutable contract through an ACL, prove parity, retain TEPP temporal/model admission, delete wrong-owner production arithmetic, and fold into a Measurement/Longitudinal Modeling landing vehicle.
 
-**Dependency-review support.** An earlier #310 head failed central Security Scan before Dependency Review because GitHub dependency-graph comparison was unavailable to the workflow token. That is predecessor evidence, not a permanent current-head exemption. The gate remains fail-closed; OSV, Trivy and Scorecard are sibling evidence, not substitutes. Current head `623fb253...` must obtain its own terminal Security Scan.
+**Dependency-review support.** An earlier #310 head failed central Security Scan before Dependency Review because GitHub dependency-graph comparison was unavailable to the workflow token. That is predecessor evidence, not a permanent current-head exemption. The gate remains fail-closed; OSV, Trivy, and Scorecard are sibling evidence, not substitutes. Current head `af767e1bb9ab27c71023e0c3f4be1bb0918dd20f` must obtain its own terminal Security Scan.
 
 **Analysis Run adapter/profile proliferation.** Export, interpretation, project-history, inferred-status, and temporal-context HTTP/CLI mechanics are adapters inside supporting contexts. Strict ancestry may be folded without force after exact comparison; diverged siblings require an actual source/test fold. One refusal/profile/route/CLI verb does not create architecture authority.
 
@@ -101,14 +105,14 @@ The surviving branch also contains source/test evidence folded from #476/#477 un
 
 The fast-mlsirm generalized-mixed/dependence compiler remains PR #1714 at exact head `6abdcc2acab7be463977e35191566119e384c906`. It publishes typed response/dimensional/generalized-mixed/dependence identities, typed membership topology and weight authority, formulation-scoped promotion evidence, and deterministic candidate manifest `fast_mlsirm.model_specification.candidate_manifest@1.0.0` with SHA-256 digest. All visible substantive review conversations are resolved, but exact-head CI is pending and Security/SAST/CodeQL are queued. It is not a released TEPP dependency.
 
-TEPP protected main checksum-pins contextual-orchestrator commit `e226e1197bdfc890c9d8e5b9b648c78857d7e465` with SHA-256 `964b22ff577e3862b761af847ccad65489bb3f8fc750c8f84fcf8628df096673`. Upstream protected `main` is now `4d143601c2904a28e95d091b261c0a15e9a4f283`, which merged the Bytez zero-price ranking repair. Advancing TEPP requires a reproducible archive digest and review of the exact replacement; removing checksum validation or pinning an unverified digest is prohibited.
+TEPP protected main checksum-pins contextual-orchestrator commit `e226e1197bdfc890c9d8e5b9b648c78857d7e465` with SHA-256 `964b22ff577e3862b761af847ccad65489bb3f8fc750c8f84fcf8628df096673`. Upstream protected `main` is `4d143601c2904a28e95d091b261c0a15e9a4f283`, which merged the Bytez zero-price ranking repair. Advancing TEPP requires a reproducible replacement archive digest and review of the exact replacement; removing checksum validation or pinning an unverified digest is prohibited.
 
 `context-graph-contracts` and `enterprise-architecture-core` remain read-only to this writer while their dedicated Context Fabric owner loop is active. Fresh state is:
 
-- context-graph-contracts default/protected `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13`, 13 open PRs, zero releases. The current Context Assertion/CloudEvent envelope work remains unreleased candidate work.
-- enterprise-architecture-core default/protected `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4`, 25 open PRs, zero releases.
+- context-graph-contracts default/protected `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13`, 13 open PRs, zero releases. Current Context Assertion/CloudEvent envelope work remains unreleased candidate work.
+- enterprise-architecture-core default/protected `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4`, 24 open PRs, zero releases.
 
-Open heads are candidate evidence, not released contracts. TEPP may maintain fail-closed conformance fixtures behind candidate/test boundaries, but deployable integration and authoritative EA projection require a released/versioned Context Graph artifact plus passing compatibility evidence. TEPP latent estimates, measurement scores, inferred event relations and validity evidence do not become authoritative EA facts.
+Open heads are candidate evidence, not released contracts. TEPP may maintain fail-closed conformance fixtures behind candidate/test boundaries, but deployable integration and authoritative EA projection require a released/versioned Context Graph artifact plus passing compatibility evidence. TEPP latent estimates, measurement scores, inferred event relations, and validity evidence do not become authoritative EA facts.
 
 ## Gap register
 
