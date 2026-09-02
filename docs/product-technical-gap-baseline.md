@@ -4,68 +4,52 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T15:48Z
+**Snapshot:** 2026-09-02T16:06Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
 **Workspace version:** `0.2.0`
 
-**Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)
+**Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md).
 
-**DDD authority:** [`docs/architecture/domain-context-map.md`](architecture/domain-context-map.md) and [`docs/architecture/temporal-dependence-composition.md`](architecture/temporal-dependence-composition.md)
+**DDD authority:** [`docs/architecture/domain-context-map.md`](architecture/domain-context-map.md) and [`docs/architecture/temporal-dependence-composition.md`](architecture/temporal-dependence-composition.md).
 
 ## Delivery truth
 
-A planning document, mergeable branch, local test, predecessor-head result, queued/skipped check, ADR number, or LLM judgment does not make a capability shipped. Only protected-main integration plus current required evidence can establish delivery.
+A planning document, mergeable branch, local test, predecessor-head result, queued/skipped check, ADR number, or LLM judgment does not make a capability shipped. Only protected-main integration plus current required evidence establishes delivery.
 
 | Signal | Fresh evidence | Implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until main advances. |
-| Open pull requests | **131** | Queue increased from 130 when #484 appeared while #435 remained open; WIP circuit breaker is active. |
-| Draft pull requests | **130** | Draft work must be consolidated/repaired rather than independently landed. |
-| Non-Draft pull requests | **1** | #480 remains the only non-Draft PR and is still non-deployable without a compatible immutable contextual-orchestrator release. |
-| Open issues | **16** | Includes ADR normalization, orchestrator admission, and dynamic-evaluation drift design/evidence work. |
+| Open pull requests | **131** | WIP circuit breaker remains active. |
+| Draft pull requests | **130** | Draft work must consolidate/repair rather than independently land. |
+| Non-Draft pull requests | **1** | #480 is the only non-Draft PR and is not deployable without a compatible immutable contextual-orchestrator release. |
+| Open issues | **16** | Includes ADR normalization, orchestrator admission, and dynamic-evaluation drift evidence work. |
 | GitHub releases | **0** | No TEPP open head is a released contract. |
 | Organization ruleset | `18156473` | One qualifying current-head approval, stale-review dismissal after push, resolved threads, unattributed-change approval where applicable, and central required workflows. |
 
-The queue rose from **130 to 131** because #484 `summarizes_edge_v1` was opened as another Analysis Run profile against `main`. Its changed files overlap the existing Analysis Run landing surfaces (`Cargo.lock`, `crates/analysis_engine/Cargo.toml`, `crates/analysis_engine/src/lib.rs`, TRACEABILITY/ADR/doctoring). It is therefore non-destructively retargeted to #416 rather than treated as an independent landing authority. The resulting conflict is real shared-file fold work; unique source/tests/doctoring and RED/repair evidence must survive into the eventual #416 head. The PR is not closed merely to reduce the count.
+#484 `summarizes_edge_v1` is a #416 Analysis Run fold child, not an independent bounded-context landing authority. Its unique source/tests/doctoring must survive the eventual shared-file fold; it is not closed merely to reduce queue count.
 
 ## Priority landing evidence
 
-This is a priority subset, not a row-for-row copy of the 131-PR queue. #435 intentionally omits its own SHA from this file because embedding a branch head inside a file changed by the same branch would make the file self-stale.
+#435 intentionally omits its own SHA from this file because embedding a branch head inside a file changed by that branch makes the file self-stale.
 
-| PR | Exact head | Draft | Base | Ownership / disposition |
-| ---: | --- | :---: | --- | --- |
-| #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `summarizes_edge_v1` fold child; future-unavailable evidence is filtered before duplicate-identity admission. |
-| #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `retrospective_edge_v1` fold child; unique tests/doctoring must survive. |
-| #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `role_contradiction_v1` fold child; unique tests/doctoring must survive. |
-| #480 | `4475542750eda01afad0cf9ea8d563f508f63fd3` | false | main | Independent consumer-side LLM-governance repair; requires released CO + HTTPS `orchestrator/free`, deployment provenance and safe gateway auth. |
-| #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `relation_absence_v1` fold child; typed cutoff equality and terminal validation separation preserved. |
-| #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `outcome_order_v1` fold child; typed cutoff equality and terminal validation separation preserved. |
-| #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | main | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `75306b2445b071fa1c3201f5dd31a8c1eba08383` | true | main | Longitudinal Modeling vehicle; current tree preserves stable CWC/within-between means, overflow-safe known-truth RMSE, and one externally reachable irregular-rate facade. |
+| PR | Exact head | Draft | Ownership / disposition |
+| ---: | --- | :---: | --- |
+| #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 Analysis Run fold child. |
+| #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 Analysis Run fold child. |
+| #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 Analysis Run fold child. |
+| #480 | `4475542750eda01afad0cf9ea8d563f508f63fd3` | false | Independent consumer-side LLM-governance repair; requires released CO plus deployment/auth provenance. |
+| #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 fold child; typed cutoff equality and terminal validation separation preserved. |
+| #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 fold child; typed cutoff equality and terminal validation separation preserved. |
+| #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
+| #310 | `440ac6902d86dce48fedd1229ac71ab8c133bdf0` | true | Longitudinal Modeling vehicle; nonzero irregular-rate underflow now fails closed while exact no-change remains zero. |
 
-Exact-head evidence becomes stale after source mutation or any new commit, even when a later commit restores byte-equivalent files.
+Exact-head evidence becomes stale after source mutation or any new commit.
 
 ## Domain ownership
 
-Cargo crates, HTTP routes, CLI verbs, refusal rules, clocks, and individual statistical maps are implementation units rather than bounded contexts.
-
-| Subdomain | Bounded context | Aggregate authority | Implementation nucleus |
-| --- | --- | --- | --- |
-| Core | Evidence & Semantic Measurement | `EvidenceCorpus`, `SemanticUnitSet`, `ConceptDictionaryRevision` | `evidence_core`, `semantic_core` |
-| Core | Temporal Semantics | `TemporalEvidenceWindow`, `KnowledgeCutoffPolicy` | temporal primitives and cutoff policy |
-| Core | Event Ontology & Temporal Graph | `EventEpisode`, `TemporalRelationSet` | `event_core`, `relation_graph` |
-| Core | Measurement | `MeasurementSpecification`, `MeasurementRun` | measurement modules + released fast-mlsirm ACL |
-| Core | Longitudinal Modeling | `TemporalModelSpecification`, `TemporalModelRun` | `longitudinal_core` + temporal/event composition |
-| Core | Validation Evidence | `ValidationStudy`, `ValidationEvidence` | `validation_core`, `tepp_simulation` |
-| Core | Scientific Claim Promotion | `ClaimPromotionDecision` | validation evidence + ADR 0014 policy |
-| Supporting | Projection / Analysis Run | `AnalysisRun`, published read models | application services; HTTP/CLI adapters |
-| Supporting | Interpretation | evidence-grounded interpretation workflow | contextual-orchestrator ACL only |
-| Supporting | Persistence & Recovery | repositories and durable receipts | persistence/object-store adapters |
-| Generic | Compute backend | execution receipt | CPU/GPU/MLX adapters; execution is not scientific authority |
-
-fast-mlsirm owns reusable static/generalized-mixed/dependence-aware psychometric specification and arithmetic, including LSIRM/MLSIRM/DLSJM kernels. TEPP owns temporal/event composition, irregular time, time-varying multilevel/cross-classified/multiple-membership semantics, longitudinal invariance/drift/alignment and temporal recovery. contextual-orchestrator owns provider/model routing and semantic LLM execution. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No source copying, mutable sibling dependency, or cross-service SQL.
+TEPP owns temporal/event composition, irregular time, time-varying multilevel/cross-classified/multiple-membership semantics, longitudinal invariance/drift/alignment, leakage-safe knowledge cutoff, temporal recovery and projection policy. fast-mlsirm owns reusable static/generalized-mixed/dependence-aware psychometric specification and arithmetic, including LSIRM/MLSIRM/DLSJM kernels. contextual-orchestrator owns provider/model routing and semantic LLM execution. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No source copying, mutable sibling dependency, or cross-service SQL.
 
 The clock contract separates event/valid time, assertion time, document time, system time, available time, and knowledge cutoff. Retrospective evidence may describe an earlier event but cannot enter an earlier knowledge cutoff. Forward state/transition edges remain distinct from retrospective/citation/revision/provenance relations.
 
@@ -84,37 +68,31 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 Closed predecessor #441 is contained by #310. The invalid covariance/earlier-variance quantity is not exposed as autocorrelation; lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. Temporal/state composition is owned by `longitudinal_core`.
 
-Current head `75306b2445b071fa1c3201f5dd31a8c1eba08383` has the same file tree as `8111b58ac3374ae26b159868ce002d755e9e7d9e`; GitHub compare reports two commits and zero changed files. The two commits record verification of a review suggestion that the canonical irregular-rate functions should be syntactically `pub(crate)`: because `lib.rs` keeps `mod irregular_residual;` private and exposes the recover operations only through `stable_irregular_rate`, plain `pub fn` inside that private module does not create a second externally reachable crate API. An exploratory syntax assertion was therefore removed rather than turning an internal spelling preference into a false architecture invariant. The facade continues to delegate to one canonical numerical implementation.
+Current head `440ac6902d86dce48fedd1229ac71ab8c133bdf0` adds a fail-closed contract for an irregular residual log-rate that is mathematically nonzero but smaller than binary64 can represent after division by an extreme positive event interval. RED `4d1031092388f6237d99fe29149c9fbccf453d1c` uses `earlier=1.0`, the next representable `later`, and `Δt=f64::MAX`; predecessor source returned `Ok(0.0)`, conflating nonrepresentable change with exact no-change. Repair `021130aa09584c56d77c91a2b090c34da4a484b9` rejects represented zero when residual magnitudes differ. Edge coverage `440ac6902d86dce48fedd1229ac71ab8c133bdf0` proves equal residual magnitudes still return exact zero.
 
-CWC RED `9a706c3c0e9e0db68e88f89b94c64c13ea7fafd0` fixes `[0.75·MAX, 0.75·MAX, -0.5·MAX]`, whose raw partial sum overflows although the centered result is representable. Repair `260413efb9d95039b5fbba41919cba8097fcf8b5` routes CWC means through the Longitudinal Modeling stable compensated mean rather than adding a second arithmetic authority.
+Earlier numerical lineages remain active: CWC RED `9a706c3c0e9e0db68e88f89b94c64c13ea7fafd0` / repair `260413efb9d95039b5fbba41919cba8097fcf8b5`; known-truth RMSE overflow/precision repair ending at `312dbcd25a7246683d5596385571068d475fc4c3`; within/between stable-mean repair `6bf3661bf390e0de00e1bb83539e6d62ee06b85f`; stationary-variance fallback `(q * 0.5) / |a|`; and two-marginal lagged Pearson correlation with covariance-bound admission.
 
-Known-truth `component_root_mean_square_error` originally formed raw `decided - truth` before its scaled sum-of-squares path. RED `d72ba2b6e28909c6def73a2638ebd63258dec500` pins four matched components with one mathematical `2·MAX` residual and three zero residuals: the aggregate RMSE is representable `MAX`, but the predecessor rejected it because the individual subtraction overflowed. Initial repair `406e6ae2b2a8fd99494e9bc82e61ced9b81bffe0` removed that intermediate overflow, but RED `dd0718e5d1b91baccc7efa4d196825c9119cd8e7` caught a precision regression for `[MAX→MAX, 0→1]`. Corrective repair `312dbcd25a7246683d5596385571068d475fc4c3` keeps direct finite residual subtraction and scales only actually overflowing differences.
-
-`decompose_within_between` also retained a raw `sum / n` mean after CWC was stabilized. RED `1292fdc77b810dedf3d75b836744ac9ce8611014` pins a valid unit with `[MAX, MAX]`; repair `6bf3661bf390e0de00e1bb83539e6d62ee06b85f` uses magnitude-normalized Neumaier accumulation and rejects only a non-representable resulting mean/residual.
-
-The current exact head must reacquire hosted evidence from scratch. Any workflow/review result on `8111b58...` or earlier is historical even though the final file tree is equal. There is no qualifying current-head independent `APPROVED` review. No merge is authorized until all central required workflows are exact-head passing.
+The current head is mergeable but remains Draft. CodeQL PR ends as `startup_failure` before any job is materialized; Rust Foundation CI, Security Scan, Documentation Quality, SAST Semgrep, Scorecard and OSV are queued/pending. There is no qualifying current-head independent approval. No merge is authorized until current ruleset evidence passes.
 
 ### #416 — Validation / Analysis Run consolidation
 
-Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-safe invariant established by RED `ffee655404716bf8d33c898a3c1a87a543abe701`: availability filtering occurs before duplicate-identity admission. #458/#460/#482/#483/#484 are comparison/fold children over shared Cargo/lib/lock/docs surfaces. Their unique evidence must be merged into a surviving #416 head before any child can be considered fully superseded.
+Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-safe invariant established by RED `ffee655404716bf8d33c898a3c1a87a543abe701`: availability filtering occurs before duplicate-identity admission. #458/#460/#482/#483/#484 remain fold children over shared Cargo/lib/lock/docs surfaces. Their unique evidence must reach a surviving #416 head before any child can be considered fully superseded.
 
-### #480 / #479 — LLM owner boundary
+### #480 / #479 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` has advanced since earlier snapshots but still has **zero GitHub releases**. The branch movement is mutable owner state, not a released contract. The consumer remains deliberately non-deployable; do not fall back to mutable source, direct provider calls, or guessed checksums.
+#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` has **zero GitHub releases**. Mutable branch state is not a released contract. The consumer remains deliberately fail-closed.
 
-### #315 / fast-mlsirm owner handoff
+### fast-mlsirm owner handoff
 
-TEPP-specific static-standardisation lineage must not become a second reusable arithmetic authority. fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`; generalized-mixed/dependence compiler #1714 is Ready/mergeable at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`. Latest immutable release is `v0.9.1` (2026-08-26), which predates #1714. TEPP may adopt the new Published Language only after a compatible immutable release and ACL/parity evidence. Open #1714 remains candidate owner evidence, not a released dependency.
+fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`; generalized-mixed/dependence compiler #1714 remains Ready/mergeable at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`. Immutable `v0.9.1` predates #1714. Exact #1714 CI is pending/queued and CodeQL PR is startup-failed. TEPP does not consume the new Published Language until a compatible immutable release and ACL/parity evidence exist.
 
 ### #437 — ADR identity
 
-Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/numbered files, index/file mismatch and repeated Decision-status or Implementation-maturity authority must fail deterministic documentation fitness. Adapter/model micro-slice ADR numbers remain implementation lineage pending normalization through #435, not branch-local architecture authority.
+Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/numbered files, index/file mismatch and repeated Decision-status or Implementation-maturity authority must fail deterministic documentation fitness. Adapter/model micro-slice ADR numbers remain implementation lineage pending normalization through #435.
 
 ## External contract state
 
-`context-graph-contracts` protected/default `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13` has **14 open PRs, 2 open issues, and zero GitHub releases**. Its release-source/provenance work remains Draft/unreleased evidence. `enterprise-architecture-core` protected/default `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4` has **24 open PRs, 2 open issues, and zero releases**. Both remain read-only from this TEPP writer; open heads are candidate evidence rather than production contracts. TEPP deployable integration and authoritative EA projection require released/versioned contract artifacts plus compatibility/provenance evidence.
-
-TEPP latent estimates, measurement scores, inferred event relations and validity evidence are not authoritative EA facts.
+`context-graph-contracts` protected/default `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13` has **14 open PRs, 2 open issues, and zero releases**. `enterprise-architecture-core` protected/default `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4` has **24 open PRs, 2 open issues, and zero releases**. Both remain read-only from this TEPP writer; open heads are candidate evidence rather than production contracts.
 
 ## Gap register
 
