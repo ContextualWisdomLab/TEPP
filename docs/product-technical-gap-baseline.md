@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-09-02T13:07Z
+**Snapshot:** 2026-09-02T13:35Z
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 **Workspace version:** `0.2.0`
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)
@@ -38,7 +38,7 @@ This is a freshly verified priority subset, not a row-for-row copy of the 130-PR
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `relation_absence_v1` fold child; typed cutoff equality and terminal validation-status separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `outcome_order_v1` fold child; typed cutoff equality and terminal validation-status separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | main | Provisional Validation / Analysis Run simple-refusal landing vehicle; generic cutoff-before-identity admission is the surviving leakage-safe invariant. |
-| #310 | `a9f84756d9e47f945040470b04268fb837ddfe4e` | true | main | Longitudinal Modeling scientific landing work; one numerical authority for irregular residual log-rate and repaired lagged correlation. Current hosted merge evidence is non-GREEN. |
+| #310 | `5c21ca130c1054307b00d369d970bc8caa31ff03` | true | main | Longitudinal Modeling scientific landing work; repaired stationary fallback double rounding plus one numerical authority for irregular residual log-rate and repaired lagged correlation. Current hosted merge evidence is non-GREEN. |
 
 Exact current-head evidence is authoritative only for the named PR and becomes stale after any source mutation.
 
@@ -78,7 +78,7 @@ Supported temporal estimators require realistic known-truth recovery for every c
 
 ## Current repairs and blockers
 
-**#310 — Longitudinal Modeling scientific landing work.** Closed predecessor #441 is contained by #310. The invalid one-sided covariance/earlier-variance ratio remains retired; public lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. `EventTimeInterval` is preserved end-to-end. Current head `a9f84756d9e47f945040470b04268fb837ddfe4e` also removes duplicate numerical authority: `stable_irregular_rate` is a compatibility facade over the canonical `irregular_residual` implementation, preserving log-domain recovery when direct same-sign ratios overflow or underflow. The PR is Draft. Exact-head CodeQL PR run `33623224470` ends in `startup_failure` with zero jobs before checkout; Documentation Quality is pending and Rust/Security/Semgrep/OSV/Scorecard remain queued. No qualifying independent approval exists. This is central workflow evidence, not permission to bypass the gate.
+**#310 — Longitudinal Modeling scientific landing work.** Closed predecessor #441 is contained by #310. The invalid one-sided covariance/earlier-variance ratio remains retired; public lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. `EventTimeInterval` is preserved end-to-end. Current head `5c21ca130c1054307b00d369d970bc8caa31ff03` adds RED `cb416f7cc63f4ee9d08ef51e23ad48b62ba977dc` and a causal repair for double rounding in the stationary-variance `2a`-overflow fallback: `(q * 1/2) / |a|` replaces `q / (|a|/2) * 1/4`, preserving the exact minimum-subnormal rounding case while keeping the earlier overflow/subnormal contracts. It also removes duplicate numerical authority: `stable_irregular_rate` is a compatibility facade over the canonical `irregular_residual` implementation, preserving log-domain recovery when direct same-sign ratios overflow or underflow. The PR is Draft. Exact-head CodeQL PR run `33636460752` ends in `startup_failure` before job materialization; Documentation Quality, Rust, Security, Semgrep, OSV, and Scorecard are queued. No qualifying independent approval exists. This is central workflow evidence, not permission to bypass the gate.
 
 **#416 — Validation / Analysis Run consolidation.** Current head `0b7155cc238defb1e55129ff3000658f04b343cf` contains non-force lineage from #473, #430, #461, #478, and #434. Shared admission/artifact invariants remain centralized while each refusal profile keeps its domain vocabulary. Generic RED `ffee655404716bf8d33c898a3c1a87a543abe701` and repair `0b7155cc238defb1e55129ff3000658f04b343cf` enforce availability cutoff before duplicate-identity admission so future-unavailable rows cannot change historical replay. #458, #460, #482, and #483 are now compared against this exact head and still conflict on shared Cargo/lib/lock/docs surfaces. Their unique evidence must be folded, not replaced or independently landed.
 
