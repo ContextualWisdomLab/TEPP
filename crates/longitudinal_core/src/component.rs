@@ -160,6 +160,23 @@ mod tests {
     }
 
     #[test]
+    fn finite_residual_precision_is_not_lost_to_unrelated_endpoint_scale() {
+        let truth = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.0),
+        ];
+        let decided = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 1.0),
+        ];
+        let expected = 1.0 / f64::sqrt(2.0);
+        assert_eq!(
+            component_root_mean_square_error(&truth, &decided),
+            Ok(expected)
+        );
+    }
+
+    #[test]
     fn overflowing_residual_fails_closed() {
         let truth = [ComponentValue::new(0, 0, ComponentLevel::Within, -f64::MAX)];
         let decided = [ComponentValue::new(0, 0, ComponentLevel::Within, f64::MAX)];
