@@ -295,12 +295,7 @@ pub fn execute_outcome_order_run(
         inference_status: OUTCOME_ORDER_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "outcome_order",
-        edge_count,
-        4,
-        OUTCOME_ORDER_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("outcome_order", edge_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
