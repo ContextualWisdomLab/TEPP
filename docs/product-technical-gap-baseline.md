@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T19:30:00Z
+**Snapshot:** 2026-09-02T20:06:00Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -38,7 +38,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve profile-specific source/tests/doctoring. |
 | #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
 | #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
-| #480 | `4475542750eda01afad0cf9ea8d563f508f63fd3` | false | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Independent consumer-side LLM-governance repair; released CO plus deployment/auth provenance required. |
+| #480 | `01f45a99392457334a4f6d3d659f992af739eeee` | false | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Independent LLM-consumer governance repair; contributor guidance now obeys released-owner routing, but immutable CO deployment identity/auth provenance remains owner-blocked. |
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
@@ -89,7 +89,9 @@ Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-
 
 ### #480 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` had zero GitHub releases at the preceding snapshot. Mutable branch state is not a released contract. The consumer remains deliberately fail-closed. Owner issue #1023 remains open for authenticated release/deployment provenance and scoped/brokered authentication that does not expose a reusable long-lived gateway bearer token to model-controlled execution.
+#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. Fresh review found one remaining TEPP-side authority drift: `CONTRIBUTING.md` still told contributors to use `NVIDIA_NIM_API_KEY` directly. RED `4248b3351a2cdfd37666696daf189d4389f8bcb1` adds that guide to the canonical owner-policy fitness contract; repair `01f45a99392457334a4f6d3d659f992af739eeee` removes direct provider credential/routing guidance and records provider/model identity only as orchestrator-returned provenance.
+
+contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` still has zero GitHub releases. Mutable branch state is not a released contract. Owner issue #1023 remains open for authenticated release/deployment provenance and scoped/ephemeral or brokered authentication that does not expose a reusable long-lived gateway bearer token to model-controlled execution. Exact-head #480 evidence is non-GREEN: CodeQL PR is `startup_failure`; Documentation Quality, Security Scan, Rust Foundation CI, OSV-Scanner PR and Scorecard PR are queued; SAST Semgrep is pending. The consumer remains deliberately fail-closed and has no qualifying independent current-head approval.
 
 ### fast-mlsirm owner handoff
 
@@ -130,6 +132,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-021 | Longitudinal irregular-rate facade duplicated public wrapper function identities over one canonical implementation | `verification-pending` | RED refinement `464863860...` + repair `7f0bea084...`; exact-head Rust/documentation/review GREEN and protected-main integration |
 | GAP-022 | Architecture assigned Longitudinal Modeling semantics to `psychometric_core` and duplicated implementation responsibility rows | `verification-pending` | RED `fe5eb745...` + repair `7fadc757...`; exact-head documentation/quality review GREEN and protected-main integration |
 | GAP-023 | `discreteDIFFUSIONstd` rejected a representable subnormal final ratio because `aΔt` underflowed before the required factor two | `verification-pending` | RED `d5107b198...` + repair `7164c7ce4...`; exact-head Rust/documentation/review GREEN and protected-main integration |
+| GAP-024 | Contributor guidance re-authorized a direct provider credential after canonical LLM ownership moved to contextual-orchestrator | `verification-pending` | RED `4248b335...` + repair `01f45a993...`; exact-head documentation/security/review GREEN, released CO adoption and protected-main integration |
 
 ## Release gate
 
