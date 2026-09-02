@@ -75,6 +75,7 @@ dependencies = [
  "event_core",
  "membership_core",
  "relation_graph",
+ "role_contradiction",
  "serde",
  "serde_json",
  "sha2",
