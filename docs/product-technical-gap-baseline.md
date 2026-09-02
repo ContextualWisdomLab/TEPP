@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T22:02:18Z
+**Snapshot:** 2026-09-02T22:06:23Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -20,8 +20,8 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until main advances. |
 | Open pull requests | **133** | WIP circuit breaker remains active; no independent micro-PR is justified while an existing bounded-context vehicle can own the work. |
-| Draft pull requests | **132** | Draft work must consolidate/repair rather than independently land. |
-| Non-Draft pull requests | **1** | #480 is the only non-Draft PR and is not deployable without a compatible immutable contextual-orchestrator release. |
+| Draft pull requests | **133** | Every current open PR is Draft; work must consolidate/repair and reacquire exact-head evidence before any Ready transition. |
+| Non-Draft pull requests | **0** | #480 was converted back to Draft because its own released-owner prerequisite is still unsatisfied. |
 | Open issues | **16** | ADR normalization, orchestration admission, evaluation drift and scientific recovery work remain open. |
 | GitHub releases | **0** | No TEPP open head is a released contract. |
 | Organization ruleset | `18156473` | One qualifying current-head approval, stale-review dismissal after push, resolved threads, unattributed-change approval where applicable, and central required workflows. |
@@ -39,7 +39,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve profile-specific source/tests/doctoring. |
 | #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
 | #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
-| #480 | `01f45a99392457334a4f6d3d659f992af739eeee` | false | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Independent LLM-consumer governance repair; contributor guidance now obeys released-owner routing, but immutable CO deployment identity/auth provenance remains owner-blocked. |
+| #480 | `01f45a99392457334a4f6d3d659f992af739eeee` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Independent LLM-consumer governance repair; now correctly Draft/blocked-equivalent while immutable contextual-orchestrator deployment identity/auth provenance remains unavailable. |
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
@@ -101,9 +101,9 @@ Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-
 
 ### #480 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. Fresh review found one remaining TEPP-side authority drift: `CONTRIBUTING.md` still told contributors to use `NVIDIA_NIM_API_KEY` directly. RED `4248b3351a2cdfd37666696daf189d4389f8bcb1` adds that guide to the canonical owner-policy fitness contract; repair `01f45a99392457334a4f6d3d659f992af739eeee` removes direct provider credential/routing guidance and records provider/model identity only as orchestrator-returned provenance.
+#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. Fresh review found one remaining TEPP-side authority drift: `CONTRIBUTING.md` still told contributors to use `NVIDIA_NIM_API_KEY` directly. RED `4248b3351a2cdfd37666696daf189d4389f8bcb1` adds that guide to the canonical authority-sync contract; repair `01f45a99392457334a4f6d3d659f992af739eeee` removes direct provider credential/routing guidance and records provider/model identity only as orchestrator-returned provenance.
 
-contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` still has zero GitHub releases. Mutable branch state is not a released contract. Owner issue #1023 remains open for authenticated release/deployment provenance and scoped/ephemeral or brokered authentication that does not expose a reusable long-lived gateway bearer token to model-controlled execution. The consumer remains deliberately fail-closed and has no qualifying independent current-head approval.
+contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` still has zero GitHub releases. Mutable branch state is not a released contract. Owner issue #1023 remains open for authenticated release/deployment provenance and scoped/ephemeral or brokered authentication that does not expose a reusable long-lived gateway bearer token to model-controlled execution. #480 is therefore now explicitly Draft/blocked-equivalent as its own owner contract requires. Its source remains alive for later released-contract adoption; it was not closed or bypassed.
 
 ### fast-mlsirm owner handoff
 
@@ -136,7 +136,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-013 | ADR identity collisions | `release-integrity` | unique repository-wide identity, deterministic duplicate detection, supersession lineage |
 | GAP-014 | current required-workflow startup/runner evidence unavailable | `external-control-risk` | central workflow repair, exact-current required workflows GREEN, no bypass |
 | GAP-015 | contextual-orchestrator lacks immutable released contract for current owner behavior | `release-blocking` | compatible immutable CO release, deployment provenance, safe gateway auth, exact TEPP ACL adoption |
-| GAP-016 | hourly LLM path needs released owner-only routing/authentication | `active-repair` | #480 + released CO adoption + exact-head GREEN/review/main merge |
+| GAP-016 | hourly LLM path needs released owner-only routing/authentication | `active-repair` | #480 Draft + released CO adoption + exact-head GREEN/review/main merge |
 | GAP-017 | dynamic evaluation item/rater/anchor drift monitoring | `owner-contract-active` | released/digest-pinned dynamic criterion/item/run contract, ACL conformance, no-anchor/no-linking refusal, evidence-gated temporal monitoring |
 | GAP-018 | Longitudinal stable-mean logic remains duplicated | `active-refactor` | semantic-equivalence proof, one TEPP Longitudinal primitive or released fast-mlsirm generic owner contract, recovery parity |
 | GAP-019 | Longitudinal scientific instructions contradict current stationary-overflow implementation | `verification-pending` | RED `9d8a82d...` + repair `9c962205...`; exact-head Documentation Quality/review GREEN and protected-main integration |
