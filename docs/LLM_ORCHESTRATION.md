@@ -1,6 +1,6 @@
 # TEPP LLM Orchestration and Test-Time Compute Contract
 
-**Status:** Partial — TEPP owns semantic-task policy/evidence contracts; provider routing requires a released `contextual-orchestrator` contract and is not yet deployable from the current repository state.  
+**Status:** Partial — TEPP owns semantic-task policy/evidence contracts; provider routing requires a released `contextual-orchestrator` contract and is not yet deployable from the current repository state.
 **Last reviewed:** 2026-09-02
 
 ## 1. Purpose
