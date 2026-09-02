@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T20:06:00Z
+**Snapshot:** 2026-09-02T20:18:00Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -42,7 +42,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `7164c7ce4a6ada24524399b0031171730a16a883` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; subnormal `discreteDIFFUSIONstd` intermediate-underflow repair plus DDD ownership/topology repair are source-complete; exact-head hosted verification is pending. |
+| #310 | `4784b370c464c3de74661124c594b8b89b9b917e` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; repeated-unit CWC admission, subnormal diffusion standardisation and DDD ownership repairs are source-complete; exact-head hosted verification is pending. |
 
 Exact-current-head evidence becomes stale after source mutation or any new commit.
 
@@ -60,6 +60,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 - Rasch remains distinct from generic 1PL; formulation-qualified 2PLM–5PLM, MIRT, ideal-point/GGUM, testlet/rater/facet/generalized-mixed identity is preserved.
 - Cross-classification and multiple membership remain distinct; weights are explicit, auditable, time-valid and observed-normalized or model-estimated according to formulation.
+- A nominal unit identifier is not repeated-measures evidence: multilevel/within-unit temporal acceptance must preserve the actual number of units contributing repeated event-time observations and may not let singleton units satisfy a longitudinal unit floor.
 - TEPP composes time over the full released upstream candidate identity; auto-expansion never means auto-activation.
 - Supported temporal estimators require state/trajectory and claimed-structure recovery, bias/RMSE, interval coverage, convergence, uncertainty calibration and leakage-safe rolling-origin evidence.
 - CPU/GPU parity counts only when the relevant accelerator path actually runs. Monte Carlo decisions use simulation uncertainty rather than arbitrary pass percentages.
@@ -71,7 +72,9 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 Closed predecessor #441 is contained by #310. The invalid covariance/earlier-variance quantity is not exposed as autocorrelation; lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. The lagged-correlation representability RED `c345ee7b8bdf642430669b7b0e1d7fc6873a84af` plus repair `5785e07a352801c193d92dde03863d0697a2853a` fail closed when a nonzero covariance would collapse to exact-zero binary64 correlation, while genuine zero covariance remains zero.
 
-The newest numerical repair is the research-candidate scalar `discreteDIFFUSIONstd = 1 - exp(2 a Δt)` path. The predecessor formed `aΔt` first and rejected a signed-zero intermediate. At `a=-0.5` and the minimum positive binary64 event interval, `aΔt` rounds to `-0.0` even though the target `2aΔt` is exactly the minimum negative subnormal and the final standardized ratio is the representable minimum positive subnormal. RED `d5107b19817556c4c902408b51ed2bb8c8181d2c` pins that final-result contract. Repair `7164c7ce4a6ada24524399b0031171730a16a883` doubles the event interval first while finite and then forms the single rounded rate product; when `2Δt` overflows, the large-interval path computes `aΔt` before the exact factor two. It never forms `2a` first, preserves the extreme-interval unit limit, and fails closed only when the target exponent/final ratio itself is non-representable.
+Fresh CWC review exposed an atomistic-fallacy admission defect. `center_within_unit_event_lags` previously accepted `groups.len() >= 2` before singleton groups were skipped, allowing one unit with repeated occasions plus one singleton identifier to return longitudinal lag evidence from only one contributing unit. RED `671709bbc6cdf1090e16c1d8f6c9f2b4f8b2d831` requires both public centering and recovery to reject that fixture. Repair `4784b370c464c3de74661124c594b8b89b9b917e` counts only groups with at least two event-time observations toward the two-unit longitudinal floor; singleton groups may remain present but cannot satisfy repeated-measures evidence. Rustdoc and the old in-module singleton expectation now state the same contract.
+
+The preceding numerical repair is the research-candidate scalar `discreteDIFFUSIONstd = 1 - exp(2 a Δt)` path. The predecessor formed `aΔt` first and rejected a signed-zero intermediate. At `a=-0.5` and the minimum positive binary64 event interval, `aΔt` rounds to `-0.0` even though the target `2aΔt` is exactly the minimum negative subnormal and the final standardized ratio is the representable minimum positive subnormal. RED `d5107b19817556c4c902408b51ed2bb8c8181d2c` pins that final-result contract. Repair `7164c7ce4a6ada24524399b0031171730a16a883` doubles the event interval first while finite and then forms the single rounded rate product; when `2Δt` overflows, the large-interval path computes `aΔt` before the exact factor two. It never forms `2a` first, preserves the extreme-interval unit limit, and fails closed only when the target exponent/final ratio itself is non-representable.
 
 The irregular-rate facade repair remains intact: RED refinement `4648638608436fb6c04315d96f59a6404e2e790b` requires a facade re-export rather than wrapper functions; repair `7f0bea0841fb89a6ce9bdd5b9f10c0e4612f4270` uses direct `pub use` of the canonical private-module function identities. The public names remain stable while there is one numerical implementation.
 
@@ -79,7 +82,7 @@ The DDD architecture repair remains intact. Test-first commit `fe5eb7457f80e7724
 
 The stationary-overflow documentation repair remains intact: RED `9d8a82d78443cafc9b5064fc3bb35aa3f2052722` rejects the retired `(q / a) * -0.5` instruction and repair `9c962205dca26925c2e60d1e15ec4ce15681bbee` synchronizes `CLAUDE.md` with `(q * 0.5) / |a|`. Earlier CWC, within/between, known-truth RMSE, irregular-rate zero-underflow, stationary-subnormal and exact covariance-bound lineages remain on the same vehicle.
 
-Current exact head `7164c7ce4a6ada24524399b0031171730a16a883` is mergeable but Draft. CodeQL PR run `33673579329` is `startup_failure`; Rust Foundation CI, Documentation Quality, Security Scan, SAST Semgrep, OSV-Scanner PR and Scorecard PR are queued. There is no qualifying current-head independent approval. Source repair does not substitute for hosted GREEN.
+Current exact head `4784b370c464c3de74661124c594b8b89b9b917e` is mergeable but Draft. CodeQL PR run `33678257146` is `startup_failure`; Rust Foundation CI, Documentation Quality, Security Scan, SAST Semgrep, OSV-Scanner PR and Scorecard PR are queued. There is no qualifying current-head independent approval. Source repair does not substitute for hosted GREEN.
 
 The CWC and within/between unit-mean helpers still have separate implementations. Consolidation remains a maintainability target only after their full error/estimand semantics are shown equivalent; a reusable domain-neutral arithmetic primitive belongs in fast-mlsirm rather than being copied across TEPP contexts.
 
@@ -95,7 +98,7 @@ contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8
 
 ### fast-mlsirm owner handoff
 
-fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c` at the preceding snapshot. Immutable `v0.9.1` predates current owner work. Generalized-mixed/dependence Published Language #1714 was open/Ready at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`; reusable static covariance-to-correlation standardization #1722 was open/Ready at `338dbb2d25f32b0e201102e7bf73076846fb57b3`; dynamic evaluation criterion/item/run snapshots #1727 remained Draft at `850c2e28dadea3bc5ae936e88bc47f2ece871c1a`. None of these mutable owner heads is a TEPP production dependency.
+fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c` at the current owner snapshot. Immutable `v0.9.1` predates current owner work. Generalized-mixed/dependence Published Language #1714 is open/Ready at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`; current CI/security evidence remains non-passing. None of these mutable owner heads is a TEPP production dependency.
 
 ### #437 — ADR identity
 
@@ -103,7 +106,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 
 ## External contract state
 
-`context-graph-contracts` and `enterprise-architecture-core` remain read-only from this TEPP writer. Their preceding snapshot had CGC `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13`, 14 open PR / 2 open issues / release 0, and EA Core `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4`, 24 open PR / 2 open issues / release 0. Open heads remain candidate evidence rather than production contracts and must be re-read before adoption.
+`context-graph-contracts` and `enterprise-architecture-core` remain read-only from this TEPP writer. Fresh state has CGC `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13`, 14 open PR and release 0; EA Core `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4`, 24 open PR and release 0. Open heads remain candidate evidence rather than production contracts and must be re-read before adoption.
 
 ## Gap register
 
@@ -133,6 +136,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-022 | Architecture assigned Longitudinal Modeling semantics to `psychometric_core` and duplicated implementation responsibility rows | `verification-pending` | RED `fe5eb745...` + repair `7fadc757...`; exact-head documentation/quality review GREEN and protected-main integration |
 | GAP-023 | `discreteDIFFUSIONstd` rejected a representable subnormal final ratio because `aΔt` underflowed before the required factor two | `verification-pending` | RED `d5107b198...` + repair `7164c7ce4...`; exact-head Rust/documentation/review GREEN and protected-main integration |
 | GAP-024 | Contributor guidance re-authorized a direct provider credential after canonical LLM ownership moved to contextual-orchestrator | `verification-pending` | RED `4248b335...` + repair `01f45a993...`; exact-head documentation/security/review GREEN, released CO adoption and protected-main integration |
+| GAP-025 | A singleton unit could satisfy the nominal CWC unit floor while all longitudinal lag evidence came from one repeated unit | `verification-pending` | RED `671709bbc...` + repair `4784b370c...`; exact-head Rust/documentation/review GREEN and protected-main integration |
 
 ## Release gate
 
