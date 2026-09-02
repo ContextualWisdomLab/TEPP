@@ -230,4 +230,20 @@ mod tests {
         assert_eq!(recovered[1].value(), 0.0);
         assert_eq!(recovered[2].value(), 0.0);
     }
+
+    #[test]
+    fn representable_subnormal_unit_mean_survives_extreme_cancellation() {
+        let minimum_subnormal = f64::from_bits(1);
+        let recovered = decompose_within_between(&[
+            OccasionObservation::new(0, 0, f64::MAX),
+            OccasionObservation::new(0, 1, -f64::MAX),
+            OccasionObservation::new(0, 2, f64::from_bits(4)),
+            OccasionObservation::new(1, 0, 0.0),
+            OccasionObservation::new(1, 1, 0.0),
+        ])
+        .expect("a representable subnormal unit mean must survive extreme cancellation");
+
+        assert_eq!(recovered[0].level(), ComponentLevel::Between);
+        assert_eq!(recovered[0].value().to_bits(), minimum_subnormal.to_bits());
+    }
 }
