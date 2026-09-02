@@ -194,17 +194,22 @@ pub fn recover_within_unit_irregular_residual_log_rate(
 
 /// Mean exact scalar log-rate on already-centered residuals.
 ///
-/// Each pair is `a = ln(later / earlier) / Δt` (Driver et al., 2017, Eq. 3
-/// inverse). The function does **not** center again. The signed residual ratio
-/// must be strictly positive. This is the known-truth path that recovers
-/// `ln(0.5)` from already-centered pairs `(1, 0.5)` over unit event time.
+/// Each pair is `a = ln(|later| / |earlier|) / Δt` (Driver et al., 2017,
+/// Eq. 3 inverse). The function does **not** center again. Residuals must be
+/// finite, nonzero, and of equal sign. A finite positive direct ratio is used
+/// when representable; ratio overflow or underflow falls back to the equivalent
+/// `ln|later| - ln|earlier|` so a representable final log-rate is not rejected
+/// because of a non-representable intermediate. This is the known-truth path
+/// that recovers `ln(0.5)` from already-centered pairs `(1, 0.5)` over unit
+/// event time.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidObservationPayload`] for an empty
 /// series or non-finite residuals, and
-/// [`LongitudinalError::InvalidTemporalTransformInput`] when a residual ratio
-/// is not strictly positive or the log-rate is not representable.
+/// [`LongitudinalError::InvalidTemporalTransformInput`] for zero or
+/// opposite-sign residuals, a non-finite log-rate, or a non-representable
+/// final mean.
 pub fn recover_centered_irregular_residual_log_rate(
     pairs: &[LaggedWithinResidual],
 ) -> Result<f64, LongitudinalError> {
@@ -216,15 +221,13 @@ pub fn recover_centered_irregular_residual_log_rate(
         if !pair.earlier_residual().is_finite() || !pair.later_residual().is_finite() {
             return Err(LongitudinalError::InvalidObservationPayload);
         }
-        if pair.earlier_residual() == 0.0 {
+        if !same_sign_nonzero(pair.earlier_residual(), pair.later_residual()) {
             return Err(LongitudinalError::InvalidTemporalTransformInput);
         }
-        let ratio = pair.later_residual() / pair.earlier_residual();
-        if !ratio.is_finite() || ratio <= 0.0 {
-            return Err(LongitudinalError::InvalidTemporalTransformInput);
-        }
-        rates.push(require_finite(
-            ratio.ln() / pair.event_interval().as_f64(),
+        rates.push(driver_same_sign_log_rate(
+            pair.earlier_residual(),
+            pair.later_residual(),
+            pair.event_interval(),
         )?);
     }
     scaled_compensated_mean(&rates)
@@ -275,8 +278,9 @@ fn pairwise_same_sign_log_rate(lagged: &[LaggedWithinResidual]) -> Result<f64, L
 /// cancellation is an opposite-sign addition and therefore cannot overflow.
 /// The remaining terms have one sign and are averaged safely; their mean is
 /// then weighted by their term count relative to the original sample count.
-/// Retained mass is `(mean * k) / n`, not `mean * (k / n)`, so a representable
-/// cancellation residue cannot lose 1 ULP to a non-exact ratio.
+/// Retained mass is evaluated multiply-first when representable; only an
+/// overflowing intermediate switches to divide-first-then-count so both
+/// subnormal retained mass and representable large final means are preserved.
 fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     if values.is_empty() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
@@ -349,8 +353,15 @@ fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
         return Ok(0.0);
     }
     let residual_mean = same_sign_mean(&residuals)?;
-    let retained_mass = residual_mean * residuals.len() as f64;
-    require_finite(retained_mass / values.len() as f64)
+    let retained_count = residuals.len() as f64;
+    let total_count = values.len() as f64;
+    let retained_mass = residual_mean * retained_count;
+    let result = if retained_mass.is_finite() {
+        retained_mass / total_count
+    } else {
+        (residual_mean / total_count) * retained_count
+    };
+    require_finite(result)
 }
 
 fn same_sign_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
@@ -570,6 +581,13 @@ mod tests {
         ])
         .expect("subnormal cancellation residue");
         assert_eq!(subnormal.to_bits(), minimum_subnormal.to_bits());
+        let finite_after_mass_overflow = scaled_compensated_mean(&[large, large, -1.0, -1.0])
+            .expect("representable final mean after retained-mass overflow");
+        assert!(finite_after_mass_overflow.is_finite());
+        assert!(
+            (finite_after_mass_overflow - large / 2.0).abs()
+                <= (large / 2.0) * 4.0 * f64::EPSILON
+        );
         assert_eq!(
             scaled_compensated_mean(&[]),
             Err(LongitudinalError::InvalidTemporalTransformInput)
@@ -774,14 +792,22 @@ mod tests {
             recover_centered_irregular_residual_log_rate(&[lagged(1.0, -0.5, 1.0)]),
             Err(LongitudinalError::InvalidTemporalTransformInput)
         );
-        assert_eq!(
-            recover_centered_irregular_residual_log_rate(&[lagged(
-                f64::from_bits(1),
-                f64::MAX,
-                1.0
-            )]),
-            Err(LongitudinalError::InvalidTemporalTransformInput)
-        );
+        let overflow_ratio = recover_centered_irregular_residual_log_rate(&[lagged(
+            f64::from_bits(1),
+            f64::MAX,
+            1.0,
+        )])
+        .expect("finite log-domain overflow fallback");
+        let expected_overflow = f64::MAX.ln() - f64::from_bits(1).ln();
+        assert_eq!(overflow_ratio.to_bits(), expected_overflow.to_bits());
+        let underflow_ratio = recover_centered_irregular_residual_log_rate(&[lagged(
+            f64::MAX,
+            f64::from_bits(1),
+            1.0,
+        )])
+        .expect("finite log-domain underflow fallback");
+        let expected_underflow = f64::from_bits(1).ln() - f64::MAX.ln();
+        assert_eq!(underflow_ratio.to_bits(), expected_underflow.to_bits());
         assert_eq!(
             recover_centered_irregular_residual_log_rate(&[lagged(
                 1e-160,
