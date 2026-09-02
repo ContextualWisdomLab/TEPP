@@ -199,6 +199,34 @@ mod tests {
     }
 
     #[test]
+    fn standardised_diffusion_does_not_materialise_a_cancelled_stationary_variance() {
+        let minimum_subnormal = f64::from_bits(1);
+        let continuous_underflow =
+            recover_event_time_standardised_continuous_diffusion(minimum_subnormal, -1.0)
+                .expect("q/p cancels a positive real stationary variance below binary64 range");
+        assert_eq!(continuous_underflow, 2.0);
+
+        let continuous_overflow =
+            recover_event_time_standardised_continuous_diffusion(f64::MAX, -0.25)
+                .expect("q/p cancels a positive real stationary variance above binary64 range");
+        assert_eq!(continuous_overflow, 0.5);
+
+        let interval = EventTimeInterval::new(1.0).expect("unit event interval");
+        let discrete_underflow = recover_event_time_standardised_discrete_diffusion(
+            minimum_subnormal,
+            -1.0,
+            interval,
+        )
+        .expect("Q_delta/p cancels the unrepresentable stationary intermediate");
+        assert!((discrete_underflow - -(-2.0_f64).exp_m1()).abs() <= f64::EPSILON);
+
+        let discrete_overflow =
+            recover_event_time_standardised_discrete_diffusion(f64::MAX, -0.25, interval)
+                .expect("finite standardized discrete diffusion must survive p overflow");
+        assert!((discrete_overflow - -(-0.5_f64).exp_m1()).abs() <= f64::EPSILON);
+    }
+
+    #[test]
     fn continuous_candidate_rejects_nonrepresentable_ratio() {
         assert_eq!(
             recover_event_time_standardised_continuous_diffusion(f64::MAX, -f64::MAX),
