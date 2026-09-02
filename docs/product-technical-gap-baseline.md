@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T23:07Z
+**Snapshot:** 2026-09-02T23:20Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -43,7 +43,7 @@ Ruleset `18156473` currently permits merge/squash and prohibits deletion/non-fas
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `7baff4c99473b1de035386e4a5055a4fe71edca0` | true | `main` | Longitudinal Modeling vehicle; owner-correct occasion-mean composition, signed-zero identity, representable-mean overflow repair, and Hamaker trace are now on the surviving branch; exact-head hosted verification remains non-passing. |
+| #310 | `7269cd78b0e0843946677ee50fdc09847e19af83` | true | `main` | Longitudinal Modeling vehicle; owner-correct occasion composition now includes numeric signed-zero identity, representable-mean overflow repair, input-permutation bit stability, and Hamaker trace. Exact-head hosted verification remains non-passing. |
 
 Exact-head evidence becomes stale after any source push.
 
@@ -63,6 +63,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - Cross-classification and multiple membership remain distinct; weights are explicit, auditable, time-valid, and normalized or model-estimated according to the formulation.
 - A nominal unit identifier is not repeated-measures evidence; singleton units cannot satisfy a longitudinal multilevel floor.
 - Occasion-mean deviations `p_it = x_it - μ_t` are not CWC residuals, sample-wide grand-mean residuals, or RI-CLPM within-person effects. Numeric event time defines occasion identity, so `-0.0` and `+0.0` are one occasion.
+- Row arrival order is not scientific evidence. For a fixed admitted occasion, the same scores must produce bit-identical occasion means and centered pairs under input permutation.
 - A representable final scientific estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. A final false 0/1/non-finite boundary remains fail-closed where the mathematical estimand is interior/nonzero.
 - TEPP composes time over the full released upstream candidate identity; auto-expansion never means auto-activation.
 - Supported temporal estimators require state/trajectory and claimed-structure recovery, bias/RMSE, interval coverage, convergence, uncertainty calibration, and leakage-safe rolling-origin evidence.
@@ -80,9 +81,10 @@ The newest fold repairs #486's occasion-mean slice test-first:
 - RED `75b0184d2f6341ef23cf14fc84398c68d8d95d22` requires numeric signed-zero occasion identity, rejects a duplicate unit hidden behind `-0.0`/`+0.0`, preserves the known exact scalar residual log-rate, and pins `[0.75·MAX, 0.75·MAX, -0.5·MAX]` as a representable occasion-mean case that naive same-sign partial summation would overflow.
 - Repair `7fe9aaf2570ffb6ecff3d6a83b12a30865fc198b` implements occasion-mean event-time composition in `crates/longitudinal_core/src/occasion_mean.rs`. It canonicalizes numeric zero, requires at least two distinct units per occasion and at least two lag-contributing units, retains typed positive finite event intervals, cancels opposing magnitudes before bounded same-sign averaging, and reuses the existing Longitudinal exact-log-rate boundary.
 - Export repair `b900e21301f1f5bb769464a4b76da9088cd669ab` publishes the boundary through `longitudinal_core`; `30771ff24cf85479eb5ed227789b59489ac7ead2` fixes the typed interval accessor in the regression contract.
-- Research trace `7baff4c99473b1de035386e4a5055a4fe71edca0` adds `docs/research/occasion-mean-event-time-composition.md` with the Hamaker et al. (2015) estimand boundary and test trace, without the mixed `Z KST` provenance string present on #486.
+- Determinism RED `8a59019ed3112a3e27dd0dcd1b6b86d8d45e5435` permutes one fixed same-sign occasion `{1, nextafter(1,+∞), MAX/2}` and requires bit-identical centered pairs. Repair `465d139dce6101c4958c8b0827b6ef5d674b54c2` orders same-sign values before incremental averaging so arrival order cannot change the scientific result.
+- Research trace `7269cd78b0e0843946677ee50fdc09847e19af83` updates `docs/research/occasion-mean-event-time-composition.md` with both RED lineages, the Hamaker et al. (2015) estimand boundary, and the deterministic-order invariant without the mixed `Z KST` provenance string present on #486.
 
-At exact head `7baff4c99473b1de035386e4a5055a4fe71edca0`, CodeQL PR run `33693410413` is `startup_failure` with zero materialized jobs. Rust Foundation CI, Documentation Quality, Security Scan, SAST Semgrep, OSV-Scanner PR, and Scorecard PR are queued. No qualifying independent current-head approval exists. #310 stays Draft and is not merge-ready.
+At exact head `7269cd78b0e0843946677ee50fdc09847e19af83`, CodeQL PR run `33694429503` is `startup_failure` with zero materialized jobs. Rust Foundation CI, Documentation Quality, Security Scan, SAST Semgrep, OSV-Scanner PR, and Scorecard PR are queued. No qualifying independent current-head approval exists. #310 stays Draft and is not merge-ready.
 
 #486 remains open Draft and conflict-exposing beneath #310. Its wrong-owner implementation must not be independently landed. The child may be closed only after its remaining unique documentation/contract/TRACEABILITY delta is proven inherited by a surviving #310 head; the mixed `2026-09-03T06:07Z KST` provenance text remains a child repair finding rather than a reason for evidence-losing closure.
 
@@ -136,7 +138,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-026 | Scalar standardized longitudinal maps rejected representable finals when a cancelled stationary-variance intermediate lay outside binary64 range | `verification-pending` | RED `4a1f6c49...` / `96d8ed13...` + repairs `a4bc6230...` / `33f4b187...` / `26b03c32...`; exact-head GREEN and protected-main integration |
 | GAP-027 | Finite-interval `discreteDIFFUSIONstd` could report exact unit diffusion after exponent overflow/saturation erased a nonzero remainder | `verification-pending` | RED `a8de3c9f...` + repair `c17e2ff8...`; exact-head GREEN and protected-main integration |
 | GAP-028 | Actual stationary variance `p` could be misreported as exact zero when positive real `p` lies below binary64 range | `verification-pending` | RED `27d9fa39...` + repair `a0132b62...`; exact-head GREEN and protected-main integration |
-| GAP-029 | Occasion-mean temporal composition arrived in the wrong bounded context with raw-bit event identity and naive mean summation | `active-fold` | RED `75b0184d...`; owner repair `7fe9aaf2...`; export/test repairs `b900e213...` / `30771ff2...`; research trace `7baff4c9...`; verify remaining #486 unique evidence inheritance; exact-head GREEN/review/main integration |
+| GAP-029 | Occasion-mean temporal composition arrived in the wrong bounded context with raw-bit event identity, naive mean summation, and input-order-dependent same-sign averaging | `active-fold` | RED `75b0184d...`; owner repair `7fe9aaf2...`; export/test repairs `b900e213...` / `30771ff2...`; determinism RED `8a59019e...` + repair `465d139d...`; research trace `7269cd78...`; verify remaining #486 unique evidence inheritance; exact-head GREEN/review/main integration |
 
 ## Release gate
 
