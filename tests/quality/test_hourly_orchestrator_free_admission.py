@@ -1,131 +1,70 @@
-"""Regression tests for the hourly contextual-orchestrator free-route gate."""
+"""Regression tests for released contextual-orchestrator routing ownership.
+
+The predecessor tests pinned TEPP-side provider discovery and explicit-zero price
+filtering. That was useful RED evidence for issue #479, but it also proved the
+consumer repository owned routing logic that belongs to contextual-orchestrator.
+These tests preserve the defect boundary by requiring the wrong-owner bootstrap
+to stay retired and the hourly workflow to consume only the released free route.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-import sys
 import unittest
-from types import ModuleType
-from unittest.mock import patch
-
-import scripts.run_contextual_orchestrator as bootstrap
 
 
-@dataclass(frozen=True)
-class FakeModel:
-    """Discovery row with the pricing evidence used by free-route admission."""
-
-    model_id: str
-    provider_name: str
-    prompt_price_per_1k: float | None
-    completion_price_per_1k: float | None
-
-
-@dataclass(frozen=True)
-class FakeAgent:
-    """Small agent shape accepted by ``dataclasses.replace`` in the bootstrap."""
-
-    model: str
-    priority: int = 0
-    disabled: bool = True
-
-
-class FakePriceBook:
-    """Constructor seam; admission is decided from discovery pricing evidence."""
-
-    def __init__(self, _store: object) -> None:
-        pass
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW = ROOT / ".github/workflows/hourly-nim-product-development.yml"
+RETIRED_BOOTSTRAP = ROOT / "scripts/run_contextual_orchestrator.py"
 
 
 class HourlyOrchestratorFreeAdmissionTests(unittest.TestCase):
-    """Keep paid and unpriced discovery rows out of the CI agent pool."""
+    """Keep provider/model/free-policy authority outside the TEPP consumer."""
 
-    def _modules(self, discovered: list[FakeModel], selected_inputs: list[list[FakeModel]]) -> dict[str, ModuleType]:
-        package = ModuleType("contextual_orchestrator")
-        package.InMemoryConfigStore = object
-        package.PriceBook = FakePriceBook
+    def test_consumer_side_provider_routing_bootstrap_is_retired(self) -> None:
+        """Do not keep a second provider discovery or price-ranking authority."""
 
-        discovery = ModuleType("contextual_orchestrator.model_discovery")
-        discovery.discover_all_models = lambda: (discovered, [])
-        discovery.refresh_price_book = lambda models, _book: sum(
-            model.prompt_price_per_1k is not None or model.completion_price_per_1k is not None
-            for model in models
+        self.assertFalse(
+            RETIRED_BOOTSTRAP.exists(),
+            "provider/model/free-route discovery belongs to released contextual-orchestrator",
         )
 
-        def select(models: list[FakeModel], _book: object, limit: int) -> list[FakeModel]:
-            selected_inputs.append(list(models))
-            return list(models[:limit])
+    def test_hourly_workflow_uses_only_released_free_route(self) -> None:
+        """Require immutable owner release, HTTPS gateway, and orchestrator/free."""
 
-        discovery.select_top_n_cheapest_discovered_agents = select
-        discovery.agent_from_discovered = lambda model, priority=0: FakeAgent(
-            model=model.model_id,
-            priority=priority,
-        )
-        return {
-            "contextual_orchestrator": package,
-            "contextual_orchestrator.model_discovery": discovery,
-        }
-
-    def test_paid_and_unpriced_routes_never_reach_cheapest_selector(self) -> None:
-        """Filter before ranking so a cheap paid or unknown-price route cannot win."""
-
-        free = FakeModel("free-chat", "openrouter", 0.0, 0.0)
-        paid = FakeModel("paid-chat", "openrouter", 0.0001, 0.0002)
-        unpriced = FakeModel("unknown-chat", "bytez", None, None)
-        embedding = FakeModel("text-embedding-3-small", "openai", 0.0, 0.0)
-        selected_inputs: list[list[FakeModel]] = []
-
-        with patch.dict(
-            sys.modules,
-            self._modules([paid, unpriced, embedding, free], selected_inputs),
+        text = WORKFLOW.read_text(encoding="utf-8")
+        for required in (
+            "CONTEXTUAL_ORCHESTRATOR_RELEASE",
+            "CONTEXTUAL_ORCHESTRATOR_BASE_URL",
+            "secrets.CONTEXTUAL_ORCHESTRATOR_GATEWAY_TOKEN",
+            "orchestrator/free",
+            ".immutable == true",
+            "contextual_orchestrator_release_unavailable",
+            "contextual_orchestrator_gateway_unavailable",
+            "--proto '=https'",
         ):
-            agents, report = bootstrap._selected_agents()
-
-        self.assertEqual([model.model_id for model in selected_inputs[0]], ["free-chat"])
-        self.assertEqual([agent.model for agent in agents], ["free-chat"])
-        self.assertEqual(report["chat_candidate_count"], 3)
-        self.assertEqual(report["explicit_free_candidate_count"], 1)
-        self.assertEqual(report["excluded_non_free_count"], 2)
-        self.assertEqual(report["excluded_non_chat_count"], 1)
-
-    def test_no_explicitly_free_chat_route_fails_closed(self) -> None:
-        """Refuse the hourly LLM run instead of silently spending on a paid route."""
-
-        selected_inputs: list[list[FakeModel]] = []
-        discovered = [
-            FakeModel("paid-chat", "openrouter", 0.0001, 0.0002),
-            FakeModel("unknown-chat", "bytez", None, None),
-        ]
-        with patch.dict(sys.modules, self._modules(discovered, selected_inputs)):
-            with self.assertRaisesRegex(RuntimeError, "no explicitly zero-cost"):
-                bootstrap._selected_agents()
-
-        self.assertEqual(selected_inputs, [])
-
-    def test_explicit_zero_requires_both_price_components(self) -> None:
-        """Treat absent, partial, unknown, or nonzero price evidence as non-free."""
-
-        self.assertTrue(bootstrap._is_explicitly_free_model(FakeModel("free", "p", 0.0, 0.0)))
-        self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("prompt-paid", "p", 0.1, 0.0)))
-        self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("completion-paid", "p", 0.0, 0.1)))
-        self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("partial", "p", 0.0, None)))
-        self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("unknown", "p", None, None)))
-        self.assertFalse(bootstrap._is_explicitly_free_model(object()))
+            self.assertIn(required, text)
+        for forbidden in (
+            "run_contextual_orchestrator.py",
+            "select_top_n_cheapest_discovered_agents",
+            "prompt_price_per_1k",
+            "completion_price_per_1k",
+            "http://127.0.0.1",
+        ):
+            self.assertNotIn(forbidden, text)
 
     def test_canonical_llm_authority_requires_released_orchestrator_contract(self) -> None:
         """Keep normative product/technical docs from re-authorizing provider keys."""
 
-        root = Path(__file__).resolve().parents[2]
         canonical_paths = (
-            root / "AGENTS.md",
-            root / "docs/product/prd-v0.4-approved.md",
-            root / "docs/TRD.md",
-            root / "docs/LLM_ORCHESTRATION.md",
-            root / "ARCHITECTURE.md",
+            ROOT / "AGENTS.md",
+            ROOT / "docs/product/prd-v0.4-approved.md",
+            ROOT / "docs/TRD.md",
+            ROOT / "docs/LLM_ORCHESTRATION.md",
+            ROOT / "ARCHITECTURE.md",
         )
         for path in canonical_paths:
-            with self.subTest(path=path.relative_to(root)):
+            with self.subTest(path=path.relative_to(ROOT)):
                 text = path.read_text(encoding="utf-8")
                 self.assertNotIn("NVIDIA_NIM_API_KEY", text)
                 self.assertIn("contextual-orchestrator", text)
