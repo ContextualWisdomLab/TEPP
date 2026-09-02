@@ -62,6 +62,28 @@ fn cwc_mean_is_deterministic_under_input_row_permutation() {
 }
 
 #[test]
+fn cwc_mean_survives_overflowing_raw_sum_when_centered_values_are_finite() {
+    let rows = [
+        timed(1, 0.0, f64::MAX * 0.75),
+        timed(1, 1.0, f64::MAX * 0.75),
+        timed(1, 2.0, -f64::MAX * 0.5),
+        timed(2, 0.0, 2.0),
+        timed(2, 1.0, 1.0),
+    ];
+    assert!(
+        (rows[0].score() + rows[1].score()).is_infinite(),
+        "fixture must overflow naive same-order summation"
+    );
+
+    let pairs = center_within_unit_event_lags(&rows)
+        .expect("finite CWC residuals must not be rejected because a raw sum overflows");
+    assert_eq!(pairs.len(), 3);
+    assert!(pairs.iter().all(|pair| {
+        pair.earlier_residual().is_finite() && pair.later_residual().is_finite()
+    }));
+}
+
+#[test]
 fn cwc_of_raw_autoregressive_path_is_not_process_drift() {
     let drift = (0.5_f64).ln();
     let rows = [
