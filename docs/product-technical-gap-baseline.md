@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-09-02T06:04Z
+**Snapshot:** 2026-09-02T06:44Z
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 **Workspace version:** `0.2.0`
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)
@@ -18,13 +18,13 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | Open pull requests | **128** | The queue is down from the observed peak of 149, but remains release-blocking. |
 | Draft pull requests | **126** | Non-landable work is explicitly parked while consolidated, repaired, or supplied with missing evidence. |
 | Non-draft pull requests | **2** | #310 is the scientific landing vehicle; #480 is an independently landable CI/provider-admission repair. |
-| Open issues | **15** | Includes #437 ADR identity normalization and #479 hourly free-route admission tracking. |
+| Open issues | **16** | Includes #437 ADR identity normalization, #479 hourly free-route admission, and #481 dynamic-evaluation drift design/evidence gathering. |
 | GitHub releases | **0** | No open TEPP head is a released contract. |
 | Effective organization ruleset | `18156473` | Current-head required workflows, resolved conversations, qualifying review, and an allowed merge method remain landing authority. |
 
 Classic branch protection is not the sole policy source; organization rulesets are effective merge authority where applicable. Any increase in open PR count while #435 remains open is a WIP regression unless the new PR is a demonstrably independent root-cause repair that cannot safely belong to an existing landing vehicle. #480 is such an exception: it owns TEPP CI/provider-admission policy and cannot coherently belong to the Validation/Analysis Run, Longitudinal Modeling, or queue-documentation vehicles.
 
-The live queue was **127** immediately before #480 was opened and is **128** after that bounded governance repair. This increase is intentional and must not be used as precedent for one-operation/model/route micro-PR creation.
+The live queue was **127** immediately before #480 was opened and is **128** after that bounded governance repair. This increase is intentional and must not be used as precedent for one-operation/model/route micro-PR creation. Issue #481 adds design/evidence work only; it does not authorize an implementation PR until immutable released upstream contracts exist.
 
 ## Current priority open pull-request evidence
 
@@ -32,7 +32,7 @@ This is a priority subset, not a row-for-row copy of the 128-PR queue. #435 inte
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
-| #480 | `feb3399cad55b00f957263e4f60f0df8531a71c8` | false | main | TEPP CI/provider-admission governance repair for issue #479; explicit zero-cost discovered routes only, fail-closed when none exist. |
+| #480 | `f8749d315bf65ad3ba0e3f790c6e00d90072de00` | false | main | TEPP CI/provider-admission governance repair for issue #479; explicit zero-cost discovered routes only, fail-closed when none exist; review-driven ADR/runbook/fixture/CHANGELOG repairs present. |
 | #469 | `72a7755bcc91b1107560c980ce817eca153126e4` | true | interpretation-run retrieval ancestry | Analysis Run / contextual-orchestrator interpretation-run retrieval, lookup, and stored-request adapter landing vehicle. |
 | #466 | `71f34b890bbd096eee152947c5e22d9778d323e8` | true | export-retrieval ancestry | Analysis Run / naruon export idempotency lookup and quarantine-parity landing vehicle. |
 | #464 | `1b3a477242336634be2c7867b29d39979e9a6dca` | true | temporal-context retrieval ancestry | Analysis Run / LineageWeave temporal-context stored-request GET+CLI landing vehicle. |
@@ -85,7 +85,9 @@ Supported temporal estimators require realistic known-truth recovery for every c
 
 **#416 — Validation / Analysis Run consolidation.** Current head `b0d6cb8969aa0ddd386ab82a1755155fa13d18a8` contains non-force lineage from #473, #430, #461, #478, and #434. Shared admission/artifact invariants remain centralized while each refusal profile keeps its domain vocabulary. The #478 TRACEABILITY repair now explicitly keeps both `containment_recovery_rate` and `identity_recovery_rate` out of inspect payloads. Next compatible simple-refusal siblings still targeting `main` are #458 (`outcome_order_v1`) and #460 (`relation_absence_v1`); they should fold into this vehicle or a coherent successor rather than ship as independent bounded contexts.
 
-**#480 / #479 — hourly free-route admission.** Protected main currently ranks all discovered chat candidates without a free-only admission step. #480 repairs the TEPP-owned bootstrap ACL so both provider-reported token-price components must be explicitly zero before a route reaches ranking. Paid, partially priced, and fully unpriced production rows are excluded; an empty explicit-free pool fails closed. The focused regression file covers paid-vs-free ranking, unknown Bytez-style prices, partial prices, and empty-pool refusal. This is a justified independent governance PR, not a precedent for route/model micro-PR proliferation. Exact-head Rust Foundation CI, Security Scan, and SAST were queued immediately after creation; no queued result is GREEN.
+**#480 / #479 — hourly free-route admission.** Protected main currently ranks all discovered chat candidates without a free-only admission step. #480 current exact head `f8749d315bf65ad3ba0e3f790c6e00d90072de00` repairs the TEPP-owned bootstrap ACL so both provider-reported token-price components must be explicitly zero before a route reaches ranking. Paid, partially priced, fully unpriced, and missing-price production rows are excluded; an empty explicit-free pool fails closed. Focused regressions cover paid-vs-free ranking, unknown Bytez-style prices, partial prices, missing price attributes, and empty-pool refusal. Review-driven runbook, ADR, legacy-fixture, and CHANGELOG findings are repaired and observed threads are resolved. Exact-head Rust Foundation CI, Documentation Quality, Security Scan, and SAST Semgrep remain queued; no queued result is GREEN and no qualifying independent approval has been observed.
+
+**#481 — dynamic evaluation drift monitoring design/evidence lane.** TEPP owns temporal composition, availability/knowledge-cutoff semantics, longitudinal/multilevel/multiple-membership structure, drift/change-point evidence, and time-indexed invariance monitoring. It does not own item generation, provider/rater invocation, adjudication, anchor promotion, or reusable static psychometric kernels. Implementation remains blocked until canonical owners publish immutable released/digest-pinned run/item/rater/adjudication/linking contracts. The first eventual slice is a versioned ACL with no-anchor/no-linking fail-closed tests, not a drift score or dashboard. Current mutable sibling PR heads are evidence only and must not become production dependencies.
 
 **#315 — static-standardisation ownership repair.** #315 remains Draft only to preserve TEPP-specific `TIPREDVARstd` naming/event-time/refusal semantics. It must not merge with duplicate reusable arithmetic. After the live fast-mlsirm owner contract is merged and released/versioned, #315 must consume that immutable contract through an ACL, prove parity, retain TEPP temporal/model admission, delete wrong-owner production arithmetic, and fold into a Measurement/Longitudinal Modeling landing vehicle.
 
@@ -119,6 +121,7 @@ TEPP protected main checksum-pins contextual-orchestrator commit `e226e1197bdfc8
 | GAP-014 | dependency-review evidence unavailable on predecessor heads | `external-control-risk` | authorized dependency-graph availability, pinned Dependency Review execution, exact-current Security Scan GREEN, no fail-open bypass |
 | GAP-015 | contextual-orchestrator pin behind protected upstream | `supply-chain-pinned` | reproducible replacement archive SHA-256, exact diff/review, pinned TEPP adoption |
 | GAP-016 | hourly LLM bootstrap can admit paid/unknown-price routes | `active-repair` | #480 exact-head GREEN, qualifying review, merge to protected main, issue #479 closure |
+| GAP-017 | dynamic evaluation item/rater/anchor drift monitoring | `blocked-external-design` | released/digest-pinned owner contracts, ACL conformance, no-anchor/no-linking refusal, then evidence-gated temporal monitoring |
 
 ## Delivery and release order
 
