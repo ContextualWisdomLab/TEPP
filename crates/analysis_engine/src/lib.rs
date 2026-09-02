@@ -12,6 +12,7 @@
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod role_contradiction_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -45,6 +46,13 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Role-contradiction artifact and execution contracts from this engine.
+pub use role_contradiction_artifact::{
+    ROLE_CONTRADICTION_ARTIFACT_BYTE_LIMIT, ROLE_CONTRADICTION_ARTIFACT_SCHEMA_VERSION,
+    ROLE_CONTRADICTION_MODEL_CONTRACT_VERSION, ROLE_CONTRADICTION_OUTPUT_PROFILE,
+    RoleContradictionArtifact, RoleContradictionAssignment, RoleContradictionExecution,
+    execute_role_contradiction_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +256,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A role-contradiction artifact violated its bounded schema or count invariants.
+    InvalidRoleContradictionArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +272,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidRoleContradictionArtifact => "invalid role-contradiction artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +691,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidRoleContradictionArtifact,
+                "invalid role-contradiction artifact",
             ),
         ];
         for (error, message) in messages {
