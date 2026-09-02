@@ -294,11 +294,11 @@ fn census_admitted_assignments(
     let mut competitor_count = 0_u64;
     let mut refused_as_entity_class_count = 0_u64;
     for assignment in assignments {
-        if !seen.insert(assignment.assignment_id()) {
-            return Err(AnalysisEngineError::DuplicateEvidence);
-        }
         if assignment.available_time().instant() > knowledge_cutoff.instant() {
             continue;
+        }
+        if !seen.insert(assignment.assignment_id()) {
+            return Err(AnalysisEngineError::DuplicateEvidence);
         }
         match refuse_role_as_entity_class(assignment.role()) {
             Err(RoleContradictionError::RoleIsNotEntityClass) => {
