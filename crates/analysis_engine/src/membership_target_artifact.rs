@@ -206,7 +206,9 @@ pub fn execute_membership_target_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != MEMBERSHIP_TARGET_MODEL_CONTRACT_VERSION
         || request.output_profile != MEMBERSHIP_TARGET_OUTPUT_PROFILE
     {
@@ -319,12 +321,7 @@ pub fn execute_membership_target_run(
         inference_status: MEMBERSHIP_TARGET_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "membership_target",
-        document_count,
-        4,
-        MEMBERSHIP_TARGET_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("membership_target", document_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
