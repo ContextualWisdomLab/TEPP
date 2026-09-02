@@ -374,12 +374,13 @@ pub fn execute_analysis_run(
     let mut identities = BTreeSet::new();
     let mut eligible = Vec::new();
     for unit in &corpus.evidence_units {
+        if unit.available_time.instant() > cutoff.instant() {
+            continue;
+        }
         if !identities.insert(unit.evidence_id.clone()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
-        if unit.available_time.instant() <= cutoff.instant() {
-            eligible.push(unit);
-        }
+        eligible.push(unit);
     }
 
     let completed_at = completed_at.into();
@@ -837,7 +838,6 @@ mod tests {
             execute_analysis_run(&request(), &accepted(), &corpus, "not-a-time"),
             Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
         );
-
         let no_evidence = AnalysisCorpus::new(
             "snapshot-1",
             vec![unit(
