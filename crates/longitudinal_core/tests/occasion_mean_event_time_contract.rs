@@ -118,3 +118,56 @@ fn occasion_mean_is_bit_stable_under_row_permutation() {
     let pairs_b = center_occasion_mean_event_lags(&rows_b).expect("second permutation");
     assert_eq!(pairs_a, pairs_b);
 }
+
+#[test]
+fn sparse_unaligned_and_nonfinite_occasion_inputs_fail_closed() {
+    assert_eq!(
+        center_occasion_mean_event_lags(&[]),
+        Err(LongitudinalError::InvalidObservationPayload)
+    );
+    assert_eq!(
+        center_occasion_mean_event_lags(&[observation(1, 0.0, 1.0)]),
+        Err(LongitudinalError::InvalidObservationPayload)
+    );
+
+    let unaligned = [
+        observation(1, 0.0, 1.0),
+        observation(1, 1.0, 0.5),
+        observation(2, 0.1, -1.0),
+        observation(2, 1.1, -0.5),
+    ];
+    assert_eq!(
+        center_occasion_mean_event_lags(&unaligned),
+        Err(LongitudinalError::InvalidObservationPayload)
+    );
+
+    let nonfinite = [
+        observation(1, f64::NAN, 1.0),
+        observation(1, 1.0, 0.5),
+        observation(2, 0.0, -1.0),
+        observation(2, 1.0, -0.5),
+    ];
+    assert_eq!(
+        center_occasion_mean_event_lags(&nonfinite),
+        Err(LongitudinalError::InvalidObservationPayload)
+    );
+}
+
+#[test]
+fn singleton_wave_unit_does_not_manufacture_or_block_lag_evidence() {
+    let drift = -0.5_f64;
+    let phi = drift.exp();
+    let rows = [
+        observation(1, 0.0, 1.0),
+        observation(1, 1.0, 4.0 + phi),
+        observation(2, 0.0, -1.0),
+        observation(2, 1.0, 4.0 - phi),
+        observation(3, 0.0, 0.0),
+    ];
+
+    let pairs = center_occasion_mean_event_lags(&rows).expect("two lag-contributing units remain");
+    assert_eq!(pairs.len(), 2);
+    let recovered = recover_occasion_mean_centered_irregular_residual_log_rate(&rows)
+        .expect("singleton-wave unit is not a lag contributor");
+    assert!((recovered - drift).abs() < 1.0e-12);
+}
