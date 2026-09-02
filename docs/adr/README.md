@@ -28,6 +28,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice; concept alignment, invariance, and topic estimation are not claimed. |
 | [0021](0021-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Credential-free bounded project-history API preserves LineageWeave authorization ownership. |
 | [0022](0022-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
+| [0076](0076-retrospective-edge-analysis-run.md) | Retrospective-edge refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0002/0003/0022; `RetrospectiveKind` + `refuse_retrospective_as_transition` / `refuse_retrospective_as_translation`, not role-contradiction, not citation-edge. |
 | [0024](0024-lineage-pair-criterion-and-project-journey-posterior.md) | Independent Event Lineage pair criterion and posterior Project Journey | Proposed | active-PR | Strict artifacts preserve criterion/event-time draws, branches, ties, and CPU/GPU receipts without claiming the scientific estimator is complete. |
 | [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
@@ -138,6 +139,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **project-history wire-size symmetry:** ADR 0019.
 - **LineageWeave project-history service boundary:** ADR 0021.
 - **accepted-run execution and terminal artifact production:** ADR 0022.
+- **retrospective-edge analysis-run profile:** ADR 0076.
 - **independent lineage criterion and posterior Project Journey:** ADR 0023.
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
 
