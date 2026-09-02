@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T15:36Z
+**Snapshot:** 2026-09-02T15:48Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -43,9 +43,9 @@ This is a priority subset, not a row-for-row copy of the 131-PR queue. #435 inte
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `relation_absence_v1` fold child; typed cutoff equality and terminal validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `outcome_order_v1` fold child; typed cutoff equality and terminal validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | main | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `8111b58ac3374ae26b159868ce002d755e9e7d9e` | true | main | Longitudinal Modeling vehicle; stable CWC/within-between means and overflow-safe, precision-preserving known-truth RMSE recovery are current. |
+| #310 | `75306b2445b071fa1c3201f5dd31a8c1eba08383` | true | main | Longitudinal Modeling vehicle; current tree preserves stable CWC/within-between means, overflow-safe known-truth RMSE, and one externally reachable irregular-rate facade. |
 
-Exact-head evidence becomes stale after source mutation.
+Exact-head evidence becomes stale after source mutation or any new commit, even when a later commit restores byte-equivalent files.
 
 ## Domain ownership
 
@@ -84,15 +84,15 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 Closed predecessor #441 is contained by #310. The invalid covariance/earlier-variance quantity is not exposed as autocorrelation; lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. Temporal/state composition is owned by `longitudinal_core`.
 
-Current head `8111b58ac3374ae26b159868ce002d755e9e7d9e` preserves typed event-time admission, covariance-bound Pearson correlation, stationary-variance/subnormal handling, full-range cancellation, one irregular-rate numerical authority, CWC stable-mean repair, precision-preserving known-truth recovery, and stable within/between decomposition.
+Current head `75306b2445b071fa1c3201f5dd31a8c1eba08383` has the same file tree as `8111b58ac3374ae26b159868ce002d755e9e7d9e`; GitHub compare reports two commits and zero changed files. The two commits record verification of a review suggestion that the canonical irregular-rate functions should be syntactically `pub(crate)`: because `lib.rs` keeps `mod irregular_residual;` private and exposes the recover operations only through `stable_irregular_rate`, plain `pub fn` inside that private module does not create a second externally reachable crate API. An exploratory syntax assertion was therefore removed rather than turning an internal spelling preference into a false architecture invariant. The facade continues to delegate to one canonical numerical implementation.
 
 CWC RED `9a706c3c0e9e0db68e88f89b94c64c13ea7fafd0` fixes `[0.75·MAX, 0.75·MAX, -0.5·MAX]`, whose raw partial sum overflows although the centered result is representable. Repair `260413efb9d95039b5fbba41919cba8097fcf8b5` routes CWC means through the Longitudinal Modeling stable compensated mean rather than adding a second arithmetic authority.
 
-Known-truth `component_root_mean_square_error` originally formed raw `decided - truth` before its scaled sum-of-squares path. RED `d72ba2b6e28909c6def73a2638ebd63258dec500` pins four matched components with one mathematical `2·MAX` residual and three zero residuals: the aggregate RMSE is representable `MAX`, but the predecessor rejected it because the individual subtraction overflowed. Initial repair `406e6ae2b2a8fd99494e9bc82e61ced9b81bffe0` removed that intermediate overflow, but fresh verification found a precision regression: normalizing every residual by an unrelated extreme endpoint could erase an ordinary finite residual. RED `dd0718e5d1b91baccc7efa4d196825c9119cd8e7` pins `[MAX→MAX, 0→1]`, whose RMSE is `1/sqrt(2)`, not zero. Corrective repair `312dbcd25a7246683d5596385571068d475fc4c3` keeps direct finite residual subtraction and its own magnitude; only an actually overflowing subtraction is represented as `endpoint_scale × normalized_difference`, after which the residual representations enter the scaled sum-of-squares accumulator. Current head `8111b58ac3374ae26b159868ce002d755e9e7d9e` tightens the finite-residual regression to a binary64 tolerance instead of requiring bit identity between algebraically equivalent square-root expressions.
+Known-truth `component_root_mean_square_error` originally formed raw `decided - truth` before its scaled sum-of-squares path. RED `d72ba2b6e28909c6def73a2638ebd63258dec500` pins four matched components with one mathematical `2·MAX` residual and three zero residuals: the aggregate RMSE is representable `MAX`, but the predecessor rejected it because the individual subtraction overflowed. Initial repair `406e6ae2b2a8fd99494e9bc82e61ced9b81bffe0` removed that intermediate overflow, but RED `dd0718e5d1b91baccc7efa4d196825c9119cd8e7` caught a precision regression for `[MAX→MAX, 0→1]`. Corrective repair `312dbcd25a7246683d5596385571068d475fc4c3` keeps direct finite residual subtraction and scales only actually overflowing differences.
 
-`decompose_within_between` also retained a raw `sum / n` mean after CWC was stabilized. RED `1292fdc77b810dedf3d75b836744ac9ce8611014` pins a valid unit with `[MAX, MAX]`, whose mean is `MAX` and within residuals are zero. Repair `6bf3661bf390e0de00e1bb83539e6d62ee06b85f` uses magnitude-normalized Neumaier accumulation for each unit mean, scales back only after dividing by count, and rejects any non-finite resulting residual. Sorting, duplicate `(unit, occasion)` refusal, minimum-unit/occasion requirements, and component identity remain unchanged.
+`decompose_within_between` also retained a raw `sum / n` mean after CWC was stabilized. RED `1292fdc77b810dedf3d75b836744ac9ce8611014` pins a valid unit with `[MAX, MAX]`; repair `6bf3661bf390e0de00e1bb83539e6d62ee06b85f` uses magnitude-normalized Neumaier accumulation and rejects only a non-representable resulting mean/residual.
 
-Hosted evidence for exact head `8111b58ac3374ae26b159868ce002d755e9e7d9e` is not GREEN. CodeQL PR run `33648256909` completed as `startup_failure`; OSV-Scanner PR, Rust Foundation CI, Scorecard PR, Security Scan, SAST Semgrep and Documentation Quality are queued. All visible review threads are resolved, but there is no qualifying current-head independent `APPROVED` review. Predecessor evidence does not transfer and the central CodeQL startup failure does not authorize bypass.
+The current exact head must reacquire hosted evidence from scratch. Any workflow/review result on `8111b58...` or earlier is historical even though the final file tree is equal. There is no qualifying current-head independent `APPROVED` review. No merge is authorized until all central required workflows are exact-head passing.
 
 ### #416 — Validation / Analysis Run consolidation
 
@@ -100,7 +100,7 @@ Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-
 
 ### #480 / #479 — LLM owner boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` has advanced since the preceding snapshot but still has **zero GitHub releases**. The branch movement is mutable owner state, not a released contract. The consumer remains deliberately non-deployable; do not fall back to mutable source, direct provider calls, or guessed checksums.
+#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` has advanced since earlier snapshots but still has **zero GitHub releases**. The branch movement is mutable owner state, not a released contract. The consumer remains deliberately non-deployable; do not fall back to mutable source, direct provider calls, or guessed checksums.
 
 ### #315 / fast-mlsirm owner handoff
 
