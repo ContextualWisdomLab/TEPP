@@ -58,14 +58,17 @@ impl ComponentValue {
 
 /// RMSE of recovered components against known-truth components.
 ///
-/// The sum of squared residuals is accumulated with max-magnitude scaling so
-/// large finite residuals cannot overflow to infinity.
+/// Finite truth and decided values are normalized by their largest absolute
+/// component magnitude before residual subtraction. The normalized residual is
+/// bounded by two, so an otherwise representable RMSE is not rejected merely
+/// because one raw `decided - truth` intermediate exceeds binary64 range.
+/// Scaling back happens only after the mean square and square root are formed.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidComponentPayload`] when either slice is
-/// empty, the lengths differ, a unit/occasion/level identity mismatches, a
-/// value or a computed residual is non-finite.
+/// empty, the lengths differ, a unit/occasion/level identity mismatches, an
+/// input value is non-finite, or the final RMSE is not representable.
 pub fn component_root_mean_square_error(
     truth: &[ComponentValue],
     decided: &[ComponentValue],
@@ -73,8 +76,8 @@ pub fn component_root_mean_square_error(
     if truth.is_empty() || truth.len() != decided.len() {
         return Err(LongitudinalError::InvalidComponentPayload);
     }
-    let mut scale = 0.0_f64;
-    let mut scaled_sum_squares = 0.0_f64;
+
+    let mut component_scale = 0.0_f64;
     for (truth_row, decided_row) in truth.iter().zip(decided) {
         if truth_row.unit_index() != decided_row.unit_index()
             || truth_row.occasion_index() != decided_row.occasion_index()
@@ -84,21 +87,28 @@ pub fn component_root_mean_square_error(
         {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
-        let residual = decided_row.value() - truth_row.value();
-        if !residual.is_finite() {
-            return Err(LongitudinalError::InvalidComponentPayload);
-        }
-        let magnitude = residual.abs();
-        if magnitude > scale {
-            let ratio = scale / magnitude;
-            scaled_sum_squares = 1.0 + scaled_sum_squares * ratio * ratio;
-            scale = magnitude;
-        } else if scale > 0.0 {
-            let ratio = magnitude / scale;
-            scaled_sum_squares += ratio * ratio;
-        }
+        component_scale = component_scale
+            .max(truth_row.value().abs())
+            .max(decided_row.value().abs());
     }
-    Ok(scale * (scaled_sum_squares / truth.len() as f64).sqrt())
+
+    if component_scale == 0.0 {
+        return Ok(0.0);
+    }
+
+    let mut scaled_sum_squares = 0.0_f64;
+    for (truth_row, decided_row) in truth.iter().zip(decided) {
+        let normalized_residual =
+            decided_row.value() / component_scale - truth_row.value() / component_scale;
+        scaled_sum_squares += normalized_residual * normalized_residual;
+    }
+    let normalized_rmse = (scaled_sum_squares / truth.len() as f64).sqrt();
+    let rmse = component_scale * normalized_rmse;
+    if rmse.is_finite() {
+        Ok(rmse)
+    } else {
+        Err(LongitudinalError::InvalidComponentPayload)
+    }
 }
 
 #[cfg(test)]
