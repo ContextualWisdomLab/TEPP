@@ -17,6 +17,8 @@ Current executable queue snapshot (2026-09-02T06:04Z; live state supersedes):
 3. #435 is the Draft queue/DDD authority vehicle and keeps `docs/product-technical-gap-baseline.md` synchronized with fresh queue state.
 4. #480 is an independently landable TEPP CI/provider-admission repair for #479. It is the exceptional governance/security-cost lane allowed by the WIP circuit breaker; it does not justify new one-route/model micro-PRs.
 
+Historical scientific queue lineage remains relevant after delivery recovery: the Driver p.16 `std`-family restoration evidence and the TDT/CHRONOS composition evidence are retained as model/recovery inputs rather than used as stale PR-number authority.
+
 ## Required repository configuration
 
 Configure these repository or organization values:
