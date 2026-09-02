@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T17:36:00Z
+**Snapshot:** 2026-09-02T17:59:20Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -43,7 +43,7 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `9c962205dca26925c2e60d1e15ec4ce15681bbee` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; stationary-overflow guidance is source-synchronized test-first; hosted documentation/review evidence remains non-GREEN. |
+| #310 | `ea550a3a2f3419061736eaa12a74909acf5f90a9` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; nonzero lagged covariance may no longer underflow into a false exact-zero correlation; exact-head hosted verification is pending. |
 
 Exact-current-head evidence becomes stale after source mutation or any new commit.
 
@@ -68,13 +68,11 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 Closed predecessor #441 is contained by #310. The invalid covariance/earlier-variance quantity is not exposed as autocorrelation; lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. Temporal/state composition is owned by `longitudinal_core`.
 
-Current head `9c962205dca26925c2e60d1e15ec4ce15681bbee` preserves the within/between subnormal-cancellation repair and closes the remaining stationary-overflow documentation drift. RED `9d8a82d78443cafc9b5064fc3bb35aa3f2052722` adds deterministic documentation fitness that rejects the retired `(q / a) * -0.5` overflow instruction and the retired warning against forming `0.5 q`, while requiring `(q * 0.5) / |a|`. Repair `9c962205dca26925c2e60d1e15ec4ce15681bbee` synchronizes `CLAUDE.md` with the production `recover_stationary_within_variance` contract.
+Current head `ea550a3a2f3419061736eaa12a74909acf5f90a9` adds a fail-closed representability contract for lagged Pearson correlation. RED `c345ee7b8bdf642430669b7b0e1d7fc6873a84af` pins finite inputs `cov=min_subnormal`, `Var_t=Var_t+Δ=f64::MAX`: the covariance satisfies the exact binary64 Cauchy–Schwarz bound, but the true standardized magnitude is below the smallest representable binary64 and the predecessor returned `Ok(0.0)`, falsely converting a nonzero association into exact no-association. Repair `5785e07a352801c193d92dde03863d0697a2853a` rejects that representability collapse as `InvalidTemporalAssociationInput` while preserving genuine zero covariance as `Ok(0.0)`. Public-boundary commit `ea550a3a2f3419061736eaa12a74909acf5f90a9` carries the same regression through typed `EventTimeInterval` and documents the refusal contract.
 
-The underlying scientific reason is numerical, not stylistic: when finite stable `a` is so negative that `2a` overflows, ratio-first `q/a` can overflow or round on a different path even though `-q/(2a)` is representable; the current branch uses `(q * 0.5) / |a|`. In this overflow branch, `|a|` is already large enough that halving a minimum-subnormal `q` cannot erase a representable positive final stationary variance. The earlier double-rounding and minimum-subnormal regressions remain preserved on the same vehicle.
+The earlier stationary-overflow documentation repair remains intact. RED `9d8a82d78443cafc9b5064fc3bb35aa3f2052722` rejects the retired `(q / a) * -0.5` overflow instruction and requires `(q * 0.5) / |a|`; repair `9c962205dca26925c2e60d1e15ec4ce15681bbee` synchronizes `CLAUDE.md` with production `recover_stationary_within_variance` behavior. Earlier CWC, within/between, known-truth RMSE, irregular-rate zero-underflow, stationary-subnormal and exact covariance-bound lineages also remain on the same vehicle.
 
-Earlier active numerical lineages include CWC RED `9a706c3c0e9e0db68e88f89b94c64c13ea7fafd0` / repair `260413efb9d95039b5fbba41919cba8097fcf8b5`, known-truth RMSE overflow/precision repair, irregular-rate zero-underflow refusal, and two-marginal lagged Pearson correlation with represented covariance-bound admission. Within/between RED `0544def0f7e39ab50e6de963ec4332ca6ccf01f4` continues to pin `[MAX, -MAX, 4*min_subnormal]` so opposite-sign cancellation cannot erase the representable low-order mean.
-
-The current head is mergeable but remains Draft. Exact-head CodeQL PR run `33661807608` is `startup_failure`; Rust Foundation CI `33661805492`, Documentation Quality `33661805528`, Security Scan `33661805381`, SAST Semgrep `33661805505`, Scorecard PR `33661805589` and OSV-Scanner PR `33661806280` are queued. There is no qualifying current-head independent approval. Source/document synchronization is repaired, but GAP-019 remains open as verification debt until exact-head documentation fitness/review and protected-main integration succeed.
+The current head is mergeable but remains Draft. No workflow/status evidence has yet materialized for exact head `ea550a3a...`; predecessor-head queued/startup-failed runs do not transfer. There is no qualifying current-head independent approval. Source and public-boundary regression are repaired, but protected-main integration waits for fresh exact-head Rust/documentation/security/SAST/CodeQL evidence and review.
 
 The CWC and within/between unit-mean helpers now agree on the material extreme-cancellation behavior but are still separate implementations. Consolidation remains a maintainability target only after their full error/estimand semantics are shown equivalent; a reusable domain-neutral arithmetic primitive belongs in fast-mlsirm rather than being copied across TEPP contexts.
 
@@ -90,7 +88,7 @@ Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-
 
 fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`. Immutable `v0.9.1` predates the current owner work.
 
-Generalized-mixed/dependence Published Language remains unreleased. Reusable static covariance-to-correlation standardization is independently represented by fast-mlsirm #1722 at `338dbb2d25f32b0e201102e7bf73076846fb57b3`, contract `fast_mlsirm.covariance_standardization@1.0.0`. Its current source/review findings were repaired at the prior snapshot, but CI/security evidence was non-GREEN and TEPP therefore does not consume that mutable PR head. Temporal/EventTime admission and state composition remain TEPP-owned.
+Generalized-mixed/dependence Published Language remains unreleased. #1714 is open/Ready at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`; its exact-head CodeQL PR is `startup_failure` and CI/security/SAST/CodeQL/OSV/Scorecard workflows are queued. Reusable static covariance-to-correlation standardization is independently represented by fast-mlsirm #1722 at `338dbb2d25f32b0e201102e7bf73076846fb57b3`. Neither mutable owner head is a TEPP production dependency. Temporal/EventTime admission and state composition remain TEPP-owned.
 
 ### #437 — ADR identity
 
@@ -123,6 +121,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-017 | dynamic evaluation item/rater/anchor drift monitoring | `blocked-external-design` | released/digest-pinned owner contracts, ACL conformance, no-anchor/no-linking refusal, evidence-gated temporal monitoring |
 | GAP-018 | Longitudinal stable-mean logic remains duplicated | `active-refactor` | semantic-equivalence proof, one TEPP Longitudinal primitive or released fast-mlsirm generic owner contract, recovery parity |
 | GAP-019 | Longitudinal scientific instructions contradict current stationary-overflow implementation | `verification-pending` | RED `9d8a82d...` + repair `9c962205...`; exact-head Documentation Quality/review GREEN and protected-main integration |
+| GAP-020 | Nonzero lagged covariance can be misreported as exact-zero correlation when the standardized magnitude is unrepresentable | `verification-pending` | RED `c345ee7b...` + repair `5785e07a...` + public contract `ea550a3a...`; exact-head Rust/documentation/review GREEN and protected-main integration |
 
 ## Release gate
 
