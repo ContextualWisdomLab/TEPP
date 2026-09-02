@@ -377,19 +377,28 @@ pub(crate) fn same_sign_nonzero(earlier: f64, later: f64) -> bool {
 /// Caller already established same-sign nonzero residuals and an admitted
 /// event interval. Prefer the finite ratio logarithm so near-equal large
 /// residuals keep a nonzero rate. Fall back to `ln|later| − ln|earlier|`
-/// only when that ratio overflows or underflows.
+/// only when that ratio overflows or underflows. A represented zero rate is
+/// accepted only when the residual magnitudes are exactly equal; otherwise it
+/// is a non-representable nonzero change and fails closed.
 pub(crate) fn driver_same_sign_log_rate(
     earlier: f64,
     later: f64,
     event_interval: EventTimeInterval,
 ) -> Result<f64, LongitudinalError> {
-    let ratio = later.abs() / earlier.abs();
+    let earlier_magnitude = earlier.abs();
+    let later_magnitude = later.abs();
+    let ratio = later_magnitude / earlier_magnitude;
     let log_ratio = if ratio.is_finite() && ratio > 0.0 {
         ratio.ln()
     } else {
-        later.abs().ln() - earlier.abs().ln()
+        later_magnitude.ln() - earlier_magnitude.ln()
     };
-    require_finite(log_ratio / event_interval.as_f64())
+    let rate = log_ratio / event_interval.as_f64();
+    if !rate.is_finite() || (rate == 0.0 && later_magnitude != earlier_magnitude) {
+        Err(LongitudinalError::InvalidTemporalTransformInput)
+    } else {
+        Ok(rate)
+    }
 }
 
 fn require_finite(value: f64) -> Result<f64, LongitudinalError> {
