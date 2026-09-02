@@ -271,12 +271,7 @@ pub fn execute_relation_absence_run(
         inference_status: RELATION_ABSENCE_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "relation_absence",
-        pair_count,
-        4,
-        RELATION_ABSENCE_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("relation_absence", pair_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
