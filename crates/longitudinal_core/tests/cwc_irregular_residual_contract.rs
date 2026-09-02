@@ -62,6 +62,26 @@ fn cwc_mean_is_deterministic_under_input_row_permutation() {
 }
 
 #[test]
+fn cwc_requires_two_units_with_repeated_event_time_evidence() {
+    let rows = [
+        timed(1, 0.0, 11.0),
+        timed(1, 1.0, 10.8),
+        timed(1, 2.0, 10.6),
+        timed(2, 0.0, 4.0),
+    ];
+    assert_eq!(
+        center_within_unit_event_lags(&rows),
+        Err(LongitudinalError::InvalidObservationPayload),
+        "a singleton second unit must not make a one-unit longitudinal sample look multilevel"
+    );
+    assert_eq!(
+        recover_within_unit_irregular_residual_log_rate(&rows),
+        Err(LongitudinalError::InvalidObservationPayload),
+        "CWC recovery requires at least two lag-contributing units"
+    );
+}
+
+#[test]
 fn cwc_mean_survives_overflowing_raw_sum_when_centered_values_are_finite() {
     let rows = [
         timed(1, 0.0, f64::MAX * 0.75),
