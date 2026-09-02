@@ -1,15 +1,15 @@
 # TEPP PRD v0.4.1 Amendment — Released contextual-orchestrator routing boundary
 
-**Status:** active-PR product-authority amendment; not implemented-main  
-**Amends:** `docs/product/prd-v0.4-approved.md` §12 LLM responsibilities  
-**Decision date:** 2026-09-02  
-**Owning implementation vehicle:** PR #480  
+**Status:** active-PR product-authority amendment; not implemented-main
+**Amends:** `docs/product/prd-v0.4-approved.md` §12 LLM responsibilities
+**Decision date:** 2026-09-02
+**Owning implementation vehicle:** PR #480
 
 ## Problem
 
-The approved v0.4 baseline still authorized live model tests with a provider-specific secret. TEPP also carried an hourly bootstrap that could rank provider discovery rows itself. Both behaviors put provider routing and credential policy in the consumer repository even though `contextual-orchestrator` is the canonical CWL owner of provider discovery/routing and `orchestrator/free` policy.
+The approved v0.4 baseline once authorized live model tests with provider-specific execution. TEPP also carried an hourly bootstrap that discovered and ranked provider rows itself. Both behaviors put routing and credential policy in the consumer repository even though `contextual-orchestrator` is the canonical CWL owner of provider discovery/routing and `orchestrator/free` policy.
 
-A second constraint is material: on 2026-09-02 contextual-orchestrator protected `main@8839081659df587b19642be17b9114f9dee8b666` has no GitHub release. A mutable main commit, open PR head, or checksum-pinned source snapshot cannot be promoted to production dependency authority merely because its source is reviewable.
+A second constraint is material: on 2026-09-02 contextual-orchestrator protected `main@6d60c756b6481c59bd8fee95996315279bd708d5` has no GitHub release. A mutable main commit, open PR head, or checksum-pinned source snapshot cannot be promoted to production dependency authority merely because its source is reviewable.
 
 ## Product requirement
 
@@ -23,17 +23,17 @@ LLM output never performs numerical estimation, scientific acceptance, or author
 
 ## Admission and release constraint
 
-The existing explicit-zero TEPP bootstrap regression remains defense-in-depth evidence against accidental paid/unknown routing, but it does not make an unreleased orchestrator snapshot a valid production dependency.
+The earlier TEPP-side explicit-zero admission regression is retained as historical defect evidence for issue #479, not as production routing authority. The local provider-discovery/ranking bootstrap is retired; keeping it would create a second owner for provider/free policy.
 
 Deployable semantic execution requires all of the following:
 
 1. a compatible immutable contextual-orchestrator release;
 2. released contract/schema/client identity and reproducible artifact digest/provenance;
 3. TEPP ACL compatibility fixtures and exact dependency review;
-4. model-backed Actions using only `orchestrator/free` plus gateway credential;
-5. exact-current TEPP CI/security/review evidence after the dependency bump.
+4. model-backed Actions using only `orchestrator/free` plus gateway credential over HTTPS;
+5. exact-current TEPP CI/security/review evidence after the dependency adoption.
 
-Until those conditions hold, semantic live execution is fail-closed rather than silently reverting to direct provider access.
+Until those conditions hold, semantic live execution is fail-closed rather than silently reverting to direct provider access or a mutable source snapshot.
 
 ## Alternatives considered
 
@@ -52,4 +52,4 @@ Long-running reasoning, streaming, and tool-call work must not be terminated sol
 
 ## Acceptance evidence
 
-PR #480 must keep the canonical product/technical/architecture/LLM documents free of provider-key execution authority and must enforce the released contextual-orchestrator boundary with deterministic documentation fitness tests. Protected-main promotion additionally requires the immutable owner release and consumer-adoption evidence above; an active PR cannot claim that release exists.
+PR #480 must keep the canonical product/technical/architecture/LLM documents free of provider-key execution authority, remove TEPP-owned provider routing from the hourly path, require immutable released contextual-orchestrator metadata plus an HTTPS gateway and `orchestrator/free`, and keep deterministic documentation/workflow fitness tests. Protected-main promotion additionally requires the immutable owner release and consumer-adoption evidence above; an active PR cannot claim that release exists.
