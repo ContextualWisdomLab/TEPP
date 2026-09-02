@@ -22,6 +22,28 @@ fn shadowed_centered_rate_does_not_reintroduce_direct_ratio_rejection() {
 }
 
 #[test]
+fn canonical_recovery_functions_are_crate_private_behind_the_public_facade() {
+    let canonical = include_str!("../src/irregular_residual.rs");
+
+    assert!(
+        canonical.contains("pub(crate) fn recover_centered_irregular_residual_log_rate("),
+        "the canonical centered-rate implementation must be crate-private so stable_irregular_rate is the only crate-public facade"
+    );
+    assert!(
+        canonical.contains("pub(crate) fn recover_within_unit_irregular_residual_log_rate("),
+        "the canonical CWC irregular-rate implementation must be crate-private so stable_irregular_rate is the only crate-public facade"
+    );
+    assert!(
+        !canonical.contains("pub fn recover_centered_irregular_residual_log_rate("),
+        "the canonical centered-rate implementation still exposes a second public API name"
+    );
+    assert!(
+        !canonical.contains("pub fn recover_within_unit_irregular_residual_log_rate("),
+        "the canonical CWC irregular-rate implementation still exposes a second public API name"
+    );
+}
+
+#[test]
 fn public_irregular_rate_facade_has_no_second_numerical_implementation() {
     let facade = include_str!("../src/stable_irregular_rate.rs");
 
