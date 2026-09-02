@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-02T14:40Z  
+**Snapshot:** 2026-09-02T15:10Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`  
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)  
@@ -22,7 +22,7 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | GitHub releases | **0** | No TEPP open head is a released contract. |
 | Organization ruleset | `18156473` | One qualifying current-head approval, stale-review dismissal after push, resolved threads, unattributed-change approval where applicable, and central required workflows. |
 
-The queue rose from **130 to 131** at 2026-09-02T14:37Z because #484 `summarizes_edge_v1` was opened as another Analysis Run profile against `main`. Its changed files overlap the existing Analysis Run landing surfaces (`Cargo.lock`, `crates/analysis_engine/Cargo.toml`, `crates/analysis_engine/src/lib.rs`, TRACEABILITY/ADR/doctoring). It has therefore been non-destructively retargeted to #416 rather than treated as an independent landing authority. The resulting conflict is real shared-file fold work; unique source/tests/doctoring and RED/repair evidence must survive into the eventual #416 head. The PR is not closed merely to reduce the count.
+The queue rose from **130 to 131** because #484 `summarizes_edge_v1` was opened as another Analysis Run profile against `main`. Its changed files overlap the existing Analysis Run landing surfaces (`Cargo.lock`, `crates/analysis_engine/Cargo.toml`, `crates/analysis_engine/src/lib.rs`, TRACEABILITY/ADR/doctoring). It has therefore been non-destructively retargeted to #416 rather than treated as an independent landing authority. The resulting conflict is real shared-file fold work; unique source/tests/doctoring and RED/repair evidence must survive into the eventual #416 head. The PR is not closed merely to reduce the count.
 
 ## Priority landing evidence
 
@@ -37,7 +37,7 @@ This is a priority subset, not a row-for-row copy of the 131-PR queue. #435 inte
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `relation_absence_v1` fold child; typed cutoff equality and terminal validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 branch @ `0b7155cc238defb1e55129ff3000658f04b343cf` | `outcome_order_v1` fold child; typed cutoff equality and terminal validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | main | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `260413efb9d95039b5fbba41919cba8097fcf8b5` | true | main | Longitudinal Modeling vehicle; new CWC stable-mean repair plus prior lagged-correlation/stationary/log-rate repair lineage. |
+| #310 | `406e6ae2b2a8fd99494e9bc82e61ced9b81bffe0` | true | main | Longitudinal Modeling vehicle; CWC stable-mean plus known-truth RMSE intermediate-overflow repairs preserve scientific fail-closed boundaries. |
 
 Exact-head evidence becomes stale after source mutation.
 
@@ -78,11 +78,13 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 Closed predecessor #441 is contained by #310. The invalid covariance/earlier-variance quantity is not exposed as autocorrelation; lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. Temporal/state composition is owned by `longitudinal_core`.
 
-Current head `260413efb9d95039b5fbba41919cba8097fcf8b5` preserves prior stationary-variance, full-range cancellation, log-domain same-sign ratio, and one-numerical-authority repairs. Fresh review found a separate CWC mean defect: naive unit-score summation rejected finite observations when an intermediate partial sum overflowed although the final mean and centered residuals were representable.
+Current head `406e6ae2b2a8fd99494e9bc82e61ced9b81bffe0` preserves prior stationary-variance, full-range cancellation, log-domain same-sign ratio, one-numerical-authority, and CWC stable-mean repairs. CWC RED `9a706c3c0e9e0db68e88f89b94c64c13ea7fafd0` fixed the counterexample `[0.75·MAX, 0.75·MAX, -0.5·MAX]`; repair `260413efb9d95039b5fbba41919cba8097fcf8b5` reuses the Longitudinal Modeling `scaled_compensated_mean` so representable means/residuals are not rejected by a raw partial-sum overflow.
 
-RED `9a706c3c0e9e0db68e88f89b94c64c13ea7fafd0` fixes the counterexample `[0.75·MAX, 0.75·MAX, -0.5·MAX]`; the first raw partial sum is infinite while the exact final mean and residuals are representable. Repair `260413efb9d95039b5fbba41919cba8097fcf8b5` reuses the existing Longitudinal Modeling `scaled_compensated_mean` for CWC unit means. `[MAX, MAX]` now forms the valid mean `MAX` and fails only at the later semantic boundary because zero residuals do not admit the real log-rate.
+Fresh review then found the same class of defect one stage later in known-truth recovery. `component_root_mean_square_error` scaled the sum of squared residuals only after computing each raw `decided - truth`. For four matched components with one `truth=-MAX, decided=MAX` pair and three zero residuals, that individual subtraction overflows even though the exact aggregate RMSE is `MAX` and therefore representable.
 
-Hosted evidence for this exact head is not GREEN. CodeQL PR run `33642608009` completed as `startup_failure`; OSV, Rust Foundation CI and Scorecard are pending, while Security Scan, SAST Semgrep and Documentation Quality are queued. No qualifying current-head independent approval exists. Predecessor-head results do not transfer and the central CodeQL startup failure does not authorize bypass.
+RED `d72ba2b6e28909c6def73a2638ebd63258dec500` pins that four-row recovery case. Causal repair `406e6ae2b2a8fd99494e9bc82e61ced9b81bffe0` validates finite matched identities first, normalizes truth and decided values by the largest absolute component magnitude before subtraction, computes the bounded normalized mean square/root, and scales only the final RMSE back to component units. The representable four-row case returns `MAX`; the one-row `-MAX → MAX` case remains fail-closed because its final RMSE is genuinely non-representable. Component identity, failure denominator, and scientific acceptance semantics are unchanged.
+
+Hosted evidence for this exact head is not GREEN. CodeQL PR run `33646689205` completed as `startup_failure`; OSV-Scanner PR, Rust Foundation CI, Scorecard PR, Security Scan, SAST Semgrep and Documentation Quality are queued. No qualifying current-head independent approval exists. Predecessor-head results do not transfer and the central CodeQL startup failure does not authorize bypass.
 
 ### #416 — Validation / Analysis Run consolidation
 
@@ -94,7 +96,7 @@ Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-
 
 ### #315 / fast-mlsirm owner handoff
 
-TEPP-specific static-standardisation lineage must not become a second reusable arithmetic authority. fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`; generalized-mixed/dependence compiler #1714 is Ready/mergeable at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`. Latest immutable release is `v0.9.1` (2026-08-26), which predates #1714 and the covariance-standardization candidate. TEPP may adopt their new Published Language only after a compatible immutable release and ACL/parity evidence.
+TEPP-specific static-standardisation lineage must not become a second reusable arithmetic authority. fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`; generalized-mixed/dependence compiler #1714 is Ready/mergeable at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`. Latest immutable release is `v0.9.1` (2026-08-26), which predates #1714. TEPP may adopt the new Published Language only after a compatible immutable release and ACL/parity evidence. Current #1714 exact-head evidence is non-GREEN: CI is pending; CodeQL PR is startup-failed; OSV, Scorecard, Semgrep, CodeQL and Security Scan are queued.
 
 ### #437 — ADR identity
 
@@ -102,7 +104,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 
 ## External contract state
 
-`context-graph-contracts` protected/default `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13` has zero GitHub releases. `enterprise-architecture-core` protected/default `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4` also has zero releases. Both remain read-only from this TEPP writer; open heads are candidate evidence rather than production contracts. TEPP deployable integration and authoritative EA projection require released/versioned contract artifacts plus compatibility/provenance evidence.
+`context-graph-contracts` protected/default `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13` has **14 open PRs, 2 open issues, and zero GitHub releases**. Its new release-source/provenance work remains Draft/unreleased evidence. `enterprise-architecture-core` protected/default `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4` has **24 open PRs, 2 open issues, and zero releases**. Both remain read-only from this TEPP writer; open heads are candidate evidence rather than production contracts. TEPP deployable integration and authoritative EA projection require released/versioned contract artifacts plus compatibility/provenance evidence.
 
 TEPP latent estimates, measurement scores, inferred event relations and validity evidence are not authoritative EA facts.
 
