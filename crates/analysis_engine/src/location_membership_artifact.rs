@@ -278,7 +278,7 @@ pub fn execute_location_membership_run(
         analysis_family: "location_membership".into(),
         evidence_count: document_count,
         statistic_count: 5,
-        validation_status: LOCATION_MEMBERSHIP_INFERENCE_STATUS.into(),
+        validation_status: "validated".into(),
     };
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
