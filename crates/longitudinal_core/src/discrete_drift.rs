@@ -1,7 +1,7 @@
 //! Event-time standardisation for scalar continuous-time drift.
 
 use crate::{
-    EventTimeInterval, LongitudinalError, stationary::recover_stationary_within_variance,
+    EventTimeInterval, LongitudinalError, stationary::validate_stationary_process_inputs,
 };
 
 /// Recover the scalar p. 16 `discreteDRIFTstd` on event time.
@@ -10,10 +10,12 @@ use crate::{
 /// interval as `exp(A * delta_t)`. Their standardisation uses the relevant
 /// within-person asymptotic variance. In the scalar stationary case the
 /// affecting/affected standard-deviation ratio is one, so the standardised
-/// auto-effect is numerically `exp(a * delta_t)` after a strictly positive
-/// stationary within-person variance has been established. Equal numerical
-/// values do not make unstandardised `discreteDRIFT` and `discreteDRIFTstd`
-/// the same estimand.
+/// auto-effect is numerically `exp(a * delta_t)` after stable negative drift
+/// and positive continuous diffusion establish a positive real stationary
+/// within-person variance. The cancelled stationary variance is not materialized
+/// as binary64, because its representability does not constrain the final scalar
+/// standardized map. Equal numerical values still do not make unstandardised
+/// `discreteDRIFT` and `discreteDRIFTstd` the same estimand.
 ///
 /// This function is temporal composition, not a ctsem/DSEM estimator. It does
 /// not estimate `a`, process noise, uncertainty, or a latent state. The caller
@@ -23,20 +25,20 @@ use crate::{
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for non-finite
-/// diffusion/drift inputs, negative diffusion, non-representable stationary
-/// variance, an `a * delta_t` product that overflows or underflows to signed
-/// zero, or an exponential that underflows to zero. Returns
+/// diffusion/drift inputs, negative diffusion, an `a * delta_t` product that
+/// overflows or underflows to signed zero, or an exponential whose nonzero
+/// change is not representable and therefore rounds to zero or one. Returns
 /// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
 /// Returns [`LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance`]
-/// when the stationary within-person variance is zero or underflows to zero.
+/// when continuous diffusion is exactly zero, because the stationary variance
+/// is then zero rather than merely outside the binary64 range.
 pub fn recover_event_time_standardised_discrete_drift(
     continuous_diffusion: f64,
     log_rate: f64,
     event_interval: EventTimeInterval,
 ) -> Result<f64, LongitudinalError> {
-    let within_person_variance =
-        recover_stationary_within_variance(continuous_diffusion, log_rate)?;
-    if within_person_variance <= 0.0 {
+    validate_stationary_process_inputs(continuous_diffusion, log_rate)?;
+    if continuous_diffusion == 0.0 {
         return Err(LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance);
     }
 
@@ -49,7 +51,11 @@ pub fn recover_event_time_standardised_discrete_drift(
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     let discrete_drift = exponent.exp();
-    if discrete_drift == 0.0 {
+    // For every admitted finite interval and stable finite drift the exact
+    // transition lies strictly inside (0, 1). Returning either endpoint would
+    // erase a nonzero scientific effect solely because binary64 cannot express
+    // it, so both endpoint collapses fail closed.
+    if discrete_drift == 0.0 || discrete_drift == 1.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     Ok(discrete_drift)
