@@ -64,6 +64,6 @@ fn representable_occasion_mean_is_not_rejected_for_intermediate_sum_overflow() {
     assert!(pairs.iter().all(|pair| {
         pair.earlier_residual().is_finite()
             && pair.later_residual().is_finite()
-            && pair.event_interval().get().is_finite()
+            && pair.event_interval().as_f64().is_finite()
     }));
 }
