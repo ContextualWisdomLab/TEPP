@@ -109,9 +109,9 @@ impl LaggedWithinResidual {
 ///
 /// Returns [`LongitudinalError::InvalidObservationPayload`] for empty,
 /// singleton-only, fewer-than-two-unit, or non-finite rows, including
-/// overflowed unit means and overflowing CWC residuals after a finite mean,
-/// and [`LongitudinalError::NonPositiveEventInterval`] when any consecutive
-/// event interval is not strictly positive.
+/// non-representable stable unit means and overflowing CWC residuals after a
+/// finite mean, and [`LongitudinalError::NonPositiveEventInterval`] when any
+/// consecutive event interval is not strictly positive.
 pub fn center_within_unit_event_lags(
     rows: &[EventTimedObservation],
 ) -> Result<Vec<LaggedWithinResidual>, LongitudinalError> {
@@ -134,15 +134,9 @@ pub fn center_within_unit_event_lags(
             continue;
         }
         occasions.sort_by(|left, right| left.event_time().total_cmp(&right.event_time()));
-        let count = occasions.len() as f64;
-        let mut total = 0.0_f64;
-        for row in occasions.iter() {
-            total += row.score();
-        }
-        let mean = total / count;
-        if !mean.is_finite() {
-            return Err(LongitudinalError::InvalidObservationPayload);
-        }
+        let scores: Vec<f64> = occasions.iter().map(|row| row.score()).collect();
+        let mean = scaled_compensated_mean(&scores)
+            .map_err(|_| LongitudinalError::InvalidObservationPayload)?;
         for window in occasions.windows(2) {
             let earlier_residual = window[0].score() - mean;
             let later_residual = window[1].score() - mean;
@@ -757,7 +751,7 @@ mod tests {
                 timed(2, 0.0, 1.0),
                 timed(2, 1.0, 0.5),
             ]),
-            Err(LongitudinalError::InvalidObservationPayload)
+            Err(LongitudinalError::InvalidTemporalTransformInput)
         );
         assert_eq!(
             center_within_unit_event_lags(&[
