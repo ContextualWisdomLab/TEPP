@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T21:04:00Z
+**Snapshot:** 2026-09-02T22:02:18Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -19,14 +19,14 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | Signal | Fresh evidence | Implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until main advances. |
-| Open pull requests | **132** | WIP circuit breaker remains active; no independent micro-PR is justified while an existing bounded-context vehicle can own the work. |
-| Draft pull requests | **131** | Draft work must consolidate/repair rather than independently land. |
+| Open pull requests | **133** | WIP circuit breaker remains active; no independent micro-PR is justified while an existing bounded-context vehicle can own the work. |
+| Draft pull requests | **132** | Draft work must consolidate/repair rather than independently land. |
 | Non-Draft pull requests | **1** | #480 is the only non-Draft PR and is not deployable without a compatible immutable contextual-orchestrator release. |
 | Open issues | **16** | ADR normalization, orchestration admission, evaluation drift and scientific recovery work remain open. |
 | GitHub releases | **0** | No TEPP open head is a released contract. |
 | Organization ruleset | `18156473` | One qualifying current-head approval, stale-review dismissal after push, resolved threads, unattributed-change approval where applicable, and central required workflows. |
 
-#484 `summarizes_edge_v1` and #485 `support_edge_v1` remain #416 Analysis Run fold children. Their unique source/tests/doctoring must survive the shared-file fold; neither is closed merely to reduce queue count.
+#484 `summarizes_edge_v1` and #485 `support_edge_v1` remain #416 Analysis Run fold children. #486 is a Longitudinal Modeling fold child retargeted non-destructively from `main` to #310 after fresh ownership review. Its unique Hamaker occasion-mean source/tests/research evidence must survive the fold, but the current `psychometric_core` temporal implementation is not canonical and must move to `longitudinal_core`. None of these children is closed merely to reduce queue count.
 
 ## Current priority open pull-request evidence
 
@@ -34,6 +34,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
+| #486 | `501d0e34f39672b4f30c7ef35255953ac60f5557` | true | #310 `agent/psychometric-discrete-drift-std-clean@a0132b62cb30acfcb6aa0a6ab96b0d6d3c6b1d3c` | Longitudinal fold child; preserve Hamaker occasion-mean source/tests/research, repair mixed provenance time format and missing APA 7 source, prove signed-zero event-time identity, replace naive occasion-mean summation, and move temporal composition out of `psychometric_core` before fold. |
 | #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve support-edge refusal/source/tests/doctoring and historical-cutoff evidence. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve profile-specific source/tests/doctoring. |
 | #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
@@ -42,7 +43,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `a0132b62cb30acfcb6aa0a6ab96b0d6d3c6b1d3c` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; actual stationary variance now refuses positive-real values that binary64 would misreport as zero, while standardized maps still avoid materializing cancelled `p`; exact-head hosted verification is pending. |
+| #310 | `a0132b62cb30acfcb6aa0a6ab96b0d6d3c6b1d3c` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; actual stationary variance now refuses positive-real values that binary64 would misreport as zero, while standardized maps still avoid materializing cancelled `p`; #486 is now a conflict-resolving fold child; exact-head hosted verification is pending. |
 
 Exact-current-head evidence becomes stale after source mutation or any new commit.
 
@@ -90,6 +91,8 @@ The stationary-overflow documentation repair remains intact: RED `9d8a82d78443ca
 
 Current exact head `a0132b62cb30acfcb6aa0a6ab96b0d6d3c6b1d3c` is mergeable but Draft. Every new source push invalidates predecessor workflow/review evidence. CodeQL PR is `startup_failure`; Rust Foundation CI, Documentation Quality, Security Scan, SAST Semgrep, OSV-Scanner PR and Scorecard PR are queued. No qualifying independent current-head approval exists.
 
+#486 is now a non-destructively retargeted fold child of this vehicle. Its current source is not yet owner-correct: it adds occasion-mean temporal composition under `psychometric_core`, groups occasion identity by raw `f64::to_bits()` so `-0.0` and `+0.0` become distinct despite numeric equality, and computes occasion means through naive summation that can overflow even when the final mean is representable. The fold must establish realistic REDs for the identity and intermediate-overflow cases, move the behavior into `longitudinal_core`, preserve the Hamaker/Voelkle research evidence, and resolve the two current documentation review findings before any child closure.
+
 The CWC and within/between unit-mean helpers still have separate implementations. Consolidation remains a maintainability target only after their full error/estimand semantics are shown equivalent; a reusable domain-neutral arithmetic primitive belongs in fast-mlsirm rather than being copied across TEPP contexts.
 
 ### #416 — Validation / Analysis Run consolidation
@@ -112,13 +115,13 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 
 ## External contract state
 
-`context-graph-contracts` and `enterprise-architecture-core` remain read-only from this TEPP writer. Fresh state at the last verified owner snapshot had CGC `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13`, 14 open PR and release 0; EA Core `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4`, 24 open PR and release 0. Open heads remain candidate evidence rather than production contracts and must be re-read before adoption.
+`context-graph-contracts` and `enterprise-architecture-core` remain read-only from this TEPP writer. Fresh state has CGC protected `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13`, 14 open PR and release 0; EA Core protected `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4`, 24 open PR and release 0. CGC #25 is a Draft release-source-provenance prerequisite and EA #40 continues to fail closed on provisional/unreleased CGC identity. Open heads remain candidate evidence rather than production contracts and must be re-read before adoption.
 
 ## Gap register
 
 | ID | Gap | Maturity | Closure evidence |
 | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 132 open PRs | `release-blocking` | coherent landing vehicles, unique-evidence preservation, protected-main reduction |
+| GAP-001 | PR authority fragmented across 133 open PRs | `release-blocking` | coherent landing vehicles, unique-evidence preservation, protected-main reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission | `partial` | immutable offsets/layout, KO/EN/JA/ZH/VI/ES/DE/FR profiles, concept dictionary, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator | `partial` | Rust CPU f64 likelihood/uncertainty, relation/time/membership effects, true recovery, fitted candidate-K |
 | GAP-004 | durable end-to-end Analysis Run | `partial` | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation/promotion separation, Compose E2E |
@@ -146,6 +149,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-026 | Scalar standardized longitudinal maps rejected representable final values when a cancelled stationary-variance intermediate lay outside binary64 range | `verification-pending` | RED `4a1f6c49...` / `96d8ed13...` + repairs `a4bc6230...` / `33f4b187...` / `26b03c32...`; PRD/ADR sync and exact-head Rust/documentation/review GREEN plus protected-main integration |
 | GAP-027 | Finite-interval `discreteDIFFUSIONstd` could report exact unit diffusion after exponent overflow or `exp_m1` saturation erased a nonzero remainder | `verification-pending` | RED `a8de3c9f...` + repair `c17e2ff8...`; exact-head Rust/documentation/review GREEN and protected-main integration |
 | GAP-028 | Actual stationary variance `p` could be misreported as exact zero when positive real `p` lies below the binary64 range | `verification-pending` | RED `27d9fa39...` + repair `a0132b62...`; exact-head Rust/documentation/review GREEN and protected-main integration |
+| GAP-029 | Occasion-mean temporal composition was added as a new `psychometric_core` micro-slice with raw-bit event identity and naive mean summation | `active-repair` | #486 retargeted to #310; realistic signed-zero/overflow REDs; owner-correct `longitudinal_core` fold; APA 7/provenance repair; exact-head Rust/documentation/review GREEN and protected-main integration |
 
 ## Release gate
 
