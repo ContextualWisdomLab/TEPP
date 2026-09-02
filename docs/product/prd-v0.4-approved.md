@@ -1,6 +1,6 @@
 # Temporal Event Psychometrics Platform — Approved PRD v0.4
 
-**Status:** Approved design baseline  
+**Status:** Approved design baseline; §12 LLM execution target is superseded on the active PR by [`prd-v0.4.1-amendment-llm-routing.md`](prd-v0.4.1-amendment-llm-routing.md) until protected-main promotion  
 **Approval date:** 2026-08-05  
 **Product name:** Temporal Event Psychometrics Platform (TEPP)  
 **Measurement family:** Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)
@@ -206,13 +206,11 @@ branches, transitions, exact ties, and uncertainty are retained.
 
 LLMs may propose semantic units, concept mappings, candidate-model reviews, topic/cluster labels, explanations, and event-schema hypotheses. They do not perform authoritative numerical estimation or bypass statistical gates.
 
-Every output is untrusted and must include approved structured fields, exact evidence identifiers, source spans, confidence, model/provider, prompt hash, reasoning effort, workflow depth, access list, and version.
+Every output is untrusted and must include approved structured fields, exact evidence identifiers, source spans, confidence, model/provider provenance, prompt hash, reasoning effort, workflow depth, access list, and version.
 
 Interpretation is produced by an evidence-bounded interpreter and checked by an independent verifier for unsupported claims, direction reversals, causal overclaiming, group generalization, and omitted uncertainty.
 
-`contextual-orchestrator` integration allocates test-time compute between direct single-model routing and deeper role-based orchestration. Evaluation varies decomposition, recursion, workflow stages, role-specific reasoning effort, and tool/access lists, with ablations informed by Fugu-, Conductor-, and TRINITY-style research directions. Speed is not the primary objective; calibrated quality and evidence are.
-
-Approved live tests use `NVIDIA_NIM_API_KEY`. `COPILOT_GITHUB_TOKEN` is prohibited.
+The active PRD v0.4.1 routing amendment makes `contextual-orchestrator` the canonical provider-routing boundary. All semantic LLM work consumes a **released, versioned** contextual-orchestrator API/client/schema through a TEPP ACL. TEPP owns task/evidence/access/scientific policy but does not select provider, concrete model, provider group, or paid fallback and does not consume provider API keys. Model-backed GitHub Actions request `orchestrator/free` through the gateway credential only. If a compatible released contract is unavailable, semantic live execution fails closed rather than falling back to a direct provider path. `COPILOT_GITHUB_TOKEN` is prohibited.
 
 ## 13. Rust and compute requirements
 
@@ -299,7 +297,7 @@ Documents and model outputs are untrusted. TEPP enforces tenant isolation, immut
 
 Scientific integrity is a security property. Silent temporal leakage, unsupported cross-language equivalence, failed uncertainty coverage, group bias, numerical backend divergence, or causal overclaiming fails closed.
 
-Changes to latent-variable meaning, temporal semantics, event ontology, multilingual invariance, or estimator targets require an ADR and PRD version increase.
+Changes to latent-variable meaning, temporal semantics, event ontology, multilingual invariance, estimator targets, or service authority require an ADR and PRD version increase/amendment.
 
 ## 18. Delivery phases
 
@@ -329,4 +327,4 @@ The first release requires:
 
 ## 20. Approved baseline
 
-This document is the approved v0.4 design baseline. The complete source PRD, preceding v0.2 and v0.3 designs, roadmap, implementation plan, validation report, instruction sources, and reproducibility manifest are retained in `docs/archive/source-material/`.
+This document is the approved v0.4 design baseline. The active v0.4.1 LLM-routing amendment changes only the service-authority and released-contract boundary for §12 until its protected-main promotion; it does not alter TEPP's scientific estimands. The complete source PRD, preceding v0.2 and v0.3 designs, roadmap, implementation plan, validation report, instruction sources, and reproducibility manifest are retained in `docs/archive/source-material/`.

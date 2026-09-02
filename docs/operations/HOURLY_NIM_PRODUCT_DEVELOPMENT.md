@@ -1,190 +1,99 @@
 # Hourly Contextual Orchestrator Product Development
 
-The hourly contextual-orchestrator product-development workflow proposes one bounded
-commercial-quality increment when the repository has no open pull request or open
-issue. It is
-separate from the deterministic minute-17 quality sentinel and never merges,
-releases, deploys, approves, or changes reviewer credentials.
+The hourly product-development workflow proposes one bounded commercial-quality increment only when the repository has no open pull request or open issue. It is separate from deterministic quality gates and never merges, releases, deploys, approves, or changes reviewer credentials.
 
 ## Schedule and queue behavior
 
-`.github/workflows/hourly-nim-product-development.yml` runs at minute 47 of every
-hour and supports `workflow_dispatch` with `dry_run=true`. The nonzero minute
-avoids the busiest scheduler boundary. A repository-scoped concurrency group
-does not cancel an active run.
+`.github/workflows/hourly-nim-product-development.yml` runs at minute 47 of every hour and also supports `workflow_dispatch` with `dry_run=true`. Its repository-scoped concurrency group does not cancel an active run.
 
-Before checkout or model execution, the proposal job reads at most one open pull
-request and one open issue. Unreadable inventory, any open PR or issue, any
-missing provider key, or a missing Maintainer App configuration produces a stable
-fail-closed no-op. A dry run may print the task contract without credentials.
+Before checkout or model execution, the proposal job reads at most one open pull request and one open issue. Unreadable inventory, any open PR or issue, an unavailable immutable contextual-orchestrator release, an unavailable released gateway, or missing Maintainer App configuration produces a stable fail-closed no-op. A dry run may print the task contract without model or publication credentials.
 
-When a PR or issue exists, normal review → repair → exact-head Checks → merge
-governance owns the hour. The scheduler does not create a competing branch.
+When a PR or issue exists, normal review → repair → exact-head Checks → merge governance owns the hour. The scheduler does not create a competing branch.
 
-Current executable queue (2026-08-27T10:20Z snapshot; live state supersedes):
-
-1. Land the regression-fix authoring PR first: #274 restores the tepp_api
-   rustdoc contract, macOS-gates the mlx_native_receipt imports, closes the
-   branch/line coverage arms the #257/#266 slices left open (new tests and a
-   provably-dead-clause removal), and repairs the stale workspace contract
-   fixture. Merge only after exact-head required Checks and independent
-   approval.
-2. Then the open Driver p.16 `std`-family restorations
-   #267/#268/#270/#271/#272, the TDT/CHRONOS composition #269, and the gap
-   baseline refresh #273 — each after a rerun on the fixed main base.
-3. Do not open a competing hourly proposal while the open-PR inventory is
-   non-empty; review → repair → exact-head Checks → merge governs the hour.
-
-Preferred buyer-visible gaps once the queue drains: GAP-169 longitudinal
-ESEM/DSEM composition beyond the recovered `std`-family, GAP-007 calibrated
-TDT/CHRONOS workflow evidence, GAP-010 Storybook/tokens workspace
-definitions with Figma, and GAP-011 multi-tenant release evidence.
+The live queue is intentionally not duplicated here. `docs/product-technical-gap-baseline.md` and the queue-authority vehicle hold point-in-time queue evidence; GitHub is authoritative for current counts and exact heads.
 
 ## Required repository configuration
 
 Configure these repository or organization values:
 
-- Secrets `BYTEZ_API_KEY`, `NVIDIA_NIM_API_KEY`, `NVIDIA_NIM_API_KEY_SUB`,
-  `OPENROUTER_API_KEY`, and `OPENAI_API_KEY` for gateway bootstrap only.
-- Variable `TEPP_MAINTAINER_APP_CLIENT_ID`.
-- Secret `TEPP_MAINTAINER_APP_PRIVATE_KEY`.
-- A repository-scoped GitHub App installation with metadata read, contents
-  write, and pull-request write permissions only.
+- variable `CONTEXTUAL_ORCHESTRATOR_RELEASE`: an immutable published contextual-orchestrator release tag;
+- variable `CONTEXTUAL_ORCHESTRATOR_BASE_URL`: the HTTPS base URL for the released gateway;
+- secret `CONTEXTUAL_ORCHESTRATOR_GATEWAY_TOKEN`: the gateway credential used by the proposal runner;
+- variable `TEPP_MAINTAINER_APP_CLIENT_ID`;
+- secret `TEPP_MAINTAINER_APP_PRIVATE_KEY`;
+- a repository-scoped GitHub App installation with metadata read, contents write, and pull-request write permissions only.
 
-Do not place GitHub App credentials in the proposal or verifier jobs. Do not
-reuse the existing review App or alter its variable, secret, identity, or
-provider route. Do not configure `COPILOT_GITHUB_TOKEN`.
+TEPP does not configure or consume provider API credentials for this workflow. Provider discovery, provider/model/group selection, free/paid admission, fallback, and provider execution remain contextual-orchestrator responsibilities. The proposal job requests only `orchestrator/free`.
 
-A manual dry run verifies scheduling, queue, and prompt contracts without model
-or publication credentials. Missing production credentials leave the hourly
-developer disabled rather than falling back to `GITHUB_TOKEN`.
+Do not place GitHub App credentials in the proposal or verifier jobs. Do not reuse the existing review App or alter its variable, secret, identity, or route. A manual dry run verifies scheduling, queue, and prompt contracts without model or publication credentials.
 
 ## Three-runner trust boundary
 
 ### 1. Proposal runner
 
-The proposal runner has read-only repository and pull-request permissions.
-OpenCode is downloaded from an immutable versioned URL and checked against a
-committed SHA-256. It calls only the loopback contextual-orchestrator gateway.
+The proposal runner has read-only repository, issue, and pull-request permissions. OpenCode is downloaded from an immutable versioned URL and checked against the committed SHA-256.
 
-The gateway source is downloaded from the pinned
-`ContextualWisdomLab/contextual-orchestrator` commit and checked against a
-committed SHA-256. At bootstrap, `scripts/run_contextual_orchestrator.py`
-registers all five provider keys in the orchestrator KV, removes them from its
-environment, discovers every provider model, records secret-free discovery
-evidence, excludes endpoint-only and safety-only model identifiers from chat
-routing, and enables the three lowest-cost general-chat candidates. OpenCode
-receives only the gateway bearer token; it never receives a provider key. The
-gateway's `/healthz` and authenticated `/v1/models` responses are checked before
-the agent starts.
+Before OpenCode runs, the workflow resolves `CONTEXTUAL_ORCHESTRATOR_RELEASE` with the GitHub Releases API and requires the matching release to be neither draft nor prerelease and to report `.immutable == true`. A mutable protected-main commit, open PR head, source archive, or checksum-pinned snapshot is not a production routing contract.
 
-The OpenCode process has provider keys, GitHub, OIDC, Actions runtime/cache, and
-runner command-file variables removed. Network tools, GitHub
-CLI, remote Git operations, commits, pushes, tags, external-directory access,
-task delegation, interactive questions, and OpenCode web tools are denied.
+The configured gateway URL must be HTTPS. The runner checks gateway liveness over HTTPS and makes an authenticated `/v1/models` request using only the gateway credential. The returned catalog must expose `orchestrator/free`; otherwise the workflow fails closed with `contextual_orchestrator_gateway_unavailable`. The workflow does not start a loopback gateway and does not perform local provider discovery, price ranking, or model selection.
 
-The model may edit the local working tree and run repository tests. The trusted
-step stages the complete proposal, rejects whitespace errors, symbolic links,
-gitlinks, excessive file count, and excessive patch bytes, then uploads one
-binary full-index patch with a one-day retention period.
+OpenCode receives only the gateway credential through its OpenAI-compatible adapter and requests `contextual-orchestrator/orchestrator/free`. Network tools, GitHub CLI, remote Git operations, commits, pushes, tags, external-directory access, task delegation, interactive questions, and OpenCode web tools remain denied by the generated configuration.
+
+There is no model/reasoning elapsed-time kill switch in the OpenCode command. The GitHub proposal job retains an explicit 55-minute administrative job budget. That administrative limit is distinct from user cancellation, provider termination, streaming/tool-call completion, and model reasoning duration.
+
+The model may edit the local working tree and run repository tests. A trusted step stages the complete proposal, rejects whitespace errors, symbolic links, gitlinks, excessive file count, and excessive patch bytes, then uploads one binary full-index patch with one-day retention.
 
 ### 2. Fresh verifier
 
-A new runner checks out the exact base SHA and downloads by immutable numeric
-artifact ID. It validates the upload digest, patch SHA-256, workflow-run
-identity, expiration, base SHA, file count, byte count, and Git modes before
-applying the patch.
+A new runner checks out the exact proposal base SHA and downloads the artifact by immutable numeric ID. It validates the upload digest, patch SHA-256, workflow-run identity, expiration, base SHA, file count, byte count, and Git modes before applying the patch.
 
-The verifier receives neither model nor publication credentials. It installs
-the hash-locked Python environment, compiles the quality scripts and tests,
-validates the workspace and documentation contracts, runs the quality tests
-with 100% statement and branch coverage, and executes the pinned Rust format,
-lint, test, documentation, dependency, line-coverage, and branch-coverage
-gates. Coverage artifacts remain under `$RUNNER_TEMP`. It rejects any
-verification mutation and proves the post-verification patch is byte-identical.
+The verifier receives neither model nor publication credentials. It installs the hash-locked Python environment, compiles quality scripts and tests, validates workspace and documentation contracts, runs quality tests with 100% statement and branch coverage, and executes pinned Rust format, lint, test, documentation, dependency, line-coverage, and branch-coverage gates. Coverage artifacts remain under `$RUNNER_TEMP`. It rejects any verification mutation and proves the post-verification patch is byte-identical.
 
 ### 3. Fresh publisher
 
-A third runner checks out the exact base and copies the trusted PR-message parser
-to `RUNNER_TEMP` before applying the proposal. It repeats the immutable artifact
-checks and applies the patch only as Git data. It executes no proposed tests,
-build scripts, packages, binaries, or shell files.
+A third runner checks out the exact base and copies the trusted PR-message parser to `RUNNER_TEMP` before applying the proposal. It repeats immutable artifact checks and applies the patch only as Git data. It executes no proposed tests, build scripts, packages, binaries, or shell files.
 
-The copied parser rejects symlinks, non-regular files, malformed UTF-8,
-unsupported controls, bidirectional spoofing, and byte-limit violations. Only
-after bounded metadata is written does the publisher mint the repository-scoped
-Maintainer App token. It then rechecks open-PR and open-issue inventory plus live
-`main`, pushes one unique branch, and calls `gh pr create` exactly once.
+The copied parser rejects symlinks, non-regular files, malformed UTF-8, unsupported controls, bidirectional spoofing, and byte-limit violations. Only after bounded metadata is written does the publisher mint the repository-scoped Maintainer App token. It then rechecks open-PR and open-issue inventory plus live `main`, pushes one unique branch, and calls `gh pr create` exactly once. The live default-branch SHA is compared with the same `EXPECTED_BASE` captured by the proposal runner; an advance fails with `base_branch_advanced`.
 
 ## Proposal contract
 
-The autonomous prompt requires one buyer-visible gap, standalone and modular MSA
-compatibility, realistic test-first evidence, 100% coverage and docstrings,
-database naming policy, CHANGELOG and operations updates, and APA 7 doctoring.
-After `audit_event` inserts are bound to `try_record`, the scheduled increment
-is binding `tepp_api` privileged-export authorization decision records to
-`operational_log::try_record`. It must not reopen a public
-`OperationalLogRecord::new` constructor or mix `service_tls` or persistence
-migration `0007` into that increment.
-LLM work must use or improve Contextual Orchestrator and consider Fugu,
-Conductor, TRINITY, workflow stages, access lists, bounded recursion,
-role-specific reasoning effort, and ablation.
+The autonomous prompt requires one buyer-visible gap, standalone and modular MSA compatibility, realistic test-first evidence, 100% coverage and docstrings, database naming policy, CHANGELOG and operations updates, and APA 7 doctoring. Semantic LLM work crosses the released contextual-orchestrator boundary and requests `orchestrator/free`; TEPP does not select provider/model/group or a paid fallback. Fugu, Conductor, and TRINITY remain experimental orchestration hypotheses evaluated through reasoning-effort and topology ablations rather than substitutes for deterministic scientific gates.
 
-The model must write `PR_MESSAGE.md` with a bounded title on the first line and a
-body describing the product gap, design, RED-to-GREEN evidence, verification,
-sources, version decision, and residual risk. Missing metadata receives a
-minimal trusted fallback body.
+Operational logging preserves the existing audit boundary: privileged persistence inserts use `audit_event`; in-memory records are created only through `operational_log::try_record` / `OperationalLogRecord::new`; raw source content and source identity do not enter operational logs.
+
+The model writes `PR_MESSAGE.md` with a bounded title on the first line and a body describing the product gap, design, RED-to-GREEN evidence, verification, sources, version decision, and residual risk. Missing metadata receives a minimal trusted fallback body.
 
 ## Failure and recovery
 
-Stable no-op reasons are:
+Stable no-op or refusal reasons include:
 
-- `pull_request_inventory_unavailable`
-- `open_pull_request`
-- `issue_inventory_unavailable`
-- `open_issue`
-- `issue_inventory_unavailable_after_generation`
-- `open_issue_after_generation`
-- `contextual_orchestrator_credentials_unavailable`
-- `maintainer_app_unavailable`
+- `pull_request_inventory_unavailable`;
+- `open_pull_request`;
+- `issue_inventory_unavailable`;
+- `open_issue`;
+- `contextual_orchestrator_release_unavailable`;
+- `contextual_orchestrator_gateway_unavailable`;
+- `maintainer_app_unavailable`;
+- `base_branch_advanced`;
+- `open_pull_request_after_generation`;
+- `open_issue_after_generation`.
 
-A failed model candidate is discarded before a later candidate runs. A cleanup
-or reinstall failure stops fallback. A failed verifier publishes nothing. A
-publisher aborts if the artifact, base, queue, or metadata changed. If branch
-push succeeds but PR creation fails, the error trap removes the orphan branch.
+There is no consumer-side provider, paid, unknown-price, or mutable-source fallback. If contextual-orchestrator has no compatible immutable release, scheduled semantic execution is intentionally unavailable until the owner publishes one and TEPP adopts its released contract.
 
-Investigate the exact run and job log, reproduce the relevant command on the
-same commit, add or retain a failing regression, and repair through a normal PR.
-Never bypass the verifier, substitute stale check evidence, or grant the model a
-write token.
+A failed verifier publishes nothing. A publisher aborts if the artifact, base, queue, or metadata changed. If branch push succeeds but PR creation fails, the error trap removes the orphan branch.
+
+Investigate the exact run and job log, reproduce the relevant command on the same commit, add or retain a failing regression, and repair through a normal PR. Never bypass the verifier, substitute stale check evidence, grant the model a write token, or reintroduce consumer-side routing to make the schedule run.
 
 ## Disablement and rollback
 
-Disable scheduled development by disabling the workflow, removing its schedule,
-or removing any one of the five provider credentials. Removing any provider key
-stops model execution; removing the Maintainer App values stops publication.
-The minute-17 deterministic quality sentinel continues independently.
+Disable scheduled development by disabling the workflow or removing its schedule. Removing the released-contract tag, HTTPS gateway URL, gateway credential, or Maintainer App configuration leaves production execution fail-closed. The deterministic quality sentinel continues independently.
 
-Rollback a faulty workflow through a reviewed revert PR. Do not edit branch
-protection, review workflows, or release workflows as an incident shortcut.
-Delete orphan `nim-agent/product-dev-*` branches only after confirming no open PR
-references them.
+Rollback a faulty workflow through a reviewed revert PR. Do not edit branch protection, review workflows, release workflows, released-contract validation, or fail-closed routing as an incident shortcut. Delete orphan `nim-agent/product-dev-*` branches only after confirming no open PR references them.
 
 ## Residual risks
 
-- The ephemeral gateway process receives provider credentials during bootstrap,
-  then removes them from its environment before serving. A future narrow
-  inference broker could keep upstream secrets outside the runner.
-- Each configured provider may process repository source; operators must review
-  confidentiality, retention, regional, and contractual obligations for every
-  provider before enabling the schedule.
-- The verifier executes untrusted code on an ephemeral hosted runner with
-  outbound network access, but receives no publication, provider, OIDC,
-  artifact/cache runtime, command-file, or reviewer credential.
-- GitHub artifact storage, hosted runners, and pinned actions remain trusted
-  infrastructure. Digests prove identity, not semantic correctness.
-- GitHub cannot atomically create a PR only when none exists. Final queue and
-  base revalidation, unique branches, review, and exact-head Checks bound the
-  race.
-- The pinned OpenCode release intentionally trails the latest observed upstream
-  release until the exact Linux asset digest is independently reviewed.
+- Gateway availability and the correctness of `orchestrator/free` admission are external owner responsibilities; TEPP validates release identity and route presence but cannot infer owner-side provider economics from consumer metadata.
+- Each orchestrator-selected provider may process repository source. Operators must review confidentiality, retention, regional, and contractual obligations before enabling the released gateway.
+- The verifier executes untrusted code on an ephemeral hosted runner with outbound network access, but receives no publication, gateway, OIDC, artifact/cache runtime, command-file, or reviewer credential.
+- GitHub artifact storage, hosted runners, pinned actions, release metadata, and the configured HTTPS gateway remain trusted infrastructure. Digests and immutable-release metadata establish identity, not semantic correctness.
+- GitHub cannot atomically create a PR only when none exists. Final queue and base revalidation, unique branches, review, and exact-head Checks bound that race.
