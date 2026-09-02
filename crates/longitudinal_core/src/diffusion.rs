@@ -164,12 +164,11 @@ mod tests {
     use crate::{EventTimeInterval, LongitudinalError};
 
     #[test]
-    fn discrete_candidate_fails_closed_on_signed_zero_event_product() {
+    fn discrete_candidate_preserves_representable_minimum_subnormal_ratio() {
         let tiny = EventTimeInterval::new(f64::from_bits(1)).expect("minimum subnormal interval");
-        assert_eq!(
-            recover_event_time_standardised_discrete_diffusion(1.0, -0.5, tiny),
-            Err(LongitudinalError::InvalidTemporalTransformInput)
-        );
+        let recovered = recover_event_time_standardised_discrete_diffusion(1.0, -0.5, tiny)
+            .expect("the final standardized ratio is the minimum positive subnormal");
+        assert_eq!(recovered.to_bits(), 1);
     }
 
     #[test]
