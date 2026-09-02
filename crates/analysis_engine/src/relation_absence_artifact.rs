@@ -200,7 +200,9 @@ pub fn execute_relation_absence_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != RELATION_ABSENCE_MODEL_CONTRACT_VERSION
         || request.output_profile != RELATION_ABSENCE_OUTPUT_PROFILE
     {
