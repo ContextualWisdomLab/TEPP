@@ -51,7 +51,13 @@ pub(crate) fn recover_stationary_within_variance(
         // is necessarily far below the minimum representable positive value.
         (continuous_diffusion * 0.5) / -log_rate
     };
-    if !stationary.is_finite() {
+    // Positive q with stable finite a implies strictly positive real p. If the
+    // binary64 evaluation collapses that requested estimand to zero, zero is a
+    // false scientific boundary rather than a representable stationary
+    // variance. Standardized callers that algebraically cancel p use the input
+    // validator above and therefore are not rejected by this materialization
+    // rule.
+    if !stationary.is_finite() || stationary == 0.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     Ok(stationary)
