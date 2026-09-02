@@ -78,6 +78,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "subevent_containment",
  "temporal_core",
  "tepp_api",
  "topic_measurement",
