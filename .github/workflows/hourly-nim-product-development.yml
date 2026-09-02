@@ -233,13 +233,13 @@ jobs:
             exit 1
           }
           gateway_base="${CONTEXTUAL_ORCHESTRATOR_BASE_URL%/}"
-          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
             --connect-timeout 10 --max-time 30 \
             "$gateway_base/healthz" >/dev/null || {
               echo '::error::contextual_orchestrator_gateway_unavailable'
               exit 1
             }
-          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
             --connect-timeout 10 --max-time 30 \
             -H "Authorization: Bearer ${CONTEXTUAL_ORCHESTRATOR_GATEWAY_TOKEN}" \
             "$gateway_base/v1/models" >"$RUNNER_TEMP/contextual-orchestrator-models.json" || {
