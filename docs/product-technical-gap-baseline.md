@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T18:17:00Z
+**Snapshot:** 2026-09-02T19:02:00Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -44,7 +44,7 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `ea550a3a2f3419061736eaa12a74909acf5f90a9` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; nonzero lagged covariance may no longer underflow into a false exact-zero correlation; exact-head hosted verification is pending. |
+| #310 | `7f0bea0841fb89a6ce9bdd5b9f10c0e4612f4270` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; one canonical irregular-rate function identity is re-exported through the stable facade; exact-head hosted verification is pending. |
 
 Exact-current-head evidence becomes stale after source mutation or any new commit.
 
@@ -69,11 +69,13 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 Closed predecessor #441 is contained by #310. The invalid covariance/earlier-variance quantity is not exposed as autocorrelation; lagged Pearson correlation requires lagged covariance and both occasion-specific marginal variances. Temporal/state composition is owned by `longitudinal_core`.
 
-Current head `ea550a3a2f3419061736eaa12a74909acf5f90a9` adds a fail-closed representability contract for lagged Pearson correlation. RED `c345ee7b8bdf642430669b7b0e1d7fc6873a84af` pins finite inputs `cov=min_subnormal`, `Var_t=Var_t+Δ=f64::MAX`: the covariance satisfies the exact binary64 Cauchy–Schwarz bound, but the true standardized magnitude is below the smallest representable binary64 and the predecessor returned `Ok(0.0)`, falsely converting a nonzero association into exact no-association. Repair `5785e07a352801c193d92dde03863d0697a2853a` rejects that representability collapse as `InvalidTemporalAssociationInput` while preserving genuine zero covariance as `Ok(0.0)`. Public-boundary commit `ea550a3a2f3419061736eaa12a74909acf5f90a9` carries the same regression through typed `EventTimeInterval` and documents the refusal contract.
+The lagged-correlation representability repair remains intact. RED `c345ee7b8bdf642430669b7b0e1d7fc6873a84af` pins finite inputs `cov=min_subnormal`, `Var_t=Var_t+Δ=f64::MAX`: the covariance satisfies the exact binary64 Cauchy–Schwarz bound, but the true standardized magnitude is below the smallest representable binary64 and the predecessor returned `Ok(0.0)`, falsely converting a nonzero association into exact no-association. Repair `5785e07a352801c193d92dde03863d0697a2853a` rejects that representability collapse as `InvalidTemporalAssociationInput` while preserving genuine zero covariance as `Ok(0.0)`.
+
+The current exact head `7f0bea0841fb89a6ce9bdd5b9f10c0e4612f4270` also removes a redundant public wrapper layer around the canonical irregular-rate implementation. An initial test commit `5697221872650f0327cbdf6db0a5020a07fe39e4` over-specified canonical visibility as `pub(crate)`; before production mutation, RED refinement `4648638608436fb6c04315d96f59a6404e2e790b` corrected the contract to preserve re-exportable canonical `pub fn` identities while forbidding facade wrapper `pub fn` declarations. Repair `7f0bea0841fb89a6ce9bdd5b9f10c0e4612f4270` replaces the wrappers with direct `pub use` re-exports. `lib.rs` retains the same crate-public names through `stable_irregular_rate`, so the API remains compatible while one function identity owns the numerical behavior.
 
 The earlier stationary-overflow documentation repair remains intact. RED `9d8a82d78443cafc9b5064fc3bb35aa3f2052722` rejects the retired `(q / a) * -0.5` overflow instruction and requires `(q * 0.5) / |a|`; repair `9c962205dca26925c2e60d1e15ec4ce15681bbee` synchronizes `CLAUDE.md` with production `recover_stationary_within_variance` behavior. Earlier CWC, within/between, known-truth RMSE, irregular-rate zero-underflow, stationary-subnormal and exact covariance-bound lineages also remain on the same vehicle.
 
-The current head is mergeable but remains Draft. Exact-head CodeQL PR run `33665256789` is `startup_failure`; Documentation Quality `33665255191`, SAST Semgrep `33665255137`, OSV-Scanner PR `33665255643`, Security Scan `33665255105`, Scorecard PR `33665255116`, and Rust Foundation CI `33665255109` are queued. There is no qualifying current-head independent approval. Source and public-boundary regression are repaired, but protected-main integration waits for fresh exact-head GREEN evidence and review.
+The current head is mergeable but remains Draft. Exact-head CodeQL PR run `33670670642` is `startup_failure`; Documentation Quality `33670668067`, SAST Semgrep `33670668039`, OSV-Scanner PR `33670669157`, Security Scan `33670667891`, Scorecard PR `33670667957`, and Rust Foundation CI `33670667997` are queued. There is no qualifying current-head independent approval. Source repair is complete, but protected-main integration waits for fresh exact-head GREEN evidence and review.
 
 The CWC and within/between unit-mean helpers now agree on the material extreme-cancellation behavior but are still separate implementations. Consolidation remains a maintainability target only after their full error/estimand semantics are shown equivalent; a reusable domain-neutral arithmetic primitive belongs in fast-mlsirm rather than being copied across TEPP contexts.
 
@@ -83,13 +85,13 @@ Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-
 
 ### #480 / #479 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` has **zero GitHub releases** at this snapshot. Mutable branch state is not a released contract. The consumer remains deliberately fail-closed. Deployment identity must be bound to the selected immutable release and model-controlled execution must not receive a reusable long-lived gateway credential.
+#480 removes TEPP-owned provider discovery/ranking and requires HTTPS `contextual-orchestrator/orchestrator/free` from an immutable owner release. contextual-orchestrator protected `main@212ff437dc297613289dba2e6064ade9942e07d8` has **zero GitHub releases** at this snapshot. Mutable branch state is not a released contract. The consumer remains deliberately fail-closed. Owner issue #1023 remains open for authenticated release/deployment provenance and scoped/brokered authentication that does not expose a reusable long-lived gateway bearer token to model-controlled execution.
 
 ### fast-mlsirm owner handoff
 
 fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`. Immutable `v0.9.1` predates the current owner work.
 
-Generalized-mixed/dependence Published Language remains unreleased. #1714 is open/Ready at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`; its exact-head CodeQL PR is `startup_failure` and CI/security/SAST/CodeQL/OSV/Scorecard workflows are queued. Reusable static covariance-to-correlation standardization is independently represented by fast-mlsirm #1722 at `338dbb2d25f32b0e201102e7bf73076846fb57b3`. Neither mutable owner head is a TEPP production dependency. Temporal/EventTime admission and state composition remain TEPP-owned.
+Generalized-mixed/dependence Published Language #1714 is open/Ready at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`. Reusable static covariance-to-correlation standardization #1722 is open/Ready at `338dbb2d25f32b0e201102e7bf73076846fb57b3`. Dynamic evaluation criterion/item/run snapshots #1727 remain Draft at `17ac218a5c0a31f0082839603a8ffc64b4432534`; zero-anchor within-run work is explicit, while unsupported cross-version linking fails closed. None of these mutable owner heads is a TEPP production dependency. Temporal/EventTime admission and state composition remain TEPP-owned.
 
 ### #437 — ADR identity
 
@@ -97,7 +99,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 
 ## External contract state
 
-`context-graph-contracts` and `enterprise-architecture-core` remain read-only from this TEPP writer. Their open heads are candidate evidence rather than production contracts. Exact branch/count/release observations are refreshed each run and must not be promoted into deployable TEPP integration without a released version and conformance evidence.
+`context-graph-contracts` and `enterprise-architecture-core` remain read-only from this TEPP writer. Fresh state is CGC `develop@99cb5468ba3c15c5e79688f53dee74724fae2d13`, 14 open PR / 2 open issue / release 0, and EA Core `develop@1c0fa8b15ceb9e72186274aeb255d6777eb84ef4`, 24 open PR / 2 open issue / release 0. CGC #25 is still a Draft source-bound release-provenance prerequisite; EA #40 remains Draft/fail-closed against unreleased CGC evidence. Open heads are candidate evidence rather than production contracts.
 
 ## Gap register
 
@@ -119,10 +121,11 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-014 | current required-workflow startup/runner evidence unavailable | `external-control-risk` | central workflow repair, exact-current required workflows GREEN, no bypass |
 | GAP-015 | contextual-orchestrator lacks immutable released contract for current owner behavior | `release-blocking` | compatible immutable CO release, deployment provenance, safe gateway auth, exact TEPP ACL adoption |
 | GAP-016 | hourly LLM path needs released owner-only routing/authentication | `active-repair` | #480 + released CO adoption + exact-head GREEN/review/main merge |
-| GAP-017 | dynamic evaluation item/rater/anchor drift monitoring | `blocked-external-design` | released/digest-pinned owner contracts, ACL conformance, no-anchor/no-linking refusal, evidence-gated temporal monitoring |
+| GAP-017 | dynamic evaluation item/rater/anchor drift monitoring | `owner-contract-active` | released/digest-pinned dynamic criterion/item/run contract, ACL conformance, no-anchor/no-linking refusal, evidence-gated temporal monitoring |
 | GAP-018 | Longitudinal stable-mean logic remains duplicated | `active-refactor` | semantic-equivalence proof, one TEPP Longitudinal primitive or released fast-mlsirm generic owner contract, recovery parity |
 | GAP-019 | Longitudinal scientific instructions contradict current stationary-overflow implementation | `verification-pending` | RED `9d8a82d...` + repair `9c962205...`; exact-head Documentation Quality/review GREEN and protected-main integration |
-| GAP-020 | Nonzero lagged covariance can be misreported as exact-zero correlation when the standardized magnitude is unrepresentable | `verification-pending` | RED `c345ee7b...` + repair `5785e07a...` + public contract `ea550a3a...`; exact-head Rust/documentation/review GREEN and protected-main integration |
+| GAP-020 | Nonzero lagged covariance can be misreported as exact-zero correlation when the standardized magnitude is unrepresentable | `verification-pending` | RED `c345ee7b...` + repair `5785e07a...`; exact-head Rust/documentation/review GREEN and protected-main integration |
+| GAP-021 | Longitudinal irregular-rate facade duplicated public wrapper function identities over one canonical implementation | `verification-pending` | RED refinement `464863860...` + repair `7f0bea084...`; exact-head Rust/documentation/review GREEN and protected-main integration |
 
 ## Release gate
 
