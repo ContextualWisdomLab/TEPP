@@ -78,6 +78,7 @@ dependencies = [
  "inferred_status",
  "location_membership",
  "membership_core",
+ "membership_target",
  "relation_graph",
  "serde",
  "serde_json",

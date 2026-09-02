@@ -16,6 +16,7 @@ mod episode_membership_artifact;
 mod inferred_status_artifact;
 mod lineage_criterion;
 mod location_membership_artifact;
+mod membership_target_artifact;
 mod subevent_containment_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -76,6 +77,13 @@ pub use location_membership_artifact::{
     LOCATION_MEMBERSHIP_MODEL_CONTRACT_VERSION, LOCATION_MEMBERSHIP_OUTPUT_PROFILE,
     LocationMembershipArtifact, LocationMembershipDocument, LocationMembershipExecution,
     execute_location_membership_run,
+};
+/// Membership-target artifact and execution contracts from this engine.
+pub use membership_target_artifact::{
+    MEMBERSHIP_TARGET_ARTIFACT_BYTE_LIMIT, MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION,
+    MEMBERSHIP_TARGET_MODEL_CONTRACT_VERSION, MEMBERSHIP_TARGET_OUTPUT_PROFILE,
+    MembershipTargetArtifact, MembershipTargetDocument, MembershipTargetExecution,
+    execute_membership_target_run,
 };
 /// Subevent-containment artifact and execution contracts from this engine.
 pub use subevent_containment_artifact::{
@@ -294,6 +302,8 @@ pub enum AnalysisEngineError {
     InvalidInferredStatusArtifact,
     /// A location-membership artifact violated its bounded schema or count invariants.
     InvalidLocationMembershipArtifact,
+    /// A membership-target artifact violated its bounded schema or count invariants.
+    InvalidMembershipTargetArtifact,
     /// A subevent-containment artifact violated its bounded schema or count invariants.
     InvalidSubeventContainmentArtifact,
 }
@@ -314,6 +324,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::InvalidEpisodeMembershipArtifact => "invalid episode-membership artifact",
             Self::InvalidInferredStatusArtifact => "invalid inferred-status artifact",
             Self::InvalidLocationMembershipArtifact => "invalid location-membership artifact",
+            Self::InvalidMembershipTargetArtifact => "invalid membership-target artifact",
             Self::InvalidSubeventContainmentArtifact => "invalid subevent-containment artifact",
         };
         formatter.write_str(message)
@@ -749,6 +760,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidLocationMembershipArtifact,
                 "invalid location-membership artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidMembershipTargetArtifact,
+                "invalid membership-target artifact",
             ),
             (
                 AnalysisEngineError::InvalidSubeventContainmentArtifact,
