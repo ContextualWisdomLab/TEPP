@@ -238,6 +238,20 @@ mod tests {
     }
 
     #[test]
+    fn nonzero_covariance_cannot_collapse_to_exact_zero_correlation() {
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(
+            recover_event_time_lagged_correlation(
+                minimum_subnormal,
+                f64::MAX,
+                f64::MAX,
+                event_time(1.0),
+            ),
+            Err(LongitudinalError::InvalidTemporalAssociationInput)
+        );
+    }
+
+    #[test]
     fn gross_subnormal_bound_violation_is_classified_before_division() {
         let minimum_subnormal = f64::from_bits(1);
         assert_eq!(
