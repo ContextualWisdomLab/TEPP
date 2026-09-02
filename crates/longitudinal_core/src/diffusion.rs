@@ -9,42 +9,40 @@
 //! research-candidate extensions, not canonical ctsem output and not a DSEM or
 //! ctsem estimator.
 
-use crate::{EventTimeInterval, LongitudinalError, stationary::recover_stationary_within_variance};
+use crate::{EventTimeInterval, LongitudinalError, stationary::validate_stationary_process_inputs};
 
 /// Recover the scalar research-candidate `DIFFUSIONstd = q / p` map.
 ///
 /// `q` is the continuous diffusion variance-rate input and `p` is the strictly
-/// positive stationary within-person variance `-q/(2a)`. The implementation
-/// first recovers `p` to enforce the named estimand's positive-stationarity
-/// admission contract. It then evaluates the algebraically identical scalar
-/// ratio as `-2a` instead of dividing by the rounded binary64 representation of
-/// `p`. That distinction matters for subnormal `q`/`p`: rounding `p` before
-/// `q/p` can destroy the cancellation and make the standardized result depend
-/// spuriously on diffusion scale. Equal numeric values still do not collapse
-/// this estimand into `asymDIFFUSIONstd` or another variance standardisation.
+/// positive stationary within-person variance `-q/(2a)`. For every finite
+/// positive `q` and stable finite `a`, that real-valued variance exists and the
+/// scalar standardisation cancels it exactly to `-2a`. The implementation
+/// therefore validates the stationary process without materializing `p` as
+/// binary64; an intermediate `p` below or above the `f64` range must not erase
+/// a representable final standardized ratio. Equal numeric values still do not
+/// collapse this estimand into `asymDIFFUSIONstd` or another variance
+/// standardisation.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for non-finite
-/// inputs, negative diffusion, a non-representable stationary variance, or a
-/// non-representable final `-2a` ratio. Returns
+/// inputs, negative diffusion, or a non-representable final `-2a` ratio. Returns
 /// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
 /// Returns [`LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance`]
-/// when the stationary within-person variance is zero or underflows to zero.
+/// when continuous diffusion is exactly zero, because the stationary variance
+/// is then zero rather than merely outside the binary64 range.
 pub fn recover_event_time_standardised_continuous_diffusion(
     continuous_diffusion: f64,
     log_rate: f64,
 ) -> Result<f64, LongitudinalError> {
-    let stationary = recover_stationary_within_variance(continuous_diffusion, log_rate)?;
-    if stationary <= 0.0 {
+    validate_stationary_process_inputs(continuous_diffusion, log_rate)?;
+    if continuous_diffusion == 0.0 {
         return Err(LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance);
     }
 
-    // Algebraically q / (-q/(2a)) == -2a for every positive q. Evaluating
-    // q / rounded(p) is numerically wrong when q and p are subnormal because
-    // the rounded stationary variance no longer preserves that cancellation.
-    // The admission gate has already established finite log_rate < 0, so the
-    // only possible invalid result here is overflow to +infinity.
+    // Algebraically q / (-q/(2a)) == -2a for every positive q. The stationary
+    // process admission above establishes that cancellation in the real-valued
+    // model without requiring the cancelled p itself to fit in binary64.
     let ratio = -2.0 * log_rate;
     if !ratio.is_finite() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
@@ -57,12 +55,12 @@ pub fn recover_event_time_standardised_continuous_diffusion(
 /// For a stable scalar continuous-time process, dividing discrete process noise
 /// over an event interval by stationary within-person variance yields
 /// `1 - exp(2 a delta)`. The implementation evaluates this ratio directly with
-/// `exp_m1` after independently proving that positive stationary variance
-/// exists. This avoids multiplying by `p` only to divide by `p` again, which can
-/// overflow even when the final standardized ratio is representable. The
-/// [`EventTimeInterval`] value object prevents measurement occasion, document,
-/// assertion, system, or availability durations from being passed as event time
-/// accidentally.
+/// `exp_m1` after proving positive stationary variance algebraically from finite
+/// positive diffusion and stable drift. It does not materialize the cancelled
+/// stationary variance, so a below-range or above-range `p` cannot reject a
+/// representable final ratio. The [`EventTimeInterval`] value object prevents
+/// measurement occasion, document, assertion, system, or availability durations
+/// from being passed as event time accidentally.
 ///
 /// # Errors
 ///
@@ -71,14 +69,14 @@ pub fn recover_event_time_standardised_continuous_diffusion(
 /// zero, or a non-representable final ratio. Returns
 /// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
 /// Returns [`LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance`]
-/// when the stationary within-person variance is zero or underflows to zero.
+/// when continuous diffusion is exactly zero.
 pub fn recover_event_time_standardised_discrete_diffusion(
     continuous_diffusion: f64,
     log_rate: f64,
     event_interval: EventTimeInterval,
 ) -> Result<f64, LongitudinalError> {
-    let stationary = recover_stationary_within_variance(continuous_diffusion, log_rate)?;
-    if stationary <= 0.0 {
+    validate_stationary_process_inputs(continuous_diffusion, log_rate)?;
+    if continuous_diffusion == 0.0 {
         return Err(LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance);
     }
 
@@ -218,12 +216,14 @@ mod tests {
             interval,
         )
         .expect("Q_delta/p cancels the unrepresentable stationary intermediate");
-        assert!((discrete_underflow - -(-2.0_f64).exp_m1()).abs() <= f64::EPSILON);
+        let underflow_truth = -(-2.0_f64).exp_m1();
+        assert!((discrete_underflow - underflow_truth).abs() <= f64::EPSILON);
 
         let discrete_overflow =
             recover_event_time_standardised_discrete_diffusion(f64::MAX, -0.25, interval)
                 .expect("finite standardized discrete diffusion must survive p overflow");
-        assert!((discrete_overflow - -(-0.5_f64).exp_m1()).abs() <= f64::EPSILON);
+        let overflow_truth = -(-0.5_f64).exp_m1();
+        assert!((discrete_overflow - overflow_truth).abs() <= f64::EPSILON);
     }
 
     #[test]
