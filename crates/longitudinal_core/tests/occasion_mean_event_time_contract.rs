@@ -1,6 +1,7 @@
 use longitudinal_core::{
     EventTimedObservation, LongitudinalError, center_occasion_mean_event_lags,
     recover_occasion_mean_centered_irregular_residual_log_rate,
+    recover_within_unit_irregular_residual_log_rate,
     refuse_occasion_mean_centered_log_rate_as_within_person_lag,
 };
 
@@ -28,6 +29,30 @@ fn signed_zero_is_one_numeric_occasion() {
     assert_eq!(
         refuse_occasion_mean_centered_log_rate_as_within_person_lag(recovered),
         Err(LongitudinalError::BetweenIsNotWithinChange)
+    );
+}
+
+#[test]
+fn occasion_mean_residual_rate_is_not_cwc_rate_on_the_same_panel() {
+    let drift = -0.4_f64;
+    let phi = drift.exp();
+    let rows = [
+        observation(1, 0.0, 1.2),
+        observation(1, 1.0, 5.0 + 1.2 * phi),
+        observation(1, 2.0, 11.0 + 1.2 * (drift * 2.0).exp()),
+        observation(2, 0.0, -0.8),
+        observation(2, 1.0, 5.0 - 0.8 * phi),
+        observation(2, 2.0, 11.0 - 0.8 * (drift * 2.0).exp()),
+    ];
+
+    let occasion = recover_occasion_mean_centered_irregular_residual_log_rate(&rows)
+        .expect("occasion-mean residual rate");
+    assert!((occasion - drift).abs() < 1.0e-12);
+
+    let cwc = recover_within_unit_irregular_residual_log_rate(&rows).expect("CWC residual rate");
+    assert!(
+        (cwc - drift).abs() > 1.0e-6,
+        "Hamaker Eq. 1a occasion deviations and person-mean CWC residuals are different estimands: occasion={occasion}, CWC={cwc}"
     );
 }
 
