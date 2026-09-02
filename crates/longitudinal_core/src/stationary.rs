@@ -2,23 +2,40 @@
 
 use crate::LongitudinalError;
 
-/// Recover scalar stationary within-person variance `p = -q / (2a)`.
+/// Validate inputs for a scalar stationary continuous-time process.
 ///
-/// This primitive is intentionally private to Longitudinal Modeling. It admits
-/// finite non-negative continuous diffusion and strictly negative drift while
-/// avoiding an otherwise unnecessary overflow in the intermediate `2a`.
-/// Callers decide whether zero stationary variance is admissible for their
-/// named estimand.
-pub(crate) fn recover_stationary_within_variance(
+/// Finite `q >= 0` and strictly negative finite drift establish a finite,
+/// non-negative stationary variance in the mathematical real-valued model.
+/// This admission deliberately does not materialize `q / (-2a)` as binary64:
+/// standardized scalar maps may cancel that variance algebraically even when
+/// the intermediate itself lies below or above the representable `f64` range.
+pub(crate) fn validate_stationary_process_inputs(
     continuous_diffusion: f64,
     log_rate: f64,
-) -> Result<f64, LongitudinalError> {
+) -> Result<(), LongitudinalError> {
     if !continuous_diffusion.is_finite() || continuous_diffusion < 0.0 || !log_rate.is_finite() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     if log_rate >= 0.0 {
         return Err(LongitudinalError::StationaryVarianceRequiresStableDrift);
     }
+    Ok(())
+}
+
+/// Recover scalar stationary within-person variance `p = -q / (2a)`.
+///
+/// This primitive is intentionally private to Longitudinal Modeling. It admits
+/// finite non-negative continuous diffusion and strictly negative drift while
+/// avoiding an otherwise unnecessary overflow in the intermediate `2a`.
+/// Unlike standardized maps in which `p` cancels algebraically, this function
+/// actually returns `p`, so the stationary variance itself must be representable
+/// as binary64. Callers decide whether zero stationary variance is admissible
+/// for their named estimand.
+pub(crate) fn recover_stationary_within_variance(
+    continuous_diffusion: f64,
+    log_rate: f64,
+) -> Result<f64, LongitudinalError> {
+    validate_stationary_process_inputs(continuous_diffusion, log_rate)?;
     if continuous_diffusion == 0.0 {
         return Ok(0.0);
     }
@@ -42,8 +59,17 @@ pub(crate) fn recover_stationary_within_variance(
 
 #[cfg(test)]
 mod tests {
-    use super::recover_stationary_within_variance;
+    use super::{recover_stationary_within_variance, validate_stationary_process_inputs};
     use crate::LongitudinalError;
+
+    #[test]
+    fn stationary_input_admission_does_not_materialise_the_variance() {
+        assert_eq!(
+            validate_stationary_process_inputs(f64::from_bits(1), -1.0),
+            Ok(())
+        );
+        assert_eq!(validate_stationary_process_inputs(f64::MAX, -0.25), Ok(()));
+    }
 
     #[test]
     fn avoids_doubling_overflow_when_final_stationary_variance_is_representable() {
