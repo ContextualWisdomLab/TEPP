@@ -19,6 +19,7 @@ Aligned occasions may be irregularly spaced. Each consecutive unit-specific pair
 - Each admitted occasion contains at least two distinct units, and at least two units contribute consecutive lags. This prevents an atomistic one-unit series from manufacturing multilevel evidence.
 - Scores and event times must be finite. Consecutive event intervals must be finite and strictly positive.
 - A representable occasion mean is not rejected merely because a same-sign intermediate partial sum would overflow binary64. The mean path preserves cancellation before bounded same-sign averaging and still fails closed if the final mean or centered residual is non-representable.
+- Occasion means are bit-stable under permutation of the same admitted rows. Same-sign retained values are put in a deterministic total order before incremental averaging; input arrival order is not scientific evidence.
 - `recover_occasion_mean_centered_irregular_residual_log_rate` composes the centered pairs with the existing Longitudinal Modeling exact-log-rate boundary. It does not create a second static psychometric arithmetic authority.
 
 ## Test trace
@@ -28,8 +29,9 @@ Current #310 branch tests:
 - `crates/longitudinal_core/tests/occasion_mean_event_time_contract.rs::signed_zero_is_one_numeric_occasion` — `-0.0`/`+0.0` share one occasion and the known scalar event-time log-rate is recovered.
 - `signed_zero_duplicate_unit_is_rejected_as_one_occasion` — the same unit cannot use signed zero to bypass duplicate occasion admission.
 - `representable_occasion_mean_is_not_rejected_for_intermediate_sum_overflow` — `[0.75·MAX, 0.75·MAX, -0.5·MAX]` at one occasion retains a finite representable mean and finite centered residuals rather than failing on the naive partial sum.
+- `occasion_mean_is_bit_stable_under_row_permutation` — the same three-unit occasion with `{1, nextafter(1,+∞), MAX/2}` yields bit-identical centered pairs when row arrival order changes.
 
-The RED commit introducing these contracts is `75b0184d2f6341ef23cf14fc84398c68d8d95d22`. The owner-correct implementation is in `crates/longitudinal_core/src/occasion_mean.rs`; the current branch head after the public export/test correction must be used for merge evidence rather than any predecessor SHA.
+The initial occasion-composition RED is `75b0184d2f6341ef23cf14fc84398c68d8d95d22`. Deterministic-order RED `8a59019ed3112a3e27dd0dcd1b6b86d8d45e5435` exposes order-dependent same-sign averaging; causal repair `465d139dce6101c4958c8b0827b6ef5d674b54c2` orders same-sign values before averaging. The owner-correct implementation remains in `crates/longitudinal_core/src/occasion_mean.rs`. Only the current exact branch head may be used for merge evidence.
 
 ## Claim boundary
 
