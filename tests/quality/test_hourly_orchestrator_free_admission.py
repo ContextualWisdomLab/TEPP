@@ -53,6 +53,20 @@ class HourlyOrchestratorFreeAdmissionTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, text)
 
+    def test_authenticated_gateway_probes_allow_only_https_redirects(self) -> None:
+        """Prevent authenticated gateway probes from following an HTTP downgrade."""
+
+        text = WORKFLOW.read_text(encoding="utf-8")
+        secure_redirect_probe = (
+            "curl --fail --silent --show-error --location --proto '=https' "
+            "--proto-redir '=https' --tlsv1.2"
+        )
+        self.assertGreaterEqual(
+            text.count(secure_redirect_probe),
+            2,
+            "both gateway probes must restrict redirect protocols to HTTPS",
+        )
+
     def test_canonical_llm_authority_requires_released_orchestrator_contract(self) -> None:
         """Keep normative product/technical docs from re-authorizing provider keys."""
 
