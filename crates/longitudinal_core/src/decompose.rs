@@ -42,31 +42,84 @@ impl OccasionObservation {
     }
 }
 
+fn same_sign_unit_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
+    let mut mean = 0.0_f64;
+    for (index, &value) in values.iter().enumerate() {
+        mean += (value - mean) / (index + 1) as f64;
+    }
+    if mean.is_finite() {
+        Ok(mean)
+    } else {
+        Err(LongitudinalError::InvalidObservationPayload)
+    }
+}
+
 fn stable_unit_mean(rows: &[OccasionObservation]) -> Result<f64, LongitudinalError> {
-    let scale = rows
-        .iter()
-        .map(|row| row.score().abs())
-        .fold(0.0_f64, f64::max);
-    if scale == 0.0 {
+    let values: Vec<f64> = rows.iter().map(|row| row.score()).collect();
+    let mut positives: Vec<f64> = values.iter().copied().filter(|value| *value > 0.0).collect();
+    let mut negatives: Vec<f64> = values.iter().copied().filter(|value| *value < 0.0).collect();
+
+    if positives.is_empty() && negatives.is_empty() {
         return Ok(0.0);
     }
-
-    // Normalization keeps every addend in [-1, 1], while Neumaier
-    // compensation preserves cancellation that a raw `sum / n` would lose.
-    let mut sum = 0.0_f64;
-    let mut correction = 0.0_f64;
-    for row in rows {
-        let value = row.score() / scale;
-        let next = sum + value;
-        if sum.abs() >= value.abs() {
-            correction += (sum - next) + value;
-        } else {
-            correction += (value - next) + sum;
-        }
-        sum = next;
+    if positives.is_empty() || negatives.is_empty() {
+        return same_sign_unit_mean(&values);
     }
-    let normalized_mean = (sum + correction) / rows.len() as f64;
-    let mean = scale * normalized_mean;
+
+    positives.sort_by(|left, right| right.total_cmp(left));
+    negatives.sort_by(|left, right| left.total_cmp(right));
+
+    let mut positive_index = 0_usize;
+    let mut negative_index = 0_usize;
+    let mut positive = positives[0];
+    let mut negative = negatives[0];
+    let mut residuals = Vec::with_capacity(values.len());
+
+    loop {
+        let residual = positive + negative;
+        if residual > 0.0 {
+            positive = residual;
+            negative_index += 1;
+            if negative_index == negatives.len() {
+                residuals.push(positive);
+                residuals.extend_from_slice(&positives[positive_index + 1..]);
+                break;
+            }
+            negative = negatives[negative_index];
+        } else if residual < 0.0 {
+            negative = residual;
+            positive_index += 1;
+            if positive_index == positives.len() {
+                residuals.push(negative);
+                residuals.extend_from_slice(&negatives[negative_index + 1..]);
+                break;
+            }
+            positive = positives[positive_index];
+        } else {
+            positive_index += 1;
+            negative_index += 1;
+            if positive_index == positives.len() || negative_index == negatives.len() {
+                residuals.extend_from_slice(&positives[positive_index..]);
+                residuals.extend_from_slice(&negatives[negative_index..]);
+                break;
+            }
+            positive = positives[positive_index];
+            negative = negatives[negative_index];
+        }
+    }
+
+    if residuals.is_empty() {
+        return Ok(0.0);
+    }
+    let residual_mean = same_sign_unit_mean(&residuals)?;
+    let retained_count = residuals.len() as f64;
+    let total_count = values.len() as f64;
+    let retained_mass = residual_mean * retained_count;
+    let mean = if retained_mass.is_finite() {
+        retained_mass / total_count
+    } else {
+        (residual_mean / total_count) * retained_count
+    };
     if mean.is_finite() {
         Ok(mean)
     } else {
@@ -78,9 +131,10 @@ fn stable_unit_mean(rows: &[OccasionObservation]) -> Result<f64, LongitudinalErr
 ///
 /// Each unit contributes one between component at occasion `0` and one within
 /// residual per observed occasion. Units and occasions are emitted in sorted
-/// order so recovery tests can pair known truth without extra matching. Unit
-/// means are accumulated after max-magnitude normalization so a representable
-/// mean is not rejected merely because its raw partial sum exceeds binary64.
+/// order so recovery tests can pair known truth without extra matching. Mixed-
+/// sign unit means cancel opposite extreme values before averaging retained
+/// mass, preserving representable low-order and subnormal evidence without raw
+/// sum overflow or max-scale normalization underflow.
 ///
 /// # Errors
 ///
