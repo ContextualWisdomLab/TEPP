@@ -96,7 +96,8 @@ fn covariance_within_binary_bound(
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalAssociationInput`] for
-/// non-finite covariance or marginal inputs,
+/// non-finite covariance or marginal inputs, or when a nonzero exact
+/// correlation is too small to be represented as binary64,
 /// [`LongitudinalError::NonPositiveMarginalVariance`] when either marginal
 /// variance is not strictly positive, and
 /// [`LongitudinalError::CovarianceBoundViolation`] when the supplied covariance
@@ -136,6 +137,13 @@ pub(crate) fn recover_event_time_lagged_correlation(
         (later_scale, earlier_scale)
     };
     let correlation = (lagged_covariance / first_scale) / second_scale;
+
+    // A nonzero covariance cannot scientifically become an exact zero
+    // correlation merely because binary64 cannot represent the standardized
+    // magnitude. Fail closed rather than report a false no-association result.
+    if lagged_covariance != 0.0 && correlation == 0.0 {
+        return Err(LongitudinalError::InvalidTemporalAssociationInput);
+    }
 
     // Finite positive marginals plus the exact covariance-bound gate guarantee
     // that both divisions stay finite. Clamping only absorbs final
