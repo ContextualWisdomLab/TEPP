@@ -4,7 +4,8 @@ use std::io::{Read, Write};
 
 use orchestrator_live::{
     CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE, INTERPRETATION_RUN_CONTRACT_VERSION,
-    INTERPRETATION_RUN_PATH, InterpretationRunRequest, OrchestrationMode, OrchestratorLiveService,
+    INTERPRETATION_RUN_PATH, InterpretationRunLookupStoredRequestPayload, InterpretationRunRequest,
+    OrchestrationMode, OrchestratorLiveService,
     contextual_orchestrator_interpretation_run_lookup_stored_request_exchange,
     interpretation_run_lookup_stored_request_path_id, is_interpretation_run_lookup_path,
     is_interpretation_run_lookup_stored_request_path, is_interpretation_run_stored_request_path,
@@ -81,8 +82,10 @@ fn live_get_returns_stored_request_without_scientific_authority() {
         "GET /v1/interpretation-runs/by-run-id/orch-run-1/request HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: contextual-orchestrator\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n",
     );
     assert_eq!(got.status_code, 200, "{}", got.body);
-    let stored = InterpretationRunRequest::from_json(&got.body).expect("stored");
-    assert_eq!(stored, request);
+    let stored_payload =
+        InterpretationRunLookupStoredRequestPayload::from_json(&got.body).expect("stored");
+    assert_eq!(stored_payload.interpretation_run_id(), "orch-run-1");
+    assert_eq!(stored_payload.request(), &request);
     assert!(!got.body.contains("tepp.scientific_acceptance.v1"));
     assert!(!got.body.contains("rmse"));
     assert!(got.body.contains("\"scientific_authority\":false"));
