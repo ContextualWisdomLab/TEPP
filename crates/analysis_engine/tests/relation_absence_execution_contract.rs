@@ -98,6 +98,15 @@ fn mixed_statuses_emit_digest_bound_refusals_without_recovery_metric() {
         AnalysisRunTerminalState::Succeeded
     );
     assert_eq!(
+        execution
+            .terminal_result
+            .summary
+            .as_ref()
+            .expect("summary")
+            .validation_status,
+        "validated"
+    );
+    assert_eq!(
         execution.terminal_result.result_sha256.as_deref(),
         Some(execution.artifact.sha256().expect("digest").as_str())
     );
