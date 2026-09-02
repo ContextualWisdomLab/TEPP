@@ -67,8 +67,8 @@ pub fn recover_event_time_standardised_continuous_diffusion(
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for invalid
-/// diffusion/drift, an event-time product that underflows to signed zero, or a
-/// non-representable final ratio. Returns
+/// diffusion/drift, a doubled event-time exponent that underflows to signed
+/// zero, or a non-representable final ratio. Returns
 /// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
 /// Returns [`LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance`]
 /// when the stationary within-person variance is zero or underflows to zero.
@@ -82,23 +82,42 @@ pub fn recover_event_time_standardised_discrete_diffusion(
         return Err(LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance);
     }
 
-    let half_exponent = log_rate * event_interval.as_f64();
-    if half_exponent == 0.0 {
+    let interval = event_interval.as_f64();
+    let doubled_interval = interval * 2.0;
+    let exponent = if doubled_interval.is_finite() {
+        // Multiplication by two is exact while finite. Scaling the interval
+        // before the only rounded product preserves a representable `2aΔ`
+        // when `aΔ` alone would round to signed zero, and it avoids forming
+        // `2a`, whose intermediate can overflow for an extreme stable drift.
+        log_rate * doubled_interval
+    } else {
+        // If 2Δ overflows, Δ is already enormous. Form aΔ first and then apply
+        // the exact factor two; this branch cannot suffer the tiny-interval
+        // underflow that motivated the primary ordering above.
+        let half_exponent = log_rate * interval;
+        if half_exponent == f64::NEG_INFINITY {
+            return Ok(1.0);
+        }
+        if !half_exponent.is_finite() {
+            return Err(LongitudinalError::InvalidTemporalTransformInput);
+        }
+        half_exponent * 2.0
+    };
+
+    // The target exponent is exactly 2aΔ with finite a < 0 and Δ > 0. If that
+    // target itself rounds to signed zero, then 1-exp(2aΔ) is also below the
+    // minimum representable positive binary64 result and must fail closed.
+    if exponent == 0.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
-    if half_exponent == f64::NEG_INFINITY {
+    if exponent == f64::NEG_INFINITY {
         return Ok(1.0);
     }
-    if !half_exponent.is_finite() {
+    if !exponent.is_finite() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
 
-    let exponent = half_exponent * 2.0;
-    let ratio = if exponent == f64::NEG_INFINITY {
-        1.0
-    } else {
-        -exponent.exp_m1()
-    };
+    let ratio = -exponent.exp_m1();
     if !ratio.is_finite() || ratio <= 0.0 || ratio > 1.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
