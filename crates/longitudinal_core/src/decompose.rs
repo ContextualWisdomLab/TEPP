@@ -170,16 +170,6 @@ mod tests {
             decompose_within_between(&nan),
             Err(LongitudinalError::InvalidObservationPayload)
         );
-        let overflow = [
-            OccasionObservation::new(0, 0, f64::MAX),
-            OccasionObservation::new(0, 1, f64::MAX),
-            OccasionObservation::new(1, 0, 0.0),
-            OccasionObservation::new(1, 1, 0.0),
-        ];
-        assert_eq!(
-            decompose_within_between(&overflow),
-            Err(LongitudinalError::InvalidObservationPayload)
-        );
         let recovered = decompose_within_between(&[
             OccasionObservation::new(1, 1, 4.0),
             OccasionObservation::new(0, 1, 2.0),
@@ -191,5 +181,21 @@ mod tests {
         assert_eq!(recovered[0].unit_index(), 0);
         assert!((recovered[0].value() - 1.0).abs() < f64::EPSILON);
         assert_eq!(OccasionObservation::new(9, 8, 0.0).unit_index(), 9);
+    }
+
+    #[test]
+    fn representable_unit_mean_survives_raw_sum_overflow() {
+        let recovered = decompose_within_between(&[
+            OccasionObservation::new(0, 0, f64::MAX),
+            OccasionObservation::new(0, 1, f64::MAX),
+            OccasionObservation::new(1, 0, 0.0),
+            OccasionObservation::new(1, 1, 0.0),
+        ])
+        .expect("representable unit mean must not fail on an overflowing partial sum");
+
+        assert_eq!(recovered[0].level(), ComponentLevel::Between);
+        assert_eq!(recovered[0].value(), f64::MAX);
+        assert_eq!(recovered[1].value(), 0.0);
+        assert_eq!(recovered[2].value(), 0.0);
     }
 }
