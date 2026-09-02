@@ -10,7 +10,9 @@
 //! uncertainty pooling, combines draw-level OLS loadings with Rubin `T`,
 //! decomposes cluster-mean within/between OLS and the CWC contextual effect,
 //! maps event-time discrete lags through the exact scalar exponential, maps
-//! already-centered irregular residuals without re-centering, remaps discrete
+//! already-centered irregular residuals without re-centering, maps Hamaker
+//! (2015, Eq. 1a) occasion-mean residuals through that log-rate (those
+//! residuals are not within-person and this is not RI-CLPM), remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
 //! exact scalar discrete effect of a constant predictor, recovers the
 //! first-order discrete effect of a time-varying predictor with matched
@@ -309,6 +311,8 @@ pub use event_time::EventOccasion;
 pub use event_time::LagClock;
 /// Already-centered lagged residual pair with an irregular event interval.
 pub use event_time::LaggedWithinResidual;
+/// Hamaker Eq. 1a occasion-mean residual lags on aligned event-time waves.
+pub use event_time::center_occasion_mean_event_lags;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
@@ -399,6 +403,8 @@ pub use event_time::recover_manifest_observed_mean;
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
+/// Hamaker Eq. 1a occasion-mean residual log-rate (not within-person; not RI-CLPM).
+pub use event_time::recover_occasion_mean_centered_irregular_residual_log_rate;
 /// Exact scalar p. 16 `asymCINTstd` `(-κ / a) / √p` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 /// Exact scalar p. 16 `asymDIFFUSIONstd` `p / p = 1` after strictly positive `asymDIFFUSION`.
@@ -612,6 +618,8 @@ pub use event_time::refuse_measurement_error_as_stationary_lagged_observed_covar
 pub use event_time::refuse_measurement_error_as_stationary_later_observed_variance;
 /// Refuse treating `τ / √(λ² Var(η) + θ)` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean;
+/// Refuse treating a Hamaker Eq. 1a occasion-mean log-rate as within-person.
+pub use event_time::refuse_occasion_mean_centered_log_rate_as_within_person_lag;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.

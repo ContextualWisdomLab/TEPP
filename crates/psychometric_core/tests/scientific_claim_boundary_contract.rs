@@ -29,6 +29,7 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_occasion_mean_centered_irregular_residual_log_rate,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
@@ -118,6 +119,7 @@ use psychometric_core::{
     refuse_measurement_error_as_stationary_later_observed_variance,
     refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
     refuse_observed_variance_as_standardised_manifest_variance,
+    refuse_occasion_mean_centered_log_rate_as_within_person_lag,
     refuse_process_noise_as_unconditional_variance,
     refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance,
     refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
@@ -262,6 +264,57 @@ fn person_mean_subtraction_on_raw_ar_is_not_the_lagged_within_effect() {
     assert!(
         (cwc - drift).abs() > 1e-6,
         "Curran & Bauer (2011, pp. 607–608): CWC of raw AR recovered {cwc}, which must not equal drift {drift}"
+    );
+}
+
+#[test]
+fn occasion_mean_centered_lag_is_not_within_person() {
+    let drift = -0.4_f64;
+    let phi = drift.exp();
+    let rows = [
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 0.0,
+            score: 0.0 + 1.2,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 1.0,
+            score: 5.0 + 1.2 * phi,
+        },
+        ClusteredEventScore {
+            cluster_key: 1,
+            event_time: 2.0,
+            score: 11.0 + 1.2 * (drift * 2.0).exp(),
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 0.0,
+            score: 0.0 - 0.8,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 1.0,
+            score: 5.0 - 0.8 * phi,
+        },
+        ClusteredEventScore {
+            cluster_key: 2,
+            event_time: 2.0,
+            score: 11.0 - 0.8 * (drift * 2.0).exp(),
+        },
+    ];
+    let occasion =
+        recover_occasion_mean_centered_irregular_residual_log_rate(&rows, LagClock::EventTime)
+            .expect("occasion mean lag");
+    assert!((occasion - drift).abs() < 1e-12);
+    let cwc = recover_within_residual_event_time_log_rate(&rows, LagClock::EventTime).expect("cwc");
+    assert!(
+        (cwc - drift).abs() > 1e-6,
+        "Hamaker et al. (2015, Eq. 1a): p_it still contains between-person deviations; CWC {cwc} must not equal occasion-mean log-rate {occasion}"
+    );
+    assert_eq!(
+        refuse_occasion_mean_centered_log_rate_as_within_person_lag(occasion),
+        Err(psychometric_core::PsychometricError::OccasionMeanCenteredLagIsNotWithinPerson)
     );
 }
 

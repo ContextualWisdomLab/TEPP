@@ -34,6 +34,7 @@ use psychometric_core::{
     recover_level_change_extra_process_contribution_after,
     recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+    recover_occasion_mean_centered_irregular_residual_log_rate,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
@@ -118,6 +119,7 @@ use psychometric_core::{
     refuse_measurement_error_as_stationary_lagged_observed_covariance,
     refuse_measurement_error_as_stationary_later_observed_variance,
     refuse_observed_variance_as_standardised_manifest_variance,
+    refuse_occasion_mean_centered_log_rate_as_within_person_lag,
     refuse_pooled_discrete_lag_across_unequal_intervals,
     refuse_process_noise_as_unconditional_variance,
     refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
@@ -710,6 +712,41 @@ fn irregular_centered_residuals_recover_known_drift_better_than_cwc_of_raw_ar() 
     assert!(
         cwc_error > centered_error,
         "Curran & Bauer: CWC of raw AR RMSE {cwc_error} must exceed already-centered {centered_error}"
+    );
+}
+
+#[test]
+fn occasion_mean_centered_residuals_recover_known_drift_and_are_not_cwc() {
+    let true_drift = -0.35_f64;
+    let mut rows = Vec::new();
+    for (cluster, start) in [(1_u64, 1.1_f64), (2, -0.9)] {
+        for step in 0..6 {
+            let time = f64::from(step);
+            let group_mean = 2.0 * time;
+            rows.push(ClusteredEventScore {
+                cluster_key: cluster,
+                event_time: time,
+                score: group_mean + start * (true_drift * time).exp(),
+            });
+        }
+    }
+    let recovered =
+        recover_occasion_mean_centered_irregular_residual_log_rate(&rows, LagClock::EventTime)
+            .expect("occasion mean lag");
+    let occasion_error = rmse(&[true_drift], &[recovered]);
+    assert!(
+        occasion_error < 1e-12,
+        "Hamaker Eq. 1a occasion-mean RMSE {occasion_error}"
+    );
+    let cwc = recover_within_residual_event_time_log_rate(&rows, LagClock::EventTime).expect("cwc");
+    let cwc_error = rmse(&[true_drift], &[cwc]);
+    assert!(
+        cwc_error > occasion_error,
+        "Hamaker et al. (2015): CWC RMSE {cwc_error} must exceed occasion-mean {occasion_error}"
+    );
+    assert_eq!(
+        refuse_occasion_mean_centered_log_rate_as_within_person_lag(recovered),
+        Err(PsychometricError::OccasionMeanCenteredLagIsNotWithinPerson)
     );
 }
 

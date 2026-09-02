@@ -193,7 +193,7 @@
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::error::PsychometricError;
 use crate::indicator::require_finite;
@@ -6795,6 +6795,146 @@ pub fn recover_irregular_centered_residual_log_rate(
     require_finite(sum / count)
 }
 
+/// Occasion-mean residuals on aligned event-time waves.
+///
+/// Hamaker, Kuiper, and Grasman (2015, Eq. 1a; UvA-DARE PDF opened
+/// 2026-09-03T06:07Z KST) write `x_it = μ_t + p_it` where `μ_t` is the
+/// grand mean at occasion `t`, not the sample-wide grand mean and not
+/// the person mean. The returned residuals are those `p_it` lagged on
+/// event time. They still contain trait-like between-person deviations
+/// from the time-varying group mean, so lagged relations on them are
+/// **not** within-person. This is not RI-CLPM (their Eq. 3a) and not
+/// DSEM. Unaligned event times have no shared occasion and fail closed.
+/// Consecutive aligned waves may have unequal spacing; each pair keeps
+/// its own event interval.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event clock,
+/// [`PsychometricError::InvalidNumericInput`] for empty, singleton, duplicate
+/// cluster-occasion, or non-finite rows, [`PsychometricError::InsufficientClusters`]
+/// when fewer than two clusters appear at any occasion, and
+/// [`PsychometricError::NonPositiveInterval`] when consecutive times are
+/// not strictly increasing.
+pub fn center_occasion_mean_event_lags(
+    rows: &[ClusteredEventScore],
+    clock: LagClock,
+) -> Result<Vec<LaggedWithinResidual>, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if rows.len() < 2 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let mut clusters = BTreeSet::new();
+    let mut by_time: BTreeMap<u64, Vec<ClusteredEventScore>> = BTreeMap::new();
+    for &row in rows {
+        if !row.event_time.is_finite() || !row.score.is_finite() {
+            return Err(PsychometricError::InvalidNumericInput);
+        }
+        clusters.insert(row.cluster_key);
+        by_time
+            .entry(row.event_time.to_bits())
+            .or_default()
+            .push(row);
+    }
+    if clusters.len() < 2 {
+        return Err(PsychometricError::InsufficientClusters);
+    }
+    let mut occasion_mean: BTreeMap<u64, f64> = BTreeMap::new();
+    for (time_bits, occasion_rows) in &by_time {
+        let mut seen = BTreeSet::new();
+        let mut sum = 0.0_f64;
+        for row in occasion_rows {
+            if !seen.insert(row.cluster_key) {
+                return Err(PsychometricError::InvalidNumericInput);
+            }
+            sum += row.score;
+        }
+        if seen.len() < 2 {
+            return Err(PsychometricError::InsufficientClusters);
+        }
+        let mean = sum / seen.len() as f64;
+        if !mean.is_finite() {
+            return Err(PsychometricError::InvalidNumericInput);
+        }
+        occasion_mean.insert(*time_bits, mean);
+    }
+    let mut by_cluster: BTreeMap<u64, Vec<ClusteredEventScore>> = BTreeMap::new();
+    for &row in rows {
+        by_cluster.entry(row.cluster_key).or_default().push(row);
+    }
+    let mut pairs = Vec::new();
+    for occasions in by_cluster.values_mut() {
+        if occasions.len() < 2 {
+            continue;
+        }
+        occasions.sort_by(|left, right| {
+            left.event_time
+                .partial_cmp(&right.event_time)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        for window in occasions.windows(2) {
+            let earlier = window[0];
+            let later = window[1];
+            let delta = later.event_time - earlier.event_time;
+            if !delta.is_finite() || delta <= 0.0 {
+                return Err(PsychometricError::NonPositiveInterval);
+            }
+            let earlier_mean = occasion_mean[&earlier.event_time.to_bits()];
+            let later_mean = occasion_mean[&later.event_time.to_bits()];
+            let earlier_residual = earlier.score - earlier_mean;
+            let later_residual = later.score - later_mean;
+            if !(earlier_residual.is_finite() & later_residual.is_finite()) {
+                return Err(PsychometricError::InvalidNumericInput);
+            }
+            pairs.push(LaggedWithinResidual {
+                earlier_residual,
+                later_residual,
+                event_delta: delta,
+            });
+        }
+    }
+    if pairs.is_empty() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    Ok(pairs)
+}
+
+/// Mean exact scalar log-rate of Hamaker Eq. 1a occasion-mean residuals.
+///
+/// Form `p_it = x_it − μ_t` on aligned waves, then
+/// `a = ln(p_{i,t}/p_{i,t-1}) / Δt` (Voelkle et al., 2012, Eq. 7).
+/// Consecutive aligned waves may have unequal spacing. Unaligned event
+/// times fail closed. This recovered rate is **not** a within-person lag
+/// (Hamaker et al., 2015, Eq. 1a–1d). This is not RI-CLPM and not DSEM.
+///
+/// # Errors
+///
+/// Returns the centering errors from [`center_occasion_mean_event_lags`]
+/// and the scalar-map errors from
+/// [`recover_irregular_centered_residual_log_rate`].
+pub fn recover_occasion_mean_centered_irregular_residual_log_rate(
+    rows: &[ClusteredEventScore],
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let pairs = center_occasion_mean_event_lags(rows, clock)?;
+    recover_irregular_centered_residual_log_rate(&pairs, clock)
+}
+
+/// Refuse treating a Hamaker Eq. 1a occasion-mean log-rate as within-person.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::OccasionMeanCenteredLagIsNotWithinPerson`].
+pub fn refuse_occasion_mean_centered_log_rate_as_within_person_lag(
+    log_rate: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = log_rate;
+    Err(PsychometricError::OccasionMeanCenteredLagIsNotWithinPerson)
+}
+
 /// Least-squares scalar log-rate for already-formed residual pairs.
 ///
 /// Pair-wise logs initialize Newton. This helper is crate-visible so overflow
@@ -6853,7 +6993,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
+        center_occasion_mean_event_lags, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
@@ -6886,6 +7027,7 @@ mod tests {
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
         recover_manifest_lagged_observed_covariance, recover_manifest_observed_mean,
         recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
+        recover_occasion_mean_centered_irregular_residual_log_rate,
         recover_standardised_asymptotic_continuous_intercept,
         recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
         recover_standardised_discrete_continuous_intercept,
@@ -6977,6 +7119,7 @@ mod tests {
         refuse_measurement_error_as_stationary_lagged_observed_covariance,
         refuse_measurement_error_as_stationary_later_observed_variance,
         refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
+        refuse_occasion_mean_centered_log_rate_as_within_person_lag,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance,
         refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance,
@@ -8284,6 +8427,201 @@ mod tests {
             ),
             Err(PsychometricError::NonPositiveInterval)
         );
+    }
+
+    fn trending_group_mean_scores(drift: f64) -> [ClusteredEventScore; 6] {
+        let phi = drift.exp();
+        [
+            clustered(1, 0.0, 0.0 + 1.0),
+            clustered(1, 1.0, 4.0 + phi),
+            clustered(1, 3.0, 10.0 + phi * (drift * 2.0).exp()),
+            clustered(2, 0.0, 0.0 - 1.0),
+            clustered(2, 1.0, 4.0 - phi),
+            clustered(2, 3.0, 10.0 - phi * (drift * 2.0).exp()),
+        ]
+    }
+
+    #[test]
+    fn occasion_mean_residuals_recover_known_drift_and_differ_from_cwc() {
+        let drift = -0.5_f64;
+        let rows = trending_group_mean_scores(drift);
+        let pairs =
+            center_occasion_mean_event_lags(&rows, LagClock::EventTime).expect("occasion pairs");
+        assert_eq!(pairs.len(), 4);
+        assert!((pairs[0].earlier_residual - 1.0).abs() < 1e-15);
+        assert!((pairs[0].later_residual - drift.exp()).abs() < 1e-15);
+        assert!((pairs[0].event_delta - 1.0).abs() < 1e-15);
+        assert!((pairs[1].event_delta - 2.0).abs() < 1e-15);
+        let recovered =
+            recover_occasion_mean_centered_irregular_residual_log_rate(&rows, LagClock::EventTime)
+                .expect("occasion lag");
+        assert!((recovered - drift).abs() < 1e-12);
+        let cwc = recover_within_residual_event_time_log_rate(&rows, LagClock::EventTime)
+            .expect("cwc of trending means");
+        assert!(
+            (cwc - drift).abs() > 1e-6,
+            "Hamaker Eq. 1a residuals are not person-mean residuals: occasion {recovered} vs CWC {cwc}"
+        );
+        assert_eq!(
+            refuse_occasion_mean_centered_log_rate_as_within_person_lag(recovered),
+            Err(PsychometricError::OccasionMeanCenteredLagIsNotWithinPerson)
+        );
+    }
+
+    #[test]
+    fn occasion_mean_centering_fails_closed() {
+        let ok = trending_group_mean_scores(-0.5);
+        assert_eq!(
+            center_occasion_mean_event_lags(&ok, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_occasion_mean_centered_irregular_residual_log_rate(
+                &ok,
+                LagClock::AssertionTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(&[], LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(&[clustered(1, 0.0, 1.0)], LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[clustered(1, 0.0, 1.0), clustered(1, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InsufficientClusters)
+        );
+        assert_eq!(
+            recover_occasion_mean_centered_irregular_residual_log_rate(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 1.0, 0.5),
+                    clustered(2, 0.1, 2.0),
+                    clustered(2, 1.1, 1.0),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InsufficientClusters)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[clustered(1, 0.0, 1.0), clustered(2, 0.0, 2.0)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 0.0, 1.2),
+                    clustered(2, 0.0, 2.0),
+                    clustered(2, 1.0, 1.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[clustered(1, f64::NAN, 1.0), clustered(2, 1.0, 0.5)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[clustered(1, 0.0, 1.0), clustered(2, 1.0, f64::INFINITY)],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn occasion_mean_centering_overflow_and_interval_fail_closed() {
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[
+                    clustered(1, 0.0, f64::MAX),
+                    clustered(1, 1.0, 1.0),
+                    clustered(2, 0.0, f64::MAX),
+                    clustered(2, 1.0, 0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[
+                    clustered(1, 0.0, f64::MAX),
+                    clustered(1, 1.0, 1.0),
+                    clustered(2, 0.0, f64::MIN),
+                    clustered(2, 1.0, 0.5),
+                    clustered(3, 0.0, f64::MIN),
+                    clustered(3, 1.0, 0.25),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[
+                    clustered(1, 0.0, 1.0),
+                    clustered(1, 1.0, f64::MAX),
+                    clustered(2, 0.0, -1.0),
+                    clustered(2, 1.0, f64::MIN),
+                    clustered(3, 0.0, 0.0),
+                    clustered(3, 1.0, f64::MIN),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            center_occasion_mean_event_lags(
+                &[
+                    clustered(1, -f64::MAX, 1.0),
+                    clustered(1, f64::MAX, 0.5),
+                    clustered(2, -f64::MAX, -1.0),
+                    clustered(2, f64::MAX, -0.5),
+                ],
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            refuse_occasion_mean_centered_log_rate_as_within_person_lag(0.0),
+            Err(PsychometricError::OccasionMeanCenteredLagIsNotWithinPerson)
+        );
+    }
+
+    #[test]
+    fn occasion_mean_skips_cluster_with_one_aligned_wave() {
+        let drift = -0.5_f64;
+        let phi = drift.exp();
+        let rows = [
+            clustered(1, 0.0, 0.0 + 1.0),
+            clustered(1, 1.0, 4.0 + phi),
+            clustered(2, 0.0, 0.0 - 1.0),
+            clustered(2, 1.0, 4.0 - phi),
+            clustered(3, 0.0, 0.0),
+        ];
+        let pairs = center_occasion_mean_event_lags(&rows, LagClock::EventTime)
+            .expect("skip singleton-wave cluster");
+        assert_eq!(pairs.len(), 2);
+        let recovered =
+            recover_occasion_mean_centered_irregular_residual_log_rate(&rows, LagClock::EventTime)
+                .expect("occasion lag after skip");
+        assert!((recovered - drift).abs() < 1e-12);
     }
 
     #[test]

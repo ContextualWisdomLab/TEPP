@@ -710,6 +710,12 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Hamaker, Kuiper, and Grasman (2015, Eq. 1a–1d) occasion-mean
+    /// residuals `p_it = x_it − μ_t` were treated as within-person
+    /// residuals. Those temporal deviations still contain trait-like
+    /// between-person differences from the time-varying group mean.
+    /// This is not RI-CLPM (their Eq. 3a).
+    OccasionMeanCenteredLagIsNotWithinPerson,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1240,9 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::OccasionMeanCenteredLagIsNotWithinPerson => {
+                "occasion-mean-centered lag is not a within-person lag"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2080,14 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn occasion_mean_centered_lag_boundary_message_is_stable() {
+        assert_eq!(
+            PsychometricError::OccasionMeanCenteredLagIsNotWithinPerson.to_string(),
+            "occasion-mean-centered lag is not a within-person lag"
         );
     }
 }
