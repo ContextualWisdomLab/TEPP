@@ -20,6 +20,7 @@ mod error;
 mod event_time;
 mod irregular_residual;
 mod level;
+mod stable_irregular_rate;
 mod stationary;
 mod temporal_association;
 
@@ -59,16 +60,16 @@ pub use irregular_residual::EventTimedObservation;
 pub use irregular_residual::LaggedWithinResidual;
 /// Cluster-mean-center consecutive event-time lags inside each unit.
 pub use irregular_residual::center_within_unit_event_lags;
-/// Mean exact scalar log-rate on already-centered residuals.
-pub use irregular_residual::recover_centered_irregular_residual_log_rate;
-/// Pairwise-mean exact log-rate after CWC on irregular event intervals.
-pub use irregular_residual::recover_within_unit_irregular_residual_log_rate;
 /// Refuse treating a CWC residual log-rate as raw-process AR drift.
 pub use irregular_residual::refuse_cwc_residual_log_rate_as_raw_process_drift;
 /// Established longitudinal component level.
 pub use level::ComponentLevel;
 /// Refuse to treat a between-unit component as within-unit change.
 pub use level::refuse_between_as_within_change;
+/// Mean exact scalar log-rate on already-centered residuals with stable count weighting.
+pub use stable_irregular_rate::recover_centered_irregular_residual_log_rate;
+/// Pairwise-mean exact log-rate after CWC with stable count weighting.
+pub use stable_irregular_rate::recover_within_unit_irregular_residual_log_rate;
 /// Recover a valid event-time lagged correlation from covariance and both
 /// marginal variances through the typed event-time boundary.
 pub use temporal_association::recover_event_time_lagged_correlation;
