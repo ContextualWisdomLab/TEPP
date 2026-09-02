@@ -206,7 +206,9 @@ pub fn execute_subevent_containment_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != SUBEVENT_CONTAINMENT_MODEL_CONTRACT_VERSION
         || request.output_profile != SUBEVENT_CONTAINMENT_OUTPUT_PROFILE
     {
@@ -245,7 +247,7 @@ pub fn execute_subevent_containment_run(
         "subevent_containment",
         assignment_count,
         4,
-        SUBEVENT_CONTAINMENT_INFERENCE_STATUS,
+        "validated",
     )?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
