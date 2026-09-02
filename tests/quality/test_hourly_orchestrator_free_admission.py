@@ -103,13 +103,14 @@ class HourlyOrchestratorFreeAdmissionTests(unittest.TestCase):
         self.assertEqual(selected_inputs, [])
 
     def test_explicit_zero_requires_both_price_components(self) -> None:
-        """Treat partially priced and fully unpriced rows as non-free evidence."""
+        """Treat absent, partial, unknown, or nonzero price evidence as non-free."""
 
         self.assertTrue(bootstrap._is_explicitly_free_model(FakeModel("free", "p", 0.0, 0.0)))
         self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("prompt-paid", "p", 0.1, 0.0)))
         self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("completion-paid", "p", 0.0, 0.1)))
         self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("partial", "p", 0.0, None)))
         self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("unknown", "p", None, None)))
+        self.assertFalse(bootstrap._is_explicitly_free_model(object()))
 
 
 if __name__ == "__main__":
