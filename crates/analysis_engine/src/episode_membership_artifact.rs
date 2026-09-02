@@ -206,7 +206,9 @@ pub fn execute_episode_membership_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != EPISODE_MEMBERSHIP_MODEL_CONTRACT_VERSION
         || request.output_profile != EPISODE_MEMBERSHIP_OUTPUT_PROFILE
     {
@@ -241,12 +243,7 @@ pub fn execute_episode_membership_run(
         inference_status: EPISODE_MEMBERSHIP_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "episode_membership",
-        assignment_count,
-        4,
-        EPISODE_MEMBERSHIP_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("episode_membership", assignment_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
