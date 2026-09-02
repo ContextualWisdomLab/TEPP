@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 import sys
 import unittest
 from types import ModuleType
@@ -111,6 +112,24 @@ class HourlyOrchestratorFreeAdmissionTests(unittest.TestCase):
         self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("partial", "p", 0.0, None)))
         self.assertFalse(bootstrap._is_explicitly_free_model(FakeModel("unknown", "p", None, None)))
         self.assertFalse(bootstrap._is_explicitly_free_model(object()))
+
+    def test_canonical_llm_authority_requires_released_orchestrator_contract(self) -> None:
+        """Keep normative product/technical docs from re-authorizing provider keys."""
+
+        root = Path(__file__).resolve().parents[2]
+        canonical_paths = (
+            root / "AGENTS.md",
+            root / "docs/product/prd-v0.4-approved.md",
+            root / "docs/TRD.md",
+            root / "docs/LLM_ORCHESTRATION.md",
+            root / "ARCHITECTURE.md",
+        )
+        for path in canonical_paths:
+            with self.subTest(path=path.relative_to(root)):
+                text = path.read_text(encoding="utf-8")
+                self.assertNotIn("NVIDIA_NIM_API_KEY", text)
+                self.assertIn("contextual-orchestrator", text)
+                self.assertIn("released", text.lower())
 
 
 if __name__ == "__main__":
