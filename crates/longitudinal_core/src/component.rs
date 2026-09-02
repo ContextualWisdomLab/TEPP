@@ -56,13 +56,38 @@ impl ComponentValue {
     }
 }
 
+fn add_scaled_square(
+    scale: &mut f64,
+    scaled_sum_squares: &mut f64,
+    residual_scale: f64,
+    residual_ratio: f64,
+) {
+    if residual_scale == 0.0 || residual_ratio == 0.0 {
+        return;
+    }
+    if *scale == 0.0 {
+        *scale = residual_scale;
+        *scaled_sum_squares = residual_ratio * residual_ratio;
+    } else if residual_scale > *scale {
+        let ratio = *scale / residual_scale;
+        *scaled_sum_squares =
+            *scaled_sum_squares * ratio * ratio + residual_ratio * residual_ratio;
+        *scale = residual_scale;
+    } else {
+        let ratio = residual_scale / *scale;
+        let normalized = ratio * residual_ratio;
+        *scaled_sum_squares += normalized * normalized;
+    }
+}
+
 /// RMSE of recovered components against known-truth components.
 ///
-/// Finite truth and decided values are normalized by their largest absolute
-/// component magnitude before residual subtraction. The normalized residual is
-/// bounded by two, so an otherwise representable RMSE is not rejected merely
-/// because one raw `decided - truth` intermediate exceeds binary64 range.
-/// Scaling back happens only after the mean square and square root are formed.
+/// Direct finite residuals keep their own magnitude so small recovery errors
+/// are not erased merely because an unrelated matched component is extreme.
+/// If one finite endpoint subtraction overflows, that residual alone is
+/// represented as `endpoint_scale × normalized_difference`, where the latter
+/// is bounded by two. The root-mean-square accumulator then rescales those
+/// representations without ever materializing a non-representable residual.
 ///
 /// # Errors
 ///
@@ -77,7 +102,8 @@ pub fn component_root_mean_square_error(
         return Err(LongitudinalError::InvalidComponentPayload);
     }
 
-    let mut component_scale = 0.0_f64;
+    let mut scale = 0.0_f64;
+    let mut scaled_sum_squares = 0.0_f64;
     for (truth_row, decided_row) in truth.iter().zip(decided) {
         if truth_row.unit_index() != decided_row.unit_index()
             || truth_row.occasion_index() != decided_row.occasion_index()
@@ -87,23 +113,32 @@ pub fn component_root_mean_square_error(
         {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
-        component_scale = component_scale
-            .max(truth_row.value().abs())
-            .max(decided_row.value().abs());
+
+        let residual = decided_row.value() - truth_row.value();
+        if residual.is_finite() {
+            add_scaled_square(
+                &mut scale,
+                &mut scaled_sum_squares,
+                residual.abs(),
+                1.0,
+            );
+        } else {
+            let endpoint_scale = truth_row.value().abs().max(decided_row.value().abs());
+            let normalized_residual =
+                decided_row.value() / endpoint_scale - truth_row.value() / endpoint_scale;
+            add_scaled_square(
+                &mut scale,
+                &mut scaled_sum_squares,
+                endpoint_scale,
+                normalized_residual.abs(),
+            );
+        }
     }
 
-    if component_scale == 0.0 {
+    if scale == 0.0 {
         return Ok(0.0);
     }
-
-    let mut scaled_sum_squares = 0.0_f64;
-    for (truth_row, decided_row) in truth.iter().zip(decided) {
-        let normalized_residual =
-            decided_row.value() / component_scale - truth_row.value() / component_scale;
-        scaled_sum_squares += normalized_residual * normalized_residual;
-    }
-    let normalized_rmse = (scaled_sum_squares / truth.len() as f64).sqrt();
-    let rmse = component_scale * normalized_rmse;
+    let rmse = scale * (scaled_sum_squares / truth.len() as f64).sqrt();
     if rmse.is_finite() {
         Ok(rmse)
     } else {
