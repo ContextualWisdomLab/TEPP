@@ -73,19 +73,11 @@ def _is_general_chat_model(model_id: object) -> bool:
 
 
 def _is_explicitly_free_model(model: object) -> bool:
-    """Admit only discovered routes whose token prices are explicitly zero.
-
-    Production discovery rows always expose both price fields. Lightweight test
-    doubles written before the price-admission contract may omit them; those
-    doubles retain their historical zero-cost meaning so the compatibility seam
-    does not become production policy.
-    """
+    """Admit only discovered routes whose two token prices are explicitly zero."""
 
     sentinel = object()
     prompt_price = getattr(model, "prompt_price_per_1k", sentinel)
     completion_price = getattr(model, "completion_price_per_1k", sentinel)
-    if prompt_price is sentinel and completion_price is sentinel:
-        return True
     return prompt_price == 0.0 and completion_price == 0.0
 
 
