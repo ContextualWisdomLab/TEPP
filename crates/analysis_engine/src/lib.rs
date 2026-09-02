@@ -12,6 +12,7 @@
 
 mod case_deletion_refit;
 mod copy_identity_artifact;
+mod inferred_status_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -47,6 +48,12 @@ pub use copy_identity_artifact::{
     COPY_IDENTITY_ARTIFACT_BYTE_LIMIT, COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION,
     COPY_IDENTITY_MODEL_CONTRACT_VERSION, COPY_IDENTITY_OUTPUT_PROFILE, CopyIdentityArtifact,
     CopyIdentityDocument, CopyIdentityExecution, execute_copy_identity_run,
+};
+/// Inferred-status artifact and execution contracts from this engine.
+pub use inferred_status_artifact::{
+    INFERRED_STATUS_ARTIFACT_BYTE_LIMIT, INFERRED_STATUS_ARTIFACT_SCHEMA_VERSION,
+    INFERRED_STATUS_MODEL_CONTRACT_VERSION, INFERRED_STATUS_OUTPUT_PROFILE, InferredStatusArtifact,
+    InferredStatusEvidence, InferredStatusExecution, execute_inferred_status_run,
 };
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
@@ -257,6 +264,8 @@ pub enum AnalysisEngineError {
     InvalidTopicLineageArtifact,
     /// A copy-identity artifact violated its bounded schema or count invariants.
     InvalidCopyIdentityArtifact,
+    /// An inferred-status artifact violated its bounded schema or count invariants.
+    InvalidInferredStatusArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -272,6 +281,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
             Self::InvalidCopyIdentityArtifact => "invalid copy-identity artifact",
+            Self::InvalidInferredStatusArtifact => "invalid inferred-status artifact",
         };
         formatter.write_str(message)
     }
@@ -694,6 +704,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidCopyIdentityArtifact,
                 "invalid copy-identity artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidInferredStatusArtifact,
+                "invalid inferred-status artifact",
             ),
         ];
         for (error, message) in messages {
