@@ -96,6 +96,22 @@ fn mixed_copy_kinds_emit_digest_bound_refusals_without_recovery_metric() {
 }
 
 #[test]
+fn equivalent_cutoff_offsets_are_compared_as_instants() {
+    let mut offset_request = request();
+    offset_request.knowledge_cutoff = "2026-08-01T09:00:00+09:00".into();
+    let execution = execute_copy_identity_run(
+        &offset_request,
+        &accepted(&offset_request),
+        "snapshot-copy-identity",
+        cutoff(),
+        &mixed_documents(),
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("equivalent RFC 3339 offsets denote the same cutoff instant");
+    assert_eq!(execution.artifact.knowledge_cutoff, "2026-08-01T00:00:00Z");
+}
+
+#[test]
 fn empty_source_only_copy_only_and_duplicate_identities_fail_closed() {
     let request = request();
     assert_eq!(
