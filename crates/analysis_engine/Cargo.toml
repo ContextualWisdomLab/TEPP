@@ -17,6 +17,7 @@ publish = false
 event_core = { path = "../event_core", version = "0.2.0" }
 episode_membership = { path = "../episode_membership", version = "0.2.0" }
 inferred_status = { path = "../inferred_status", version = "0.2.0" }
+subevent_containment = { path = "../subevent_containment", version = "0.2.0" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

@@ -28,6 +28,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice; concept alignment, invariance, and topic estimation are not claimed. |
 | [0021](0021-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Credential-free bounded project-history API preserves LineageWeave authorization ownership. |
 | [0022](0022-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
+| [0074](0074-subevent-containment-analysis-run.md) | Subevent-containment refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `EventInterval` + `refuse_escaped_subevent`, not episode-membership, not inferred-status. |
 | [0024](0024-lineage-pair-criterion-and-project-journey-posterior.md) | Independent Event Lineage pair criterion and posterior Project Journey | Proposed | active-PR | Strict artifacts preserve criterion/event-time draws, branches, ties, and CPU/GPU receipts without claiming the scientific estimator is complete. |
 | [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
 | [0058](0058-copy-identity-analysis-run.md) | Template-copy identity refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `refuse_copy_as_source_identity` + `refuse_copy_as_transition`, not a simulation method-effect census. |
@@ -144,6 +145,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **copy-identity analysis-run profile:** ADR 0058.
 - **location-membership analysis-run profile:** ADR 0066.
 - **episode-membership analysis-run profile:** ADR 0072.
+- **subevent-containment analysis-run profile:** ADR 0074.
 - **independent lineage criterion and posterior Project Journey:** ADR 0023.
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
 

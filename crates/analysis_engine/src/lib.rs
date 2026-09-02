@@ -16,6 +16,7 @@ mod episode_membership_artifact;
 mod inferred_status_artifact;
 mod lineage_criterion;
 mod location_membership_artifact;
+mod subevent_containment_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -75,6 +76,13 @@ pub use location_membership_artifact::{
     LOCATION_MEMBERSHIP_MODEL_CONTRACT_VERSION, LOCATION_MEMBERSHIP_OUTPUT_PROFILE,
     LocationMembershipArtifact, LocationMembershipDocument, LocationMembershipExecution,
     execute_location_membership_run,
+};
+/// Subevent-containment artifact and execution contracts from this engine.
+pub use subevent_containment_artifact::{
+    SUBEVENT_CONTAINMENT_ARTIFACT_BYTE_LIMIT, SUBEVENT_CONTAINMENT_ARTIFACT_SCHEMA_VERSION,
+    SUBEVENT_CONTAINMENT_MODEL_CONTRACT_VERSION, SUBEVENT_CONTAINMENT_OUTPUT_PROFILE,
+    SubeventContainmentArtifact, SubeventContainmentAssignment, SubeventContainmentExecution,
+    execute_subevent_containment_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -286,6 +294,8 @@ pub enum AnalysisEngineError {
     InvalidInferredStatusArtifact,
     /// A location-membership artifact violated its bounded schema or count invariants.
     InvalidLocationMembershipArtifact,
+    /// A subevent-containment artifact violated its bounded schema or count invariants.
+    InvalidSubeventContainmentArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -304,6 +314,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::InvalidEpisodeMembershipArtifact => "invalid episode-membership artifact",
             Self::InvalidInferredStatusArtifact => "invalid inferred-status artifact",
             Self::InvalidLocationMembershipArtifact => "invalid location-membership artifact",
+            Self::InvalidSubeventContainmentArtifact => "invalid subevent-containment artifact",
         };
         formatter.write_str(message)
     }
@@ -738,6 +749,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidLocationMembershipArtifact,
                 "invalid location-membership artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidSubeventContainmentArtifact,
+                "invalid subevent-containment artifact",
             ),
         ];
         for (error, message) in messages {
