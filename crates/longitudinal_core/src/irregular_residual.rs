@@ -173,12 +173,12 @@ pub fn center_within_unit_event_lags(
 /// used so near-equal large residuals do not collapse to zero. Overflowed or
 /// underflowed ratios fall back to `ln|later| − ln|earlier|`. Opposite-sign
 /// and zero residuals have no real logarithm and are skipped. The pairwise
-/// mean uses sign-capacity power-of-two normalization with Neumaier
-/// compensation, so finite opposite-signed rates can cancel across the full
-/// binary64 exponent range without forming an overflowing raw sum or erasing
-/// a representable smaller contribution. An empty admissible set fails closed.
-/// This is not Newton LS and does not recover raw-process drift from CWC of a
-/// raw AR path (Curran & Bauer, 2011, pp. 583–619; Eq. 36).
+/// mean cancels opposite-signed finite rates from largest magnitude downward
+/// before averaging the surviving same-sign residuals. This avoids both
+/// overflowing a raw same-sign sum and destroying representable subnormal
+/// terms by pre-scaling them. An empty admissible set fails closed. This is
+/// not Newton LS and does not recover raw-process drift from CWC of a raw AR
+/// path (Curran & Bauer, 2011, pp. 583–619; Eq. 36).
 ///
 /// # Errors
 ///
@@ -265,63 +265,99 @@ fn pairwise_same_sign_log_rate(lagged: &[LaggedWithinResidual]) -> Result<f64, L
     scaled_compensated_mean(&rates)
 }
 
-/// Overflow-safe compensated mean for finite values across binary64 scales.
+/// Overflow-safe mean for finite values across binary64 scales.
 ///
 /// Same-sign inputs use a convex running mean, whose intermediate stays inside
-/// the observed range and therefore cannot overflow. Mixed-sign inputs first
-/// divide by a power of two large enough to bound the entire contribution from
-/// either sign. Power-of-two scaling is exact for representable normal values,
-/// minimizes subnormal loss, and lets Neumaier compensation retain low-order
-/// terms when extreme positive and negative rates cancel. The final division
-/// by `count / divisor` avoids a second rounding path that would perturb a
-/// representable tiny mean after cancellation.
+/// the observed range and therefore cannot overflow. Mixed-sign inputs are
+/// partitioned by sign and sorted from largest magnitude downward. Opposite
+/// signs are cancelled before any scale reduction, so a subnormal addend is
+/// never divided into zero merely to protect an unrelated extreme term. Each
+/// cancellation is an opposite-sign addition and therefore cannot overflow.
+/// The remaining terms have one sign and are averaged safely; their mean is
+/// then weighted by their term count relative to the original sample count.
 fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     if values.is_empty() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
 
-    let mut positive_count = 0_usize;
-    let mut negative_count = 0_usize;
+    let mut positives = Vec::new();
+    let mut negatives = Vec::new();
     for &value in values {
         if !value.is_finite() {
             return Err(LongitudinalError::InvalidTemporalTransformInput);
         }
         if value > 0.0 {
-            positive_count += 1;
+            positives.push(value);
         } else if value < 0.0 {
-            negative_count += 1;
+            negatives.push(value);
         }
     }
 
-    if positive_count == 0 && negative_count == 0 {
+    if positives.is_empty() && negatives.is_empty() {
         return Ok(0.0);
     }
 
-    if positive_count == 0 || negative_count == 0 {
-        let mut mean = 0.0_f64;
-        for (index, &value) in values.iter().enumerate() {
-            let count = (index + 1) as f64;
-            mean += (value - mean) / count;
-        }
-        return require_finite(mean);
+    if positives.is_empty() || negatives.is_empty() {
+        return same_sign_mean(values);
     }
 
-    let same_sign_capacity = positive_count.max(negative_count).next_power_of_two();
-    let divisor = same_sign_capacity as f64;
-    let count = values.len() as f64;
-    let mut sum = 0.0_f64;
-    let mut compensation = 0.0_f64;
-    for &value in values {
-        let scaled = value / divisor;
-        let next = sum + scaled;
-        if sum.abs() >= scaled.abs() {
-            compensation += (sum - next) + scaled;
+    positives.sort_by(|left, right| right.total_cmp(left));
+    negatives.sort_by(|left, right| left.total_cmp(right));
+
+    let mut positive_index = 0_usize;
+    let mut negative_index = 0_usize;
+    let mut positive = positives[0];
+    let mut negative = negatives[0];
+    let mut residuals = Vec::with_capacity(values.len());
+
+    loop {
+        let residual = positive + negative;
+        if residual > 0.0 {
+            positive = residual;
+            negative_index += 1;
+            if negative_index == negatives.len() {
+                residuals.push(positive);
+                residuals.extend_from_slice(&positives[positive_index + 1..]);
+                break;
+            }
+            negative = negatives[negative_index];
+        } else if residual < 0.0 {
+            negative = residual;
+            positive_index += 1;
+            if positive_index == positives.len() {
+                residuals.push(negative);
+                residuals.extend_from_slice(&negatives[negative_index + 1..]);
+                break;
+            }
+            positive = positives[positive_index];
         } else {
-            compensation += (scaled - next) + sum;
+            positive_index += 1;
+            negative_index += 1;
+            if positive_index == positives.len() || negative_index == negatives.len() {
+                residuals.extend_from_slice(&positives[positive_index..]);
+                residuals.extend_from_slice(&negatives[negative_index..]);
+                break;
+            }
+            positive = positives[positive_index];
+            negative = negatives[negative_index];
         }
-        sum = next;
     }
-    require_finite((sum + compensation) / (count / divisor))
+
+    if residuals.is_empty() {
+        return Ok(0.0);
+    }
+    let residual_mean = same_sign_mean(&residuals)?;
+    let retained_weight = residuals.len() as f64 / values.len() as f64;
+    require_finite(residual_mean * retained_weight)
+}
+
+fn same_sign_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
+    let mut mean = 0.0_f64;
+    for (index, &value) in values.iter().enumerate() {
+        let count = (index + 1) as f64;
+        mean += (value - mean) / count;
+    }
+    require_finite(mean)
 }
 
 /// Nonzero residuals of equal sign admit a real Driver Eq. 3 logarithm.
@@ -523,6 +559,15 @@ mod tests {
         let full_range = scaled_compensated_mean(&[f64::MAX, 1.0e-16, -f64::MAX])
             .expect("full exponent range cancellation");
         assert_eq!(full_range.to_bits(), (1.0e-16_f64 / 3.0).to_bits());
+        let minimum_subnormal = f64::from_bits(1);
+        let subnormal = scaled_compensated_mean(&[
+            f64::MAX,
+            f64::from_bits(2),
+            f64::from_bits(2),
+            -f64::MAX,
+        ])
+        .expect("subnormal cancellation residue");
+        assert_eq!(subnormal.to_bits(), minimum_subnormal.to_bits());
         assert_eq!(
             scaled_compensated_mean(&[]),
             Err(LongitudinalError::InvalidTemporalTransformInput)
