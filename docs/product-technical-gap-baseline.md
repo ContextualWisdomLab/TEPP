@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T22:06:23Z
+**Snapshot:** 2026-09-02T22:10:57Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -34,7 +34,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
-| #486 | `501d0e34f39672b4f30c7ef35255953ac60f5557` | true | #310 `agent/psychometric-discrete-drift-std-clean@a0132b62cb30acfcb6aa0a6ab96b0d6d3c6b1d3c` | Longitudinal fold child; preserve Hamaker occasion-mean source/tests/research, repair mixed provenance time format and missing APA 7 source, prove signed-zero event-time identity, replace naive occasion-mean summation, and move temporal composition out of `psychometric_core` before fold. |
+| #486 | `c451587e288ba119aebda67addee382106daf670` | true | #310 `agent/psychometric-discrete-drift-std-clean@a0132b62cb30acfcb6aa0a6ab96b0d6d3c6b1d3c` | Longitudinal fold child; Hamaker inline/APA 7 source repair is now on the current head and its review thread is resolved; preserve occasion-mean source/tests/research, repair mixed provenance time format, prove signed-zero event-time identity, replace naive occasion-mean summation, and move temporal composition out of `psychometric_core` before fold. |
 | #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve support-edge refusal/source/tests/doctoring and historical-cutoff evidence. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve profile-specific source/tests/doctoring. |
 | #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
@@ -91,7 +91,7 @@ The stationary-overflow documentation repair remains intact: RED `9d8a82d78443ca
 
 Current exact head `a0132b62cb30acfcb6aa0a6ab96b0d6d3c6b1d3c` is mergeable but Draft. Every new source push invalidates predecessor workflow/review evidence. CodeQL PR is `startup_failure`; Rust Foundation CI, Documentation Quality, Security Scan, SAST Semgrep, OSV-Scanner PR and Scorecard PR are queued. No qualifying independent current-head approval exists.
 
-#486 is now a non-destructively retargeted fold child of this vehicle. Its current source is not yet owner-correct: it adds occasion-mean temporal composition under `psychometric_core`, groups occasion identity by raw `f64::to_bits()` so `-0.0` and `+0.0` become distinct despite numeric equality, and computes occasion means through naive summation that can overflow even when the final mean is representable. The fold must establish realistic REDs for the identity and intermediate-overflow cases, move the behavior into `longitudinal_core`, preserve the Hamaker/Voelkle research evidence, and resolve the two current documentation review findings before any child closure.
+#486 is now a non-destructively retargeted fold child of this vehicle. Current child head `c451587e288ba119aebda67addee382106daf670` repaired the missing Hamaker inline/APA 7 citation and resolved that review thread. Its production source is not yet owner-correct: it adds occasion-mean temporal composition under `psychometric_core`, groups occasion identity by raw `f64::to_bits()` so `-0.0` and `+0.0` become distinct despite numeric equality, and computes occasion means through naive summation that can overflow even when the final mean is representable. The fold must establish realistic REDs for the identity and intermediate-overflow cases, move the behavior into `longitudinal_core`, preserve the Hamaker research evidence, and resolve the remaining mixed-timezone provenance review finding before child closure.
 
 The CWC and within/between unit-mean helpers still have separate implementations. Consolidation remains a maintainability target only after their full error/estimand semantics are shown equivalent; a reusable domain-neutral arithmetic primitive belongs in fast-mlsirm rather than being copied across TEPP contexts.
 
@@ -149,7 +149,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-026 | Scalar standardized longitudinal maps rejected representable final values when a cancelled stationary-variance intermediate lay outside binary64 range | `verification-pending` | RED `4a1f6c49...` / `96d8ed13...` + repairs `a4bc6230...` / `33f4b187...` / `26b03c32...`; PRD/ADR sync and exact-head Rust/documentation/review GREEN plus protected-main integration |
 | GAP-027 | Finite-interval `discreteDIFFUSIONstd` could report exact unit diffusion after exponent overflow or `exp_m1` saturation erased a nonzero remainder | `verification-pending` | RED `a8de3c9f...` + repair `c17e2ff8...`; exact-head Rust/documentation/review GREEN and protected-main integration |
 | GAP-028 | Actual stationary variance `p` could be misreported as exact zero when positive real `p` lies below the binary64 range | `verification-pending` | RED `27d9fa39...` + repair `a0132b62...`; exact-head Rust/documentation/review GREEN and protected-main integration |
-| GAP-029 | Occasion-mean temporal composition was added as a new `psychometric_core` micro-slice with raw-bit event identity and naive mean summation | `active-repair` | #486 retargeted to #310; realistic signed-zero/overflow REDs; owner-correct `longitudinal_core` fold; APA 7/provenance repair; exact-head Rust/documentation/review GREEN and protected-main integration |
+| GAP-029 | Occasion-mean temporal composition was added as a new `psychometric_core` micro-slice with raw-bit event identity and naive mean summation | `active-repair` | #486 retargeted to #310; Hamaker citation repair `c451587e...`; realistic signed-zero/overflow REDs; owner-correct `longitudinal_core` fold; provenance repair; exact-head Rust/documentation/review GREEN and protected-main integration |
 
 ## Release gate
 
