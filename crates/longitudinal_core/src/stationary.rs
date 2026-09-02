@@ -27,10 +27,12 @@ pub(crate) fn recover_stationary_within_variance(
     let stationary = if twice_rate.is_finite() {
         continuous_diffusion / -twice_rate
     } else {
-        // Scale the overflowing denominator down before division and compensate
-        // afterward. This keeps a representable minimum-subnormal result from
-        // being rounded to one subnormal and then erased by a final halving.
-        (continuous_diffusion / (-log_rate * 0.5)) * 0.25
+        // In this branch |a| > MAX/2, so halving the finite numerator before
+        // division is the exact power-of-two rescaling q/(2|a|). It avoids the
+        // predecessor's division-then-quarter sequence, which could round twice
+        // at the subnormal boundary. If q/2 itself underflows here, q/(2|a|)
+        // is necessarily far below the minimum representable positive value.
+        (continuous_diffusion * 0.5) / -log_rate
     };
     if !stationary.is_finite() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
