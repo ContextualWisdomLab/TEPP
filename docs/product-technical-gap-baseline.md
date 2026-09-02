@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T17:10:00Z
+**Snapshot:** 2026-09-02T17:16:00Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -43,7 +43,7 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal-validation separation preserved. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `bd7191cf176c9e68e450757294086429cd880b09` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; subnormal unit means survive extreme cancellation without fail-open arithmetic. |
+| #310 | `bd7191cf176c9e68e450757294086429cd880b09` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; subnormal unit means survive extreme cancellation; scientific docs still need stationary-fallback synchronization. |
 
 Exact-current-head evidence becomes stale after source mutation or any new commit.
 
@@ -71,6 +71,8 @@ Closed predecessor #441 is contained by #310. The invalid covariance/earlier-var
 Current head `bd7191cf176c9e68e450757294086429cd880b09` repairs a second extreme-value mean defect in within/between decomposition. RED `0544def0f7e39ab50e6de963ec4332ca6ccf01f4` uses one unit with scores `[f64::MAX, -f64::MAX, 4*min_subnormal]`; its representable binary64 mean is `min_subnormal`, while the predecessor max-scale normalization erased the low-order term. The repair cancels opposite-sign extremes before averaging retained same-sign mass and restores original sample-count weighting without pre-scaling. Same-sign means remain bounded and non-representable final means/residuals still fail closed.
 
 Earlier active numerical lineages include CWC RED `9a706c3c0e9e0db68e88f89b94c64c13ea7fafd0` / repair `260413efb9d95039b5fbba41919cba8097fcf8b5`, known-truth RMSE overflow/precision repair, stationary fallback `(q * 0.5) / |a|`, irregular-rate zero-underflow refusal, and two-marginal lagged Pearson correlation with represented covariance-bound admission.
+
+A docs-to-code review found `CLAUDE.md` still describes the `2a`-overflow fallback as `(q / a) * -0.5` and warns against forming `0.5 q`. That text predates the later RED evidence showing `q / a` can overflow while the final result remains representable and now contradicts the source contract above. This is an explicit merge blocker until the scientific authority text is safely repaired and documentation validation passes; it is not hidden by treating source tests as sufficient.
 
 The current head is mergeable but remains Draft. Exact-head CodeQL PR is `startup_failure`; Rust Foundation CI, Security Scan, Documentation Quality, SAST Semgrep, Scorecard and OSV are queued. There is no qualifying current-head independent approval. No merge is authorized until the live ruleset passes.
 
@@ -120,6 +122,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-016 | hourly LLM path needs released owner-only routing/authentication | `active-repair` | #480 + released CO adoption + exact-head GREEN/review/main merge |
 | GAP-017 | dynamic evaluation item/rater/anchor drift monitoring | `blocked-external-design` | released/digest-pinned owner contracts, ACL conformance, no-anchor/no-linking refusal, evidence-gated temporal monitoring |
 | GAP-018 | Longitudinal stable-mean logic remains duplicated | `active-refactor` | semantic-equivalence proof, one TEPP Longitudinal primitive or released fast-mlsirm generic owner contract, recovery parity |
+| GAP-019 | Longitudinal scientific instructions contradict current stationary-overflow implementation | `release-integrity` | repair `CLAUDE.md` stationary fallback text, documentation fitness GREEN, exact-head review |
 
 ## Release gate
 
