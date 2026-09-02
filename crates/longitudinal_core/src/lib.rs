@@ -20,6 +20,7 @@ mod error;
 mod event_time;
 mod irregular_residual;
 mod level;
+mod occasion_mean;
 mod stable_irregular_rate;
 mod stationary;
 mod temporal_association;
@@ -62,6 +63,12 @@ pub use irregular_residual::LaggedWithinResidual;
 pub use irregular_residual::center_within_unit_event_lags;
 /// Refuse treating a CWC residual log-rate as raw-process AR drift.
 pub use irregular_residual::refuse_cwc_residual_log_rate_as_raw_process_drift;
+/// Form consecutive event-time lags after subtracting each occasion's group mean.
+pub use occasion_mean::center_occasion_mean_event_lags;
+/// Recover the exact scalar log-rate of occasion-mean residuals.
+pub use occasion_mean::recover_occasion_mean_centered_irregular_residual_log_rate;
+/// Refuse treating occasion-mean residual lag as within-person change.
+pub use occasion_mean::refuse_occasion_mean_centered_log_rate_as_within_person_lag;
 /// Established longitudinal component level.
 pub use level::ComponentLevel;
 /// Refuse to treat a between-unit component as within-unit change.
