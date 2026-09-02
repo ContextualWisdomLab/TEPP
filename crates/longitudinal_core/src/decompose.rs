@@ -42,17 +42,52 @@ impl OccasionObservation {
     }
 }
 
+fn stable_unit_mean(rows: &[OccasionObservation]) -> Result<f64, LongitudinalError> {
+    let scale = rows
+        .iter()
+        .map(|row| row.score().abs())
+        .fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+
+    // Normalization keeps every addend in [-1, 1], while Neumaier
+    // compensation preserves cancellation that a raw `sum / n` would lose.
+    let mut sum = 0.0_f64;
+    let mut correction = 0.0_f64;
+    for row in rows {
+        let value = row.score() / scale;
+        let next = sum + value;
+        if sum.abs() >= value.abs() {
+            correction += (sum - next) + value;
+        } else {
+            correction += (value - next) + sum;
+        }
+        sum = next;
+    }
+    let normalized_mean = (sum + correction) / rows.len() as f64;
+    let mean = scale * normalized_mean;
+    if mean.is_finite() {
+        Ok(mean)
+    } else {
+        Err(LongitudinalError::InvalidObservationPayload)
+    }
+}
+
 /// Decompose occasion scores into unit means and within residuals.
 ///
 /// Each unit contributes one between component at occasion `0` and one within
 /// residual per observed occasion. Units and occasions are emitted in sorted
-/// order so recovery tests can pair known truth without extra matching.
+/// order so recovery tests can pair known truth without extra matching. Unit
+/// means are accumulated after max-magnitude normalization so a representable
+/// mean is not rejected merely because its raw partial sum exceeds binary64.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidObservationPayload`] when fewer than two
 /// units are present, any unit has fewer than two occasions, a `(unit,
-/// occasion)` pair is duplicated, or a score is non-finite.
+/// occasion)` pair is duplicated, a score is non-finite, or a resulting mean
+/// or within residual is not representable.
 pub fn decompose_within_between(
     observations: &[OccasionObservation],
 ) -> Result<Vec<ComponentValue>, LongitudinalError> {
@@ -93,21 +128,18 @@ pub fn decompose_within_between(
         if count < 2 {
             return Err(LongitudinalError::InvalidObservationPayload);
         }
-        let mut total = 0.0_f64;
-        for row in &rows[start..end] {
-            total += row.score();
-        }
-        let mean = total / count as f64;
-        if !mean.is_finite() {
-            return Err(LongitudinalError::InvalidObservationPayload);
-        }
+        let mean = stable_unit_mean(&rows[start..end])?;
         components.push(ComponentValue::new(unit, 0, ComponentLevel::Between, mean));
         for row in &rows[start..end] {
+            let residual = row.score() - mean;
+            if !residual.is_finite() {
+                return Err(LongitudinalError::InvalidObservationPayload);
+            }
             components.push(ComponentValue::new(
                 unit,
                 row.occasion_index(),
                 ComponentLevel::Within,
-                row.score() - mean,
+                residual,
             ));
         }
     }
