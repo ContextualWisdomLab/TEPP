@@ -91,7 +91,7 @@ Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-
 
 ### fast-mlsirm owner handoff
 
-fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`. Immutable `v0.9.1` predates current owner work. Generalized-mixed/dependence Published Language #1714 is open/Ready at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`; reusable static covariance-to-correlation standardization #1722 is open/Ready at `338dbb2d25f32b0e201102e7bf73076846fb57b3`; dynamic evaluation criterion/item/run snapshots #1727 remain Draft at `17ac218a5c0a31f0082839603a8ffc64b4432534`. None of these mutable owner heads is a TEPP production dependency.
+fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`. Immutable `v0.9.1` predates current owner work. Generalized-mixed/dependence Published Language #1714 is open/Ready at `92a3f2152033b61ca89661b5ba8a584842e8c3a9`; reusable static covariance-to-correlation standardization #1722 is open/Ready at `338dbb2d25f32b0e201102e7bf73076846fb57b3`; dynamic evaluation criterion/item/run snapshots #1727 remain Draft at `850c2e28dadea3bc5ae936e88bc47f2ece871c1a`. None of these mutable owner heads is a TEPP production dependency.
 
 ### #437 — ADR identity
 
