@@ -105,6 +105,15 @@ fn mixed_windows_emit_digest_bound_refusals_without_recovery_metric() {
         AnalysisRunTerminalState::Succeeded
     );
     assert_eq!(
+        execution
+            .terminal_result
+            .summary
+            .as_ref()
+            .expect("summary")
+            .validation_status,
+        "validated"
+    );
+    assert_eq!(
         execution.terminal_result.result_sha256.as_deref(),
         Some(execution.artifact.sha256().expect("digest").as_str())
     );
@@ -112,6 +121,14 @@ fn mixed_windows_emit_digest_bound_refusals_without_recovery_metric() {
         execution.terminal_result.result_schema_version.as_deref(),
         Some(EPISODE_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION)
     );
+}
+
+#[test]
+fn equivalent_rfc3339_cutoff_offsets_are_the_same_instant() {
+    let mut offset_request = request();
+    offset_request.knowledge_cutoff = "2026-08-01T09:00:00+09:00".into();
+    let execution = execute(&offset_request, &mixed_assignments()).expect("equivalent cutoff");
+    assert_eq!(execution.artifact.knowledge_cutoff, "2026-08-01T00:00:00+00:00");
 }
 
 #[test]
