@@ -52,3 +52,22 @@ fn full_exponent_range_cancellation_preserves_representable_tiny_mean() {
     assert!(expected > 0.0 && expected.is_finite());
     assert_eq!(recovered.to_bits(), expected.to_bits());
 }
+
+#[test]
+fn cancellation_does_not_underflow_subnormal_rates_before_the_mean() {
+    let minimum_subnormal = f64::from_bits(1);
+    let target_small_rate = f64::from_bits(2);
+    let next_after_one = f64::from_bits(1.0_f64.to_bits() + 1);
+    let small_interval = next_after_one.ln() / target_small_rate;
+    let extreme_interval = 4.0e-309_f64;
+    let pairs = [
+        ratio_pair(2.0, extreme_interval),
+        ratio_pair(next_after_one, small_interval),
+        ratio_pair(next_after_one, small_interval),
+        ratio_pair(0.5, extreme_interval),
+    ];
+
+    let recovered = recover_centered_irregular_residual_log_rate(&pairs)
+        .expect("large cancellation must retain a representable subnormal mean");
+    assert_eq!(recovered.to_bits(), minimum_subnormal.to_bits());
+}
