@@ -18,7 +18,8 @@ use crate::{EventTimeInterval, LongitudinalError};
 /// `-0.0` and `+0.0` are one occasion rather than two binary encodings. Every
 /// admitted occasion must contain at least two distinct units, and at least two
 /// units must contribute a consecutive lag. Occasion means are computed without
-/// allowing an overflowing same-sign partial sum to reject a representable mean.
+/// allowing an overflowing same-sign partial sum to reject a representable mean
+/// and are bit-stable under row permutation.
 ///
 /// # Errors
 ///
@@ -222,8 +223,11 @@ fn occasion_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
 }
 
 fn same_sign_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
+    let mut ordered = values.to_vec();
+    ordered.sort_by(f64::total_cmp);
+
     let mut mean = 0.0_f64;
-    for (index, &value) in values.iter().enumerate() {
+    for (index, value) in ordered.into_iter().enumerate() {
         let count = (index + 1) as f64;
         mean += (value - mean) / count;
     }
