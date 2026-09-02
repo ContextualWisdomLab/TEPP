@@ -82,6 +82,7 @@ class HourlyOrchestratorFreeAdmissionTests(unittest.TestCase):
 
         canonical_paths = (
             ROOT / "AGENTS.md",
+            ROOT / "CONTRIBUTING.md",
             ROOT / "docs/product/prd-v0.4-approved.md",
             ROOT / "docs/TRD.md",
             ROOT / "docs/LLM_ORCHESTRATION.md",
