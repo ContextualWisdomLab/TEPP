@@ -102,6 +102,15 @@ mod tests {
     }
 
     #[test]
+    fn positive_stationary_variance_below_binary64_range_fails_closed() {
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(
+            recover_stationary_within_variance(minimum_subnormal, -1.0),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+    }
+
+    #[test]
     fn stationary_variance_admission_is_fail_closed() {
         assert_eq!(recover_stationary_within_variance(0.0, -0.5), Ok(0.0));
         assert_eq!(
