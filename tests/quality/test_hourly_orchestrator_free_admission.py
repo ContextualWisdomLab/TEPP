@@ -67,6 +67,16 @@ class HourlyOrchestratorFreeAdmissionTests(unittest.TestCase):
             "both gateway probes must restrict redirect protocols to HTTPS",
         )
 
+    def test_opencode_archive_download_allows_only_https_redirects(self) -> None:
+        """Keep the checksum-pinned CLI download from following an HTTP downgrade."""
+
+        text = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn(
+            "curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \\",
+            text,
+            "OpenCode archive download must restrict redirect protocols to HTTPS",
+        )
+
     def test_canonical_llm_authority_requires_released_orchestrator_contract(self) -> None:
         """Keep normative product/technical docs from re-authorizing provider keys."""
 
