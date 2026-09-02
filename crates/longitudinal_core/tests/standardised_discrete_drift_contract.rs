@@ -54,6 +54,30 @@ fn extreme_stable_rate_preserves_representable_stationary_result() {
 }
 
 #[test]
+fn standardised_drift_does_not_materialise_a_cancelled_stationary_variance() {
+    let underflowed_stationary = recover_event_time_standardised_discrete_drift(
+        f64::from_bits(1),
+        -1.0,
+        event_time(1.0),
+    )
+    .expect("positive real stationary variance cancels from the scalar standardisation");
+    assert!((underflowed_stationary - (-1.0_f64).exp()).abs() <= f64::EPSILON);
+
+    let overflowed_stationary =
+        recover_event_time_standardised_discrete_drift(f64::MAX, -0.25, event_time(1.0))
+            .expect("an out-of-range stationary intermediate must not erase a finite final map");
+    assert!((overflowed_stationary - (-0.25_f64).exp()).abs() <= f64::EPSILON);
+
+    let extreme_scale = recover_event_time_standardised_discrete_drift(
+        f64::from_bits(1),
+        -1.0e307,
+        event_time(1.0e-307),
+    )
+    .expect("the exact scalar standardisation is independent of diffusion scale");
+    assert!((extreme_scale - (-1.0_f64).exp()).abs() <= f64::EPSILON);
+}
+
+#[test]
 fn event_time_exponent_underflow_fails_closed_instead_of_becoming_one() {
     assert_eq!(
         recover_event_time_standardised_discrete_drift(
@@ -69,14 +93,6 @@ fn event_time_exponent_underflow_fails_closed_instead_of_becoming_one() {
 fn standardised_drift_fails_closed_without_positive_stationary_within_variance() {
     assert_eq!(
         recover_event_time_standardised_discrete_drift(0.0, -0.5, event_time(1.0)),
-        Err(LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance)
-    );
-    assert_eq!(
-        recover_event_time_standardised_discrete_drift(
-            f64::from_bits(1),
-            -1.0e307,
-            event_time(1.0e-307),
-        ),
         Err(LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance)
     );
     assert_eq!(
