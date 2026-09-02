@@ -62,6 +62,18 @@ mod tests {
     }
 
     #[test]
+    fn overflow_fallback_does_not_double_round_a_minimum_subnormal_result() {
+        // The exact q / (-2a) rounds to the minimum positive subnormal. The
+        // predecessor fallback rounded once during division and again during
+        // its final quarter-scale, returning two subnormal ulps instead.
+        let diffusion = f64::from_bits(0x3cdad6b3492a639e);
+        let log_rate = -f64::from_bits(0x7fe2342c95642bec);
+        let stationary = recover_stationary_within_variance(diffusion, log_rate)
+            .expect("the final stationary variance is representable");
+        assert_eq!(stationary.to_bits(), 1);
+    }
+
+    #[test]
     fn stationary_variance_admission_is_fail_closed() {
         assert_eq!(recover_stationary_within_variance(0.0, -0.5), Ok(0.0));
         assert_eq!(
