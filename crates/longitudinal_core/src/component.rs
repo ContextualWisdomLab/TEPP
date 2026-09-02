@@ -130,6 +130,26 @@ mod tests {
     }
 
     #[test]
+    fn representable_rmse_survives_an_overflowing_individual_residual() {
+        let truth = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, -f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(2, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(3, 0, ComponentLevel::Between, 0.0),
+        ];
+        let decided = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(2, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(3, 0, ComponentLevel::Between, 0.0),
+        ];
+        assert_eq!(
+            component_root_mean_square_error(&truth, &decided),
+            Ok(f64::MAX)
+        );
+    }
+
+    #[test]
     fn overflowing_residual_fails_closed() {
         let truth = [ComponentValue::new(0, 0, ComponentLevel::Within, -f64::MAX)];
         let decided = [ComponentValue::new(0, 0, ComponentLevel::Within, f64::MAX)];
