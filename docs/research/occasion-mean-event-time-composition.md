@@ -27,11 +27,12 @@ Aligned occasions may be irregularly spaced. Each consecutive unit-specific pair
 Current #310 branch tests:
 
 - `crates/longitudinal_core/tests/occasion_mean_event_time_contract.rs::signed_zero_is_one_numeric_occasion` — `-0.0`/`+0.0` share one occasion and the known scalar event-time log-rate is recovered.
+- `occasion_mean_residual_rate_is_not_cwc_rate_on_the_same_panel` — the same time-varying-group-mean panel recovers the known Hamaker Eq. 1a occasion-residual rate while person-mean CWC does not recover that rate. This preserves the valid scientific distinction from Draft #486 without retaining its wrong `psychometric_core` ownership.
 - `signed_zero_duplicate_unit_is_rejected_as_one_occasion` — the same unit cannot use signed zero to bypass duplicate occasion admission.
 - `representable_occasion_mean_is_not_rejected_for_intermediate_sum_overflow` — `[0.75·MAX, 0.75·MAX, -0.5·MAX]` at one occasion retains a finite representable mean and finite centered residuals rather than failing on the naive partial sum.
 - `occasion_mean_is_bit_stable_under_row_permutation` — the same three-unit occasion with `{1, nextafter(1,+∞), MAX/2}` yields bit-identical centered pairs when row arrival order changes.
 
-The initial occasion-composition RED is `75b0184d2f6341ef23cf14fc84398c68d8d95d22`. Deterministic-order RED `8a59019ed3112a3e27dd0dcd1b6b86d8d45e5435` exposes order-dependent same-sign averaging; causal repair `465d139dce6101c4958c8b0827b6ef5d674b54c2` orders same-sign values before averaging. The owner-correct implementation remains in `crates/longitudinal_core/src/occasion_mean.rs`. Only the current exact branch head may be used for merge evidence.
+The initial occasion-composition RED is `75b0184d2f6341ef23cf14fc84398c68d8d95d22`. Deterministic-order RED `8a59019ed3112a3e27dd0dcd1b6b86d8d45e5435` exposes order-dependent same-sign averaging; causal repair `465d139dce6101c4958c8b0827b6ef5d674b54c2` orders same-sign values before averaging. Successor-evidence commit `b9e952bb8a893f62aaead59cdf825b5e3c6251c6` ports #486's valid same-panel occasion-vs-CWC scientific claim boundary into the owner-correct Longitudinal test surface. The owner-correct implementation remains in `crates/longitudinal_core/src/occasion_mean.rs`. Only the current exact branch head may be used for merge evidence.
 
 ## Claim boundary
 
