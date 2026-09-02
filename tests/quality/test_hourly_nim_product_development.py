@@ -278,6 +278,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         for pull_request in (93, 94, 97, 101, 102, 104, 108, 109, 111, 112):
             with self.subTest(pull_request=pull_request):
                 self.assertNotIn(f"PR #{pull_request}", runbook)
+
     def test_bootstrap_registers_each_provider_key_and_removes_environment_values(self) -> None:
         """Exercise the real bootstrap loop with a key-counting KV double."""
 
@@ -334,11 +335,25 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             def __init__(self, _store: object) -> None:
                 pass
 
-        sample = type("SampleModel", (), {"model_id": "model_one", "provider_name": "provider_one"})()
+        sample = type(
+            "SampleModel",
+            (),
+            {
+                "model_id": "model_one",
+                "provider_name": "provider_one",
+                "prompt_price_per_1k": 0.0,
+                "completion_price_per_1k": 0.0,
+            },
+        )()
         embedding = type(
             "EmbeddingModel",
             (),
-            {"model_id": "text-embedding-3-small", "provider_name": "provider_one"},
+            {
+                "model_id": "text-embedding-3-small",
+                "provider_name": "provider_one",
+                "prompt_price_per_1k": 0.0,
+                "completion_price_per_1k": 0.0,
+            },
         )()
         error = type("SampleError", (), {"provider_name": "provider_two"})()
         fake_package = ModuleType("contextual_orchestrator")
@@ -361,6 +376,8 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             self.assertFalse(agents[0].disabled)
             self.assertEqual(report["discovered_count"], 2)
             self.assertEqual(report["chat_candidate_count"], 1)
+            self.assertEqual(report["explicit_free_candidate_count"], 1)
+            self.assertEqual(report["excluded_non_free_count"], 0)
             self.assertEqual(report["excluded_non_chat_count"], 1)
             self.assertEqual(report["providers_with_errors"], ["provider_two"])
 
