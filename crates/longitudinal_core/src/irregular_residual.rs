@@ -173,11 +173,12 @@ pub fn center_within_unit_event_lags(
 /// used so near-equal large residuals do not collapse to zero. Overflowed or
 /// underflowed ratios fall back to `ln|later| − ln|earlier|`. Opposite-sign
 /// and zero residuals have no real logarithm and are skipped. The pairwise
-/// mean uses scale-normalized Neumaier compensation so finite rates can cancel
-/// without forming an overflowing raw sum or discarding a much smaller finite
-/// contribution. An empty admissible set fails closed. This is not Newton LS
-/// and does not recover raw-process drift from CWC of a raw AR path (Curran
-/// & Bauer, 2011, pp. 583–619; Eq. 36).
+/// mean uses sign-capacity power-of-two normalization with Neumaier
+/// compensation, so finite opposite-signed rates can cancel across the full
+/// binary64 exponent range without forming an overflowing raw sum or erasing
+/// a representable smaller contribution. An empty admissible set fails closed.
+/// This is not Newton LS and does not recover raw-process drift from CWC of a
+/// raw AR path (Curran & Bauer, 2011, pp. 583–619; Eq. 36).
 ///
 /// # Errors
 ///
@@ -264,31 +265,54 @@ fn pairwise_same_sign_log_rate(lagged: &[LaggedWithinResidual]) -> Result<f64, L
     scaled_compensated_mean(&rates)
 }
 
-/// Scale-normalized Neumaier mean for finite values with extreme dynamic range.
+/// Overflow-safe compensated mean for finite values across binary64 scales.
 ///
-/// Normalizing by the largest magnitude keeps the raw accumulation bounded by
-/// the number of values. Neumaier compensation retains low-order terms when
-/// large opposite-signed rates cancel. Division by the count happens before
-/// scaling back, so a representable mean is not lost to an overflowing sum.
+/// Same-sign inputs use a convex running mean, whose intermediate stays inside
+/// the observed range and therefore cannot overflow. Mixed-sign inputs first
+/// divide by a power of two large enough to bound the entire contribution from
+/// either sign. Power-of-two scaling is exact for representable normal values,
+/// minimizes subnormal loss, and lets Neumaier compensation retain low-order
+/// terms when extreme positive and negative rates cancel. The final division
+/// by `count / divisor` avoids a second rounding path that would perturb a
+/// representable tiny mean after cancellation.
 fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     if values.is_empty() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
-    let mut scale = 0.0_f64;
+
+    let mut positive_count = 0_usize;
+    let mut negative_count = 0_usize;
     for &value in values {
         if !value.is_finite() {
             return Err(LongitudinalError::InvalidTemporalTransformInput);
         }
-        scale = scale.max(value.abs());
+        if value > 0.0 {
+            positive_count += 1;
+        } else if value < 0.0 {
+            negative_count += 1;
+        }
     }
-    if scale == 0.0 {
+
+    if positive_count == 0 && negative_count == 0 {
         return Ok(0.0);
     }
 
+    if positive_count == 0 || negative_count == 0 {
+        let mut mean = 0.0_f64;
+        for (index, &value) in values.iter().enumerate() {
+            let count = (index + 1) as f64;
+            mean += (value - mean) / count;
+        }
+        return require_finite(mean);
+    }
+
+    let same_sign_capacity = positive_count.max(negative_count).next_power_of_two();
+    let divisor = same_sign_capacity as f64;
+    let count = values.len() as f64;
     let mut sum = 0.0_f64;
     let mut compensation = 0.0_f64;
     for &value in values {
-        let scaled = value / scale;
+        let scaled = value / divisor;
         let next = sum + scaled;
         if sum.abs() >= scaled.abs() {
             compensation += (sum - next) + scaled;
@@ -297,8 +321,7 @@ fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
         }
         sum = next;
     }
-    let normalized_mean = (sum + compensation) / values.len() as f64;
-    require_finite(normalized_mean * scale)
+    require_finite((sum + compensation) / (count / divisor))
 }
 
 /// Nonzero residuals of equal sign admit a real Driver Eq. 3 logarithm.
@@ -489,12 +512,17 @@ mod tests {
         let same_sign = scaled_compensated_mean(&[large, large]).expect("same-sign mean");
         assert!(same_sign.is_finite());
         assert!((same_sign - large).abs() < 1.0);
+        let negative = scaled_compensated_mean(&[-4.0, -2.0]).expect("negative same-sign mean");
+        assert_eq!(negative, -3.0);
         let mixed = scaled_compensated_mean(&[large, -large]).expect("mixed mean");
         assert!(mixed.abs() < 1.0);
 
         let recovered = scaled_compensated_mean(&[1.0e100, 1.0, -1.0e100])
             .expect("small signal survives cancellation");
         assert!((recovered - (1.0 / 3.0)).abs() <= 1.0e-12);
+        let full_range = scaled_compensated_mean(&[f64::MAX, 1.0e-16, -f64::MAX])
+            .expect("full exponent range cancellation");
+        assert_eq!(full_range.to_bits(), (1.0e-16_f64 / 3.0).to_bits());
         assert_eq!(
             scaled_compensated_mean(&[]),
             Err(LongitudinalError::InvalidTemporalTransformInput)
