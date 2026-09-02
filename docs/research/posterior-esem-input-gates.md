@@ -12,7 +12,7 @@ This slice delivers the first executable ADR 0005 contract in `psychometric_core
 6. refuse latent-mean comparison unless typed invariance evidence carries a strong or strict two-group OLS status (`LatentMeanComparisonEvidence`; metric/configural evidence cannot reduce to a passing flag), and recover a mean difference only under that strong or strict status (Putnick & Bornstein, 2016: scalar licenses means; residual invariance is not required; two-observation series cap at strong because residual variance is identically `0`);
 7. refuse causal language that rests only on temporal precedence, document linkage, event tracking, or model prediction.
 
-Cluster-mean CWC, the CWC contextual effect, Kish WLS, event-time log-rate, CWC-then-lag, irregular already-centered residual log-rate, Hamaker Eq. 1a occasion-mean residual log-rate (not within-person; not RI-CLPM), the Driver Eq. 5 of the Eq. 3 evolved mean, the Driver Eq. 3 contemporaneous `TDPREDEFFECT` impulse, the Driver Eq. 5 of that contemporaneous impulse, the Driver Eq. 1–2 within-interval impulse carry, the Driver Eq. 5 of that carried latent mean, the Driver Eq. 3 `TIPREDEFFECT` increment, and the Driver Eq. 5 of that increment live in the same crate and are documented in `docs/research/multilevel-event-time-recovery.md`. Full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target.
+Cluster-mean CWC, the CWC contextual effect, Kish WLS, event-time log-rate, CWC-then-lag, irregular already-centered residual log-rate, occasion-mean residual log-rate (Hamaker et al., 2015, Eq. 1a; not within-person; not RI-CLPM), the Driver Eq. 5 of the Eq. 3 evolved mean, the Driver Eq. 3 contemporaneous `TDPREDEFFECT` impulse, the Driver Eq. 5 of that contemporaneous impulse, the Driver Eq. 1–2 within-interval impulse carry, the Driver Eq. 5 of that carried latent mean, the Driver Eq. 3 `TIPREDEFFECT` increment, and the Driver Eq. 5 of that increment live in the same crate and are documented in `docs/research/multilevel-event-time-recovery.md`. Full ESEM/set-ESEM, formative composites, DSEM, and matrix continuous-time dynamics remain accepted-target.
 
 ## Authoritative sources
 
@@ -25,6 +25,8 @@ Aitchison, J. (1982). The statistical analysis of compositional data. *Journal o
 Bollen, K., & Lennox, R. (1991). Conventional wisdom on measurement: A structural equation perspective. *Psychological Bulletin, 110*(2), 305–314. https://doi.org/10.1037/0033-2909.110.2.305
 
 Driver, C. C., Oud, J. H. L., & Voelkle, M. C. (2017). Continuous time structural equation modeling with R package ctsem. *Journal of Statistical Software, 77*(5), 1–35. https://doi.org/10.18637/jss.v077.i05
+
+Hamaker, E. L., Kuiper, R. M., & Grasman, R. P. P. P. (2015). A critique of the cross-lagged panel model. *Psychological Methods, 20*(1), 102–116. https://doi.org/10.1037/a0038889
 
 Mislevy, R. J. (1991). Randomization-based inference about latent variables from complex samples. *Psychometrika, 56*(2), 177–196. https://doi.org/10.1007/BF02294457
 
