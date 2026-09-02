@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery
 **Product:** Temporal Event Psychometrics Platform (TEPP)
-**Snapshot:** 2026-09-02T01:42Z
+**Snapshot:** 2026-09-02T03:46Z
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 **Workspace version:** `0.2.0`
 **Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md)
@@ -15,20 +15,20 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | Signal | Current evidence | Delivery implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until protected main changes. |
-| Open pull requests | **130** | WIP remains release-blocking, but the queue is down from the observed peak of 149. |
-| Draft pull requests | **129** | Non-landable work is explicitly parked while consolidated, repaired, or supplied with missing evidence. |
+| Open pull requests | **131** | WIP remains release-blocking, but the queue is down from the observed peak of 149. |
+| Draft pull requests | **130** | Non-landable work is explicitly parked while consolidated, repaired, or supplied with missing evidence. |
 | Non-draft pull requests | **1** | #310 is the only current non-Draft landing vehicle. |
-| Open issues | **15** | Includes #437 for repository-wide ADR identity normalization and active Analysis Run/product gaps. |
+| Open issues | **14** | Includes #437 for repository-wide ADR identity normalization and active Analysis Run/product gaps. |
 | GitHub releases | **0** | No open head is a released TEPP contract. |
 | Effective organization ruleset | `18156473` | Current-head required workflows, resolved conversations, qualifying review, and an allowed merge method remain landing authority. |
 
 Classic branch protection is not the sole policy source; organization rulesets are effective merge authority where applicable. Any increase in open PR count while #435 remains open is a WIP regression unless the new PR is a demonstrably independent root-cause repair that cannot safely belong to an existing landing vehicle.
 
-The queue previously regressed when one-map and one-route Drafts appeared as independently shippable work. Recovery preserves unique RED/GREEN, review, research, and contract evidence on coherent bounded-context landing vehicles before strict ancestors or superseded siblings are closed. The live TEPP queue is **130**.
+The queue previously regressed when one-map and one-route Drafts appeared as independently shippable work. Recovery preserves unique RED/GREEN, review, research, and contract evidence on coherent bounded-context landing vehicles before strict ancestors or superseded siblings are closed. The live TEPP queue is **131**.
 
 ## Current priority open pull-request evidence
 
-This is a priority subset, not a row-for-row copy of the 130-PR queue. #435 intentionally omits its own SHA because embedding the branch head in a file changed by that same branch would make the evidence self-stale. Every row below was re-read before this snapshot.
+This is a priority subset, not a row-for-row copy of the 131-PR queue. #435 intentionally omits its own SHA because embedding the branch head in a file changed by that same branch would make the evidence self-stale. Every row below was re-read before this snapshot.
 
 | PR | Exact current head | Draft | Base | Ownership / disposition |
 | ---: | --- | :---: | --- | --- |
@@ -119,7 +119,7 @@ Open heads are candidate evidence, not released contracts. TEPP may maintain fai
 
 | ID | Gap | Maturity | Closure evidence |
 | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 130 open PRs | `release-blocking` | coherent landing vehicles, unique evidence preservation, protected-main reduction |
+| GAP-001 | PR authority fragmented across 131 open PRs | `release-blocking` | coherent landing vehicles, unique evidence preservation, protected-main reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission | `partial` | immutable offsets/layout, language profiles, concept dictionary, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator | `partial` | Rust CPU f64 likelihood/uncertainty, relation/time/membership effects, true recovery, fitted candidate-K |
 | GAP-004 | durable end-to-end Analysis Run | `partial` | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation/promotion separation, Compose E2E |
