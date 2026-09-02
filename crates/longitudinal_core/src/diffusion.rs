@@ -66,7 +66,8 @@ pub fn recover_event_time_standardised_continuous_diffusion(
 ///
 /// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for invalid
 /// diffusion/drift, a doubled event-time exponent that underflows to signed
-/// zero, or a non-representable final ratio. Returns
+/// zero or overflows, or a finite-interval final ratio that collapses to the
+/// false binary64 endpoints zero or one. Returns
 /// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
 /// Returns [`LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance`]
 /// when continuous diffusion is exactly zero.
@@ -91,32 +92,27 @@ pub fn recover_event_time_standardised_discrete_diffusion(
     } else {
         // If 2Δ overflows, Δ is already enormous. Form aΔ first and then apply
         // the exact factor two; this branch cannot suffer the tiny-interval
-        // underflow that motivated the primary ordering above.
+        // underflow that motivated the primary ordering above. A non-finite
+        // product cannot be reported as the exact finite-interval endpoint one.
         let half_exponent = log_rate * interval;
-        if half_exponent == f64::NEG_INFINITY {
-            return Ok(1.0);
-        }
         if !half_exponent.is_finite() {
             return Err(LongitudinalError::InvalidTemporalTransformInput);
         }
         half_exponent * 2.0
     };
 
-    // The target exponent is exactly 2aΔ with finite a < 0 and Δ > 0. If that
-    // target itself rounds to signed zero, then 1-exp(2aΔ) is also below the
-    // minimum representable positive binary64 result and must fail closed.
-    if exponent == 0.0 {
-        return Err(LongitudinalError::InvalidTemporalTransformInput);
-    }
-    if exponent == f64::NEG_INFINITY {
-        return Ok(1.0);
-    }
-    if !exponent.is_finite() {
+    // For finite stable a and finite positive Δ, the exact 2aΔ is finite and
+    // strictly negative. Signed zero or infinity therefore means the target
+    // exponent itself is not representable in binary64 and must fail closed.
+    if !exponent.is_finite() || exponent == 0.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
 
     let ratio = -exponent.exp_m1();
-    if !ratio.is_finite() || ratio <= 0.0 || ratio > 1.0 {
+    // The exact finite-interval ratio is strictly inside (0, 1). If exp_m1
+    // rounds it to either endpoint, reporting zero/one would erase a nonzero
+    // remainder and turn a numerical limitation into a scientific boundary.
+    if !ratio.is_finite() || ratio <= 0.0 || ratio >= 1.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     Ok(ratio)
