@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T16:06Z
+**Snapshot:** 2026-09-02T16:13Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -30,22 +30,22 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 
 #484 `summarizes_edge_v1` is a #416 Analysis Run fold child, not an independent bounded-context landing authority. Its unique source/tests/doctoring must survive the eventual shared-file fold; it is not closed merely to reduce queue count.
 
-## Priority landing evidence
+## Current priority open pull-request evidence
 
 #435 intentionally omits its own SHA from this file because embedding a branch head inside a file changed by that branch makes the file self-stale.
 
-| PR | Exact head | Draft | Ownership / disposition |
-| ---: | --- | :---: | --- |
-| #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 Analysis Run fold child. |
-| #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 Analysis Run fold child. |
-| #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 Analysis Run fold child. |
-| #480 | `4475542750eda01afad0cf9ea8d563f508f63fd3` | false | Independent consumer-side LLM-governance repair; requires released CO plus deployment/auth provenance. |
-| #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 fold child; typed cutoff equality and terminal validation separation preserved. |
-| #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 fold child; typed cutoff equality and terminal validation separation preserved. |
-| #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
-| #310 | `440ac6902d86dce48fedd1229ac71ab8c133bdf0` | true | Longitudinal Modeling vehicle; nonzero irregular-rate underflow now fails closed while exact no-change remains zero. |
+| PR | Exact current head | Draft | Base | Disposition |
+| ---: | --- | :---: | --- | --- |
+| #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve profile-specific source/tests/doctoring. |
+| #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
+| #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
+| #480 | `4475542750eda01afad0cf9ea8d563f508f63fd3` | false | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Independent consumer-side LLM-governance repair; released CO plus deployment/auth provenance required. |
+| #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal validation separation preserved. |
+| #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Fold child; typed cutoff equality and terminal validation separation preserved. |
+| #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Validation / Analysis Run landing candidate; availability cutoff precedes duplicate-identity admission. |
+| #310 | `440ac6902d86dce48fedd1229ac71ab8c133bdf0` | true | `main@1bc02f580cf48e1d39da239f0e818453437c31c3` | Longitudinal Modeling vehicle; nonzero irregular-rate underflow fails closed while exact no-change remains zero. |
 
-Exact-head evidence becomes stale after source mutation or any new commit.
+Exact-current-head evidence becomes stale after source mutation or any new commit.
 
 ## Domain ownership
 
