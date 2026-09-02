@@ -14,6 +14,7 @@ mod case_deletion_refit;
 mod copy_identity_artifact;
 mod inferred_status_artifact;
 mod lineage_criterion;
+mod location_membership_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -59,6 +60,13 @@ pub use inferred_status_artifact::{
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Location-membership artifact and execution contracts from this engine.
+pub use location_membership_artifact::{
+    LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT, LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
+    LOCATION_MEMBERSHIP_MODEL_CONTRACT_VERSION, LOCATION_MEMBERSHIP_OUTPUT_PROFILE,
+    LocationMembershipArtifact, LocationMembershipDocument, LocationMembershipExecution,
+    execute_location_membership_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -266,6 +274,8 @@ pub enum AnalysisEngineError {
     InvalidCopyIdentityArtifact,
     /// An inferred-status artifact violated its bounded schema or count invariants.
     InvalidInferredStatusArtifact,
+    /// A location-membership artifact violated its bounded schema or count invariants.
+    InvalidLocationMembershipArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -282,6 +292,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
             Self::InvalidCopyIdentityArtifact => "invalid copy-identity artifact",
             Self::InvalidInferredStatusArtifact => "invalid inferred-status artifact",
+            Self::InvalidLocationMembershipArtifact => "invalid location-membership artifact",
         };
         formatter.write_str(message)
     }
@@ -708,6 +719,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidInferredStatusArtifact,
                 "invalid inferred-status artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidLocationMembershipArtifact,
+                "invalid location-membership artifact",
             ),
         ];
         for (error, message) in messages {

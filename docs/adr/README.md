@@ -31,6 +31,7 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0024](0024-lineage-pair-criterion-and-project-journey-posterior.md) | Independent Event Lineage pair criterion and posterior Project Journey | Proposed | active-PR | Strict artifacts preserve criterion/event-time draws, branches, ties, and CPU/GPU receipts without claiming the scientific estimator is complete. |
 | [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
 | [0058](0058-copy-identity-analysis-run.md) | Template-copy identity refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `refuse_copy_as_source_identity` + `refuse_copy_as_transition`, not a simulation method-effect census. |
+| [0066](0066-location-membership-analysis-run.md) | Location-membership refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `refuse_location_as_entity_identity` + `refuse_location_as_language_channel`, not membership-posterior ICC. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -140,6 +141,7 @@ Use the narrowest owning ADR when decisions overlap:
 - **LineageWeave project-history service boundary:** ADR 0021.
 - **accepted-run execution and terminal artifact production:** ADR 0022.
 - **copy-identity analysis-run profile:** ADR 0058.
+- **location-membership analysis-run profile:** ADR 0066.
 - **independent lineage criterion and posterior Project Journey:** ADR 0023.
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
 

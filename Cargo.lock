@@ -74,6 +74,7 @@ dependencies = [
  "copy_identity",
  "corpus_split",
  "event_core",
+ "location_membership",
  "membership_core",
  "relation_graph",
  "serde",
