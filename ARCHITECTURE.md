@@ -58,7 +58,7 @@ TEPP keeps these clocks distinct end to end:
 5. `available_time`;
 6. `knowledge_cutoff`.
 
-Historical analysis admission requires `available_time <= knowledge_cutoff`. The Validation / Analysis Run invariant requires cutoff filtering before duplicate-identity, count, membership-total, inference, or terminal-state logic so future-unavailable evidence cannot change a historical result. The active #416 landing vehicle carries that source/test repair; until it reaches protected main, this paragraph is a target invariant rather than an `implemented-main` claim.
+Historical analysis admission requires `available_time <= knowledge_cutoff`. The Validation / Analysis Run invariant requires cutoff filtering before duplicate-identity, count, membership-total, inference, or terminal-state logic so future-unavailable evidence cannot change a historical result. Implementation maturity and active landing evidence are tracked in `docs/TRACEABILITY.md` and PR state; until the corresponding source/tests reach protected main, this paragraph is a target invariant rather than an `implemented-main` claim.
 
 Forward state-transition and input/process/outcome relations require a valid forward event-time partial order. Citation, revision, translation, support, contradiction, summary, and retrospective-reporting relations retain their own direction/provenance but do not become reverse transitions.
 
