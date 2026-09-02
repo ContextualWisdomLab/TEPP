@@ -8,7 +8,7 @@ const DEFAULT_SOURCE_ARTIFACT_BYTE_LIMIT: usize = 64 * 1024 * 1024;
 /// An immutable source artifact identified independently from its content hash.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceArtifact {
-    id: EvidenceId,
+    source_artifact_id: EvidenceId,
     content_digest: ContentDigest,
     content: Arc<[u8]>,
 }
@@ -39,7 +39,7 @@ impl SourceArtifact {
         validate_content(content, maximum_bytes)?;
 
         Ok(Self {
-            id: EvidenceId::new(),
+            source_artifact_id: EvidenceId::new(),
             content_digest: ContentDigest::sha256(content),
             content: Arc::from(content),
         })
@@ -79,7 +79,7 @@ impl SourceArtifact {
     }
 
     pub(crate) fn from_wire_parts(
-        id: EvidenceId,
+        source_artifact_id: EvidenceId,
         content_digest: ContentDigest,
         content: Vec<u8>,
         maximum_bytes: usize,
@@ -90,16 +90,25 @@ impl SourceArtifact {
         }
 
         Ok(Self {
-            id,
+            source_artifact_id,
             content_digest,
             content: Arc::from(content),
         })
     }
 
-    /// Return the stable artifact identifier.
+    /// Return the stable source-artifact identifier.
+    #[must_use]
+    pub const fn source_artifact_id(&self) -> EvidenceId {
+        self.source_artifact_id
+    }
+
+    /// Return the stable source-artifact identifier through the historical API alias.
+    ///
+    /// New code should prefer [`Self::source_artifact_id`]. This alias remains
+    /// available so existing package consumers do not need a flag-day API migration.
     #[must_use]
     pub const fn id(&self) -> EvidenceId {
-        self.id
+        self.source_artifact_id
     }
 
     /// Return the canonical content digest.
