@@ -20,8 +20,8 @@ impl EventTimedObservation {
     /// Construct an event-timed observation.
     ///
     /// The constructor stores the fields as given. Admission of finite scores,
-    /// strictly positive consecutive intervals, and at least two units happens
-    /// in [`center_within_unit_event_lags`].
+    /// strictly positive consecutive intervals, and at least two lag-contributing
+    /// units happens in [`center_within_unit_event_lags`].
     #[must_use]
     pub const fn new(unit_index: u32, event_time: f64, score: f64) -> Self {
         Self {
@@ -99,8 +99,9 @@ impl LaggedWithinResidual {
 ///
 /// Stable between-unit means are removed first (CWC). Consecutive within-unit
 /// residuals then become [`LaggedWithinResidual`] pairs on possibly irregular
-/// event intervals. Singleton units are skipped. Curran and Bauer (2011,
-/// pp. 583–619; PMC3059070 XML opened 2026-09-02; Eq. 36) show that
+/// event intervals. Singleton units do not contribute lags and therefore do not
+/// count toward the two-unit longitudinal evidence floor. Curran and Bauer
+/// (2011, pp. 583–619; PMC3059070 XML opened 2026-09-02; Eq. 36) show that
 /// person-mean subtraction of a time-varying covariate related to time is
 /// biased for the within-person effect. The returned pairs are therefore not a
 /// license to recover raw-process drift `a`.
@@ -108,10 +109,10 @@ impl LaggedWithinResidual {
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidObservationPayload`] for empty,
-/// singleton-only, fewer-than-two-unit, or non-finite rows, including
-/// non-representable stable unit means and overflowing CWC residuals after a
-/// finite mean, and [`LongitudinalError::NonPositiveEventInterval`] when any
-/// consecutive event interval is not strictly positive.
+/// singleton-only, fewer-than-two lag-contributing units, or non-finite rows,
+/// including non-representable stable unit means and overflowing CWC residuals
+/// after a finite mean, and [`LongitudinalError::NonPositiveEventInterval`]
+/// when any consecutive event interval is not strictly positive.
 pub fn center_within_unit_event_lags(
     rows: &[EventTimedObservation],
 ) -> Result<Vec<LaggedWithinResidual>, LongitudinalError> {
@@ -126,6 +127,13 @@ pub fn center_within_unit_event_lags(
         groups.entry(row.unit_index()).or_default().push(row);
     }
     if groups.len() < 2 {
+        return Err(LongitudinalError::InvalidObservationPayload);
+    }
+    let lag_contributing_units = groups
+        .values()
+        .filter(|occasions| occasions.len() >= 2)
+        .count();
+    if lag_contributing_units < 2 {
         return Err(LongitudinalError::InvalidObservationPayload);
     }
     let mut pairs = Vec::new();
@@ -843,7 +851,7 @@ mod tests {
     }
 
     #[test]
-    fn singleton_unit_is_skipped_and_all_singletons_fail_closed() {
+    fn singleton_second_unit_does_not_satisfy_longitudinal_unit_floor() {
         let drift = -0.2_f64;
         let mixed = [
             timed(1, 0.0, 10.0 + 1.0),
@@ -852,8 +860,10 @@ mod tests {
             timed(1, 3.0, 10.0 + (drift * 3.0).exp()),
             timed(2, 0.0, 4.0),
         ];
-        let recovered = recover_within_unit_irregular_residual_log_rate(&mixed).expect("skip");
-        assert!(recovered.is_finite());
+        assert_eq!(
+            recover_within_unit_irregular_residual_log_rate(&mixed),
+            Err(LongitudinalError::InvalidObservationPayload)
+        );
         assert_eq!(
             recover_within_unit_irregular_residual_log_rate(&[
                 timed(1, 0.0, 1.0),
