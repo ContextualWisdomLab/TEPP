@@ -41,17 +41,20 @@ pub fn recover_within_unit_irregular_residual_log_rate(
 
 /// Mean exact scalar log-rate on already-centered residuals.
 ///
-/// Each pair is `ln(later / earlier) / Δt`. The signed ratio must be finite and
-/// strictly positive. Opposing extreme finite rates are cancelled before count
-/// weighting so a representable final mean is not rejected merely because an
-/// intermediate multiplication overflows.
+/// Each pair is `ln(|later| / |earlier|) / Δt` and therefore requires finite,
+/// nonzero residuals of equal sign. Direct division is used when its positive
+/// ratio is representable; otherwise the equivalent log-domain difference is
+/// used so ratio overflow or underflow cannot reject a finite log-rate.
+/// Opposing extreme finite rates are cancelled before count weighting so a
+/// representable final mean is not rejected merely because an intermediate
+/// multiplication overflows.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidObservationPayload`] for an empty input
 /// or non-finite residuals, and
-/// [`LongitudinalError::InvalidTemporalTransformInput`] for an inadmissible
-/// ratio, non-finite rate, or non-representable final mean.
+/// [`LongitudinalError::InvalidTemporalTransformInput`] for opposite-sign or
+/// zero residuals, a non-finite rate, or a non-representable final mean.
 pub fn recover_centered_irregular_residual_log_rate(
     pairs: &[LaggedWithinResidual],
 ) -> Result<f64, LongitudinalError> {
@@ -64,18 +67,14 @@ pub fn recover_centered_irregular_residual_log_rate(
         if !pair.earlier_residual().is_finite() || !pair.later_residual().is_finite() {
             return Err(LongitudinalError::InvalidObservationPayload);
         }
-        if pair.earlier_residual() == 0.0 {
+        if !same_sign_nonzero(pair.earlier_residual(), pair.later_residual()) {
             return Err(LongitudinalError::InvalidTemporalTransformInput);
         }
-        let ratio = pair.later_residual() / pair.earlier_residual();
-        if !ratio.is_finite() || ratio <= 0.0 {
-            return Err(LongitudinalError::InvalidTemporalTransformInput);
-        }
-        let rate = ratio.ln() / pair.event_interval().as_f64();
-        if !rate.is_finite() {
-            return Err(LongitudinalError::InvalidTemporalTransformInput);
-        }
-        rates.push(rate);
+        rates.push(driver_same_sign_log_rate(
+            pair.earlier_residual(),
+            pair.later_residual(),
+            pair.event_interval(),
+        )?);
     }
 
     stable_mean(&rates)
