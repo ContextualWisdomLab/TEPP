@@ -67,3 +67,29 @@ fn representable_occasion_mean_is_not_rejected_for_intermediate_sum_overflow() {
             && pair.event_interval().as_f64().is_finite()
     }));
 }
+
+#[test]
+fn occasion_mean_is_bit_stable_under_row_permutation() {
+    let large = f64::MAX * 0.5;
+    let next_one = f64::from_bits(1.0_f64.to_bits() + 1);
+    let rows_a = [
+        observation(1, 0.0, 1.0),
+        observation(1, 1.0, 1.0),
+        observation(2, 0.0, next_one),
+        observation(2, 1.0, 1.0),
+        observation(3, 0.0, large),
+        observation(3, 1.0, 1.0),
+    ];
+    let rows_b = [
+        observation(1, 0.0, 1.0),
+        observation(1, 1.0, 1.0),
+        observation(3, 0.0, large),
+        observation(3, 1.0, 1.0),
+        observation(2, 0.0, next_one),
+        observation(2, 1.0, 1.0),
+    ];
+
+    let pairs_a = center_occasion_mean_event_lags(&rows_a).expect("first permutation");
+    let pairs_b = center_occasion_mean_event_lags(&rows_b).expect("second permutation");
+    assert_eq!(pairs_a, pairs_b);
+}
