@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-02T17:59:20Z
+**Snapshot:** 2026-09-02T18:17:00Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -21,14 +21,14 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 | Signal | Fresh evidence | Implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until main advances. |
-| Open pull requests | **131** | WIP circuit breaker remains active. |
-| Draft pull requests | **130** | Draft work must consolidate/repair rather than independently land. |
+| Open pull requests | **132** | WIP circuit breaker remains active; #485 caused a fresh regression and was retargeted into #416 rather than accepted as an independent landing lane. |
+| Draft pull requests | **131** | Draft work must consolidate/repair rather than independently land. |
 | Non-Draft pull requests | **1** | #480 is the only non-Draft PR and is not deployable without a compatible immutable contextual-orchestrator release. |
 | Open issues | **16** | ADR normalization, orchestration admission, evaluation drift and scientific recovery work remain open. |
 | GitHub releases | **0** | No TEPP open head is a released contract. |
 | Organization ruleset | `18156473` | One qualifying current-head approval, stale-review dismissal after push, resolved threads, unattributed-change approval where applicable, and central required workflows. |
 
-#484 `summarizes_edge_v1` remains a #416 Analysis Run fold child. Its unique source/tests/doctoring must survive the shared-file fold; it is not closed merely to reduce queue count.
+#484 `summarizes_edge_v1` and #485 `support_edge_v1` remain #416 Analysis Run fold children. Their unique source/tests/doctoring must survive the shared-file fold; neither is closed merely to reduce queue count.
 
 ## Current priority open pull-request evidence
 
@@ -36,6 +36,7 @@ A planning document, mergeable branch, local test, predecessor-head result, queu
 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
+| #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child after fresh WIP regression; preserve support-edge refusal/source/tests/doctoring and historical-cutoff evidence. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve profile-specific source/tests/doctoring. |
 | #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
 | #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 `feat/copy-identity-analysis-run-gap-004@0b7155cc238defb1e55129ff3000658f04b343cf` | Analysis Run fold child; preserve unique evidence. |
@@ -72,13 +73,13 @@ Current head `ea550a3a2f3419061736eaa12a74909acf5f90a9` adds a fail-closed repre
 
 The earlier stationary-overflow documentation repair remains intact. RED `9d8a82d78443cafc9b5064fc3bb35aa3f2052722` rejects the retired `(q / a) * -0.5` overflow instruction and requires `(q * 0.5) / |a|`; repair `9c962205dca26925c2e60d1e15ec4ce15681bbee` synchronizes `CLAUDE.md` with production `recover_stationary_within_variance` behavior. Earlier CWC, within/between, known-truth RMSE, irregular-rate zero-underflow, stationary-subnormal and exact covariance-bound lineages also remain on the same vehicle.
 
-The current head is mergeable but remains Draft. No workflow/status evidence has yet materialized for exact head `ea550a3a...`; predecessor-head queued/startup-failed runs do not transfer. There is no qualifying current-head independent approval. Source and public-boundary regression are repaired, but protected-main integration waits for fresh exact-head Rust/documentation/security/SAST/CodeQL evidence and review.
+The current head is mergeable but remains Draft. Exact-head CodeQL PR run `33665256789` is `startup_failure`; Documentation Quality `33665255191`, SAST Semgrep `33665255137`, OSV-Scanner PR `33665255643`, Security Scan `33665255105`, Scorecard PR `33665255116`, and Rust Foundation CI `33665255109` are queued. There is no qualifying current-head independent approval. Source and public-boundary regression are repaired, but protected-main integration waits for fresh exact-head GREEN evidence and review.
 
 The CWC and within/between unit-mean helpers now agree on the material extreme-cancellation behavior but are still separate implementations. Consolidation remains a maintainability target only after their full error/estimand semantics are shown equivalent; a reusable domain-neutral arithmetic primitive belongs in fast-mlsirm rather than being copied across TEPP contexts.
 
 ### #416 — Validation / Analysis Run consolidation
 
-Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-safe invariant established by RED `ffee655404716bf8d33c898a3c1a87a543abe701`: availability filtering occurs before duplicate-identity admission. #458/#460/#482/#483/#484 remain fold children over shared Cargo/lib/lock/docs surfaces. Their unique evidence must reach a surviving #416 head before any child can be considered fully superseded.
+Current head `0b7155cc238defb1e55129ff3000658f04b343cf` centralizes the leakage-safe invariant established by RED `ffee655404716bf8d33c898a3c1a87a543abe701`: availability filtering occurs before duplicate-identity admission. #458/#460/#482/#483/#484/#485 remain fold children over shared Cargo/lib/lock/docs surfaces. Their unique evidence must reach a surviving #416 head before any child can be considered fully superseded. #485 was opened as an independent main-targeting profile despite the active WIP circuit breaker; fresh file-surface verification showed it touches the same Analysis Run integration files, so it was repaired by non-force retargeting to #416.
 
 ### #480 / #479 — contextual-orchestrator boundary
 
@@ -92,7 +93,7 @@ Generalized-mixed/dependence Published Language remains unreleased. #1714 is ope
 
 ### #437 — ADR identity
 
-Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/numbered files, index/file mismatch and repeated Decision-status or Implementation-maturity authority must fail deterministic documentation fitness. Adapter/model micro-slice ADR numbers remain implementation lineage pending normalization through #435.
+Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/numbered files, index/file mismatch and repeated Decision-status or Implementation-maturity authority must fail deterministic documentation fitness. Adapter/model micro-slice ADR numbers, including #485's ADR 0078, remain implementation lineage pending normalization through #435.
 
 ## External contract state
 
@@ -102,7 +103,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 
 | ID | Gap | Maturity | Closure evidence |
 | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 131 open PRs | `release-blocking` | coherent landing vehicles, unique-evidence preservation, protected-main reduction |
+| GAP-001 | PR authority fragmented across 132 open PRs | `release-blocking` | coherent landing vehicles, unique-evidence preservation, protected-main reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission | `partial` | immutable offsets/layout, KO/EN/JA/ZH/VI/ES/DE/FR profiles, concept dictionary, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator | `partial` | Rust CPU f64 likelihood/uncertainty, relation/time/membership effects, true recovery, fitted candidate-K |
 | GAP-004 | durable end-to-end Analysis Run | `partial` | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation/promotion separation, Compose E2E |
