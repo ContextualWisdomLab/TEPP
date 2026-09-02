@@ -241,12 +241,7 @@ pub fn execute_inferred_status_run(
         inference_status: INFERRED_STATUS_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "inferred_status",
-        evidence_count,
-        4,
-        INFERRED_STATUS_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("inferred_status", evidence_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
