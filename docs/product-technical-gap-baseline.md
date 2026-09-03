@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-03T06:15Z
+**Snapshot:** 2026-09-03T06:27Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -19,8 +19,8 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | Signal | Fresh evidence | Implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until main advances. |
-| Open pull requests | **134** | WIP circuit breaker remains active; consolidate into existing bounded-context vehicles. |
-| Draft pull requests | **134** | Every current open PR is Draft. |
+| Open pull requests | **133** | WIP circuit breaker remains active; consolidate into existing bounded-context vehicles. |
+| Draft pull requests | **133** | Every current open PR is Draft. |
 | Non-Draft pull requests | **0** | No PR is eligible for normal merge until it is deliberately made Ready after exact-head evidence. |
 | Open issues | **16** | ADR normalization, orchestration admission, evaluation drift, and scientific recovery remain open. |
 | GitHub releases | **0** | No TEPP open head is a released contract. |
@@ -35,7 +35,6 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
 | #487 | `6b0c8de64f41bc11f8bf908e0f9cbe854c1e213c` | true | #416 `feat/copy-identity-analysis-run-gap-004` | Validation / Analysis Run fold child. Sparse observed relation classes are valid evidence; RED `a2892b6...`, repair `a6402015...`, predecessor-test correction `6b0c8de6...`. No child-head CI transfers to #416. |
-| #486 | `c451587e288ba119aebda67addee382106daf670` | true | #310 `agent/psychometric-discrete-drift-std-clean` | Longitudinal fold child. Valid Hamaker/operational release wording is preserved owner-correctly in #310 `CHANGELOG.d`; canonical root CHANGELOG assembly remains pending. Wrong-owner temporal source and mixed-timezone provenance are rejected. |
 | #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 | Analysis Run fold child; preserve support-edge source/tests/doctoring. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 | Analysis Run fold child; preserve summarizes-edge source/tests/doctoring. |
 | #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 | Analysis Run fold child; preserve unique evidence. |
@@ -44,7 +43,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main` | Validation / Analysis Run landing vehicle; availability cutoff precedes duplicate-identity admission. |
-| #310 | `919435109d59469383e23aca4d18104f8a02daf0` | true | `main` | Longitudinal Modeling vehicle; current repair prevents a strict-interior exact covariance from being rounded into a false perfect `±1` correlation. Exact-head verification remains non-passing until current gates and review complete. |
+| #310 | `be5123d50ad9edf22232b51d3819328a37063352` | true | `main` | Longitudinal Modeling vehicle; exact covariance-bound authority now prevents both false perfect endpoints from strict-interior inputs and false interior endpoints from exact perfect inputs. Exact-head verification remains non-passing until current gates and review complete. |
 
 Exact-head evidence becomes stale after any source push.
 
@@ -67,7 +66,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - Row arrival order is not scientific evidence. Fixed admitted observations must produce bit-identical means/centered results under permutation wherever the contract claims deterministic f64 reference behavior.
 - A representable final scientific estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. False exact 0/1/non-finite endpoints remain fail-closed when the mathematical estimand is interior/nonzero.
 - A mathematically nonzero scientific error metric must not be promoted to exact perfect recovery merely because its final binary64 representation underflows to zero.
-- A strict-interior exact binary64 covariance must not be promoted to exact `±1` correlation merely because rounded square roots/divisions reach the endpoint. Only the exact represented Cauchy–Schwarz boundary authorizes a perfect-correlation claim.
+- A strict-interior exact binary64 covariance must not be promoted to exact `±1` correlation merely because rounded square roots/divisions reach the endpoint. Conversely, an exact represented Cauchy–Schwarz boundary must not be weakened to an interior coefficient merely because rounded square roots/divisions fall one ULP below `1`.
 - Binary64 minimum-subnormal means follow IEEE ties-to-even at the public composition boundary. Overflow-safe normalization must not add an avoidable earlier rounding step, and mixed-sign cancellation must apply the original sample-count denominator before rounding a retained-only mean.
 - Observed Allen support classes are data, not required design strata. A historical prediction census may truthfully have zero covered, partial-overlap, adjacent, or contradictory rows; absent classes remain explicit zero counts rather than invalidating the run.
 - Historical-cutoff admission occurs before duplicate-identity checks. Future-unavailable evidence cannot change an earlier run's conflicts, counts, or terminal state.
@@ -81,17 +80,19 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 #310 remains the canonical Longitudinal Modeling landing vehicle. Its lineage covers lagged Pearson correlation with both marginal variances, stationary-variance materialization versus algebraically cancelled standardized maps, discrete-diffusion endpoint/subnormal representability, CWC atomistic admission, one irregular-rate authority, occasion-mean composition, known-truth recovery, within/between decomposition, and DDD relocation from `psychometric_core` to `longitudinal_core`.
 
-The #486 occasion-mean fold is owner-correct on #310: RED `75b0184d...`, owner repair `7fe9aaf2...`, export/test repairs `b900e213...` / `30771ff2...`, determinism RED `8a59019e...`, same-sign ordering repair `465d139d...`, same-panel/sparse successor regressions `b9e952bb...` / `aad56b50...`, ADR `04b3c26e...`, PRD `a221f494...`, research trace `27aa78ee...`, subnormal RED `9aff817f...`, source repair `40e057b8...`, and trace `a2e6ace7...`. Commit `db335d904ccc43dd0af7982c34df83008c968ef6` additionally preserves the child's valid operational release delta in `CHANGELOG.d/longitudinal-occasion-mean-event-time.md` under the correct owner. Root `CHANGELOG.md` assembly is still required before #486 can satisfy verified-successor closure.
+The #486 occasion-mean fold is owner-correct on #310: RED `75b0184d...`, owner repair `7fe9aaf2...`, export/test repairs `b900e213...` / `30771ff2...`, determinism RED `8a59019e...`, same-sign ordering repair `465d139d...`, same-panel/sparse successor regressions `b9e952bb...` / `aad56b50...`, ADR `04b3c26e...`, PRD `a221f494...`, research trace `27aa78ee...`, subnormal RED `9aff817f...`, source repair `40e057b8...`, and trace `a2e6ace7...`. Commit `db335d904ccc43dd0af7982c34df83008c968ef6` preserves the child's valid operational release delta in `CHANGELOG.d/longitudinal-occasion-mean-event-time.md` under the correct owner. Repository precedent verifies `CHANGELOG.d` as a valid non-destructive stacked-consolidation release-note carrier, and #486 was closed as a verified successor after all valid scientific/test/contract/docs/release-note deltas were checked on #310; invalid wrong-owner/weaker deltas were intentionally not copied.
 
 The CWC/occasion/decomposition mean lineage remains one Longitudinal-local authority. CWC RED `23476f45...` / repair `b14eb6e8...` closed the `[1 ULP, 2 ULP]` ties-to-even defect; `b073f03f...` / `350b8d4e...` changed arbitrary normalization to an exact power-of-two scale; `dd53eff6...` consolidated CWC and occasion means; mixed-sign RED `ae5e61f9...` / repair `39469067...` plus `201f3900...` and trace `34fd059a...` removed retained-mean double rounding; decomposition RED `7dc87aa8...` / repair `97c8ad35...` and trace `a1aef11e...` removed the remaining shadow running mean.
 
 Known-truth component RMSE has a separate fail-closed repair. For minimum positive subnormal ULP `u`, five identity-matched component rows with one residual `u` and four exact-zero residuals have mathematical RMSE `u / sqrt(5) > 0`, but the final binary64 product rounds to exact zero. RED `496583c6b62cbe0ad1be0e65b51f01d7f72acd5a` drives the public API; causal repair `a82b383b5940126a0139180d66729d2e6aa4baf7` preserves exact perfect recovery only on the pre-existing `scale == 0` path and rejects a later rounded zero after nonzero residual scale. Trace `bfaa69c4...` records the boundary.
 
-Fresh exact-binary association review found another endpoint defect. With earlier variance `f64::from_bits(4_607_182_418_800_016_408)`, later variance `f64::from_bits(4_607_182_418_800_016_427)`, and covariance magnitude `f64::from_bits(4_607_182_418_800_016_417)`, exact `Cov²` is strictly below the exact product of the two represented marginal variances, yet rounded square roots/divisions produce exact `±1.0`. RED `683b28eeeda3ad72ac11f5317c5aea54f34e0692` fixes both signs through the public `recover_event_time_lagged_correlation` API. Causal repair `9eeb373df2cd333fe7543df2197ea0cc0c492780` extends the existing exact integer-significand/power-of-two covariance comparison to return both admissibility and exact-boundary identity, and rejects rounded `±1` unless that exact relation is on the Cauchy–Schwarz boundary. Public rustdoc `d21c0a2d...` and research trace/current head `919435109d59469383e23aca4d18104f8a02daf0` synchronize the scientific contract.
+Exact-binary association review found two endpoint defects in opposite directions. First, with earlier variance `f64::from_bits(4_607_182_418_800_016_408)`, later variance `f64::from_bits(4_607_182_418_800_016_427)`, and covariance magnitude `f64::from_bits(4_607_182_418_800_016_417)`, exact `Cov²` is strictly below the exact product of the two represented marginal variances, yet rounded square roots/divisions produce exact `±1.0`. RED `683b28eeeda3ad72ac11f5317c5aea54f34e0692` fixes both signs through the public `recover_event_time_lagged_correlation` API. Causal repair `9eeb373df2cd333fe7543df2197ea0cc0c492780` extends the exact integer-significand/power-of-two covariance comparison to distinguish strict interior from exact boundary and rejects rounded `±1` for strict-interior inputs.
 
-At exact #310 head `919435109d...`, predecessor workflow/review evidence is stale by definition. Current-head Rust/documentation/security/coverage workflows and a qualifying independent approval must complete before the Draft can become a normal merge candidate; queued, pending, startup-failed, skipped, or predecessor-head evidence is not GREEN.
+Second, exact-boundary inputs can round the other way. `Var_t = 2`, `Var_{t+Δ} = 8`, and `|Cov| = 4` satisfy exact represented `Cov² = Var_t Var_{t+Δ}`, but the predecessor square-root/division path returns `0x1.fffffffffffffp-1` for the positive coefficient. RED `c25000901eb429a43817552f8b76cf4aae04e522` fixes both signs; causal repair `d06259ec1e036558d8d2f775c266b2b9db4e42c4` returns the exact signed endpoint when the exact integer relation is on the boundary and uses rounded standardization only for strict-interior coefficients. Research trace/current #310 head `be5123d50ad9edf22232b51d3819328a37063352` synchronizes the contract.
 
-#486 remains open Draft beneath the #310 branch. Its valid Hamaker scientific evidence and operational release wording are preserved owner-correctly; wrong-owner source, raw signed-zero bit identity, naive `sum/count`, mixed `Z KST` provenance, and unsupported claims are intentionally rejected rather than copied. Close still requires canonical root CHANGELOG assembly or exact evidence that the repository's release process treats the preserved fragment as the final canonical record.
+At exact #310 head `be5123d50ad9edf22232b51d3819328a37063352`, predecessor workflow/review evidence is stale by definition. Current-head Rust/documentation/security/coverage workflows and a qualifying independent approval must complete before the Draft can become a normal merge candidate; queued, pending, startup-failed, skipped, or predecessor-head evidence is not GREEN.
+
+#486 is closed as a verified-successor consolidation, not a PR-count-only close. No child-head CI/review evidence transfers to #310.
 
 ### #416 — Validation / Analysis Run consolidation
 
@@ -117,7 +118,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 
 | ID | Gap | Maturity | Closure evidence |
 | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 134 open PRs | `release-blocking` | coherent landing vehicles, unique-evidence preservation, protected-main reduction |
+| GAP-001 | PR authority fragmented across 133 open PRs | `release-blocking` | coherent landing vehicles, unique-evidence preservation, protected-main reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission | `partial` | immutable offsets/layout, KO/EN/JA/ZH/VI/ES/DE/FR profiles, concept dictionary, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator | `partial` | Rust CPU f64 likelihood/uncertainty, relation/time/membership effects, true recovery, fitted candidate-K |
 | GAP-004 | durable end-to-end Analysis Run | `partial` | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation/promotion separation, Compose E2E |
@@ -145,7 +146,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-026 | Scalar standardized longitudinal maps rejected representable finals when a cancelled stationary-variance intermediate lay outside binary64 range | `verification-pending` | RED `4a1f6c49...` / `96d8ed13...` + repairs `a4bc6230...` / `33f4b187...` / `26b03c32...`; exact-head GREEN and protected-main integration |
 | GAP-027 | Finite-interval `discreteDIFFUSIONstd` could report exact unit diffusion after exponent saturation erased a nonzero remainder | `verification-pending` | RED `a8de3c9f...` + repair `c17e2ff8...`; exact-head GREEN and protected-main integration |
 | GAP-028 | Actual stationary variance `p` could be misreported as exact zero when positive real `p` lies below binary64 range | `verification-pending` | RED `27d9fa39...` + repair `a0132b62...`; exact-head GREEN and protected-main integration |
-| GAP-029 | Occasion-mean temporal composition arrived in the wrong bounded context with raw-bit event identity, naive mean summation, and order-dependent averaging | `active-fold` | owner-correct #310 lineage + release fragment `db335d90...`; canonical root CHANGELOG assembly, exact-head GREEN/review/main integration |
+| GAP-029 | Occasion-mean temporal composition arrived in the wrong bounded context with raw-bit event identity, naive mean summation, and order-dependent averaging | `verification-pending` | verified-successor #486 closure into owner-correct #310 lineage + release fragment `db335d90...`; exact-head GREEN/review/main integration |
 | GAP-030 | Prediction-contradiction Analysis Run treated four observed relation classes as mandatory design strata | `active-fold` | RED `a2892b6...` + repair `a6402015...` + predecessor-test correction `6b0c8de6...`; fold unique evidence into #416; exact-survivor GREEN/review/main integration |
 | GAP-031 | Occasion-mean same-sign averaging double-rounded a representable minimum-subnormal ties-to-even mean | `verification-pending` | RED `9aff817f...` + repair `40e057b8...` + trace `a2e6ace7...`; exact-head GREEN and protected-main integration |
 | GAP-032 | CWC/irregular-residual same-sign averaging retained the same minimum-subnormal double-rounding defect | `verification-pending` | RED `23476f45...` + repair `b14eb6e8...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
@@ -153,7 +154,8 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-034 | Mixed-sign cancellation rounded a retained-only mean before restoring the original denominator, moving a representable subnormal mean by one ULP | `verification-pending` | RED `ae5e61f9...` + causal repair `39469067...` + occasion public-contract hardening `201f3900...` + research trace `34fd059a...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-035 | Within/between decomposition shadow running mean misrounded the representable `[1 ULP, 2 ULP]` unit mean and shifted residuals by one ULP | `verification-pending` | RED `7dc87aa8...` + causal repair `97c8ad35...` + research trace `a1aef11e...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-036 | Known-truth component RMSE could underflow a mathematically nonzero recovery error to exact zero and falsely report perfect recovery | `verification-pending` | RED `496583c6...` + causal repair `a82b383b...` + research trace `bfaa69c4...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
-| GAP-037 | Strict-interior lagged covariance could round to false exact `±1` correlation after exact covariance-bound admission | `verification-pending` | RED `683b28ee...` + causal repair `9eeb373d...` + public rustdoc `d21c0a2d...` + research trace `91943510...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-037 | Strict-interior lagged covariance could round to false exact `±1` correlation after exact covariance-bound admission | `verification-pending` | RED `683b28ee...` + causal repair `9eeb373d...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-038 | Exact Cauchy–Schwarz boundary covariance could round one ULP below `±1` and weaken a perfect represented association | `verification-pending` | RED `c2500090...` + causal repair `d06259ec...` + research trace `be5123d5...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 
 ## Release gate
 
