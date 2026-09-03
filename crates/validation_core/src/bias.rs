@@ -2,7 +2,7 @@
 
 use crate::ValidationError;
 use crate::input::require_paired_finite;
-use crate::numeric::deterministic_compensated_sum;
+use crate::numeric::{deterministic_compensated_sum, deterministic_representable_mean};
 
 fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, ValidationError> {
     require_paired_finite(truth, recovered)?;
@@ -18,108 +18,6 @@ fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, Valida
             }
         })
         .collect()
-}
-
-fn exact_power_of_two_scale(max_magnitude: f64) -> f64 {
-    let bits = max_magnitude.to_bits();
-    let exponent = (bits >> 52) & 0x7ff;
-    if exponent == 0 {
-        let significand = bits & 0x000f_ffff_ffff_ffff;
-        let highest_bit = 63 - significand.leading_zeros();
-        f64::from_bits(1_u64 << highest_bit)
-    } else {
-        f64::from_bits(exponent << 52)
-    }
-}
-
-fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, ValidationError> {
-    let max_magnitude = values
-        .iter()
-        .map(|value| value.abs())
-        .max_by(f64::total_cmp)
-        .ok_or(ValidationError::InvalidInput)?;
-    if max_magnitude == 0.0 {
-        return Ok(0.0);
-    }
-
-    let scale = exact_power_of_two_scale(max_magnitude);
-    let normalized = values.iter().map(|value| *value / scale).collect();
-    let normalized_mean = deterministic_compensated_sum(normalized) / total_count as f64;
-    let mean = normalized_mean * scale;
-    if !mean.is_finite() || mean == 0.0 {
-        Err(ValidationError::InvalidInput)
-    } else {
-        Ok(mean)
-    }
-}
-
-fn scaled_compensated_mean(values: &[f64]) -> Result<f64, ValidationError> {
-    let mut positives = Vec::new();
-    let mut negatives = Vec::new();
-    for &value in values {
-        if !value.is_finite() {
-            return Err(ValidationError::InvalidInput);
-        }
-        if value > 0.0 {
-            positives.push(value);
-        } else if value < 0.0 {
-            negatives.push(value);
-        }
-    }
-
-    if positives.is_empty() && negatives.is_empty() {
-        return Ok(0.0);
-    }
-    if positives.is_empty() || negatives.is_empty() {
-        return same_sign_mean_over_total(values, values.len());
-    }
-
-    positives.sort_by(|left, right| right.total_cmp(left));
-    negatives.sort_by(|left, right| left.total_cmp(right));
-
-    let mut positive_index = 0_usize;
-    let mut negative_index = 0_usize;
-    let mut positive = positives[0];
-    let mut negative = negatives[0];
-    let mut residuals = Vec::with_capacity(values.len());
-
-    loop {
-        let residual = positive + negative;
-        if residual > 0.0 {
-            positive = residual;
-            negative_index += 1;
-            if negative_index == negatives.len() {
-                residuals.push(positive);
-                residuals.extend_from_slice(&positives[positive_index + 1..]);
-                break;
-            }
-            negative = negatives[negative_index];
-        } else if residual < 0.0 {
-            negative = residual;
-            positive_index += 1;
-            if positive_index == positives.len() {
-                residuals.push(negative);
-                residuals.extend_from_slice(&negatives[negative_index + 1..]);
-                break;
-            }
-            positive = positives[positive_index];
-        } else {
-            positive_index += 1;
-            negative_index += 1;
-            if positive_index == positives.len() || negative_index == negatives.len() {
-                residuals.extend_from_slice(&positives[positive_index..]);
-                residuals.extend_from_slice(&negatives[negative_index..]);
-                break;
-            }
-            positive = positives[positive_index];
-            negative = negatives[negative_index];
-        }
-    }
-
-    if residuals.is_empty() {
-        return Ok(0.0);
-    }
-    same_sign_mean_over_total(&residuals, values.len())
 }
 
 fn standard_error_from_deviations(deviations: &[f64]) -> Result<f64, ValidationError> {
@@ -170,7 +68,7 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
         return Ok(0.0);
     }
     let normalized_values: Vec<_> = values.iter().map(|value| *value / outer_scale).collect();
-    let normalized_mean = scaled_compensated_mean(&normalized_values)?;
+    let normalized_mean = deterministic_representable_mean(&normalized_values)?;
     let normalized_deviations: Vec<_> = normalized_values
         .iter()
         .map(|value| *value - normalized_mean)
@@ -204,12 +102,12 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
 /// final mean bias.
 pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     let residuals = signed_residuals(truth, recovered)?;
-    scaled_compensated_mean(&residuals)
+    deterministic_representable_mean(&residuals)
 }
 
 /// Standard error of the mean signed bias under independent observations.
 ///
-/// The signed-difference mean uses the same overflow-safe deterministic
+/// The signed-difference mean uses the same cancellation-safe deterministic
 /// reference as [`mean_bias`]. Squared deviations are accumulated only after
 /// scaling by their largest magnitude, and the standard error is formed
 /// directly without materializing an avoidably overflowing raw variance.
@@ -224,7 +122,7 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
         return Err(ValidationError::InvalidInput);
     }
     let diffs = signed_residuals(truth, recovered)?;
-    let mean = scaled_compensated_mean(&diffs)?;
+    let mean = deterministic_representable_mean(&diffs)?;
     scaled_standard_error(&diffs, mean)
 }
 
