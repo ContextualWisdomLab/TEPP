@@ -182,17 +182,19 @@ pub fn center_within_unit_event_lags(
 ///
 /// This is [`center_within_unit_event_lags`] then the pairwise mean of the
 /// Driver, Oud, and Voelkle (2017, Eq. 3) scalar inverse
-/// `a = ln(|later| / |earlier|) / Δt` on nonzero same-sign residuals. When
-/// `|later| / |earlier|` is finite and positive the finite ratio logarithm is
-/// used so near-equal large residuals do not collapse to zero. Overflowed or
-/// underflowed ratios fall back to `ln|later| − ln|earlier|`. Opposite-sign
-/// and zero residuals have no real logarithm and are skipped. The pairwise
-/// mean cancels opposite-signed finite rates from largest magnitude downward
-/// before averaging the surviving same-sign residuals. This avoids both
-/// overflowing a raw same-sign sum and destroying representable subnormal
-/// terms by pre-scaling them. An empty admissible set fails closed. This is
-/// not Newton LS and does not recover raw-process drift from CWC of a raw AR
-/// path (Curran & Bauer, 2011, pp. 583–619; Eq. 36).
+/// `a = ln(|later| / |earlier|) / Δt` on nonzero same-sign residuals. For
+/// magnitudes within a factor of two, the represented magnitude difference is
+/// converted with `ln_1p` so an adjacent-float change is not rounded once by a
+/// quotient and again by the logarithm. More extreme ratios use the direct
+/// quotient when representable and otherwise fall back to
+/// `ln|later| − ln|earlier|`. Opposite-sign and zero residuals have no real
+/// logarithm and are skipped. The pairwise mean cancels opposite-signed finite
+/// rates from largest magnitude downward before averaging the surviving
+/// same-sign residuals. This avoids both overflowing a raw same-sign sum and
+/// destroying representable subnormal terms by pre-scaling them. An empty
+/// admissible set fails closed. This is not Newton LS and does not recover
+/// raw-process drift from CWC of a raw AR path (Curran & Bauer, 2011,
+/// pp. 583–619; Eq. 36).
 ///
 /// # Errors
 ///
@@ -210,12 +212,13 @@ pub fn recover_within_unit_irregular_residual_log_rate(
 ///
 /// Each pair is `a = ln(|later| / |earlier|) / Δt` (Driver et al., 2017,
 /// Eq. 3 inverse). The function does **not** center again. Residuals must be
-/// finite, nonzero, and of equal sign. A finite positive direct ratio is used
-/// when representable; ratio overflow or underflow falls back to the equivalent
-/// `ln|later| - ln|earlier|` so a representable final log-rate is not rejected
-/// because of a non-representable intermediate. This is the known-truth path
-/// that recovers `ln(0.5)` from already-centered pairs `(1, 0.5)` over unit
-/// event time.
+/// finite, nonzero, and of equal sign. Nearby represented magnitudes are
+/// compared through their difference and `ln_1p`, avoiding a ratio-first
+/// rounding step that can nearly double an adjacent-float change at a
+/// power-of-two boundary. Extreme ratios retain direct-ratio and log-domain
+/// fallbacks so a representable final log-rate is not rejected because of a
+/// non-representable intermediate. This is the known-truth path that recovers
+/// `ln(0.5)` from already-centered pairs `(1, 0.5)` over unit event time.
 ///
 /// # Errors
 ///
@@ -420,11 +423,14 @@ pub(crate) fn same_sign_nonzero(earlier: f64, later: f64) -> bool {
 /// Driver et al. (2017, Eq. 3) inverse `a = ln(|later| / |earlier|) / Δt`.
 ///
 /// Caller already established same-sign nonzero residuals and an admitted
-/// event interval. Prefer the finite ratio logarithm so near-equal large
-/// residuals keep a nonzero rate. Fall back to `ln|later| − ln|earlier|`
-/// only when that ratio overflows or underflows. A represented zero rate is
-/// accepted only when the residual magnitudes are exactly equal; otherwise it
-/// is a non-representable nonzero change and fails closed.
+/// event interval. When the represented magnitudes differ by no more than a
+/// factor of two, subtraction is exact in binary floating point and `ln_1p`
+/// preserves the represented relative change without first rounding a quotient.
+/// Growth uses `-ln1p(-(later-earlier)/later)` and decay uses
+/// `ln1p((later-earlier)/earlier)`. More extreme scales retain the finite direct
+/// ratio and log-domain fallbacks. A represented zero rate is accepted only
+/// when the residual magnitudes are exactly equal; otherwise it is a
+/// non-representable nonzero change and fails closed.
 pub(crate) fn driver_same_sign_log_rate(
     earlier: f64,
     later: f64,
@@ -432,11 +438,25 @@ pub(crate) fn driver_same_sign_log_rate(
 ) -> Result<f64, LongitudinalError> {
     let earlier_magnitude = earlier.abs();
     let later_magnitude = later.abs();
-    let ratio = later_magnitude / earlier_magnitude;
-    let log_ratio = if ratio.is_finite() && ratio > 0.0 {
-        ratio.ln()
+    let log_ratio = if later_magnitude >= earlier_magnitude
+        && later_magnitude <= earlier_magnitude * 2.0
+    {
+        let relative_loss_from_later =
+            (later_magnitude - earlier_magnitude) / later_magnitude;
+        -(-relative_loss_from_later).ln_1p()
+    } else if earlier_magnitude > later_magnitude
+        && earlier_magnitude <= later_magnitude * 2.0
+    {
+        let relative_change_from_earlier =
+            (later_magnitude - earlier_magnitude) / earlier_magnitude;
+        relative_change_from_earlier.ln_1p()
     } else {
-        later_magnitude.ln() - earlier_magnitude.ln()
+        let ratio = later_magnitude / earlier_magnitude;
+        if ratio.is_finite() && ratio > 0.0 {
+            ratio.ln()
+        } else {
+            later_magnitude.ln() - earlier_magnitude.ln()
+        }
     };
     let rate = log_ratio / event_interval.as_f64();
     if !rate.is_finite() || (rate == 0.0 && later_magnitude != earlier_magnitude) {
@@ -584,14 +604,20 @@ mod tests {
     }
 
     #[test]
-    fn driver_same_sign_prefers_finite_ratio_ln_for_near_equal_large_residuals() {
+    fn driver_same_sign_uses_relative_change_for_nearby_residuals() {
         let earlier = 1e20_f64;
         let later = earlier * (-1e-12_f64).exp();
-        let ratio = later.abs() / earlier.abs();
-        assert!(ratio.is_finite() && ratio > 0.0);
-        let from_ratio = ratio.ln();
+        let relative_change = (later.abs() - earlier.abs()) / earlier.abs();
+        let from_relative_change = relative_change.ln_1p();
         let rate = driver_same_sign_log_rate(earlier, later, unit_interval()).expect("near-equal");
-        assert_eq!(rate.to_bits(), from_ratio.to_bits());
+        assert_eq!(rate.to_bits(), from_relative_change.to_bits());
+
+        let adjacent_earlier = f64::from_bits(2.0_f64.to_bits() - 1);
+        let adjacent_growth = driver_same_sign_log_rate(adjacent_earlier, 2.0, unit_interval())
+            .expect("adjacent power-of-two growth");
+        let exact_adjacent_growth = -(-(f64::EPSILON / 2.0)).ln_1p();
+        assert_eq!(adjacent_growth.to_bits(), exact_adjacent_growth.to_bits());
+
         let overflow_rate = driver_same_sign_log_rate(f64::from_bits(1), f64::MAX, unit_interval())
             .expect("overflow arm");
         let overflow_logs = f64::MAX.ln() - f64::from_bits(1).ln();
