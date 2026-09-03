@@ -50,6 +50,24 @@ applies the original denominator inside the shared normalized sum. Contract
 `mixed_sign_mean_rounding_contract.rs` also exercises the public occasion-mean
 path so the shared numerical authority cannot silently split again.
 
+A second boundary applies after the normalized sum. If the retained residual
+mass has one sign and is nonzero, its real mean is also nonzero. Binary64 may
+still round that final mean to exact zero when the magnitude lies below half
+the minimum subnormal. Reporting that zero would change a nonzero temporal
+rate into exact no-change. `same_sign_mean_over_total` therefore accepts zero
+only when its admitted mass was itself exact zero; otherwise final zero is
+`InvalidTemporalTransformInput`.
+
+Public RED `96f1c3342071173ba870e6ef5e11b826391c7621` adds
+`irregular_rate_mean_underflow_contract.rs`. One already-centered pair has an
+exact zero rate and one has a representable positive subnormal rate; averaging
+that nonzero rate with fifteen exact-zero rates makes the real mean positive
+but too small for binary64. Causal repair
+`ae5081d8ae580c19e73aff7f03711e50c3c631dd` fails closed at the shared mean
+boundary rather than returning exact zero. Exact cancellation of mixed-sign
+rates still returns zero before the one-sign helper, and an all-zero input
+still returns canonical `+0.0`.
+
 This arithmetic remains a Longitudinal composition primitive in this stack.
 It is not a new reusable static psychometric kernel. A fast-mlsirm handoff
 requires semantic-equivalence evidence and an immutable released owner
@@ -87,8 +105,8 @@ CWC of a raw AR path with a stable between-unit offset does **not** recover
 that `a`. Fail-closed cases cover empty and singleton-only rows, fewer than
 two lag-contributing units, non-positive intervals, non-finite scores,
 non-representable means, overflowing CWC residuals after a finite mean,
-tiny intervals with huge log-ratios, underflowed nonzero final rates, and the
-Curran refusal.
+tiny intervals with huge log-ratios, underflowed nonzero individual rates,
+underflowed nonzero final mean rates, and the Curran refusal.
 
 Exact zero CWC residuals also have one public identity. IEEE 754 binary64
 has distinct `+0.0` and `-0.0` encodings, and subtraction from a canonical
@@ -115,12 +133,12 @@ Signed-zero traceability:
   arithmetic* (IEEE Std 754-2019). IEEE. The canonical repository register
   is `docs/research/standards-and-literature.md`.
 
-
 The current public numerical regressions include same-sign raw-sum overflow,
 full-exponent mixed-sign cancellation, minimum-subnormal cancellation,
-halfway ties-to-even for same-sign means, and the mixed-sign `-31u/3` case
-above. Hosted exact-head CI and independent review remain delivery gates; these
-source contracts do not by themselves establish release readiness.
+halfway ties-to-even for same-sign means, the mixed-sign `-31u/3` case, and
+nonzero irregular-rate means that are not representable in binary64. Hosted
+exact-head CI and independent review remain delivery gates; these source
+contracts do not by themselves establish release readiness.
 
 ## Traceability
 
