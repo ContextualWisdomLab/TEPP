@@ -71,3 +71,28 @@ fn cancellation_does_not_underflow_subnormal_rates_before_the_mean() {
         .expect("large cancellation must retain a representable subnormal mean");
     assert_eq!(recovered.to_bits(), minimum_subnormal.to_bits());
 }
+
+#[test]
+fn same_sign_rate_mean_is_bit_stable_under_pair_permutation() {
+    let pairs_a = [
+        ratio_pair(2.0, 1.0),
+        ratio_pair(4.0, 1.0),
+        ratio_pair(8.0, 1.0),
+    ];
+    let pairs_b = [
+        ratio_pair(2.0, 1.0),
+        ratio_pair(8.0, 1.0),
+        ratio_pair(4.0, 1.0),
+    ];
+
+    let recovered_a = recover_centered_irregular_residual_log_rate(&pairs_a)
+        .expect("first permutation remains identifiable");
+    let recovered_b = recover_centered_irregular_residual_log_rate(&pairs_b)
+        .expect("second permutation remains identifiable");
+
+    assert_eq!(
+        recovered_a.to_bits(),
+        recovered_b.to_bits(),
+        "scientific evidence order must not change the binary64 reference mean"
+    );
+}
