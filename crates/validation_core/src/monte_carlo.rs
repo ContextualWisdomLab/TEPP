@@ -22,12 +22,19 @@ pub struct MonteCarloSummary {
 }
 
 impl MonteCarloSummary {
-    /// Validate structural invariants for a Monte Carlo summary payload.
+    /// Validate structural and derived-field invariants for a Monte Carlo summary payload.
+    ///
+    /// The standard error is a derived field, not an independently selectable
+    /// uncertainty estimate: it must equal `standard_deviation / sqrt(n)` for
+    /// the represented replication count. A nonzero standard deviation whose
+    /// implied standard error is not representable fails closed rather than
+    /// becoming false zero uncertainty.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when counts or numeric fields
-    /// violate the summary contract.
+    /// violate the summary contract or the standard error disagrees with the
+    /// standard deviation and replication count.
     pub fn validate(self) -> Result<Self, ValidationError> {
         if self.replication_count == 0 {
             return Err(ValidationError::InvalidInput);
@@ -47,6 +54,15 @@ impl MonteCarloSummary {
             return Err(ValidationError::InvalidInput);
         }
         if self.percentile_lower > self.percentile_upper {
+            return Err(ValidationError::InvalidInput);
+        }
+
+        let implied_standard_error =
+            self.standard_deviation / (self.replication_count as f64).sqrt();
+        if !implied_standard_error.is_finite()
+            || (implied_standard_error == 0.0 && self.standard_deviation != 0.0)
+            || self.standard_error != implied_standard_error
+        {
             return Err(ValidationError::InvalidInput);
         }
         Ok(self)
