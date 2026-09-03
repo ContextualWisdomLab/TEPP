@@ -18,15 +18,42 @@ raw-process autoregressive drift.
    Singleton units are skipped and at least two units must contribute lags.
 2. `recover_within_unit_irregular_residual_log_rate` is the mean of the
    Driver, Oud, and Voelkle (2017, Eq. 3) scalar inverse
-   `a = ln(|later| / |earlier|) / Δt` on nonzero same-sign residuals. When
-   the absolute residual ratio is finite and positive the finite-ratio
-   logarithm is used; overflowed or underflowed ratios fall back to
-   `ln|later| − ln|earlier|`.
+   `a = ln(|later| / |earlier|) / Δt` on nonzero same-sign residuals. Nearby
+   represented magnitudes are evaluated from their exact binary difference
+   with `ln_1p`; more extreme ratios use a direct finite quotient when possible
+   and otherwise fall back to `ln|later| − ln|earlier|`.
 3. `recover_centered_irregular_residual_log_rate` is the already-centered
    path. It does **not** re-center. Residuals must be nonzero and have equal
    sign. Known-truth pairs `(1, 0.5)` with `Δt = 1` recover `ln(0.5)`; for a
    general admitted interval the scalar result is `ln(0.5) / Δt`.
 4. `refuse_cwc_residual_log_rate_as_raw_process_drift` always fails closed.
+
+## Log-ratio numerical contract
+
+The log-rate must represent the ratio of the two **represented residual
+magnitudes**, not the ratio after an avoidable intermediate quotient rounding.
+That distinction is material near a power-of-two boundary. If `earlier` is the
+binary64 value immediately below `2.0` and `later = 2.0`, the represented
+magnitude change is one ULP below the boundary. Forming `later / earlier`
+first rounds that ratio to `1 + 2^-52`; applying `ln` then reports a change
+close to `2^-52`. The correctly rounded logarithm of the represented endpoint
+ratio is instead close to `2^-53`, so the quotient-first path nearly doubles
+the temporal rate.
+
+RED `766ddc7a3d95102450d663f06d2c577306964d79` adds
+`irregular_rate_adjacent_growth_contract.rs` through the public already-centered
+recovery API. Causal repair `16f21d9a223fb34d52f24d148c7cad9b385e1d91`
+uses the exact represented magnitude difference for values within a factor of
+two. Growth evaluates `-ln1p(-(later-earlier)/later)` and decay evaluates
+`ln1p((later-earlier)/earlier)`. This keeps the difference subtraction in the
+Sterbenz exact-subtraction region and avoids the quotient-first rounding step.
+Direct-ratio and log-domain fallbacks remain for extreme scale differences, so
+previous overflow/underflow recovery behavior is retained rather than traded
+for local near-equality accuracy.
+
+This is a numerical implementation repair of the Driver et al. (2017, Eq. 3)
+Longitudinal estimand. It does not create a second arithmetic owner, change the
+scientific target, or authorize CWC residual rates as raw-process drift.
 
 ## Numerical mean contract
 
@@ -106,7 +133,9 @@ that `a`. Fail-closed cases cover empty and singleton-only rows, fewer than
 two lag-contributing units, non-positive intervals, non-finite scores,
 non-representable means, overflowing CWC residuals after a finite mean,
 tiny intervals with huge log-ratios, underflowed nonzero individual rates,
-underflowed nonzero final mean rates, and the Curran refusal.
+underflowed nonzero final mean rates, and the Curran refusal. Adjacent-float
+power-of-two growth additionally verifies that a quotient-rounding artifact
+cannot nearly double a representable temporal change.
 
 Exact zero CWC residuals also have one public identity. IEEE 754 binary64
 has distinct `+0.0` and `-0.0` encodings, and subtraction from a canonical
@@ -135,8 +164,9 @@ Signed-zero traceability:
 
 The current public numerical regressions include same-sign raw-sum overflow,
 full-exponent mixed-sign cancellation, minimum-subnormal cancellation,
-halfway ties-to-even for same-sign means, the mixed-sign `-31u/3` case, and
-nonzero irregular-rate means that are not representable in binary64. Hosted
+halfway ties-to-even for same-sign means, the mixed-sign `-31u/3` case,
+nonzero irregular-rate means that are not representable in binary64, and
+adjacent-float log-rate changes across a power-of-two boundary. Hosted
 exact-head CI and independent review remain delivery gates; these source
 contracts do not by themselves establish release readiness.
 
