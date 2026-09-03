@@ -67,8 +67,22 @@ fn validation_report_rejects_incoherent_wilson_evidence() {
 }
 
 #[test]
-fn serialization_cannot_bypass_report_validation() {
+fn serialization_and_deserialization_cannot_bypass_report_validation() {
     let mut report = valid_report();
     report.interval_coverage = 1.5;
     assert_eq!(report.to_json(), Err(ValidationError::InvalidInput));
+
+    let impossible = r#"{
+        "study_label":"invalid-wire-report",
+        "rmse":0.1,
+        "rmse_standard_error":0.01,
+        "mean_bias":0.0,
+        "bias_standard_error":0.01,
+        "interval_coverage":1.5,
+        "coverage_wilson_lower":0.6,
+        "coverage_wilson_upper":0.9,
+        "temporal_order_accuracy":0.75,
+        "monte_carlo_rmse":null
+    }"#;
+    assert!(serde_json::from_str::<ValidationReport>(impossible).is_err());
 }
