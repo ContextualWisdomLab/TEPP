@@ -94,10 +94,16 @@ impl ValidationReport {
         serde_json::to_string(self).map_err(|_| ValidationError::InvalidInput)
     }
 
-    /// Render a short human-readable summary line.
-    #[must_use]
-    pub fn to_human_summary(&self) -> String {
-        format!(
+    /// Render a short human-readable summary line after validating the report.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] when the report violates its
+    /// numeric or scientific invariants. Human-readable projection is therefore
+    /// subject to the same fail-closed boundary as JSON ingress and egress.
+    pub fn to_human_summary(&self) -> Result<String, ValidationError> {
+        self.validate()?;
+        Ok(format!(
             "study={} rmse={:.6} (se={:.6}) bias={:.6} (se={:.6}) coverage={:.3} temporal_order={:.3}",
             self.study_label,
             self.rmse,
@@ -106,7 +112,7 @@ impl ValidationReport {
             self.bias_standard_error,
             self.interval_coverage,
             self.temporal_order_accuracy
-        )
+        ))
     }
 }
 
@@ -247,7 +253,12 @@ mod tests {
         let json = report.to_json().expect("json");
         let decoded: ValidationReport = serde_json::from_str(&json).expect("decode");
         assert_eq!(decoded.study_label, "foundation-recovery");
-        assert!(report.to_human_summary().contains("rmse=0.100000"));
+        assert!(
+            report
+                .to_human_summary()
+                .expect("human summary")
+                .contains("rmse=0.100000")
+        );
         let none_report = ValidationReport {
             monte_carlo_rmse: None,
             ..report.clone()
