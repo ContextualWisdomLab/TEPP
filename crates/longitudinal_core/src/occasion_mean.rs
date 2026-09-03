@@ -18,8 +18,9 @@ use crate::{EventTimeInterval, LongitudinalError};
 /// `-0.0` and `+0.0` are one occasion rather than two binary encodings. Every
 /// admitted occasion must contain at least two distinct units, and at least two
 /// units must contribute a consecutive lag. Occasion means are computed without
-/// allowing an overflowing same-sign partial sum to reject a representable mean
-/// and are bit-stable under row permutation.
+/// allowing an overflowing same-sign partial sum or an underflowed incremental
+/// update to reject or mis-round a representable mean, and are bit-stable under
+/// row permutation.
 ///
 /// # Errors
 ///
@@ -223,14 +224,32 @@ fn occasion_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
 }
 
 fn same_sign_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
+    if values.is_empty() || values.iter().any(|value| !value.is_finite()) {
+        return Err(LongitudinalError::InvalidObservationPayload);
+    }
+
     let mut ordered = values.to_vec();
     ordered.sort_by(f64::total_cmp);
-
-    let mut mean = 0.0_f64;
-    for (index, value) in ordered.into_iter().enumerate() {
-        let count = (index + 1) as f64;
-        mean += (value - mean) / count;
+    let scale = ordered
+        .iter()
+        .map(|value| value.abs())
+        .max_by(f64::total_cmp)
+        .unwrap_or(0.0);
+    if scale == 0.0 {
+        return Ok(0.0);
     }
+
+    let mut scaled_sum = 0.0_f64;
+    let mut compensation = 0.0_f64;
+    for value in ordered {
+        let scaled = value / scale;
+        let adjusted = scaled - compensation;
+        let next = scaled_sum + adjusted;
+        compensation = (next - scaled_sum) - adjusted;
+        scaled_sum = next;
+    }
+
+    let mean = (scaled_sum / values.len() as f64) * scale;
     if mean.is_finite() {
         Ok(mean)
     } else {
