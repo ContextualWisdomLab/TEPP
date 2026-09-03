@@ -36,6 +36,30 @@ Traceability:
 - Public API under test — `decompose_within_between` with
   `OccasionObservation`; between/within component identity remains unchanged.
 
+Known-truth recovery metrics have the same fail-closed representability
+boundary. `component_root_mean_square_error` may return exact zero only when
+all admitted matched component residuals are exactly zero. If at least one
+residual is nonzero but the positive real-valued RMSE falls below binary64
+range, returning `0.0` would convert a numerical limitation into false perfect
+recovery. For five matched components with one minimum-subnormal residual `u`
+and four exact-zero residuals, the mathematical RMSE is `u / sqrt(5) > 0`
+but binary64 rounds that final product to zero. That case must therefore be
+reported as `InvalidComponentPayload`, consistent with the public contract
+that a non-representable final RMSE fails closed.
+
+Recovery-metric traceability:
+
+- RED `496583c6b62cbe0ad1be0e65b51f01d7f72acd5a` —
+  `crates/longitudinal_core/tests/component_rmse_underflow_contract.rs` drives
+  the public `component_root_mean_square_error` API with identity-matched
+  within components and one minimum-subnormal nonzero recovery error.
+- Causal repair `a82b383b5940126a0139180d66729d2e6aa4baf7` —
+  `crates/longitudinal_core/src/component.rs` keeps exact-zero recovery on the
+  existing `scale == 0` path and rejects a later rounded `rmse == 0` once a
+  nonzero residual scale has already been established.
+- Acceptance boundary — an unrepresentable nonzero error is not a recovered
+  parameter and cannot count toward perfect RMSE or scientific claim promotion.
+
 This consolidation is local to Longitudinal Modeling. It does not create a
 second reusable psychometric arithmetic owner and does not move static
 psychometric truth out of fast-mlsirm.
