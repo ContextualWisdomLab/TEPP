@@ -280,11 +280,10 @@ fn pairwise_same_sign_log_rate(lagged: &[LaggedWithinResidual]) -> Result<f64, L
 /// signs are cancelled before any scale reduction, so a subnormal addend is
 /// never divided into zero merely to protect an unrelated extreme term. Each
 /// cancellation is an opposite-sign addition and therefore cannot overflow.
-/// The remaining terms have one sign and are averaged safely; their mean is
-/// then weighted by their term count relative to the original sample count.
-/// Retained mass is evaluated multiply-first when representable; only an
-/// overflowing intermediate switches to divide-first-then-count so both
-/// subnormal retained mass and representable large final means are preserved.
+/// The remaining terms have one sign and are normalized and summed before the
+/// original sample-count denominator is applied. This avoids rounding a
+/// retained-only mean and then weighting that rounded intermediate, which can
+/// move a representable mixed-sign subnormal result by one ULP.
 pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     if values.is_empty() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
@@ -308,7 +307,7 @@ pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, Longitudina
     }
 
     if positives.is_empty() || negatives.is_empty() {
-        return same_sign_mean(values);
+        return same_sign_mean_over_total(values, values.len());
     }
 
     positives.sort_by(|left, right| right.total_cmp(left));
@@ -356,19 +355,13 @@ pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, Longitudina
     if residuals.is_empty() {
         return Ok(0.0);
     }
-    let residual_mean = same_sign_mean(&residuals)?;
-    let retained_count = residuals.len() as f64;
-    let total_count = values.len() as f64;
-    let retained_mass = residual_mean * retained_count;
-    let result = if retained_mass.is_finite() {
-        retained_mass / total_count
-    } else {
-        (residual_mean / total_count) * retained_count
-    };
-    require_finite(result)
+    same_sign_mean_over_total(&residuals, values.len())
 }
 
-fn same_sign_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
+fn same_sign_mean_over_total(
+    values: &[f64],
+    total_count: usize,
+) -> Result<f64, LongitudinalError> {
     let max_magnitude = values
         .iter()
         .map(|value| value.abs())
@@ -389,7 +382,7 @@ fn same_sign_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
         compensation = (next - sum) - adjusted;
         sum = next;
     }
-    let mean = (sum / values.len() as f64) * scale;
+    let mean = (sum / total_count as f64) * scale;
     require_finite(mean)
 }
 
