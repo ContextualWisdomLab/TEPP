@@ -36,6 +36,28 @@ Traceability:
 - Public API under test — `decompose_within_between` with
   `OccasionObservation`; between/within component identity remains unchanged.
 
+Exact zero within residuals also have one public identity. IEEE 754 binary64
+has distinct `+0.0` and `-0.0` encodings, and subtraction can therefore leave
+`-0.0` when a negative-zero observed score equals a canonical zero unit mean.
+That sign bit does not represent positive versus negative within-person change:
+the deviation is exactly zero. The public decomposition boundary therefore
+canonicalizes only validated exact-zero residuals to `+0.0`; private numerical
+intermediates remain free to retain signed zero where it is diagnostically
+meaningful. IEEE Std 754-2019 remains the active published floating-point
+standard while IEEE P754 is the active revision project as of 2026-09-03.
+
+Signed-zero traceability:
+
+- RED `aeb008a38bc333ba0f1bec0651739e361426e66d` —
+  `crates/longitudinal_core/tests/decomposition_signed_zero_contract.rs`
+  exercises the public decomposition API with `-0.0` and `+0.0` observations.
+- Causal repair `a9a70baa5c2a40ec8bf3fc77748bc3a5eaf92cd8` —
+  `crates/longitudinal_core/src/decompose.rs` canonicalizes an exact-zero
+  within residual only after finite-result validation.
+- Standard authority — IEEE. (2019). *IEEE standard for floating-point
+  arithmetic* (IEEE Std 754-2019). IEEE. The canonical repository register is
+  `docs/research/standards-and-literature.md`.
+
 Known-truth recovery metrics have the same fail-closed representability
 boundary. `component_root_mean_square_error` may return exact zero only when
 all admitted matched component residuals are exactly zero. If at least one
