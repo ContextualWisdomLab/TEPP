@@ -4,13 +4,15 @@
 
 `validation_core::ValidationReport` previously treated finiteness as sufficient payload validity. That allowed finite but impossible Validation Evidence to be serialized or deserialized: negative RMSE or standard errors, empirical coverage and temporal-order accuracy outside `[0, 1]`, Wilson endpoints outside the probability domain, inverted Wilson intervals, or an empirical coverage value outside the Wilson interval stored beside it.
 
+After the serde boundary was hardened, the human-readable projection remained a separate bypass: `to_human_summary()` returned a `String` without validating the public report fields. A manually constructed invalid report could therefore be refused by JSON while still being rendered as apparently normal human-facing Validation Evidence.
+
 The same boundary review found that `MonteCarloSummary` already rejected impossible values on explicit validation and serde ingress, but its direct serde serializer wrote public fields without applying that contract. A caller could therefore serialize a negative standard deviation or otherwise invalid summary directly even though the same payload would be rejected on re-ingress.
 
 These defects are evidence-admission/projection problems rather than new estimators. The report and Monte Carlo summary are durable boundaries over already-computed recovery metrics, so their responsibility is to preserve the metric domains and cross-field relationships established by the producing functions. Mean signed bias is intentionally not sign-restricted.
 
 ## Decision
 
-The report boundary now enforces the following invariants on explicit validation, canonical JSON egress, direct serde serialization, and JSON ingress:
+The report boundary now enforces the following invariants on explicit validation, canonical JSON egress, direct serde serialization, JSON ingress, and human-readable projection:
 
 - `rmse >= 0`, `rmse_standard_error >= 0`, and `bias_standard_error >= 0`;
 - empirical coverage, Wilson endpoints, and temporal-order accuracy are each in `[0, 1]`;
@@ -18,7 +20,7 @@ The report boundary now enforces the following invariants on explicit validation
 - `coverage_wilson_lower <= interval_coverage <= coverage_wilson_upper`;
 - all numeric fields remain finite and an embedded Monte Carlo summary must satisfy its existing validation contract.
 
-Custom `Serialize` and `Deserialize` implementations validate `ValidationReport` at both wire boundaries. `MonteCarloSummary` direct serialization now also invokes its existing validator before writing fields. This prevents callers from bypassing durable evidence contracts by choosing a different serde path instead of the explicit validation helpers.
+`ValidationReport::to_human_summary()` now returns `Result<String, ValidationError>` and validates before rendering. Custom `Serialize` and `Deserialize` implementations validate `ValidationReport` at both wire boundaries. `MonteCarloSummary` direct serialization also invokes its existing validator before writing fields. Callers therefore cannot select a weaker projection path to turn impossible finite values into durable or human-facing scientific evidence.
 
 ## RED -> repair trace
 
@@ -30,13 +32,16 @@ Custom `Serialize` and `Deserialize` implementations validate `ValidationReport`
 - Direct-report-egress repair `f7e58ccdb1864ce775ef6797f7fd88596dff1269`: custom `Serialize` validates before writing any report field.
 - Direct-Monte-Carlo-egress RED `b5a8ae1fbd1344b09a9fbb3c65a3c6d0cdc38c28`: an invalid `MonteCarloSummary` must not serialize directly despite its public fields.
 - Direct-Monte-Carlo-egress repair `18374c35061fb0b98bfe09079d4967baef7697b4`: the existing summary validator is applied before serde writes fields.
-- Changelog trace `0d03efa1474e6ce605db32980c3f65e97e0dc66b`.
+- Human-projection RED `541273f10d2085680073fb8ca9dc72d3cbe1e62b`: the human summary must not render a report rejected by the canonical Validation Evidence contract.
+- Human-projection repair `53607f8033ee03b409c8fce4ee464797e8cb7be1`: human summary projection validates and returns `Result` instead of rendering invalid evidence.
+- Changelog trace `d1f1b85ac1441ef573bbb84478bacec1c7424266`.
 
 Owned module/API/tests:
 
 - `crates/validation_core/src/report.rs`
 - `validation_core::ValidationReport::validate`
 - `validation_core::ValidationReport::to_json`
+- `validation_core::ValidationReport::to_human_summary`
 - `serde::Serialize` / `serde::Deserialize` for `ValidationReport`
 - `serde::Serialize` / existing `serde::Deserialize` for `MonteCarloSummary`
 - `crates/validation_core/tests/validation_report_scientific_invariants_contract.rs`
