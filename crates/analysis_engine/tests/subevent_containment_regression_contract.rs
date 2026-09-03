@@ -29,8 +29,12 @@ fn request(cutoff: &str) -> AnalysisRunRequest {
 }
 
 fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
-    AnalysisRunAccepted::new("run-subevent-containment", "accepted", &request.idempotency_key)
-        .expect("accepted")
+    AnalysisRunAccepted::new(
+        "run-subevent-containment",
+        "accepted",
+        &request.idempotency_key,
+    )
+    .expect("accepted")
 }
 
 fn assignments() -> Vec<SubeventContainmentAssignment> {
