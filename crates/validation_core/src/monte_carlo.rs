@@ -181,7 +181,9 @@ pub fn summarize_replications(
 /// Comparison scales all terms by a shared finite magnitude so opposite-sign
 /// extremes do not overflow both sides of the inequality to infinity. A zero
 /// standard error or zero multiplier is an exact-recovery gate and is compared
-/// before scale reduction so a huge SE cannot erase a nonzero residual.
+/// before scale reduction so a huge SE cannot erase a nonzero residual. Exact
+/// recovery uses numeric equality, for which IEEE `-0.0` and `+0.0` denote the
+/// same zero-valued scientific result.
 ///
 /// # Errors
 ///
@@ -203,8 +205,8 @@ pub fn accept_within_standard_errors(
         return Err(ValidationError::InvalidConfiguration);
     }
     if standard_error == 0.0 || k == 0.0 {
-        // Exact recovery only: a zero SE or zero multiplier admits no residual.
-        return Ok(estimate.total_cmp(&target).is_eq());
+        // Exact recovery is numerical equality; signed zero is one zero value.
+        return Ok(estimate == target);
     }
     let scale = estimate
         .abs()
