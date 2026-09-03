@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-03T06:27Z
+**Snapshot:** 2026-09-03T07:05Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -43,7 +43,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main` | Validation / Analysis Run landing vehicle; availability cutoff precedes duplicate-identity admission. |
-| #310 | `be5123d50ad9edf22232b51d3819328a37063352` | true | `main` | Longitudinal Modeling vehicle; exact covariance-bound authority now prevents both false perfect endpoints from strict-interior inputs and false interior endpoints from exact perfect inputs. Exact-head verification remains non-passing until current gates and review complete. |
+| #310 | `b56e1d160debde3b656f3ec71780fadb03d2fe85` | true | `main` | Longitudinal Modeling vehicle; exact covariance endpoint authority plus canonical public `+0.0` no-association encoding. Exact-head verification remains non-passing until current gates and review complete. |
 
 Exact-head evidence becomes stale after any source push.
 
@@ -67,6 +67,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - A representable final scientific estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. False exact 0/1/non-finite endpoints remain fail-closed when the mathematical estimand is interior/nonzero.
 - A mathematically nonzero scientific error metric must not be promoted to exact perfect recovery merely because its final binary64 representation underflows to zero.
 - A strict-interior exact binary64 covariance must not be promoted to exact `±1` correlation merely because rounded square roots/divisions reach the endpoint. Conversely, an exact represented Cauchy–Schwarz boundary must not be weakened to an interior coefficient merely because rounded square roots/divisions fall one ULP below `1`.
+- Exact zero covariance has one public no-association encoding. IEEE `-0.0` is not directional scientific evidence and is canonicalized to `+0.0` at the Temporal Association projection boundary after validation.
 - Binary64 minimum-subnormal means follow IEEE ties-to-even at the public composition boundary. Overflow-safe normalization must not add an avoidable earlier rounding step, and mixed-sign cancellation must apply the original sample-count denominator before rounding a retained-only mean.
 - Observed Allen support classes are data, not required design strata. A historical prediction census may truthfully have zero covered, partial-overlap, adjacent, or contradictory rows; absent classes remain explicit zero counts rather than invalidating the run.
 - Historical-cutoff admission occurs before duplicate-identity checks. Future-unavailable evidence cannot change an earlier run's conflicts, counts, or terminal state.
@@ -88,9 +89,11 @@ Known-truth component RMSE has a separate fail-closed repair. For minimum positi
 
 Exact-binary association review found two endpoint defects in opposite directions. First, with earlier variance `f64::from_bits(4_607_182_418_800_016_408)`, later variance `f64::from_bits(4_607_182_418_800_016_427)`, and covariance magnitude `f64::from_bits(4_607_182_418_800_016_417)`, exact `Cov²` is strictly below the exact product of the two represented marginal variances, yet rounded square roots/divisions produce exact `±1.0`. RED `683b28eeeda3ad72ac11f5317c5aea54f34e0692` fixes both signs through the public `recover_event_time_lagged_correlation` API. Causal repair `9eeb373df2cd333fe7543df2197ea0cc0c492780` extends the exact integer-significand/power-of-two covariance comparison to distinguish strict interior from exact boundary and rejects rounded `±1` for strict-interior inputs.
 
-Second, exact-boundary inputs can round the other way. `Var_t = 2`, `Var_{t+Δ} = 8`, and `|Cov| = 4` satisfy exact represented `Cov² = Var_t Var_{t+Δ}`, but the predecessor square-root/division path returns `0x1.fffffffffffffp-1` for the positive coefficient. RED `c25000901eb429a43817552f8b76cf4aae04e522` fixes both signs; causal repair `d06259ec1e036558d8d2f775c266b2b9db4e42c4` returns the exact signed endpoint when the exact integer relation is on the boundary and uses rounded standardization only for strict-interior coefficients. Research trace/current #310 head `be5123d50ad9edf22232b51d3819328a37063352` synchronizes the contract.
+Second, exact-boundary inputs can round the other way. `Var_t = 2`, `Var_{t+Δ} = 8`, and `|Cov| = 4` satisfy exact represented `Cov² = Var_t Var_{t+Δ}`, but the predecessor square-root/division path returns `0x1.fffffffffffffp-1` for the positive coefficient. RED `c25000901eb429a43817552f8b76cf4aae04e522` fixes both signs; causal repair `d06259ec1e036558d8d2f775c266b2b9db4e42c4` returns the exact signed endpoint when the exact integer relation is on the boundary and uses rounded standardization only for strict-interior coefficients.
 
-At exact #310 head `be5123d50ad9edf22232b51d3819328a37063352`, predecessor workflow/review evidence is stale by definition. Current-head Rust/documentation/security/coverage workflows and a qualifying independent approval must complete before the Draft can become a normal merge candidate; queued, pending, startup-failed, skipped, or predecessor-head evidence is not GREEN.
+A third endpoint identity defect existed at exact zero. A supplied `-0.0` lagged covariance is the same exact no-association estimand as `+0.0`, but the private numeric path could preserve the negative IEEE sign bit into the public return value. RED `e15d053100c17ac46b48cc04ad61440d0185e729` requires both signs to project to public `+0.0`; causal repair `fc61f7bdb2fd8c67719c41a9ce9ef6436beab38a` canonicalizes only the validated zero result at `temporal_association.rs`, preserving private numerical validation/error precedence. Research trace/current #310 head `b56e1d160debde3b656f3ec71780fadb03d2fe85` synchronizes the API/test/module boundary.
+
+At exact #310 head `b56e1d160debde3b656f3ec71780fadb03d2fe85`, predecessor workflow/review evidence is stale by definition. Current-head Rust/documentation/security/coverage workflows and a qualifying independent approval must complete before the Draft can become a normal merge candidate; queued, pending, startup-failed, skipped, or predecessor-head evidence is not GREEN.
 
 #486 is closed as a verified-successor consolidation, not a PR-count-only close. No child-head CI/review evidence transfers to #310.
 
@@ -156,6 +159,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-036 | Known-truth component RMSE could underflow a mathematically nonzero recovery error to exact zero and falsely report perfect recovery | `verification-pending` | RED `496583c6...` + causal repair `a82b383b...` + research trace `bfaa69c4...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-037 | Strict-interior lagged covariance could round to false exact `±1` correlation after exact covariance-bound admission | `verification-pending` | RED `683b28ee...` + causal repair `9eeb373d...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-038 | Exact Cauchy–Schwarz boundary covariance could round one ULP below `±1` and weaken a perfect represented association | `verification-pending` | RED `c2500090...` + causal repair `d06259ec...` + research trace `be5123d5...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-039 | Exact zero lagged covariance could leak IEEE `-0.0` through the public Temporal Association projection and create a bit-distinct directional-looking no-association value | `verification-pending` | RED `e15d0531...` + causal repair `fc61f7bd...` + research trace `b56e1d16...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 
 ## Release gate
 
