@@ -90,6 +90,32 @@ non-representable means, overflowing CWC residuals after a finite mean,
 tiny intervals with huge log-ratios, underflowed nonzero final rates, and the
 Curran refusal.
 
+Exact zero CWC residuals also have one public identity. IEEE 754 binary64
+has distinct `+0.0` and `-0.0` encodings, and subtraction from a canonical
+`+0.0` unit mean can therefore leave `-0.0` when an observed score is
+signed zero or otherwise equals that mean. That sign bit does not represent
+positive versus negative within-person change: the person-mean deviation is
+exactly zero. The public CWC lag boundary therefore canonicalizes only
+validated exact-zero residuals to `+0.0`; private numerical intermediates
+and caller-constructed already-centered pairs remain free to retain signed
+zero. IEEE Std 754-2019 remains the active published floating-point
+standard while IEEE P754 is the active revision project as of 2026-09-03.
+This is the same public-identity contract as
+`decompose_within_between`; it is not a license to treat CWC residuals as
+raw-process drift (Curran & Bauer, 2011, Eq. 36).
+
+Signed-zero traceability:
+
+- RED `crates/longitudinal_core/tests/cwc_signed_zero_contract.rs` drives
+  `center_within_unit_event_lags` with a `-0.0` score equal to the unit
+  mean so the public later/earlier residual pair cannot keep `-0.0`.
+- Causal repair `f98ee093f6f7fd318ad6623ab44313385195f956` canonicalizes an exact-zero CWC residual only
+  after finite-result validation.
+- Standard authority — IEEE. (2019). *IEEE standard for floating-point
+  arithmetic* (IEEE Std 754-2019). IEEE. The canonical repository register
+  is `docs/research/standards-and-literature.md`.
+
+
 The current public numerical regressions include same-sign raw-sum overflow,
 full-exponent mixed-sign cancellation, minimum-subnormal cancellation,
 halfway ties-to-even for same-sign means, and the mixed-sign `-31u/3` case
@@ -110,3 +136,6 @@ Voelkle, M. C., Oud, J. H. L., Davidov, E., & Schmidt, P. (2012). An SEM
 approach to continuous time modeling of panel data: Relating
 authoritarianism and anomia. *Psychological Methods, 17*(2), 176–192.
 https://doi.org/10.1037/a0027543
+
+IEEE. (2019). *IEEE standard for floating-point arithmetic* (IEEE Std
+754-2019). IEEE.
