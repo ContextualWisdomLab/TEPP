@@ -5,7 +5,7 @@ use crate::ValidationError;
 use serde::{Deserialize, Serialize};
 
 /// Machine-readable recovery report for a single study.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct ValidationReport {
     /// Study label (not free-form PII).
     pub study_label: String,
@@ -107,6 +107,43 @@ impl ValidationReport {
             self.interval_coverage,
             self.temporal_order_accuracy
         )
+    }
+}
+
+impl<'de> Deserialize<'de> for ValidationReport {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Raw {
+            study_label: String,
+            rmse: f64,
+            rmse_standard_error: f64,
+            mean_bias: f64,
+            bias_standard_error: f64,
+            interval_coverage: f64,
+            coverage_wilson_lower: f64,
+            coverage_wilson_upper: f64,
+            temporal_order_accuracy: f64,
+            monte_carlo_rmse: Option<MonteCarloSummary>,
+        }
+
+        let raw = Raw::deserialize(deserializer)?;
+        let report = Self {
+            study_label: raw.study_label,
+            rmse: raw.rmse,
+            rmse_standard_error: raw.rmse_standard_error,
+            mean_bias: raw.mean_bias,
+            bias_standard_error: raw.bias_standard_error,
+            interval_coverage: raw.interval_coverage,
+            coverage_wilson_lower: raw.coverage_wilson_lower,
+            coverage_wilson_upper: raw.coverage_wilson_upper,
+            temporal_order_accuracy: raw.temporal_order_accuracy,
+            monte_carlo_rmse: raw.monte_carlo_rmse,
+        };
+        report.validate().map_err(serde::de::Error::custom)?;
+        Ok(report)
     }
 }
 
