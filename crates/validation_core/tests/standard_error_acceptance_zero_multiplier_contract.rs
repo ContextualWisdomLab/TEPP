@@ -20,3 +20,17 @@ fn zero_multiplier_requires_exact_recovery_before_scale_reduction() {
         "exact equality remains accepted when k = 0"
     );
 }
+
+#[test]
+fn exact_recovery_treats_signed_zero_as_one_numeric_value() {
+    assert_eq!(
+        accept_within_standard_errors(-0.0, 0.0, f64::MAX, 0.0),
+        Ok(true),
+        "zero multiplier must use numeric equality, not signed-zero bit identity"
+    );
+    assert_eq!(
+        accept_within_standard_errors(0.0, -0.0, 0.0, 1.0),
+        Ok(true),
+        "zero-SE exact recovery must not split +0.0 and -0.0 into different scientific values"
+    );
+}
