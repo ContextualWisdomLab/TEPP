@@ -22,19 +22,20 @@ pub struct MonteCarloSummary {
 }
 
 impl MonteCarloSummary {
-    /// Validate structural and derived-field invariants for a Monte Carlo summary payload.
+    /// Validate structural and uncertainty-domain invariants for a Monte Carlo summary payload.
     ///
-    /// The standard error is a derived field, not an independently selectable
-    /// uncertainty estimate: it must equal `standard_deviation / sqrt(n)` for
-    /// the represented replication count. A nonzero standard deviation whose
-    /// implied standard error is not representable fails closed rather than
-    /// becoming false zero uncertainty.
+    /// A standard error of the mean cannot exceed its sample standard deviation.
+    /// A nonzero sample standard deviation cannot carry exact-zero standard
+    /// error, because finite replication counts cannot erase all uncertainty.
+    /// A singleton summary uses the canonical zero-spread/zero-SE convention
+    /// produced by [`summarize_replications`]. These admission checks prevent
+    /// finite but impossible uncertainty evidence from becoming durable.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when counts or numeric fields
-    /// violate the summary contract or the standard error disagrees with the
-    /// standard deviation and replication count.
+    /// violate the summary contract or the standard-error field is impossible
+    /// for the represented sample spread/count.
     pub fn validate(self) -> Result<Self, ValidationError> {
         if self.replication_count == 0 {
             return Err(ValidationError::InvalidInput);
@@ -56,12 +57,10 @@ impl MonteCarloSummary {
         if self.percentile_lower > self.percentile_upper {
             return Err(ValidationError::InvalidInput);
         }
-
-        let implied_standard_error =
-            self.standard_deviation / (self.replication_count as f64).sqrt();
-        if !implied_standard_error.is_finite()
-            || (implied_standard_error == 0.0 && self.standard_deviation != 0.0)
-            || self.standard_error != implied_standard_error
+        if (self.standard_error == 0.0 && self.standard_deviation != 0.0)
+            || self.standard_error > self.standard_deviation
+            || (self.replication_count == 1
+                && (self.standard_deviation != 0.0 || self.standard_error != 0.0))
         {
             return Err(ValidationError::InvalidInput);
         }
