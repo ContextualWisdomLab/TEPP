@@ -5,7 +5,7 @@ use crate::ValidationError;
 use serde::{Deserialize, Serialize};
 
 /// Machine-readable recovery report for a single study.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ValidationReport {
     /// Study label (not free-form PII).
     pub study_label: String,
@@ -107,6 +107,29 @@ impl ValidationReport {
             self.interval_coverage,
             self.temporal_order_accuracy
         )
+    }
+}
+
+impl Serialize for ValidationReport {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        self.validate().map_err(serde::ser::Error::custom)?;
+        let mut state = serializer.serialize_struct("ValidationReport", 10)?;
+        state.serialize_field("study_label", &self.study_label)?;
+        state.serialize_field("rmse", &self.rmse)?;
+        state.serialize_field("rmse_standard_error", &self.rmse_standard_error)?;
+        state.serialize_field("mean_bias", &self.mean_bias)?;
+        state.serialize_field("bias_standard_error", &self.bias_standard_error)?;
+        state.serialize_field("interval_coverage", &self.interval_coverage)?;
+        state.serialize_field("coverage_wilson_lower", &self.coverage_wilson_lower)?;
+        state.serialize_field("coverage_wilson_upper", &self.coverage_wilson_upper)?;
+        state.serialize_field("temporal_order_accuracy", &self.temporal_order_accuracy)?;
+        state.serialize_field("monte_carlo_rmse", &self.monte_carlo_rmse)?;
+        state.end()
     }
 }
 
