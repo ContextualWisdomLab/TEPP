@@ -20,6 +20,7 @@ mod graph_metrics;
 mod input;
 mod matching;
 mod monte_carlo;
+mod numeric;
 mod report;
 mod rmse;
 mod temporal_order;
