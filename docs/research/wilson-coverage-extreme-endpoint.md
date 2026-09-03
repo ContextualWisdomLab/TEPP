@@ -2,7 +2,7 @@
 
 ## Decision
 
-`validation_core::wilson_coverage_interval` remains the Validation Evidence authority for a Wilson score interval around empirical interval-coverage proportions. The public estimand is unchanged. The numerical implementation must not turn a mathematically interior, binary64-representable Wilson endpoint into exact `0.0` or `1.0` through avoidable cancellation or rounded equality in intermediate expressions.
+`validation_core::wilson_coverage_interval` remains the Validation Evidence authority for a Wilson score interval around empirical interval-coverage proportions. The public estimand is unchanged. The numerical implementation must not turn a mathematically interior, binary64-representable Wilson endpoint into exact `0.0` or `1.0`, or substitute a floating-point cancellation residue for that endpoint, through avoidable intermediate rounding.
 
 For an all-covered sample (`p̂ = 1`), the ordinary Wilson lower endpoint simplifies algebraically to
 
@@ -24,6 +24,14 @@ Dividing numerator and denominator through by `z²` avoids both the `A - B` canc
 
 With two replications, one covered (`p̂ = 0.5`), and finite `z = 1e154`, the generic predecessor path produces an exact-zero lower endpoint because its center and margin both round to `2.5e307`. The rationalized Wilson lower endpoint is approximately `5e-309`, still representable in binary64.
 
+An exact-zero fallback is not sufficient. With three replications, one covered (`p̂ = 1/3`), and finite `z = 1e11`, binary64 rounds the predecessor center and margin to adjacent values whose subtraction leaves the nonzero residue `262144`. Dividing that residue by the Wilson denominator produces approximately `7.86432e-17`, while the algebraically equivalent rationalized endpoint is approximately `3.3333333333333333e-23`. The predecessor result is therefore exactly 2,359,296 times larger even though it never reaches zero and would bypass an exact-zero-only fallback.
+
+The repair evaluates every nonzero strict-interior lower endpoint through the rationalized positive root. For `z² >= 1`, it uses the `z²`-normalized expression above. For `z² < 1`, dividing through by `z²` can itself create avoidable overflow, so the same rationalized root is evaluated on its natural scale as
+
+`2np̂² / (z² + 2np̂ + z sqrt(z² + 4np̂(1-p̂)))`.
+
+This is one algebraic estimand with scale-aware evaluation, not a confidence-policy change.
+
 The upper endpoint has the complementary identity
 
 `U(p̂) = 1 - L(1 - p̂)`.
@@ -36,12 +44,15 @@ The repair therefore keeps the ordinary upper calculation when it remains below 
 
 - All-covered lower public RED: `f84e5918acc81ca8bf3708f3cce2004c67675b78`, `crates/validation_core/tests/wilson_all_covered_extreme_z_contract.rs`.
 - All-covered lower causal repair: `fe9b9c8a5b94a01cd8416efd613503569b98ac1a`, `crates/validation_core/src/coverage.rs`.
-- Strict-interior lower public RED: `9d45f482854037d96d5dff38964fd3844335a39b`, `crates/validation_core/tests/wilson_interior_extreme_z_contract.rs`.
-- Strict-interior lower causal repair: `4f259f6e5c98ade2e4a34125430de872f32c1589`, `crates/validation_core/src/coverage.rs`.
+- Strict-interior exact-zero lower public RED: `9d45f482854037d96d5dff38964fd3844335a39b`, `crates/validation_core/tests/wilson_interior_extreme_z_contract.rs`.
+- Strict-interior exact-zero causal repair: `4f259f6e5c98ade2e4a34125430de872f32c1589`, `crates/validation_core/src/coverage.rs`.
+- Strict-interior nonzero cancellation-residue RED: `1a24fac71569334b0c0185d013574ec5ccdcc58d`, `crates/validation_core/tests/wilson_interior_cancellation_residual_contract.rs`.
+- Scale-aware rationalized-lower causal repair: `f7e20ddc59399f2e014a3ac91809bb57ba73460f`, `crates/validation_core/src/coverage.rs`.
+- Small-`z` branch coverage and oracle reinforcement: `39e5e087cba22d6df85b9ad5901cda0194e3da93`, same public contract file.
 - All-uncovered upper public RED: `c070da269aa257fc9c9fa9eae17231a51ec63b74`, `crates/validation_core/tests/wilson_all_uncovered_upper_endpoint_contract.rs`.
 - Strict-interior upper RED expansion: `344081bfd98ee9bc70a3bf8fdebc795a9090e692`, same public contract file.
 - Complementary rationalized upper repair: `9a2fdd05c2994f51f6c72030fe39e695ba5a876d`, `crates/validation_core/src/coverage.rs`.
-- Release trace: `c68076f565822ef9dd1e7c540d966cc29bf54191`, `CHANGELOG.d/validation-wilson-extreme-endpoint.md`.
+- Release trace: `2dbdf330af21ea6263fd5d03eb6cb8defa867254`, `CHANGELOG.d/validation-wilson-extreme-endpoint.md`.
 - API: `validation_core::wilson_coverage_interval`.
 
 Interval-admission rules and rejection of non-finite/non-positive `z` or overflowing `z²` remain unchanged. The new path is endpoint-representation repair, not a change to nominal coverage policy.
