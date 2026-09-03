@@ -23,6 +23,7 @@ The change also repairs the pre-existing report round-trip fixture to use the ge
 - Public RED: `a17dfe1bd9d845356b757ec98e930b5d927eab8f`, `crates/validation_core/tests/validation_report_zero_mean_rmse_summary_contract.rs`.
 - Causal repair: `d17d803415333f79bf6291efed9206a630979adf`, `ValidationReport::validate` in `crates/validation_core/src/report.rs`.
 - Release note: `42be85748c4e4136c54fd1f918dfa89533376451`, `CHANGELOG.d/validation-report-zero-mean-rmse-summary.md`.
+- Edge contract: `944fa96e89e31123e97f95f6909835026c0bd6fa`; exact signed-zero perfect recovery remains admissible while zero-mean positive spread/support fails closed.
 - Owner: TEPP Validation Evidence. No reusable static psychometric estimator or mutable sibling implementation is introduced.
 
 ## Methodological basis
