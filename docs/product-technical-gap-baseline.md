@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-03T03:56Z
+**Snapshot:** 2026-09-03T05:08Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -44,7 +44,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main` | Validation / Analysis Run landing vehicle; availability cutoff precedes duplicate-identity admission. |
-| #310 | `a1aef11e8e38f34ac4d6cdfb4c61b099c04e69e6` | true | `main` | Longitudinal Modeling vehicle; CWC, occasion-mean, and within/between decomposition now share one Longitudinal-local stable-mean authority. Hosted exact-head verification remains non-passing. |
+| #310 | `bfaa69c4f372c264fc2c4baa8c37bb0e07482216` | true | `main` | Longitudinal Modeling vehicle; current repair prevents nonzero known-truth component RMSE from underflowing to false perfect recovery. Exact-head verification remains non-passing. |
 
 Exact-head evidence becomes stale after any source push.
 
@@ -54,7 +54,7 @@ TEPP owns temporal/event composition, irregular time, time-varying multilevel/cr
 
 `psychometric_core` is not authority for new temporal/state composition. fast-mlsirm owns reusable static/generalized-mixed/dependence-aware psychometric specification and arithmetic. TEPP consumes only immutable released/versioned Published Language through an ACL; source copying and mutable sibling-head dependencies are prohibited.
 
-contextual-orchestrator owns provider/model routing and semantic LLM execution. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No cross-service SQL.
+contextual-orchestrator owns provider/model routing and semantic LLM execution. Semantic LLM work and model-backed Actions must use a released/versioned contextual-orchestrator contract; Actions use `orchestrator/free` through the gateway credential and must not select providers/models/groups or consume direct provider keys. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No cross-service SQL.
 
 The clock contract separates event/valid time, assertion time, document time, system time, available time, and knowledge cutoff. Retrospective evidence may describe an earlier event but cannot enter an earlier knowledge cutoff. Forward state/transition edges remain distinct from retrospective/citation/revision/provenance relations.
 
@@ -66,6 +66,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - Occasion-mean deviations `p_it = x_it - μ_t` are not CWC residuals, sample-wide grand-mean residuals, or RI-CLPM within-person effects. Numeric event time defines occasion identity, so `-0.0` and `+0.0` are one occasion.
 - Row arrival order is not scientific evidence. Fixed admitted observations must produce bit-identical means/centered results under permutation wherever the contract claims deterministic f64 reference behavior.
 - A representable final scientific estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. False exact 0/1/non-finite endpoints remain fail-closed when the mathematical estimand is interior/nonzero.
+- A mathematically nonzero scientific error metric must not be promoted to exact perfect recovery merely because its final binary64 representation underflows to zero.
 - Binary64 minimum-subnormal means follow IEEE ties-to-even at the public composition boundary. Overflow-safe normalization must not add an avoidable earlier rounding step, and mixed-sign cancellation must apply the original sample-count denominator before rounding a retained-only mean.
 - Observed Allen support classes are data, not required design strata. A historical prediction census may truthfully have zero covered, partial-overlap, adjacent, or contradictory rows; absent classes remain explicit zero counts rather than invalidating the run.
 - Historical-cutoff admission occurs before duplicate-identity checks. Future-unavailable evidence cannot change an earlier run's conflicts, counts, or terminal state.
@@ -81,13 +82,11 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 The #486 occasion-mean fold is owner-correct on #310: RED `75b0184d...`, owner repair `7fe9aaf2...`, export/test repairs `b900e213...` / `30771ff2...`, determinism RED `8a59019e...`, same-sign ordering repair `465d139d...`, same-panel/sparse successor regressions `b9e952bb...` / `aad56b50...`, ADR `04b3c26e...`, PRD `a221f494...`, research trace `27aa78ee...`, subnormal RED `9aff817f...`, source repair `40e057b8...`, and trace `a2e6ace7...`.
 
-The earlier CWC RED `23476f45c506504babf16f33e6d61fdddef23b67` / repair `b14eb6e863cce1b94b36e787ada2ec32c129cadf` closed the sorted-incremental `[from_bits(1), from_bits(2)]` ties-to-even defect. RED `b073f03f5e28c94226e7dcaa72e11b25233ccc65` then exposed arbitrary max-magnitude normalization at `[from_bits(1), from_bits(14)]`; repair `350b8d4e0fdb3f5d68cd22bdfffb3b879cea62f2` switched to an exact power-of-two scale and `dd53eff6ed939ae06b51d70959c06b2a36fade08` consolidated CWC and occasion means onto one Longitudinal-local primitive.
+The CWC/occasion/decomposition mean lineage remains one Longitudinal-local authority. CWC RED `23476f45...` / repair `b14eb6e8...` closed the `[1 ULP, 2 ULP]` ties-to-even defect; `b073f03f...` / `350b8d4e...` changed arbitrary normalization to an exact power-of-two scale; `dd53eff6...` consolidated CWC and occasion means; mixed-sign RED `ae5e61f9...` / repair `39469067...` plus `201f3900...` and trace `34fd059a...` removed retained-mean double rounding; decomposition RED `7dc87aa8...` / repair `97c8ad35...` and trace `a1aef11e...` removed the remaining shadow running mean.
 
-Fresh review then found a separate mixed-sign double-rounding boundary. For minimum-subnormal ULP `u`, `[-20u, -20u, 9u]` has exact mean `-31u/3` and must round once to `-10u`. The predecessor cancelled signs, rounded the surviving `[-11u, -20u]` mean to `-16u`, then weighted that rounded intermediate by `2/3`, yielding `-11u`. RED `ae5e61f9a829adbfed2ea13c5705d4b85d80b0d6` pins the correct value through public CWC. Causal repair `39469067aca2fa93e2fa4c914848f7cec8031811` applies the original sample-count denominator directly inside the shared normalized compensated sum. Contract hardening `201f3900960278cb87d2e6b28176ac0d23e51954` exercises the same boundary through public occasion-mean composition. Research trace `34fd059aa10c7538f3513b6fb994a9f2972ff5b1` makes that algorithm code-current.
+Fresh review found a separate known-truth recovery defect. For minimum positive subnormal ULP `u`, five identity-matched component rows with one residual `u` and four exact-zero residuals have mathematical RMSE `u / sqrt(5) > 0`, but the final binary64 product rounds to exact zero. The predecessor accepted any finite final RMSE and therefore reported false perfect recovery. RED `496583c6b62cbe0ad1be0e65b51f01d7f72acd5a` drives the public `component_root_mean_square_error` API. Causal repair `a82b383b5940126a0139180d66729d2e6aa4baf7` preserves the existing exact-zero `scale == 0` path but fails closed when a later RMSE rounds to zero after a nonzero residual scale exists. Research trace `bfaa69c4f372c264fc2c4baa8c37bb0e07482216` records the API/test/module/acceptance lineage in `docs/research/longitudinal-within-between.md`.
 
-GAP-018 review then found that `decompose_within_between` still maintained a shadow running/cancellation mean after CWC and occasion composition had one numerical authority. For minimum positive binary64 subnormal ULP `u`, unit scores `[u, 2u]` have exact mean `1.5u`, which ties-to-even must represent as `2u`; the predecessor recurrence rounded the half-ULP update away and returned `u`, shifting public within residuals from `[-u, 0]` to `[0, u]`. RED `7dc87aa8ad4de4a73a502646c5667d01656e9dbd` pins the public decomposition result. Causal repair `97c8ad35d1a1a483d8feb2d617e5fbc035c5ead9` removes the decomposition-only arithmetic and delegates to the existing Longitudinal-local `scaled_compensated_mean`. Research trace `a1aef11e8e38f34ac4d6cdfb4c61b099c04e69e6` records the exact API/test/module lineage.
-
-At exact #310 head `a1aef11...`, current-head check runs have materialized but remain queued, including Rust/format-test-rustdoc/dependency, production coverage, and live PostgreSQL integration lanes. Fresh formal reviews contain no qualifying `APPROVED`. #310 therefore remains Draft and non-passing; predecessor-head evidence is not inherited.
+At exact #310 head `bfaa69c4...`, 20 check-runs have materialized. Rust Foundation CI, Documentation Quality, Security Scan, SAST Semgrep, OSV-Scanner PR, and Scorecard PR remain queued; fresh formal reviews contain no qualifying `APPROVED`, while review threads are resolved. #310 therefore remains Draft and non-passing; predecessor-head evidence is not inherited.
 
 #486 remains open Draft beneath the #310 branch. It can close only after its remaining valid CHANGELOG/operational wording is either inherited owner-correctly or verified redundant; wrong-owner source and mixed `Z KST` provenance are intentionally rejected rather than copied.
 
@@ -99,11 +98,11 @@ At exact #310 head `a1aef11...`, current-head check runs have materialized but r
 
 ### #480 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires the contextual-orchestrator owner contract. Fresh owner evidence is protected `contextual-orchestrator/main@f4e5fc67dfcb7ddb1afb004a06417e915afb9826` with zero GitHub releases. That owner main contains the hourly OpenCode contract repair that removes repository-authored elapsed-time caps and pins model-backed execution to `orchestrator/free`, but it is still mutable unreleased evidence. #480 remains Draft/blocked-equivalent; mutable owner `main` is not a released production contract.
+#480 removes TEPP-owned provider discovery/ranking and requires the contextual-orchestrator owner contract. Its branch-local `AGENTS.md` already replaces the protected-main direct-NVIDIA-key guidance with released contextual-orchestrator-only routing and `orchestrator/free` for model-backed Actions. The consumer remains Draft until the owner provides an immutable compatible release plus authenticated deployment identity/schema/artifact provenance and safe scoped/brokered gateway authentication. Mutable owner main is evidence, not a production contract.
 
 ### Owner handoffs
 
-fast-mlsirm protected main remains `b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`; latest verified immutable release remains `v0.9.1` (2026-08-26). Open owner heads newer than that release are candidate evidence, not TEPP dependency authority.
+fast-mlsirm protected main and latest immutable release must be revalidated before any dependency bump. Open owner heads newer than the latest release are candidate evidence, not TEPP dependency authority.
 
 Context Graph Contracts and Enterprise Architecture Core remain read-only owner dependencies until their relevant contracts are immutable releases. No sibling mutable head is promoted to TEPP production authority.
 
@@ -150,6 +149,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-033 | Arbitrary max-magnitude normalization introduced a second rounding and misrounded a 7.5-ULP subnormal mean to 7 ULPs | `verification-pending` | RED `b073f03f...` + exact-power-of-two repair `350b8d4e...` + Longitudinal mean-authority consolidation `dd53eff6...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-034 | Mixed-sign cancellation rounded a retained-only mean before restoring the original denominator, moving a representable subnormal mean by one ULP | `verification-pending` | RED `ae5e61f9...` + causal repair `39469067...` + occasion public-contract hardening `201f3900...` + research trace `34fd059a...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-035 | Within/between decomposition shadow running mean misrounded the representable `[1 ULP, 2 ULP]` unit mean and shifted residuals by one ULP | `verification-pending` | RED `7dc87aa8...` + causal repair `97c8ad35...` + research trace `a1aef11e...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-036 | Known-truth component RMSE could underflow a mathematically nonzero recovery error to exact zero and falsely report perfect recovery | `verification-pending` | RED `496583c6...` + causal repair `a82b383b...` + research trace `bfaa69c4...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 
 ## Release gate
 
