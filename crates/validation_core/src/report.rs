@@ -36,14 +36,18 @@ impl ValidationReport {
     /// endpoints, and temporal-order accuracy are probabilities in `[0, 1]`;
     /// the Wilson interval is ordered and must contain the empirical coverage
     /// recorded in the same report. Mean signed bias remains unrestricted in
-    /// sign. These checks prevent a finite but scientifically impossible payload
-    /// from becoming durable Validation Evidence.
+    /// sign. A generic [`MonteCarloSummary`] may summarize a signed metric, but
+    /// when it occupies `monte_carlo_rmse` its mean and percentile endpoints are
+    /// nonnegative because every RMSE replication is nonnegative. These checks
+    /// prevent a finite but scientifically impossible payload from becoming
+    /// durable Validation Evidence.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when any `f64` field is
     /// non-finite, violates its metric domain, Wilson evidence is incoherent, or
-    /// the optional Monte Carlo summary violates its own invariants.
+    /// the optional Monte Carlo RMSE summary violates either generic summary
+    /// invariants or the nonnegative RMSE domain.
     pub fn validate(&self) -> Result<(), ValidationError> {
         for value in [
             self.rmse,
@@ -78,7 +82,13 @@ impl ValidationReport {
         }
 
         if let Some(summary) = self.monte_carlo_rmse {
-            summary.validate()?;
+            let summary = summary.validate()?;
+            if summary.mean < 0.0
+                || summary.percentile_lower < 0.0
+                || summary.percentile_upper < 0.0
+            {
+                return Err(ValidationError::InvalidInput);
+            }
         }
         Ok(())
     }
