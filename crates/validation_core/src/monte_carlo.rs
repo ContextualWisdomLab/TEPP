@@ -24,12 +24,13 @@ pub struct MonteCarloSummary {
 impl MonteCarloSummary {
     /// Validate structural and uncertainty-domain invariants for a Monte Carlo summary payload.
     ///
-    /// A standard error of the mean cannot exceed its sample standard deviation.
-    /// A nonzero sample standard deviation cannot carry exact-zero standard
-    /// error, because finite replication counts cannot erase all uncertainty.
-    /// A singleton summary uses the canonical zero-spread/zero-SE convention
-    /// produced by [`summarize_replications`]. These admission checks prevent
-    /// finite but impossible uncertainty evidence from becoming durable.
+    /// A standard error of the mean from more than one replication is strictly
+    /// smaller than a nonzero sample standard deviation. A nonzero sample
+    /// standard deviation cannot carry exact-zero standard error, because a
+    /// finite replication count cannot erase all uncertainty. A singleton
+    /// summary uses the canonical zero-spread/zero-SE convention produced by
+    /// [`summarize_replications`]. These admission checks prevent finite but
+    /// impossible uncertainty evidence from becoming durable.
     ///
     /// # Errors
     ///
@@ -58,7 +59,9 @@ impl MonteCarloSummary {
             return Err(ValidationError::InvalidInput);
         }
         if (self.standard_error == 0.0 && self.standard_deviation != 0.0)
-            || self.standard_error > self.standard_deviation
+            || (self.replication_count > 1
+                && self.standard_deviation != 0.0
+                && self.standard_error >= self.standard_deviation)
             || (self.replication_count == 1
                 && (self.standard_deviation != 0.0 || self.standard_error != 0.0))
         {
